@@ -8,6 +8,7 @@ from django.urls import path
 
 from plane.app.views import (
     IssueActivityEndpoint,
+    IssueAttachmentV2Endpoint,
     IssueCommentViewSet,
     IssueLinkViewSet,
     IssueReactionViewSet,
@@ -109,4 +110,17 @@ urlpatterns = [
         WorkItemDescriptionVersionEndpoint.as_view(),
         name="epic-description-versions",
     ),
+    path(
+        f"assets/v2/{EPIC_BASE}/<uuid:issue_id>/attachments/",
+        IssueAttachmentV2Endpoint.as_view(),
+        name="epic-attachments",
+    ),
+    path(
+        f"assets/v2/{EPIC_BASE}/<uuid:issue_id>/attachments/<uuid:pk>/",
+        IssueAttachmentV2Endpoint.as_view(),
+        name="epic-attachments",
+    ),
+    # Deferred epic routes (upstream views inline the epic-excluding
+    # issue_objects manager and need dedicated ext variants):
+    # epics-detail/, epics/list/, issue-relation/, archive/.
 ]
