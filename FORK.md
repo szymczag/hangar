@@ -49,27 +49,29 @@ Every fork edit to an upstream-owned file is listed here. Target: fewer than 25 
 New-file-only additions (routes, admin pages) are listed for completeness but carry no
 merge-conflict risk.
 
-| # | File | Phase | Nature |
-|---|------|-------|--------|
-| 1 | `apps/api/plane/settings/common.py` | 0 | +1 line: `plane.ext` in `INSTALLED_APPS` |
-| 2 | `apps/api/plane/urls.py` | 0 | +2 lines: `include("plane.ext.urls")`, `include("plane.ext.auth_urls")` |
-| 3 | `docker-compose-test.yml` | 0 | +1 env var: raise `AUTHENTICATION_RATE_LIMIT` so the full suite passes from one IP (upstreamable) |
-| 4 | `apps/api/plane/utils/instance_config_variables/extended.py` | 1 | designated empty hook — filled with OIDC + SAML config vars (incl. env-derived enable defaults) |
-| 5 | `apps/api/plane/license/api/views/instance.py` | 1 | append-only: `is_oidc_enabled` / `oidc_provider_name` / `is_saml_enabled` / `saml_provider_name` in the public config payload |
-| 6 | `packages/types/src/instance/auth.ts`, `base.ts`, `auth-ee.ts` | 1 | `auth-ee.ts` is the designated `never` hook — filled; config-key unions and instance flags appended |
-| 7 | `apps/web/core/hooks/oauth/extended.tsx` | 1 | designated empty hook — filled with extended sign-in options |
-| 8 | `apps/admin/hooks/oauth/index.ts`, `apps/admin/app/routes.ts` | 1 | append extended authentication modes + admin route |
-| 9 | `apps/api/Dockerfile.api`, `Dockerfile.dev` | 1 | +3 build packages (`xmlsec-dev`, `libxml2-dev`, `libxslt-dev`) for the xmlsec binding |
-| 10 | `apps/api/requirements/base.txt` | 1 | +1 include: `-r ext.txt` (fork requirements live in `requirements/ext.txt`) |
-| 11 | `apps/api/plane/db/models/issue.py` | 2 | +1 exclude in `IssueManager`: epics (`type__is_epic=True`) stay out of work-item querysets |
-| 12 | `packages/types/src/settings.ts`, `packages/constants/src/settings/project.ts`, `apps/web/core/components/settings/project/sidebar/item-icon.tsx` | 3 | append `work_item_types` settings tab (type union, item + group entry, icon) |
-| 13 | `packages/constants/src/auth/extended.ts` | 1 | designated empty hook — extended login-medium labels (oidc, saml) |
-| 14 | `packages/i18n/src/locales/*/common.json` | 3 | append `common.work_item_types` label (all 19 locales, translations mined from each locale's established work-item-types phrasing) |
-| 15 | `apps/api/plane/utils/issue_filters.py` | 3 | append `issue_type` filter key (`filter_issue_type_id` → `type_id__in`) |
-| 16 | `apps/api/plane/bgtasks/issue_activities_task.py` | 3, 4 | append `track_type` field tracker + worklog activity handlers (created/updated/deleted mapper entries) |
+| #   | File                                                                                                                                              | Phase | Nature                                                                                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `apps/api/plane/settings/common.py`                                                                                                               | 0     | +1 line: `plane.ext` in `INSTALLED_APPS`                                                                                                                             |
+| 2   | `apps/api/plane/urls.py`                                                                                                                          | 0     | +2 lines: `include("plane.ext.urls")`, `include("plane.ext.auth_urls")`                                                                                              |
+| 3   | `docker-compose-test.yml`                                                                                                                         | 0     | +1 env var: raise `AUTHENTICATION_RATE_LIMIT` so the full suite passes from one IP (upstreamable)                                                                    |
+| 4   | `apps/api/plane/utils/instance_config_variables/extended.py`                                                                                      | 1     | designated empty hook — filled with OIDC + SAML config vars (incl. env-derived enable defaults)                                                                      |
+| 5   | `apps/api/plane/license/api/views/instance.py`                                                                                                    | 1     | append-only: `is_oidc_enabled` / `oidc_provider_name` / `is_saml_enabled` / `saml_provider_name` in the public config payload                                        |
+| 6   | `packages/types/src/instance/auth.ts`, `base.ts`, `auth-ee.ts`                                                                                    | 1     | `auth-ee.ts` is the designated `never` hook — filled; config-key unions and instance flags appended                                                                  |
+| 7   | `apps/web/core/hooks/oauth/extended.tsx`                                                                                                          | 1     | designated empty hook — filled with extended sign-in options                                                                                                         |
+| 8   | `apps/admin/hooks/oauth/index.ts`, `apps/admin/app/routes.ts`                                                                                     | 1     | append extended authentication modes + admin route                                                                                                                   |
+| 9   | `apps/api/Dockerfile.api`, `Dockerfile.dev`                                                                                                       | 1     | +3 build packages (`xmlsec-dev`, `libxml2-dev`, `libxslt-dev`) for the xmlsec binding                                                                                |
+| 10  | `apps/api/requirements/base.txt`                                                                                                                  | 1     | +1 include: `-r ext.txt` (fork requirements live in `requirements/ext.txt`)                                                                                          |
+| 11  | `apps/api/plane/db/models/issue.py`                                                                                                               | 2     | +1 exclude in `IssueManager`: epics (`type__is_epic=True`) stay out of work-item querysets                                                                           |
+| 12  | `packages/types/src/settings.ts`, `packages/constants/src/settings/project.ts`, `apps/web/core/components/settings/project/sidebar/item-icon.tsx` | 3     | append `work_item_types` settings tab (type union, item + group entry, icon)                                                                                         |
+| 13  | `packages/constants/src/auth/extended.ts`                                                                                                         | 1     | designated empty hook — extended login-medium labels (oidc, saml)                                                                                                    |
+| 14  | `packages/i18n/src/locales/*/common.json`                                                                                                         | 3     | append `common.work_item_types` label (all 19 locales, translations mined from each locale's established work-item-types phrasing)                                   |
+| 15  | `apps/api/plane/utils/issue_filters.py`                                                                                                           | 3     | append `issue_type` filter key (`filter_issue_type_id` → `type_id__in`)                                                                                              |
+| 16  | `apps/api/plane/bgtasks/issue_activities_task.py`                                                                                                 | 3, 4  | append `track_type` field tracker + worklog activity handlers (created/updated/deleted mapper entries)                                                               |
+| 17  | `packages/constants/src/issue/filter.ts`                                                                                                          | 4     | append `WORKLOG` activity filter type (enum member, filter option, default filters); rename a shadowing callback param to satisfy the pre-commit lint (upstreamable) |
+| 18  | `packages/types/src/project/projects.ts`                                                                                                          | 4     | append `is_time_tracking_enabled` to `IProject` (flag already exists on the server model)                                                                            |
 
 Planned (added when the phase lands):
 
-| File | Phase | Nature |
-|------|-------|--------|
-| `packages/i18n/src/locales/*` | all | append-only strings |
+| File                          | Phase | Nature              |
+| ----------------------------- | ----- | ------------------- |
+| `packages/i18n/src/locales/*` | all   | append-only strings |
