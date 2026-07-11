@@ -1,8 +1,17 @@
 # Hangar
 
 Hangar is an independent, community-maintained fork of [Plane](https://github.com/makeplane/plane)
-(AGPL-3.0) that adds features on top of the open-source core: SSO (OIDC + SAML 2.0), epics,
-custom issue types with custom properties, and time tracking.
+(AGPL-3.0) that adds features on top of the open-source core:
+
+- **SSO** — sign in with any OIDC or SAML 2.0 identity provider, configured from the
+  instance admin panel alongside the existing OAuth options.
+- **Epics** — group large bodies of work spanning multiple cycles into epics with
+  their own progress tracking; enabled per project from project settings.
+- **Custom work-item types & properties** — define per-project work-item types and
+  attach typed custom fields (text, number, date, boolean, select, multi-select,
+  member) that show up in the create modal, the detail sidebar, and filters.
+- **Time tracking** — log time on work items with worklog totals on the detail
+  sidebar, entries in the activity feed, and a per-project toggle.
 
 Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 "Plane" and the Plane logo are trademarks of Plane Software, Inc. See [FORK.md](FORK.md)
