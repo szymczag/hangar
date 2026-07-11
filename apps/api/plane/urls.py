@@ -20,6 +20,9 @@ urlpatterns = [
     path("api/instances/", include("plane.license.urls")),
     path("api/v1/", include("plane.api.urls")),
     path("auth/", include("plane.authentication.urls")),
+    # Fork extensions (see FORK.md) — Django stacks includes on shared prefixes.
+    path("api/", include("plane.ext.urls")),
+    path("auth/", include("plane.ext.auth_urls")),
     path("", include("plane.web.urls")),
 ]
 
