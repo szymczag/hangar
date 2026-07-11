@@ -37,15 +37,15 @@ merge-conflict risk.
 | 1 | `apps/api/plane/settings/common.py` | 0 | +1 line: `plane.ext` in `INSTALLED_APPS` |
 | 2 | `apps/api/plane/urls.py` | 0 | +2 lines: `include("plane.ext.urls")`, `include("plane.ext.auth_urls")` |
 | 3 | `docker-compose-test.yml` | 0 | +1 env var: raise `AUTHENTICATION_RATE_LIMIT` so the full suite passes from one IP (upstreamable) |
+| 4 | `apps/api/plane/utils/instance_config_variables/extended.py` | 1 | designated empty hook — filled with OIDC config vars (incl. env-derived `IS_OIDC_ENABLED` default) |
+| 5 | `apps/api/plane/license/api/views/instance.py` | 1 | append-only: `is_oidc_enabled` / `oidc_provider_name` in the public config payload |
 
 Planned (added when the phase lands):
 
 | File | Phase | Nature |
 |------|-------|--------|
-| `apps/api/Dockerfile.api`, `apps/api/requirements.txt` | 1 | xmlsec build deps; include `requirements/ext.txt` |
-| `apps/api/plane/utils/instance_config_variables/extended.py` | 1 | designated empty hook — fill with OIDC/SAML config vars |
-| `apps/api/plane/license/management/commands/configure_instance.py` | 1 | append `IS_OIDC_ENABLED` / `IS_SAML_ENABLED` derivation |
-| `apps/api/plane/license/api/views/instance.py` | 1 | append `is_oidc_enabled` / `is_saml_enabled` flags |
+| `apps/api/Dockerfile.api`, `apps/api/requirements.txt` | 1 | xmlsec build deps; include `requirements/ext.txt` (SAML only) |
+| `apps/api/plane/license/api/views/instance.py` | 1 | append `is_saml_enabled` flag (SAML PR) |
 | `packages/types/src/instance/auth.ts` | 1 | append `oidc` / `saml` mode + method keys |
 | `apps/web/core/hooks/oauth/extended.tsx` | 1 | designated empty hook — return OIDC/SAML sign-in options |
 | `apps/admin/hooks/oauth/index.ts` | 1 | append extended authentication modes |

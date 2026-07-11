@@ -136,6 +136,23 @@ class InstanceEndpoint(BaseAPIView):
         data["is_magic_login_enabled"] = ENABLE_MAGIC_LINK_LOGIN == "1"
         data["is_email_password_enabled"] = ENABLE_EMAIL_PASSWORD == "1"
 
+        # Fork (see FORK.md): extended authentication providers, resolved in a
+        # separate call to keep this an append-only edit.
+        (IS_OIDC_ENABLED, OIDC_PROVIDER_NAME) = get_configuration_value(
+            [
+                {
+                    "key": "IS_OIDC_ENABLED",
+                    "default": os.environ.get("IS_OIDC_ENABLED", "0"),
+                },
+                {
+                    "key": "OIDC_PROVIDER_NAME",
+                    "default": os.environ.get("OIDC_PROVIDER_NAME", "OIDC"),
+                },
+            ]
+        )
+        data["is_oidc_enabled"] = IS_OIDC_ENABLED == "1"
+        data["oidc_provider_name"] = str(OIDC_PROVIDER_NAME)
+
         # Github app name
         data["github_app_name"] = str(GITHUB_APP_NAME)
 
