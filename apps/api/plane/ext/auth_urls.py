@@ -1,4 +1,4 @@
-# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# Copyright (c) 2026-present Maciej Szymczak and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
@@ -12,6 +12,9 @@ from plane.ext.auth.views import (
     OIDCCallbackEndpoint,
     OIDCAuthInitiateSpaceEndpoint,
     OIDCCallbackSpaceEndpoint,
+    SAMLAuthInitiateEndpoint,
+    SAMLCallbackEndpoint,
+    SAMLMetadataEndpoint,
 )
 
 urlpatterns = [
@@ -19,4 +22,7 @@ urlpatterns = [
     path("oidc/callback/", OIDCCallbackEndpoint.as_view(), name="oidc-callback"),
     path("spaces/oidc/", OIDCAuthInitiateSpaceEndpoint.as_view(), name="oidc-space-initiate"),
     path("spaces/oidc/callback/", OIDCCallbackSpaceEndpoint.as_view(), name="oidc-space-callback"),
+    path("saml/", SAMLAuthInitiateEndpoint.as_view(), name="saml-initiate"),
+    path("saml/callback/", SAMLCallbackEndpoint.as_view(), name="saml-callback"),
+    path("saml/metadata/", SAMLMetadataEndpoint.as_view(), name="saml-metadata"),
 ]

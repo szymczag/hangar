@@ -75,3 +75,5 @@ opentelemetry-exporter-otlp-proto-grpc==1.28.1
 drf-spectacular==0.28.0
 # html sanitizer
 nh3==0.2.18
+# Fork requirements (see FORK.md)
+-r ext.txt
