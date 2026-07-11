@@ -416,6 +416,7 @@
     }
   },
   "common": {
+    "work_item_types": "Tipuri de activități",
     "all": "Toate",
     "no_items_in_this_group": "Nu există elemente în acest grup",
     "drop_here_to_move": "Eliberează aici pentru a muta",

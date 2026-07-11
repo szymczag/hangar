@@ -62,6 +62,9 @@ merge-conflict risk.
 | 9 | `apps/api/Dockerfile.api`, `Dockerfile.dev` | 1 | +3 build packages (`xmlsec-dev`, `libxml2-dev`, `libxslt-dev`) for the xmlsec binding |
 | 10 | `apps/api/requirements/base.txt` | 1 | +1 include: `-r ext.txt` (fork requirements live in `requirements/ext.txt`) |
 | 11 | `apps/api/plane/db/models/issue.py` | 2 | +1 exclude in `IssueManager`: epics (`type__is_epic=True`) stay out of work-item querysets |
+| 12 | `packages/types/src/settings.ts`, `packages/constants/src/settings/project.ts`, `apps/web/core/components/settings/project/sidebar/item-icon.tsx` | 3 | append `work_item_types` settings tab (type union, item + group entry, icon) |
+| 13 | `packages/constants/src/auth/extended.ts` | 1 | designated empty hook — extended login-medium labels (oidc, saml) |
+| 14 | `packages/i18n/src/locales/*/common.json` | 3 | append `common.work_item_types` label (all 19 locales, translations mined from each locale's established work-item-types phrasing) |
 
 Planned (added when the phase lands):
 
