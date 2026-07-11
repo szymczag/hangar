@@ -228,3 +228,84 @@ class TestEpicScoping:
         assert response.data["progress"]["total_issues"] == 2
         assert response.data["progress"]["completed_issues"] == 1
         assert len(response.data["issues"]) == 2
+
+
+@pytest.mark.contract
+class TestEpicListEndpoint:
+    @pytest.mark.django_db
+    def test_bulk_fetch_by_ids(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_a = create_epic(session_client, workspace, project, name="A").data["id"]
+        epic_b = create_epic(session_client, workspace, project, name="B").data["id"]
+        create_epic(session_client, workspace, project, name="C")
+
+        response = session_client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/list/",
+            {"issues": f"{epic_a},{epic_b}"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert {str(item["id"]) for item in response.data} == {epic_a, epic_b}
+
+    @pytest.mark.django_db
+    def test_work_items_are_not_returned(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        issue = Issue.objects.create(name="Plain", project=project, workspace=workspace, state=default_state)
+
+        response = session_client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/list/",
+            {"issues": str(issue.id)},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == []
+
+    @pytest.mark.django_db
+    def test_rejects_missing_or_invalid_ids(self, session_client, workspace, project, default_state):
+        base = f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/list/"
+        assert session_client.get(base).status_code == status.HTTP_400_BAD_REQUEST
+        assert session_client.get(base, {"issues": "not-a-uuid"}).status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.contract
+class TestEpicArchive:
+    @pytest.mark.django_db
+    def test_archive_completed_epic(self, session_client, workspace, project, default_state, completed_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(completed_state.id)).data["id"]
+
+        archive_url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/archive/"
+        response = session_client.post(archive_url)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["archived_at"]
+
+        # Archived epics drop out of every epic surface
+        listing = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/")
+        assert epic_id not in {str(item["id"]) for item in listing.data}
+        detail = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/")
+        assert detail.status_code == status.HTTP_404_NOT_FOUND
+
+        # Unarchive restores them
+        response = session_client.delete(archive_url)
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        listing = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/")
+        assert epic_id in {str(item["id"]) for item in listing.data}
+
+    @pytest.mark.django_db
+    def test_cannot_archive_unfinished_epic(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/archive/"
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
+    def test_guest_cannot_archive(self, session_client, workspace, project, default_state, completed_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(completed_state.id)).data["id"]
+
+        guest_client, _ = make_role_client(workspace, project, role=5)
+        response = guest_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/archive/"
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN

@@ -4,6 +4,7 @@
 
 # Python imports
 import json
+from uuid import UUID
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
@@ -247,6 +248,97 @@ class EpicPaginatedViewSet(IssuePaginatedViewSet):
                 )
             )
         )
+
+
+class EpicListEndpoint(BaseAPIView):
+    """Bulk fetch epics by id — the `epics/list/` dialect of the web issue
+    service. Mirrors IssueListEndpoint, which resolves through the
+    epic-excluding issue_objects manager."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def get(self, request, slug, project_id):
+        raw_ids = request.GET.get("issues", "")
+        epic_ids = []
+        for raw_id in raw_ids.split(","):
+            raw_id = raw_id.strip()
+            if not raw_id:
+                continue
+            try:
+                epic_ids.append(UUID(raw_id))
+            except ValueError:
+                return Response({"error": "Invalid issue id"}, status=status.HTTP_400_BAD_REQUEST)
+        if not epic_ids:
+            return Response({"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        epics = (
+            epic_queryset(slug, project_id)
+            .filter(pk__in=epic_ids)
+            .select_related("workspace", "project", "state", "parent")
+            .prefetch_related("assignees", "labels")
+            .annotate(
+                sub_issues_count=Count(
+                    "parent_issue",
+                    filter=Q(parent_issue__deleted_at__isnull=True) & ~Q(parent_issue__type__is_epic=True),
+                    distinct=True,
+                )
+            )
+        )
+        serializer = IssueSerializer(epics, many=True, fields=self.fields, expand=self.expand)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class EpicArchiveEndpoint(BaseAPIView):
+    """Archive/unarchive an epic — mirrors IssueArchiveViewSet.archive and
+    .unarchive, which resolve through the epic-excluding issue_objects
+    manager. Archived epics drop out of every epic surface (epic_queryset
+    excludes them); unarchiving restores them."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def post(self, request, slug, project_id, pk):
+        epic = epic_queryset(slug, project_id).select_related("state").get(pk=pk)
+        if epic.state.group not in [StateGroup.COMPLETED.value, StateGroup.CANCELLED.value]:
+            return Response(
+                {"error": "Can only archive epics in a completed or cancelled state group"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        issue_activity.delay(
+            type="issue.activity.updated",
+            requested_data=json.dumps({"archived_at": str(timezone.now().date()), "automation": False}),
+            actor_id=str(request.user.id),
+            issue_id=str(epic.id),
+            project_id=str(project_id),
+            current_instance=json.dumps(IssueSerializer(epic).data, cls=DjangoJSONEncoder),
+            epoch=int(timezone.now().timestamp()),
+            notification=True,
+            origin=base_host(request=request, is_app=True),
+        )
+        epic.archived_at = timezone.now().date()
+        epic.save()
+        return Response({"archived_at": str(epic.archived_at)}, status=status.HTTP_200_OK)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def delete(self, request, slug, project_id, pk):
+        epic = Issue.objects.get(
+            workspace__slug=slug,
+            project_id=project_id,
+            pk=pk,
+            type__is_epic=True,
+            archived_at__isnull=False,
+        )
+        issue_activity.delay(
+            type="issue.activity.updated",
+            requested_data=json.dumps({"archived_at": None}),
+            actor_id=str(request.user.id),
+            issue_id=str(epic.id),
+            project_id=str(project_id),
+            current_instance=json.dumps(IssueSerializer(epic).data, cls=DjangoJSONEncoder),
+            epoch=int(timezone.now().timestamp()),
+            notification=True,
+            origin=base_host(request=request, is_app=True),
+        )
+        epic.archived_at = None
+        epic.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EpicIssuesEndpoint(BaseAPIView):

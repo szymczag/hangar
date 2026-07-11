@@ -17,8 +17,10 @@ from plane.app.views import (
 )
 
 from plane.ext.views.epic import (
+    EpicArchiveEndpoint,
     EpicDetailViewSet,
     EpicIssuesEndpoint,
+    EpicListEndpoint,
     EpicPaginatedViewSet,
     EpicSettingsEndpoint,
     EpicViewSet,
@@ -98,6 +100,16 @@ urlpatterns = [
         name="epics",
     ),
     path(
+        f"{EPIC_BASE}/list/",
+        EpicListEndpoint.as_view(),
+        name="epics-list",
+    ),
+    path(
+        f"{EPIC_BASE}/<uuid:pk>/archive/",
+        EpicArchiveEndpoint.as_view(),
+        name="epic-archive",
+    ),
+    path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/epics/<uuid:pk>/",
         EpicDetailViewSet.as_view(),
         name="epic-detail",
@@ -174,7 +186,12 @@ urlpatterns = [
         IssueAttachmentV2Endpoint.as_view(),
         name="epic-attachments",
     ),
-    # Deferred epic routes (upstream views inline the epic-excluding
-    # issue_objects manager and need dedicated ext variants):
-    # epics-detail/, epics/list/, issue-relation/, archive/.
+    # Deliberately not routed:
+    # - epics-detail/: only requested when the expand param includes
+    #   issue_relation, which the web build never sends
+    #   (ENABLE_ISSUE_DEPENDENCIES is false in @plane/constants).
+    # - epics/<id>/issue-relation/: epic relations already work — the web
+    #   relation store calls the issues/ relation endpoints (not
+    #   parameterized by service type), and the upstream view never resolves
+    #   the parent through the epic-excluding issue_objects manager.
 ]
