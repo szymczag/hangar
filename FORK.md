@@ -36,6 +36,7 @@ merge-conflict risk.
 |---|------|-------|--------|
 | 1 | `apps/api/plane/settings/common.py` | 0 | +1 line: `plane.ext` in `INSTALLED_APPS` |
 | 2 | `apps/api/plane/urls.py` | 0 | +2 lines: `include("plane.ext.urls")`, `include("plane.ext.auth_urls")` |
+| 3 | `docker-compose-test.yml` | 0 | +1 env var: raise `AUTHENTICATION_RATE_LIMIT` so the full suite passes from one IP (upstreamable) |
 
 Planned (added when the phase lands):
 
