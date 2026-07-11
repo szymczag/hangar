@@ -15,11 +15,14 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
+from django.db.models import OuterRef, Subquery
+
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import IssueCreateSerializer, IssueSerializer
 from plane.app.views.base import BaseAPIView
+from plane.app.views.issue.base import IssuePaginatedViewSet
 from plane.bgtasks.issue_activities_task import issue_activity
-from plane.db.models import Issue, IssueType, Project
+from plane.db.models import CycleIssue, FileAsset, Issue, IssueLink, IssueType, Project
 from plane.db.models.issue_type import ProjectIssueType
 from plane.db.models.state import StateGroup
 from plane.utils.host import base_host
@@ -214,6 +217,48 @@ class EpicDetailViewSet(BaseAPIView):
             origin=base_host(request=request, is_app=True),
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EpicPaginatedViewSet(IssuePaginatedViewSet):
+    """v2 paginated epic list — the surface the web epic store fetches.
+
+    Mirrors IssuePaginatedViewSet.get_queryset with the epic base queryset
+    (issue_objects excludes epics; see the fork note in IssueManager).
+    """
+
+    def get_queryset(self):
+        queryset = epic_queryset(self.kwargs.get("slug"), self.kwargs.get("project_id"))
+        return (
+            queryset.select_related("state")
+            .annotate(cycle_id=Subquery(CycleIssue.objects.filter(issue=OuterRef("id")).values("cycle_id")[:1]))
+            .annotate(
+                link_count=Subquery(
+                    IssueLink.objects.filter(issue=OuterRef("id"))
+                    .values("issue")
+                    .annotate(count=Count("id"))
+                    .values("count")
+                )
+            )
+            .annotate(
+                attachment_count=Subquery(
+                    FileAsset.objects.filter(
+                        issue_id=OuterRef("id"),
+                        entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+                    )
+                    .values("issue_id")
+                    .annotate(count=Count("id"))
+                    .values("count")
+                )
+            )
+            .annotate(
+                sub_issues_count=Subquery(
+                    Issue.issue_objects.filter(parent=OuterRef("id"))
+                    .values("parent")
+                    .annotate(count=Count("id"))
+                    .values("count")
+                )
+            )
+        )
 
 
 class EpicIssuesEndpoint(BaseAPIView):
