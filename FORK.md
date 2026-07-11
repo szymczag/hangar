@@ -61,6 +61,7 @@ merge-conflict risk.
 | 8 | `apps/admin/hooks/oauth/index.ts`, `apps/admin/app/routes.ts` | 1 | append extended authentication modes + admin route |
 | 9 | `apps/api/Dockerfile.api`, `Dockerfile.dev` | 1 | +3 build packages (`xmlsec-dev`, `libxml2-dev`, `libxslt-dev`) for the xmlsec binding |
 | 10 | `apps/api/requirements/base.txt` | 1 | +1 include: `-r ext.txt` (fork requirements live in `requirements/ext.txt`) |
+| 11 | `apps/api/plane/db/models/issue.py` | 2 | +1 exclude in `IssueManager`: epics (`type__is_epic=True`) stay out of work-item querysets |
 
 Planned (added when the phase lands):
 

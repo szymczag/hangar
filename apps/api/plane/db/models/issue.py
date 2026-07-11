@@ -98,6 +98,9 @@ class IssueManager(SoftDeletionManager):
             .exclude(archived_at__isnull=False)
             .exclude(project__archived_at__isnull=False)
             .exclude(is_draft=True)
+            # Fork (see FORK.md): epics are issues with type__is_epic=True and
+            # have their own surfaces — keep them out of work-item querysets.
+            .exclude(type__is_epic=True)
         )
 
 
