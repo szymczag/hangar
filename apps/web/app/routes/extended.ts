@@ -25,6 +25,17 @@ export const extendedRoutes: RouteConfigEntry[] = [
           ]),
         ]),
       ]),
+      layout("./(all)/[workspaceSlug]/(settings)/layout.tsx", [
+        layout("./(all)/[workspaceSlug]/(settings)/settings/projects/layout.tsx", [
+          layout("./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/layout.tsx", [
+            // Work item types settings
+            route(
+              ":workspaceSlug/settings/projects/:projectId/work-item-types",
+              "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/work-item-types/page.tsx"
+            ),
+          ]),
+        ]),
+      ]),
     ]),
   ]),
 ];

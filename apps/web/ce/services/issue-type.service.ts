@@ -48,6 +48,14 @@ export class IssueTypeService extends APIService {
       });
   }
 
+  async createOption(workspaceSlug: string, projectId: string, propertyId: string, data: { name: string }) {
+    return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/properties/${propertyId}/options/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
   async getPropertyValues(workspaceSlug: string, projectId: string, issueId: string): Promise<TIssuePropertyValues> {
     return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/issues/${issueId}/property-values/`)
       .then((response) => response?.data)

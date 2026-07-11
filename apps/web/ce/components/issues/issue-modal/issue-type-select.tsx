@@ -4,11 +4,19 @@
  * See the LICENSE file for details.
  */
 
-import type { Control } from "react-hook-form";
+// Fork (see FORK.md): work-item type dropdown for the create/update modal,
+// backed by the project's custom issue types.
+
+import { useParams } from "next/navigation";
+import type { Control, Path, PathValue } from "react-hook-form";
+import { Controller } from "react-hook-form";
 // plane imports
 import type { EditorRefApi } from "@plane/editor";
+import { CustomSearchSelect } from "@plane/ui";
 // types
 import type { TBulkIssueProperties, TIssue } from "@plane/types";
+// plane web
+import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
 
 export type TIssueFields = TIssue & TBulkIssueProperties;
 
@@ -28,7 +36,40 @@ export type TIssueTypeSelectProps<T extends Partial<TIssueFields>> = {
   handleFormChange?: () => void;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function IssueTypeSelect<T extends Partial<TIssueFields>>(props: TIssueTypeSelectProps<T>) {
-  return <></>;
+  const { control, projectId, disabled = false, placeholder, handleFormChange } = props;
+  // router
+  const { workspaceSlug } = useParams();
+  // data
+  const { issueTypes } = useIssueTypes(workspaceSlug?.toString(), projectId);
+  // derived values
+  const availableTypes = (issueTypes ?? []).filter((type) => !type.is_epic && type.is_active);
+
+  if (!projectId || availableTypes.length === 0) return <></>;
+
+  const options = availableTypes.map((type) => ({
+    value: type.id,
+    query: type.name,
+    content: type.name,
+  }));
+
+  return (
+    <Controller
+      control={control}
+      name={"type_id" as Path<T>}
+      render={({ field: { value, onChange } }) => (
+        <CustomSearchSelect
+          value={(value as string | null) ?? null}
+          onChange={(next: string | null) => {
+            onChange(next as PathValue<T, Path<T>>);
+            handleFormChange?.();
+          }}
+          options={options}
+          label={availableTypes.find((type) => type.id === value)?.name ?? (placeholder || "Work item type")}
+          disabled={disabled}
+          buttonClassName="h-7"
+        />
+      )}
+    />
+  );
 }
