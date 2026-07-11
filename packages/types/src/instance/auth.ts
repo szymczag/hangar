@@ -12,7 +12,12 @@ export type TCoreInstanceAuthenticationModeKeys =
   | "gitlab"
   | "gitea";
 
-export type TInstanceAuthenticationModeKeys = TCoreInstanceAuthenticationModeKeys;
+// Fork (see FORK.md): extended modes come from the designated auth-ee hook
+import type { TExtendedInstanceAuthenticationModeKeys } from "./auth-ee";
+
+export type TInstanceAuthenticationModeKeys =
+  | TCoreInstanceAuthenticationModeKeys
+  | TExtendedInstanceAuthenticationModeKeys;
 
 export type TInstanceAuthenticationModes = {
   key: TInstanceAuthenticationModeKeys;
@@ -31,7 +36,9 @@ export type TInstanceAuthenticationMethodKeys =
   | "IS_GOOGLE_ENABLED"
   | "IS_GITHUB_ENABLED"
   | "IS_GITLAB_ENABLED"
-  | "IS_GITEA_ENABLED";
+  | "IS_GITEA_ENABLED"
+  // Fork (see FORK.md)
+  | "IS_OIDC_ENABLED";
 
 export type TInstanceGoogleAuthenticationConfigurationKeys =
   | "GOOGLE_CLIENT_ID"
@@ -56,11 +63,20 @@ export type TInstanceGiteaAuthenticationConfigurationKeys =
   | "GITEA_CLIENT_SECRET"
   | "ENABLE_GITEA_SYNC";
 
+// Fork (see FORK.md): OIDC configuration keys
+export type TInstanceOIDCAuthenticationConfigurationKeys =
+  | "OIDC_ISSUER"
+  | "OIDC_CLIENT_ID"
+  | "OIDC_CLIENT_SECRET"
+  | "OIDC_PROVIDER_NAME"
+  | "OIDC_ALLOW_UNVERIFIED_EMAIL";
+
 export type TInstanceAuthenticationConfigurationKeys =
   | TInstanceGoogleAuthenticationConfigurationKeys
   | TInstanceGithubAuthenticationConfigurationKeys
   | TInstanceGitlabAuthenticationConfigurationKeys
-  | TInstanceGiteaAuthenticationConfigurationKeys;
+  | TInstanceGiteaAuthenticationConfigurationKeys
+  | TInstanceOIDCAuthenticationConfigurationKeys;
 
 export type TInstanceAuthenticationKeys = TInstanceAuthenticationMethodKeys | TInstanceAuthenticationConfigurationKeys;
 

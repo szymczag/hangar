@@ -4,6 +4,9 @@
  * See the LICENSE file for details.
  */
 
-export type TExtendedLoginMediums = never;
+// Fork (see FORK.md): upstream ships both types as `never`; this file is the
+// designated hook for extended authentication modes.
 
-export type TExtendedInstanceAuthenticationModeKeys = never;
+export type TExtendedLoginMediums = "oidc";
+
+export type TExtendedInstanceAuthenticationModeKeys = "oidc";

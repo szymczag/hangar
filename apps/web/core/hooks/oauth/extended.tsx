@@ -4,12 +4,40 @@
  * See the LICENSE file for details.
  */
 
-// plane imports
-import type { TOAuthConfigs } from "@plane/types";
+// Fork (see FORK.md): upstream ships this hook returning no options; it is the
+// designated seam for extended sign-in methods.
 
-export const useExtendedOAuthConfig = (_oauthActionText: string): TOAuthConfigs => {
+// plane imports
+import { useSearchParams } from "next/navigation";
+import { KeyRound } from "lucide-react";
+import { API_BASE_URL } from "@plane/constants";
+import type { TOAuthConfigs, TOAuthOption } from "@plane/types";
+// hooks
+import { useInstance } from "@/hooks/store/use-instance";
+
+export const useExtendedOAuthConfig = (oauthActionText: string): TOAuthConfigs => {
+  // router
+  const searchParams = useSearchParams();
+  // query params
+  const next_path = searchParams.get("next_path");
+  // store hooks
+  const { config } = useInstance();
+  // derived values
+  const providerName = config?.oidc_provider_name || "OIDC";
+  const oAuthOptions: TOAuthOption[] = [
+    {
+      id: "oidc",
+      text: `${oauthActionText} with ${providerName}`,
+      icon: <KeyRound className="h-[18px] w-[18px]" />,
+      onClick: () => {
+        window.location.assign(`${API_BASE_URL}/auth/oidc/${next_path ? `?next_path=${next_path}` : ``}`);
+      },
+      enabled: config?.is_oidc_enabled,
+    },
+  ];
+
   return {
-    isOAuthEnabled: false,
-    oAuthOptions: [],
+    isOAuthEnabled: config?.is_oidc_enabled || false,
+    oAuthOptions,
   };
 };
