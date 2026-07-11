@@ -8,3 +8,4 @@ from .issue_property import (
     IssuePropertyValue,
     PropertyTypeChoices,
 )
+from .worklog import IssueWorkLog

@@ -32,6 +32,10 @@ from plane.ext.views.issue_type import (
     IssueTypeDetailEndpoint,
     IssueTypesEndpoint,
 )
+from plane.ext.views.worklog import (
+    IssueWorkLogDetailEndpoint,
+    IssueWorkLogsEndpoint,
+)
 
 PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
 
@@ -77,6 +81,16 @@ urlpatterns = [
         f"{PROJECT_BASE}/issues/<uuid:issue_id>/property-values/",
         IssuePropertyValuesEndpoint.as_view(),
         name="issue-property-values",
+    ),
+    path(
+        f"{PROJECT_BASE}/issues/<uuid:issue_id>/worklogs/",
+        IssueWorkLogsEndpoint.as_view(),
+        name="issue-worklogs",
+    ),
+    path(
+        f"{PROJECT_BASE}/issues/<uuid:issue_id>/worklogs/<uuid:pk>/",
+        IssueWorkLogDetailEndpoint.as_view(),
+        name="issue-worklog-detail",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/epics/",
