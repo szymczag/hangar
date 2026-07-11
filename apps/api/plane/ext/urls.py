@@ -22,8 +22,18 @@ from plane.ext.views.epic import (
     EpicPaginatedViewSet,
     EpicSettingsEndpoint,
     EpicViewSet,
-    IssueTypeListEndpoint,
 )
+from plane.ext.views.issue_type import (
+    IssuePropertiesEndpoint,
+    IssuePropertyDetailEndpoint,
+    IssuePropertyOptionDetailEndpoint,
+    IssuePropertyOptionsEndpoint,
+    IssuePropertyValuesEndpoint,
+    IssueTypeDetailEndpoint,
+    IssueTypesEndpoint,
+)
+
+PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
 
 EPIC_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>/epics"
 
@@ -34,9 +44,39 @@ urlpatterns = [
         name="epic-settings",
     ),
     path(
-        "workspaces/<str:slug>/projects/<uuid:project_id>/issue-types/",
-        IssueTypeListEndpoint.as_view(),
+        f"{PROJECT_BASE}/issue-types/",
+        IssueTypesEndpoint.as_view(),
         name="issue-types",
+    ),
+    path(
+        f"{PROJECT_BASE}/issue-types/<uuid:type_id>/",
+        IssueTypeDetailEndpoint.as_view(),
+        name="issue-type-detail",
+    ),
+    path(
+        f"{PROJECT_BASE}/issue-types/<uuid:type_id>/properties/",
+        IssuePropertiesEndpoint.as_view(),
+        name="issue-type-properties",
+    ),
+    path(
+        f"{PROJECT_BASE}/properties/<uuid:property_id>/",
+        IssuePropertyDetailEndpoint.as_view(),
+        name="issue-property-detail",
+    ),
+    path(
+        f"{PROJECT_BASE}/properties/<uuid:property_id>/options/",
+        IssuePropertyOptionsEndpoint.as_view(),
+        name="issue-property-options",
+    ),
+    path(
+        f"{PROJECT_BASE}/properties/<uuid:property_id>/options/<uuid:option_id>/",
+        IssuePropertyOptionDetailEndpoint.as_view(),
+        name="issue-property-option-detail",
+    ),
+    path(
+        f"{PROJECT_BASE}/issues/<uuid:issue_id>/property-values/",
+        IssuePropertyValuesEndpoint.as_view(),
+        name="issue-property-values",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/epics/",

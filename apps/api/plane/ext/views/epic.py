@@ -27,8 +27,6 @@ from plane.db.models.issue_type import ProjectIssueType
 from plane.db.models.state import StateGroup
 from plane.utils.host import base_host
 
-from plane.ext.serializers.issue_type import IssueTypeSerializer
-
 EPIC_TYPE_NAME = "Epic"
 
 
@@ -95,16 +93,6 @@ class EpicSettingsEndpoint(BaseAPIView):
             ProjectIssueType.objects.filter(project=project, issue_type__is_epic=True).delete()
 
         return Response({"is_epic_enabled": enable}, status=status.HTTP_200_OK)
-
-
-class IssueTypeListEndpoint(BaseAPIView):
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
-    def get(self, request, slug, project_id):
-        issue_types = IssueType.objects.filter(
-            workspace__slug=slug,
-            project_issue_types__project_id=project_id,
-        ).distinct()
-        return Response(IssueTypeSerializer(issue_types, many=True).data, status=status.HTTP_200_OK)
 
 
 class EpicViewSet(BaseAPIView):
