@@ -235,8 +235,8 @@ class TestEpicListEndpoint:
     @pytest.mark.django_db
     def test_bulk_fetch_by_ids(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
-        epic_a = create_epic(session_client, workspace, project, name="A").data["id"]
-        epic_b = create_epic(session_client, workspace, project, name="B").data["id"]
+        epic_a = str(create_epic(session_client, workspace, project, name="A").data["id"])
+        epic_b = str(create_epic(session_client, workspace, project, name="B").data["id"])
         create_epic(session_client, workspace, project, name="C")
 
         response = session_client.get(
@@ -270,7 +270,7 @@ class TestEpicArchive:
     @pytest.mark.django_db
     def test_archive_completed_epic(self, session_client, workspace, project, default_state, completed_state):
         enable_epics(session_client, workspace, project)
-        epic_id = create_epic(session_client, workspace, project, state_id=str(completed_state.id)).data["id"]
+        epic_id = str(create_epic(session_client, workspace, project, state_id=str(completed_state.id)).data["id"])
 
         archive_url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/archive/"
         response = session_client.post(archive_url)
