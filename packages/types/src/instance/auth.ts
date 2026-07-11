@@ -38,7 +38,8 @@ export type TInstanceAuthenticationMethodKeys =
   | "IS_GITLAB_ENABLED"
   | "IS_GITEA_ENABLED"
   // Fork (see FORK.md)
-  | "IS_OIDC_ENABLED";
+  | "IS_OIDC_ENABLED"
+  | "IS_SAML_ENABLED";
 
 export type TInstanceGoogleAuthenticationConfigurationKeys =
   | "GOOGLE_CLIENT_ID"
@@ -71,12 +72,23 @@ export type TInstanceOIDCAuthenticationConfigurationKeys =
   | "OIDC_PROVIDER_NAME"
   | "OIDC_ALLOW_UNVERIFIED_EMAIL";
 
+// Fork (see FORK.md): SAML configuration keys
+export type TInstanceSAMLAuthenticationConfigurationKeys =
+  | "SAML_IDP_ENTITY_ID"
+  | "SAML_IDP_SSO_URL"
+  | "SAML_IDP_CERTIFICATE"
+  | "SAML_PROVIDER_NAME"
+  | "SAML_ATTR_EMAIL"
+  | "SAML_ATTR_FIRST_NAME"
+  | "SAML_ATTR_LAST_NAME";
+
 export type TInstanceAuthenticationConfigurationKeys =
   | TInstanceGoogleAuthenticationConfigurationKeys
   | TInstanceGithubAuthenticationConfigurationKeys
   | TInstanceGitlabAuthenticationConfigurationKeys
   | TInstanceGiteaAuthenticationConfigurationKeys
-  | TInstanceOIDCAuthenticationConfigurationKeys;
+  | TInstanceOIDCAuthenticationConfigurationKeys
+  | TInstanceSAMLAuthenticationConfigurationKeys;
 
 export type TInstanceAuthenticationKeys = TInstanceAuthenticationMethodKeys | TInstanceAuthenticationConfigurationKeys;
 

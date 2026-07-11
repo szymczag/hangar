@@ -25,6 +25,7 @@ export const useAuthenticationModes = (props: TGetAuthenticationModeProps): TIns
     authenticationModes["gitea"],
     // Fork (see FORK.md)
     extendedAuthenticationModes["oidc"],
+    extendedAuthenticationModes["saml"],
   ];
 
   return availableAuthenticationModes;

@@ -7,6 +7,6 @@
 // Fork (see FORK.md): upstream ships both types as `never`; this file is the
 // designated hook for extended authentication modes.
 
-export type TExtendedLoginMediums = "oidc";
+export type TExtendedLoginMediums = "oidc" | "saml";
 
-export type TExtendedInstanceAuthenticationModeKeys = "oidc";
+export type TExtendedInstanceAuthenticationModeKeys = "oidc" | "saml";

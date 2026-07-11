@@ -7,7 +7,7 @@
 // Fork (see FORK.md): extended authentication modes merged into the list in
 // ./index.ts alongside upstream's core map.
 
-import { KeyRound } from "lucide-react";
+import { KeyRound, ShieldCheck } from "lucide-react";
 // types
 import type {
   TExtendedInstanceAuthenticationModeKeys,
@@ -16,6 +16,7 @@ import type {
 } from "@plane/types";
 // components
 import { OIDCConfiguration } from "@/components/authentication/oidc-config";
+import { SAMLConfiguration } from "@/components/authentication/saml-config";
 
 export const getExtendedAuthenticationModesMap: (
   props: TGetBaseAuthenticationModeProps
@@ -27,5 +28,13 @@ export const getExtendedAuthenticationModesMap: (
     icon: <KeyRound className="h-6 w-6 p-0.5 text-tertiary" />,
     config: <OIDCConfiguration disabled={disabled} updateConfig={updateConfig} />,
     enabledConfigKey: "IS_OIDC_ENABLED",
+  },
+  saml: {
+    key: "saml",
+    name: "SAML 2.0",
+    description: "Allow members to log in or sign up through your SAML 2.0 identity provider.",
+    icon: <ShieldCheck className="h-6 w-6 p-0.5 text-tertiary" />,
+    config: <SAMLConfiguration disabled={disabled} updateConfig={updateConfig} />,
+    enabledConfigKey: "IS_SAML_ENABLED",
   },
 });

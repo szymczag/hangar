@@ -9,7 +9,7 @@
 
 // plane imports
 import { useSearchParams } from "next/navigation";
-import { KeyRound } from "lucide-react";
+import { KeyRound, ShieldCheck } from "lucide-react";
 import { API_BASE_URL } from "@plane/constants";
 import type { TOAuthConfigs, TOAuthOption } from "@plane/types";
 // hooks
@@ -23,21 +23,31 @@ export const useExtendedOAuthConfig = (oauthActionText: string): TOAuthConfigs =
   // store hooks
   const { config } = useInstance();
   // derived values
-  const providerName = config?.oidc_provider_name || "OIDC";
+  const oidcProviderName = config?.oidc_provider_name || "OIDC";
+  const samlProviderName = config?.saml_provider_name || "SAML";
   const oAuthOptions: TOAuthOption[] = [
     {
       id: "oidc",
-      text: `${oauthActionText} with ${providerName}`,
+      text: `${oauthActionText} with ${oidcProviderName}`,
       icon: <KeyRound className="h-[18px] w-[18px]" />,
       onClick: () => {
         window.location.assign(`${API_BASE_URL}/auth/oidc/${next_path ? `?next_path=${next_path}` : ``}`);
       },
       enabled: config?.is_oidc_enabled,
     },
+    {
+      id: "saml",
+      text: `${oauthActionText} with ${samlProviderName}`,
+      icon: <ShieldCheck className="h-[18px] w-[18px]" />,
+      onClick: () => {
+        window.location.assign(`${API_BASE_URL}/auth/saml/${next_path ? `?next_path=${next_path}` : ``}`);
+      },
+      enabled: config?.is_saml_enabled,
+    },
   ];
 
   return {
-    isOAuthEnabled: config?.is_oidc_enabled || false,
+    isOAuthEnabled: config?.is_oidc_enabled || config?.is_saml_enabled || false,
     oAuthOptions,
   };
 };
