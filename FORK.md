@@ -65,12 +65,12 @@ merge-conflict risk.
 | 12 | `packages/types/src/settings.ts`, `packages/constants/src/settings/project.ts`, `apps/web/core/components/settings/project/sidebar/item-icon.tsx` | 3 | append `work_item_types` settings tab (type union, item + group entry, icon) |
 | 13 | `packages/constants/src/auth/extended.ts` | 1 | designated empty hook — extended login-medium labels (oidc, saml) |
 | 14 | `packages/i18n/src/locales/*/common.json` | 3 | append `common.work_item_types` label (all 19 locales, translations mined from each locale's established work-item-types phrasing) |
+| 15 | `apps/api/plane/utils/issue_filters.py` | 3 | append `issue_type` filter key (`filter_issue_type_id` → `type_id__in`) |
+| 16 | `apps/api/plane/bgtasks/issue_activities_task.py` | 3 | append `track_type` field tracker (`type_id` mapper entry) |
 
 Planned (added when the phase lands):
 
 | File | Phase | Nature |
 |------|-------|--------|
-| `apps/api/plane/bgtasks/issue_activities_task.py` | 3, 4 | append mapper entries (`track_type`, worklog activities) |
-| `apps/api/plane/utils/grouper.py`, `apps/api/plane/utils/issue_filters.py` | 3 | append `type_id` group-by / filter keys |
-| `apps/web/app/.../epics/`, settings `issue-types/` route folders | 2, 3 | new files only |
+| `apps/api/plane/bgtasks/issue_activities_task.py` | 4 | append worklog activity mapper entries |
 | `packages/i18n/src/locales/*` | all | append-only strings |
