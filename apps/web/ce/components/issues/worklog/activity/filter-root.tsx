@@ -27,18 +27,22 @@ export const ActivityFilterRoot = observer(function ActivityFilterRoot(props: TA
   // derived values — the worklog filter only applies where worklogs can exist
   const isTimeTrackingEnabled = Boolean(getProjectById(projectId)?.is_time_tracking_enabled);
   const showWorklogFilter = isTimeTrackingEnabled && !isIntakeIssue;
+  const selectedFilterSet = new Set(selectedFilters);
 
-  const filters: TActivityFilterOption[] = Object.entries(ACTIVITY_FILTER_TYPE_OPTIONS)
-    .filter(([key]) => showWorklogFilter || key !== EActivityFilterType.WORKLOG)
-    .map(([key, value]) => {
+  const filters = Object.entries(ACTIVITY_FILTER_TYPE_OPTIONS).reduce<TActivityFilterOption[]>(
+    (options, [key, value]) => {
+      if (!showWorklogFilter && key === EActivityFilterType.WORKLOG) return options;
       const filterKey = key as TActivityFilters;
-      return {
+      options.push({
         key: filterKey,
         labelTranslationKey: value.labelTranslationKey,
-        isSelected: selectedFilters.includes(filterKey),
+        isSelected: selectedFilterSet.has(filterKey),
         onClick: () => toggleFilter(filterKey),
-      };
-    });
+      });
+      return options;
+    },
+    []
+  );
 
   return <ActivityFilter selectedFilters={selectedFilters} filterOptions={filters} />;
 });
