@@ -46,7 +46,7 @@ import { IssueWorklogProperty } from "@/plane-web/components/issues/worklog/prop
 import { canViewWorklogsForRole } from "@/plane-web/helpers/worklog";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
 import { IssueCycleSelect } from "./cycle-select";
-import { IssueLabel } from "./label";
+import { IssueLabel } from "./label/root";
 import { IssueModuleSelect } from "./module-select";
 import type { TIssueOperations } from "./root";
 

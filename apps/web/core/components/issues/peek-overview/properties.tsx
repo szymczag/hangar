@@ -45,7 +45,7 @@ import { IssueWorklogProperty } from "@/plane-web/components/issues/worklog/prop
 import { canViewWorklogsForRole } from "@/plane-web/helpers/worklog";
 import type { TIssueOperations } from "../issue-detail";
 import { IssueCycleSelect } from "../issue-detail/cycle-select";
-import { IssueLabel } from "../issue-detail/label";
+import { IssueLabel } from "../issue-detail/label/root";
 import { IssueModuleSelect } from "../issue-detail/module-select";
 
 interface IPeekOverviewProperties {
