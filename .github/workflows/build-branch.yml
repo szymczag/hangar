@@ -1,410 +1,315 @@
-name: Branch Build CE
+name: Publish Hangar Containers
 
 on:
   workflow_dispatch:
-    inputs:
-      build_type:
-        description: "Type of build to run"
-        required: true
-        type: choice
-        default: "Build"
-        options:
-          - "Build"
-          - "Release"
-      releaseVersion:
-        description: "Release Version"
-        type: string
-        default: v0.0.0
-      isPrerelease:
-        description: "Is Pre-release"
-        type: boolean
-        default: false
-        required: true
-      arm64:
-        description: "Build for ARM64 architecture"
-        required: false
-        default: false
-        type: boolean
-      aio_build:
-        description: "Build for AIO docker image"
-        required: false
-        default: false
-        type: boolean
   push:
-    branches:
-      - preview
-      - canary
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: publish-containers-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 env:
-  TARGET_BRANCH: ${{ github.ref_name }}
-  ARM64_BUILD: ${{ github.event.inputs.arm64 }}
-  BUILD_TYPE: ${{ github.event.inputs.build_type }}
-  RELEASE_VERSION: ${{ github.event.inputs.releaseVersion }}
-  IS_PRERELEASE: ${{ github.event.inputs.isPrerelease }}
-  AIO_BUILD: ${{ github.event.inputs.aio_build }}
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/szymczag/hangar-
 
 jobs:
-  branch_build_setup:
-    name: Build Setup
+  setup:
+    name: Validate publication
     runs-on: ubuntu-22.04
     outputs:
-      gh_branch_name: ${{ steps.set_env_variables.outputs.TARGET_BRANCH }}
-      gh_buildx_driver: ${{ steps.set_env_variables.outputs.BUILDX_DRIVER }}
-      gh_buildx_version: ${{ steps.set_env_variables.outputs.BUILDX_VERSION }}
-      gh_buildx_platforms: ${{ steps.set_env_variables.outputs.BUILDX_PLATFORMS }}
-      gh_buildx_endpoint: ${{ steps.set_env_variables.outputs.BUILDX_ENDPOINT }}
-
-      dh_img_web: ${{ steps.set_env_variables.outputs.DH_IMG_WEB }}
-      dh_img_space: ${{ steps.set_env_variables.outputs.DH_IMG_SPACE }}
-      dh_img_admin: ${{ steps.set_env_variables.outputs.DH_IMG_ADMIN }}
-      dh_img_live: ${{ steps.set_env_variables.outputs.DH_IMG_LIVE }}
-      dh_img_backend: ${{ steps.set_env_variables.outputs.DH_IMG_BACKEND }}
-      dh_img_proxy: ${{ steps.set_env_variables.outputs.DH_IMG_PROXY }}
-      dh_img_aio: ${{ steps.set_env_variables.outputs.DH_IMG_AIO }}
-
-      build_type: ${{steps.set_env_variables.outputs.BUILD_TYPE}}
-      build_release: ${{ steps.set_env_variables.outputs.BUILD_RELEASE }}
-      build_prerelease: ${{ steps.set_env_variables.outputs.BUILD_PRERELEASE }}
-      release_version: ${{ steps.set_env_variables.outputs.RELEASE_VERSION }}
-      aio_build: ${{ steps.set_env_variables.outputs.AIO_BUILD }}
-
+      is_release: ${{ steps.metadata.outputs.is_release }}
+      is_prerelease: ${{ steps.metadata.outputs.is_prerelease }}
+      primary_tag: ${{ steps.metadata.outputs.primary_tag }}
+      sha_tag: ${{ steps.metadata.outputs.sha_tag }}
+      version: ${{ steps.metadata.outputs.version }}
     steps:
-      - id: set_env_variables
-        name: Set Environment Variables
-        run: |
-          if [ "${{ env.ARM64_BUILD }}" == "true" ] || ([ "${{ env.BUILD_TYPE }}" == "Release" ] && [ "${{ env.IS_PRERELEASE }}" != "true" ]); then
-            echo "BUILDX_DRIVER=cloud" >> $GITHUB_OUTPUT
-            echo "BUILDX_VERSION=lab:latest" >> $GITHUB_OUTPUT
-            echo "BUILDX_PLATFORMS=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
-            echo "BUILDX_ENDPOINT=makeplane/plane-dev" >> $GITHUB_OUTPUT
-          else
-            echo "BUILDX_DRIVER=docker-container" >> $GITHUB_OUTPUT
-            echo "BUILDX_VERSION=latest" >> $GITHUB_OUTPUT
-            echo "BUILDX_PLATFORMS=linux/amd64" >> $GITHUB_OUTPUT
-            echo "BUILDX_ENDPOINT=" >> $GITHUB_OUTPUT
-          fi
-          BR_NAME=$( echo "${{ env.TARGET_BRANCH }}" |sed 's/[^a-zA-Z0-9.-]//g')
-          echo "TARGET_BRANCH=$BR_NAME" >> $GITHUB_OUTPUT
-
-          echo "DH_IMG_WEB=plane-frontend" >> $GITHUB_OUTPUT
-          echo "DH_IMG_SPACE=plane-space" >> $GITHUB_OUTPUT
-          echo "DH_IMG_ADMIN=plane-admin" >> $GITHUB_OUTPUT
-          echo "DH_IMG_LIVE=plane-live" >> $GITHUB_OUTPUT
-          echo "DH_IMG_BACKEND=plane-backend" >> $GITHUB_OUTPUT
-          echo "DH_IMG_PROXY=plane-proxy" >> $GITHUB_OUTPUT
-          echo "DH_IMG_AIO=plane-aio-community" >> $GITHUB_OUTPUT
-
-          echo "BUILD_TYPE=${{env.BUILD_TYPE}}" >> $GITHUB_OUTPUT
-          BUILD_RELEASE=false
-          BUILD_PRERELEASE=false
-          RELVERSION="latest"
-
-          BUILD_AIO=${{ env.AIO_BUILD }}
-
-          if [ "${{ env.BUILD_TYPE }}" == "Release" ]; then
-            FLAT_RELEASE_VERSION=$(echo "${{ env.RELEASE_VERSION }}" | sed 's/[^a-zA-Z0-9.-]//g')
-            echo "FLAT_RELEASE_VERSION=${FLAT_RELEASE_VERSION}" >> $GITHUB_OUTPUT
-
-            semver_regex="^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*)?$"
-            if [[ ! $FLAT_RELEASE_VERSION =~ $semver_regex ]]; then
-              echo "Invalid Release Version Format : $FLAT_RELEASE_VERSION"
-              echo "Please provide a valid SemVer version"
-              echo "e.g. v1.2.3 or v1.2.3-alpha-1"
-              echo "Exiting the build process"
-              exit 1  # Exit with status 1 to fail the step
-            fi
-            BUILD_RELEASE=true
-            RELVERSION=$FLAT_RELEASE_VERSION
-
-            if [ "${{ env.IS_PRERELEASE }}" == "true" ]; then
-              BUILD_PRERELEASE=true
-            fi
-
-            BUILD_AIO=true
-          fi
-
-          echo "BUILD_RELEASE=${BUILD_RELEASE}" >> $GITHUB_OUTPUT
-          echo "BUILD_PRERELEASE=${BUILD_PRERELEASE}" >> $GITHUB_OUTPUT
-          echo "RELEASE_VERSION=${RELVERSION}" >> $GITHUB_OUTPUT
-          echo "AIO_BUILD=${BUILD_AIO}" >> $GITHUB_OUTPUT
-
-      - id: checkout_files
-        name: Checkout Files
-        uses: actions/checkout@v6
-
-  branch_build_push_admin:
-    name: Build-Push Admin Docker Image
-    runs-on: ubuntu-22.04
-    needs: [branch_build_setup]
-    steps:
-      - name: Admin Build and Push
-        uses: makeplane/actions/build-push@v1.4.0
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
         with:
-          build-release: ${{ needs.branch_build_setup.outputs.build_release }}
-          build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
-          release-version: ${{ needs.branch_build_setup.outputs.release_version }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          docker-image-owner: makeplane
-          docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_admin }}
-          build-context: .
-          dockerfile-path: ./apps/admin/Dockerfile.admin
-          buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
-          buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
-          buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
-          buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
+          fetch-depth: 0
 
-  branch_build_push_web:
-    name: Build-Push Web Docker Image
-    runs-on: ubuntu-22.04
-    needs: [branch_build_setup]
-    steps:
-      - name: Web Build and Push
-        uses: makeplane/actions/build-push@v1.4.0
-        with:
-          build-release: ${{ needs.branch_build_setup.outputs.build_release }}
-          build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
-          release-version: ${{ needs.branch_build_setup.outputs.release_version }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          docker-image-owner: makeplane
-          docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_web }}
-          build-context: .
-          dockerfile-path: ./apps/web/Dockerfile.web
-          buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
-          buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
-          buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
-          buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
-
-  branch_build_push_space:
-    name: Build-Push Space Docker Image
-    runs-on: ubuntu-22.04
-    needs: [branch_build_setup]
-    steps:
-      - name: Space Build and Push
-        uses: makeplane/actions/build-push@v1.4.0
-        with:
-          build-release: ${{ needs.branch_build_setup.outputs.build_release }}
-          build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
-          release-version: ${{ needs.branch_build_setup.outputs.release_version }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          docker-image-owner: makeplane
-          docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_space }}
-          build-context: .
-          dockerfile-path: ./apps/space/Dockerfile.space
-          buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
-          buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
-          buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
-          buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
-
-  branch_build_push_live:
-    name: Build-Push Live Collaboration Docker Image
-    runs-on: ubuntu-22.04
-    needs: [branch_build_setup]
-    steps:
-      - name: Live Build and Push
-        uses: makeplane/actions/build-push@v1.4.0
-        with:
-          build-release: ${{ needs.branch_build_setup.outputs.build_release }}
-          build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
-          release-version: ${{ needs.branch_build_setup.outputs.release_version }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          docker-image-owner: makeplane
-          docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_live }}
-          build-context: .
-          dockerfile-path: ./apps/live/Dockerfile.live
-          buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
-          buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
-          buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
-          buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
-
-  branch_build_push_api:
-    name: Build-Push API Server Docker Image
-    runs-on: ubuntu-22.04
-    needs: [branch_build_setup]
-    steps:
-      - name: Backend Build and Push
-        uses: makeplane/actions/build-push@v1.4.0
-        with:
-          build-release: ${{ needs.branch_build_setup.outputs.build_release }}
-          build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
-          release-version: ${{ needs.branch_build_setup.outputs.release_version }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          docker-image-owner: makeplane
-          docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_backend }}
-          build-context: ./apps/api
-          dockerfile-path: ./apps/api/Dockerfile.api
-          buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
-          buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
-          buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
-          buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
-
-  branch_build_push_proxy:
-    name: Build-Push Proxy Docker Image
-    runs-on: ubuntu-22.04
-    needs: [branch_build_setup]
-    steps:
-      - name: Proxy Build and Push
-        uses: makeplane/actions/build-push@v1.4.0
-        with:
-          build-release: ${{ needs.branch_build_setup.outputs.build_release }}
-          build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
-          release-version: ${{ needs.branch_build_setup.outputs.release_version }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          docker-image-owner: makeplane
-          docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_proxy }}
-          build-context: ./apps/proxy
-          dockerfile-path: ./apps/proxy/Dockerfile.ce
-          buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
-          buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
-          buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
-          buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
-
-  branch_build_push_aio:
-    if: ${{ needs.branch_build_setup.outputs.aio_build == 'true' }}
-    name: Build-Push AIO Docker Image
-    runs-on: ubuntu-22.04
-    needs:
-      - branch_build_setup
-      - branch_build_push_admin
-      - branch_build_push_web
-      - branch_build_push_space
-      - branch_build_push_live
-      - branch_build_push_api
-      - branch_build_push_proxy
-    steps:
-      - name: Checkout Files
-        uses: actions/checkout@v6
-
-      - name: Prepare AIO Assets
-        id: prepare_aio_assets
-        run: |
-          cd deployments/aio/community
-
-          if [ "${{ needs.branch_build_setup.outputs.build_type }}" == "Release" ]; then
-            aio_version=${{ needs.branch_build_setup.outputs.release_version }}
-          else
-            aio_version=${{ needs.branch_build_setup.outputs.gh_branch_name }}
-          fi
-          bash ./build.sh --release $aio_version
-          echo "AIO_BUILD_VERSION=${aio_version}" >> $GITHUB_OUTPUT
-
-      - name: Upload AIO Assets
-        uses: actions/upload-artifact@v7
-        with:
-          path: ./deployments/aio/community/dist
-          name: aio-assets-dist
-
-      - name: AIO Build and Push
-        uses: makeplane/actions/build-push@v1.4.0
-        with:
-          build-release: ${{ needs.branch_build_setup.outputs.build_release }}
-          build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
-          release-version: ${{ needs.branch_build_setup.outputs.release_version }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          docker-image-owner: makeplane
-          docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_aio }}
-          build-context: ./deployments/aio/community
-          dockerfile-path: ./deployments/aio/community/Dockerfile
-          buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
-          buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
-          buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
-          buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
-          additional-assets: aio-assets-dist
-          additional-assets-dir: ./deployments/aio/community/dist
-          build-args: |
-            PLANE_VERSION=${{ steps.prepare_aio_assets.outputs.AIO_BUILD_VERSION }}
-
-  upload_build_assets:
-    name: Upload Build Assets
-    runs-on: ubuntu-22.04
-    needs:
-      - branch_build_setup
-      - branch_build_push_admin
-      - branch_build_push_web
-      - branch_build_push_space
-      - branch_build_push_live
-      - branch_build_push_api
-      - branch_build_push_proxy
-    steps:
-      - name: Checkout Files
-        uses: actions/checkout@v6
-
-      - name: Update Assets
-        run: |
-          if [ "${{ needs.branch_build_setup.outputs.build_type }}" == "Release" ]; then
-            REL_VERSION=${{ needs.branch_build_setup.outputs.release_version }}
-          else
-            REL_VERSION=${{ needs.branch_build_setup.outputs.gh_branch_name }}
-          fi
-
-          cp ./deployments/cli/community/install.sh deployments/cli/community/setup.sh
-          sed -i 's/${APP_RELEASE:-stable}/${APP_RELEASE:-'${REL_VERSION}'}/g' deployments/cli/community/docker-compose.yml
-          # sed -i 's/APP_RELEASE=stable/APP_RELEASE='${REL_VERSION}'/g' deployments/cli/community/variables.env
-
-      - name: Upload Assets
-        uses: actions/upload-artifact@v7
-        with:
-          name: community-assets
-          path: |
-            ./deployments/cli/community/setup.sh
-            ./deployments/cli/community/restore.sh
-            ./deployments/cli/community/restore-airgapped.sh
-            ./deployments/cli/community/docker-compose.yml
-            ./deployments/cli/community/variables.env
-            ./deployments/swarm/community/swarm.sh
-
-  publish_release:
-    if: ${{ needs.branch_build_setup.outputs.build_type == 'Release' }}
-    name: Build Release
-    runs-on: ubuntu-22.04
-    needs:
-      [
-        branch_build_setup,
-        branch_build_push_admin,
-        branch_build_push_web,
-        branch_build_push_space,
-        branch_build_push_live,
-        branch_build_push_api,
-        branch_build_push_proxy,
-      ]
-    env:
-      REL_VERSION: ${{ needs.branch_build_setup.outputs.release_version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Update Assets
-        run: |
-          cp ./deployments/cli/community/install.sh deployments/cli/community/setup.sh
-          sed -i 's/${APP_RELEASE:-stable}/${APP_RELEASE:-'${REL_VERSION}'}/g' deployments/cli/community/docker-compose.yml
-          # sed -i 's/APP_RELEASE=stable/APP_RELEASE='${REL_VERSION}'/g' deployments/cli/community/variables.env
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v2.6.1
+      - name: Validate ref and calculate tags
+        id: metadata
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          echo "sha_tag=sha-${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            semver_regex='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'
+            if [[ ! "$REF_NAME" =~ $semver_regex ]]; then
+              echo "Unsupported release tag: $REF_NAME" >&2
+              exit 1
+            fi
+
+            git fetch --no-tags origin preview
+            if ! git merge-base --is-ancestor "$COMMIT_SHA" origin/preview; then
+              echo "Release commit must be contained in origin/preview" >&2
+              exit 1
+            fi
+
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "primary_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
+            if [[ "$REF_NAME" == *-* ]]; then
+              echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            preview_ref=$(printf '%s' "$REF_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^[.-]+//; s/[.-]+$//')
+            if [[ -z "$preview_ref" ]]; then
+              echo "The selected ref cannot be converted to a safe OCI tag" >&2
+              exit 1
+            fi
+
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "version=$preview_ref" >> "$GITHUB_OUTPUT"
+            echo "primary_tag=preview-$preview_ref" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Reject an existing immutable release
+        if: steps.metadata.outputs.is_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub Release $VERSION already exists" >&2
+            exit 1
+          fi
+
+          for image in web admin space live api proxy aio; do
+            if docker manifest inspect "${IMAGE_PREFIX}${image}:${VERSION}" >/dev/null 2>&1; then
+              echo "Immutable image tag already exists: ${IMAGE_PREFIX}${image}:${VERSION}" >&2
+              exit 1
+            fi
+          done
+
+  release_approval:
+    name: Approve release publication
+    if: needs.setup.outputs.is_release == 'true'
+    needs: setup
+    runs-on: ubuntu-22.04
+    environment: release
+    steps:
+      - name: Record approval
+        run: echo "Release publication approved"
+
+  components:
+    name: Publish ${{ matrix.image }}
+    if: >-
+      always() &&
+      needs.setup.result == 'success' &&
+      (needs.release_approval.result == 'success' || needs.release_approval.result == 'skipped')
+    needs: [setup, release_approval]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: web
+            context: .
+            dockerfile: ./apps/web/Dockerfile.web
+          - image: admin
+            context: .
+            dockerfile: ./apps/admin/Dockerfile.admin
+          - image: space
+            context: .
+            dockerfile: ./apps/space/Dockerfile.space
+          - image: live
+            context: .
+            dockerfile: ./apps/live/Dockerfile.live
+          - image: api
+            context: ./apps/api
+            dockerfile: ./apps/api/Dockerfile.api
+          - image: proxy
+            context: ./apps/proxy
+            dockerfile: ./apps/proxy/Dockerfile.ce
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.0.0
         with:
-          tag_name: ${{ env.REL_VERSION }}
-          name: ${{ env.REL_VERSION }}
-          target_commitish: ${{ github.sha }}
-          draft: false
-          prerelease: ${{ env.IS_PRERELEASE }}
-          generate_release_notes: true
-          files: |
-            ${{ github.workspace }}/deployments/cli/community/setup.sh
-            ${{ github.workspace }}/deployments/cli/community/restore.sh
-            ${{ github.workspace }}/deployments/cli/community/restore-airgapped.sh
-            ${{ github.workspace }}/deployments/cli/community/docker-compose.yml
-            ${{ github.workspace }}/deployments/cli/community/variables.env
-            ${{ github.workspace }}/deployments/swarm/community/swarm.sh
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish image
+        id: build
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}${{ matrix.image }}:${{ needs.setup.outputs.primary_tag }}
+            ${{ env.IMAGE_PREFIX }}${{ matrix.image }}:${{ needs.setup.outputs.sha_tag }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.setup.outputs.version }}
+            org.opencontainers.image.licenses=AGPL-3.0-only
+            org.opencontainers.image.title=Hangar ${{ matrix.image }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Attest image provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-name: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  aio:
+    name: Publish aio
+    needs: [setup, components]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+
+      - name: Prepare AIO assets
+        env:
+          VERSION: ${{ needs.setup.outputs.primary_tag }}
+        run: deployments/aio/community/build.sh --release="$VERSION" --image-name="${IMAGE_PREFIX}aio"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish image
+        id: build
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: ./deployments/aio/community
+          file: ./deployments/aio/community/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}aio:${{ needs.setup.outputs.primary_tag }}
+            ${{ env.IMAGE_PREFIX }}aio:${{ needs.setup.outputs.sha_tag }}
+          build-args: |
+            IMAGE_PREFIX=${{ env.IMAGE_PREFIX }}
+            PLANE_VERSION=${{ needs.setup.outputs.primary_tag }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.setup.outputs.version }}
+            org.opencontainers.image.licenses=AGPL-3.0-only
+            org.opencontainers.image.title=Hangar aio
+          cache-from: type=gha,scope=aio
+          cache-to: type=gha,mode=max,scope=aio
+          provenance: mode=max
+          sbom: true
+
+      - name: Attest image provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-name: ${{ env.IMAGE_PREFIX }}aio
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  release:
+    name: Publish GitHub Release
+    if: needs.setup.outputs.is_release == 'true'
+    needs: [setup, aio]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
+
+      - name: Promote stable manifests
+        if: needs.setup.outputs.is_prerelease != 'true'
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          for image in web admin space live api proxy aio; do
+            docker buildx imagetools create \
+              --tag "${IMAGE_PREFIX}${image}:stable" \
+              "${IMAGE_PREFIX}${image}:${VERSION}"
+          done
+
+      - name: Stage release assets
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir release-assets
+          cp deployments/cli/community/install.sh release-assets/setup.sh
+          cp deployments/cli/community/restore.sh release-assets/
+          cp deployments/cli/community/restore-airgapped.sh release-assets/
+          cp deployments/cli/community/docker-compose.yml release-assets/
+          cp deployments/cli/community/variables.env release-assets/
+          cp deployments/swarm/community/swarm.sh release-assets/
+          sed -i "s/\${APP_RELEASE:-stable}/\${APP_RELEASE:-${VERSION}}/g" release-assets/docker-compose.yml
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.setup.outputs.version }}
+          IS_PRERELEASE: ${{ needs.setup.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          args=(--repo "$GITHUB_REPOSITORY" --title "$VERSION" --target "$GITHUB_SHA" --generate-notes)
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$VERSION" release-assets/* "${args[@]}"
