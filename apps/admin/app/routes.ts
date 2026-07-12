@@ -21,6 +21,7 @@ export default [
     route("authentication/gitea", "./(all)/(dashboard)/authentication/gitea/page.tsx"),
     // Fork (see FORK.md)
     route("authentication/oidc", "./(all)/(dashboard)/authentication/oidc/page.tsx"),
+    route("authentication/saml", "./(all)/(dashboard)/authentication/saml/page.tsx"),
     route("ai", "./(all)/(dashboard)/ai/page.tsx"),
     route("image", "./(all)/(dashboard)/image/page.tsx"),
   ]),

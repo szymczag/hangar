@@ -56,6 +56,8 @@ export interface IInstanceConfig {
   // Fork (see FORK.md)
   is_oidc_enabled: boolean;
   oidc_provider_name: string | undefined;
+  is_saml_enabled: boolean;
+  saml_provider_name: string | undefined;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;
