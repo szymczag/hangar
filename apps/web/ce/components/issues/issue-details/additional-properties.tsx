@@ -45,9 +45,12 @@ export const WorkItemAdditionalSidebarProperties = observer(function WorkItemAdd
 
   const handleChange = async (propertyId: string, next: string[]) => {
     const previous = values;
-    await mutate({ ...(values ?? {}), [propertyId]: next }, { revalidate: false });
+    await mutate({ ...values, [propertyId]: next }, { revalidate: false });
     try {
-      await issueTypeService.updatePropertyValues(workspaceSlug, projectId, workItemId, { [propertyId]: next });
+      await issueTypeService.updatePropertyValues(workspaceSlug, projectId, workItemId, {
+        ...values,
+        [propertyId]: next,
+      });
     } catch (error) {
       console.error(error);
       await mutate(previous, { revalidate: false });

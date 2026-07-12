@@ -13,6 +13,13 @@ from plane.db.models import Issue, Project, ProjectMember, State, User, Workspac
 from plane.ext.models import IssueWorkLog
 
 
+@pytest.fixture(autouse=True)
+def mock_issue_activity(mocker):
+    """Keep API contract tests independent from the external Celery broker."""
+    mocker.patch("plane.ext.views.worklog.issue_activity.delay")
+    mocker.patch("plane.db.mixins.soft_delete_related_objects.delay")
+
+
 @pytest.fixture
 def project(db, workspace, create_user):
     project = Project.objects.create(
@@ -93,6 +100,13 @@ class TestWorklogCRUD:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
+    def test_missing_issue_returns_not_found(self, session_client, workspace, project):
+        response = session_client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{uuid4()}/worklogs/"
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.django_db
     def test_guest_cannot_log(self, workspace, project, issue):
         guest_client, _ = make_role_client(workspace, project, role=5)
         response = guest_client.post(worklogs_url(workspace, project, issue), {"duration": 10}, format="json")
@@ -133,6 +147,44 @@ class TestWorklogOwnership:
         response = session_client.delete(f"{worklogs_url(workspace, project, issue)}{created['id']}/")
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not IssueWorkLog.objects.filter(pk=created["id"]).exists()
+
+    @pytest.mark.django_db
+    def test_workspace_admin_can_delete_any_entry(self, workspace, project, issue):
+        member_client, _ = make_role_client(workspace, project, role=15)
+        created = member_client.post(
+            worklogs_url(workspace, project, issue), {"duration": 60}, format="json"
+        ).data
+        admin_client, admin = make_role_client(workspace, project, role=15)
+        WorkspaceMember.objects.filter(workspace=workspace, member=admin).update(role=20)
+
+        response = admin_client.delete(f"{worklogs_url(workspace, project, issue)}{created['id']}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    @pytest.mark.django_db
+    def test_disabled_flag_blocks_detail_mutations(self, session_client, workspace, project, issue):
+        created = session_client.post(
+            worklogs_url(workspace, project, issue), {"duration": 60}, format="json"
+        ).data
+        project.is_time_tracking_enabled = False
+        project.save(update_fields=["is_time_tracking_enabled"])
+
+        detail_url = f"{worklogs_url(workspace, project, issue)}{created['id']}/"
+        patch_response = session_client.patch(detail_url, {"duration": 5}, format="json")
+        delete_response = session_client.delete(detail_url)
+
+        assert patch_response.status_code == status.HTTP_400_BAD_REQUEST
+        assert delete_response.status_code == status.HTTP_400_BAD_REQUEST
+        assert IssueWorkLog.objects.filter(pk=created["id"], duration=60).exists()
+
+    @pytest.mark.django_db
+    def test_missing_worklog_returns_not_found(self, session_client, workspace, project, issue):
+        response = session_client.patch(
+            f"{worklogs_url(workspace, project, issue)}{uuid4()}/",
+            {"duration": 5},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     @pytest.mark.django_db
     def test_cross_project_scoping(self, session_client, workspace, project, issue, create_user):

@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
@@ -13,6 +13,7 @@ import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TIssue } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 import { EModalPosition, EModalWidth, Input, ModalCore, TextArea } from "@plane/ui";
+import { sanitizeHTML } from "@plane/utils";
 // hooks
 import { useIssues } from "@/hooks/store/use-issues";
 // plane web
@@ -32,6 +33,16 @@ export interface EpicModalProps {
   isProjectSelectionDisabled?: boolean;
 }
 
+const descriptionToHtml = (description: string): string => {
+  const escaped = description
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+  return `<p>${escaped.replaceAll("\n", "<br>")}</p>`;
+};
+
 export const CreateUpdateEpicModal = observer(function CreateUpdateEpicModal(props: EpicModalProps) {
   const { data, isOpen, onClose, beforeFormSubmit, onSubmit, primaryButtonText } = props;
   // router
@@ -47,6 +58,12 @@ export const CreateUpdateEpicModal = observer(function CreateUpdateEpicModal(pro
   // derived values
   const isUpdate = Boolean(data?.id);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setName(data?.name ?? "");
+    setDescription(sanitizeHTML(data?.description_html ?? ""));
+  }, [data?.description_html, data?.id, data?.name, isOpen]);
+
   const handleClose = () => {
     setName("");
     setDescription("");
@@ -59,7 +76,7 @@ export const CreateUpdateEpicModal = observer(function CreateUpdateEpicModal(pro
     try {
       await beforeFormSubmit?.();
       const payload: Partial<TIssue> = { name: name.trim() };
-      if (description.trim()) payload.description_html = `<p>${description.trim()}</p>`;
+      if (description.trim()) payload.description_html = descriptionToHtml(description.trim());
       const response =
         data?.id !== undefined
           ? await epicService.updateEpic(workspaceSlug, projectId, data.id, payload)
@@ -95,7 +112,6 @@ export const CreateUpdateEpicModal = observer(function CreateUpdateEpicModal(pro
           onChange={(e) => setName(e.target.value)}
           placeholder="Epic title"
           className="w-full"
-          autoFocus
         />
         <TextArea
           id="epic-description"

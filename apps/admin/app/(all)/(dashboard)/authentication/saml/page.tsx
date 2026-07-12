@@ -52,14 +52,13 @@ const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticat
       },
     });
 
-    await updateConfigPromise
-      .then(() => {
-        setIsSubmitting(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setIsSubmitting(false);
-      });
+    try {
+      await updateConfigPromise;
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isSAMLEnabled = enableSAMLConfig === "1";
