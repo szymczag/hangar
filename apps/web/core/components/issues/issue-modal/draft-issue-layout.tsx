@@ -84,8 +84,16 @@ export const DraftIssueLayout = observer(function DraftIssueLayout(props: DraftI
       project_id: projectId,
     };
 
-    const response = await createIssue(workspaceSlug.toString(), payload)
-      .then((res) => {
+    try {
+      const response = await createIssue(workspaceSlug.toString(), payload);
+      if (response) {
+        await handleCreateUpdatePropertyValues({
+          issueId: response.id,
+          issueTypeId: response.type_id,
+          projectId,
+          workspaceSlug: workspaceSlug.toString(),
+          isDraft: true,
+        });
         setToast({
           type: TOAST_TYPE.SUCCESS,
           title: `${t("success")}!`,
@@ -94,23 +102,12 @@ export const DraftIssueLayout = observer(function DraftIssueLayout(props: DraftI
         onChange(null);
         setIssueDiscardModal(false);
         onClose();
-        return res;
-      })
-      .catch((_error) => {
-        setToast({
-          type: TOAST_TYPE.ERROR,
-          title: `${t("error")}!`,
-          message: t("workspace_draft_issues.toasts.created.error"),
-        });
-      });
-
-    if (response && handleCreateUpdatePropertyValues) {
-      handleCreateUpdatePropertyValues({
-        issueId: response.id,
-        issueTypeId: response.type_id,
-        projectId,
-        workspaceSlug: workspaceSlug?.toString(),
-        isDraft: true,
+      }
+    } catch (_error) {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: `${t("error")}!`,
+        message: t("workspace_draft_issues.toasts.created.error"),
       });
     }
   };

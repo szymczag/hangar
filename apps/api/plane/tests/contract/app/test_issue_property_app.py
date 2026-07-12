@@ -307,6 +307,31 @@ class TestPropertyValues:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
+    def test_values_from_previous_issue_type_are_removed(
+        self, session_client, workspace, project, issue, text_prop
+    ):
+        IssuePropertyValue.objects.create(
+            workspace=workspace,
+            project=project,
+            issue=issue,
+            property=text_prop,
+            value_text="stale",
+        )
+        other_type = IssueType.objects.create(workspace=workspace, name="Task")
+        ProjectIssueType.objects.create(project=project, issue_type=other_type)
+        issue.type = other_type
+        issue.save(update_fields=["type"])
+
+        response = session_client.post(
+            self.values_url(workspace, project, issue),
+            {},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not IssuePropertyValue.objects.filter(issue=issue).exists()
+
+    @pytest.mark.django_db
     def test_deleted_property_values_are_not_returned(
         self, session_client, workspace, project, issue, text_prop
     ):

@@ -416,6 +416,7 @@
     }
   },
   "common": {
+    "work_item_types": "Typy pracovních položek",
     "all": "Vše",
     "no_items_in_this_group": "V této skupině nejsou žádné položky",
     "drop_here_to_move": "Přetáhněte sem pro přesunutí",

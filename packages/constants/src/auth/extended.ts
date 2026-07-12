@@ -4,6 +4,8 @@
  * See the LICENSE file for details.
  */
 
+// Fork (see FORK.md): labels for the extended sign-in mediums.
+
 import type { TExtendedLoginMediums } from "@plane/types";
 
 export const EXTENDED_LOGIN_MEDIUM_LABELS: Record<TExtendedLoginMediums, string> = {

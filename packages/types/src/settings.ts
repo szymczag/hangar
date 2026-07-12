@@ -30,7 +30,9 @@ export type TProjectSettingsTabs =
   | "states"
   | "labels"
   | "estimates"
-  | "automations";
+  | "automations"
+  // Fork (see FORK.md)
+  | "work_item_types";
 export type TProjectSettingsItem = {
   key: TProjectSettingsTabs;
   i18n_label: string;

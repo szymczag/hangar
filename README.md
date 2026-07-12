@@ -36,7 +36,7 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Epics backend                                 | Available on `preview` | [#7](https://github.com/szymczag/hangar/pull/7)                                  |
 | Epics UI and required API surfaces            | Available on `preview` | [#9](https://github.com/szymczag/hangar/pull/9)                                  |
 | Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10)                                |
-| Custom work-item types and properties UI      | Stacked                | [#11](https://github.com/szymczag/hangar/pull/11)                                |
+| Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11)                                |
 | Time tracking and worklogs                    | Stacked                | [#12–#13](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+worklogs) |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not

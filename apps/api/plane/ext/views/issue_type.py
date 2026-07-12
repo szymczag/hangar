@@ -275,6 +275,7 @@ class IssuePropertyValuesEndpoint(BaseAPIView):
             # concurrent requests can both delete then insert scalar rows;
             # scalar/multi cardinality cannot be expressed as one DB constraint.
             Issue.objects.select_for_update().get(pk=issue.pk)
+            IssuePropertyValue.objects.filter(issue=issue).exclude(property__issue_type_id=issue.type_id).delete()
             for key, raw_values in payload.items():
                 prop = writable[key]
                 rows = validate_property_values(prop, raw_values, project_id)

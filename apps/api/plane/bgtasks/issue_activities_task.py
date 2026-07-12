@@ -430,6 +430,48 @@ def track_assignees(
         )
 
 
+# Fork (see FORK.md): track work item type changes.
+def track_type(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    if current_instance.get("type_id") != requested_data.get("type_id"):
+        from plane.db.models import IssueType
+
+        old_type = (
+            IssueType.objects.filter(pk=current_instance.get("type_id")).first()
+            if current_instance.get("type_id") is not None
+            else None
+        )
+        new_type = (
+            IssueType.objects.filter(pk=requested_data.get("type_id")).first()
+            if requested_data.get("type_id") is not None
+            else None
+        )
+        issue_activities.append(
+            IssueActivity(
+                issue_id=issue_id,
+                actor_id=actor_id,
+                verb="removed" if new_type is None else "updated",
+                old_identifier=current_instance.get("type_id"),
+                new_identifier=requested_data.get("type_id"),
+                old_value=old_type.name if old_type else None,
+                new_value=new_type.name if new_type else None,
+                field="type",
+                project_id=project_id,
+                workspace_id=workspace_id,
+                comment="updated the work item type to",
+                epoch=epoch,
+            )
+        )
+
+
 def track_estimate_points(
     requested_data,
     current_instance,
@@ -612,6 +654,8 @@ def update_issue_activity(
         "label_ids": track_labels,
         "assignee_ids": track_assignees,
         "estimate_point": track_estimate_points,
+        # Fork (see FORK.md)
+        "type_id": track_type,
         "archived_at": track_archive_at,
         "closed_to": track_closed_to,
         # External endpoint keys

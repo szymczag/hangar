@@ -159,6 +159,19 @@ def filter_labels(params, issue_filter, method, prefix=""):
     return issue_filter
 
 
+# Fork (see FORK.md): filter by custom work item type (Issue.type FK).
+def filter_issue_type_id(params, issue_filter, method, prefix=""):
+    if method == "GET":
+        issue_types = [item for item in params.get("issue_type").split(",") if item != "null"]
+        issue_types = filter_valid_uuids(issue_types)
+        if len(issue_types) and "" not in issue_types:
+            issue_filter[f"{prefix}type_id__in"] = issue_types
+    else:
+        if params.get("issue_type", None) and len(params.get("issue_type")) and params.get("issue_type") != "null":
+            issue_filter[f"{prefix}type_id__in"] = params.get("issue_type")
+    return issue_filter
+
+
 def filter_assignees(params, issue_filter, method, prefix=""):
     if method == "GET":
         assignees = [item for item in params.get("assignees").split(",") if item != "null"]
@@ -446,6 +459,8 @@ def issue_filters(query_params, method, prefix=""):
         "target_date": filter_target_date,
         "completed_at": filter_completed_at,
         "type": filter_issue_state_type,
+        # Fork (see FORK.md)
+        "issue_type": filter_issue_type_id,
         "project": filter_project,
         "cycle": filter_cycle,
         "module": filter_module,
