@@ -65,9 +65,10 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
   const issue = issueId ? getIssueById(issueId) : undefined;
   const currentUserProjectRole = getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug, projectId);
   const isAdmin = currentUserProjectRole === EUserPermissions.ADMIN;
-  const isGuest = currentUserProjectRole === EUserPermissions.GUEST;
+  const canViewWorklogs =
+    currentUserProjectRole === EUserPermissions.ADMIN || currentUserProjectRole === EUserPermissions.MEMBER;
   const isAssigned = issue?.assignee_ids && currentUser?.id ? issue?.assignee_ids.includes(currentUser?.id) : false;
-  const isWorklogButtonEnabled = !isIntakeIssue && !isGuest && (isAdmin || isAssigned);
+  const isWorklogButtonEnabled = !isIntakeIssue && canViewWorklogs && (isAdmin || isAssigned);
   // toggle filter
   const toggleFilter = (filter: TActivityFilters) => {
     if (!selectedFilters) return;
@@ -116,6 +117,7 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
               projectId={projectId}
               issueId={issueId}
               disabled={disabled}
+              canViewWorklogs={canViewWorklogs}
             />
           )}
           <ActivitySortRoot sortOrder={sortOrder || E_SORT_ORDER.ASC} toggleSort={toggleSortOrder} />
@@ -124,6 +126,7 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
             toggleFilter={toggleFilter}
             isIntakeIssue={isIntakeIssue}
             projectId={projectId}
+            canViewWorklogs={canViewWorklogs}
           />
         </div>
       </div>
@@ -143,6 +146,7 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
               showAccessSpecifier={!!project.anchor}
               disabled={disabled}
               sortOrder={sortOrder || E_SORT_ORDER.ASC}
+              canViewWorklogs={canViewWorklogs}
             />
             {!disabled && sortOrder === E_SORT_ORDER.ASC && renderCommentCreationBox}
           </div>

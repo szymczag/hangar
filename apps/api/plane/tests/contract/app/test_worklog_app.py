@@ -8,7 +8,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from plane.db.models import Issue, Project, ProjectMember, State, User, WorkspaceMember
+from plane.db.models import Issue, IssueActivity, IssueComment, Project, ProjectMember, State, User, WorkspaceMember
 
 from plane.ext.models import IssueWorkLog
 
@@ -49,10 +49,15 @@ def worklogs_url(workspace, project, issue):
     return f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{issue.id}/worklogs/"
 
 
-def make_role_client(workspace, project, role):
+def make_role_client(workspace, project, role, workspace_role=None):
     uid = uuid4().hex[:8]
     user = User.objects.create(email=f"user-{uid}@hangar.test", username=f"user_{uid}")
-    WorkspaceMember.objects.create(workspace=workspace, member=user, role=role, is_active=True)
+    WorkspaceMember.objects.create(
+        workspace=workspace,
+        member=user,
+        role=workspace_role if workspace_role is not None else role,
+        is_active=True,
+    )
     ProjectMember.objects.create(project=project, member=user, role=role, is_active=True)
     client = APIClient()
     client.force_authenticate(user=user)
@@ -128,6 +133,95 @@ class TestWorklogCRUD:
         guest_client, _ = make_role_client(workspace, project, role=5)
         response = guest_client.post(worklogs_url(workspace, project, issue), {"duration": 10}, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.django_db
+    def test_guest_cannot_list_worklogs(self, workspace, project, issue):
+        guest_client, _ = make_role_client(workspace, project, role=5)
+
+        response = guest_client.get(worklogs_url(workspace, project, issue))
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("role", [15, 20])
+    def test_member_and_admin_can_list_worklogs(self, workspace, project, issue, role):
+        client, _ = make_role_client(workspace, project, role=role)
+
+        response = client.get(worklogs_url(workspace, project, issue))
+
+        assert response.status_code == status.HTTP_200_OK
+
+    @pytest.mark.django_db
+    def test_workspace_admin_with_guest_project_role_can_list_worklogs(self, workspace, project, issue):
+        client, _ = make_role_client(workspace, project, role=5, workspace_role=20)
+
+        response = client.get(worklogs_url(workspace, project, issue))
+
+        assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.contract
+class TestGuestWorklogActivityConfidentiality:
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("query", ["", "?activity_type=issue-property", "?created_at__gt=2000-01-01T00:00:00Z"])
+    def test_guest_history_omits_worklogs_but_keeps_other_activity_and_comments(
+        self, workspace, project, issue, query
+    ):
+        guest_client, guest = make_role_client(workspace, project, role=5)
+        worklog_activity = IssueActivity.objects.create(
+            issue=issue,
+            project=project,
+            workspace=workspace,
+            actor=guest,
+            field="worklog",
+            verb="created",
+        )
+        normal_activity = IssueActivity.objects.create(
+            issue=issue,
+            project=project,
+            workspace=workspace,
+            actor=guest,
+            field="priority",
+            verb="updated",
+        )
+        comment = IssueComment.objects.create(
+            issue=issue,
+            project=project,
+            workspace=workspace,
+            actor=guest,
+            comment_html="<p>visible</p>",
+            comment_stripped="visible",
+        )
+
+        response = guest_client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{issue.id}/history/{query}"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        returned_ids = {str(item["id"]) for item in response.data}
+        assert str(worklog_activity.id) not in returned_ids
+        assert str(normal_activity.id) in returned_ids
+        if "activity_type=issue-property" not in query:
+            assert str(comment.id) in returned_ids
+
+    @pytest.mark.django_db
+    def test_workspace_admin_with_guest_project_role_sees_worklog_activity(self, workspace, project, issue):
+        client, user = make_role_client(workspace, project, role=5, workspace_role=20)
+        worklog_activity = IssueActivity.objects.create(
+            issue=issue,
+            project=project,
+            workspace=workspace,
+            actor=user,
+            field="worklog",
+            verb="created",
+        )
+
+        response = client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{issue.id}/history/"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert str(worklog_activity.id) in {str(item["id"]) for item in response.data}
 
 
 @pytest.mark.contract
