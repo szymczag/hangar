@@ -93,6 +93,15 @@ class TestWorklogCRUD:
             assert response.status_code == status.HTTP_400_BAD_REQUEST, bad
 
     @pytest.mark.django_db
+    def test_description_length_is_bounded(self, session_client, workspace, project, issue):
+        response = session_client.post(
+            worklogs_url(workspace, project, issue),
+            {"duration": 10, "description": "x" * 2001},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
     def test_disabled_flag_blocks(self, session_client, workspace, project, issue):
         project.is_time_tracking_enabled = False
         project.save()

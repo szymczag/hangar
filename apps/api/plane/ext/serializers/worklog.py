@@ -8,6 +8,8 @@ from plane.ext.models import IssueWorkLog
 
 
 class IssueWorkLogSerializer(serializers.ModelSerializer):
+    description = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+
     class Meta:
         model = IssueWorkLog
         fields = [
