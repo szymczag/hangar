@@ -152,6 +152,32 @@ class TestEpicCRUD:
         assert epic.type_id != rogue_type.id
 
     @pytest.mark.django_db
+    def test_create_forces_visible_top_level_epic(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        parent = Issue.objects.create(
+            name="Ordinary parent",
+            project=project,
+            workspace=workspace,
+            state=default_state,
+        )
+        response = create_epic(
+            session_client,
+            workspace,
+            project,
+            state_id=str(default_state.id),
+            parent_id=str(parent.id),
+            is_draft=True,
+            archived_at="2026-01-01",
+            deleted_at="2026-01-01T00:00:00Z",
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        epic = Issue.objects.get(pk=response.data["id"])
+        assert epic.parent_id is None
+        assert epic.is_draft is False
+        assert epic.archived_at is None
+        assert epic.deleted_at is None
+
+    @pytest.mark.django_db
     def test_update_cannot_change_type(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
         epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
@@ -165,6 +191,33 @@ class TestEpicCRUD:
         epic = Issue.objects.get(pk=epic_id)
         assert epic.name == "Renamed rock"
         assert epic.type.is_epic is True
+
+    @pytest.mark.django_db
+    def test_update_cannot_hide_or_parent_epic(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
+        parent = Issue.objects.create(
+            name="Ordinary parent",
+            project=project,
+            workspace=workspace,
+            state=default_state,
+        )
+        response = session_client.patch(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/",
+            {
+                "parent_id": str(parent.id),
+                "is_draft": True,
+                "archived_at": "2026-01-01",
+                "deleted_at": "2026-01-01T00:00:00Z",
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_200_OK
+        epic = Issue.objects.get(pk=epic_id)
+        assert epic.parent_id is None
+        assert epic.is_draft is False
+        assert epic.archived_at is None
+        assert epic.deleted_at is None
 
     @pytest.mark.django_db
     def test_epics_and_issues_are_separated(self, session_client, workspace, project, default_state):

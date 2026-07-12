@@ -21,6 +21,17 @@ type Props = {
   updateConfig: (key: TInstanceAuthenticationMethodKeys, value: string) => void;
 };
 
+const isValidHttpsUrl = (value: string | undefined) => {
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && Boolean(url.hostname) && !url.username && !url.password && !url.hash;
+  } catch {
+    return false;
+  }
+};
+
 export const SAMLConfiguration = observer(function SAMLConfiguration(props: Props) {
   const { disabled, updateConfig } = props;
   // store
@@ -29,7 +40,7 @@ export const SAMLConfiguration = observer(function SAMLConfiguration(props: Prop
   const samlConfig = formattedConfig?.IS_SAML_ENABLED ?? "";
   const samlConfigured =
     !!formattedConfig?.SAML_IDP_ENTITY_ID &&
-    !!formattedConfig?.SAML_IDP_SSO_URL &&
+    isValidHttpsUrl(formattedConfig?.SAML_IDP_SSO_URL) &&
     !!formattedConfig?.SAML_IDP_CERTIFICATE;
 
   return (

@@ -192,6 +192,16 @@ class TestSAMLInitiate:
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["SAML_NOT_CONFIGURED"]
 
     @pytest.mark.django_db
+    def test_http_idp_sso_url_is_rejected(self, django_client, setup_instance, saml_config):
+        InstanceConfiguration.objects.update_or_create(
+            key="SAML_IDP_SSO_URL",
+            defaults={"value": "http://idp.test/sso", "category": "SAML", "is_encrypted": False},
+        )
+        response = django_client.get(reverse("saml-initiate"))
+        assert response.status_code == 302
+        assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["SAML_NOT_CONFIGURED"]
+
+    @pytest.mark.django_db
     def test_rate_limit_is_enforced(self, django_client, setup_instance, saml_config):
         with pytest.MonkeyPatch.context() as monkeypatch:
             monkeypatch.setattr(
