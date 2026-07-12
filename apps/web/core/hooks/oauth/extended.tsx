@@ -19,7 +19,7 @@ export const useExtendedOAuthConfig = (oauthActionText: string): TOAuthConfigs =
   // router
   const searchParams = useSearchParams();
   // query params
-  const next_path = searchParams.get("next_path");
+  const nextPath = searchParams.get("next_path");
   // store hooks
   const { config } = useInstance();
   // derived values
@@ -31,7 +31,10 @@ export const useExtendedOAuthConfig = (oauthActionText: string): TOAuthConfigs =
       text: `${oauthActionText} with ${oidcProviderName}`,
       icon: <KeyRound className="h-[18px] w-[18px]" />,
       onClick: () => {
-        window.location.assign(`${API_BASE_URL}/auth/oidc/${next_path ? `?next_path=${next_path}` : ``}`);
+        const params = new URLSearchParams();
+        if (nextPath) params.set("next_path", nextPath);
+        const query = params.toString();
+        window.location.assign(`${API_BASE_URL}/auth/oidc/${query ? `?${query}` : ""}`);
       },
       enabled: config?.is_oidc_enabled,
     },
