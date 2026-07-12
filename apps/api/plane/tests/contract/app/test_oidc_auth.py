@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import ssl
 import time
 import uuid
 from types import SimpleNamespace
@@ -217,6 +218,8 @@ class TestOIDCOutboundURLPolicy:
 
         assert connected is raw_socket
         raw_socket.connect.assert_called_once_with(("8.8.8.8", 443))
+        assert tls_context.minimum_version == ssl.TLSVersion.TLSv1_3
+        assert tls_context.maximum_version == ssl.TLSVersion.TLSv1_3
         tls_context.wrap_socket.assert_called_once_with(raw_socket, server_hostname="idp.test")
         assert public_oidc_dns.call_count == 1
 

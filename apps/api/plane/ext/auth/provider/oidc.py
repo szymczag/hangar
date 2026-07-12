@@ -165,7 +165,16 @@ def _connect_pinned(target, address, timeout):
         if peer_ip != address.ip:
             raise OSError("OIDC connection peer does not match the validated address")
         if target.scheme == "https":
-            raw_socket = ssl.create_default_context().wrap_socket(raw_socket, server_hostname=target.hostname)
+            # OIDC carries client credentials, bearer tokens, and identity
+            # assertions. Require TLS 1.3 exactly so that neither local OpenSSL
+            # policy nor a provider's protocol negotiation can silently fall
+            # back to TLS 1.2 or legacy TLS versions. Operators must upgrade an
+            # IdP or reverse proxy that cannot negotiate TLS 1.3 before enabling
+            # it in Hangar.
+            tls_context = ssl.create_default_context()
+            tls_context.minimum_version = ssl.TLSVersion.TLSv1_3
+            tls_context.maximum_version = ssl.TLSVersion.TLSv1_3
+            raw_socket = tls_context.wrap_socket(raw_socket, server_hostname=target.hostname)
         return raw_socket
     except Exception:
         raw_socket.close()
