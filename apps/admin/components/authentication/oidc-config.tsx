@@ -40,9 +40,7 @@ export const OIDCConfiguration = observer(function OIDCConfiguration(props: Prop
           <ToggleSwitch
             value={Boolean(parseInt(oidcConfig))}
             onChange={() => {
-              Boolean(parseInt(oidcConfig)) === true
-                ? updateConfig("IS_OIDC_ENABLED", "0")
-                : updateConfig("IS_OIDC_ENABLED", "1");
+              updateConfig("IS_OIDC_ENABLED", parseInt(oidcConfig) ? "0" : "1");
             }}
             size="sm"
             disabled={disabled}

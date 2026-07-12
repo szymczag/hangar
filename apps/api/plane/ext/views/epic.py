@@ -7,7 +7,9 @@ import json
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Count, Q
+from django.db import transaction
+from django.db.models import Count, Q, OuterRef, Subquery
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 # Third party imports
@@ -15,19 +17,26 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
-from django.db.models import OuterRef, Subquery
-
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import IssueCreateSerializer, IssueSerializer
+from plane.app.views import (
+    IssueActivityEndpoint,
+    IssueAttachmentV2Endpoint,
+    IssueCommentViewSet,
+    IssueLinkViewSet,
+    IssueReactionViewSet,
+    IssueSubscriberViewSet,
+    WorkItemDescriptionVersionEndpoint,
+)
 from plane.app.views.base import BaseAPIView
 from plane.app.views.issue.base import IssuePaginatedViewSet
 from plane.bgtasks.issue_activities_task import issue_activity
-from plane.db.models import CycleIssue, FileAsset, Issue, IssueLink, IssueType, Project
+from plane.db.models import CycleIssue, FileAsset, Issue, IssueLink, IssueType, Project, Workspace
 from plane.db.models.issue_type import ProjectIssueType
 from plane.db.models.state import StateGroup
 from plane.utils.host import base_host
 
-from plane.ext.serializers.issue_type import IssueTypeSerializer
+from plane.ext.serializers.issue_type import EpicSettingsSerializer, IssueTypeSerializer
 
 EPIC_TYPE_NAME = "Epic"
 
@@ -77,22 +86,39 @@ class EpicSettingsEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN])
     def patch(self, request, slug, project_id):
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
-        enable = bool(request.data.get("is_epic_enabled", True))
+        serializer = EpicSettingsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        enable = serializer.validated_data["is_epic_enabled"]
 
-        if enable:
-            epic_type = IssueType.objects.filter(workspace=project.workspace, is_epic=True, is_active=True).first()
-            if epic_type is None:
-                epic_type = IssueType.objects.create(
+        with transaction.atomic():
+            # Serialize epic-type creation across projects in one workspace;
+            # IssueType has no uniqueness constraint for the is_epic flag.
+            Workspace.objects.select_for_update().get(pk=project.workspace_id)
+            if enable:
+                epic_type = IssueType.objects.filter(
                     workspace=project.workspace,
-                    name=EPIC_TYPE_NAME,
                     is_epic=True,
                     is_active=True,
-                )
-            if not ProjectIssueType.objects.filter(project=project, issue_type=epic_type).exists():
-                ProjectIssueType.objects.create(project=project, issue_type=epic_type)
-        else:
-            # Soft delete the link; epics and their data are retained.
-            ProjectIssueType.objects.filter(project=project, issue_type__is_epic=True).delete()
+                ).first()
+                if epic_type is None:
+                    epic_type = IssueType.objects.create(
+                        workspace=project.workspace,
+                        name=EPIC_TYPE_NAME,
+                        is_epic=True,
+                        is_active=True,
+                    )
+                if not ProjectIssueType.objects.filter(
+                    project=project,
+                    issue_type=epic_type,
+                ).exists():
+                    ProjectIssueType.objects.create(project=project, issue_type=epic_type)
+            else:
+                # Soft delete the link; epics and their data are retained.
+                ProjectIssueType.objects.filter(
+                    project=project,
+                    issue_type__is_epic=True,
+                ).delete()
 
         return Response({"is_epic_enabled": enable}, status=status.HTTP_200_OK)
 
@@ -103,6 +129,7 @@ class IssueTypeListEndpoint(BaseAPIView):
         issue_types = IssueType.objects.filter(
             workspace__slug=slug,
             project_issue_types__project_id=project_id,
+            is_active=True,
         ).distinct()
         return Response(IssueTypeSerializer(issue_types, many=True).data, status=status.HTTP_200_OK)
 
@@ -183,7 +210,16 @@ class EpicDetailViewSet(BaseAPIView):
         current_instance = json.dumps(IssueSerializer(epic).data, cls=DjangoJSONEncoder)
 
         requested_data = {key: value for key, value in request.data.items() if key not in ["type", "type_id"]}
-        serializer = IssueCreateSerializer(epic, data=requested_data, partial=True)
+        serializer = IssueCreateSerializer(
+            epic,
+            data=requested_data,
+            partial=True,
+            context={
+                "project_id": project_id,
+                "workspace_id": epic.workspace_id,
+                "default_assignee_id": epic.project.default_assignee_id,
+            },
+        )
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
@@ -271,7 +307,9 @@ class EpicIssuesEndpoint(BaseAPIView):
         epic_queryset(slug, project_id).get(pk=pk)
 
         children = Issue.issue_objects.filter(
-            workspace__slug=slug, parent_id=pk
+            workspace__slug=slug,
+            project_id=project_id,
+            parent_id=pk,
         ).select_related("state", "project")
         total = children.count()
         completed = children.filter(state__group=StateGroup.COMPLETED.value).count()
@@ -283,3 +321,44 @@ class EpicIssuesEndpoint(BaseAPIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class EpicResourceScopeMixin:
+    """Reject subresource access unless the URL identifies an epic in this project."""
+
+    epic_lookup_kwarg = "issue_id"
+
+    def dispatch(self, request, *args, **kwargs):
+        get_object_or_404(
+            epic_queryset(kwargs.get("slug"), kwargs.get("project_id")),
+            pk=kwargs.get(self.epic_lookup_kwarg),
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+
+class EpicActivityEndpoint(EpicResourceScopeMixin, IssueActivityEndpoint):
+    pass
+
+
+class EpicAttachmentV2Endpoint(EpicResourceScopeMixin, IssueAttachmentV2Endpoint):
+    pass
+
+
+class EpicCommentViewSet(EpicResourceScopeMixin, IssueCommentViewSet):
+    pass
+
+
+class EpicLinkViewSet(EpicResourceScopeMixin, IssueLinkViewSet):
+    pass
+
+
+class EpicReactionViewSet(EpicResourceScopeMixin, IssueReactionViewSet):
+    pass
+
+
+class EpicSubscriberViewSet(EpicResourceScopeMixin, IssueSubscriberViewSet):
+    pass
+
+
+class EpicDescriptionVersionEndpoint(EpicResourceScopeMixin, WorkItemDescriptionVersionEndpoint):
+    epic_lookup_kwarg = "work_item_id"
