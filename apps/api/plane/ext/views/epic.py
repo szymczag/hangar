@@ -38,7 +38,7 @@ from plane.db.models.state import StateGroup
 from plane.utils.host import base_host
 
 from plane.ext.models import EpicUserProperty
-from plane.ext.serializers.issue_type import EpicSettingsSerializer, EpicUserPropertySerializer, IssueTypeSerializer
+from plane.ext.serializers.issue_type import EpicSettingsSerializer, EpicUserPropertySerializer
 
 EPIC_TYPE_NAME = "Epic"
 MAX_BULK_EPICS = 100
@@ -135,17 +135,6 @@ class EpicSettingsEndpoint(BaseAPIView):
         return Response({"is_epic_enabled": enable}, status=status.HTTP_200_OK)
 
 
-class IssueTypeListEndpoint(BaseAPIView):
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
-    def get(self, request, slug, project_id):
-        issue_types = IssueType.objects.filter(
-            workspace__slug=slug,
-            project_issue_types__project_id=project_id,
-            is_active=True,
-        ).distinct()
-        return Response(IssueTypeSerializer(issue_types, many=True).data, status=status.HTTP_200_OK)
-
-
 class EpicUserPropertyEndpoint(BaseAPIView):
     """Read and update per-user Epic filters without touching work-item preferences."""
 
@@ -168,7 +157,6 @@ class EpicUserPropertyEndpoint(BaseAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 class EpicViewSet(BaseAPIView):
     """List/create epics for a project."""
