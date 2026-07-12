@@ -1,8 +1,12 @@
+<p align="center">
+  <img src="./hangar-logo.png" alt="Hangar" width="768" />
+</p>
+
 # Hangar
 
 Hangar is an independent, community-maintained fork of [Plane](https://github.com/makeplane/plane)
-(AGPL-3.0) that adds features on top of the open-source core: SSO (OIDC + SAML 2.0), epics,
-custom issue types with custom properties, and time tracking.
+(AGPL-3.0) being developed to add features on top of the open-source core: SSO
+(OIDC + SAML 2.0), epics, custom issue types with custom properties, and time tracking.
 
 Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 "Plane" and the Plane logo are trademarks of Plane Software, Inc. See [FORK.md](FORK.md)
