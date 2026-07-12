@@ -39,6 +39,15 @@ from plane.utils.host import base_host
 from plane.ext.serializers.issue_type import EpicSettingsSerializer, IssueTypeSerializer
 
 EPIC_TYPE_NAME = "Epic"
+EPIC_IMMUTABLE_FIELDS = {
+    "archived_at",
+    "deleted_at",
+    "is_draft",
+    "parent",
+    "parent_id",
+    "type",
+    "type_id",
+}
 
 
 def project_epic_type(project):
@@ -178,7 +187,13 @@ class EpicViewSet(BaseAPIView):
 
         # The epic type is never taken from the client — it is fixed to the
         # project's active epic type.
-        serializer.save(type=epic_type)
+        serializer.save(
+            type=epic_type,
+            parent=None,
+            is_draft=False,
+            archived_at=None,
+            deleted_at=None,
+        )
 
         issue_activity.delay(
             type="issue.activity.created",
@@ -209,7 +224,7 @@ class EpicDetailViewSet(BaseAPIView):
         epic = self.get_epic(slug, project_id, pk)
         current_instance = json.dumps(IssueSerializer(epic).data, cls=DjangoJSONEncoder)
 
-        requested_data = {key: value for key, value in request.data.items() if key not in ["type", "type_id"]}
+        requested_data = {key: value for key, value in request.data.items() if key not in EPIC_IMMUTABLE_FIELDS}
         serializer = IssueCreateSerializer(
             epic,
             data=requested_data,
