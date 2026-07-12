@@ -42,9 +42,7 @@ export const SAMLConfiguration = observer(function SAMLConfiguration(props: Prop
           <ToggleSwitch
             value={Boolean(parseInt(samlConfig))}
             onChange={() => {
-              Boolean(parseInt(samlConfig)) === true
-                ? updateConfig("IS_SAML_ENABLED", "0")
-                : updateConfig("IS_SAML_ENABLED", "1");
+              updateConfig("IS_SAML_ENABLED", parseInt(samlConfig) ? "0" : "1");
             }}
             size="sm"
             disabled={disabled}

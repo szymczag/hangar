@@ -229,6 +229,62 @@ class TestEpicScoping:
         assert response.data["progress"]["completed_issues"] == 1
         assert len(response.data["issues"]) == 2
 
+    @pytest.mark.django_db
+    def test_children_exclude_other_projects(
+        self, session_client, workspace, project, default_state
+    ):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(
+            session_client,
+            workspace,
+            project,
+            state_id=str(default_state.id),
+        ).data["id"]
+        other_project = Project.objects.create(
+            name="Other project",
+            identifier="OTH",
+            workspace=workspace,
+            created_by=project.created_by,
+        )
+        other_state = State.objects.create(
+            name="Other todo",
+            group="unstarted",
+            color="#fff",
+            project=other_project,
+            workspace=workspace,
+        )
+        Issue.objects.create(
+            name="Cross-project child",
+            project=other_project,
+            workspace=workspace,
+            state=other_state,
+            parent_id=epic_id,
+        )
+
+        response = session_client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/issues/"
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["progress"]["total_issues"] == 0
+        assert response.data["issues"] == []
+
+    @pytest.mark.django_db
+    def test_epic_subresources_reject_ordinary_issue(
+        self, session_client, workspace, project, default_state
+    ):
+        issue = Issue.objects.create(
+            name="Ordinary work item",
+            project=project,
+            workspace=workspace,
+            state=default_state,
+        )
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{issue.id}/comments/",
+            {"comment_html": "Must not be created"},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
 
 @pytest.mark.contract
 class TestEpicListEndpoint:
