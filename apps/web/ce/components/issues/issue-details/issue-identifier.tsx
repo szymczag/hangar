@@ -5,6 +5,8 @@
  */
 
 import { observer } from "mobx-react";
+// icons
+import { Layers } from "lucide-react";
 // plane imports
 import type { TIssueIdentifierProps, TIssueTypeIdentifier } from "@plane/types";
 // hooks
@@ -41,6 +43,11 @@ export const IssueIdentifier = observer(function IssueIdentifier(props: TIssueId
   );
 });
 
-export const IssueTypeIdentifier = observer(function IssueTypeIdentifier(_props: TIssueTypeIdentifier) {
-  return <></>;
+export const IssueTypeIdentifier = observer(function IssueTypeIdentifier(props: TIssueTypeIdentifier) {
+  const { size } = props;
+  // Fork (see FORK.md): the only issue types in this fork today are epics, so
+  // render the epic mark. Phase 3 (custom issue types) replaces this with a
+  // logo_props-driven icon looked up from the issue-types store.
+  const sizeClass = size === "xs" || size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
+  return <Layers className={`${sizeClass} flex-shrink-0 text-tertiary`} />;
 });

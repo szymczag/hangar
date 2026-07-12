@@ -4,6 +4,7 @@
 
 # Python imports
 import json
+from uuid import UUID
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
@@ -36,9 +37,11 @@ from plane.db.models.issue_type import ProjectIssueType
 from plane.db.models.state import StateGroup
 from plane.utils.host import base_host
 
-from plane.ext.serializers.issue_type import EpicSettingsSerializer, IssueTypeSerializer
+from plane.ext.models import EpicUserProperty
+from plane.ext.serializers.issue_type import EpicSettingsSerializer, EpicUserPropertySerializer, IssueTypeSerializer
 
 EPIC_TYPE_NAME = "Epic"
+MAX_BULK_EPICS = 100
 EPIC_IMMUTABLE_FIELDS = {
     "archived_at",
     "deleted_at",
@@ -141,6 +144,30 @@ class IssueTypeListEndpoint(BaseAPIView):
             is_active=True,
         ).distinct()
         return Response(IssueTypeSerializer(issue_types, many=True).data, status=status.HTTP_200_OK)
+
+
+class EpicUserPropertyEndpoint(BaseAPIView):
+    """Read and update per-user Epic filters without touching work-item preferences."""
+
+    def get_property(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        epic_property, _ = EpicUserProperty.objects.get_or_create(user=request.user, project=project)
+        return epic_property
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def get(self, request, slug, project_id):
+        return Response(EpicUserPropertySerializer(self.get_property(request, slug, project_id)).data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def patch(self, request, slug, project_id):
+        serializer = EpicUserPropertySerializer(
+            self.get_property(request, slug, project_id),
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class EpicViewSet(BaseAPIView):
@@ -310,6 +337,91 @@ class EpicPaginatedViewSet(IssuePaginatedViewSet):
                 )
             )
         )
+
+
+class EpicListEndpoint(BaseAPIView):
+    """Bulk fetch epics by id for the web Epic store."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def get(self, request, slug, project_id):
+        epic_ids = []
+        for raw_id in request.GET.get("issues", "").split(","):
+            if not (raw_id := raw_id.strip()):
+                continue
+            try:
+                epic_ids.append(UUID(raw_id))
+            except ValueError:
+                return Response({"error": "Invalid issue id"}, status=status.HTTP_400_BAD_REQUEST)
+        if not epic_ids:
+            return Response({"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(epic_ids) > MAX_BULK_EPICS:
+            return Response(
+                {"error": f"A maximum of {MAX_BULK_EPICS} epics can be requested"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        epics = (
+            epic_queryset(slug, project_id)
+            .filter(pk__in=epic_ids)
+            .select_related("workspace", "project", "state", "parent")
+            .prefetch_related("assignees", "labels")
+        )
+        return Response(
+            IssueSerializer(epics, many=True, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class EpicArchiveEndpoint(BaseAPIView):
+    """Archive or unarchive a project-scoped epic."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def post(self, request, slug, project_id, pk):
+        epic = get_object_or_404(epic_queryset(slug, project_id).select_related("state"), pk=pk)
+        if epic.state.group not in [StateGroup.COMPLETED.value, StateGroup.CANCELLED.value]:
+            return Response(
+                {"error": "Can only archive epics in a completed or cancelled state group"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        issue_activity.delay(
+            type="issue.activity.updated",
+            requested_data=json.dumps({"archived_at": str(timezone.now().date()), "automation": False}),
+            actor_id=str(request.user.id),
+            issue_id=str(epic.id),
+            project_id=str(project_id),
+            current_instance=json.dumps(IssueSerializer(epic).data, cls=DjangoJSONEncoder),
+            epoch=int(timezone.now().timestamp()),
+            notification=True,
+            origin=base_host(request=request, is_app=True),
+        )
+        epic.archived_at = timezone.now().date()
+        epic.save(update_fields=["archived_at"])
+        return Response({"archived_at": str(epic.archived_at)}, status=status.HTTP_200_OK)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def delete(self, request, slug, project_id, pk):
+        epic = get_object_or_404(
+            Issue.all_objects.filter(deleted_at__isnull=True),
+            workspace__slug=slug,
+            project_id=project_id,
+            pk=pk,
+            type__is_epic=True,
+            archived_at__isnull=False,
+        )
+        issue_activity.delay(
+            type="issue.activity.updated",
+            requested_data=json.dumps({"archived_at": None}),
+            actor_id=str(request.user.id),
+            issue_id=str(epic.id),
+            project_id=str(project_id),
+            current_instance=json.dumps(IssueSerializer(epic).data, cls=DjangoJSONEncoder),
+            epoch=int(timezone.now().timestamp()),
+            notification=True,
+            origin=base_host(request=request, is_app=True),
+        )
+        epic.archived_at = None
+        epic.save(update_fields=["archived_at"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EpicIssuesEndpoint(BaseAPIView):

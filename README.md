@@ -34,7 +34,7 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | SAML 2.0 backend                       | Available on `preview` | [#5](https://github.com/szymczag/hangar/pull/5)                                     |
 | SAML 2.0 administration and sign-in UI | Available on `preview` | [#6](https://github.com/szymczag/hangar/pull/6)                                     |
 | Epics backend                          | Available on `preview` | [#7](https://github.com/szymczag/hangar/pull/7)                                     |
-| Epics UI and extended API surfaces     | Stacked                | [#9, #14](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+epic)        |
+| Epics UI and required API surfaces     | Available on `preview` | [#9](https://github.com/szymczag/hangar/pull/9)                                     |
 | Custom work-item types and properties  | Stacked                | [#10–#11](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+issue-types) |
 | Time tracking and worklogs             | Stacked                | [#12–#13](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+worklogs)    |
 
