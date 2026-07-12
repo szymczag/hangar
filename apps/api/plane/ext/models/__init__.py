@@ -9,11 +9,13 @@ from .issue_property import (
     IssuePropertyValue,
     PropertyTypeChoices,
 )
+from .worklog import IssueWorkLog
 
 __all__ = [
     "EpicUserProperty",
     "IssueProperty",
     "IssuePropertyOption",
     "IssuePropertyValue",
+    "IssueWorkLog",
     "PropertyTypeChoices",
 ]

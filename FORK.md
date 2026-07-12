@@ -1,11 +1,8 @@
 # Hangar — fork maintenance guide
 
-Hangar is a fork of [makeplane/plane](https://github.com/makeplane/plane) (AGPL-3.0) being
-developed to add features on top of the open-source core: SSO (OIDC + SAML 2.0), Epics,
-custom issue types with custom properties, and time tracking (worklogs).
-
-The official fork logo is stored at [`hangar-logo.png`](hangar-logo.png). Keep its
-name and appearance consistent in project documentation and release materials.
+Hangar is a fork of [makeplane/plane](https://github.com/makeplane/plane) (AGPL-3.0) that
+implements additional features on top of the open-source core: SSO (OIDC + SAML 2.0),
+Epics, custom issue types with custom properties, and time tracking (worklogs).
 
 All fork code is isolated so upstream syncs stay cheap:
 
@@ -70,11 +67,10 @@ merge-conflict risk.
 | 14  | `packages/types/src/settings.ts`, `packages/constants/src/settings/project.ts`, `apps/web/core/components/settings/project/sidebar/item-icon.tsx` | 3     | append the `work_item_types` project-settings tab, group entry, and icon                            |
 | 15  | `packages/i18n/src/locales/*/common.json`                                                                                                         | 3     | append the localized `common.work_item_types` label                                                 |
 | 16  | `apps/api/plane/utils/issue_filters.py`                                                                                                           | 3     | append the UUID-validated `issue_type` filter mapped to `type_id__in`                               |
-| 17  | `apps/api/plane/bgtasks/issue_activities_task.py`                                                                                                 | 3     | append the `track_type` field tracker and `type_id` mapper entry                                    |
+| 17  | `apps/api/plane/bgtasks/issue_activities_task.py`                                                                                                 | 3, 4  | append the `track_type` field tracker plus worklog create/update/delete activity handlers           |
 
 Planned (added when the phase lands):
 
-| File                                              | Phase | Nature                                 |
-| ------------------------------------------------- | ----- | -------------------------------------- |
-| `apps/api/plane/bgtasks/issue_activities_task.py` | 4     | append worklog activity mapper entries |
-| `packages/i18n/src/locales/*`                     | all   | append-only strings                    |
+| File                          | Phase | Nature              |
+| ----------------------------- | ----- | ------------------- |
+| `packages/i18n/src/locales/*` | all   | append-only strings |
