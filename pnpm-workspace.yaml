@@ -191,6 +191,7 @@ catalog:
   "zod": "^3.25.76"
 
 overrides:
+  morgan: 1.11.0
   express: "catalog:"
   mdast-util-to-hast: 13.2.1
   valibot: 1.2.0
