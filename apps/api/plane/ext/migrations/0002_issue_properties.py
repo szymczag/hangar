@@ -7,12 +7,10 @@ import uuid
 
 
 class Migration(migrations.Migration):
-
-    initial = True
-
     dependencies = [
+        ("ext", "0001_epic_user_property"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('db', '0121_alter_estimate_type'),
+        ("db", "0121_alter_estimate_type"),
     ]
 
     operations = [

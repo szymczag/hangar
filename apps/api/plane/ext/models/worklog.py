@@ -13,6 +13,7 @@ from plane.db.models.project import ProjectBaseModel
 # A single entry may not exceed 24 hours; longer work is logged as multiple
 # entries. Stored in minutes — the UI parses "2h 30m" style input.
 MAX_WORKLOG_MINUTES = 24 * 60
+MAX_WORKLOG_DESCRIPTION_LENGTH = 5000
 
 
 class IssueWorkLog(ProjectBaseModel):
@@ -27,7 +28,7 @@ class IssueWorkLog(ProjectBaseModel):
         validators=[MinValueValidator(1), MaxValueValidator(MAX_WORKLOG_MINUTES)],
         help_text="Logged time in minutes",
     )
-    description = models.TextField(blank=True)
+    description = models.TextField(blank=True, max_length=MAX_WORKLOG_DESCRIPTION_LENGTH)
 
     class Meta:
         verbose_name = "Issue Work Log"
@@ -38,6 +39,12 @@ class IssueWorkLog(ProjectBaseModel):
             models.Index(fields=["issue"]),
             models.Index(fields=["project", "logged_by"]),
             models.Index(fields=["workspace", "created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(duration__gte=1, duration__lte=MAX_WORKLOG_MINUTES),
+                name="ext_issue_worklog_duration_range",
+            )
         ]
 
     def __str__(self):

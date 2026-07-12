@@ -62,7 +62,15 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
   // root store
   rootIssueStore: IIssueRootStore;
   // services
-  projectService;
+  projectService: Pick<ProjectService, "getProjectUserProperties" | "updateProjectUserProperties">;
+
+  protected get issuesStore() {
+    return this.rootIssueStore.projectIssues;
+  }
+
+  protected get issuesStoreType() {
+    return EIssuesStoreType.PROJECT;
+  }
 
   constructor(_rootStore: IIssueRootStore) {
     super();
@@ -149,7 +157,7 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
     const currentUserId = this.rootIssueStore.currentUserId;
     if (currentUserId) {
       const _kanbanFilters = this.handleIssuesLocalFilters.get(
-        EIssuesStoreType.PROJECT,
+        this.issuesStoreType,
         workspaceSlug,
         projectId,
         currentUserId
@@ -181,7 +189,7 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
         set(this.filters, [projectId, "richFilters"], filters);
       });
 
-      this.rootIssueStore.projectIssues.fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation");
+      this.issuesStore.fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation");
       await this.projectService.updateProjectUserProperties(workspaceSlug, projectId, {
         rich_filters: filters,
       });
@@ -237,11 +245,11 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
           });
 
           if (this.getShouldClearIssues(updatedDisplayFilters)) {
-            this.rootIssueStore.projectIssues.clear(true); // clear issues for local store when some filters like layout changes
+            this.issuesStore.clear(true); // clear issues for local store when some filters like layout changes
           }
 
           if (this.getShouldReFetchIssues(updatedDisplayFilters)) {
-            this.rootIssueStore.projectIssues.fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation");
+            this.issuesStore.fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation");
           }
 
           await this.projectService.updateProjectUserProperties(workspaceSlug, projectId, {
@@ -276,7 +284,7 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
 
           const currentUserId = this.rootIssueStore.currentUserId;
           if (currentUserId)
-            this.handleIssuesLocalFilters.set(EIssuesStoreType.PROJECT, type, workspaceSlug, projectId, currentUserId, {
+            this.handleIssuesLocalFilters.set(this.issuesStoreType, type, workspaceSlug, projectId, currentUserId, {
               kanban_filters: _filters.kanbanFilters,
             });
 

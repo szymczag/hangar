@@ -76,18 +76,15 @@ export const PropertyValueInput = observer(function PropertyValueInput(props: Pr
     case "select":
     case "multi_select": {
       const isMulti = property.property_type === "multi_select" && property.is_multi;
-      const options = (property.options ?? [])
-        .filter((option) => option.is_active)
-        .map((option) => ({
-          value: option.id,
-          query: option.name,
-          content: option.name,
-        }));
-      const selectedLabel = values.length
-        ? (property.options ?? [])
-            .filter((option) => values.includes(option.id))
-            .map((option) => option.name)
-            .join(", ")
+      const selectedValueIds = new Set(values);
+      const options: { value: string; query: string; content: string }[] = [];
+      const selectedOptionNames: string[] = [];
+      for (const option of property.options ?? []) {
+        if (option.is_active) options.push({ value: option.id, query: option.name, content: option.name });
+        if (selectedValueIds.has(option.id)) selectedOptionNames.push(option.name);
+      }
+      const selectedLabel = selectedOptionNames.length
+        ? selectedOptionNames.join(", ")
         : `Select ${property.display_name}`;
       if (isMulti) {
         return (

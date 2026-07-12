@@ -29,6 +29,15 @@ type Props = {
 
 type SAMLConfigFormValues = Record<TInstanceSAMLAuthenticationConfigurationKeys, string>;
 
+const isValidHttpsUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && Boolean(url.hostname) && !url.username && !url.password && !url.hash;
+  } catch {
+    return false;
+  }
+};
+
 export function InstanceSAMLConfigForm(props: Props) {
   const { config } = props;
   // states
@@ -40,6 +49,7 @@ export function InstanceSAMLConfigForm(props: Props) {
     handleSubmit,
     control,
     reset,
+    setError,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<SAMLConfigFormValues>({
     defaultValues: {
@@ -69,7 +79,12 @@ export function InstanceSAMLConfigForm(props: Props) {
       key: "SAML_IDP_SSO_URL",
       type: "text",
       label: "IdP single sign-on URL",
-      description: <>The HTTP-Redirect SSO endpoint of your identity provider.</>,
+      description: (
+        <>
+          The HTTPS HTTP-Redirect SSO endpoint of your identity provider. Configure the IdP or its reverse proxy to
+          require TLS 1.3.
+        </>
+      ),
       placeholder: "https://idp.example.com/sso/saml",
       error: Boolean(errors.SAML_IDP_SSO_URL),
       required: true,
@@ -148,6 +163,14 @@ export function InstanceSAMLConfigForm(props: Props) {
   ];
 
   const onSubmit = async (formData: SAMLConfigFormValues) => {
+    if (!isValidHttpsUrl(formData.SAML_IDP_SSO_URL)) {
+      setError("SAML_IDP_SSO_URL", {
+        type: "validate",
+        message: "Enter a valid HTTPS URL without credentials or a fragment.",
+      });
+      return;
+    }
+
     const payload: Partial<SAMLConfigFormValues> = { ...formData };
 
     try {

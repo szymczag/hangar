@@ -125,6 +125,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
     setSelectedParentIssue,
     getIssueTypeIdOnProjectChange,
     getActiveAdditionalPropertiesLength,
+    handleProjectEntitiesFetch,
     handlePropertyValuesValidation,
     handleCreateUpdatePropertyValues,
     handleTemplateChange,
@@ -194,14 +195,34 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
 
   // Update the issue type id when the project id changes
   useEffect(() => {
-    const issueTypeId = watch("type_id");
+    if (!projectId) return;
+    let cancelled = false;
 
-    // if issue type id is present or project not available, return
-    if (issueTypeId || !projectId) return;
+    const loadProjectSchema = async () => {
+      try {
+        await handleProjectEntitiesFetch({
+          workspaceSlug: workspaceSlug?.toString(),
+          workItemProjectId: projectId,
+          workItemTypeId: watch("type_id") ?? undefined,
+        });
+        if (cancelled || watch("type_id")) return;
+        const issueTypeIdOnProjectChange = getIssueTypeIdOnProjectChange(projectId);
+        if (issueTypeIdOnProjectChange) setValue("type_id", issueTypeIdOnProjectChange, { shouldValidate: true });
+      } catch (error) {
+        console.error(error);
+        if (!cancelled)
+          setToast({
+            type: TOAST_TYPE.ERROR,
+            title: `${t("error")}!`,
+            message: "Failed to load work item types. Please retry before submitting.",
+          });
+      }
+    };
 
-    // get issue type id on project change
-    const issueTypeIdOnProjectChange = getIssueTypeIdOnProjectChange(projectId);
-    if (issueTypeIdOnProjectChange) setValue("type_id", issueTypeIdOnProjectChange, { shouldValidate: true });
+    void loadProjectSchema();
+    return () => {
+      cancelled = true;
+    };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, projectId]);
@@ -342,7 +363,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
     setSelectedParentIssue(
       convertWorkItemDataToSearchResponse(workspaceSlug?.toString(), issue, projectDetails, stateDetails)
     );
-  }, [watch, getIssueById, getProjectById, selectedParentIssue, getStateById]);
+  }, [watch, getIssueById, getProjectById, selectedParentIssue, getStateById, setSelectedParentIssue, workspaceSlug]);
 
   // executing this useEffect when isDirty changes
   useEffect(() => {
@@ -515,11 +536,13 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                   {!data?.id && (
                     <div
                       className="inline-flex cursor-pointer items-center gap-1.5"
+                      aria-checked={isCreateMoreToggleEnabled}
                       onClick={() => onCreateMoreToggleChange(!isCreateMoreToggleEnabled)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") onCreateMoreToggleChange(!isCreateMoreToggleEnabled);
                       }}
-                      role="button"
+                      role="switch"
+                      tabIndex={0}
                     >
                       <ToggleSwitch value={isCreateMoreToggleEnabled} onChange={() => {}} size="sm" />
                       <span className="text-caption-sm-regular">{t("create_more")}</span>
