@@ -331,6 +331,34 @@ class TestEpicListEndpoint:
 
 
 @pytest.mark.contract
+class TestEpicPaginatedAuthorization:
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("role", [20, 15, 5])
+    def test_project_roles_can_read(self, workspace, project, default_state, role):
+        client, _ = make_role_client(workspace, project, role)
+
+        response = client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/v2/epics/")
+
+        assert response.status_code == status.HTTP_200_OK
+
+    @pytest.mark.django_db
+    def test_authenticated_outsider_cannot_read(self, workspace, project, default_state):
+        outsider = User.objects.create(email="epic-outsider@hangar.test", username="epic_outsider")
+        client = APIClient()
+        client.force_authenticate(user=outsider)
+
+        response = client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/v2/epics/")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.django_db
+    def test_anonymous_cannot_read(self, workspace, project, default_state):
+        response = APIClient().get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/v2/epics/")
+
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
+
+
+@pytest.mark.contract
 class TestEpicArchive:
     @pytest.mark.django_db
     def test_missing_epic_returns_not_found(self, session_client, workspace, project):

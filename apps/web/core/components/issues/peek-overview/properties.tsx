@@ -35,6 +35,8 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
 import { useProjectState } from "@/hooks/store/use-project-state";
+import { useUserPermissions } from "@/hooks/store/user";
+import { EUserPermissions } from "@plane/constants";
 // plane web components
 import { WorkItemAdditionalSidebarProperties } from "@/plane-web/components/issues/issue-details/additional-properties";
 import { IssueParentSelectRoot } from "@/plane-web/components/issues/issue-details/parent-select-root";
@@ -59,6 +61,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
   const { t } = useTranslation();
   // store hooks
   const { getProjectById } = useProject();
+  const { getProjectRoleByWorkspaceSlugAndProjectId } = useUserPermissions();
   const {
     issue: { getIssueById },
   } = useIssueDetail();
@@ -71,6 +74,8 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
   const projectDetails = getProjectById(issue.project_id);
   const isEstimateEnabled = projectDetails?.estimate;
   const stateDetails = getStateById(issue.state_id);
+  const projectRole = getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug, projectId);
+  const canViewWorklogs = projectRole === EUserPermissions.ADMIN || projectRole === EUserPermissions.MEMBER;
 
   const minDate = getDate(issue.start_date);
   minDate?.setDate(minDate.getDate());
@@ -258,6 +263,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           projectId={projectId}
           issueId={issueId}
           disabled={disabled}
+          canViewWorklogs={canViewWorklogs}
         />
 
         <WorkItemAdditionalSidebarProperties

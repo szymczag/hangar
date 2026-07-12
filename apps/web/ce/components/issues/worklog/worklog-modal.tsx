@@ -31,6 +31,7 @@ type TWorklogModal = {
   projectId: string;
   issueId: string;
   disabled?: boolean;
+  canViewWorklogs: boolean;
 };
 
 function validateDurationInput(input: string): number | null {
@@ -40,7 +41,7 @@ function validateDurationInput(input: string): number | null {
 }
 
 export const WorklogModal = observer(function WorklogModal(props: TWorklogModal) {
-  const { isOpen, onClose, workspaceSlug, projectId, issueId, disabled = false } = props;
+  const { isOpen, onClose, workspaceSlug, projectId, issueId, disabled = false, canViewWorklogs } = props;
   // i18n
   const { t } = useTranslation();
   // state — add form
@@ -58,10 +59,17 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
   const { getProjectRoleByWorkspaceSlugAndProjectId } = useUserPermissions();
   const { fetchActivities } = useIssueDetail();
   // derived values
-  const { worklogs, totalDuration, isLoading, mutate } = useWorklogs(workspaceSlug, projectId, issueId, isOpen);
+  const { worklogs, totalDuration, isLoading, mutate } = useWorklogs(
+    workspaceSlug,
+    projectId,
+    issueId,
+    isOpen && canViewWorklogs
+  );
   const isAdmin = getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug, projectId) === EUserPermissions.ADMIN;
 
   const canModify = (worklog: TIssueWorklog) => !disabled && (isAdmin || worklog.logged_by === currentUser?.id);
+
+  if (!canViewWorklogs) return <></>;
 
   const refresh = async () => {
     await mutate();

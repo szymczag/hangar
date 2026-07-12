@@ -18,7 +18,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
-from plane.app.permissions import ROLE, allow_permission
+from plane.app.permissions import ProjectEntityPermission, ROLE, allow_permission
 from plane.app.serializers import IssueCreateSerializer, IssueSerializer
 from plane.app.views import (
     IssueActivityEndpoint,
@@ -252,6 +252,8 @@ class EpicPaginatedViewSet(IssuePaginatedViewSet):
     Mirrors IssuePaginatedViewSet.get_queryset with the epic base queryset
     (issue_objects excludes epics; see the fork note in IssueManager).
     """
+
+    permission_classes = [ProjectEntityPermission]
 
     def get_queryset(self):
         queryset = epic_queryset(self.kwargs.get("slug"), self.kwargs.get("project_id"))

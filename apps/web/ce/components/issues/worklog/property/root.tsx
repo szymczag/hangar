@@ -23,10 +23,11 @@ type TIssueWorklogProperty = {
   projectId: string;
   issueId: string;
   disabled: boolean;
+  canViewWorklogs: boolean;
 };
 
 export const IssueWorklogProperty = observer(function IssueWorklogProperty(props: TIssueWorklogProperty) {
-  const { workspaceSlug, projectId, issueId, disabled } = props;
+  const { workspaceSlug, projectId, issueId, disabled, canViewWorklogs } = props;
   // i18n
   const { t } = useTranslation();
   // state
@@ -35,9 +36,9 @@ export const IssueWorklogProperty = observer(function IssueWorklogProperty(props
   const { getProjectById } = useProject();
   // derived values
   const isTimeTrackingEnabled = Boolean(getProjectById(projectId)?.is_time_tracking_enabled);
-  const { totalDuration } = useWorklogs(workspaceSlug, projectId, issueId, isTimeTrackingEnabled);
+  const { totalDuration } = useWorklogs(workspaceSlug, projectId, issueId, isTimeTrackingEnabled && canViewWorklogs);
 
-  if (!isTimeTrackingEnabled) return <></>;
+  if (!isTimeTrackingEnabled || !canViewWorklogs) return <></>;
 
   return (
     <>
@@ -57,6 +58,7 @@ export const IssueWorklogProperty = observer(function IssueWorklogProperty(props
         projectId={projectId}
         issueId={issueId}
         disabled={disabled}
+        canViewWorklogs={canViewWorklogs}
       />
     </>
   );

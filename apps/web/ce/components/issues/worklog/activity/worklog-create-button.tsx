@@ -19,12 +19,13 @@ type TIssueActivityWorklogCreateButton = {
   projectId: string;
   issueId: string;
   disabled: boolean;
+  canViewWorklogs: boolean;
 };
 
 export const IssueActivityWorklogCreateButton = observer(function IssueActivityWorklogCreateButton(
   props: TIssueActivityWorklogCreateButton
 ) {
-  const { workspaceSlug, projectId, issueId, disabled } = props;
+  const { workspaceSlug, projectId, issueId, disabled, canViewWorklogs } = props;
   // state
   const [isModalOpen, setIsModalOpen] = useState(false);
   // store hooks
@@ -32,7 +33,7 @@ export const IssueActivityWorklogCreateButton = observer(function IssueActivityW
   // derived values
   const isTimeTrackingEnabled = Boolean(getProjectById(projectId)?.is_time_tracking_enabled);
 
-  if (!isTimeTrackingEnabled) return <></>;
+  if (!isTimeTrackingEnabled || !canViewWorklogs) return <></>;
 
   return (
     <>
@@ -52,6 +53,7 @@ export const IssueActivityWorklogCreateButton = observer(function IssueActivityW
         projectId={projectId}
         issueId={issueId}
         disabled={disabled}
+        canViewWorklogs={canViewWorklogs}
       />
     </>
   );

@@ -18,15 +18,16 @@ export type TActivityFilterRoot = {
   toggleFilter: (filter: TActivityFilters) => void;
   projectId: string;
   isIntakeIssue?: boolean;
+  canViewWorklogs: boolean;
 };
 
 export const ActivityFilterRoot = observer(function ActivityFilterRoot(props: TActivityFilterRoot) {
-  const { selectedFilters, toggleFilter, projectId, isIntakeIssue = false } = props;
+  const { selectedFilters, toggleFilter, projectId, isIntakeIssue = false, canViewWorklogs } = props;
   // store hooks
   const { getProjectById } = useProject();
   // derived values — the worklog filter only applies where worklogs can exist
   const isTimeTrackingEnabled = Boolean(getProjectById(projectId)?.is_time_tracking_enabled);
-  const showWorklogFilter = isTimeTrackingEnabled && !isIntakeIssue;
+  const showWorklogFilter = isTimeTrackingEnabled && canViewWorklogs && !isIntakeIssue;
 
   const filters: TActivityFilterOption[] = Object.entries(ACTIVITY_FILTER_TYPE_OPTIONS)
     .filter(([key]) => showWorklogFilter || key !== EActivityFilterType.WORKLOG)
