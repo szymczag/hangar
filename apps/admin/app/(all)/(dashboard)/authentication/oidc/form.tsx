@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * Copyright (c) 2026-present Maciej Szymczak and contributors
  * SPDX-License-Identifier: AGPL-3.0-only
  * See the LICENSE file for details.
  */
@@ -30,6 +30,11 @@ type Props = {
 };
 
 type OIDCConfigFormValues = Record<TInstanceOIDCAuthenticationConfigurationKeys, string>;
+
+const OIDC_FORM_SWITCH_FIELD: TControllerSwitchFormField<OIDCConfigFormValues> = {
+  name: "OIDC_ALLOW_UNVERIFIED_EMAIL",
+  label: "Allow unverified email addresses",
+};
 
 export function InstanceOIDCConfigForm(props: Props) {
   const { config } = props;
@@ -99,11 +104,6 @@ export function InstanceOIDCConfigForm(props: Props) {
       required: false,
     },
   ];
-
-  const OIDC_FORM_SWITCH_FIELD: TControllerSwitchFormField<OIDCConfigFormValues> = {
-    name: "OIDC_ALLOW_UNVERIFIED_EMAIL",
-    label: "Allow unverified email addresses",
-  };
 
   const OIDC_SERVICE_FIELD: TCopyField[] = [
     {

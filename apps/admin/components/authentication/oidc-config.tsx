@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * Copyright (c) 2026-present Maciej Szymczak and contributors
  * SPDX-License-Identifier: AGPL-3.0-only
  * See the LICENSE file for details.
  */
@@ -40,9 +40,7 @@ export const OIDCConfiguration = observer(function OIDCConfiguration(props: Prop
           <ToggleSwitch
             value={Boolean(parseInt(oidcConfig))}
             onChange={() => {
-              Boolean(parseInt(oidcConfig)) === true
-                ? updateConfig("IS_OIDC_ENABLED", "0")
-                : updateConfig("IS_OIDC_ENABLED", "1");
+              updateConfig("IS_OIDC_ENABLED", parseInt(oidcConfig) ? "0" : "1");
             }}
             size="sm"
             disabled={disabled}
