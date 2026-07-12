@@ -1,11 +1,12 @@
-# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# Copyright (c) 2026-present Maciej Szymczak and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
 # Python imports
 import os
+import hashlib
 from datetime import datetime, timedelta
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import jwt
 import pytz
@@ -69,12 +70,17 @@ class OIDCOAuthProvider(OauthAdapter):
         is_space=False,
     ):
         (
+            IS_OIDC_ENABLED,
             OIDC_ISSUER,
             OIDC_CLIENT_ID,
             OIDC_CLIENT_SECRET,
             OIDC_ALLOW_UNVERIFIED_EMAIL,
         ) = get_configuration_value(
             [
+                {
+                    "key": "IS_OIDC_ENABLED",
+                    "default": os.environ.get("IS_OIDC_ENABLED", "0"),
+                },
                 {"key": "OIDC_ISSUER", "default": os.environ.get("OIDC_ISSUER")},
                 {"key": "OIDC_CLIENT_ID", "default": os.environ.get("OIDC_CLIENT_ID")},
                 {
@@ -88,13 +94,21 @@ class OIDCOAuthProvider(OauthAdapter):
             ]
         )
 
-        if not (OIDC_ISSUER and OIDC_CLIENT_ID and OIDC_CLIENT_SECRET):
+        if IS_OIDC_ENABLED != "1" or not (OIDC_ISSUER and OIDC_CLIENT_ID and OIDC_CLIENT_SECRET):
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_NOT_CONFIGURED"],
                 error_message="OIDC_NOT_CONFIGURED",
             )
 
-        if not (OIDC_ISSUER.startswith("https://") or OIDC_ISSUER.startswith("http://")):
+        issuer_url = urlparse(OIDC_ISSUER)
+        if (
+            issuer_url.scheme not in {"https", "http"}
+            or not issuer_url.netloc
+            or issuer_url.username
+            or issuer_url.password
+            or issuer_url.query
+            or issuer_url.fragment
+        ):
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_NOT_CONFIGURED"],
                 error_message="OIDC_NOT_CONFIGURED",
@@ -125,7 +139,16 @@ class OIDCOAuthProvider(OauthAdapter):
         if code_challenge:
             url_params["code_challenge"] = code_challenge
             url_params["code_challenge_method"] = "S256"
-        auth_url = f"{discovery['authorization_endpoint']}?{urlencode(url_params)}"
+        authorization_url = urlparse(discovery["authorization_endpoint"])
+        reserved_params = set(url_params)
+        existing_params = [
+            (key, value)
+            for key, value in parse_qsl(authorization_url.query, keep_blank_values=True)
+            if key not in reserved_params
+        ]
+        auth_url = urlunparse(
+            authorization_url._replace(query=urlencode([*existing_params, *url_params.items()]))
+        )
 
         super().__init__(
             request,
@@ -142,19 +165,68 @@ class OIDCOAuthProvider(OauthAdapter):
         )
         self.jwks_uri = discovery.get("jwks_uri")
 
-    def __get_discovery_document(self):
-        cache_key = f"ext:oidc:discovery:{self.issuer}"
-        discovery = cache.get(cache_key)
-        if discovery:
-            return discovery
+    def get_user_token(self, data, headers=None):
         try:
-            response = requests.get(
-                f"{self.issuer}/.well-known/openid-configuration",
+            response = requests.post(
+                self.get_token_url(),
+                data=data,
+                headers=headers or {},
                 timeout=DISCOVERY_TIMEOUT,
             )
             response.raise_for_status()
-            discovery = response.json()
+            token_response = response.json()
+            if not isinstance(token_response, dict):
+                raise ValueError("OIDC token response is not an object")
+            return token_response
         except (requests.RequestException, ValueError):
+            self.logger.warning("OIDC token request failed")
+            raise AuthenticationException(
+                error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
+                error_message="OIDC_PROVIDER_ERROR",
+            )
+
+    def get_user_response(self):
+        try:
+            response = requests.get(
+                self.get_user_info_url(),
+                headers={"Authorization": f"Bearer {self.token_data.get('access_token')}"},
+                timeout=DISCOVERY_TIMEOUT,
+            )
+            response.raise_for_status()
+            userinfo = response.json()
+            if not isinstance(userinfo, dict):
+                raise ValueError("OIDC userinfo response is not an object")
+            return userinfo
+        except (requests.RequestException, ValueError):
+            self.logger.warning("OIDC userinfo request failed")
+            raise AuthenticationException(
+                error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
+                error_message="OIDC_PROVIDER_ERROR",
+            )
+
+    def __get_discovery_document(self):
+        cache_key = f"ext:oidc:discovery:{self.issuer}"
+        discovery = cache.get(cache_key)
+        if not discovery:
+            try:
+                response = requests.get(
+                    f"{self.issuer}/.well-known/openid-configuration",
+                    timeout=DISCOVERY_TIMEOUT,
+                )
+                response.raise_for_status()
+                discovery = response.json()
+                if not isinstance(discovery, dict):
+                    raise ValueError("OIDC discovery response is not an object")
+            except (requests.RequestException, ValueError):
+                raise AuthenticationException(
+                    error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
+                    error_message="OIDC_PROVIDER_ERROR",
+                )
+
+        # Validate cached documents too. Besides being defensive against cache
+        # corruption, this keeps validation effective after security rules are
+        # tightened while an older document is still cached.
+        if not isinstance(discovery, dict):
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
                 error_message="OIDC_PROVIDER_ERROR",
@@ -168,8 +240,29 @@ class OIDCOAuthProvider(OauthAdapter):
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
                 error_message="OIDC_PROVIDER_ERROR",
             )
-        for required in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
-            if not discovery.get(required):
+        for endpoint_name in (
+            "authorization_endpoint",
+            "token_endpoint",
+            "jwks_uri",
+            "userinfo_endpoint",
+        ):
+            endpoint = discovery.get(endpoint_name)
+            if endpoint_name != "userinfo_endpoint" and not endpoint:
+                raise AuthenticationException(
+                    error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
+                    error_message="OIDC_PROVIDER_ERROR",
+                )
+            if not endpoint:
+                continue
+            endpoint_url = urlparse(endpoint)
+            if (
+                endpoint_url.scheme not in {"https", "http"}
+                or not endpoint_url.netloc
+                or endpoint_url.username
+                or endpoint_url.password
+                or endpoint_url.fragment
+                or (self.issuer.startswith("https://") and endpoint_url.scheme != "https")
+            ):
                 raise AuthenticationException(
                     error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
                     error_message="OIDC_PROVIDER_ERROR",
@@ -190,17 +283,34 @@ class OIDCOAuthProvider(OauthAdapter):
             data["code_verifier"] = self.code_verifier
         headers = {"Accept": "application/json"}
         token_response = self.get_user_token(data=data, headers=headers)
+        access_token = token_response.get("access_token")
+        id_token = token_response.get("id_token")
+        if not isinstance(access_token, str) or not access_token or not isinstance(id_token, str) or not id_token:
+            raise AuthenticationException(
+                error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
+                error_message="OIDC_PROVIDER_ERROR",
+            )
+        expires_in = token_response.get("expires_in")
+        try:
+            expires_in = float(expires_in) if expires_in is not None else None
+            if expires_in is not None and expires_in <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            raise AuthenticationException(
+                error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
+                error_message="OIDC_PROVIDER_ERROR",
+            )
         super().set_token_data(
             {
-                "access_token": token_response.get("access_token"),
+                "access_token": access_token,
                 "refresh_token": token_response.get("refresh_token", None),
                 "access_token_expired_at": (
-                    datetime.now(tz=pytz.utc) + timedelta(seconds=token_response.get("expires_in"))
-                    if token_response.get("expires_in")
+                    datetime.now(tz=pytz.utc) + timedelta(seconds=expires_in)
+                    if expires_in is not None
                     else None
                 ),
                 "refresh_token_expired_at": None,
-                "id_token": token_response.get("id_token", ""),
+                "id_token": id_token,
             }
         )
 
@@ -299,7 +409,12 @@ class OIDCOAuthProvider(OauthAdapter):
             {
                 "email": email,
                 "user": {
-                    "provider_id": str(claims.get("sub")),
+                    # `sub` is unique only within an issuer. Hash the pair into
+                    # Account.provider_account_id so changing providers cannot
+                    # collide with an account from a previous issuer.
+                    "provider_id": hashlib.sha256(
+                        f"{self.issuer}\0{claims.get('sub')}".encode()
+                    ).hexdigest(),
                     "email": email,
                     "avatar": claims.get("picture"),
                     "first_name": first_name,
