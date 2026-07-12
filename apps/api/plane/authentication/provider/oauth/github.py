@@ -160,7 +160,6 @@ class GitHubOAuthProvider(OauthAdapter):
                     "User is not in organization",
                     extra={
                         "organization_id": self.organization_id,
-                        "user_login": user_info_response.get("login"),
                     },
                 )
                 raise AuthenticationException(

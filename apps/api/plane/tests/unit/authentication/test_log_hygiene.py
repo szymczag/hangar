@@ -1,0 +1,66 @@
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+
+from unittest.mock import Mock, patch
+
+import pytest
+import requests
+
+from plane.authentication.adapter.base import Adapter
+from plane.authentication.adapter.error import AuthenticationException
+from plane.authentication.adapter.oauth import OauthAdapter
+from plane.authentication.provider.oauth.github import GitHubOAuthProvider
+
+
+@pytest.mark.unit
+class TestAuthenticationLogHygiene:
+    def test_invalid_email_is_not_logged(self):
+        adapter = Adapter(request=Mock(), provider="credentials")
+        adapter.logger = Mock()
+        submitted_email = "private-user@example"
+
+        with pytest.raises(AuthenticationException):
+            adapter.sanitize_email(submitted_email)
+
+        adapter.logger.warning.assert_called_once_with("Email validation failed")
+        assert submitted_email not in str(adapter.logger.mock_calls)
+
+    def test_oauth_access_token_is_not_logged_when_user_request_fails(self):
+        adapter = OauthAdapter(
+            request=Mock(),
+            provider="github",
+            client_id="client-id",
+            scope="read:user",
+            redirect_uri="https://example.com/callback",
+            auth_url="https://example.com/authorize",
+            token_url="https://example.com/token",
+            userinfo_url="https://example.com/user",
+        )
+        adapter.logger = Mock()
+        access_token = "secret-oauth-access-token"
+        adapter.token_data = {"access_token": access_token}
+
+        with patch("plane.authentication.adapter.oauth.requests.get", side_effect=requests.RequestException):
+            with pytest.raises(AuthenticationException):
+                adapter.get_user_response()
+
+        adapter.logger.warning.assert_called_once_with("Error getting user response")
+        assert access_token not in str(adapter.logger.mock_calls)
+
+    def test_github_membership_failure_does_not_log_username(self):
+        provider = object.__new__(GitHubOAuthProvider)
+        provider.organization_id = "example-org"
+        provider.token_data = {"access_token": "secret-oauth-access-token"}
+        provider.logger = Mock()
+        provider.get_user_response = Mock(return_value={"login": "private-user"})
+        provider.is_user_in_organization = Mock(return_value=False)
+
+        with pytest.raises(AuthenticationException):
+            provider.set_user_data()
+
+        provider.logger.warning.assert_called_once_with(
+            "User is not in organization",
+            extra={"organization_id": "example-org"},
+        )
+        assert "private-user" not in str(provider.logger.mock_calls)
