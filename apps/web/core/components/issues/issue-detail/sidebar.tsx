@@ -35,7 +35,6 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
-import { EUserPermissions } from "@plane/constants";
 import { useProjectState } from "@/hooks/store/use-project-state";
 // plane web components
 // components
@@ -44,6 +43,7 @@ import { IssueParentSelectRoot } from "@/plane-web/components/issues/issue-detai
 import { DateAlert } from "@/plane-web/components/issues/issue-details/sidebar/date-alert";
 import { TransferHopInfo } from "@/plane-web/components/issues/issue-details/sidebar/transfer-hop-info";
 import { IssueWorklogProperty } from "@/plane-web/components/issues/worklog/property";
+import { canViewWorklogsForRole } from "@/plane-web/helpers/worklog";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
 import { IssueCycleSelect } from "./cycle-select";
 import { IssueLabel } from "./label";
@@ -79,7 +79,7 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
   const projectDetails = getProjectById(issue.project_id);
   const stateDetails = getStateById(issue.state_id);
   const projectRole = getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug, projectId);
-  const canViewWorklogs = projectRole === EUserPermissions.ADMIN || projectRole === EUserPermissions.MEMBER;
+  const canViewWorklogs = canViewWorklogsForRole(projectRole);
 
   const minDate = issue.start_date ? getDate(issue.start_date) : null;
   minDate?.setDate(minDate.getDate());

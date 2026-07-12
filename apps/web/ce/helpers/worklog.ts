@@ -8,6 +8,13 @@
 export const MAX_WORKLOG_MINUTES = 24 * 60;
 export const MAX_WORKLOG_DESCRIPTION_LENGTH = 5000;
 
+// Mirrors the backend project roles allowed to read confidential worklog data.
+const WORKLOG_READER_ROLES = new Set([20, 15]);
+
+export function canViewWorklogsForRole(role: number | undefined): boolean {
+  return role !== undefined && WORKLOG_READER_ROLES.has(role);
+}
+
 export function formatWorklogDuration(minutes: number): string {
   const total = Math.max(0, Math.floor(minutes || 0));
   const hours = Math.floor(total / 60);
