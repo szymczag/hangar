@@ -29,8 +29,8 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | -------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------- |
 | Fork maintenance guide and CI baseline | Available on `preview` | [FORK.md](FORK.md)                                                                  |
 | Isolated backend extension scaffold    | Available on `preview` | [#2](https://github.com/szymczag/hangar/pull/2)                                     |
-| OIDC backend                           | In review              | [#3](https://github.com/szymczag/hangar/pull/3)                                     |
-| OIDC administration and sign-in UI     | Stacked                | [#4](https://github.com/szymczag/hangar/pull/4)                                     |
+| OIDC backend                           | Available on `preview` | [#3](https://github.com/szymczag/hangar/pull/3)                                     |
+| OIDC administration and sign-in UI     | In review              | [#4](https://github.com/szymczag/hangar/pull/4)                                     |
 | SAML 2.0 backend and UI                | Stacked                | [#5–#6](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+SAML)          |
 | Epics                                  | Stacked                | [#7, #9, #14](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+epic)    |
 | Custom work-item types and properties  | Stacked                | [#10–#11](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+issue-types) |
