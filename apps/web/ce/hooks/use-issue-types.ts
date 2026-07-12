@@ -8,10 +8,13 @@ import useSWR from "swr";
 import { issueTypeService } from "@/plane-web/services/issue-type.service";
 import type { TIssueTypeExt } from "@/plane-web/types/issue-types";
 
+export const getIssueTypesKey = (workspaceSlug: string, projectId: string) =>
+  `ISSUE_TYPES_${workspaceSlug}_${projectId}`;
+
 /** Project issue types with their properties, SWR-cached. */
 export const useIssueTypes = (workspaceSlug: string | undefined, projectId: string | undefined | null) => {
   const { data, isLoading, mutate } = useSWR<TIssueTypeExt[]>(
-    workspaceSlug && projectId ? `ISSUE_TYPES_${workspaceSlug}_${projectId}` : null,
+    workspaceSlug && projectId ? getIssueTypesKey(workspaceSlug, projectId) : null,
     workspaceSlug && projectId ? () => issueTypeService.getIssueTypes(workspaceSlug, projectId) : null,
     { revalidateOnFocus: false }
   );

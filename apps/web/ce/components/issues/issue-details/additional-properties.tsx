@@ -8,7 +8,7 @@
 // sidebar/peek. Values load from the bundle endpoint and save per property
 // on change.
 
-import React from "react";
+import React, { useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 // plane imports
@@ -39,22 +39,25 @@ export const WorkItemAdditionalSidebarProperties = observer(function WorkItemAdd
     () => issueTypeService.getPropertyValues(workspaceSlug, projectId, workItemId),
     { revalidateOnFocus: false }
   );
+  const [isSaving, setIsSaving] = useState(false);
 
   const properties = activeProperties(workItemTypeId);
   if (!workItemTypeId || properties.length === 0) return null;
 
   const handleChange = async (propertyId: string, next: string[]) => {
+    if (!values || isSaving) return;
     const previous = values;
-    await mutate({ ...values, [propertyId]: next }, { revalidate: false });
+    const optimistic = { ...previous, [propertyId]: next };
+    setIsSaving(true);
+    await mutate(optimistic, { revalidate: false });
     try {
-      await issueTypeService.updatePropertyValues(workspaceSlug, projectId, workItemId, {
-        ...values,
-        [propertyId]: next,
-      });
+      await issueTypeService.updatePropertyValues(workspaceSlug, projectId, workItemId, optimistic);
     } catch (error) {
       console.error(error);
       await mutate(previous, { revalidate: false });
       setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to update the property." });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -72,7 +75,7 @@ export const WorkItemAdditionalSidebarProperties = observer(function WorkItemAdd
               values={((values ?? {})[property.id] as string[] | undefined) ?? []}
               onChange={(next) => void handleChange(property.id, next)}
               projectId={projectId}
-              disabled={!isEditable}
+              disabled={!isEditable || !values || isSaving}
             />
           </div>
         </div>

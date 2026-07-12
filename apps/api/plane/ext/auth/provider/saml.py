@@ -102,7 +102,7 @@ class SAMLProvider(Adapter):
 
         sso_url = urlparse(SAML_IDP_SSO_URL)
         if (
-            sso_url.scheme not in {"https", "http"}
+            sso_url.scheme != "https"
             or not sso_url.netloc
             or sso_url.username
             or sso_url.password

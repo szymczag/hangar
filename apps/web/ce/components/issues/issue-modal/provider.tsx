@@ -12,7 +12,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
+import { mutate } from "swr";
 // plane imports
+import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { ISearchIssueResponse, TIssue, TIssuePropertyValueErrors, TIssuePropertyValues } from "@plane/types";
 // components
 import type {
@@ -26,6 +28,7 @@ import { IssueModalContext } from "@/components/issues/issue-modal/context";
 // hooks
 import { useUser } from "@/hooks/store/user/user-user";
 // plane web
+import { getIssueTypesKey } from "@/plane-web/hooks/use-issue-types";
 import { issueTypeService } from "@/plane-web/services/issue-type.service";
 import type { TIssueTypeExt } from "@/plane-web/types/issue-types";
 
@@ -43,13 +46,61 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
   const [selectedParentIssue, setSelectedParentIssue] = useState<ISearchIssueResponse | null>(null);
   const [issuePropertyValues, setIssuePropertyValues] = useState<TIssuePropertyValues>({});
   const [issuePropertyValueErrors, setIssuePropertyValueErrors] = useState<TIssuePropertyValueErrors>({});
-  // Per-project issue type definitions, fetched on project change. A ref is
-  // enough — consumers re-render through the state setters above.
-  const issueTypesByProject = useRef<Record<string, TIssueTypeExt[]>>({});
+  // The ref provides synchronous reads after an awaited fetch; the state map
+  // makes schema-dependent consumers re-render. SWR remains the shared cache
+  // used by the rendered inputs.
+  const issueTypesByProjectRef = useRef<Record<string, TIssueTypeExt[]>>({});
+  const [, setIssueTypesByProject] = useState<Record<string, TIssueTypeExt[]>>({});
+  const schemaStatusByProject = useRef<Record<string, "loading" | "ready" | "error">>({});
+  const schemaRequestsByProject = useRef<Record<string, Promise<void>>>({});
   // store hooks
   const { projectsWithCreatePermissions } = useUser();
   // derived values
   const projectIdsWithCreatePermissions = Object.keys(projectsWithCreatePermissions ?? {});
+
+  const getProjectTypes = useCallback(
+    (projectId: string | null | undefined) => (projectId ? (issueTypesByProjectRef.current[projectId] ?? []) : []),
+    []
+  );
+
+  const getActiveProperties = useCallback(
+    (projectId: string | null | undefined, typeId: string | null | undefined) => {
+      const type = getProjectTypes(projectId).find((item) => item.id === typeId);
+      return (type?.properties ?? []).filter((property) => property.is_active);
+    },
+    [getProjectTypes]
+  );
+
+  const handleProjectEntitiesFetch = useCallback(
+    async ({ workItemProjectId, workspaceSlug }: THandleProjectEntitiesFetchProps) => {
+      if (!workItemProjectId || schemaStatusByProject.current[workItemProjectId] === "ready") return;
+      const pendingRequest = schemaRequestsByProject.current[workItemProjectId];
+      if (pendingRequest) return pendingRequest;
+
+      schemaStatusByProject.current[workItemProjectId] = "loading";
+      const request = (async () => {
+        try {
+          const types = await mutate<TIssueTypeExt[]>(
+            getIssueTypesKey(workspaceSlug, workItemProjectId),
+            issueTypeService.getIssueTypes(workspaceSlug, workItemProjectId),
+            { populateCache: true, revalidate: false }
+          );
+          if (!types) throw new Error("Issue type schema returned no data");
+          issueTypesByProjectRef.current[workItemProjectId] = types;
+          schemaStatusByProject.current[workItemProjectId] = "ready";
+          setIssueTypesByProject((current) => ({ ...current, [workItemProjectId]: types }));
+        } catch (error) {
+          schemaStatusByProject.current[workItemProjectId] = "error";
+          throw error;
+        } finally {
+          delete schemaRequestsByProject.current[workItemProjectId];
+        }
+      })();
+      schemaRequestsByProject.current[workItemProjectId] = request;
+      return request;
+    },
+    []
+  );
 
   useEffect(() => {
     const workspaceSlug = routeWorkspaceSlug?.toString();
@@ -64,52 +115,31 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
 
     const preloadPropertyValues = async () => {
       try {
-        const [types, values] = await Promise.all([
-          issueTypeService.getIssueTypes(workspaceSlug, projectId),
+        const [, values] = await Promise.all([
+          handleProjectEntitiesFetch({
+            workspaceSlug,
+            workItemProjectId: projectId,
+            workItemTypeId: dataForPreload.type_id ?? undefined,
+          }),
           issueTypeService.getPropertyValues(workspaceSlug, projectId, issueId),
         ]);
-        if (cancelled) return;
-        issueTypesByProject.current[projectId] = types;
-        setIssuePropertyValues(values);
+        if (!cancelled) setIssuePropertyValues(values);
       } catch {
         if (!cancelled) setIssuePropertyValues({});
       }
     };
 
     void preloadPropertyValues();
-
     return () => {
       cancelled = true;
     };
-  }, [dataForPreload?.id, dataForPreload?.project_id, routeWorkspaceSlug]);
-
-  const getProjectTypes = useCallback(
-    (projectId: string | null | undefined) => (projectId ? (issueTypesByProject.current[projectId] ?? []) : []),
-    []
-  );
-
-  const getActiveProperties = useCallback(
-    (projectId: string | null | undefined, typeId: string | null | undefined) => {
-      const type = getProjectTypes(projectId).find((item) => item.id === typeId);
-      return (type?.properties ?? []).filter((property) => property.is_active);
-    },
-    [getProjectTypes]
-  );
-
-  const handleProjectEntitiesFetch = useCallback(
-    async ({ workItemProjectId, workspaceSlug }: THandleProjectEntitiesFetchProps) => {
-      if (!workItemProjectId || issueTypesByProject.current[workItemProjectId]) return;
-      try {
-        issueTypesByProject.current[workItemProjectId] = await issueTypeService.getIssueTypes(
-          workspaceSlug,
-          workItemProjectId
-        );
-      } catch {
-        issueTypesByProject.current[workItemProjectId] = [];
-      }
-    },
-    []
-  );
+  }, [
+    dataForPreload?.id,
+    dataForPreload?.project_id,
+    dataForPreload?.type_id,
+    handleProjectEntitiesFetch,
+    routeWorkspaceSlug,
+  ]);
 
   const getIssueTypeIdOnProjectChange = useCallback(
     (projectId: string) => {
@@ -126,6 +156,14 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
 
   const handlePropertyValuesValidation = useCallback(
     ({ projectId, watch }: TPropertyValuesValidationProps) => {
+      if (!projectId || schemaStatusByProject.current[projectId] !== "ready") {
+        setToast({
+          type: TOAST_TYPE.ERROR,
+          title: "Unable to validate work item properties",
+          message: "The work item type schema is not available yet. Retry after it finishes loading.",
+        });
+        return false;
+      }
       const properties = getActiveProperties(projectId, watch("type_id"));
       const errors: TIssuePropertyValueErrors = {};
       for (const property of properties) {
@@ -142,6 +180,11 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
 
   const handleCreateUpdatePropertyValues = useCallback(
     async ({ issueId, projectId, workspaceSlug, issueTypeId }: TCreateUpdatePropertyValuesProps) => {
+      await handleProjectEntitiesFetch({
+        workspaceSlug,
+        workItemProjectId: projectId,
+        workItemTypeId: issueTypeId ?? undefined,
+      });
       const properties = getActiveProperties(projectId, issueTypeId);
       const payload: TIssuePropertyValues = {};
       for (const property of properties) {
@@ -150,7 +193,7 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
       await issueTypeService.updatePropertyValues(workspaceSlug, projectId, issueId, payload);
       setIssuePropertyValues({});
     },
-    [getActiveProperties, issuePropertyValues]
+    [getActiveProperties, handleProjectEntitiesFetch, issuePropertyValues]
   );
 
   const contextValue = useMemo<TIssueModalContext>(
