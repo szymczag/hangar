@@ -10,9 +10,11 @@ from urllib.parse import parse_qs, urlparse
 
 import jwt
 import pytest
+import requests
 from cryptography.hazmat.primitives.asymmetric import rsa
 from django.core.cache import cache
 from django.test import Client
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -20,6 +22,7 @@ from plane.db.models import User
 from plane.license.models import Instance, InstanceConfiguration
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
+from plane.ext.auth.provider.oidc import OIDCResponse, _checked_response, _connect_pinned, validate_outbound_url
 from plane.ext.auth.views.oidc import SESSION_NONCE, SESSION_STATE, SESSION_VERIFIER
 from plane.authentication.adapter.error import AUTHENTICATION_ERROR_CODES
 
@@ -85,6 +88,15 @@ def django_client():
     return Client(HTTP_USER_AGENT="Mozilla/5.0 (X11; Linux x86_64) test-client")
 
 
+@pytest.fixture(autouse=True)
+def public_oidc_dns(mocker):
+    """OIDC contracts are deterministic and never perform real DNS lookups."""
+    return mocker.patch(
+        "plane.ext.auth.provider.oidc._getaddrinfo",
+        return_value=[(2, 1, 6, "", ("8.8.8.8", 443))],
+    )
+
+
 def make_id_token(rsa_key, **overrides):
     now = int(time.time())
     claims = {
@@ -131,9 +143,7 @@ def run_callback(
     token_response = {"access_token": "at-123", "expires_in": 3600, "id_token": id_token}
     token_response.update(token_response_overrides or {})
 
-    fake_jwk_client = SimpleNamespace(
-        get_signing_key_from_jwt=lambda _token: SimpleNamespace(key=rsa_key.public_key())
-    )
+    fake_jwk_client = SimpleNamespace(get_signing_key_from_jwt=lambda _token: SimpleNamespace(key=rsa_key.public_key()))
     with (
         patch(
             "plane.ext.auth.provider.oidc.OIDCOAuthProvider.get_user_token",
@@ -148,6 +158,90 @@ def run_callback(
 def error_code_of(response):
     query = parse_qs(urlparse(response["Location"]).query)
     return int(query["error_code"][0]) if "error_code" in query else None
+
+
+@pytest.mark.contract
+class TestOIDCOutboundURLPolicy:
+    @pytest.mark.parametrize(
+        "url,address",
+        [
+            ("https://localhost/oidc", "127.0.0.1"),
+            ("https://private.test/oidc", "10.0.0.1"),
+            ("https://link-local.test/oidc", "169.254.169.254"),
+            ("https://reserved.test/oidc", "192.0.2.1"),
+            ("https://ipv6-private.test/oidc", "fd00::1"),
+        ],
+    )
+    def test_rejects_non_public_destinations(self, public_oidc_dns, url, address):
+        public_oidc_dns.return_value = [(2, 1, 6, "", (address, 443))]
+
+        with pytest.raises(ValueError):
+            validate_outbound_url(url)
+
+    def test_rejects_credentials_and_mixed_dns(self, public_oidc_dns):
+        with pytest.raises(ValueError):
+            validate_outbound_url("https://user:password@idp.test/oidc")
+
+        public_oidc_dns.return_value = [
+            (2, 1, 6, "", ("8.8.8.8", 443)),
+            (2, 1, 6, "", ("10.0.0.1", 443)),
+        ]
+        with pytest.raises(ValueError):
+            validate_outbound_url("https://idp.test/oidc")
+
+    def test_rejects_ipv4_mapped_private_ipv6_and_scoped_ipv6(self, public_oidc_dns):
+        public_oidc_dns.return_value = [(10, 1, 6, "", ("::ffff:127.0.0.1", 443, 0, 0))]
+        with pytest.raises(ValueError):
+            validate_outbound_url("https://idp.test/oidc")
+
+        with pytest.raises(ValueError):
+            validate_outbound_url("https://[fe80::1%25eth0]/oidc")
+
+    def test_supports_public_ipv6(self, public_oidc_dns):
+        public_oidc_dns.return_value = [(10, 1, 6, "", ("2606:4700:4700::1111", 443, 0, 0))]
+
+        target = validate_outbound_url("https://idp.test/oidc")
+
+        assert str(target.addresses[0].ip) == "2606:4700:4700::1111"
+
+    def test_pins_validated_address_without_second_dns_lookup(self, public_oidc_dns, mocker):
+        target = validate_outbound_url("https://idp.test/oidc")
+        public_oidc_dns.return_value = [(2, 1, 6, "", ("127.0.0.1", 443))]
+        raw_socket = Mock()
+        raw_socket.getpeername.return_value = ("8.8.8.8", 443)
+        mocker.patch("plane.ext.auth.provider.oidc.socket.socket", return_value=raw_socket)
+        tls_context = mocker.patch("plane.ext.auth.provider.oidc.ssl.create_default_context").return_value
+        tls_context.wrap_socket.return_value = raw_socket
+
+        connected = _connect_pinned(target, target.addresses[0], 10)
+
+        assert connected is raw_socket
+        raw_socket.connect.assert_called_once_with(("8.8.8.8", 443))
+        tls_context.wrap_socket.assert_called_once_with(raw_socket, server_hostname="idp.test")
+        assert public_oidc_dns.call_count == 1
+
+    def test_rejects_unexpected_connected_peer(self, public_oidc_dns, mocker):
+        target = validate_outbound_url("https://idp.test/oidc")
+        raw_socket = Mock()
+        raw_socket.getpeername.return_value = ("1.1.1.1", 80)
+        mocker.patch("plane.ext.auth.provider.oidc.socket.socket", return_value=raw_socket)
+
+        with pytest.raises(OSError):
+            _connect_pinned(target, target.addresses[0], 10)
+
+        raw_socket.close.assert_called_once()
+
+    @override_settings(DEBUG=False)
+    def test_requires_https_outside_development(self):
+        with pytest.raises(ValueError):
+            validate_outbound_url("http://idp.test/oidc")
+
+    @pytest.mark.parametrize("location", ["http://10.0.0.1/internal", "https://public.example/elsewhere"])
+    def test_rejects_redirects(self, location):
+        response = Mock(status_code=302, headers={"Location": location})
+
+        with pytest.raises(requests.RequestException):
+            _checked_response(response)
 
 
 @pytest.mark.contract
@@ -179,9 +273,7 @@ class TestOIDCInitiate:
         assert error_code_of(response) == AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"]
 
     @pytest.mark.django_db
-    def test_https_issuer_rejects_downgraded_endpoint(
-        self, django_client, setup_instance, oidc_config
-    ):
+    def test_https_issuer_rejects_downgraded_endpoint(self, django_client, setup_instance, oidc_config):
         cache.set(
             f"ext:oidc:discovery:{ISSUER}",
             {**DISCOVERY, "token_endpoint": "http://idp.test/token"},
@@ -207,9 +299,7 @@ class TestOIDCInitiate:
         assert django_client.session[SESSION_VERIFIER]
 
     @pytest.mark.django_db
-    def test_preserves_discovery_authorization_query(
-        self, django_client, setup_instance, oidc_config
-    ):
+    def test_preserves_discovery_authorization_query(self, django_client, setup_instance, oidc_config):
         cache.set(
             f"ext:oidc:discovery:{ISSUER}",
             {**DISCOVERY, "authorization_endpoint": f"{ISSUER}/authorize?tenant=hangar"},
@@ -221,9 +311,7 @@ class TestOIDCInitiate:
         assert query["client_id"] == [CLIENT_ID]
 
     @pytest.mark.django_db
-    def test_app_and_space_flows_keep_separate_state(
-        self, django_client, setup_instance, oidc_config
-    ):
+    def test_app_and_space_flows_keep_separate_state(self, django_client, setup_instance, oidc_config):
         app_state, _, _ = initiate(django_client)
         space_response = django_client.get(reverse("oidc-space-initiate"))
         assert space_response.status_code == 302
@@ -274,11 +362,9 @@ class TestOIDCCallback:
     @pytest.mark.django_db
     def test_malformed_token_response_rejected(self, django_client, setup_instance, oidc_config):
         session_state, _, _ = initiate(django_client)
-        token_http_response = Mock()
-        token_http_response.raise_for_status.return_value = None
-        token_http_response.json.return_value = []
+        token_http_response = OIDCResponse(200, b"[]")
         with patch(
-            "plane.ext.auth.provider.oidc.requests.post",
+            "plane.ext.auth.provider.oidc._request_oidc",
             return_value=token_http_response,
         ) as token_post:
             response = django_client.get(
@@ -286,7 +372,7 @@ class TestOIDCCallback:
                 {"code": "auth-code", "state": session_state},
             )
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"]
-        assert token_post.call_args.kwargs["timeout"] == 10
+        assert token_post.call_args.args[0] == "POST"
 
     @pytest.mark.django_db
     def test_wrong_nonce_rejected(self, django_client, setup_instance, oidc_config):
@@ -300,10 +386,52 @@ class TestOIDCCallback:
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_TOKEN_VALIDATION_FAILED"]
 
     @pytest.mark.django_db
-    def test_wrong_issuer_rejected(self, django_client, setup_instance, oidc_config):
+    def test_single_audience_mismatched_azp_rejected(self, django_client, setup_instance, oidc_config):
         response = run_callback(
-            django_client, rsa_key=self._key(), token_overrides={"iss": "https://evil.test"}
+            django_client,
+            rsa_key=self._key(),
+            token_overrides={"aud": CLIENT_ID, "azp": "other-client"},
         )
+        assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_TOKEN_VALIDATION_FAILED"]
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "token_overrides",
+        [
+            {"aud": CLIENT_ID},
+            {"aud": CLIENT_ID, "azp": CLIENT_ID},
+            {"aud": [CLIENT_ID, "resource-api"], "azp": CLIENT_ID},
+        ],
+    )
+    def test_valid_authorized_party_combinations_accepted(
+        self, django_client, setup_instance, oidc_config, token_overrides
+    ):
+        response = run_callback(
+            django_client,
+            rsa_key=self._key(),
+            token_overrides=token_overrides,
+        )
+        assert error_code_of(response) is None
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "token_overrides",
+        [
+            {"aud": [CLIENT_ID, "resource-api"]},
+            {"aud": [CLIENT_ID, "resource-api"], "azp": "other-client"},
+        ],
+    )
+    def test_multiple_audiences_require_matching_azp(self, django_client, setup_instance, oidc_config, token_overrides):
+        response = run_callback(
+            django_client,
+            rsa_key=self._key(),
+            token_overrides=token_overrides,
+        )
+        assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_TOKEN_VALIDATION_FAILED"]
+
+    @pytest.mark.django_db
+    def test_wrong_issuer_rejected(self, django_client, setup_instance, oidc_config):
+        response = run_callback(django_client, rsa_key=self._key(), token_overrides={"iss": "https://evil.test"})
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_TOKEN_VALIDATION_FAILED"]
 
     @pytest.mark.django_db
@@ -331,16 +459,12 @@ class TestOIDCCallback:
             ),
             patch("plane.ext.auth.provider.oidc._get_jwk_client", return_value=fake_jwk_client),
         ):
-            response = django_client.get(
-                reverse("oidc-callback"), {"code": "auth-code", "state": session_state}
-            )
+            response = django_client.get(reverse("oidc-callback"), {"code": "auth-code", "state": session_state})
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_TOKEN_VALIDATION_FAILED"]
 
     @pytest.mark.django_db
     def test_unverified_email_rejected(self, django_client, setup_instance, oidc_config):
-        response = run_callback(
-            django_client, rsa_key=self._key(), token_overrides={"email_verified": False}
-        )
+        response = run_callback(django_client, rsa_key=self._key(), token_overrides={"email_verified": False})
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_UNVERIFIED_EMAIL"]
         assert not User.objects.filter(email="oidc-user@hangar.test").exists()
 
@@ -350,9 +474,7 @@ class TestOIDCCallback:
             key="OIDC_ALLOW_UNVERIFIED_EMAIL",
             defaults={"value": "1", "category": "OIDC", "is_encrypted": False},
         )
-        response = run_callback(
-            django_client, rsa_key=self._key(), token_overrides={"email_verified": False}
-        )
+        response = run_callback(django_client, rsa_key=self._key(), token_overrides={"email_verified": False})
         assert error_code_of(response) is None
         assert User.objects.filter(email="oidc-user@hangar.test").exists()
 
