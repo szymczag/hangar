@@ -1,6 +1,8 @@
+blank_issues_enabled: false
 contact_links:
-  - name: Help and support
-    about: Reach out to us on our Forum or GitHub discussions.
-  - name: Dedicated support
-    url: mailto:support@plane.so
-    about: Write to us if you'd like dedicated support using Plane
+  - name: Report a security vulnerability
+    url: https://github.com/szymczag/hangar/security/advisories/new
+    about: Report security issues privately instead of opening a public issue.
+  - name: Upstream Plane
+    url: https://github.com/makeplane/plane/issues
+    about: Report issues that reproduce on an unmodified Plane build and do not involve Hangar.
