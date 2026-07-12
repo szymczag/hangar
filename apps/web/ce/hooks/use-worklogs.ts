@@ -9,7 +9,7 @@ import { worklogService } from "@/plane-web/services/worklog.service";
 
 export function useWorklogs(workspaceSlug: string, projectId: string, issueId: string, enabled: boolean = true) {
   const { data, isLoading, mutate } = useSWR(
-    enabled && workspaceSlug && projectId && issueId ? `ISSUE_WORKLOGS_${issueId}` : null,
+    enabled && workspaceSlug && projectId && issueId ? `ISSUE_WORKLOGS_${workspaceSlug}_${projectId}_${issueId}` : null,
     () => worklogService.getWorklogs(workspaceSlug, projectId, issueId),
     { revalidateOnFocus: false }
   );

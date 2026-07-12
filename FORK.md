@@ -70,6 +70,8 @@ merge-conflict risk.
 | 17  | `apps/api/plane/bgtasks/issue_activities_task.py`                                                                                                 | 3, 4  | append the `track_type` field tracker plus worklog create/update/delete activity handlers           |
 | 18  | `packages/constants/src/issue/filter.ts`                                                                                                          | 4     | append the `WORKLOG` activity filter type and option; retain the lint-safe callback parameter rename |
 | 19  | `packages/types/src/project/projects.ts`                                                                                                          | 4     | append `is_time_tracking_enabled` to `IProject`; the flag already exists on the server model         |
+| 20  | `apps/api/plane/app/views/issue/activity.py`                                                                                                      | 4     | exclude confidential worklog activity from guest history while preserving member and effective workspace-admin access |
+| 21  | `apps/web/core/components/issues/issue-detail/`, `apps/web/core/components/issues/peek-overview/properties.tsx`                                  | 4     | propagate the effective worklog-read capability so guest clients do not fetch or render confidential time entries |
 
 Planned (added when the phase lands):
 

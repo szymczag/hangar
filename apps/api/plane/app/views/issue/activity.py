@@ -18,7 +18,7 @@ from rest_framework import status
 from .. import BaseAPIView
 from plane.app.serializers import IssueActivitySerializer, IssueCommentSerializer
 from plane.app.permissions import ProjectEntityPermission, allow_permission, ROLE
-from plane.db.models import IssueActivity, IssueComment, CommentReaction, IntakeIssue
+from plane.db.models import IssueActivity, IssueComment, CommentReaction, IntakeIssue, ProjectMember, WorkspaceMember
 
 
 class IssueActivityEndpoint(BaseAPIView):
@@ -44,6 +44,19 @@ class IssueActivityEndpoint(BaseAPIView):
             .filter(**filters)
             .select_related("actor", "workspace", "issue", "project")
         ).order_by("created_at")
+        project_role = ProjectMember.objects.filter(
+            project_id=project_id,
+            member=request.user,
+            is_active=True,
+        ).values_list("role", flat=True).first()
+        is_workspace_admin = WorkspaceMember.objects.filter(
+            workspace__slug=slug,
+            member=request.user,
+            role=ROLE.ADMIN.value,
+            is_active=True,
+        ).exists()
+        if project_role not in (ROLE.ADMIN.value, ROLE.MEMBER.value) and not is_workspace_admin:
+            issue_activities = issue_activities.exclude(field="worklog")
         issue_comments = (
             IssueComment.objects.filter(issue_id=issue_id)
             .filter(
@@ -78,6 +91,8 @@ class IssueActivityEndpoint(BaseAPIView):
             issue_comments = IssueCommentSerializer(issue_comments, many=True).data
             return Response(issue_comments, status=status.HTTP_200_OK)
 
+        issue_activities = IssueActivitySerializer(issue_activities, many=True).data
+        issue_comments = IssueCommentSerializer(issue_comments, many=True).data
         result_list = sorted(
             chain(issue_activities, issue_comments),
             key=lambda instance: instance["created_at"],

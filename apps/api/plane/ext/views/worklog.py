@@ -53,7 +53,7 @@ def can_modify(worklog, user, slug, project_id):
 
 
 class IssueWorkLogsEndpoint(BaseAPIView):
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id, issue_id):
         if not time_tracking_enabled(slug, project_id):
             return Response({"error": "Time tracking is not enabled"}, status=status.HTTP_400_BAD_REQUEST)
