@@ -59,6 +59,8 @@ export interface IProject extends IPartialProject {
   members?: string[];
   timezone?: string;
   next_work_item_sequence?: number;
+  // Fork (see FORK.md): server flag gating the worklogs feature
+  is_time_tracking_enabled?: boolean;
 }
 
 export type TProjectAnalyticsCountParams = {
