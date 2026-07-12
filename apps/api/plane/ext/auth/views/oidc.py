@@ -18,6 +18,7 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
     AuthenticationException,
 )
+from plane.authentication.rate_limit import authentication_throttle_allows
 from plane.authentication.utils.host import base_host
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.redirection_path import get_redirection_path
@@ -54,13 +55,27 @@ class OIDCEndpointMixin:
             return base_host(request=request, is_space=True)
         return base_host(request=request, is_app=True)
 
+    def _session_key(self, key):
+        # App and Space authorization attempts may coexist in one browser
+        # session. Keep their one-shot values separate to prevent one flow
+        # from overwriting or being consumed by the other.
+        return f"{key}_space" if self.is_space else key
+
 
 class OIDCAuthInitiateBase(OIDCEndpointMixin, View):
     def get(self, request):
-        request.session["host"] = self._host(request)
+        host = self._host(request)
+        request.session["host"] = host
         next_path = request.GET.get("next_path")
         if next_path:
             request.session["next_path"] = str(validate_next_path(next_path))
+
+        if not authentication_throttle_allows(request):
+            exc = AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+                error_message="RATE_LIMIT_EXCEEDED",
+            )
+            return _error_redirect(host, exc.get_error_dict(), next_path)
 
         # Check instance configuration
         instance = Instance.objects.first()
@@ -69,7 +84,7 @@ class OIDCAuthInitiateBase(OIDCEndpointMixin, View):
                 error_code=AUTHENTICATION_ERROR_CODES["INSTANCE_NOT_CONFIGURED"],
                 error_message="INSTANCE_NOT_CONFIGURED",
             )
-            return _error_redirect(self._host(request), exc.get_error_dict(), next_path)
+            return _error_redirect(host, exc.get_error_dict(), next_path)
 
         try:
             state = uuid.uuid4().hex
@@ -82,12 +97,12 @@ class OIDCAuthInitiateBase(OIDCEndpointMixin, View):
                 code_challenge=code_challenge,
                 is_space=self.is_space,
             )
-            request.session[SESSION_STATE] = state
-            request.session[SESSION_NONCE] = nonce
-            request.session[SESSION_VERIFIER] = code_verifier
+            request.session[self._session_key(SESSION_STATE)] = state
+            request.session[self._session_key(SESSION_NONCE)] = nonce
+            request.session[self._session_key(SESSION_VERIFIER)] = code_verifier
             return HttpResponseRedirect(provider.get_auth_url())
         except AuthenticationException as e:
-            return _error_redirect(self._host(request), e.get_error_dict(), next_path)
+            return _error_redirect(host, e.get_error_dict(), next_path)
 
 
 class OIDCCallbackBase(OIDCEndpointMixin, View):
@@ -99,9 +114,9 @@ class OIDCCallbackBase(OIDCEndpointMixin, View):
 
         # One-shot session values: pop them so a replayed callback URL cannot
         # reuse this session's state/nonce/verifier.
-        session_state = request.session.pop(SESSION_STATE, "")
-        nonce = request.session.pop(SESSION_NONCE, "")
-        code_verifier = request.session.pop(SESSION_VERIFIER, "")
+        session_state = request.session.pop(self._session_key(SESSION_STATE), "")
+        nonce = request.session.pop(self._session_key(SESSION_NONCE), "")
+        code_verifier = request.session.pop(self._session_key(SESSION_VERIFIER), "")
 
         if not state or state != session_state or not code:
             exc = AuthenticationException(
