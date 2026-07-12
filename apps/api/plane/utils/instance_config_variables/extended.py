@@ -54,4 +54,62 @@ oidc_config_variables = [
     },
 ]
 
-extended_config_variables = oidc_config_variables
+# Same env-derived enablement pattern as OIDC.
+_saml_env_configured = all(
+    bool(os.environ.get(key)) for key in ("SAML_IDP_ENTITY_ID", "SAML_IDP_SSO_URL", "SAML_IDP_CERTIFICATE")
+)
+
+saml_config_variables = [
+    {
+        "key": "IS_SAML_ENABLED",
+        "value": os.environ.get("IS_SAML_ENABLED", "1" if _saml_env_configured else "0"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+    {
+        "key": "SAML_PROVIDER_NAME",
+        "value": os.environ.get("SAML_PROVIDER_NAME", "SAML"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+    {
+        "key": "SAML_IDP_ENTITY_ID",
+        "value": os.environ.get("SAML_IDP_ENTITY_ID"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+    {
+        "key": "SAML_IDP_SSO_URL",
+        "value": os.environ.get("SAML_IDP_SSO_URL"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+    {
+        # The IdP's public signing certificate (PEM) — public key material,
+        # stored unencrypted.
+        "key": "SAML_IDP_CERTIFICATE",
+        "value": os.environ.get("SAML_IDP_CERTIFICATE"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+    {
+        "key": "SAML_ATTR_EMAIL",
+        "value": os.environ.get("SAML_ATTR_EMAIL"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+    {
+        "key": "SAML_ATTR_FIRST_NAME",
+        "value": os.environ.get("SAML_ATTR_FIRST_NAME"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+    {
+        "key": "SAML_ATTR_LAST_NAME",
+        "value": os.environ.get("SAML_ATTR_LAST_NAME"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+]
+
+extended_config_variables = [*oidc_config_variables, *saml_config_variables]

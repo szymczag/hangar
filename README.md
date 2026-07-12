@@ -30,8 +30,9 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Fork maintenance guide and CI baseline | Available on `preview` | [FORK.md](FORK.md)                                                                  |
 | Isolated backend extension scaffold    | Available on `preview` | [#2](https://github.com/szymczag/hangar/pull/2)                                     |
 | OIDC backend                           | Available on `preview` | [#3](https://github.com/szymczag/hangar/pull/3)                                     |
-| OIDC administration and sign-in UI     | In review              | [#4](https://github.com/szymczag/hangar/pull/4)                                     |
-| SAML 2.0 backend and UI                | Stacked                | [#5–#6](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+SAML)          |
+| OIDC administration and sign-in UI     | Available on `preview` | [#4](https://github.com/szymczag/hangar/pull/4)                                     |
+| SAML 2.0 backend                       | Available on `preview` | [#5](https://github.com/szymczag/hangar/pull/5)                                     |
+| SAML 2.0 administration and sign-in UI | Stacked                | [#6](https://github.com/szymczag/hangar/pull/6)                                     |
 | Epics                                  | Stacked                | [#7, #9, #14](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+epic)    |
 | Custom work-item types and properties  | Stacked                | [#10–#11](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+issue-types) |
 | Time tracking and worklogs             | Stacked                | [#12–#13](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+worklogs)    |
@@ -44,6 +45,10 @@ the table marks them as available.
 > Hangar's OIDC backend requires TLS 1.3 for discovery, token, JWKS, and userinfo
 > connections. Identity providers or reverse proxies limited to TLS 1.2 are not
 > supported.
+
+> Hangar requires an HTTPS SAML IdP single sign-on endpoint. Because SAML uses a
+> browser redirect to the IdP, TLS protocol negotiation is controlled by the browser
+> and IdP rather than by Hangar; configure the IdP or its reverse proxy to require TLS 1.3.
 
 ## Development quick start
 

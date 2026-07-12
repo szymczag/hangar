@@ -8,3 +8,8 @@ from .oidc import (
     OIDCAuthInitiateSpaceEndpoint,
     OIDCCallbackSpaceEndpoint,
 )
+from .saml import (
+    SAMLAuthInitiateEndpoint,
+    SAMLCallbackEndpoint,
+    SAMLMetadataEndpoint,
+)

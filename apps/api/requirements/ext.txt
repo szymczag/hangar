@@ -1,0 +1,5 @@
+# Fork requirements (see FORK.md)
+
+# SAML 2.0 service-provider support
+python3-saml==1.16.0
+xmlsec==1.3.17
