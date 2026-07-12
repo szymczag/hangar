@@ -8,16 +8,19 @@ from django.urls import path
 
 from plane.ext.views.epic import (
     EpicActivityEndpoint,
+    EpicArchiveEndpoint,
     EpicAttachmentV2Endpoint,
     EpicCommentViewSet,
     EpicDescriptionVersionEndpoint,
     EpicDetailViewSet,
     EpicIssuesEndpoint,
+    EpicListEndpoint,
     EpicLinkViewSet,
     EpicPaginatedViewSet,
     EpicSettingsEndpoint,
     EpicReactionViewSet,
     EpicSubscriberViewSet,
+    EpicUserPropertyEndpoint,
     EpicViewSet,
 )
 from plane.ext.views.issue_type import (
@@ -76,10 +79,17 @@ urlpatterns = [
         name="issue-property-values",
     ),
     path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/epics-user-properties/",
+        EpicUserPropertyEndpoint.as_view(),
+        name="epic-user-properties",
+    ),
+    path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/epics/",
         EpicViewSet.as_view(),
         name="epics",
     ),
+    path(f"{EPIC_BASE}/list/", EpicListEndpoint.as_view(), name="epics-list"),
+    path(f"{EPIC_BASE}/<uuid:pk>/archive/", EpicArchiveEndpoint.as_view(), name="epic-archive"),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/epics/<uuid:pk>/",
         EpicDetailViewSet.as_view(),
