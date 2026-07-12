@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./hangar-logo.png" alt="Hangar" width="768" />
+</p>
+
 # Hangar
 
 Hangar is an independent, community-maintained fork of [Plane](https://github.com/makeplane/plane)

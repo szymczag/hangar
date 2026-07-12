@@ -4,6 +4,9 @@ Hangar is a fork of [makeplane/plane](https://github.com/makeplane/plane) (AGPL-
 developed to add features on top of the open-source core: SSO (OIDC + SAML 2.0), Epics,
 custom issue types with custom properties, and time tracking (worklogs).
 
+The official fork logo is stored at [`hangar-logo.png`](hangar-logo.png). Keep its
+name and appearance consistent in project documentation and release materials.
+
 All fork code is isolated so upstream syncs stay cheap:
 
 - **Backend** lives in the dedicated Django app `apps/api/plane/ext/` (own models,
