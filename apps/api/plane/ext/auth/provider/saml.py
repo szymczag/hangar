@@ -5,6 +5,8 @@
 # Python imports
 import os
 import time
+import hashlib
+from urllib.parse import urlparse
 
 # Django imports
 from django.core.cache import cache
@@ -48,8 +50,9 @@ DEFAULT_LAST_NAME_ATTRIBUTES = [
 class SAMLProvider(Adapter):
     provider = "saml"
 
-    def __init__(self, request, callback=None):
+    def __init__(self, request, callback=None, require_enabled=True):
         (
+            IS_SAML_ENABLED,
             SAML_IDP_ENTITY_ID,
             SAML_IDP_SSO_URL,
             SAML_IDP_CERTIFICATE,
@@ -58,6 +61,10 @@ class SAMLProvider(Adapter):
             SAML_ATTR_LAST_NAME,
         ) = get_configuration_value(
             [
+                {
+                    "key": "IS_SAML_ENABLED",
+                    "default": os.environ.get("IS_SAML_ENABLED", "0"),
+                },
                 {
                     "key": "SAML_IDP_ENTITY_ID",
                     "default": os.environ.get("SAML_IDP_ENTITY_ID"),
@@ -85,7 +92,22 @@ class SAMLProvider(Adapter):
             ]
         )
 
-        if not (SAML_IDP_ENTITY_ID and SAML_IDP_SSO_URL and SAML_IDP_CERTIFICATE):
+        if (require_enabled and IS_SAML_ENABLED != "1") or not (
+            SAML_IDP_ENTITY_ID and SAML_IDP_SSO_URL and SAML_IDP_CERTIFICATE
+        ):
+            raise AuthenticationException(
+                error_code=EXT_AUTHENTICATION_ERROR_CODES["SAML_NOT_CONFIGURED"],
+                error_message="SAML_NOT_CONFIGURED",
+            )
+
+        sso_url = urlparse(SAML_IDP_SSO_URL)
+        if (
+            sso_url.scheme not in {"https", "http"}
+            or not sso_url.netloc
+            or sso_url.username
+            or sso_url.password
+            or sso_url.fragment
+        ):
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["SAML_NOT_CONFIGURED"],
                 error_message="SAML_NOT_CONFIGURED",
@@ -199,7 +221,11 @@ class SAMLProvider(Adapter):
             {
                 "email": email,
                 "user": {
-                    "provider_id": auth.get_nameid(),
+                    # NameID is scoped to the IdP. Hash the IdP/NameID pair so
+                    # switching IdPs cannot collide with an existing account.
+                    "provider_id": hashlib.sha256(
+                        f"{self.idp_entity_id}\0{auth.get_nameid() or email}".encode()
+                    ).hexdigest(),
                     "email": email,
                     "avatar": None,
                     "first_name": first_name,
