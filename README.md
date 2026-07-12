@@ -1,3 +1,14 @@
+<p align="center">
+  <img src="./hangar-logo.png" alt="Hangar" width="720" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/szymczag/hangar/actions/workflows/pull-request-build-lint-web-apps.yml"><img src="https://github.com/szymczag/hangar/actions/workflows/pull-request-build-lint-web-apps.yml/badge.svg?branch=preview" alt="Web checks" /></a>
+  <a href="https://github.com/szymczag/hangar/actions/workflows/api-tests.yml"><img src="https://github.com/szymczag/hangar/actions/workflows/api-tests.yml/badge.svg?branch=preview" alt="API tests" /></a>
+  <a href="./LICENSE.txt"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0" /></a>
+  <a href="https://github.com/szymczag/hangar/issues"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions welcome" /></a>
+</p>
+
 # Hangar
 
 Hangar is an independent, community-maintained fork of
