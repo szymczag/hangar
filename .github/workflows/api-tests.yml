@@ -1,0 +1,41 @@
+name: API tests
+
+on:
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - "docker-compose-test.yml"
+      - ".github/workflows/api-tests.yml"
+  push:
+    branches:
+      - preview
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Generate API environment
+        run: |
+          cp apps/api/.env.example apps/api/.env
+          printf '\nSECRET_KEY="%s"\n' "$(openssl rand -hex 32)" >> apps/api/.env
+
+      - name: Run API test suite
+        run: |
+          docker compose -f docker-compose-test.yml up \
+            --build --abort-on-container-exit --exit-code-from api-tests
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose-test.yml down -v

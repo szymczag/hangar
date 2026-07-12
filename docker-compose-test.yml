@@ -119,6 +119,10 @@ services:
       # Magic-link tests mock the celery delay but the view first checks that
       # EMAIL_HOST is configured. Set a placeholder so the check passes.
       EMAIL_HOST: test-smtp.invalid
+      # The auth endpoints throttle anonymous requests per client IP
+      # (default 10/minute). The whole suite runs from a single IP, so the
+      # magic sign-in/up contract tests would trip the limit mid-run.
+      AUTHENTICATION_RATE_LIMIT: 10000/minute
     volumes:
       - ./apps/api:/code
     working_dir: /code
