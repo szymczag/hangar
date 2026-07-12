@@ -43,7 +43,10 @@ export const useExtendedOAuthConfig = (oauthActionText: string): TOAuthConfigs =
       text: `${oauthActionText} with ${samlProviderName}`,
       icon: <ShieldCheck className="h-[18px] w-[18px]" />,
       onClick: () => {
-        window.location.assign(`${API_BASE_URL}/auth/saml/${next_path ? `?next_path=${next_path}` : ``}`);
+        const params = new URLSearchParams();
+        if (nextPath) params.set("next_path", nextPath);
+        const query = params.toString();
+        window.location.assign(`${API_BASE_URL}/auth/saml/${query ? `?${query}` : ""}`);
       },
       enabled: config?.is_saml_enabled,
     },
