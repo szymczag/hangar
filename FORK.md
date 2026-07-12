@@ -59,10 +59,10 @@ merge-conflict risk.
 | 3   | `docker-compose-test.yml`                                      | 0     | +1 env var: raise `AUTHENTICATION_RATE_LIMIT` so the full suite passes from one IP (upstreamable)   |
 | 4   | `apps/api/plane/utils/instance_config_variables/extended.py`   | 1     | designated empty hook — filled with OIDC + SAML config vars (including env-derived enable defaults) |
 | 5   | `apps/api/plane/license/api/views/instance.py`                 | 1     | append-only: OIDC and SAML enable flags and provider names in the public config payload             |
-| 6   | `packages/types/src/instance/auth.ts`, `base.ts`, `auth-ee.ts` | 1     | append OIDC authentication mode, configuration, and public instance types                           |
-| 7   | `packages/constants/src/auth/extended.ts`                      | 1     | designated empty hook — add the OIDC login-medium label                                             |
-| 8   | `apps/web/core/hooks/oauth/extended.tsx`                       | 1     | designated empty hook — return the OIDC sign-in option                                              |
-| 9   | `apps/admin/hooks/oauth/index.ts`, `apps/admin/app/routes.ts`  | 1     | append the OIDC authentication mode and admin configuration route                                   |
+| 6   | `packages/types/src/instance/auth.ts`, `base.ts`, `auth-ee.ts` | 1     | append OIDC and SAML authentication modes, configuration, and public instance types                 |
+| 7   | `packages/constants/src/auth/extended.ts`                      | 1     | designated empty hook — add OIDC and SAML login-medium labels                                       |
+| 8   | `apps/web/core/hooks/oauth/extended.tsx`                       | 1     | designated empty hook — return OIDC and SAML sign-in options                                        |
+| 9   | `apps/admin/hooks/oauth/index.ts`, `apps/admin/app/routes.ts`  | 1     | append OIDC and SAML authentication modes and admin configuration routes                            |
 | 10  | `apps/api/Dockerfile.api`, `Dockerfile.dev`                    | 1     | add the build packages required by the xmlsec binding                                               |
 | 11  | `apps/api/requirements/base.txt`                               | 1     | include `requirements/ext.txt`, which isolates fork-only Python dependencies                        |
 

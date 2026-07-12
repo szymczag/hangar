@@ -22,6 +22,17 @@ import type { Route } from "./+types/page";
 // local
 import { InstanceSAMLConfigForm } from "./form";
 
+const isValidHttpsUrl = (value: string | undefined) => {
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && Boolean(url.hostname) && !url.username && !url.password && !url.hash;
+  } catch {
+    return false;
+  }
+};
+
 const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticationPage() {
   // store
   const { fetchInstanceConfigurations, formattedConfig, updateInstanceConfigurations } = useInstance();
@@ -62,6 +73,10 @@ const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticat
   };
 
   const isSAMLEnabled = enableSAMLConfig === "1";
+  const isSAMLConfigured =
+    Boolean(formattedConfig?.SAML_IDP_ENTITY_ID) &&
+    isValidHttpsUrl(formattedConfig?.SAML_IDP_SSO_URL) &&
+    Boolean(formattedConfig?.SAML_IDP_CERTIFICATE);
 
   return (
     <PageWrapper
@@ -77,7 +92,7 @@ const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticat
                 updateConfig("IS_SAML_ENABLED", isSAMLEnabled ? "0" : "1");
               }}
               size="sm"
-              disabled={isSubmitting || !formattedConfig}
+              disabled={isSubmitting || !formattedConfig || (!isSAMLEnabled && !isSAMLConfigured)}
             />
           }
           disabled={isSubmitting || !formattedConfig}
