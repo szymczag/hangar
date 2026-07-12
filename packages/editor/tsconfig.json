@@ -12,6 +12,6 @@
       "@/styles/*": ["./src/styles/*"]
     }
   },
-  "include": ["src/**/*", "index.d.ts"],
+  "include": ["src/**/*", "tests/**/*", "index.d.ts"],
   "exclude": ["dist", "build", "node_modules"]
 }

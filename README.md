@@ -25,19 +25,20 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 
 ## Project status
 
-| Capability                                    | Status                 | Tracking                                                                         |
-| --------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------- |
-| Fork maintenance guide and CI baseline        | Available on `preview` | [FORK.md](FORK.md)                                                               |
-| Isolated backend extension scaffold           | Available on `preview` | [#2](https://github.com/szymczag/hangar/pull/2)                                  |
-| OIDC backend                                  | Available on `preview` | [#3](https://github.com/szymczag/hangar/pull/3)                                  |
-| OIDC administration and sign-in UI            | Available on `preview` | [#4](https://github.com/szymczag/hangar/pull/4)                                  |
-| SAML 2.0 backend                              | Available on `preview` | [#5](https://github.com/szymczag/hangar/pull/5)                                  |
-| SAML 2.0 administration and sign-in UI        | Available on `preview` | [#6](https://github.com/szymczag/hangar/pull/6)                                  |
-| Epics backend                                 | Available on `preview` | [#7](https://github.com/szymczag/hangar/pull/7)                                  |
-| Epics UI and required API surfaces            | Available on `preview` | [#9](https://github.com/szymczag/hangar/pull/9)                                  |
-| Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10)                                |
-| Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11)                                |
-| Time tracking and worklogs                    | Stacked                | [#12–#13](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+worklogs) |
+| Capability                                    | Status                 | Tracking                                          |
+| --------------------------------------------- | ---------------------- | ------------------------------------------------- |
+| Fork maintenance guide and CI baseline        | Available on `preview` | [FORK.md](FORK.md)                                |
+| Isolated backend extension scaffold           | Available on `preview` | [#2](https://github.com/szymczag/hangar/pull/2)   |
+| OIDC backend                                  | Available on `preview` | [#3](https://github.com/szymczag/hangar/pull/3)   |
+| OIDC administration and sign-in UI            | Available on `preview` | [#4](https://github.com/szymczag/hangar/pull/4)   |
+| SAML 2.0 backend                              | Available on `preview` | [#5](https://github.com/szymczag/hangar/pull/5)   |
+| SAML 2.0 administration and sign-in UI        | Available on `preview` | [#6](https://github.com/szymczag/hangar/pull/6)   |
+| Epics backend                                 | Available on `preview` | [#7](https://github.com/szymczag/hangar/pull/7)   |
+| Epics UI and required API surfaces            | Available on `preview` | [#9](https://github.com/szymczag/hangar/pull/9)   |
+| Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10) |
+| Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11) |
+| Time tracking and worklogs backend            | Available on `preview` | [#12](https://github.com/szymczag/hangar/pull/12) |
+| Time tracking and worklogs UI                 | In review              | [#13](https://github.com/szymczag/hangar/pull/13) |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
 plan a deployment around those capabilities until their pull requests have merged and
