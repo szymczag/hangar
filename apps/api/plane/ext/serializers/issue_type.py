@@ -7,6 +7,10 @@ from rest_framework import serializers
 from plane.db.models import IssueType
 
 
+class EpicSettingsSerializer(serializers.Serializer):
+    is_epic_enabled = serializers.BooleanField()
+
+
 class IssueTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = IssueType

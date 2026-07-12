@@ -18,6 +18,7 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
     AuthenticationException,
 )
+from plane.authentication.rate_limit import authentication_throttle_allows
 from plane.authentication.utils.host import base_host
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.redirection_path import get_redirection_path
@@ -40,6 +41,10 @@ def _relay_key(token):
     return f"ext:saml:relay:{token}"
 
 
+def _relay_claim_key(token):
+    return f"ext:saml:relay-claimed:{token}"
+
+
 def _error_redirect(host, exc_params, next_path):
     params = dict(exc_params)
     if next_path:
@@ -51,6 +56,13 @@ class SAMLAuthInitiateEndpoint(View):
     def get(self, request):
         host = base_host(request=request, is_app=True)
         next_path = request.GET.get("next_path")
+
+        if not authentication_throttle_allows(request):
+            exc = AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+                error_message="RATE_LIMIT_EXCEEDED",
+            )
+            return _error_redirect(host, exc.get_error_dict(), next_path)
 
         # Check instance configuration
         instance = Instance.objects.first()
@@ -92,8 +104,12 @@ class SAMLCallbackEndpoint(View):
     def post(self, request):
         relay_token = request.POST.get("RelayState", "")
         flow = cache.get(_relay_key(relay_token)) if relay_token else None
-        if flow:
+        # cache.add is atomic across workers. Two concurrent requests may both
+        # read the flow, but only one can claim and consume it.
+        if flow and cache.add(_relay_claim_key(relay_token), "1", RELAY_STATE_TTL):
             cache.delete(_relay_key(relay_token))
+        else:
+            flow = None
 
         host = (flow or {}).get("host") or base_host(request=request, is_app=True)
         next_path = (flow or {}).get("next_path")
@@ -120,7 +136,9 @@ class SAMLMetadataEndpoint(View):
 
     def get(self, request):
         try:
-            provider = SAMLProvider(request=request)
+            # Metadata must remain available while the provider is disabled so
+            # administrators can configure the IdP before enabling sign-in.
+            provider = SAMLProvider(request=request, require_enabled=False)
             metadata = provider.get_sp_metadata()
             return HttpResponse(metadata, content_type="text/xml")
         except AuthenticationException as e:
