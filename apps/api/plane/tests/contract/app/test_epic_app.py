@@ -21,6 +21,13 @@ from plane.db.models import (
 from plane.db.models.issue_type import ProjectIssueType
 
 
+@pytest.fixture(autouse=True)
+def mock_epic_background_tasks(mocker):
+    """Keep API contract tests independent from the external Celery broker."""
+    mocker.patch("plane.ext.views.epic.issue_activity.delay")
+    mocker.patch("plane.db.mixins.soft_delete_related_objects.delay")
+
+
 @pytest.fixture
 def project(db, workspace, create_user):
     project = Project.objects.create(
@@ -319,10 +326,18 @@ class TestEpicListEndpoint:
         base = f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/list/"
         assert session_client.get(base).status_code == status.HTTP_400_BAD_REQUEST
         assert session_client.get(base, {"issues": "not-a-uuid"}).status_code == status.HTTP_400_BAD_REQUEST
+        too_many = ",".join(str(uuid4()) for _ in range(101))
+        assert session_client.get(base, {"issues": too_many}).status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.contract
 class TestEpicArchive:
+    @pytest.mark.django_db
+    def test_missing_epic_returns_not_found(self, session_client, workspace, project):
+        archive_url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{uuid4()}/archive/"
+        assert session_client.post(archive_url).status_code == status.HTTP_404_NOT_FOUND
+        assert session_client.delete(archive_url).status_code == status.HTTP_404_NOT_FOUND
+
     @pytest.mark.django_db
     def test_archive_completed_epic(self, session_client, workspace, project, default_state, completed_state):
         enable_epics(session_client, workspace, project)

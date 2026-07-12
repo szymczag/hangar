@@ -38,7 +38,9 @@ from plane.db.models.state import StateGroup
 from plane.utils.host import base_host
 
 from plane.ext.serializers.issue_type import EpicSettingsSerializer
+
 EPIC_TYPE_NAME = "Epic"
+MAX_BULK_EPICS = 100
 
 
 def project_epic_type(project):
@@ -305,6 +307,11 @@ class EpicListEndpoint(BaseAPIView):
                 return Response({"error": "Invalid issue id"}, status=status.HTTP_400_BAD_REQUEST)
         if not epic_ids:
             return Response({"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(epic_ids) > MAX_BULK_EPICS:
+            return Response(
+                {"error": f"A maximum of {MAX_BULK_EPICS} epics can be requested"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         epics = (
             epic_queryset(slug, project_id)
@@ -331,7 +338,7 @@ class EpicArchiveEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id, pk):
-        epic = epic_queryset(slug, project_id).select_related("state").get(pk=pk)
+        epic = get_object_or_404(epic_queryset(slug, project_id).select_related("state"), pk=pk)
         if epic.state.group not in [StateGroup.COMPLETED.value, StateGroup.CANCELLED.value]:
             return Response(
                 {"error": "Can only archive epics in a completed or cancelled state group"},
@@ -349,12 +356,13 @@ class EpicArchiveEndpoint(BaseAPIView):
             origin=base_host(request=request, is_app=True),
         )
         epic.archived_at = timezone.now().date()
-        epic.save()
+        epic.save(update_fields=["archived_at"])
         return Response({"archived_at": str(epic.archived_at)}, status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def delete(self, request, slug, project_id, pk):
-        epic = Issue.objects.get(
+        epic = get_object_or_404(
+            Issue.all_objects.filter(deleted_at__isnull=True),
             workspace__slug=slug,
             project_id=project_id,
             pk=pk,
@@ -373,7 +381,7 @@ class EpicArchiveEndpoint(BaseAPIView):
             origin=base_host(request=request, is_app=True),
         )
         epic.archived_at = None
-        epic.save()
+        epic.save(update_fields=["archived_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
