@@ -221,6 +221,15 @@ class TestPropertyValues:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
+    def test_oversized_number_rejected(self, session_client, workspace, project, issue, number_prop):
+        response = session_client.post(
+            self.values_url(workspace, project, issue),
+            {str(number_prop.id): ["1234567890123456789012345.123456"]},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
     def test_select_value_must_be_own_option(self, session_client, workspace, project, issue, select_prop):
         foreign_prop = IssueProperty.objects.create(
             workspace=workspace, issue_type=select_prop.issue_type, display_name="Other", property_type="select"
@@ -259,6 +268,84 @@ class TestPropertyValues:
             self.values_url(workspace, project, issue), {str(required.id): []}, format="json"
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
+    def test_omitted_required_property_rejected(
+        self, session_client, workspace, project, issue, issue_type
+    ):
+        IssueProperty.objects.create(
+            workspace=workspace,
+            issue_type=issue_type,
+            display_name="Mandatory",
+            property_type="text",
+            is_required=True,
+        )
+        response = session_client.post(
+            self.values_url(workspace, project, issue),
+            {},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
+    def test_property_from_different_issue_type_rejected(
+        self, session_client, workspace, project, issue
+    ):
+        other_type = IssueType.objects.create(workspace=workspace, name="Task")
+        ProjectIssueType.objects.create(project=project, issue_type=other_type)
+        foreign_prop = IssueProperty.objects.create(
+            workspace=workspace,
+            issue_type=other_type,
+            display_name="Foreign",
+            property_type="text",
+        )
+        response = session_client.post(
+            self.values_url(workspace, project, issue),
+            {str(foreign_prop.id): ["must not attach"]},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
+    def test_values_from_previous_issue_type_are_removed(
+        self, session_client, workspace, project, issue, text_prop
+    ):
+        IssuePropertyValue.objects.create(
+            workspace=workspace,
+            project=project,
+            issue=issue,
+            property=text_prop,
+            value_text="stale",
+        )
+        other_type = IssueType.objects.create(workspace=workspace, name="Task")
+        ProjectIssueType.objects.create(project=project, issue_type=other_type)
+        issue.type = other_type
+        issue.save(update_fields=["type"])
+
+        response = session_client.post(
+            self.values_url(workspace, project, issue),
+            {},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not IssuePropertyValue.objects.filter(issue=issue).exists()
+
+    @pytest.mark.django_db
+    def test_deleted_property_values_are_not_returned(
+        self, session_client, workspace, project, issue, text_prop
+    ):
+        IssuePropertyValue.objects.create(
+            workspace=workspace,
+            project=project,
+            issue=issue,
+            property=text_prop,
+            value_text="stale",
+        )
+        text_prop.delete()
+        response = session_client.get(self.values_url(workspace, project, issue))
+        assert response.status_code == status.HTTP_200_OK
+        assert str(text_prop.id) not in response.data
 
     @pytest.mark.django_db
     def test_multi_select_multiple_rows(self, session_client, workspace, project, issue, multi_prop):

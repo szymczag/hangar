@@ -23,6 +23,7 @@ from plane.db.models import User
 from plane.license.models import Instance, InstanceConfiguration
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
+from plane.authentication.adapter.error import AUTHENTICATION_ERROR_CODES
 
 IDP_ENTITY_ID = "https://idp.test/metadata"
 IDP_SSO_URL = "https://idp.test/sso"
@@ -80,6 +81,7 @@ def setup_instance(db):
 def saml_config(db):
     _, cert_pem = idp_keypair()
     for key, value in (
+        ("IS_SAML_ENABLED", "1"),
         ("SAML_IDP_ENTITY_ID", IDP_ENTITY_ID),
         ("SAML_IDP_SSO_URL", IDP_SSO_URL),
         ("SAML_IDP_CERTIFICATE", cert_pem),
@@ -115,7 +117,7 @@ def build_response(
     now = saml_time()
     expiry = saml_time(not_on_or_after)
 
-    assertion = f"""<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{assertion_id}" Version="2.0" IssueInstant="{now}"><saml:Issuer>{issuer}</saml:Issuer><saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">{email}</saml:NameID><saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData InResponseTo="{request_id}" NotOnOrAfter="{expiry}" Recipient="{destination}"/></saml:SubjectConfirmation></saml:Subject><saml:Conditions NotBefore="{saml_time(-60)}" NotOnOrAfter="{expiry}"><saml:AudienceRestriction><saml:Audience>{audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions><saml:AuthnStatement AuthnInstant="{now}" SessionIndex="_s{uuid.uuid4().hex}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement><saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{email}</saml:AttributeValue></saml:Attribute><saml:Attribute Name="first_name"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Sally</saml:AttributeValue></saml:Attribute><saml:Attribute Name="last_name"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Assertion</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion>"""
+    assertion = f"""<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{assertion_id}" Version="2.0" IssueInstant="{now}"><saml:Issuer>{issuer}</saml:Issuer><saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">{email}</saml:NameID><saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData InResponseTo="{request_id}" NotOnOrAfter="{expiry}" Recipient="{destination}"/></saml:SubjectConfirmation></saml:Subject><saml:Conditions NotBefore="{saml_time(-60)}" NotOnOrAfter="{expiry}"><saml:AudienceRestriction><saml:Audience>{audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions><saml:AuthnStatement AuthnInstant="{now}" SessionIndex="_s{uuid.uuid4().hex}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement><saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{email}</saml:AttributeValue></saml:Attribute><saml:Attribute Name="first_name"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Sally</saml:AttributeValue></saml:Attribute><saml:Attribute Name="last_name"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Assertion</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion>"""  # noqa: E501
 
     if sign_assertion:
         signed = OneLogin_Saml2_Utils.add_sign(assertion, key_pem, cert_pem)
@@ -127,7 +129,7 @@ def build_response(
     if tamper:
         assertion = assertion.replace(email, "attacker@hangar.test")
 
-    response = f"""<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_r{uuid.uuid4().hex}" Version="2.0" IssueInstant="{now}" Destination="{destination}" InResponseTo="{request_id}"><saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{issuer}</saml:Issuer><samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>{assertion}</samlp:Response>"""
+    response = f"""<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_r{uuid.uuid4().hex}" Version="2.0" IssueInstant="{now}" Destination="{destination}" InResponseTo="{request_id}"><saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{issuer}</saml:Issuer><samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>{assertion}</samlp:Response>"""  # noqa: E501
     return base64.b64encode(response.encode()).decode()
 
 
@@ -178,6 +180,27 @@ class TestSAMLInitiate:
         response = django_client.get(reverse("saml-initiate"))
         assert response.status_code == 302
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["SAML_NOT_CONFIGURED"]
+
+    @pytest.mark.django_db
+    def test_disabled_provider_is_rejected(self, django_client, setup_instance, saml_config):
+        InstanceConfiguration.objects.update_or_create(
+            key="IS_SAML_ENABLED",
+            defaults={"value": "0", "category": "SAML", "is_encrypted": False},
+        )
+        response = django_client.get(reverse("saml-initiate"))
+        assert response.status_code == 302
+        assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["SAML_NOT_CONFIGURED"]
+
+    @pytest.mark.django_db
+    def test_rate_limit_is_enforced(self, django_client, setup_instance, saml_config):
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr(
+                "plane.ext.auth.views.saml.authentication_throttle_allows",
+                lambda _request: False,
+            )
+            response = django_client.get(reverse("saml-initiate"))
+        assert response.status_code == 302
+        assert error_code_of(response) == AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"]
 
     @pytest.mark.django_db
     def test_redirects_to_idp_with_relay_state(self, django_client, setup_instance, saml_config):

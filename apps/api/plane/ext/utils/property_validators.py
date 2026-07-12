@@ -12,6 +12,9 @@ returns the kwargs for one IssuePropertyValue row or raises ValidationError.
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import DecimalValidator
+from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework.exceptions import ValidationError
 
@@ -26,8 +29,12 @@ def _validate_text(prop, raw, _project_id):
 
 def _validate_number(prop, raw, _project_id):
     try:
-        return {"value_number": Decimal(str(raw))}
-    except (InvalidOperation, ValueError):
+        value = Decimal(str(raw))
+        if not value.is_finite():
+            raise InvalidOperation
+        DecimalValidator(max_digits=24, decimal_places=6)(value)
+        return {"value_number": value}
+    except (InvalidOperation, ValueError, DjangoValidationError):
         raise ValidationError({prop.display_name: f"'{raw}' is not a valid number"})
 
 
@@ -48,6 +55,8 @@ def _validate_date(prop, raw, _project_id):
             parsed = datetime(date_only.year, date_only.month, date_only.day)
     if parsed is None:
         raise ValidationError({prop.display_name: f"'{raw}' is not a valid date"})
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
     return {"value_date": parsed}
 
 

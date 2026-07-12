@@ -9,8 +9,9 @@
 // modal state and written through the bundle endpoint after the work item is
 // created or updated.
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
+import { useParams } from "next/navigation";
 // plane imports
 import type { ISearchIssueResponse, TIssue, TIssuePropertyValueErrors, TIssuePropertyValues } from "@plane/types";
 // components
@@ -18,6 +19,7 @@ import type {
   TActiveAdditionalPropertiesProps,
   TCreateUpdatePropertyValuesProps,
   THandleProjectEntitiesFetchProps,
+  TIssueModalContext,
   TPropertyValuesValidationProps,
 } from "@/components/issues/issue-modal/context";
 import { IssueModalContext } from "@/components/issues/issue-modal/context";
@@ -35,7 +37,8 @@ export type TIssueModalProviderProps = {
 };
 
 export const IssueModalProvider = observer(function IssueModalProvider(props: TIssueModalProviderProps) {
-  const { children, allowedProjectIds } = props;
+  const { children, allowedProjectIds, dataForPreload } = props;
+  const { workspaceSlug: routeWorkspaceSlug } = useParams();
   // states
   const [selectedParentIssue, setSelectedParentIssue] = useState<ISearchIssueResponse | null>(null);
   const [issuePropertyValues, setIssuePropertyValues] = useState<TIssuePropertyValues>({});
@@ -47,6 +50,38 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
   const { projectsWithCreatePermissions } = useUser();
   // derived values
   const projectIdsWithCreatePermissions = Object.keys(projectsWithCreatePermissions ?? {});
+
+  useEffect(() => {
+    const workspaceSlug = routeWorkspaceSlug?.toString();
+    const issueId = dataForPreload?.id;
+    const projectId = dataForPreload?.project_id;
+    let cancelled = false;
+
+    if (!workspaceSlug || !issueId || !projectId) {
+      setIssuePropertyValues({});
+      return;
+    }
+
+    const preloadPropertyValues = async () => {
+      try {
+        const [types, values] = await Promise.all([
+          issueTypeService.getIssueTypes(workspaceSlug, projectId),
+          issueTypeService.getPropertyValues(workspaceSlug, projectId, issueId),
+        ]);
+        if (cancelled) return;
+        issueTypesByProject.current[projectId] = types;
+        setIssuePropertyValues(values);
+      } catch {
+        if (!cancelled) setIssuePropertyValues({});
+      }
+    };
+
+    void preloadPropertyValues();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dataForPreload?.id, dataForPreload?.project_id, routeWorkspaceSlug]);
 
   const getProjectTypes = useCallback(
     (projectId: string | null | undefined) => (projectId ? (issueTypesByProject.current[projectId] ?? []) : []),
@@ -108,43 +143,51 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
   const handleCreateUpdatePropertyValues = useCallback(
     async ({ issueId, projectId, workspaceSlug, issueTypeId }: TCreateUpdatePropertyValuesProps) => {
       const properties = getActiveProperties(projectId, issueTypeId);
-      if (properties.length === 0) return;
       const payload: TIssuePropertyValues = {};
       for (const property of properties) {
-        if (property.id in issuePropertyValues) payload[property.id] = issuePropertyValues[property.id];
+        payload[property.id] = issuePropertyValues[property.id] ?? [];
       }
-      if (Object.keys(payload).length === 0) return;
       await issueTypeService.updatePropertyValues(workspaceSlug, projectId, issueId, payload);
       setIssuePropertyValues({});
     },
     [getActiveProperties, issuePropertyValues]
   );
 
-  return (
-    <IssueModalContext.Provider
-      value={{
-        allowedProjectIds: allowedProjectIds ?? projectIdsWithCreatePermissions,
-        workItemTemplateId: null,
-        setWorkItemTemplateId: () => {},
-        isApplyingTemplate: false,
-        setIsApplyingTemplate: () => {},
-        selectedParentIssue,
-        setSelectedParentIssue,
-        issuePropertyValues,
-        setIssuePropertyValues,
-        issuePropertyValueErrors,
-        setIssuePropertyValueErrors,
-        getIssueTypeIdOnProjectChange,
-        getActiveAdditionalPropertiesLength,
-        handlePropertyValuesValidation,
-        handleCreateUpdatePropertyValues,
-        handleProjectEntitiesFetch,
-        handleTemplateChange: () => Promise.resolve(),
-        handleConvert: () => Promise.resolve(),
-        handleCreateSubWorkItem: () => Promise.resolve(),
-      }}
-    >
-      {children}
-    </IssueModalContext.Provider>
+  const contextValue = useMemo<TIssueModalContext>(
+    () => ({
+      allowedProjectIds: allowedProjectIds ?? projectIdsWithCreatePermissions,
+      workItemTemplateId: null,
+      setWorkItemTemplateId: () => {},
+      isApplyingTemplate: false,
+      setIsApplyingTemplate: () => {},
+      selectedParentIssue,
+      setSelectedParentIssue,
+      issuePropertyValues,
+      setIssuePropertyValues,
+      issuePropertyValueErrors,
+      setIssuePropertyValueErrors,
+      getIssueTypeIdOnProjectChange,
+      getActiveAdditionalPropertiesLength,
+      handlePropertyValuesValidation,
+      handleCreateUpdatePropertyValues,
+      handleProjectEntitiesFetch,
+      handleTemplateChange: () => Promise.resolve(),
+      handleConvert: () => Promise.resolve(),
+      handleCreateSubWorkItem: () => Promise.resolve(),
+    }),
+    [
+      allowedProjectIds,
+      getActiveAdditionalPropertiesLength,
+      getIssueTypeIdOnProjectChange,
+      handleCreateUpdatePropertyValues,
+      handleProjectEntitiesFetch,
+      handlePropertyValuesValidation,
+      issuePropertyValueErrors,
+      issuePropertyValues,
+      projectIdsWithCreatePermissions,
+      selectedParentIssue,
+    ]
   );
+
+  return <IssueModalContext.Provider value={contextValue}>{children}</IssueModalContext.Provider>;
 });
