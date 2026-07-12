@@ -65,6 +65,7 @@ merge-conflict risk.
 | 9   | `apps/admin/hooks/oauth/index.ts`, `apps/admin/app/routes.ts`  | 1     | append OIDC and SAML authentication modes and admin configuration routes                            |
 | 10  | `apps/api/Dockerfile.api`, `Dockerfile.dev`                    | 1     | add the build packages required by the xmlsec binding                                               |
 | 11  | `apps/api/requirements/base.txt`                               | 1     | include `requirements/ext.txt`, which isolates fork-only Python dependencies                        |
+| 12  | `apps/api/plane/db/models/issue.py`                            | 2     | exclude epics from the upstream work-item manager so they remain on dedicated Epic surfaces         |
 
 Planned (added when the phase lands):
 
