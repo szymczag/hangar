@@ -189,6 +189,10 @@ jobs:
 
   aio:
     name: Publish aio
+    if: >-
+      always() &&
+      needs.setup.result == 'success' &&
+      needs.components.result == 'success'
     needs: [setup, components]
     runs-on: ubuntu-22.04
     permissions:
@@ -247,10 +251,34 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
+  verify_publication:
+    name: Verify container publication
+    if: always()
+    needs: [setup, components, aio]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require every publication job to succeed
+        env:
+          SETUP_RESULT: ${{ needs.setup.result }}
+          COMPONENTS_RESULT: ${{ needs.components.result }}
+          AIO_RESULT: ${{ needs.aio.result }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$SETUP_RESULT" != "success" || "$COMPONENTS_RESULT" != "success" || "$AIO_RESULT" != "success" ]]; then
+            echo "Container publication incomplete:" >&2
+            echo "  setup=$SETUP_RESULT" >&2
+            echo "  components=$COMPONENTS_RESULT" >&2
+            echo "  aio=$AIO_RESULT" >&2
+            exit 1
+          fi
+
+          echo "All required container publication jobs succeeded"
+
   release:
     name: Publish GitHub Release
     if: needs.setup.outputs.is_release == 'true'
-    needs: [setup, aio]
+    needs: [setup, verify_publication]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
