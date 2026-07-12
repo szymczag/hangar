@@ -6,6 +6,7 @@
 
 // Mirrors the server-side cap (24h per entry).
 export const MAX_WORKLOG_MINUTES = 24 * 60;
+export const MAX_WORKLOG_DESCRIPTION_LENGTH = 5000;
 
 export function formatWorklogDuration(minutes: number): string {
   const total = Math.max(0, Math.floor(minutes || 0));

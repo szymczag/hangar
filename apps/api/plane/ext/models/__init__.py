@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+from .epic import EpicUserProperty
 from .issue_property import (
     IssueProperty,
     IssuePropertyOption,
@@ -9,3 +10,12 @@ from .issue_property import (
     PropertyTypeChoices,
 )
 from .worklog import IssueWorkLog
+
+__all__ = [
+    "EpicUserProperty",
+    "IssueProperty",
+    "IssuePropertyOption",
+    "IssuePropertyValue",
+    "IssueWorkLog",
+    "PropertyTypeChoices",
+]

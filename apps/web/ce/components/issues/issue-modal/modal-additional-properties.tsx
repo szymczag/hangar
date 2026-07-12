@@ -9,6 +9,7 @@
 // context and are persisted by handleCreateUpdatePropertyValues after the
 // work item is saved.
 
+import { useEffect, useRef } from "react";
 import { observer } from "mobx-react";
 import { useFormContext } from "react-hook-form";
 // plane imports
@@ -34,8 +35,18 @@ export const WorkItemModalAdditionalProperties = observer(function WorkItemModal
   const { watch } = useFormContext<TIssue>();
   const typeId = watch("type_id");
   // context + data
-  const { issuePropertyValues, setIssuePropertyValues, issuePropertyValueErrors } = useIssueModal();
+  const { issuePropertyValues, setIssuePropertyValues, issuePropertyValueErrors, setIssuePropertyValueErrors } =
+    useIssueModal();
   const { activeProperties } = useIssueTypes(workspaceSlug, projectId);
+  const previousTypeId = useRef(typeId);
+
+  useEffect(() => {
+    if (previousTypeId.current && previousTypeId.current !== typeId) {
+      setIssuePropertyValues({});
+      setIssuePropertyValueErrors({});
+    }
+    previousTypeId.current = typeId;
+  }, [setIssuePropertyValueErrors, setIssuePropertyValues, typeId]);
 
   if (!projectId || !typeId) return null;
   const properties = activeProperties(typeId);

@@ -5,6 +5,7 @@
 from rest_framework import serializers
 
 from plane.db.models import IssueType
+from plane.ext.models import EpicUserProperty
 
 
 class EpicSettingsSerializer(serializers.Serializer):
@@ -28,3 +29,9 @@ class IssueTypeSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "workspace", "created_at", "updated_at"]
+
+
+class EpicUserPropertySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EpicUserProperty
+        fields = ["filters", "display_filters", "display_properties", "rich_filters", "preferences", "sort_order"]

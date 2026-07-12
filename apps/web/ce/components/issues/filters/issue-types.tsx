@@ -33,6 +33,7 @@ export const FilterIssueTypes = observer(function FilterIssueTypes(props: Props)
   // derived values
   const availableTypes = (issueTypes ?? []).filter((type) => !type.is_epic && type.is_active);
   const filteredTypes = availableTypes.filter((type) => type.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const appliedFilterIds = new Set(appliedFilters ?? []);
   const appliedFiltersCount = appliedFilters?.length ?? 0;
 
   if (availableTypes.length === 0) return null;
@@ -50,7 +51,7 @@ export const FilterIssueTypes = observer(function FilterIssueTypes(props: Props)
             filteredTypes.map((type) => (
               <FilterOption
                 key={type.id}
-                isChecked={Boolean(appliedFilters?.includes(type.id))}
+                isChecked={appliedFilterIds.has(type.id)}
                 onClick={() => handleUpdate(type.id)}
                 icon={<Shapes className="h-3 w-3 text-tertiary" />}
                 title={type.name}

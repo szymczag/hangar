@@ -13,6 +13,7 @@ from plane.db.models import (
     IssueType,
     Project,
     ProjectMember,
+    ProjectUserProperty,
     State,
     User,
     Workspace,
@@ -152,6 +153,32 @@ class TestEpicCRUD:
         assert epic.type_id != rogue_type.id
 
     @pytest.mark.django_db
+    def test_create_forces_visible_top_level_epic(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        parent = Issue.objects.create(
+            name="Ordinary parent",
+            project=project,
+            workspace=workspace,
+            state=default_state,
+        )
+        response = create_epic(
+            session_client,
+            workspace,
+            project,
+            state_id=str(default_state.id),
+            parent_id=str(parent.id),
+            is_draft=True,
+            archived_at="2026-01-01",
+            deleted_at="2026-01-01T00:00:00Z",
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        epic = Issue.objects.get(pk=response.data["id"])
+        assert epic.parent_id is None
+        assert epic.is_draft is False
+        assert epic.archived_at is None
+        assert epic.deleted_at is None
+
+    @pytest.mark.django_db
     def test_update_cannot_change_type(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
         epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
@@ -165,6 +192,33 @@ class TestEpicCRUD:
         epic = Issue.objects.get(pk=epic_id)
         assert epic.name == "Renamed rock"
         assert epic.type.is_epic is True
+
+    @pytest.mark.django_db
+    def test_update_cannot_hide_or_parent_epic(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
+        parent = Issue.objects.create(
+            name="Ordinary parent",
+            project=project,
+            workspace=workspace,
+            state=default_state,
+        )
+        response = session_client.patch(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/",
+            {
+                "parent_id": str(parent.id),
+                "is_draft": True,
+                "archived_at": "2026-01-01",
+                "deleted_at": "2026-01-01T00:00:00Z",
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_200_OK
+        epic = Issue.objects.get(pk=epic_id)
+        assert epic.parent_id is None
+        assert epic.is_draft is False
+        assert epic.archived_at is None
+        assert epic.deleted_at is None
 
     @pytest.mark.django_db
     def test_epics_and_issues_are_separated(self, session_client, workspace, project, default_state):
@@ -295,3 +349,44 @@ class TestEpicScoping:
             format="json",
         )
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.contract
+class TestEpicWebContracts:
+    @pytest.mark.django_db
+    def test_bulk_list_returns_only_requested_epics(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
+        ordinary_issue = Issue.objects.create(
+            name="Ordinary",
+            project=project,
+            workspace=workspace,
+            state=default_state,
+        )
+        response = session_client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/list/",
+            {"issues": f"{epic_id},{ordinary_issue.id}"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert {str(item["id"]) for item in response.data} == {str(epic_id)}
+
+    @pytest.mark.django_db
+    def test_archive_round_trip(self, session_client, workspace, project, completed_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(completed_state.id)).data["id"]
+        url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/archive/"
+        assert session_client.post(url).status_code == status.HTTP_200_OK
+        assert session_client.delete(url).status_code == status.HTTP_204_NO_CONTENT
+        assert Issue.objects.get(pk=epic_id).archived_at is None
+
+    @pytest.mark.django_db
+    def test_epic_filters_do_not_mutate_work_item_filters(self, session_client, create_user, workspace, project):
+        normal_property = ProjectUserProperty.objects.get(user=create_user, project=project)
+        normal_property.display_filters = {"layout": "list"}
+        normal_property.save(update_fields=["display_filters"])
+        url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics-user-properties/"
+        response = session_client.patch(url, {"display_filters": {"layout": "kanban"}}, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        normal_property.refresh_from_db()
+        assert normal_property.display_filters == {"layout": "list"}
+        assert session_client.get(url).data["display_filters"] == {"layout": "kanban"}

@@ -68,8 +68,9 @@ export function InstanceOIDCConfigForm(props: Props) {
       description: (
         <>
           The issuer URL of your identity provider, without the{" "}
-          <CodeBlock darkerShade>/.well-known/openid-configuration</CodeBlock> suffix. The discovery document must be
-          served from that path.
+          <CodeBlock darkerShade>/.well-known/openid-configuration</CodeBlock> suffix. Use an HTTPS endpoint that
+          negotiates TLS 1.3; providers and reverse proxies limited to TLS 1.2 are not supported. The token, JWKS, and
+          userinfo endpoints in the discovery document must use the same origin.
         </>
       ),
       placeholder: "https://accounts.example.com",

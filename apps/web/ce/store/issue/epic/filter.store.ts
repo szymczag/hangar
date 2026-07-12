@@ -7,16 +7,31 @@
 import type { IProjectIssuesFilter } from "@/store/issue/project";
 import { ProjectIssuesFilter } from "@/store/issue/project";
 import type { IIssueRootStore } from "@/store/issue/root.store";
+import { EIssuesStoreType } from "@plane/types";
+import { IssueFiltersService } from "@/services/issue_filter.service";
 
-// @ts-nocheck - This class will never be used, extending similar class to avoid type errors
 export type IProjectEpicsFilter = IProjectIssuesFilter;
 
-// @ts-nocheck - This class will never be used, extending similar class to avoid type errors
 export class ProjectEpicsFilter extends ProjectIssuesFilter implements IProjectEpicsFilter {
   constructor(_rootStore: IIssueRootStore) {
     super(_rootStore);
+    const epicFilterService = new IssueFiltersService();
+    this.projectService = {
+      getProjectUserProperties: (workspaceSlug: string, projectId: string) =>
+        epicFilterService.fetchProjectEpicFilters(workspaceSlug, projectId),
+      updateProjectUserProperties: (
+        workspaceSlug: string,
+        projectId: string,
+        data: Parameters<IssueFiltersService["patchProjectEpicFilters"]>[2]
+      ) => epicFilterService.patchProjectEpicFilters(workspaceSlug, projectId, data),
+    };
+  }
 
-    // root store
-    this.rootIssueStore = _rootStore;
+  protected override get issuesStore() {
+    return this.rootIssueStore.projectEpics;
+  }
+
+  protected override get issuesStoreType() {
+    return EIssuesStoreType.EPIC;
   }
 }

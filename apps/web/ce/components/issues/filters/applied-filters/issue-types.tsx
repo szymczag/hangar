@@ -39,6 +39,7 @@ export const AppliedIssueTypeFilters = observer(function AppliedIssueTypeFilters
             {editable && (
               <button
                 type="button"
+                aria-label={`Remove ${typeDetails.name} filter`}
                 className="grid place-items-center text-tertiary hover:text-secondary"
                 onClick={() => handleRemove(typeId)}
               >

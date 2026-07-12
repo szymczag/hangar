@@ -19,7 +19,12 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
 // plane web
-import { MAX_WORKLOG_MINUTES, formatWorklogDuration, parseWorklogDuration } from "@/plane-web/helpers/worklog";
+import {
+  MAX_WORKLOG_DESCRIPTION_LENGTH,
+  MAX_WORKLOG_MINUTES,
+  formatWorklogDuration,
+  parseWorklogDuration,
+} from "@/plane-web/helpers/worklog";
 import { useWorklogs } from "@/plane-web/hooks/use-worklogs";
 import { worklogService } from "@/plane-web/services/worklog.service";
 import type { TIssueWorklog } from "@/plane-web/types/worklog";
@@ -181,7 +186,7 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What was done? (optional)"
-                maxLength={2000}
+                maxLength={MAX_WORKLOG_DESCRIPTION_LENGTH}
                 className="grow"
               />
               <Button variant="primary" size="sm" onClick={handleCreate} loading={isSubmitting} disabled={isSubmitting}>
@@ -214,7 +219,7 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
                         value={editDescription}
                         onChange={(e) => setEditDescription(e.target.value)}
                         placeholder="What was done? (optional)"
-                        maxLength={2000}
+                        maxLength={MAX_WORKLOG_DESCRIPTION_LENGTH}
                         className="grow"
                       />
                       <Button
