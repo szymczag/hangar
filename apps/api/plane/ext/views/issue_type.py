@@ -218,7 +218,12 @@ class IssuePropertyValuesEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, issue_id):
         issue = self.get_issue(slug, project_id, issue_id)
-        rows = IssuePropertyValue.objects.filter(issue=issue).select_related("property")
+        rows = IssuePropertyValue.objects.filter(
+            issue=issue,
+            property__issue_type_id=issue.type_id,
+            property__is_active=True,
+            property__deleted_at__isnull=True,
+        ).select_related("property")
         values = {}
         for row in rows:
             values.setdefault(str(row.property_id), []).append(serialize_value_row(row))
@@ -231,16 +236,17 @@ class IssuePropertyValuesEndpoint(BaseAPIView):
         if not isinstance(payload, dict):
             return Response({"error": "Expected a property→values map"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Only properties of types linked to this project are writable; the
-        # issue's own type additionally scopes which properties make sense,
-        # but values are keyed by property id so the project-level check is
-        # the security boundary.
+        # A property is writable only when it belongs to this issue's type.
+        # Project-level scoping alone would let clients attach values from a
+        # different type and create data that no issue UI can interpret.
         writable = {
             str(prop.id): prop
             for prop in IssueProperty.objects.filter(
                 workspace__slug=slug,
                 issue_type__project_issue_types__project_id=project_id,
+                issue_type_id=issue.type_id,
                 is_active=True,
+                deleted_at__isnull=True,
             )
         }
 
@@ -248,7 +254,27 @@ class IssuePropertyValuesEndpoint(BaseAPIView):
         if unknown:
             return Response({"error": f"Unknown properties: {unknown}"}, status=status.HTTP_400_BAD_REQUEST)
 
+        missing_required = [
+            prop.display_name
+            for key, prop in writable.items()
+            if prop.is_required
+            and (
+                key not in payload
+                or not isinstance(payload[key], list)
+                or not any(v not in (None, "") for v in payload[key])
+            )
+        ]
+        if missing_required:
+            return Response(
+                {"error": f"Required properties missing: {missing_required}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         with transaction.atomic():
+            # Serialize bundle replacement for this issue. Without a row lock,
+            # concurrent requests can both delete then insert scalar rows;
+            # scalar/multi cardinality cannot be expressed as one DB constraint.
+            Issue.objects.select_for_update().get(pk=issue.pk)
             for key, raw_values in payload.items():
                 prop = writable[key]
                 rows = validate_property_values(prop, raw_values, project_id)
