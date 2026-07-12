@@ -5,4 +5,18 @@
 # Fork authentication endpoints (OIDC, SAML), mounted under /auth/ alongside
 # plane.authentication.urls.
 
-urlpatterns = []
+from django.urls import path
+
+from plane.ext.auth.views import (
+    OIDCAuthInitiateEndpoint,
+    OIDCCallbackEndpoint,
+    OIDCAuthInitiateSpaceEndpoint,
+    OIDCCallbackSpaceEndpoint,
+)
+
+urlpatterns = [
+    path("oidc/", OIDCAuthInitiateEndpoint.as_view(), name="oidc-initiate"),
+    path("oidc/callback/", OIDCCallbackEndpoint.as_view(), name="oidc-callback"),
+    path("spaces/oidc/", OIDCAuthInitiateSpaceEndpoint.as_view(), name="oidc-space-initiate"),
+    path("spaces/oidc/callback/", OIDCCallbackSpaceEndpoint.as_view(), name="oidc-space-callback"),
+]

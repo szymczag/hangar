@@ -28,15 +28,22 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Capability                             | Status                 | Tracking                                                                            |
 | -------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------- |
 | Fork maintenance guide and CI baseline | Available on `preview` | [FORK.md](FORK.md)                                                                  |
-| Isolated backend extension scaffold    | In review              | [#2](https://github.com/szymczag/hangar/pull/2)                                     |
-| OIDC and SAML 2.0 single sign-on       | In review              | [#3–#6](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+auth)          |
-| Epics                                  | In review              | [#7, #9, #14](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+epic)    |
-| Custom work-item types and properties  | In review              | [#10–#11](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+issue-types) |
-| Time tracking and worklogs             | In review              | [#12–#13](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+worklogs)    |
+| Isolated backend extension scaffold    | Available on `preview` | [#2](https://github.com/szymczag/hangar/pull/2)                                     |
+| OIDC backend                           | In review              | [#3](https://github.com/szymczag/hangar/pull/3)                                     |
+| OIDC administration and sign-in UI     | Stacked                | [#4](https://github.com/szymczag/hangar/pull/4)                                     |
+| SAML 2.0 backend and UI                | Stacked                | [#5–#6](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+SAML)          |
+| Epics                                  | Stacked                | [#7, #9, #14](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+epic)    |
+| Custom work-item types and properties  | Stacked                | [#10–#11](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+issue-types) |
+| Time tracking and worklogs             | Stacked                | [#12–#13](https://github.com/szymczag/hangar/pulls?q=is%3Apr+is%3Aopen+worklogs)    |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
 plan a deployment around those capabilities until their pull requests have merged and
 the table marks them as available.
+
+> [!NOTE]
+> Hangar's OIDC backend requires TLS 1.3 for discovery, token, JWKS, and userinfo
+> connections. Identity providers or reverse proxies limited to TLS 1.2 are not
+> supported.
 
 ## Development quick start
 
