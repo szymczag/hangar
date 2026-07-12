@@ -68,6 +68,8 @@ merge-conflict risk.
 | 15  | `packages/i18n/src/locales/*/common.json`                                                                                                         | 3     | append the localized `common.work_item_types` label                                                 |
 | 16  | `apps/api/plane/utils/issue_filters.py`                                                                                                           | 3     | append the UUID-validated `issue_type` filter mapped to `type_id__in`                               |
 | 17  | `apps/api/plane/bgtasks/issue_activities_task.py`                                                                                                 | 3, 4  | append the `track_type` field tracker plus worklog create/update/delete activity handlers           |
+| 18  | `packages/constants/src/issue/filter.ts`                                                                                                          | 4     | append the `WORKLOG` activity filter type and option; retain the lint-safe callback parameter rename |
+| 19  | `packages/types/src/project/projects.ts`                                                                                                          | 4     | append `is_time_tracking_enabled` to `IProject`; the flag already exists on the server model         |
 
 Planned (added when the phase lands):
 

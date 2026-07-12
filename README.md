@@ -38,7 +38,7 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10) |
 | Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11) |
 | Time tracking and worklogs backend            | Available on `preview` | [#12](https://github.com/szymczag/hangar/pull/12) |
-| Time tracking and worklogs UI                 | Stacked                | [#13](https://github.com/szymczag/hangar/pull/13) |
+| Time tracking and worklogs UI                 | In review              | [#13](https://github.com/szymczag/hangar/pull/13) |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
 plan a deployment around those capabilities until their pull requests have merged and

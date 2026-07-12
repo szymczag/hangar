@@ -93,13 +93,21 @@ class TestWorklogCRUD:
             assert response.status_code == status.HTTP_400_BAD_REQUEST, bad
 
     @pytest.mark.django_db
-    def test_description_length_is_bounded(self, session_client, workspace, project, issue):
-        response = session_client.post(
+    def test_description_length_boundary(self, session_client, workspace, project, issue):
+        accepted = session_client.post(
+            worklogs_url(workspace, project, issue),
+            {"duration": 10, "description": "x" * 5000},
+            format="json",
+        )
+        assert accepted.status_code == status.HTTP_201_CREATED
+        assert len(accepted.data["description"]) == 5000
+
+        rejected = session_client.post(
             worklogs_url(workspace, project, issue),
             {"duration": 10, "description": "x" * 5001},
             format="json",
         )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert rejected.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
     def test_disabled_flag_blocks(self, session_client, workspace, project, issue):
