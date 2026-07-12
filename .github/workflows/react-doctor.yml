@@ -44,8 +44,6 @@ concurrency:
 
 jobs:
   react-doctor:
-    # Disabled: this repository only permits owner, GitHub, or verified actions.
-    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
