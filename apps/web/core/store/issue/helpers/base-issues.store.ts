@@ -254,7 +254,7 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
     this.isArchived = isArchived;
 
     this.issueService = new IssueService(serviceType);
-    this.issueArchiveService = new IssueArchiveService();
+    this.issueArchiveService = new IssueArchiveService(serviceType);
     this.moduleService = new ModuleService();
     this.cycleService = new CycleService();
 
