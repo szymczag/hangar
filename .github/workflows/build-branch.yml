@@ -497,7 +497,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' "$GITHUB_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          push_output=$(helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts)
+          push_output=$(helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts 2>&1)
           printf '%s\n' "$push_output"
           chart_digest=$(printf '%s\n' "$push_output" | awk '$1 == "Digest:" && !digest { digest = $2 } END { print digest }')
           if [[ ! "$chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
