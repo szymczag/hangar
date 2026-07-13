@@ -5,6 +5,7 @@ publicUrl:
   host: hangar.example.com
 
 ingress:
+  enabled: true
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: 6m

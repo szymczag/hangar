@@ -13,6 +13,10 @@ DEBUG = int(os.environ.get("DEBUG", 0)) == 1
 
 # Honor the 'X-Forwarded-Proto' header for request.is_secure()
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# TLS terminates at the trusted ingress or Gateway. Use the canonical external
+# host and port supplied by that proxy when Django constructs absolute URLs.
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 
 INSTALLED_APPS += ("scout_apm.django",)  # noqa
 

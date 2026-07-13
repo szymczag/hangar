@@ -1,0 +1,30 @@
+deploymentProfile: production
+
+publicUrl:
+  scheme: https
+  host: hangar.example.com
+
+ingress:
+  enabled: false
+
+gateway:
+  enabled: true
+  create: true
+  className: envoy
+  name: ""
+  namespace: ""
+  sectionName: https
+  annotations: {}
+  tls:
+    secretName: hangar-tls
+
+# Replace these selectors with labels from the Envoy data-plane Pods that
+# connect to Hangar Services. They depend on the Envoy Gateway installation.
+networkPolicy:
+  ingressController:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: envoy-gateway-system
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: envoy

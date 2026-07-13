@@ -9,6 +9,7 @@ trap 'rm -rf "$tmp_dir"' EXIT
 production_render="$tmp_dir/production.yaml"
 evaluation_render="$tmp_dir/evaluation.yaml"
 boundary_render="$tmp_dir/boundary.yaml"
+gateway_render="$tmp_dir/gateway.yaml"
 kube_version="${KUBE_VERSION:-1.36.2}"
 
 fail() {
@@ -64,6 +65,9 @@ helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_versi
     --set application.fileSizeLimit=1073741824 \
     --set application.signedUrlExpiration=86400 \
     --set application.hardDeleteAfterDays=3650 >"$boundary_render"
+helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
+    --set gateway.enabled=true \
+    --set gateway.create=true >"$gateway_render"
 
 for render in "$production_render" "$evaluation_render"; do
     image_count="$(grep -Ec '^[[:space:]]+image:' "$render")"
@@ -101,6 +105,23 @@ assert_present '^  FILE_SIZE_LIMIT: "1073741824"$' "$boundary_render" "maximum f
 assert_present '^  SIGNED_URL_EXPIRATION: "86400"$' "$boundary_render" "maximum signed-URL expiration must render as an exact decimal integer"
 assert_present '^  HARD_DELETE_AFTER_DAYS: "3650"$' "$boundary_render" "maximum hard-delete retention must render as an exact decimal integer"
 assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$boundary_render" "maximum integer application settings must not use exponent notation"
+
+assert_absent '^kind: Ingress$' "$gateway_render" "Gateway API mode must not render an NGINX Ingress"
+assert_present '^kind: Gateway$' "$gateway_render" "Gateway API mode must render a Gateway when create is enabled"
+gateway_route_count="$(grep -Ec '^kind: HTTPRoute$' "$gateway_render")"
+[[ "$gateway_route_count" -eq 6 ]] || fail "Gateway API mode must render redirect, admin, spaces, live, API, and web routes"
+for path in /god-mode /spaces /live /api; do
+    assert_present "^[[:space:]]+value: ${path}$" "$gateway_render" "Gateway route is missing ${path}"
+    assert_present "^[[:space:]]+replaceFullPath: ${path}/$" "$gateway_render" "Gateway route does not normalize ${path}"
+done
+assert_present '^[[:space:]]+value: /$' "$gateway_render" "Gateway route is missing the web root"
+assert_present '^[[:space:]]+statusCode: 308$' "$gateway_render" "Gateway trailing-slash redirects must preserve the request method"
+assert_present '^[[:space:]]+- name: X-Forwarded-Proto$' "$gateway_render" "Gateway API route must set X-Forwarded-Proto"
+assert_present '^[[:space:]]+- name: X-Forwarded-Host$' "$gateway_render" "Gateway API route must set X-Forwarded-Host"
+assert_present '^[[:space:]]+- name: X-Forwarded-Port$' "$gateway_render" "Gateway API route must set X-Forwarded-Port"
+for variable in VITE_ADMIN_BASE_URL VITE_SPACE_BASE_URL VITE_LIVE_BASE_URL VITE_WEB_BASE_URL VITE_API_BASE_URL; do
+    assert_present "^[[:space:]]+${variable}: \\\"https://hangar.example.com\\\",?$" "$production_render" "frontend runtime config is missing ${variable}"
+done
 
 assert_absent 'Source: hangar/charts/evaluation' "$production_render" "production must not render evaluation dependencies"
 assert_present 'Source: hangar/charts/evaluation-postgresql' "$evaluation_render" "evaluation PostgreSQL did not render"

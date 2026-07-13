@@ -38,6 +38,18 @@ app.kubernetes.io/part-of: hangar
 {{- printf "%s://%s" .Values.publicUrl.scheme .Values.publicUrl.host -}}
 {{- end -}}
 
+{{- define "hangar.gatewayName" -}}
+{{- default (include "hangar.fullname" .) .Values.gateway.name -}}
+{{- end -}}
+
+{{- define "hangar.gatewayParentRef" -}}
+- name: {{ include "hangar.gatewayName" . }}
+  {{- with .Values.gateway.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  sectionName: {{ .Values.gateway.sectionName }}
+{{- end -}}
+
 {{- define "hangar.coreSecretEnv" -}}
 - name: SECRET_KEY
   valueFrom:
