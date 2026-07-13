@@ -319,6 +319,12 @@ evaluation-rabbitmq:
     enabled: false
   prometheusPlugin:
     enabled: false
+  # Hangar's current Celery/Kombu stack still creates transient, non-exclusive
+  # reply queues. RabbitMQ 4.x requires this deprecated feature to be permitted
+  # explicitly. Remove this compatibility setting after the application stack
+  # no longer declares those queues.
+  customConfig: |
+    deprecated_features.permit.transient_nonexcl_queues = true
   storage:
     requestedSize: 8Gi
     persistentVolumeClaimRetentionPolicy:

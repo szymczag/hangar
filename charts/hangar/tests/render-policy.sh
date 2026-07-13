@@ -92,6 +92,7 @@ assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_A
 assert_absent 'Source: hangar/charts/evaluation' "$production_render" "production must not render evaluation dependencies"
 assert_present 'Source: hangar/charts/evaluation-postgresql' "$evaluation_render" "evaluation PostgreSQL did not render"
 assert_present 'Source: hangar/charts/evaluation-rabbitmq' "$evaluation_render" "evaluation RabbitMQ did not render"
+assert_present '^[[:space:]]+deprecated_features\.permit\.transient_nonexcl_queues = true$' "$evaluation_render" "evaluation RabbitMQ must permit the queue type required by Celery"
 assert_present 'Source: hangar/charts/evaluation-valkey' "$evaluation_render" "evaluation Valkey did not render"
 assert_present '^  name: hangar-hangar-evaluation-object-storage$' "$evaluation_render" "evaluation object storage did not render"
 assert_present '^automountServiceAccountToken: false$' "$evaluation_render" "evaluation service accounts must disable token mounting"
@@ -120,6 +121,7 @@ assert_invalid "reserved Pod label override" --set-string global.podLabels.app\\
 assert_invalid "mutable evaluation image" --set-string evaluation-postgresql.image.tag=18.4
 assert_invalid "mutable evaluation object-storage image" --set-string evaluationObjectStorage.image.tag=4.39
 assert_invalid "evaluation RBAC" --set evaluation-rabbitmq.rbac.create=true
+assert_invalid "disabled RabbitMQ Celery compatibility" --set-string evaluation-rabbitmq.customConfig=
 assert_invalid "evaluation service-account creation" --set evaluation-postgresql.serviceAccount.create=true
 assert_invalid "unreviewed evaluation object-storage repository" --set-string evaluationObjectStorage.image.repository=example.invalid/object-store
 

@@ -431,10 +431,20 @@ helm upgrade --install "$RELEASE_NAME" "$chart_reference" \
   --wait-for-jobs \
   --timeout 20m
 
-kubectl --namespace "$NAMESPACE" wait pods \
-  --selector app.kubernetes.io/instance="$RELEASE_NAME" \
-  --for=condition=Ready \
-  --timeout=10m
+for workload in \
+  deployment/hangar-hangar-admin \
+  deployment/hangar-hangar-api \
+  deployment/hangar-hangar-beat-worker \
+  deployment/hangar-hangar-live \
+  deployment/hangar-hangar-space \
+  deployment/hangar-hangar-web \
+  deployment/hangar-hangar-worker \
+  statefulset/hangar-evaluation-postgresql \
+  statefulset/hangar-evaluation-rabbitmq \
+  statefulset/hangar-evaluation-valkey \
+  statefulset/hangar-hangar-evaluation-object-storage; do
+  kubectl --namespace "$NAMESPACE" rollout status "$workload" --timeout=5m
+done
 pvc_phases=$(kubectl --namespace "$NAMESPACE" get pvc \
   -o jsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')
 if grep -qv '^Bound$' <<<"$pvc_phases"; then

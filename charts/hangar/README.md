@@ -161,6 +161,14 @@ The evaluation dependency images are pinned to amd64 platform digests, so the
 profile schedules them only on `kubernetes.io/arch=amd64` nodes. See
 `DEPENDENCIES.md` for the exact chart and image evidence.
 
+The bundled RabbitMQ 4.x instance explicitly permits the deprecated
+`transient_nonexcl_queues` feature required by Hangar's current Celery/Kombu
+stack. This compatibility setting is schema-locked for evaluation installs. It
+does not configure an external production RabbitMQ service; production
+operators must verify this application requirement against their RabbitMQ
+version and remove any temporary permission only after Hangar's Celery/Kombu
+stack stops declaring these queues.
+
 To use a non-default storage class, set all four values explicitly:
 
 ```yaml
@@ -181,7 +189,9 @@ evaluationObjectStorage:
 ## Verify an installation
 
 The migration Job name includes the Helm revision. Verify that it completed and
-that all workloads became ready:
+that the controllers rolled out successfully. Do not wait for every release Pod
+to report `Ready`: a successfully completed migration Job is intentionally not
+Ready.
 
 ```bash
 kubectl --namespace hangar get jobs,pods,pvc,ingress,networkpolicy
