@@ -1,0 +1,43 @@
+deploymentProfile: evaluation
+
+publicUrl:
+  scheme: https
+  host: hangar-evaluation.example.com
+
+evaluation:
+  enabled: true
+
+# This example targets the community ingress-nginx controller. Change the class,
+# annotations, and NetworkPolicy selectors together when using another controller.
+ingress:
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 6m
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  tls:
+    secretName: hangar-tls
+
+networkPolicy:
+  ingressController:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: ingress-nginx
+
+# When the cluster has no suitable default StorageClass, uncomment all four
+# settings and replace the example class with an available encrypted RWO class.
+# evaluation-postgresql:
+#   storage:
+#     className: encrypted-rwo
+# evaluation-rabbitmq:
+#   storage:
+#     className: encrypted-rwo
+# evaluation-valkey:
+#   storage:
+#     className: encrypted-rwo
+# evaluationObjectStorage:
+#   persistence:
+#     storageClass: encrypted-rwo

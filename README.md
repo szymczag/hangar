@@ -25,21 +25,21 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 
 ## Project status
 
-| Capability                                    | Status                 | Tracking                                          |
-| --------------------------------------------- | ---------------------- | ------------------------------------------------- |
-| Fork maintenance guide and CI baseline        | Available on `preview` | [FORK.md](FORK.md)                                |
-| Isolated backend extension scaffold           | Available on `preview` | [#2](https://github.com/szymczag/hangar/pull/2)   |
-| OIDC backend                                  | Available on `preview` | [#3](https://github.com/szymczag/hangar/pull/3)   |
-| OIDC administration and sign-in UI            | Available on `preview` | [#4](https://github.com/szymczag/hangar/pull/4)   |
-| SAML 2.0 backend                              | Available on `preview` | [#5](https://github.com/szymczag/hangar/pull/5)   |
-| SAML 2.0 administration and sign-in UI        | Available on `preview` | [#6](https://github.com/szymczag/hangar/pull/6)   |
-| Epics backend                                 | Available on `preview` | [#7](https://github.com/szymczag/hangar/pull/7)   |
-| Epics UI and required API surfaces            | Available on `preview` | [#9](https://github.com/szymczag/hangar/pull/9)   |
-| Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10) |
-| Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11) |
-| Time tracking and worklogs backend            | Available on `preview` | [#12](https://github.com/szymczag/hangar/pull/12) |
-| Time tracking and worklogs UI                 | Available on `preview` | [#13](https://github.com/szymczag/hangar/pull/13) |
-| Helm chart evaluation profile                 | Available on `preview` | [Chart documentation](charts/hangar/README.md)    |
+| Capability                                    | Status                 | Tracking                                              |
+| --------------------------------------------- | ---------------------- | ----------------------------------------------------- |
+| Fork maintenance guide and CI baseline        | Available on `preview` | [FORK.md](FORK.md)                                    |
+| Isolated backend extension scaffold           | Available on `preview` | [#2](https://github.com/szymczag/hangar/pull/2)       |
+| OIDC backend                                  | Available on `preview` | [#3](https://github.com/szymczag/hangar/pull/3)       |
+| OIDC administration and sign-in UI            | Available on `preview` | [#4](https://github.com/szymczag/hangar/pull/4)       |
+| SAML 2.0 backend                              | Available on `preview` | [#5](https://github.com/szymczag/hangar/pull/5)       |
+| SAML 2.0 administration and sign-in UI        | Available on `preview` | [#6](https://github.com/szymczag/hangar/pull/6)       |
+| Epics backend                                 | Available on `preview` | [#7](https://github.com/szymczag/hangar/pull/7)       |
+| Epics UI and required API surfaces            | Available on `preview` | [#9](https://github.com/szymczag/hangar/pull/9)       |
+| Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10)     |
+| Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11)     |
+| Time tracking and worklogs backend            | Available on `preview` | [#12](https://github.com/szymczag/hangar/pull/12)     |
+| Time tracking and worklogs UI                 | Available on `preview` | [#13](https://github.com/szymczag/hangar/pull/13)     |
+| Helm chart evaluation profile                 | Public prerelease      | [Kubernetes documentation](docs/kubernetes/README.md) |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
 plan a deployment around those capabilities until their pull requests have merged and
@@ -48,8 +48,8 @@ the table marks them as available.
 ## Deployment
 
 - [Docker deployment](deployments/cli/community/README.md)
-- [Hangar Helm chart](charts/hangar/README.md) — the evaluation profile is
-  live-qualified; production support gates remain open.
+- [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.4`
+  evaluation release; production support gates remain open.
 
 The inherited Plane Community chart is not a Hangar release and is not supported
 for new Hangar installations.
@@ -121,12 +121,13 @@ Install Cosign, obtain the digest for the version you intend to deploy, and veri
 both the exact workflow identity and GitHub's OIDC issuer:
 
 ```sh
-VERSION=v1.2.3
+VERSION=v0.1.0-rc.4
+GIT_TAG=hangar-$VERSION
 DIGEST=sha256:replace-with-the-published-digest
 IMAGE=ghcr.io/szymczag/hangar-api
 
 cosign verify \
-  --certificate-identity "https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/${VERSION}" \
+  --certificate-identity "https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/${GIT_TAG}" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   "${IMAGE}@${DIGEST}"
 ```

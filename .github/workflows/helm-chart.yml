@@ -51,28 +51,34 @@ jobs:
       - name: Render validation fixtures
         run: |
           set -euo pipefail
-          mkdir -p build/helm
-          helm template hangar charts/hangar \
-            --namespace hangar \
-            --kube-version 1.35.0 \
-            > build/helm/production.yaml
-          helm template hangar charts/hangar \
-            --namespace hangar \
-            --kube-version 1.35.0 \
-            --values charts/hangar/ci/evaluation-values.yaml \
-            > build/helm/evaluation.yaml
+          for kube_version in 1.30.0 1.31.0 1.32.0 1.33.0 1.34.0 1.35.0 1.36.2; do
+            output_directory="build/helm/$kube_version"
+            mkdir -p "$output_directory"
+            helm template hangar charts/hangar \
+              --namespace hangar \
+              --kube-version "$kube_version" \
+              > "$output_directory/production.yaml"
+            helm template hangar charts/hangar \
+              --namespace hangar \
+              --kube-version "$kube_version" \
+              --values charts/hangar/ci/evaluation-values.yaml \
+              > "$output_directory/evaluation.yaml"
+          done
 
       - name: Validate Kubernetes schemas
         run: |
-          docker run --rm \
-            --volume "$PWD/build/helm:/work:ro" \
-            ghcr.io/yannh/kubeconform@sha256:7426d17ca19f3731d2a6287c868005f052f2682800141f20e83d3109f5c8faa1 \
-            -strict -summary -kubernetes-version 1.35.0 /work
+          set -euo pipefail
+          for kube_version in 1.30.0 1.31.0 1.32.0 1.33.0 1.34.0 1.35.0 1.36.2; do
+            docker run --rm \
+              --volume "$PWD/build/helm/$kube_version:/work:ro" \
+              ghcr.io/yannh/kubeconform@sha256:7426d17ca19f3731d2a6287c868005f052f2682800141f20e83d3109f5c8faa1 \
+              -strict -summary -kubernetes-version "$kube_version" /work
+          done
 
       - name: Lint Kubernetes security and reliability
         run: |
           docker run --rm \
-            --volume "$PWD/build/helm:/work:ro" \
+            --volume "$PWD/build/helm/1.36.2:/work:ro" \
             ghcr.io/stackrox/kube-linter@sha256:94644f35948465a70b2dd1526a80522d1a1f26499f783b1eff21618dda1fd4dd \
             lint /work
 

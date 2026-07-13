@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-readonly KIND_NODE_IMAGE="kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95"
+readonly KIND_NODE_IMAGE="kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5"
 readonly CILIUM_VERSION="1.19.5"
 readonly CILIUM_CHART_DIGEST="sha256:557ea3b67b2380bdf91f3006ecea924e10e2963dbaf6085887652311e581460b"
 readonly NGINX_CHART_VERSION="2.6.1"
@@ -704,7 +704,7 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   cat >>"$GITHUB_STEP_SUMMARY" <<'EOF'
 ## Helm end-to-end qualification
 
-- Kubernetes 1.35.5 on Kind 0.32.0
+- Kubernetes 1.36.1 on Kind 0.32.0, with Kubernetes 1.36.2 client and schema validation
 - Cilium 1.19.5 policy enforcement
 - F5 NGINX Ingress Controller 5.5.1
 - Exact packaged chart installed with immutable application image digests
@@ -714,4 +714,4 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
 EOF
 fi
 
-echo "Hangar Helm end-to-end qualification passed on Kubernetes 1.35.5"
+echo "Hangar Helm end-to-end qualification passed on Kubernetes 1.36.1"

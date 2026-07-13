@@ -1,6 +1,6 @@
 # Evaluation dependency record
 
-This file records the resolved dependencies for Hangar chart `0.1.0-rc.3`.
+This file records the resolved dependencies for Hangar chart `0.1.0-rc.4`.
 The evaluation profile is for non-critical testing. These records do not turn
 single-replica dependencies into a production availability recommendation.
 
@@ -34,6 +34,9 @@ the corresponding platform manifest digest.
 | Tool        | Pinned release or image                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------ |
 | Helm        | `v4.2.0` through `azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310`                           |
+| Kind        | `v0.32.0`; downloaded binaries are verified against repository-owned SHA-256 pins                      |
+| Kind node   | `kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5`         |
+| kubectl     | `v1.36.2`; downloaded binaries are verified against repository-owned SHA-256 pins                      |
 | kubeconform | `ghcr.io/yannh/kubeconform@sha256:7426d17ca19f3731d2a6287c868005f052f2682800141f20e83d3109f5c8faa1`    |
 | kube-linter | `ghcr.io/stackrox/kube-linter@sha256:94644f35948465a70b2dd1526a80522d1a1f26499f783b1eff21618dda1fd4dd` |
 | Cosign      | `v3.0.6` through `sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6`                  |

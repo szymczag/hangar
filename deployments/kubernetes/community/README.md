@@ -5,6 +5,7 @@ used for new installations.
 
 Use the maintained Hangar chart and operator documentation instead:
 
+- [Kubernetes documentation](../../../docs/kubernetes/README.md)
 - [Hangar Helm chart](../../../charts/hangar/README.md)
 - [Kubernetes deployment plan](../../../docs/kubernetes-deployment-plan.md)
 
