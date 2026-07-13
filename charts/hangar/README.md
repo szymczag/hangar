@@ -59,7 +59,7 @@ helm upgrade --install hangar oci://ghcr.io/szymczag/charts/hangar \
   --namespace hangar \
   --create-namespace \
   --values production-values.yaml \
-  --atomic \
+  --rollback-on-failure \
   --wait \
   --wait-for-jobs \
   --timeout 15m
@@ -130,7 +130,7 @@ helm upgrade --install hangar oci://ghcr.io/szymczag/charts/hangar \
   --version VERSION \
   --namespace hangar-evaluation \
   --values evaluation-values.yaml \
-  --atomic \
+  --rollback-on-failure \
   --wait \
   --wait-for-jobs \
   --timeout 20m
