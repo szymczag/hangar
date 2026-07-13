@@ -69,7 +69,7 @@ jobs:
           cp -a charts/hangar "$chart_dir"
 
           for component in web admin space live api; do
-            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${IMAGE_TAG}" | awk '$1 == "Digest:" { print $2; exit }')
+            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${IMAGE_TAG}" | awk '$1 == "Digest:" && !digest { digest = $2 } END { print digest }')
             if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
               echo "Could not resolve immutable digest for ${component}:${IMAGE_TAG}" >&2
               exit 1

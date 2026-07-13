@@ -358,7 +358,7 @@ jobs:
           cp -a charts/hangar "$chart_dir"
 
           for component in web admin space live api; do
-            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${VERSION}" | awk '$1 == "Digest:" { print $2; exit }')
+            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${VERSION}" | awk '$1 == "Digest:" && !digest { digest = $2 } END { print digest }')
             if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
               echo "Could not resolve immutable digest for ${component}:${VERSION}" >&2
               exit 1
@@ -409,7 +409,7 @@ jobs:
           printf '%s' "$GITHUB_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           push_output=$(helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts)
           printf '%s\n' "$push_output"
-          chart_digest=$(printf '%s\n' "$push_output" | awk '$1 == "Digest:" { print $2; exit }')
+          chart_digest=$(printf '%s\n' "$push_output" | awk '$1 == "Digest:" && !digest { digest = $2 } END { print digest }')
           if [[ ! "$chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "Helm did not return a valid OCI chart digest" >&2
             exit 1
@@ -490,7 +490,7 @@ jobs:
 
           : > release-assets/image-digests.txt
           for component in web admin space live api proxy aio; do
-            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${VERSION}" | awk '$1 == "Digest:" { print $2; exit }')
+            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${VERSION}" | awk '$1 == "Digest:" && !digest { digest = $2 } END { print digest }')
             if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
               echo "Could not resolve immutable digest for ${component}:${VERSION}" >&2
               exit 1
