@@ -67,14 +67,14 @@ helm upgrade --install hangar oci://ghcr.io/szymczag/charts/hangar \
 
 ### Required production Secrets
 
-| Secret                  | Required keys                                | Consumer               |
-| ----------------------- | -------------------------------------------- | ---------------------- |
-| `hangar-application`    | `SECRET_KEY`                                 | API, workers, migrator |
-| `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                     | Live service           |
-| `hangar-database`       | `DATABASE_URL`                               | API, workers, migrator |
-| `hangar-cache`          | `REDIS_URL`                                  | API, Live, workers     |
-| `hangar-queue`          | `AMQP_URL`                                   | API and Celery workers |
-| `hangar-object-storage` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | API and task worker    |
+| Secret                  | Required keys                                | Consumer                     |
+| ----------------------- | -------------------------------------------- | ---------------------------- |
+| `hangar-application`    | `SECRET_KEY`                                 | API, workers, migrator       |
+| `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                     | Live service                 |
+| `hangar-database`       | `DATABASE_URL`                               | API, workers, migrator       |
+| `hangar-cache`          | `REDIS_URL`                                  | API, Live, workers, migrator |
+| `hangar-queue`          | `AMQP_URL`                                   | API and Celery workers       |
+| `hangar-object-storage` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | API and task worker          |
 
 Use application-specific database, cache, queue, and bucket identities. Do not
 use provider administrator credentials. Encode reserved URL characters in the

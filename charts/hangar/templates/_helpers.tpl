@@ -51,17 +51,25 @@ app.kubernetes.io/part-of: hangar
       key: {{ .Values.existingSecrets.database.urlKey }}
 {{- end -}}
 
-{{- define "hangar.celerySecretEnv" -}}
+{{- define "hangar.cacheSecretEnv" -}}
 - name: REDIS_URL
   valueFrom:
     secretKeyRef:
       name: {{ .Values.existingSecrets.cache.name }}
       key: {{ .Values.existingSecrets.cache.urlKey }}
+{{- end -}}
+
+{{- define "hangar.queueSecretEnv" -}}
 - name: AMQP_URL
   valueFrom:
     secretKeyRef:
       name: {{ .Values.existingSecrets.queue.name }}
       key: {{ .Values.existingSecrets.queue.urlKey }}
+{{- end -}}
+
+{{- define "hangar.celerySecretEnv" -}}
+{{ include "hangar.cacheSecretEnv" . }}
+{{ include "hangar.queueSecretEnv" . }}
 {{- end -}}
 
 {{- define "hangar.objectStorageSecretEnv" -}}

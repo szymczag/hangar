@@ -36,6 +36,7 @@ spec:
                 name: {{ include "hangar.fullname" . }}-api
           env:
             {{- include "hangar.coreSecretEnv" . | nindent 12 }}
+            {{- include "hangar.cacheSecretEnv" . | nindent 12 }}
           resources:
             {{- toYaml .Values.migrator.resources | nindent 12 }}
           volumeMounts:

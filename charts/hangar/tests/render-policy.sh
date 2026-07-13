@@ -78,6 +78,8 @@ for render in "$production_render" "$evaluation_render"; do
     assert_present '^  SIGNED_URL_EXPIRATION: "3600"$' "$render" "signed-URL expiration must render as an exact decimal integer"
     assert_present '^  HARD_DELETE_AFTER_DAYS: "60"$' "$render" "hard-delete retention must render as an exact decimal integer"
     assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$render" "integer application settings must not use exponent notation"
+    redis_url_consumers="$(grep -Ec '^[[:space:]]+- name: REDIS_URL$' "$render")"
+    [[ "$redis_url_consumers" -eq 5 ]] || fail "API, Live, workers, and migrator must each receive REDIS_URL in $render"
 done
 
 assert_present '^  FILE_SIZE_LIMIT: "1073741824"$' "$boundary_render" "maximum file-size limit must render as an exact decimal integer"
