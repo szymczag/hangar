@@ -1,0 +1,35 @@
+deploymentProfile: production
+
+publicUrl:
+  scheme: https
+  host: hangar.example.com
+
+ingress:
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 6m
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  tls:
+    secretName: hangar-tls
+
+externalServices:
+  objectStorage:
+    endpoint: https://s3.example.com
+    bucket: hangar
+    region: eu-central-1
+    pathStyle: false
+
+# Add only the private destinations that Hangar must reach. Public HTTPS egress
+# is already allowed; RFC1918 and cluster ranges are denied unless listed here.
+networkPolicy:
+  privateEgress:
+    - cidr: 10.20.30.10/32
+      ports:
+        - port: 5432
+    - cidr: 10.20.30.11/32
+      ports:
+        - port: 6379
+    - cidr: 10.20.30.12/32
+      ports:
+        - port: 5672

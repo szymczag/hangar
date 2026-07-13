@@ -39,10 +39,20 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11) |
 | Time tracking and worklogs backend            | Available on `preview` | [#12](https://github.com/szymczag/hangar/pull/12) |
 | Time tracking and worklogs UI                 | Available on `preview` | [#13](https://github.com/szymczag/hangar/pull/13) |
+| Helm chart evaluation profile                 | Available on `preview` | [Chart documentation](charts/hangar/README.md)    |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
 plan a deployment around those capabilities until their pull requests have merged and
 the table marks them as available.
+
+## Deployment
+
+- [Docker deployment](deployments/cli/community/README.md)
+- [Hangar Helm chart](charts/hangar/README.md) — the evaluation profile is
+  live-qualified; production support gates remain open.
+
+The inherited Plane Community chart is not a Hangar release and is not supported
+for new Hangar installations.
 
 > [!NOTE]
 > Hangar's OIDC backend requires TLS 1.3 for discovery, token, JWKS, and userinfo

@@ -118,6 +118,7 @@ scripts/
 !.github/scripts/tests/test_release_metadata.py
 !.github/scripts/tests/test_release_notes.py
 !.github/scripts/tests/test_release_workflow.py
+!charts/hangar/scripts/
 
 # i18n auto-generated types (regenerated on every build)
 packages/i18n/src/types/keys.generated.ts

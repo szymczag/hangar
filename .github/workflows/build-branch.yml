@@ -2,6 +2,17 @@ name: Publish Hangar Containers
 
 on:
   workflow_dispatch:
+    inputs:
+      run_helm_e2e:
+        description: Qualify the published preview images with the Helm Kubernetes E2E suite
+        required: false
+        default: false
+        type: boolean
+      reuse_preview_images:
+        description: Retry Helm qualification against the existing branch preview images without rebuilding them
+        required: false
+        default: false
+        type: boolean
   push:
     tags:
       - "hangar-v[0-9]+.[0-9]+.[0-9]+"
@@ -161,6 +172,8 @@ jobs:
             reject_existing_image_tag "${IMAGE_PREFIX}${image}:${SHA_TAG}"
           done
 
+          reject_existing_image_tag "ghcr.io/szymczag/charts/hangar:${VERSION#v}"
+
   release_approval:
     name: Approve release publication
     if: needs.setup.outputs.is_release == 'true'
@@ -176,6 +189,7 @@ jobs:
     if: >-
       always() &&
       needs.setup.result == 'success' &&
+      !(github.event_name == 'workflow_dispatch' && inputs.reuse_preview_images == true) &&
       (needs.release_approval.result == 'success' || needs.release_approval.result == 'skipped')
     needs: [setup, release_approval]
     runs-on: ubuntu-22.04
@@ -283,6 +297,7 @@ jobs:
     if: >-
       always() &&
       needs.setup.result == 'success' &&
+      !(github.event_name == 'workflow_dispatch' && inputs.reuse_preview_images == true) &&
       needs.components.result == 'success'
     needs: [setup, components]
     runs-on: ubuntu-22.04
@@ -369,10 +384,141 @@ jobs:
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "${IMAGE}@${DIGEST}"
 
+  preview_helm_e2e:
+    name: Qualify preview Helm chart
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_helm_e2e == true &&
+      needs.setup.result == 'success' &&
+      (needs.aio.result == 'success' ||
+      (inputs.reuse_preview_images == true && needs.aio.result == 'skipped'))
+    needs: [setup, aio]
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/helm-e2e.yml
+    with:
+      image_tag: ${{ needs.setup.outputs.primary_tag }}
+    secrets: inherit
+
+  chart:
+    name: Publish Helm chart
+    if: needs.setup.outputs.is_release == 'true'
+    needs: [setup, components]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    outputs:
+      digest: ${{ steps.publish_chart.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve images and prepare release chart
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          chart_dir="$RUNNER_TEMP/hangar-chart"
+          cp -a charts/hangar "$chart_dir"
+
+          for component in web admin space live api; do
+            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${VERSION}" | awk '$1 == "Digest:" && !digest { digest = $2 } END { print digest }')
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo "Could not resolve immutable digest for ${component}:${VERSION}" >&2
+              exit 1
+            fi
+            export "${component^^}_DIGEST=$digest"
+          done
+
+          charts/hangar/scripts/prepare-release.sh "$chart_dir" "$VERSION"
+          "$chart_dir/tests/render-policy.sh"
+
+      - name: Package candidate chart
+        id: package_chart
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          chart_dir="$RUNNER_TEMP/hangar-chart"
+          helm package "$chart_dir" --dependency-update=false --destination "$RUNNER_TEMP"
+
+          chart_version="${VERSION#v}"
+          chart_package="$RUNNER_TEMP/hangar-${chart_version}.tgz"
+          test -f "$chart_package"
+          echo "chart_package=$chart_package" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Kubernetes test tools
+        run: |
+          set -euo pipefail
+          charts/hangar/tests/install-e2e-tools.sh "$RUNNER_TEMP/e2e-bin"
+          echo "$RUNNER_TEMP/e2e-bin" >> "$GITHUB_PATH"
+
+      - name: Qualify release chart in an ephemeral cluster
+        env:
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: charts/hangar/tests/e2e-kind.sh "${{ steps.package_chart.outputs.chart_package }}"
+
+      - name: Attest chart provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: ${{ steps.package_chart.outputs.chart_package }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Publish and verify chart
+        id: publish_chart
+        env:
+          CERTIFICATE_IDENTITY: ${{ github.server_url }}/${{ github.workflow_ref }}
+          CHART_PACKAGE: ${{ steps.package_chart.outputs.chart_package }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GITHUB_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          push_output=$(helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts)
+          printf '%s\n' "$push_output"
+          chart_digest=$(printf '%s\n' "$push_output" | awk '$1 == "Digest:" && !digest { digest = $2 } END { print digest }')
+          if [[ ! "$chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "Helm did not return a valid OCI chart digest" >&2
+            exit 1
+          fi
+
+          chart_ref="ghcr.io/szymczag/charts/hangar@${chart_digest}"
+          cosign sign --yes "$chart_ref"
+          cosign verify \
+            --certificate-identity "$CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$chart_ref"
+          echo "digest=$chart_digest" >> "$GITHUB_OUTPUT"
+
   verify_publication:
-    name: Verify container publication
-    if: always()
-    needs: [setup, components, aio]
+    name: Verify publication
+    if: >-
+      always() &&
+      !(github.event_name == 'workflow_dispatch' && inputs.reuse_preview_images == true)
+    needs: [setup, components, aio, chart]
     runs-on: ubuntu-22.04
     steps:
       - name: Require every publication job to succeed
@@ -380,6 +526,8 @@ jobs:
           SETUP_RESULT: ${{ needs.setup.result }}
           COMPONENTS_RESULT: ${{ needs.components.result }}
           AIO_RESULT: ${{ needs.aio.result }}
+          CHART_RESULT: ${{ needs.chart.result }}
+          IS_RELEASE: ${{ needs.setup.outputs.is_release }}
         run: |
           set -euo pipefail
 
@@ -391,16 +539,25 @@ jobs:
             exit 1
           fi
 
-          echo "All required container publication jobs succeeded"
+          expected_chart_result=skipped
+          if [[ "$IS_RELEASE" == "true" ]]; then
+            expected_chart_result=success
+          fi
+          if [[ "$CHART_RESULT" != "$expected_chart_result" ]]; then
+            echo "Unexpected chart publication result: $CHART_RESULT (expected $expected_chart_result)" >&2
+            exit 1
+          fi
+
+          echo "All required publication jobs succeeded"
 
   release:
     name: Publish GitHub Release
     if: needs.setup.outputs.is_release == 'true'
-    needs: [setup, verify_publication]
+    needs: [setup, verify_publication, chart]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
-      packages: write
+      packages: read
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
@@ -417,8 +574,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
 
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.2.0
+
       - name: Stage release assets
         env:
+          CHART_DIGEST: ${{ needs.chart.outputs.digest }}
           VERSION: ${{ needs.setup.outputs.version }}
         run: |
           set -euo pipefail
@@ -430,6 +593,13 @@ jobs:
           cp deployments/cli/community/variables.env release-assets/
           cp deployments/swarm/community/swarm.sh release-assets/
           sed -i "s/\${APP_RELEASE:-stable}/\${APP_RELEASE:-${VERSION}}/g" release-assets/docker-compose.yml
+
+          printf '%s' "$GITHUB_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          helm pull oci://ghcr.io/szymczag/charts/hangar --version "${VERSION#v}" --destination release-assets
+          chart_package="release-assets/hangar-${VERSION#v}.tgz"
+          chart_checksum=$(sha256sum "$chart_package" | awk '{ print $1 }')
+          printf '%s  %s\n' "$chart_checksum" "$(basename "$chart_package")" > "${chart_package}.sha256"
+          printf 'ghcr.io/szymczag/charts/hangar@%s\n' "$CHART_DIGEST" > release-assets/chart-oci-digest.txt
 
       - name: Generate release notes from published evidence
         env:

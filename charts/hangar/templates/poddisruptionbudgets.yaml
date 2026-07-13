@@ -1,0 +1,20 @@
+{{- $root := . -}}
+{{- range $component := list "web" "admin" "space" "live" "api" "worker" }}
+{{- $values := index $root.Values $component }}
+{{- if and $values.pdb.enabled (gt (int $values.replicas) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "hangar.fullname" $root }}-{{ $component }}
+  labels:
+    {{- include "hangar.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  maxUnavailable: {{ $values.pdb.maxUnavailable }}
+  unhealthyPodEvictionPolicy: AlwaysAllow
+  selector:
+    matchLabels:
+      {{- include "hangar.selectorLabels" (dict "component" $component "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) | nindent 6 }}
+---
+{{- end }}
+{{- end }}

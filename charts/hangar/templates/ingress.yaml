@@ -1,0 +1,73 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hangar.fullname" . }}
+  labels:
+    {{- include "hangar.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  tls:
+    - hosts:
+        - {{ .Values.publicUrl.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ .Values.publicUrl.host }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hangar.fullname" . }}-api
+                port:
+                  name: http
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hangar.fullname" . }}-api
+                port:
+                  name: http
+          - path: /static
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hangar.fullname" . }}-api
+                port:
+                  name: http
+          - path: /live
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hangar.fullname" . }}-live
+                port:
+                  name: http
+          - path: /god-mode
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hangar.fullname" . }}-admin
+                port:
+                  name: http
+          - path: /spaces
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hangar.fullname" . }}-space
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hangar.fullname" . }}-web
+                port:
+                  name: http
+{{- end }}
