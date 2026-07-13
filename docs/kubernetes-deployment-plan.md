@@ -24,6 +24,14 @@ bounded dependency waits, and privacy-by-default startup.
 Focused unit tests cover release-discovery opt-in, telemetry enqueue behavior,
 form-value parsing, and the privacy-preserving model default.
 
+Release-candidate configuration must render integer-valued environment settings
+as exact decimal strings so Helm client implementation details cannot change the
+application input. Bundled Valkey health probes must authenticate against the
+local process over loopback; probing through its readiness-gated Service creates
+a circular dependency and is forbidden. The evaluation `hangar-cache` Secret
+therefore carries a probe-only `VALKEY_PASSWORD` in addition to the application
+`REDIS_URL` and mounted `users.acl` file.
+
 This implementation is intentionally still unsupported. The new ephemeral test
 must pass on an actual release run, and production-profile installation,
 application-level uploads and background work, coordinated backup/restore,

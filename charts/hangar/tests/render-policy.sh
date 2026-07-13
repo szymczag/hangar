@@ -8,6 +8,7 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 production_render="$tmp_dir/production.yaml"
 evaluation_render="$tmp_dir/evaluation.yaml"
+boundary_render="$tmp_dir/boundary.yaml"
 kube_version="${KUBE_VERSION:-1.35.0}"
 
 fail() {
@@ -48,6 +49,10 @@ helm lint "$chart_dir" --kube-version "$kube_version"
 helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" >"$production_render"
 helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
     --values "$chart_dir/ci/evaluation-values.yaml" >"$evaluation_render"
+helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
+    --set application.fileSizeLimit=1073741824 \
+    --set application.signedUrlExpiration=86400 \
+    --set application.hardDeleteAfterDays=3650 >"$boundary_render"
 
 for render in "$production_render" "$evaluation_render"; do
     image_count="$(grep -Ec '^[[:space:]]+image:' "$render")"
@@ -69,7 +74,16 @@ for render in "$production_render" "$evaluation_render"; do
     assert_absent '^  name: [^[:space:]]*[A-Z]' "$render" "resource names must be lowercase DNS names in $render"
     assert_present '^kind: NetworkPolicy$' "$render" "network policies must render in $render"
     assert_present '^[[:space:]]+seccompProfile:$' "$render" "RuntimeDefault seccomp must render in $render"
+    assert_present '^  FILE_SIZE_LIMIT: "5242880"$' "$render" "file-size limit must render as an exact decimal integer"
+    assert_present '^  SIGNED_URL_EXPIRATION: "3600"$' "$render" "signed-URL expiration must render as an exact decimal integer"
+    assert_present '^  HARD_DELETE_AFTER_DAYS: "60"$' "$render" "hard-delete retention must render as an exact decimal integer"
+    assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$render" "integer application settings must not use exponent notation"
 done
+
+assert_present '^  FILE_SIZE_LIMIT: "1073741824"$' "$boundary_render" "maximum file-size limit must render as an exact decimal integer"
+assert_present '^  SIGNED_URL_EXPIRATION: "86400"$' "$boundary_render" "maximum signed-URL expiration must render as an exact decimal integer"
+assert_present '^  HARD_DELETE_AFTER_DAYS: "3650"$' "$boundary_render" "maximum hard-delete retention must render as an exact decimal integer"
+assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$boundary_render" "maximum integer application settings must not use exponent notation"
 
 assert_absent 'Source: hangar/charts/evaluation' "$production_render" "production must not render evaluation dependencies"
 assert_present 'Source: hangar/charts/evaluation-postgresql' "$evaluation_render" "evaluation PostgreSQL did not render"
@@ -80,6 +94,10 @@ assert_present '^automountServiceAccountToken: false$' "$evaluation_render" "eva
 dependency_service_account_uses="$(grep -Ec '^[[:space:]]+serviceAccountName: hangar-evaluation-dependencies$' "$evaluation_render")"
 [[ "$dependency_service_account_uses" -eq 4 ]] || fail "every evaluation dependency Pod must use the tokenless dependency ServiceAccount"
 assert_present 'AWS_S3_ENDPOINT_URL: "http://hangar-hangar-evaluation-object-storage:8333"' "$evaluation_render" "evaluation object storage endpoint is incorrect"
+valkey_probe_auth_uses="$(grep -Ec '^[[:space:]]+- VALKEYCLI_AUTH="\$VALKEY_PASSWORD" valkey-cli --no-auth-warning --user hangar -h$' "$evaluation_render")"
+valkey_probe_loopback_uses="$(grep -Ec '^[[:space:]]+127\.0\.0\.1 -p 6379 ping \| grep -qx PONG$' "$evaluation_render")"
+[[ "$valkey_probe_auth_uses" -eq 3 && "$valkey_probe_loopback_uses" -eq 3 ]] || fail "every evaluation Valkey probe must authenticate over loopback"
+assert_absent 'valkey-cli[^[:cntrl:]]*REDIS_URL' "$evaluation_render" "evaluation Valkey probes must not expose or route through REDIS_URL"
 assert_absent '^kind: Secret$' "$evaluation_render" "charts must not generate credential Secrets"
 assert_present '^  name: hangar-hangar-internal-api$' "$evaluation_render" "internal API network policy did not render"
 

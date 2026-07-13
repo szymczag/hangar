@@ -317,6 +317,7 @@ metadata:
 type: Opaque
 stringData:
   REDIS_URL: redis://hangar:${cache_password}@hangar-evaluation-valkey:6379/0
+  VALKEY_PASSWORD: ${cache_password}
   users.acl: "user default off\\nuser hangar on >${cache_password} ~* &* +@all\\n"
 ---
 apiVersion: v1

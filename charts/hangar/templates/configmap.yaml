@@ -29,9 +29,9 @@ data:
   AWS_REGION: {{ .Values.externalServices.objectStorage.region | quote }}
   USE_MINIO: {{ ternary "1" "0" $objectStoragePathStyle | quote }}
   MINIO_ENDPOINT_SSL: {{ ternary "1" "0" (hasPrefix "https://" $objectStorageEndpoint) | quote }}
-  FILE_SIZE_LIMIT: {{ .Values.application.fileSizeLimit | quote }}
-  SIGNED_URL_EXPIRATION: {{ .Values.application.signedUrlExpiration | quote }}
-  HARD_DELETE_AFTER_DAYS: {{ .Values.application.hardDeleteAfterDays | quote }}
+  FILE_SIZE_LIMIT: {{ printf "%d" (int64 .Values.application.fileSizeLimit) | quote }}
+  SIGNED_URL_EXPIRATION: {{ printf "%d" (int64 .Values.application.signedUrlExpiration) | quote }}
+  HARD_DELETE_AFTER_DAYS: {{ printf "%d" (int64 .Values.application.hardDeleteAfterDays) | quote }}
   API_KEY_RATE_LIMIT: {{ .Values.application.apiKeyRateLimit | quote }}
   WEBHOOK_ALLOWED_HOSTS: {{ join "," .Values.application.webhookAllowedHosts | quote }}
   WEBHOOK_ALLOWED_IPS: {{ join "," .Values.application.webhookAllowedCIDRs | quote }}
