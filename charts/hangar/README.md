@@ -333,5 +333,9 @@ manual `Publish Hangar Containers` run to qualify changes without creating a
 release tag. Before the qualification workflow is present on the default
 branch, enable `run_helm_e2e` on the manual container publication; the publisher
 invokes the same reusable qualification workflow after every preview image has
-been published. The release workflow runs the same test automatically and will
-not attest, sign, or publish the candidate chart if it fails.
+been published. To retry only the qualification gate after a workflow-only fix
+or a transient runner failure, enable both `run_helm_e2e` and
+`reuse_preview_images`; this mode resolves and tests the existing
+`preview-<branch>` images and does not rebuild or republish them. The release
+workflow runs the same test automatically and will not attest, sign, or publish
+the candidate chart if it fails.
