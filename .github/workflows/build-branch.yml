@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
-      - "v[0-9]+.[0-9]+.[0-9]+-*"
+      - "hangar-v[0-9]+.[0-9]+.[0-9]+"
+      - "hangar-v[0-9]+.[0-9]+.[0-9]+-*"
 
 concurrency:
   group: publish-containers-${{ github.ref }}
@@ -28,6 +28,7 @@ jobs:
       primary_tag: ${{ steps.metadata.outputs.primary_tag }}
       sha_tag: ${{ steps.metadata.outputs.sha_tag }}
       version: ${{ steps.metadata.outputs.version }}
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
@@ -46,7 +47,7 @@ jobs:
           echo "sha_tag=sha-${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
 
           if [[ "$EVENT_NAME" == "push" ]]; then
-            semver_regex='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'
+            semver_regex='^hangar-v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$'
             if [[ ! "$REF_NAME" =~ $semver_regex ]]; then
               echo "Unsupported release tag: $REF_NAME" >&2
               exit 1
@@ -58,10 +59,12 @@ jobs:
               exit 1
             fi
 
+            product_version="${REF_NAME#hangar-}"
             echo "is_release=true" >> "$GITHUB_OUTPUT"
-            echo "version=$REF_NAME" >> "$GITHUB_OUTPUT"
-            echo "primary_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
-            if [[ "$REF_NAME" == *-* ]]; then
+            echo "release_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "version=$product_version" >> "$GITHUB_OUTPUT"
+            echo "primary_tag=$product_version" >> "$GITHUB_OUTPUT"
+            if [[ "$product_version" == *-* ]]; then
               echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
             else
               echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
@@ -83,12 +86,13 @@ jobs:
         if: steps.metadata.outputs.is_release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.metadata.outputs.release_tag }}
           VERSION: ${{ steps.metadata.outputs.version }}
         run: |
           set -euo pipefail
 
-          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "GitHub Release $VERSION already exists" >&2
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub Release $RELEASE_TAG already exists" >&2
             exit 1
           fi
 
@@ -98,6 +102,11 @@ jobs:
               exit 1
             fi
           done
+
+          if docker manifest inspect "ghcr.io/szymczag/charts/hangar:${VERSION#v}" >/dev/null 2>&1; then
+            echo "Immutable chart version already exists: ${VERSION#v}" >&2
+            exit 1
+          fi
 
   release_approval:
     name: Approve release publication
@@ -190,6 +199,23 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
+      - name: Install Cosign
+        if: needs.setup.outputs.is_release == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign and verify image digest
+        if: needs.setup.outputs.is_release == 'true'
+        env:
+          IMAGE: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          CERTIFICATE_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/build-branch.yml@${{ github.ref }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "$IMAGE"
+          cosign verify \
+            --certificate-identity "$CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$IMAGE"
+
   aio:
     name: Publish aio
     needs: [setup, components]
@@ -253,14 +279,141 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
+      - name: Install Cosign
+        if: needs.setup.outputs.is_release == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign and verify image digest
+        if: needs.setup.outputs.is_release == 'true'
+        env:
+          IMAGE: ${{ env.IMAGE_PREFIX }}aio@${{ steps.build.outputs.digest }}
+          CERTIFICATE_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/build-branch.yml@${{ github.ref }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "$IMAGE"
+          cosign verify \
+            --certificate-identity "$CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$IMAGE"
+
+  chart:
+    name: Publish Helm Chart
+    if: needs.setup.outputs.is_release == 'true'
+    needs: [setup, components]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    outputs:
+      digest: ${{ steps.publish_chart.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve images and prepare release chart
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          chart_dir="$RUNNER_TEMP/hangar-chart"
+          cp -a charts/hangar "$chart_dir"
+
+          for component in web admin space live api; do
+            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${VERSION}" | awk '$1 == "Digest:" { print $2; exit }')
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo "Could not resolve immutable digest for ${component}:${VERSION}" >&2
+              exit 1
+            fi
+            export "${component^^}_DIGEST=$digest"
+          done
+
+          charts/hangar/scripts/prepare-release.sh "$chart_dir" "$VERSION"
+          "$chart_dir/tests/render-policy.sh"
+
+      - name: Package candidate chart
+        id: package_chart
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          chart_dir="$RUNNER_TEMP/hangar-chart"
+          helm package "$chart_dir" --dependency-update=false --destination "$RUNNER_TEMP"
+
+          chart_version="${VERSION#v}"
+          chart_package="$RUNNER_TEMP/hangar-${chart_version}.tgz"
+          echo "chart_package=$chart_package" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Kubernetes test tools
+        run: |
+          set -euo pipefail
+          charts/hangar/tests/install-e2e-tools.sh "$RUNNER_TEMP/e2e-bin"
+          echo "$RUNNER_TEMP/e2e-bin" >> "$GITHUB_PATH"
+
+      - name: Qualify release chart in an ephemeral cluster
+        env:
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: charts/hangar/tests/e2e-kind.sh "${{ steps.package_chart.outputs.chart_package }}"
+
+      - name: Attest chart provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: ${{ steps.package_chart.outputs.chart_package }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Publish chart to GHCR
+        id: publish_chart
+        run: |
+          set -euo pipefail
+          printf '%s' "$GITHUB_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          push_output=$(helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts)
+          printf '%s\n' "$push_output"
+          chart_digest=$(printf '%s\n' "$push_output" | awk '$1 == "Digest:" { print $2; exit }')
+          if [[ ! "$chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "Helm did not return a valid OCI chart digest" >&2
+            exit 1
+          fi
+
+          chart_ref="ghcr.io/szymczag/charts/hangar@${chart_digest}"
+          cosign sign --yes "$chart_ref"
+          cosign verify \
+            --certificate-identity "$CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$chart_ref"
+          echo "digest=$chart_digest" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHART_PACKAGE: ${{ steps.package_chart.outputs.chart_package }}
+          CERTIFICATE_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/build-branch.yml@${{ github.ref }}
+
   release:
     name: Publish GitHub Release
     if: needs.setup.outputs.is_release == 'true'
-    needs: [setup, aio]
+    needs: [setup, aio, chart]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
-      packages: write
+      packages: read
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
@@ -271,6 +424,11 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.2.0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
@@ -290,6 +448,8 @@ jobs:
       - name: Stage release assets
         env:
           VERSION: ${{ needs.setup.outputs.version }}
+          CHART_DIGEST: ${{ needs.chart.outputs.digest }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir release-assets
@@ -300,16 +460,33 @@ jobs:
           cp deployments/cli/community/variables.env release-assets/
           cp deployments/swarm/community/swarm.sh release-assets/
           sed -i "s/\${APP_RELEASE:-stable}/\${APP_RELEASE:-${VERSION}}/g" release-assets/docker-compose.yml
+          printf '%s' "$GITHUB_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          helm pull oci://ghcr.io/szymczag/charts/hangar --version "${VERSION#v}" --destination release-assets
+          chart_package="release-assets/hangar-${VERSION#v}.tgz"
+          chart_checksum=$(sha256sum "$chart_package" | awk '{ print $1 }')
+          printf '%s  %s\n' "$chart_checksum" "$(basename "$chart_package")" > "${chart_package}.sha256"
+          printf 'ghcr.io/szymczag/charts/hangar@%s\n' "$CHART_DIGEST" > release-assets/chart-oci-digest.txt
+
+          : > release-assets/image-digests.txt
+          for component in web admin space live api proxy aio; do
+            digest=$(docker buildx imagetools inspect "${IMAGE_PREFIX}${component}:${VERSION}" | awk '$1 == "Digest:" { print $2; exit }')
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo "Could not resolve immutable digest for ${component}:${VERSION}" >&2
+              exit 1
+            fi
+            printf '%s%s@%s\n' "$IMAGE_PREFIX" "$component" "$digest" >> release-assets/image-digests.txt
+          done
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.setup.outputs.version }}
+          RELEASE_TAG: ${{ needs.setup.outputs.release_tag }}
           IS_PRERELEASE: ${{ needs.setup.outputs.is_prerelease }}
         run: |
           set -euo pipefail
-          args=(--repo "$GITHUB_REPOSITORY" --title "$VERSION" --target "$GITHUB_SHA" --generate-notes)
+          args=(--repo "$GITHUB_REPOSITORY" --title "Hangar $VERSION" --target "$GITHUB_SHA" --generate-notes)
           if [[ "$IS_PRERELEASE" == "true" ]]; then
             args+=(--prerelease)
           fi
-          gh release create "$VERSION" release-assets/* "${args[@]}"
+          gh release create "$RELEASE_TAG" release-assets/* "${args[@]}"

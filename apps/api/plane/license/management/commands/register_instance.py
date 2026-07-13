@@ -4,18 +4,18 @@
 
 # Python imports
 import json
-import secrets
 import os
+import secrets
+
 import requests
 
 # Django imports
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-
 # Module imports
-from plane.license.models import Instance, InstanceEdition
 from plane.license.bgtasks.telemetry_metrics import push_instance_metrics
+from plane.license.models import Instance, InstanceEdition
 
 
 class Command(BaseCommand):
@@ -38,9 +38,13 @@ class Command(BaseCommand):
             return "v0.1.0"
 
     def check_for_latest_version(self, fallback_version):
+        release_discovery_url = os.environ.get("RELEASE_DISCOVERY_URL", "").strip()
+        if not release_discovery_url:
+            return fallback_version
+
         try:
             response = requests.get(
-                "https://api.github.com/repos/makeplane/plane/releases/latest",
+                release_discovery_url,
                 timeout=10,
             )
             response.raise_for_status()
@@ -86,7 +90,10 @@ class Command(BaseCommand):
             instance.edition = InstanceEdition.PLANE_COMMUNITY.value
             instance.save()
 
-        # Push instance metrics on registration
-        push_instance_metrics.delay()
+        # Telemetry is opt-in. The scheduled task performs the same database
+        # check, but avoiding the enqueue here also avoids unnecessary broker
+        # traffic for the default self-managed configuration.
+        if instance.is_telemetry_enabled:
+            push_instance_metrics.delay()
 
         return

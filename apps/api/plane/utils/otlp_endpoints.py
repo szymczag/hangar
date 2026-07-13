@@ -4,9 +4,8 @@
 
 """
 Shared OTLP endpoint helpers so metrics and traces use the same collector
-when both are enabled. One URL (OTLP_ENDPOINT) is enough: same as traces
-(e.g. https://telemetry.plane.so or https://telemetry.plane.town behind
-nginx ingress with gRPC backend).
+when both are enabled. One explicit URL (OTLP_ENDPOINT) is enough for both
+signals. No external collector is selected by default.
 """
 
 import os
@@ -15,9 +14,6 @@ from urllib.parse import urlparse
 # When no port in URL: https -> 443 (ingress), http -> 4317 (OTLP gRPC default)
 OTLP_GRPC_DEFAULT_PORT = "4317"
 HTTPS_DEFAULT_PORT = "443"
-
-_DEFAULT_OTLP_ENDPOINT = "https://telemetry.plane.so"
-
 
 def grpc_endpoint_from_url(url: str) -> str:
     """
@@ -28,12 +24,17 @@ def grpc_endpoint_from_url(url: str) -> str:
     - telemetry.plane.so -> telemetry.plane.so:4317 (scheme-less, default gRPC port)
     - Explicit port in URL is always preserved.
     """
+    if not url.strip():
+        raise ValueError("OTLP_ENDPOINT must be configured explicitly")
+
     # urlparse needs a scheme to correctly populate hostname/netloc.
     # Scheme-less values like "host:port" are misread as scheme="host", path="port".
     if "://" not in url:
         url = "//" + url
     parsed = urlparse(url)
-    host = parsed.hostname or "telemetry.plane.so"
+    host = parsed.hostname
+    if not host:
+        raise ValueError("OTLP_ENDPOINT must contain a valid hostname")
     if parsed.port is not None:
         port = str(parsed.port)
     elif parsed.scheme == "https":
@@ -49,11 +50,13 @@ def get_otlp_grpc_endpoint() -> str:
     Derived from OTLP_ENDPOINT so the same URL works for both (e.g. collector
     behind nginx ingress with gRPC backend on 443).
     """
-    base = os.environ.get("OTLP_ENDPOINT", _DEFAULT_OTLP_ENDPOINT)
+    base = os.environ.get("OTLP_ENDPOINT", "").strip()
     return grpc_endpoint_from_url(base)
 
 
 def get_otlp_http_metrics_url() -> str:
     """Return the HTTP URL for OTLP metrics (OTLP_ENDPOINT + /v1/metrics)."""
-    base = os.environ.get("OTLP_ENDPOINT", _DEFAULT_OTLP_ENDPOINT)
+    base = os.environ.get("OTLP_ENDPOINT", "").strip()
+    if not base:
+        raise ValueError("OTLP_ENDPOINT must be configured explicitly")
     return f"{base.rstrip('/')}/v1/metrics"

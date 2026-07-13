@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-migrate-%d" (include "hangar.fullname" .) .Release.Revision | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "hangar.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrator
+spec:
+  activeDeadlineSeconds: {{ .Values.migrator.activeDeadlineSeconds }}
+  backoffLimit: {{ .Values.migrator.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.migrator.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "hangar.selectorLabels" (dict "component" "migrator" "Values" .Values "Chart" .Chart "Release" .Release) | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- include "hangar.podSecurityContext" (dict "uid" 10001 "gid" 10001) | nindent 8 }}
+      {{- with concat .Values.global.imagePullSecrets .Values.api.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrator
+          image: {{ include "hangar.image" .Values.api.image | quote }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+            - ./bin/docker-entrypoint-migrator.sh
+          securityContext:
+            {{- include "hangar.containerSecurityContext" (dict "uid" 10001 "gid" 10001) | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "hangar.fullname" . }}-api
+          env:
+            {{- include "hangar.coreSecretEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrator.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /code/plane/logs
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: logs
+          emptyDir:
+            sizeLimit: 512Mi
+      {{- include "hangar.scheduling" . | nindent 6 }}

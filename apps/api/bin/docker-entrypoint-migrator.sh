@@ -1,6 +1,13 @@
 #!/bin/bash
-set -e
 
-python manage.py wait_for_db $1
+set -euo pipefail
 
-python manage.py migrate $1
+source "$(dirname "$0")/docker-entrypoint-common.sh"
+
+if [[ $# -gt 0 ]]; then
+    wait_for_database "$1"
+    python manage.py migrate "$1"
+else
+    wait_for_database
+    python manage.py migrate
+fi

@@ -1,0 +1,22 @@
+Hangar has been rendered for the {{ .Values.deploymentProfile }} profile.
+
+Before waiting for the workloads, verify that these pre-existing Secrets and all
+documented keys are present in namespace {{ .Release.Namespace }}:
+
+  {{ .Values.existingSecrets.application.name }}
+  {{ .Values.existingSecrets.live.name }}
+  {{ .Values.existingSecrets.database.name }}
+  {{ .Values.existingSecrets.cache.name }}
+  {{ .Values.existingSecrets.queue.name }}
+  {{ .Values.existingSecrets.objectStorage.name }}
+
+The chart never reads those Secrets through Kubernetes RBAC and never stores
+their values in the Helm release. Missing keys appear as CreateContainerConfigError.
+
+Verify the release with:
+
+  kubectl -n {{ .Release.Namespace }} get pods,jobs,ingress,networkpolicy
+
+PersistentVolumeClaims created by the evaluation dependencies are retained for
+deliberate cleanup. The evaluation profile is not a production availability
+recommendation.

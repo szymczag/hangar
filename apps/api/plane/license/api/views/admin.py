@@ -42,6 +42,11 @@ from plane.utils.ip_address import get_client_ip
 from plane.utils.path_validator import get_safe_redirect_url
 
 
+def _form_boolean_is_enabled(value):
+    """Return True only for explicit, conventional HTML form opt-in values."""
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
 class InstanceAdminEndpoint(BaseAPIView):
     permission_classes = [InstanceAdminPermission]
 
@@ -126,7 +131,9 @@ class InstanceAdminSignUpEndpoint(View):
         first_name = request.POST.get("first_name", False)
         last_name = request.POST.get("last_name", "")
         company_name = request.POST.get("company_name", "")
-        is_telemetry_enabled = request.POST.get("is_telemetry_enabled", True)
+        is_telemetry_enabled = _form_boolean_is_enabled(
+            request.POST.get("is_telemetry_enabled", False)
+        )
 
         # return error if the email and password is not present
         if not email or not password or not first_name:

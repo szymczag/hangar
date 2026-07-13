@@ -1,0 +1,77 @@
+{{- $root := . -}}
+{{- range $component := list (dict "name" "web" "uid" 101 "path" "/") (dict "name" "admin" "uid" 101 "path" "/god-mode/") (dict "name" "space" "uid" 1000 "path" "/spaces/") }}
+{{- $values := index $root.Values $component.name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hangar.fullname" $root }}-{{ $component.name }}
+  labels:
+    {{- include "hangar.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $component.name }}
+spec:
+  replicas: {{ $values.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "hangar.selectorLabels" (dict "component" $component.name "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hangar.selectorLabels" (dict "component" $component.name "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) | nindent 8 }}
+        {{- with $root.Values.global.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- with $root.Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ $root.Values.podDefaults.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- include "hangar.podSecurityContext" (dict "uid" $component.uid "gid" $component.uid) | nindent 8 }}
+      {{- with concat $root.Values.global.imagePullSecrets $values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $component.name }}
+          image: {{ include "hangar.image" $values.image | quote }}
+          imagePullPolicy: {{ $values.image.pullPolicy }}
+          securityContext:
+            {{- include "hangar.containerSecurityContext" (dict "uid" $component.uid "gid" $component.uid) | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: {{ $component.path }}
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: {{ $component.path }}
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: {{ $component.path }}
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml $values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 128Mi
+      {{- include "hangar.scheduling" $root | nindent 6 }}
+---
+{{- end }}

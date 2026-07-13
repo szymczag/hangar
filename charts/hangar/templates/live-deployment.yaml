@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hangar.fullname" . }}-live
+  labels:
+    {{- include "hangar.labels" . | nindent 4 }}
+    app.kubernetes.io/component: live
+spec:
+  replicas: {{ .Values.live.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "hangar.selectorLabels" (dict "component" "live" "Values" .Values "Chart" .Chart "Release" .Release) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hangar.selectorLabels" (dict "component" "live" "Values" .Values "Chart" .Chart "Release" .Release) | nindent 8 }}
+        {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ .Values.podDefaults.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- include "hangar.podSecurityContext" (dict "uid" 1000 "gid" 1000) | nindent 8 }}
+      {{- with concat .Values.global.imagePullSecrets .Values.live.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: live
+          image: {{ include "hangar.image" .Values.live.image | quote }}
+          imagePullPolicy: {{ .Values.live.image.pullPolicy }}
+          securityContext:
+            {{- include "hangar.containerSecurityContext" (dict "uid" 1000 "gid" 1000) | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "hangar.fullname" . }}-live
+          env:
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecrets.cache.name }}
+                  key: {{ .Values.existingSecrets.cache.urlKey }}
+            - name: LIVE_SERVER_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecrets.live.name }}
+                  key: {{ .Values.existingSecrets.live.secretKeyKey }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /live/health/
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /live/health/
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /live/health/
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.live.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+      {{- include "hangar.scheduling" . | nindent 6 }}
