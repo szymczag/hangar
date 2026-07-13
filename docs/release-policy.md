@@ -1,6 +1,6 @@
 # Hangar release and versioning policy
 
-Status: approved on 2026-07-13; metadata foundation implemented; publishing integration pending.
+Status: approved on 2026-07-13.
 
 ## Purpose
 
@@ -171,6 +171,8 @@ GHCR tag:       v0.1.0-rc.1
 Manually dispatched `preview-*` images are development artifacts, not releases.
 They have no Git tag or GitHub Release, do not update `stable`, and remain unsigned
 by Cosign so a Cosign signature retains the meaning "approved release flow".
+Preview source tags use `preview-sha-<full-hangar-commit>` so they cannot consume or
+overwrite the immutable `sha-<full-hangar-commit>` namespace used by releases.
 
 ## Signing and immutability
 
@@ -181,6 +183,9 @@ image digest is then:
 2. attested with GitHub artifact attestations;
 3. signed keylessly with Cosign through GitHub OIDC; and
 4. immediately verified against the exact Hangar publication workflow and tag.
+
+The publication workflow rejects lightweight tags, unverified annotated tags, and
+tags that do not point directly to the workflow commit.
 
 The expected certificate identity includes the namespaced tag:
 

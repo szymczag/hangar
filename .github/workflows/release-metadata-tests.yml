@@ -8,7 +8,7 @@ on:
     paths:
       - "UPSTREAM_BASE.json"
       - ".github/scripts/release_metadata.py"
-      - ".github/scripts/tests/test_release_metadata.py"
+      - ".github/scripts/tests/**"
       - ".github/workflows/build-branch.yml"
       - ".github/workflows/release-metadata-tests.yml"
   push:
@@ -17,7 +17,7 @@ on:
     paths:
       - "UPSTREAM_BASE.json"
       - ".github/scripts/release_metadata.py"
-      - ".github/scripts/tests/test_release_metadata.py"
+      - ".github/scripts/tests/**"
       - ".github/workflows/build-branch.yml"
       - ".github/workflows/release-metadata-tests.yml"
 
@@ -45,4 +45,5 @@ jobs:
           python3 .github/scripts/release_metadata.py \
             --event-name workflow_dispatch \
             --ref-name preview \
-            --commit-sha "$COMMIT_SHA"
+            --commit-sha "$COMMIT_SHA" \
+            --format github-output
