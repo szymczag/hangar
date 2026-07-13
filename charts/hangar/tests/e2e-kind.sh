@@ -36,7 +36,8 @@ for command in base64 curl docker helm kind kubectl openssl sha256sum; do
   fi
 done
 
-if helm show values "$chart_reference" | grep -Eq 'digest: sha256:0{64}$'; then
+chart_values=$(helm show values "$chart_reference")
+if grep -Eq 'digest: sha256:0{64}$' <<<"$chart_values"; then
   echo "refusing to install a chart with fail-closed application image digests" >&2
   exit 1
 fi
@@ -154,9 +155,13 @@ nginx_daemonset=$(kubectl --namespace "$INGRESS_NAMESPACE" get daemonset \
   -o jsonpath='{.items[0].metadata.name}')
 kubectl --namespace "$INGRESS_NAMESPACE" rollout status \
   "daemonset/$nginx_daemonset" --timeout=5m
-kubectl --namespace "$INGRESS_NAMESPACE" get pods \
+nginx_pods=$(kubectl --namespace "$INGRESS_NAMESPACE" get pods \
   --selector app.kubernetes.io/name=nginx-ingress \
-  -o name | grep -q '^pod/'
+  -o name)
+if [[ "$nginx_pods" != pod/* ]]; then
+  echo "NGINX ingress controller Pod was not found" >&2
+  exit 1
+fi
 
 kubectl create namespace "$NAMESPACE"
 kubectl label namespace "$NAMESPACE" \
@@ -452,8 +457,12 @@ if grep -qv '^Bound$' <<<"$pvc_phases"; then
   echo "not all evaluation PVCs are Bound" >&2
   exit 1
 fi
-kubectl --namespace "$NAMESPACE" get job hangar-hangar-migrate-1 \
-  -o jsonpath='{.status.succeeded}' | grep -qx '1'
+migration_1_succeeded=$(kubectl --namespace "$NAMESPACE" get job hangar-hangar-migrate-1 \
+  -o jsonpath='{.status.succeeded}')
+if [[ "$migration_1_succeeded" != "1" ]]; then
+  echo "initial migration Job did not succeed exactly once" >&2
+  exit 1
+fi
 
 curl --noproxy '*' --fail --silent --show-error --cacert "$work_directory/tls.crt" \
   --resolve "${PUBLIC_HOST}:8443:127.0.0.1" \
@@ -464,9 +473,13 @@ curl --noproxy '*' --fail --silent --show-error --cacert "$work_directory/tls.cr
 curl --noproxy '*' --fail --silent --show-error --cacert "$work_directory/tls.crt" \
   --resolve "${PUBLIC_HOST}:8443:127.0.0.1" \
   "https://${PUBLIC_HOST}:8443/spaces/" >/dev/null
-curl --noproxy '*' --fail --silent --show-error --cacert "$work_directory/tls.crt" \
+live_health=$(curl --noproxy '*' --fail --silent --show-error --cacert "$work_directory/tls.crt" \
   --resolve "${PUBLIC_HOST}:8443:127.0.0.1" \
-  "https://${PUBLIC_HOST}:8443/live/health/" | grep -q '"status":"OK"'
+  "https://${PUBLIC_HOST}:8443/live/health/")
+if [[ "$live_health" != *'"status":"OK"'* ]]; then
+  echo "Live health response did not report OK" >&2
+  exit 1
+fi
 
 api_status=$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' \
   --cacert "$work_directory/tls.crt" \
@@ -485,7 +498,7 @@ redirect_status=$(curl --noproxy '*' --silent --show-error --head \
   --resolve "${PUBLIC_HOST}:8080:127.0.0.1" \
   --header "Host: ${PUBLIC_HOST}" \
   "http://${PUBLIC_HOST}:8080/")
-redirect_location=$(tr -d '\r' <"$redirect_headers" | awk 'tolower($1) == "location:" { print $2; exit }')
+redirect_location=$(awk 'tolower($1) == "location:" { sub(/\r$/, "", $2); location = $2 } END { print location }' "$redirect_headers")
 redirect_host_regex="${PUBLIC_HOST//./\\.}"
 if [[ ! "$redirect_status" =~ ^30(1|2|7|8)$ ]] || \
   [[ ! "$redirect_location" =~ ^https://${redirect_host_regex}(:[0-9]+)?(/|$) ]]; then
@@ -509,7 +522,7 @@ if [[ "$websocket_curl_status" -ne 0 && "$websocket_curl_status" -ne 28 ]]; then
   echo "WebSocket probe failed with curl status $websocket_curl_status" >&2
   exit 1
 fi
-if ! tr -d '\r' <"$work_directory/websocket-headers" | grep -q '^HTTP/1.1 101 '; then
+if ! grep -E '^HTTP/1\.1 101 ' "$work_directory/websocket-headers" >/dev/null; then
   echo "WebSocket probe did not receive HTTP 101 Switching Protocols" >&2
   exit 1
 fi
@@ -657,16 +670,28 @@ helm upgrade "$RELEASE_NAME" "$chart_reference" \
   --namespace "$NAMESPACE" \
   --values "$work_directory/values.yaml" \
   --set application.signedUrlExpiration=7200 \
-  --atomic \
+  --rollback-on-failure \
   --wait \
   --wait-for-jobs \
   --timeout 20m
-kubectl --namespace "$NAMESPACE" get job hangar-hangar-migrate-2 \
-  -o jsonpath='{.status.succeeded}' | grep -qx '1'
-helm --namespace "$NAMESPACE" status "$RELEASE_NAME" | grep -q '^STATUS: deployed$'
-curl --noproxy '*' --fail --silent --show-error --cacert "$work_directory/tls.crt" \
+migration_2_succeeded=$(kubectl --namespace "$NAMESPACE" get job hangar-hangar-migrate-2 \
+  -o jsonpath='{.status.succeeded}')
+if [[ "$migration_2_succeeded" != "1" ]]; then
+  echo "upgrade migration Job did not succeed exactly once" >&2
+  exit 1
+fi
+release_status=$(helm --namespace "$NAMESPACE" status "$RELEASE_NAME")
+if ! grep -q '^STATUS: deployed$' <<<"$release_status"; then
+  echo "Helm release is not deployed after upgrade" >&2
+  exit 1
+fi
+upgraded_live_health=$(curl --noproxy '*' --fail --silent --show-error --cacert "$work_directory/tls.crt" \
   --resolve "${PUBLIC_HOST}:8443:127.0.0.1" \
-  "https://${PUBLIC_HOST}:8443/live/health/" | grep -q '"status":"OK"'
+  "https://${PUBLIC_HOST}:8443/live/health/")
+if [[ "$upgraded_live_health" != *'"status":"OK"'* ]]; then
+  echo "Live health response did not report OK after upgrade" >&2
+  exit 1
+fi
 
 helm --namespace "$NAMESPACE" uninstall "$RELEASE_NAME" --wait --timeout 10m
 retained_pvc_count=$(kubectl --namespace "$NAMESPACE" get pvc --no-headers | wc -l | tr -d ' ')
