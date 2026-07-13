@@ -57,6 +57,14 @@ jobs:
             --commit-sha "$COMMIT_SHA" \
             --format github-output >> "$GITHUB_OUTPUT"
 
+      - name: Validate curated release notes
+        if: steps.metadata.outputs.is_release == 'true'
+        env:
+          GIT_TAG: ${{ steps.metadata.outputs.git_tag }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/release_notes.py validate --git-tag "$GIT_TAG"
+
       - name: Require release commit on preview
         if: steps.metadata.outputs.is_release == 'true'
         env:
@@ -223,6 +231,8 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}${{ matrix.image }}:${{ needs.setup.outputs.primary_tag }}
             ${{ env.IMAGE_PREFIX }}${{ matrix.image }}:${{ needs.setup.outputs.sha_tag }}
+          build-args: |
+            APP_VERSION=${{ needs.setup.outputs.version }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -394,6 +404,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Log in to GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.0.0
@@ -419,35 +431,30 @@ jobs:
           cp deployments/swarm/community/swarm.sh release-assets/
           sed -i "s/\${APP_RELEASE:-stable}/\${APP_RELEASE:-${VERSION}}/g" release-assets/docker-compose.yml
 
-      - name: Write release notes
+      - name: Generate release notes from published evidence
         env:
+          GH_TOKEN: ${{ github.token }}
           GIT_TAG: ${{ needs.setup.outputs.git_tag }}
-          UPSTREAM_PACKAGE_VERSION: ${{ needs.setup.outputs.upstream_package_version }}
-          UPSTREAM_REPOSITORY: ${{ needs.setup.outputs.upstream_repository }}
-          UPSTREAM_REVISION: ${{ needs.setup.outputs.upstream_revision }}
-          UPSTREAM_SYNCED_AT: ${{ needs.setup.outputs.upstream_synced_at }}
           VERSION: ${{ needs.setup.outputs.version }}
         run: |
           set -euo pipefail
-          cat > release-notes.md <<EOF
-          ## Release metadata
+          gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/releases?per_page=100" > release-pages.json
 
-          - Hangar version: \`${VERSION}\`
-          - Git tag: \`${GIT_TAG}\`
-          - Hangar commit: \`${GITHUB_SHA}\`
-          - Upstream repository: \`${UPSTREAM_REPOSITORY}\`
-          - Upstream revision: \`${UPSTREAM_REVISION}\`
-          - Upstream package version: \`${UPSTREAM_PACKAGE_VERSION}\` (informational)
-          - Upstream sync date: \`${UPSTREAM_SYNCED_AT}\`
+          digests='{}'
+          for image in web admin space live api proxy aio; do
+            image_ref="${IMAGE_PREFIX}${image}:${VERSION}"
+            manifest=$(docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}')
+            digest=$(jq -er '.digest | select(type == "string" and test("^sha256:[0-9a-f]{64}$"))' <<< "$manifest")
+            digests=$(jq --arg image "$image" --arg digest "$digest" '. + {($image): $digest}' <<< "$digests")
+          done
+          printf '%s\n' "$digests" > release-digests.json
 
-          ## Containers
-
-          The \`web\`, \`admin\`, \`space\`, \`live\`, \`api\`, \`proxy\`, and \`aio\`
-          images are published at \`${IMAGE_PREFIX}<image>:${VERSION}\` for \`linux/amd64\`.
-
-          Each release image includes an SBOM and GitHub build-provenance attestation and is
-          signed keylessly with Cosign. Pin the verified image digest in production.
-          EOF
+          python3 .github/scripts/release_notes.py generate \
+            --git-tag "$GIT_TAG" \
+            --commit-sha "$GITHUB_SHA" \
+            --release-pages release-pages.json \
+            --digests release-digests.json > release-notes.md
 
       - name: Create GitHub Release
         env:

@@ -1,9 +1,12 @@
 FROM python:3.12.10-alpine
 
+ARG APP_VERSION=v0.1.0
+
 # set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 
+ENV APP_VERSION=${APP_VERSION}
 
 # Update system packages for security
 RUN apk update && apk upgrade

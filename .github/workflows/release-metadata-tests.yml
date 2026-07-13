@@ -8,18 +8,22 @@ on:
     paths:
       - "UPSTREAM_BASE.json"
       - ".github/scripts/release_metadata.py"
+      - ".github/scripts/release_notes.py"
       - ".github/scripts/tests/**"
       - ".github/workflows/build-branch.yml"
       - ".github/workflows/release-metadata-tests.yml"
+      - "docs/releases/**"
   push:
     branches:
       - preview
     paths:
       - "UPSTREAM_BASE.json"
       - ".github/scripts/release_metadata.py"
+      - ".github/scripts/release_notes.py"
       - ".github/scripts/tests/**"
       - ".github/workflows/build-branch.yml"
       - ".github/workflows/release-metadata-tests.yml"
+      - "docs/releases/**"
 
 permissions:
   contents: read

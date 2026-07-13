@@ -90,6 +90,14 @@ connection to the validated DNS result, ignores ambient proxies, refuses redirec
 and limits the response size. Failures leave the locally packaged version as the
 source of truth and do not block startup.
 
+The endpoint must return a published Hangar GitHub Release whose `tag_name` uses
+the strict `hangar-vMAJOR.MINOR.PATCH` namespace (or an approved `alpha.N`,
+`beta.N`, or `rc.N` suffix). Hangar removes only the `hangar-` Git namespace before
+displaying the product version; inherited Plane `v*` tags and malformed versions
+are rejected. Release-built API and Live images embed that same product version as
+`APP_VERSION`, so offline version reporting does not depend on the upstream
+`package.json` value.
+
 ## Verifying release images
 
 Approved semver-tagged container releases are signed by the Hangar publication

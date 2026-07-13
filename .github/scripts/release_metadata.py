@@ -70,14 +70,7 @@ def validate_commit_sha(value: str, *, field_name: str) -> str:
     return value
 
 
-def load_upstream_base(path: Path) -> UpstreamBase:
-    try:
-        raw_data = json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise MetadataError(f"cannot read upstream baseline: {path}") from exc
-    except json.JSONDecodeError as exc:
-        raise MetadataError("upstream baseline must be valid JSON") from exc
-
+def parse_upstream_base(raw_data: Any) -> UpstreamBase:
     if not isinstance(raw_data, dict):
         raise MetadataError("upstream baseline must be a JSON object")
 
@@ -119,6 +112,16 @@ def load_upstream_base(path: Path) -> UpstreamBase:
         package_version=package_version,
         synced_at=synced_at,
     )
+
+
+def load_upstream_base(path: Path) -> UpstreamBase:
+    try:
+        raw_data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise MetadataError(f"cannot read upstream baseline: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise MetadataError("upstream baseline must be valid JSON") from exc
+    return parse_upstream_base(raw_data)
 
 
 def parse_release_tag(ref_name: str) -> tuple[str, bool]:
