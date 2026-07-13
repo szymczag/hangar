@@ -38,7 +38,7 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10) |
 | Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11) |
 | Time tracking and worklogs backend            | Available on `preview` | [#12](https://github.com/szymczag/hangar/pull/12) |
-| Time tracking and worklogs UI                 | In review              | [#13](https://github.com/szymczag/hangar/pull/13) |
+| Time tracking and worklogs UI                 | Available on `preview` | [#13](https://github.com/szymczag/hangar/pull/13) |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
 plan a deployment around those capabilities until their pull requests have merged and
@@ -52,6 +52,43 @@ the table marks them as available.
 > Hangar requires an HTTPS SAML IdP single sign-on endpoint. Because SAML uses a
 > browser redirect to the IdP, TLS protocol negotiation is controlled by the browser
 > and IdP rather than by Hangar; configure the IdP or its reverse proxy to require TLS 1.3.
+
+## Privacy by default
+
+Hangar does not send telemetry or perform an external release check by default. A
+fresh installation, and an existing installation upgraded through the privacy
+migration, has telemetry disabled. There is no fallback to a Plane-controlled
+collector, release API, or changelog.
+
+Telemetry requires two deliberate operator actions:
+
+1. Configure `OTLP_ENDPOINT` with the absolute URL of a collector you control.
+2. Enable telemetry in the Hangar instance administration screen.
+
+If either condition is absent, the scheduled metrics task exits without opening a
+network connection. When enabled, the metrics include instance ID, instance name,
+domain, version and setup state; workspace IDs and slugs; and aggregate user,
+workspace, project, work-item, module, cycle, page, and membership counts. Review
+that payload and your collector's retention policy before opting in.
+
+```env
+# Optional. Leave empty to keep telemetry offline.
+OTLP_ENDPOINT=
+OTLP_METRICS_PROTOCOL=grpc
+
+# Optional. Leave empty to disable release discovery.
+# If enabled, this must be a credential-free HTTPS URL resolving only to public IPs.
+HANGAR_RELEASE_CHECK_URL=https://api.github.com/repos/szymczag/hangar/releases/latest
+
+# Optional link displayed by the instance UI. No default is provided.
+INSTANCE_CHANGELOG_URL=https://github.com/szymczag/hangar/releases
+```
+
+The optional release request uses certificate-verified HTTPS, blocks private,
+loopback, link-local, reserved, and metadata-service destinations, pins the
+connection to the validated DNS result, ignores ambient proxies, refuses redirects,
+and limits the response size. Failures leave the locally packaged version as the
+source of truth and do not block startup.
 
 ## Development quick start
 
