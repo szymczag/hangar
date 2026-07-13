@@ -31,6 +31,10 @@ local process over loopback; probing through its readiness-gated Service creates
 a circular dependency and is forbidden. The evaluation `hangar-cache` Secret
 therefore carries a probe-only `VALKEY_PASSWORD` in addition to the application
 `REDIS_URL` and mounted `users.acl` file.
+The migrator also receives `REDIS_URL` because Django imports the Celery module
+while loading settings for management commands. It receives only the cache URL
+in addition to its core application and database keys; queue and object-storage
+credentials remain outside the migration Job's trust boundary.
 
 This implementation is intentionally still unsupported. The new ephemeral test
 must pass on an actual release run, and production-profile installation,
