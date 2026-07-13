@@ -75,16 +75,20 @@ RUN pnpm turbo run build --filter=web
 # *****************************************************************************
 # STAGE 3: Serve with nginx
 # *****************************************************************************
-FROM nginx:1.29-alpine AS production
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS production
+
+USER root
 
 RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
 
-COPY apps/web/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY --from=installer /app/apps/web/build/client /usr/share/nginx/html
+COPY --chown=101:101 apps/web/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY --chown=101:101 --from=installer /app/apps/web/build/client /usr/share/nginx/html
+
+USER 101:101
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:3000/ >/dev/null || exit 1
+  CMD wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

@@ -1,0 +1,81 @@
+{{- $root := . -}}
+{{- range $worker := list (dict "name" "worker" "values" .Values.worker "command" "./bin/docker-entrypoint-worker.sh") (dict "name" "beat-worker" "values" .Values.beatWorker "command" "./bin/docker-entrypoint-beat.sh") }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hangar.fullname" $root }}-{{ $worker.name }}
+  labels:
+    {{- include "hangar.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $worker.name }}
+spec:
+  replicas: {{ $worker.values.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "hangar.selectorLabels" (dict "component" $worker.name "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hangar.selectorLabels" (dict "component" $worker.name "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) | nindent 8 }}
+        {{- with $root.Values.global.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $root.Template.BasePath "/configmap.yaml") $root | sha256sum }}
+        {{- with $root.Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ $root.Values.podDefaults.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- include "hangar.podSecurityContext" (dict "uid" 10001 "gid" 10001) | nindent 8 }}
+      {{- with concat $root.Values.global.imagePullSecrets $root.Values.api.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $worker.name }}
+          image: {{ include "hangar.image" $root.Values.api.image | quote }}
+          imagePullPolicy: {{ $root.Values.api.image.pullPolicy }}
+          command:
+            - {{ $worker.command }}
+          securityContext:
+            {{- include "hangar.containerSecurityContext" (dict "uid" 10001 "gid" 10001) | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "hangar.fullname" $root }}-api
+          env:
+            {{- include "hangar.coreSecretEnv" $root | nindent 12 }}
+            {{- include "hangar.celerySecretEnv" $root | nindent 12 }}
+            {{- if eq $worker.name "worker" }}
+            {{- include "hangar.objectStorageSecretEnv" $root | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            exec:
+              command: ["/bin/sh", "-c", "kill -0 1"]
+            failureThreshold: 60
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "kill -0 1"]
+            periodSeconds: 30
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml $worker.values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /code/plane/logs
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: logs
+          emptyDir:
+            sizeLimit: 512Mi
+      {{- include "hangar.scheduling" $root | nindent 6 }}
+---
+{{- end }}

@@ -1,0 +1,416 @@
+deploymentProfile: production
+
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullSecrets: []
+  podLabels: {}
+  podAnnotations: {}
+
+publicUrl:
+  scheme: https
+  host: hangar.example.com
+
+application:
+  allowedHosts: []
+  fileSizeLimit: 5242880
+  signedUrlExpiration: 3600
+  hardDeleteAfterDays: 60
+  apiKeyRateLimit: 60/minute
+  webhookAllowedHosts: []
+  webhookAllowedCIDRs: []
+  webhookDisallowedDomains: []
+
+observability:
+  otlpEndpoint: ""
+  metricsProtocol: grpc
+
+existingSecrets:
+  application:
+    name: hangar-application
+    secretKeyKey: SECRET_KEY
+  live:
+    name: hangar-live
+    secretKeyKey: LIVE_SERVER_SECRET_KEY
+  database:
+    name: hangar-database
+    urlKey: DATABASE_URL
+  cache:
+    name: hangar-cache
+    urlKey: REDIS_URL
+  queue:
+    name: hangar-queue
+    urlKey: AMQP_URL
+  objectStorage:
+    name: hangar-object-storage
+    accessKeyIdKey: AWS_ACCESS_KEY_ID
+    secretAccessKeyKey: AWS_SECRET_ACCESS_KEY
+
+externalServices:
+  objectStorage:
+    endpoint: https://s3.example.com
+    bucket: hangar
+    region: us-east-1
+    pathStyle: false
+
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  tls:
+    secretName: hangar-tls
+
+networkPolicy:
+  enabled: true
+  ingressController:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: ingress-nginx
+  dns:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kube-system
+    podSelector:
+      matchLabels:
+        k8s-app: kube-dns
+  clusterCIDRs:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - fc00::/7
+  privateEgress: []
+
+podDefaults:
+  terminationGracePeriodSeconds: 60
+  nodeSelector: {}
+  tolerations: []
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 50
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/part-of: hangar
+  topologySpreadConstraints: []
+
+web:
+  replicas: 2
+  image:
+    repository: ghcr.io/szymczag/hangar-web
+    tag: v0.1.0-rc.1
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+
+admin:
+  replicas: 2
+  image:
+    repository: ghcr.io/szymczag/hangar-admin
+    tag: v0.1.0-rc.1
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+
+space:
+  replicas: 2
+  image:
+    repository: ghcr.io/szymczag/hangar-space
+    tag: v0.1.0-rc.1
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+
+live:
+  replicas: 2
+  image:
+    repository: ghcr.io/szymczag/hangar-live
+    tag: v0.1.0-rc.1
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+
+api:
+  replicas: 1
+  image:
+    repository: ghcr.io/szymczag/hangar-api
+    tag: v0.1.0-rc.1
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+  gunicornWorkers: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  pdb:
+    enabled: false
+    maxUnavailable: 1
+
+worker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  pdb:
+    enabled: false
+    maxUnavailable: 1
+
+beatWorker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+migrator:
+  activeDeadlineSeconds: 900
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+evaluation:
+  enabled: false
+  serviceAccountName: hangar-evaluation-dependencies
+
+evaluation-postgresql:
+  image:
+    tag: 18.4@sha256:0c49c0c906cb405ea65e70c284570fee91c7750ca9336369afc0edf4fce211db
+  serviceAccount:
+    create: false
+    name: hangar-evaluation-dependencies
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  settings:
+    existingSecret: hangar-database
+    superuser:
+      secretKey: POSTGRES_USER
+    superuserPassword:
+      secretKey: POSTGRES_PASSWORD
+  userDatabase:
+    existingSecret: hangar-database
+    name:
+      secretKey: POSTGRES_DB
+    user:
+      secretKey: USERDB_USER
+    password:
+      secretKey: USERDB_PASSWORD
+  storage:
+    requestedSize: 8Gi
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  initResources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+evaluation-rabbitmq:
+  image:
+    tag: 4.3.1@sha256:11846d5a067c15c0f260d6c387263e34972b884a6e711561608753c22fca5221
+  initImage:
+    tag: stable@sha256:b7f3d86d6e84fc17718c48bcde1450807faa2d56704205c697b4bd5df7b9e29f
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: hangar-evaluation-dependencies
+  rbac:
+    create: false
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  clustering:
+    useLongName: true
+  authentication:
+    existingSecret: hangar-queue
+    user:
+      secretKey: RABBITMQ_DEFAULT_USER
+    password:
+      secretKey: RABBITMQ_DEFAULT_PASS
+    erlangCookie:
+      secretKey: ERLANG_COOKIE
+  managementPlugin:
+    enabled: false
+  prometheusPlugin:
+    enabled: false
+  storage:
+    requestedSize: 8Gi
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  initResources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+evaluation-valkey:
+  image:
+    tag: 9.1.0@sha256:e30fbdc8d6d6b355712e50f4008321026f69db3e450254b4f0008d22745d8d0e
+  serviceAccount:
+    create: false
+    name: hangar-evaluation-dependencies
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  useDeploymentWhenNonHA: false
+  valkeyConfig: |
+    aclfile /etc/valkey-auth/users.acl
+  extraValkeyEnvSecrets:
+    - hangar-cache
+  extraValkeySecrets:
+    - name: hangar-cache
+      defaultMode: 0440
+      mountPath: /etc/valkey-auth
+  customStartupProbe: &valkeyProbe
+    exec:
+      command: [sh, -ec, 'valkey-cli -u "$REDIS_URL" ping | grep -qx PONG']
+    initialDelaySeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 30
+    periodSeconds: 5
+  customLivenessProbe: *valkeyProbe
+  customReadinessProbe: *valkeyProbe
+  storage:
+    requestedSize: 4Gi
+    accessModes:
+      - ReadWriteOnce
+    keepPvc: true
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  initResources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+evaluationObjectStorage:
+  image:
+    repository: docker.io/chrislusf/seaweedfs
+    tag: 4.39@sha256:1f4d22c98089dba5e849ea3a1f24a7d85b3177ab39a8d9a70275856882ce2be3
+    pullPolicy: IfNotPresent
+  serviceAccountName: hangar-evaluation-dependencies
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  persistence:
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi

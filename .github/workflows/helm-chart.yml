@@ -1,0 +1,80 @@
+name: Validate Hangar Helm Chart
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/helm-chart.yml"
+      - ".github/workflows/helm-e2e.yml"
+      - ".github/workflows/build-branch.yml"
+      - "charts/hangar/**"
+      - "apps/api/Dockerfile.api"
+      - "apps/admin/Dockerfile.admin"
+      - "apps/live/Dockerfile.live"
+      - "apps/space/Dockerfile.space"
+      - "apps/web/Dockerfile.web"
+  push:
+    branches:
+      - preview
+    paths:
+      - ".github/workflows/helm-chart.yml"
+      - "charts/hangar/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-chart-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, render, and validate
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.2.0
+
+      - name: Verify dependency lock and vendored charts
+        run: charts/hangar/scripts/verify-dependencies.sh
+
+      - name: Run render and schema policies
+        run: charts/hangar/tests/render-policy.sh
+
+      - name: Check end-to-end harness syntax
+        run: bash -n charts/hangar/tests/install-e2e-tools.sh charts/hangar/tests/e2e-kind.sh
+
+      - name: Render validation fixtures
+        run: |
+          set -euo pipefail
+          mkdir -p build/helm
+          helm template hangar charts/hangar \
+            --namespace hangar \
+            --kube-version 1.35.0 \
+            > build/helm/production.yaml
+          helm template hangar charts/hangar \
+            --namespace hangar \
+            --kube-version 1.35.0 \
+            --values charts/hangar/ci/evaluation-values.yaml \
+            > build/helm/evaluation.yaml
+
+      - name: Validate Kubernetes schemas
+        run: |
+          docker run --rm \
+            --volume "$PWD/build/helm:/work:ro" \
+            ghcr.io/yannh/kubeconform@sha256:7426d17ca19f3731d2a6287c868005f052f2682800141f20e83d3109f5c8faa1 \
+            -strict -summary -kubernetes-version 1.35.0 /work
+
+      - name: Lint Kubernetes security and reliability
+        run: |
+          docker run --rm \
+            --volume "$PWD/build/helm:/work:ro" \
+            ghcr.io/stackrox/kube-linter@sha256:94644f35948465a70b2dd1526a80522d1a1f26499f783b1eff21618dda1fd4dd \
+            lint /work
+
+      - name: Package chart
+        run: helm package charts/hangar --dependency-update=false --destination build

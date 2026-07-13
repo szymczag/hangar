@@ -1,5 +1,12 @@
-# Helm Chart: Plane Community
+# Deprecated Kubernetes deployment
 
-Click on the below link to access the helm chart instructions.
+The inherited Plane Community chart is not supported by Hangar and must not be
+used for new installations.
 
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/makeplane)](https://artifacthub.io/packages/helm/makeplane/plane-ce)
+Use the maintained Hangar chart and operator documentation instead:
+
+- [Hangar Helm chart](../../../charts/hangar/README.md)
+- [Kubernetes deployment plan](../../../docs/kubernetes-deployment-plan.md)
+
+This directory remains only as a compatibility pointer for existing links. It
+does not contain deployable Kubernetes manifests.

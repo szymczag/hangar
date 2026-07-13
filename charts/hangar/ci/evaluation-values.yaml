@@ -1,0 +1,8 @@
+deploymentProfile: evaluation
+
+publicUrl:
+  scheme: https
+  host: hangar-evaluation.example.com
+
+evaluation:
+  enabled: true

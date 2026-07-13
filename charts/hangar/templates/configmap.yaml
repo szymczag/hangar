@@ -1,0 +1,59 @@
+{{- $objectStorageEndpoint := .Values.externalServices.objectStorage.endpoint -}}
+{{- $objectStoragePathStyle := .Values.externalServices.objectStorage.pathStyle -}}
+{{- if .Values.evaluation.enabled -}}
+{{- $objectStorageEndpoint = printf "http://%s-evaluation-object-storage:8333" (include "hangar.fullname" .) -}}
+{{- $objectStoragePathStyle = true -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hangar.fullname" . }}-api
+  labels:
+    {{- include "hangar.labels" . | nindent 4 }}
+data:
+  DEBUG: "0"
+  APP_VERSION: {{ .Chart.AppVersion | quote }}
+  ALLOWED_HOSTS: {{ join "," (concat (list .Values.publicUrl.host) .Values.application.allowedHosts) | quote }}
+  CORS_ALLOWED_ORIGINS: {{ include "hangar.publicOrigin" . | quote }}
+  WEB_URL: {{ include "hangar.publicOrigin" . | quote }}
+  APP_BASE_URL: {{ include "hangar.publicOrigin" . | quote }}
+  APP_BASE_PATH: "/"
+  ADMIN_BASE_URL: {{ include "hangar.publicOrigin" . | quote }}
+  ADMIN_BASE_PATH: "/god-mode"
+  SPACE_BASE_URL: {{ include "hangar.publicOrigin" . | quote }}
+  SPACE_BASE_PATH: "/spaces"
+  LIVE_BASE_URL: {{ include "hangar.publicOrigin" . | quote }}
+  LIVE_BASE_PATH: "/live"
+  AWS_S3_ENDPOINT_URL: {{ $objectStorageEndpoint | quote }}
+  AWS_S3_BUCKET_NAME: {{ .Values.externalServices.objectStorage.bucket | quote }}
+  AWS_REGION: {{ .Values.externalServices.objectStorage.region | quote }}
+  USE_MINIO: {{ ternary "1" "0" $objectStoragePathStyle | quote }}
+  MINIO_ENDPOINT_SSL: {{ ternary "1" "0" (hasPrefix "https://" $objectStorageEndpoint) | quote }}
+  FILE_SIZE_LIMIT: {{ .Values.application.fileSizeLimit | quote }}
+  SIGNED_URL_EXPIRATION: {{ .Values.application.signedUrlExpiration | quote }}
+  HARD_DELETE_AFTER_DAYS: {{ .Values.application.hardDeleteAfterDays | quote }}
+  API_KEY_RATE_LIMIT: {{ .Values.application.apiKeyRateLimit | quote }}
+  WEBHOOK_ALLOWED_HOSTS: {{ join "," .Values.application.webhookAllowedHosts | quote }}
+  WEBHOOK_ALLOWED_IPS: {{ join "," .Values.application.webhookAllowedCIDRs | quote }}
+  WEBHOOK_DISALLOWED_DOMAINS: {{ join "," .Values.application.webhookDisallowedDomains | quote }}
+  INSTANCE_CHANGELOG_URL: ""
+  RELEASE_DISCOVERY_URL: ""
+  OTLP_ENDPOINT: {{ .Values.observability.otlpEndpoint | quote }}
+  OTLP_METRICS_PROTOCOL: {{ .Values.observability.metricsProtocol | quote }}
+  DEPENDENCY_WAIT_TIMEOUT_SECONDS: "300"
+  MIGRATION_WAIT_TIMEOUT_SECONDS: "600"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hangar.fullname" . }}-live
+  labels:
+    {{- include "hangar.labels" . | nindent 4 }}
+data:
+  APP_VERSION: {{ .Chart.AppVersion | quote }}
+  PORT: "3000"
+  API_BASE_URL: {{ printf "http://%s-api:8000" (include "hangar.fullname" .) | quote }}
+  WEB_BASE_URL: {{ include "hangar.publicOrigin" . | quote }}
+  LIVE_BASE_URL: {{ include "hangar.publicOrigin" . | quote }}
+  LIVE_BASE_PATH: "/live"
+  CORS_ALLOWED_ORIGINS: {{ include "hangar.publicOrigin" . | quote }}

@@ -14,6 +14,10 @@ env:
 jobs:
   branch_build_setup:
     name: Build Setup
+    # Disabled: this inherited Plane workflow deploys an external chart with
+    # TLS verification bypassed. Hangar preview environments must use the
+    # qualified chart and a separately reviewed deployment workflow.
+    if: github.repository == 'disabled/hangar-feature-deployment'
     runs-on: ubuntu-latest
     outputs:
       gh_branch_name: ${{ steps.set_env_variables.outputs.TARGET_BRANCH }}

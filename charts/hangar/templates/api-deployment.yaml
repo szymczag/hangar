@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hangar.fullname" . }}-api
+  labels:
+    {{- include "hangar.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "hangar.selectorLabels" (dict "component" "api" "Values" .Values "Chart" .Chart "Release" .Release) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hangar.selectorLabels" (dict "component" "api" "Values" .Values "Chart" .Chart "Release" .Release) | nindent 8 }}
+        {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ .Values.podDefaults.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- include "hangar.podSecurityContext" (dict "uid" 10001 "gid" 10001) | nindent 8 }}
+      {{- with concat .Values.global.imagePullSecrets .Values.api.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ include "hangar.image" .Values.api.image | quote }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          securityContext:
+            {{- include "hangar.containerSecurityContext" (dict "uid" 10001 "gid" 10001) | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "hangar.fullname" . }}-api
+          env:
+            {{- include "hangar.apiSecretEnv" . | nindent 12 }}
+            - name: GUNICORN_WORKERS
+              value: {{ .Values.api.gunicornWorkers | quote }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 90
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /code/plane/logs
+            - name: static-assets
+              mountPath: /code/plane/static-assets
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: logs
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: static-assets
+          emptyDir:
+            sizeLimit: 512Mi
+      {{- include "hangar.scheduling" . | nindent 6 }}

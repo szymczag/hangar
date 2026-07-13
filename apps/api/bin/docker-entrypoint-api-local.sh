@@ -1,24 +1,13 @@
 #!/bin/bash
-set -e
-python manage.py wait_for_db
-# Wait for migrations
-python manage.py wait_for_migrations
 
-# Create the default bucket
-#!/bin/bash
+set -euo pipefail
 
-# Collect system information
-HOSTNAME=$(hostname)
-MAC_ADDRESS=$(ip link show | awk '/ether/ {print $2}' | head -n 1)
-CPU_INFO=$(cat /proc/cpuinfo)
-MEMORY_INFO=$(free -h)
-DISK_INFO=$(df -h)
+source "$(dirname "$0")/docker-entrypoint-common.sh"
 
-# Concatenate information and compute SHA-256 hash
-SIGNATURE=$(echo "$HOSTNAME$MAC_ADDRESS$CPU_INFO$MEMORY_INFO$DISK_INFO" | sha256sum | awk '{print $1}')
+wait_for_database
+wait_for_migrations
 
-# Export the variables
-export MACHINE_SIGNATURE=$SIGNATURE
+export MACHINE_SIGNATURE="${MACHINE_SIGNATURE:-hangar-self-managed}"
 
 # Register instance
 python manage.py register_instance "$MACHINE_SIGNATURE"

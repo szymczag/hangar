@@ -1,0 +1,12 @@
+dependencies:
+- name: postgres
+  repository: https://groundhog2k.github.io/helm-charts/
+  version: 1.6.4
+- name: rabbitmq
+  repository: https://groundhog2k.github.io/helm-charts/
+  version: 2.3.2
+- name: valkey
+  repository: https://groundhog2k.github.io/helm-charts/
+  version: 2.3.1
+digest: sha256:77696e8c85459d5cbf11abb870db2d860bdf6257a9d9fff83953b8586f986842
+generated: "2026-07-13T13:10:22.276400744+02:00"
