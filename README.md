@@ -90,6 +90,34 @@ connection to the validated DNS result, ignores ambient proxies, refuses redirec
 and limits the response size. Failures leave the locally packaged version as the
 source of truth and do not block startup.
 
+## Verifying release images
+
+Approved semver-tagged container releases are signed by the Hangar publication
+workflow using Cosign keyless signing and GitHub's OpenID Connect identity. The
+signature is attached to the immutable image digest in GHCR and recorded in the
+Sigstore transparency log. Manually dispatched `preview-*` images are intentionally
+unsigned; a signature therefore identifies an image produced through the approved
+release flow.
+
+Install Cosign, obtain the digest for the version you intend to deploy, and verify
+both the exact workflow identity and GitHub's OIDC issuer:
+
+```sh
+VERSION=v1.2.3
+DIGEST=sha256:replace-with-the-published-digest
+IMAGE=ghcr.io/szymczag/hangar-api
+
+cosign verify \
+  --certificate-identity "https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/${VERSION}" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  "${IMAGE}@${DIGEST}"
+```
+
+Replace `api` with `web`, `admin`, `space`, `live`, `proxy`, or `aio` as needed.
+Pin deployments to the verified digest rather than relying on the mutable `stable`
+tag. Hangar also publishes an SBOM and GitHub build-provenance attestation for every
+container image.
+
 ## Development quick start
 
 ### Requirements
