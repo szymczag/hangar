@@ -686,7 +686,8 @@ the repository policy that forbids host access.
 
 The live assertions currently cover:
 
-- atomic evaluation installation and completion of revision-scoped migrations;
+- evaluation installation with failed resources retained for diagnostics and
+  completion of revision-scoped migrations;
 - readiness of all release workloads and binding of every dependency PVC;
 - TLS routing for Web, Admin, Space, API, and Live, HTTP-to-HTTPS redirect, and a
   real WebSocket `101 Switching Protocols` response;

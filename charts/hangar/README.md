@@ -325,7 +325,10 @@ If GHCR requires authentication, set `REGISTRY_USERNAME` and
 `REGISTRY_PASSWORD`; the harness creates a namespace-local pull Secret and does
 not print the credential. It generates all application credentials and TLS
 material in a restricted temporary directory and deletes the disposable Kind
-cluster on exit.
+cluster on exit. The harness uses dedicated static storage classes and
+pre-owned host directories so each non-root evaluation dependency binds only to
+its intended persistent volume. A failed initial install is retained until the
+diagnostic trap has collected pod descriptions and logs.
 
 The `Qualify Hangar Helm Chart` GitHub workflow performs the staging and live
 test for an existing image tag. Use the `preview-<branch>` tag produced by a

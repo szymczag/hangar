@@ -164,11 +164,45 @@ kubectl label namespace "$NAMESPACE" \
   pod-security.kubernetes.io/audit=restricted \
   pod-security.kubernetes.io/warn=restricted
 
+docker exec "${cluster_name}-control-plane" sh -ec '
+  for entry in postgresql:999 rabbitmq:999 valkey:999 object-storage:1000; do
+    directory=${entry%:*}
+    owner=${entry#*:}
+    mkdir -p "/var/local/hangar-e2e/${directory}"
+    chown "${owner}:${owner}" "/var/local/hangar-e2e/${directory}"
+    chmod 0770 "/var/local/hangar-e2e/${directory}"
+  done
+'
+
 cat >"$work_directory/storage.yaml" <<EOF
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kind-static
+  name: kind-static-postgresql
+provisioner: kubernetes.io/no-provisioner
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kind-static-rabbitmq
+provisioner: kubernetes.io/no-provisioner
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kind-static-valkey
+provisioner: kubernetes.io/no-provisioner
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kind-static-object-storage
 provisioner: kubernetes.io/no-provisioner
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
@@ -182,7 +216,7 @@ spec:
     storage: 20Gi
   accessModes: [ReadWriteOnce]
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: kind-static
+  storageClassName: kind-static-postgresql
   hostPath:
     path: /var/local/hangar-e2e/postgresql
     type: DirectoryOrCreate
@@ -196,7 +230,7 @@ spec:
     storage: 20Gi
   accessModes: [ReadWriteOnce]
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: kind-static
+  storageClassName: kind-static-rabbitmq
   hostPath:
     path: /var/local/hangar-e2e/rabbitmq
     type: DirectoryOrCreate
@@ -210,7 +244,7 @@ spec:
     storage: 20Gi
   accessModes: [ReadWriteOnce]
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: kind-static
+  storageClassName: kind-static-valkey
   hostPath:
     path: /var/local/hangar-e2e/valkey
     type: DirectoryOrCreate
@@ -224,7 +258,7 @@ spec:
     storage: 20Gi
   accessModes: [ReadWriteOnce]
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: kind-static
+  storageClassName: kind-static-object-storage
   hostPath:
     path: /var/local/hangar-e2e/object-storage
     type: DirectoryOrCreate
@@ -376,23 +410,22 @@ live:
     enabled: false
 evaluation-postgresql:
   storage:
-    className: kind-static
+    className: kind-static-postgresql
 evaluation-rabbitmq:
   storage:
-    className: kind-static
+    className: kind-static-rabbitmq
 evaluation-valkey:
   storage:
-    className: kind-static
+    className: kind-static-valkey
 evaluationObjectStorage:
   persistence:
-    storageClass: kind-static
+    storageClass: kind-static-object-storage
 ${registry_values}
 EOF
 
 helm upgrade --install "$RELEASE_NAME" "$chart_reference" \
   --namespace "$NAMESPACE" \
   --values "$work_directory/values.yaml" \
-  --atomic \
   --wait \
   --wait-for-jobs \
   --timeout 20m
