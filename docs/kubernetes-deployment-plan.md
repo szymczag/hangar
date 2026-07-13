@@ -1,6 +1,7 @@
 # Hangar Kubernetes and Helm delivery plan
 
-Status: release-candidate implementation; not yet qualified or supported.
+Status: release-candidate implementation; evaluation profile live-qualified,
+not yet supported for production.
 
 Last reviewed: 2026-07-13.
 
@@ -11,12 +12,11 @@ and vendored evaluation dependencies, production and evaluation profiles, JSON
 Schema validation, restricted workload security contexts, default-deny network
 policies, revision-scoped migrations, operator documentation, render-policy
 tests, Kubernetes schema validation, security linting, OCI publication, and
-release attestation and keyless Cosign signing wiring. Release publication is
-now blocked on an ephemeral-cluster qualification harness that installs the
-evaluation profile with exact staged application image digests. Evaluation
-dependencies now render only lowercase DNS-compatible resource names, and the
-chart-owned object store consumes an existing Secret rather than generating
-credentials.
+release attestation and keyless Cosign signing wiring. The ephemeral-cluster
+qualification harness installs the evaluation profile with exact staged
+application image digests. Evaluation dependencies render only lowercase
+DNS-compatible resource names, and the chart-owned object store consumes an
+existing Secret rather than generating credentials.
 
 The runtime images and entrypoints have also been hardened for fixed non-root
 identities, read-only-root-filesystem operation, stable self-managed identity,
@@ -39,12 +39,19 @@ API HTTP probes send the configured public hostname explicitly. Pod IPs must not
 be added to `ALLOWED_HOSTS` merely to accommodate kubelet probes, and the chart
 must not use a wildcard host policy.
 
-This implementation is intentionally still unsupported. The new ephemeral test
-must pass on an actual release run, and production-profile installation,
-application-level uploads and background work, coordinated backup/restore,
-rollback, vulnerability, license, and distribution-matrix qualification remain
-release gates. Source-chart application digests are fail-closed placeholders and
-are replaced with resolved manifest digests only by the release workflow.
+The evaluation profile passed its complete AMD64 ephemeral-cluster qualification
+on 2026-07-13 in [GitHub Actions run 29272669799](https://github.com/szymczag/hangar/actions/runs/29272669799).
+The run covered a Restricted namespace, migrations, HTTPS ingress, a real
+WebSocket upgrade, positive and negative Cilium policies, dependency
+connectivity, object-storage persistence, a rollback-on-failure upgrade, a
+second migration, post-upgrade health, uninstall, and retained PVCs.
+
+This implementation is intentionally still unsupported for production.
+Production-profile installation, application-level uploads and background work,
+coordinated backup/restore, migration-failure recovery, vulnerability, license,
+public-distribution, and supported-version matrix qualification remain release
+gates. Source-chart application digests are fail-closed placeholders and are
+replaced with resolved manifest digests only by the release workflow.
 
 ## Purpose and audience
 
@@ -903,7 +910,7 @@ links every checked item to a CI run, report, digest, or signed manual exercise.
 - [ ] PRIV-01 through PRIV-05 pass startup and privacy tests.
 - [ ] Production installs with external PostgreSQL, Valkey, RabbitMQ, and object
       storage.
-- [ ] Evaluation installs with pinned dependencies, non-default credentials, and
+- [x] Evaluation installs with pinned dependencies, non-default credentials, and
       persistent storage.
 - [ ] HTTPS ingress, routing, trusted headers, WebSockets, uploads, and limits are
       verified.
