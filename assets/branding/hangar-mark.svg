@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Hangar</title>
+  <rect width="64" height="64" rx="14" fill="#171B26"/>
+  <path d="M10 53V23L32 9l22 14v30h-7V26.8L32 17.2 17 26.8V53h-7Z" fill="#F7F8FC"/>
+  <path d="m20 31 12-6 12 6v7l-12-4.4L20 38v-7Z" fill="#8796F4" opacity=".55"/>
+  <path d="m20 40 12-4.5L44 40v6l-12-3L20 46v-6Z" fill="#8796F4" opacity=".78"/>
+  <path d="m20 48 12-3 12 3v5H20v-5Z" fill="#5B6FE8"/>
+</svg>

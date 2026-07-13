@@ -5,7 +5,7 @@
  */
 
 import { autorun } from "mobx";
-// Plane-web
+// Hangar-web
 import type { RootStore } from "@/plane-web/store/root.store";
 import type { IBaseTimelineStore } from "@/plane-web/store/timeline/base-timeline.store";
 import { BaseTimeLineStore } from "@/plane-web/store/timeline/base-timeline.store";

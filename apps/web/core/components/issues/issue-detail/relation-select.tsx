@@ -9,7 +9,7 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 
 import { EditIcon, CloseIcon } from "@plane/propel/icons";
-// Plane
+// Hangar
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { Tooltip } from "@plane/propel/tooltip";
 import type { ISearchIssueResponse } from "@plane/types";
@@ -21,7 +21,7 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useIssues } from "@/hooks/store/use-issues";
 import { useProject } from "@/hooks/store/use-project";
 import { usePlatformOS } from "@/hooks/use-platform-os";
-// Plane web imports
+// Hangar web imports
 import { useTimeLineRelationOptions } from "@/plane-web/components/relations";
 import type { TIssueRelationTypes } from "@plane/types";
 import type { TRelationObject } from "../issue-detail-widgets/relations";

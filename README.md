@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./hangar-logo.png" alt="Hangar" width="720" />
+  <img src="./assets/branding/hangar-wordmark.svg" alt="Hangar" width="480" />
 </p>
 
 <p align="center">
@@ -10,6 +10,8 @@
 </p>
 
 # Hangar
+
+Open-source project management for self-hosted teams.
 
 Hangar is an independent, community-maintained fork of
 [Plane](https://github.com/makeplane/plane), focused on extending the open-source
@@ -53,6 +55,18 @@ the table marks them as available.
 
 The inherited Plane Community chart is not a Hangar release and is not supported
 for new Hangar installations.
+
+## Product links and exact source
+
+Hangar defaults its help, documentation, issue, private security, and source links
+to this GitHub repository. Operators can override those destinations with the
+documented `HANGAR_*_URL` settings. Release images embed their Git revision so the
+instance API can identify the exact corresponding source.
+
+If you are stuck, [open a GitHub issue](https://github.com/szymczag/hangar/issues).
+Do not include credentials, private workspace data, or vulnerability details in a
+public issue. Report vulnerabilities through
+[GitHub private vulnerability reporting](SECURITY.md).
 
 > [!NOTE]
 > Hangar's OIDC backend requires TLS 1.3 for discovery, token, JWKS, and userinfo

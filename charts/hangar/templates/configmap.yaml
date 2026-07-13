@@ -36,6 +36,11 @@ data:
   WEBHOOK_ALLOWED_HOSTS: {{ join "," .Values.application.webhookAllowedHosts | quote }}
   WEBHOOK_ALLOWED_IPS: {{ join "," .Values.application.webhookAllowedCIDRs | quote }}
   WEBHOOK_DISALLOWED_DOMAINS: {{ join "," .Values.application.webhookDisallowedDomains | quote }}
+  HANGAR_DOCUMENTATION_URL: {{ .Values.branding.documentationUrl | quote }}
+  HANGAR_ISSUES_URL: {{ .Values.branding.issuesUrl | quote }}
+  HANGAR_SECURITY_URL: {{ .Values.branding.securityUrl | quote }}
+  HANGAR_TERMS_URL: {{ .Values.branding.termsUrl | quote }}
+  HANGAR_PRIVACY_URL: {{ .Values.branding.privacyUrl | quote }}
   INSTANCE_CHANGELOG_URL: ""
   RELEASE_DISCOVERY_URL: ""
   OTLP_ENDPOINT: {{ .Values.observability.otlpEndpoint | quote }}

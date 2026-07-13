@@ -5,6 +5,7 @@
  */
 
 import { EmptyStateDetailed } from "@plane/propel/empty-state";
+import { SOURCE_CODE_URL } from "@plane/constants";
 
 type TProductUpdatesFallbackProps = {
   description: string;
@@ -14,10 +15,7 @@ type TProductUpdatesFallbackProps = {
 export function ProductUpdatesFallback(props: TProductUpdatesFallbackProps) {
   const { description, variant } = props;
   // derived values
-  const changelogUrl =
-    variant === "cloud"
-      ? "https://plane.so/changelog?category=cloud"
-      : "https://plane.so/changelog?category=self-hosted";
+  const changelogUrl = `${SOURCE_CODE_URL}/releases`;
 
   return (
     <div className="py-8">

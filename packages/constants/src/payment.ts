@@ -7,6 +7,8 @@
 import type { IPaymentProduct, TBillingFrequency, TProductBillingFrequency } from "@plane/types";
 import { EProductSubscriptionEnum } from "@plane/types";
 
+import { ISSUE_TRACKER_URL } from "./endpoints";
+
 /**
  * Default billing frequency for each product subscription type
  */
@@ -34,7 +36,7 @@ export const SUBSCRIPTION_WITH_BILLING_FREQUENCY = [
 export const PLANE_COMMUNITY_PRODUCTS: Record<string, IPaymentProduct> = {
   [EProductSubscriptionEnum.PRO]: {
     id: EProductSubscriptionEnum.PRO,
-    name: "Plane Pro",
+    name: "Optional feature",
     description:
       "More views, more cycles powers, more pages features, new reports, and better dashboards are waiting to be unlocked.",
     type: "PRO",
@@ -57,13 +59,13 @@ export const PLANE_COMMUNITY_PRODUCTS: Record<string, IPaymentProduct> = {
       },
     ],
     payment_quantity: 1,
-    is_active: true,
+    is_active: false,
   },
   [EProductSubscriptionEnum.BUSINESS]: {
     id: EProductSubscriptionEnum.BUSINESS,
-    name: "Plane Business",
+    name: "Optional feature",
     description:
-      "The earliest packaging of Business at $10 a seat a month billed annually, $12 a seat a month billed monthly for Plane Cloud",
+      "The earliest packaging of Business at $10 a seat a month billed annually, $12 a seat a month billed monthly for Hangar Cloud",
     type: "BUSINESS",
     prices: [
       {
@@ -84,11 +86,11 @@ export const PLANE_COMMUNITY_PRODUCTS: Record<string, IPaymentProduct> = {
       },
     ],
     payment_quantity: 1,
-    is_active: true,
+    is_active: false,
   },
   [EProductSubscriptionEnum.ENTERPRISE]: {
     id: EProductSubscriptionEnum.ENTERPRISE,
-    name: "Plane Enterprise",
+    name: "Optional feature",
     description: "",
     type: "ENTERPRISE",
     prices: [
@@ -117,7 +119,7 @@ export const PLANE_COMMUNITY_PRODUCTS: Record<string, IPaymentProduct> = {
 /**
  * URL for the "Talk to Sales" page where users can contact sales team
  */
-export const TALK_TO_SALES_URL = "https://plane.so/talk-to-sales";
+export const TALK_TO_SALES_URL = ISSUE_TRACKER_URL;
 
 /**
  * Mapping of subscription types to their respective upgrade/redirection URLs based on billing frequency
@@ -133,12 +135,12 @@ export const SUBSCRIPTION_REDIRECTION_URLS: Record<EProductSubscriptionEnum, Rec
     year: TALK_TO_SALES_URL,
   },
   [EProductSubscriptionEnum.PRO]: {
-    month: "https://app.plane.so/upgrade/pro/self-hosted?plan=month",
-    year: "https://app.plane.so/upgrade/pro/self-hosted?plan=year",
+    month: ISSUE_TRACKER_URL,
+    year: ISSUE_TRACKER_URL,
   },
   [EProductSubscriptionEnum.BUSINESS]: {
-    month: "https://app.plane.so/upgrade/business/self-hosted?plan=month",
-    year: "https://app.plane.so/upgrade/business/self-hosted?plan=year",
+    month: ISSUE_TRACKER_URL,
+    year: ISSUE_TRACKER_URL,
   },
   [EProductSubscriptionEnum.ENTERPRISE]: {
     month: TALK_TO_SALES_URL,
@@ -153,7 +155,7 @@ export const SUBSCRIPTION_REDIRECTION_URLS: Record<EProductSubscriptionEnum, Rec
 export const SUBSCRIPTION_WEBPAGE_URLS: Record<EProductSubscriptionEnum, string> = {
   [EProductSubscriptionEnum.FREE]: TALK_TO_SALES_URL,
   [EProductSubscriptionEnum.ONE]: TALK_TO_SALES_URL,
-  [EProductSubscriptionEnum.PRO]: "https://plane.so/pro",
-  [EProductSubscriptionEnum.BUSINESS]: "https://plane.so/business",
-  [EProductSubscriptionEnum.ENTERPRISE]: "https://plane.so/business",
+  [EProductSubscriptionEnum.PRO]: ISSUE_TRACKER_URL,
+  [EProductSubscriptionEnum.BUSINESS]: ISSUE_TRACKER_URL,
+  [EProductSubscriptionEnum.ENTERPRISE]: ISSUE_TRACKER_URL,
 };

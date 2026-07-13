@@ -21,7 +21,7 @@ import { CreateUpdateIssueModal } from "@/components/issues/issue-modal/modal";
 import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
 import { CreateUpdateEpicModal } from "@/plane-web/components/epics/epic-modal";
 // types
-// Plane-web
+// Hangar-web
 import { WorkFlowGroupTree } from "@/plane-web/components/workflow";
 
 interface IHeaderGroupByCard {

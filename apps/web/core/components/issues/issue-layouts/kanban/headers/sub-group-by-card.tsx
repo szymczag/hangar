@@ -8,9 +8,9 @@ import React from "react";
 import { observer } from "mobx-react";
 import { Circle } from "lucide-react";
 import { ChevronDownIcon, ChevronUpIcon } from "@plane/propel/icons";
-// Plane
+// Hangar
 import type { TIssueGroupByOptions, TIssueKanbanFilters } from "@plane/types";
-// Plane-web
+// Hangar-web
 import { WorkFlowGroupTree } from "@/plane-web/components/workflow";
 // mobx
 

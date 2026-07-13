@@ -7,9 +7,15 @@
 import { useState, useRef } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
-import { HelpCircle, MessageSquare, MoveLeft } from "lucide-react";
+import { FileCode2, HelpCircle, MoveLeft, ShieldCheck } from "lucide-react";
 import { Transition } from "@headlessui/react";
-import { WEB_BASE_URL } from "@plane/constants";
+import {
+  DOCUMENTATION_URL,
+  ISSUE_TRACKER_URL,
+  SECURITY_REPORT_URL,
+  SOURCE_CODE_URL,
+  WEB_BASE_URL,
+} from "@plane/constants";
 // plane internal packages
 import { GithubIcon, NewTabIcon, PageIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";
@@ -18,34 +24,39 @@ import { cn } from "@plane/utils";
 import { useInstance, useTheme } from "@/hooks/store";
 // assets
 
-const helpOptions = [
-  {
-    name: "Documentation",
-    href: "https://docs.plane.so/",
-    Icon: PageIcon,
-  },
-  {
-    name: "Join our Forum",
-    href: "https://forum.plane.so",
-    Icon: MessageSquare,
-  },
-  {
-    name: "Report a bug",
-    href: "https://github.com/makeplane/plane/issues/new/choose",
-    Icon: GithubIcon,
-  },
-];
-
 export const AdminSidebarHelpSection = observer(function AdminSidebarHelpSection() {
   // states
   const [isNeedHelpOpen, setIsNeedHelpOpen] = useState(false);
   // store
-  const { instance } = useInstance();
+  const { instance, config } = useInstance();
+  const product = config?.product;
   const { isSidebarCollapsed, toggleSidebar } = useTheme();
   // refs
   const helpOptionsRef = useRef<HTMLDivElement | null>(null);
 
   const redirectionLink = encodeURI(WEB_BASE_URL + "/");
+  const helpOptions = [
+    {
+      name: "Documentation",
+      href: product?.documentation_url ?? DOCUMENTATION_URL,
+      Icon: PageIcon,
+    },
+    {
+      name: "Open a GitHub issue",
+      href: product?.issues_url ?? ISSUE_TRACKER_URL,
+      Icon: GithubIcon,
+    },
+    {
+      name: "Report a vulnerability privately",
+      href: product?.security_url ?? SECURITY_REPORT_URL,
+      Icon: ShieldCheck,
+    },
+    {
+      name: "Source code and license",
+      href: product?.source_url ?? SOURCE_CODE_URL,
+      Icon: FileCode2,
+    },
+  ];
 
   return (
     <div
@@ -57,13 +68,13 @@ export const AdminSidebarHelpSection = observer(function AdminSidebarHelpSection
       )}
     >
       <div className={`flex items-center gap-1 ${isSidebarCollapsed ? "flex-col justify-center" : "w-full"}`}>
-        <Tooltip tooltipContent="Redirect to Plane" position="right" className="ml-4" disabled={!isSidebarCollapsed}>
+        <Tooltip tooltipContent="Open Hangar" position="right" className="ml-4" disabled={!isSidebarCollapsed}>
           <a
             href={redirectionLink}
             className={`relative flex items-center gap-1 rounded-sm bg-layer-1 px-2 py-1 text-body-xs-medium whitespace-nowrap text-secondary`}
           >
             <NewTabIcon width={14} height={14} />
-            {!isSidebarCollapsed && "Redirect to Plane"}
+            {!isSidebarCollapsed && "Open Hangar"}
           </a>
         </Tooltip>
         <Tooltip tooltipContent="Help" position={isSidebarCollapsed ? "right" : "top"} className="ml-4">
@@ -134,7 +145,9 @@ export const AdminSidebarHelpSection = observer(function AdminSidebarHelpSection
                   );
               })}
             </div>
-            <div className="px-2 pt-2 pb-1 text-10">Version: v{instance?.current_version}</div>
+            <div className="px-2 pt-2 pb-1 text-10">
+              Hangar {product?.version ?? instance?.current_version ?? "development"}
+            </div>
           </div>
         </Transition>
       </div>
