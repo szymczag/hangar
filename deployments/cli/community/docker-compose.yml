@@ -60,6 +60,11 @@ x-app-env: &app-env
   LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY}
   WEBHOOK_ALLOWED_IPS: ${WEBHOOK_ALLOWED_IPS:-}
   WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-}
+  HANGAR_DOCUMENTATION_URL: ${HANGAR_DOCUMENTATION_URL:-https://github.com/szymczag/hangar#readme}
+  HANGAR_ISSUES_URL: ${HANGAR_ISSUES_URL:-https://github.com/szymczag/hangar/issues}
+  HANGAR_SECURITY_URL: ${HANGAR_SECURITY_URL:-https://github.com/szymczag/hangar/security/advisories/new}
+  HANGAR_TERMS_URL: ${HANGAR_TERMS_URL:-}
+  HANGAR_PRIVACY_URL: ${HANGAR_PRIVACY_URL:-}
 
 services:
   web:

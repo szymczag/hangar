@@ -10,10 +10,10 @@ import { useTheme } from "next-themes";
 import useSWR from "swr";
 // plane imports
 import { SPACE_BASE_PATH } from "@plane/constants";
-import { PlaneLockup } from "@plane/propel/icons";
+import { HangarLogo } from "@plane/propel/icons";
 // assets
-import PlaneBackgroundPatternDark from "@/app/assets/auth/background-pattern-dark.svg?url";
-import PlaneBackgroundPattern from "@/app/assets/auth/background-pattern.svg?url";
+import HangarBackgroundPatternDark from "@/app/assets/auth/background-pattern-dark.svg?url";
+import HangarBackgroundPattern from "@/app/assets/auth/background-pattern.svg?url";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
 import { InstanceFailureView } from "@/components/instance/instance-failure-view";
@@ -26,7 +26,7 @@ export const InstanceProvider = observer(function InstanceProvider({ children }:
   const { fetchCurrentUser } = useUser();
   const { resolvedTheme } = useTheme();
 
-  const patternBackground = resolvedTheme === "dark" ? PlaneBackgroundPatternDark : PlaneBackgroundPattern;
+  const patternBackground = resolvedTheme === "dark" ? HangarBackgroundPatternDark : HangarBackgroundPattern;
 
   useSWR("INSTANCE_INFO", () => fetchInstanceInfo(), {
     revalidateOnFocus: false,
@@ -53,12 +53,12 @@ export const InstanceProvider = observer(function InstanceProvider({ children }:
           <div className="z-50 container mx-auto flex h-[110px] flex-shrink-0 items-center justify-between gap-5 px-5 lg:px-0">
             <div className="flex items-center gap-x-2 py-10">
               <Link to={`${SPACE_BASE_PATH}/`}>
-                <PlaneLockup className="h-7 w-auto text-primary" />
+                <HangarLogo className="h-7 w-auto text-primary" />
               </Link>
             </div>
           </div>
           <div className="absolute inset-0 z-0">
-            <img src={patternBackground} className="h-full w-screen object-cover" alt="Plane background pattern" />
+            <img src={patternBackground} className="h-full w-screen object-cover" alt="Hangar background pattern" />
           </div>
           <div className="relative z-10 flex-grow">
             <div className="relative mx-auto flex h-full w-full items-center justify-center overflow-y-auto px-6 py-10">

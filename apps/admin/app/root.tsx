@@ -15,6 +15,7 @@ import { LogoSpinner } from "@/components/common/logo-spinner";
 import globalStyles from "@/styles/globals.css?url";
 import { AppProviders } from "@/providers";
 import type { Route } from "./+types/root";
+import { PRODUCT_REPOSITORY_URL, PRODUCT_TAGLINE } from "@plane/constants";
 // fonts
 // oxlint-disable-next-line import/no-unassigned-import -- registers the bundled font faces
 import "@fontsource-variable/inter";
@@ -24,9 +25,8 @@ import "@fontsource/material-symbols-rounded";
 // oxlint-disable-next-line import/no-unassigned-import -- registers the bundled monospace font
 import "@fontsource/ibm-plex-mono";
 
-const APP_TITLE = "Plane | Simple, extensible, open-source project management tool.";
-const APP_DESCRIPTION =
-  "Open-source project management tool to manage work items, sprints, and product roadmaps with peace of mind.";
+const APP_TITLE = "Hangar Admin | Self-hosted instance administration";
+const APP_DESCRIPTION = PRODUCT_TAGLINE;
 
 export const links: LinksFunction = () => [
   { rel: "apple-touch-icon", sizes: "180x180", href: appleTouchIcon },
@@ -67,13 +67,12 @@ export const meta: Route.MetaFunction = () => [
   { name: "description", content: APP_DESCRIPTION },
   { property: "og:title", content: APP_TITLE },
   { property: "og:description", content: APP_DESCRIPTION },
-  { property: "og:url", content: "https://plane.so/" },
+  { property: "og:url", content: PRODUCT_REPOSITORY_URL },
   {
     name: "keywords",
     content:
       "software development, customer feedback, software, accelerate, code management, release management, project management, work items tracking, agile, scrum, kanban, collaboration",
   },
-  { name: "twitter:site", content: "@planepowers" },
 ];
 
 export default function Root() {

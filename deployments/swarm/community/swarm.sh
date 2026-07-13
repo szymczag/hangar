@@ -286,12 +286,12 @@ function deployStack() {
     done
 
     if [ -z "$api_service" ]; then
-        echo "Plane Server failed to start ❌"
+        echo "Hangar Server failed to start ❌"
         echo "Please check the logs for the 'api' service and resolve the issue(s)."
         echo "Stop the services by running the command: ./swarm.sh stop"
         exit 1
     fi
-    echo "   Plane Server started successfully ✅"
+    echo "   Hangar Server started successfully ✅"
     echo ""
     echo "   You can access the application at $WEB_URL"
     echo ""

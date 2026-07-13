@@ -7,7 +7,7 @@
 import { isEmpty, set } from "lodash-es";
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
 import { computedFn } from "mobx-utils";
-// Plane Imports
+// Hangar Imports
 import type { TSupportedFilterTypeForUpdate } from "@plane/constants";
 import { EIssueFilterType } from "@plane/constants";
 import type {

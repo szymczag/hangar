@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { isEqual, xor } from "lodash-es";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-// Plane imports
+// Hangar imports
 import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TBaseIssue, TIssue } from "@plane/types";

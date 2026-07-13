@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 # Networks that must never be reachable as an outbound request target but which
 # the stdlib ``ipaddress`` flags (is_private/is_loopback/...) do NOT reliably
 # classify on every Python version. Listed explicitly so the verdict is
-# identical and fail-closed across Python 3.9 – 3.14 (Plane ships on 3.12,
+# identical and fail-closed across Python 3.9 – 3.14 (Hangar ships on 3.12,
 # where e.g. 100.64.0.0/10 is neither is_private nor is_global).
 _BLOCKED_NETWORKS = [
     ipaddress.ip_network(cidr)

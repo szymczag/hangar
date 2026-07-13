@@ -263,6 +263,8 @@ jobs:
             ${{ env.IMAGE_PREFIX }}${{ matrix.image }}:${{ needs.setup.outputs.sha_tag }}
           build-args: |
             APP_VERSION=${{ needs.setup.outputs.version }}
+            HANGAR_SOURCE_REVISION=${{ github.sha }}
+            VITE_SOURCE_CODE_URL=${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}
             VITE_ADMIN_BASE_URL=${{ needs.setup.outputs.public_origin }}
             VITE_SPACE_BASE_URL=${{ needs.setup.outputs.public_origin }}
             VITE_LIVE_BASE_URL=${{ needs.setup.outputs.public_origin }}

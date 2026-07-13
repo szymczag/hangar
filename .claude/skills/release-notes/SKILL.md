@@ -1,21 +1,21 @@
 ---
 name: release-notes
-description: "Generate release notes for a Plane release PR in either `makeplane/plane-cloud` (date-based versioning, e.g. `release: vYY.MM.DD-N`) or `makeplane/plane-ee` (semver, e.g. `release: vX.Y.Z`). Reads PR commits, filters out noise, categorizes by conventional-commit type, optionally enriches via Plane MCP, and writes the result as the PR description in the GitHub Releases format."
+description: "Generate release notes for a Hangar release PR in either `szymczag/hangar` (date-based versioning, e.g. `release: vYY.MM.DD-N`) or `szymczag/hangar` (semver, e.g. `release: vX.Y.Z`). Reads PR commits, filters out noise, categorizes by conventional-commit type, optionally enriches via Hangar MCP, and writes the result as the PR description in the GitHub Releases format."
 user_invocable: true
 ---
 
 # Release Notes Generator
 
-Generate structured release notes from a Plane release PR by parsing its commit list, then update the PR description. Output matches the format used on `github.com/makeplane/plane/releases` (e.g. [v1.2.0](https://github.com/makeplane/plane/releases/tag/v1.2.0)). Works for both `makeplane/plane-cloud` and `makeplane/plane-ee`.
+Generate structured release notes from a Hangar release PR by parsing its commit list, then update the PR description. Output matches the format used on `github.com/szymczag/hangar/releases` (e.g. [v1.2.0](https://github.com/szymczag/hangar/releases/tag/v1.2.0)). Works for both `szymczag/hangar` and `szymczag/hangar`.
 
 ## Repo-specific versioning
 
-Plane uses **different version schemes** across its two release repos. Detect which repo the PR belongs to and use the matching scheme when communicating about the release — the version itself does **not** appear in the release notes body (GitHub's release tag carries it).
+Hangar uses **different version schemes** across its two release repos. Detect which repo the PR belongs to and use the matching scheme when communicating about the release — the version itself does **not** appear in the release notes body (GitHub's release tag carries it).
 
-| Repo                    | Version scheme | Example PR title       | Source branch | Target branch        |
-| ----------------------- | -------------- | ---------------------- | ------------- | -------------------- |
-| `makeplane/plane-cloud` | Date-based     | `release: v26.04.13-1` | `uat`         | `master`             |
-| `makeplane/plane-ee`    | Semver         | `release: v1.12.0`     | `uat`         | `master` / `preview` |
+| Repo              | Version scheme | Example PR title       | Source branch | Target branch        |
+| ----------------- | -------------- | ---------------------- | ------------- | -------------------- |
+| `szymczag/hangar` | Date-based     | `release: v26.04.13-1` | `uat`         | `master`             |
+| `szymczag/hangar` | Semver         | `release: v1.12.0`     | `uat`         | `master` / `preview` |
 
 - **plane-cloud** ships daily — version is `vYY.MM.DD-N` where `N` is the counter for that date's release.
 - **plane-ee** ships on a versioned cadence — version is `vX.Y.Z` (major.minor.patch) following semver.
@@ -23,8 +23,8 @@ Plane uses **different version schemes** across its two release repos. Detect wh
 
 ## When to Use
 
-- User links/mentions a Plane release PR (e.g. `release: v26.04.13-1` for cloud or `release: v1.12.0` for EE) and asks for release notes
-- User asks to "create release notes" / "update PR description" for a PR in `makeplane/plane-cloud` or `makeplane/plane-ee`
+- User links/mentions a Hangar release PR (e.g. `release: v26.04.13-1` for cloud or `release: v1.12.0` for EE) and asks for release notes
+- User asks to "create release notes" / "update PR description" for a PR in `szymczag/hangar` or `szymczag/hangar`
 - The branch is named `uat` or `release/x.y.z` and the base is `master` or `preview`
 
 ## Steps
@@ -56,7 +56,7 @@ gh pr view <PR_NUM> --json commits \
 
 ### 3. Identify work item IDs (for research only)
 
-Most meaningful commits begin with a Plane work item identifier in brackets:
+Most meaningful commits begin with a Hangar work item identifier in brackets:
 
 - `[WEB-XXXX]` — web/frontend product items
 - `[SILO-XXXX]` — Silo (integrations: Slack, GitHub, GitLab, Jira/Linear)
@@ -64,7 +64,7 @@ Most meaningful commits begin with a Plane work item identifier in brackets:
 
 **Do not include these IDs in the release notes.** The GitHub Releases format is end-user-facing — IDs are only useful as a lookup key for fetching context in step 4.
 
-### 4. (Optional) Enrich via Plane MCP
+### 4. (Optional) Enrich via Hangar MCP
 
 For larger features where the commit headline is terse, fetch the work item to write a richer paragraph:
 
@@ -174,7 +174,7 @@ EOF
 
 ## Reference example
 
-The canonical target format is [v1.2.0](https://github.com/makeplane/plane/releases/tag/v1.2.0) on `makeplane/plane`. When in doubt about heading levels, spacing, bolding, or paragraph voice, match that page exactly (minus images).
+The canonical target format is [v1.2.0](https://github.com/szymczag/hangar/releases/tag/v1.2.0) on `szymczag/hangar`. When in doubt about heading levels, spacing, bolding, or paragraph voice, match that page exactly (minus images).
 
 ## Common Mistakes
 
@@ -189,7 +189,7 @@ The canonical target format is [v1.2.0](https://github.com/makeplane/plane/relea
 - **Editing the PR title** — release PR titles are version markers; only edit the body.
 - **Adding a Chores section** — the GitHub Releases format has no Chores section; user-invisible chores are dropped entirely.
 
-## Plane-Specific Conventions
+## Hangar-Specific Conventions
 
 - Release PRs go from `uat` → `master` (or `preview`).
 - PR title format:

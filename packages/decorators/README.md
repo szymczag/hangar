@@ -12,7 +12,7 @@ A lightweight TypeScript decorator library for building Express.js controllers w
 
 ## Installation
 
-This package is part of the Plane workspace and can be used by adding it to your project's dependencies:
+This package is part of the Hangar workspace and can be used by adding it to your project's dependencies:
 
 ```json
 {
@@ -92,4 +92,4 @@ chatController.registerWebSocketRoutes(router);
 
 ## License
 
-This project is licensed under the [GNU Affero General Public License v3.0](https://github.com/makeplane/plane/blob/master/LICENSE.txt).
+This project is licensed under the [GNU Affero General Public License v3.0](https://github.com/szymczag/hangar/blob/master/LICENSE.txt).

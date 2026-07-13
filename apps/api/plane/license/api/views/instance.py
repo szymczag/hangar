@@ -16,6 +16,7 @@ from rest_framework.response import Response
 # Module imports
 from plane.app.views import BaseAPIView
 from plane.db.models import Workspace
+from plane.ext.product_metadata import get_product_metadata
 from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.api.serializers import InstanceSerializer
 from plane.license.models import Instance
@@ -39,7 +40,11 @@ class InstanceEndpoint(BaseAPIView):
         # get the instance
         if instance is None:
             return Response(
-                {"is_activated": False, "is_setup_done": False},
+                {
+                    "is_activated": False,
+                    "is_setup_done": False,
+                    "product": get_product_metadata(),
+                },
                 status=status.HTTP_200_OK,
             )
         # Return instance
@@ -126,6 +131,7 @@ class InstanceEndpoint(BaseAPIView):
         )
 
         data = {}
+        data["product"] = get_product_metadata()
         # Authentication
         data["enable_signup"] = ENABLE_SIGNUP == "1"
         data["is_workspace_creation_disabled"] = DISABLE_WORKSPACE_CREATION == "1"

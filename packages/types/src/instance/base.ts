@@ -20,6 +20,18 @@ export interface IInstanceInfo {
   config: IInstanceConfig;
 }
 
+export interface IProductMetadata {
+  name: "Hangar";
+  version: string;
+  repository_url: string;
+  source_url: string;
+  documentation_url: string;
+  issues_url: string;
+  security_url: string;
+  terms_url: string | null;
+  privacy_url: string | null;
+}
+
 export interface IInstance {
   id: string;
   created_at: string;
@@ -45,6 +57,7 @@ export interface IInstance {
 }
 
 export interface IInstanceConfig {
+  product: IProductMetadata;
   enable_signup: boolean;
   is_workspace_creation_disabled: boolean;
   is_google_enabled: boolean;

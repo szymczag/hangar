@@ -36,11 +36,19 @@ export const LIVE_URL = encodeURI(`${LIVE_BASE_URL}${LIVE_BASE_PATH}`);
 export const WEB_BASE_URL = runtimeConfig?.VITE_WEB_BASE_URL || process.env.VITE_WEB_BASE_URL || "";
 export const WEB_BASE_PATH = process.env.VITE_WEB_BASE_PATH || "";
 export const WEB_URL = encodeURI(`${WEB_BASE_URL}${WEB_BASE_PATH}`);
-// plane website url
-export const WEBSITE_URL = process.env.VITE_WEBSITE_URL || "https://plane.so";
-// support email
-export const SUPPORT_EMAIL = process.env.VITE_SUPPORT_EMAIL || "support@plane.so";
-// marketing links
-export const MARKETING_PRICING_PAGE_LINK = "https://plane.so/pricing";
-export const MARKETING_CONTACT_US_PAGE_LINK = "https://plane.so/contact";
-export const MARKETING_PLANE_ONE_PAGE_LINK = "https://plane.so/one";
+// Hangar project destinations. Runtime instance metadata can override these
+// links for independently operated installations.
+export const WEBSITE_URL = process.env.VITE_WEBSITE_URL || "https://github.com/szymczag/hangar";
+export const DOCUMENTATION_URL = process.env.VITE_DOCUMENTATION_URL || `${WEBSITE_URL}#readme`;
+export const ISSUE_TRACKER_URL = process.env.VITE_ISSUE_TRACKER_URL || `${WEBSITE_URL}/issues`;
+export const SECURITY_REPORT_URL = process.env.VITE_SECURITY_REPORT_URL || `${WEBSITE_URL}/security/advisories/new`;
+export const SOURCE_CODE_URL = process.env.VITE_SOURCE_CODE_URL || WEBSITE_URL;
+export const TERMS_URL = process.env.VITE_TERMS_URL || "";
+export const PRIVACY_URL = process.env.VITE_PRIVACY_URL || "";
+
+// Compatibility exports retained for upstream call sites. They intentionally
+// resolve to Hangar resources and never to Hangar commercial services.
+export const SUPPORT_EMAIL = "";
+export const MARKETING_PRICING_PAGE_LINK = DOCUMENTATION_URL;
+export const MARKETING_CONTACT_US_PAGE_LINK = ISSUE_TRACKER_URL;
+export const MARKETING_PLANE_ONE_PAGE_LINK = DOCUMENTATION_URL;

@@ -6,6 +6,7 @@
 
 import { useTheme } from "next-themes";
 // plane imports
+import { ISSUE_TRACKER_URL, SOURCE_CODE_URL } from "@plane/constants";
 import { Button } from "@plane/propel/button";
 // assets
 import maintenanceModeDarkModeImage from "@/app/assets/instance/maintenance-mode-dark.svg?url";
@@ -15,19 +16,14 @@ import DefaultLayout from "@/layouts/default-layout";
 
 const linkMap = [
   {
-    key: "mail_to",
-    label: "Contact Support",
-    value: "mailto:support@plane.so",
+    key: "report_issue",
+    label: "Open a GitHub issue",
+    value: ISSUE_TRACKER_URL,
   },
   {
-    key: "status",
-    label: "Status Page",
-    value: "https://status.plane.so/",
-  },
-  {
-    key: "twitter_handle",
-    label: "@planepowers",
-    value: "https://x.com/planepowers",
+    key: "source",
+    label: "View source",
+    value: SOURCE_CODE_URL,
   },
 ];
 
@@ -59,8 +55,8 @@ export function ProdErrorComponent({ onGoHome }: ProdErrorComponentProps) {
           <div className="flex flex-col gap-2.5">
             <h1 className="text-left text-18 font-semibold text-primary">&#x1F6A7; Looks like something went wrong!</h1>
             <span className="text-left text-14 font-medium text-secondary">
-              We track these errors automatically and working on getting things back up and running. If the problem
-              persists feel free to contact us. In the meantime, try refreshing.
+              Refresh and try again. If the problem persists, open a GitHub issue with the steps that led here. Do not
+              include secrets or private workspace data.
             </span>
           </div>
 

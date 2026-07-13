@@ -4,9 +4,9 @@
   "display": "standalone",
   "scope": "/",
   "start_url": "/",
-  "name": "Plane | Accelerate software development with peace.",
-  "short_name": "Plane",
-  "description": "Plane accelerated the software development by order of magnitude for agencies and product companies.",
+  "name": "Hangar | Open-source project management for self-hosted teams.",
+  "short_name": "Hangar",
+  "description": "Open-source project management for self-hosted teams.",
   "icons": [
     {
       "src": "/icon-192x192.png",

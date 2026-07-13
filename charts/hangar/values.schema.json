@@ -7,6 +7,7 @@
     "global",
     "publicUrl",
     "application",
+    "branding",
     "existingSecrets",
     "externalServices",
     "observability",
@@ -78,6 +79,18 @@
         "webhookAllowedHosts": { "$ref": "#/definitions/stringList" },
         "webhookAllowedCIDRs": { "$ref": "#/definitions/stringList" },
         "webhookDisallowedDomains": { "$ref": "#/definitions/stringList" }
+      }
+    },
+    "branding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentationUrl", "issuesUrl", "securityUrl", "termsUrl", "privacyUrl"],
+      "properties": {
+        "documentationUrl": { "$ref": "#/definitions/httpUrl" },
+        "issuesUrl": { "$ref": "#/definitions/httpUrl" },
+        "securityUrl": { "$ref": "#/definitions/httpUrl" },
+        "termsUrl": { "$ref": "#/definitions/optionalHttpUrl" },
+        "privacyUrl": { "$ref": "#/definitions/optionalHttpUrl" }
       }
     },
     "existingSecrets": {
@@ -356,6 +369,11 @@
   ],
   "definitions": {
     "nonEmptyString": { "type": "string", "minLength": 1 },
+    "httpUrl": { "type": "string", "pattern": "^https?://[^\\s]+$" },
+    "optionalHttpUrl": {
+      "type": "string",
+      "anyOf": [{ "const": "" }, { "pattern": "^https?://[^\\s]+$" }]
+    },
     "stringList": {
       "type": "array",
       "uniqueItems": true,
