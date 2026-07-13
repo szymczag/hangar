@@ -383,6 +383,7 @@ ingress:
   className: nginx
   annotations:
     nginx.org/ssl-redirect: "true"
+    nginx.org/websocket-services: hangar-hangar-live
   tls:
     secretName: hangar-tls
 networkPolicy:
@@ -493,7 +494,7 @@ if [[ ! "$redirect_status" =~ ^30(1|2|7|8)$ ]] || \
 fi
 
 set +e
-curl --noproxy '*' --silent --show-error --http1.1 --max-time 5 \
+curl --noproxy '*' --fail --silent --show-error --http1.1 --max-time 5 \
   --cacert "$work_directory/tls.crt" \
   --resolve "${PUBLIC_HOST}:8443:127.0.0.1" \
   --header 'Connection: Upgrade' \
@@ -508,7 +509,10 @@ if [[ "$websocket_curl_status" -ne 0 && "$websocket_curl_status" -ne 28 ]]; then
   echo "WebSocket probe failed with curl status $websocket_curl_status" >&2
   exit 1
 fi
-tr -d '\r' <"$work_directory/websocket-headers" | grep -q '^HTTP/1.1 101 '
+if ! tr -d '\r' <"$work_directory/websocket-headers" | grep -q '^HTTP/1.1 101 '; then
+  echo "WebSocket probe did not receive HTTP 101 Switching Protocols" >&2
+  exit 1
+fi
 
 api_service_ip=$(kubectl --namespace "$NAMESPACE" get service hangar-hangar-api -o jsonpath='{.spec.clusterIP}')
 cat >"$work_directory/network-probes.yaml" <<EOF

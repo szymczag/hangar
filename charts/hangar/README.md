@@ -348,6 +348,13 @@ pre-owned host directories so each non-root evaluation dependency binds only to
 its intended persistent volume. A failed initial install is retained until the
 diagnostic trap has collected pod descriptions and logs.
 
+The qualification stack uses F5 NGINX Ingress Controller, so its generated
+values enable `nginx.org/ssl-redirect` and identify the Live Service with
+`nginx.org/websocket-services`. Production operators must configure equivalent
+TLS redirect and WebSocket forwarding behavior for their selected ingress
+controller; these annotations are intentionally not imposed by the
+controller-neutral chart.
+
 The `Qualify Hangar Helm Chart` GitHub workflow performs the staging and live
 test for an existing image tag. Use the `preview-<branch>` tag produced by a
 manual `Publish Hangar Containers` run to qualify changes without creating a
