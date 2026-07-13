@@ -38,29 +38,26 @@ FLUSH_TIMEOUT_MILLIS = 30000
 EXPORT_INTERVAL_MILLIS = 20000
 
 
-def _create_otlp_metric_exporter():
+def _create_otlp_metric_exporter(protocol: str, endpoint: str):
     """
     Create OTLP metric exporter based on OTLP_METRICS_PROTOCOL (http or grpc).
     Uses shared endpoint helpers so metrics and traces target the same collector.
     Default is grpc; override with OTLP_METRICS_PROTOCOL=http if needed.
     """
-    protocol = (os.environ.get("OTLP_METRICS_PROTOCOL") or "grpc").strip().lower()
-
     if protocol == "grpc":
         from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
             OTLPMetricExporter as GrpcOTLPMetricExporter,
         )
 
-        grpc_endpoint = get_otlp_grpc_endpoint()
         insecure = os.environ.get("OTEL_EXPORTER_OTLP_METRICS_INSECURE", "").lower() == "true"
-        return GrpcOTLPMetricExporter(endpoint=grpc_endpoint, insecure=insecure)
+        return GrpcOTLPMetricExporter(endpoint=endpoint, insecure=insecure)
 
     # HTTP fallback
     from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
         OTLPMetricExporter as HttpOTLPMetricExporter,
     )
 
-    return HttpOTLPMetricExporter(endpoint=get_otlp_http_metrics_url())
+    return HttpOTLPMetricExporter(endpoint=endpoint)
 
 
 def _collect_and_push_metrics() -> None:
@@ -83,20 +80,34 @@ def _collect_and_push_metrics() -> None:
 
     # Configure OTEL metrics (gRPC default, or HTTP if OTLP_METRICS_PROTOCOL=http)
     protocol = (os.environ.get("OTLP_METRICS_PROTOCOL") or "grpc").strip().lower()
-    export_endpoint = get_otlp_grpc_endpoint() if protocol == "grpc" else get_otlp_http_metrics_url()
+    if protocol not in {"grpc", "http"}:
+        logger.warning("Unsupported OTLP metrics protocol; skipping metrics push")
+        return
 
-    service_name = os.environ.get("SERVICE_NAME", "plane-ce-api")
+    try:
+        export_endpoint = get_otlp_grpc_endpoint() if protocol == "grpc" else get_otlp_http_metrics_url()
+    except ValueError:
+        logger.warning("Invalid OTLP endpoint; skipping metrics push")
+        return
+
+    if export_endpoint is None:
+        logger.warning("Telemetry enabled without an OTLP endpoint; skipping metrics push")
+        return
+
+    service_name = os.environ.get("SERVICE_NAME", "hangar-api")
 
     # Create resource with instance identification for the collector
-    resource = Resource.create({
-        "service.name": service_name,
-        "instance_id": str(instance.instance_id or ""),
-        "plane.instance.type": "self-hosted",
-    })
+    resource = Resource.create(
+        {
+            "service.name": service_name,
+            "instance_id": str(instance.instance_id or ""),
+            "hangar.instance.type": "self-hosted",
+        }
+    )
 
     # Configure the OTLP metric exporter (HTTP or gRPC)
-    logger.info(f"Configuring OTLP exporter: protocol={protocol}, endpoint={export_endpoint}")
-    exporter = _create_otlp_metric_exporter()
+    logger.info("Configuring OTLP exporter with protocol=%s", protocol)
+    exporter = _create_otlp_metric_exporter(protocol, export_endpoint)
     reader = PeriodicExportingMetricReader(
         exporter,
         export_interval_millis=EXPORT_INTERVAL_MILLIS,
@@ -122,8 +133,8 @@ def _collect_and_push_metrics() -> None:
         module_issue_count = ModuleIssue.objects.count()
         page_count = Page.objects.exclude(owned_by__is_bot=True, access=1).count()
 
-        # Derive domain from WEB_URL env var (e.g. https://plane.acmecorp.com -> plane.acmecorp.com).
-        # Prepend "//" for scheme-less values (e.g. "plane.acmecorp.com") so urlparse
+        # Derive domain from WEB_URL env var (e.g. https://hangar.example.com -> hangar.example.com).
+        # Prepend "//" for scheme-less values (e.g. "hangar.example.com") so urlparse
         # populates netloc correctly instead of treating the host as a path component.
         web_url = os.environ.get("WEB_URL", "")
         if web_url and "://" not in web_url:
@@ -173,7 +184,7 @@ def _collect_and_push_metrics() -> None:
         # Register observable gauges for instance metrics
         meter.create_observable_gauge(
             name="plane_instance_users_total",
-            description="Total number of users in the Plane instance",
+            description="Total number of users in the Hangar instance",
             callbacks=[users_callback],
         )
         meter.create_observable_gauge(
@@ -266,17 +277,19 @@ def _collect_and_push_metrics() -> None:
         workspace_metrics = []
         for workspace in workspaces:
             ws_id = workspace.id
-            workspace_metrics.append({
-                "instance_id": instance_id_str,
-                "workspace_id": str(ws_id),
-                "workspace_slug": str(workspace.slug),
-                "project_count": project_counts.get(ws_id, 0),
-                "issue_count": issue_counts.get(ws_id, 0),
-                "module_count": module_counts.get(ws_id, 0),
-                "cycle_count": cycle_counts.get(ws_id, 0),
-                "member_count": member_counts.get(ws_id, 0),
-                "page_count": page_counts.get(ws_id, 0),
-            })
+            workspace_metrics.append(
+                {
+                    "instance_id": instance_id_str,
+                    "workspace_id": str(ws_id),
+                    "workspace_slug": str(workspace.slug),
+                    "project_count": project_counts.get(ws_id, 0),
+                    "issue_count": issue_counts.get(ws_id, 0),
+                    "module_count": module_counts.get(ws_id, 0),
+                    "cycle_count": cycle_counts.get(ws_id, 0),
+                    "member_count": member_counts.get(ws_id, 0),
+                    "page_count": page_counts.get(ws_id, 0),
+                }
+            )
 
         def _ws_attrs(ws: dict) -> dict:
             return {
@@ -347,15 +360,9 @@ def _collect_and_push_metrics() -> None:
         flush_success = provider.force_flush(timeout_millis=FLUSH_TIMEOUT_MILLIS)
 
         if flush_success:
-            logger.info(
-                f"Successfully pushed metrics to OTEL collector at {export_endpoint} "
-                f"for instance {instance.instance_id}"
-            )
+            logger.info("Successfully pushed metrics to the configured OTLP collector")
         else:
-            logger.warning(
-                f"Metrics flush timed out for instance {instance.instance_id}, "
-                f"some metrics may not have been exported"
-            )
+            logger.warning("Metrics flush timed out; some metrics may not have been exported")
 
     except Exception as e:
         logger.exception(f"Error pushing metrics to OTEL collector: {e}")
