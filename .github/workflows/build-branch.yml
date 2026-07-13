@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
-      - "v[0-9]+.[0-9]+.[0-9]+-*"
+      - "hangar-v[0-9]+.[0-9]+.[0-9]+"
+      - "hangar-v[0-9]+.[0-9]+.[0-9]+-*"
 
 concurrency:
   group: publish-containers-${{ github.ref }}
@@ -22,11 +22,20 @@ jobs:
   setup:
     name: Validate publication
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: read
     outputs:
       is_release: ${{ steps.metadata.outputs.is_release }}
       is_prerelease: ${{ steps.metadata.outputs.is_prerelease }}
+      git_tag: ${{ steps.metadata.outputs.git_tag }}
       primary_tag: ${{ steps.metadata.outputs.primary_tag }}
+      release_title: ${{ steps.metadata.outputs.release_title }}
       sha_tag: ${{ steps.metadata.outputs.sha_tag }}
+      upstream_package_version: ${{ steps.metadata.outputs.upstream_package_version }}
+      upstream_repository: ${{ steps.metadata.outputs.upstream_repository }}
+      upstream_revision: ${{ steps.metadata.outputs.upstream_revision }}
+      upstream_synced_at: ${{ steps.metadata.outputs.upstream_synced_at }}
       version: ${{ steps.metadata.outputs.version }}
     steps:
       - name: Check out repository
@@ -34,7 +43,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate ref and calculate tags
+      - name: Validate release metadata
         id: metadata
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -42,61 +51,106 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          python3 .github/scripts/release_metadata.py \
+            --event-name "$EVENT_NAME" \
+            --ref-name "$REF_NAME" \
+            --commit-sha "$COMMIT_SHA" \
+            --format github-output >> "$GITHUB_OUTPUT"
 
-          echo "sha_tag=sha-${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Require release commit on preview
+        if: steps.metadata.outputs.is_release == 'true'
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin preview
+          git merge-base --is-ancestor "$COMMIT_SHA" origin/preview || {
+            echo "Release commit must be contained in origin/preview" >&2
+            exit 1
+          }
 
-          if [[ "$EVENT_NAME" == "push" ]]; then
-            semver_regex='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'
-            if [[ ! "$REF_NAME" =~ $semver_regex ]]; then
-              echo "Unsupported release tag: $REF_NAME" >&2
-              exit 1
-            fi
-
-            git fetch --no-tags origin preview
-            if ! git merge-base --is-ancestor "$COMMIT_SHA" origin/preview; then
-              echo "Release commit must be contained in origin/preview" >&2
-              exit 1
-            fi
-
-            echo "is_release=true" >> "$GITHUB_OUTPUT"
-            echo "version=$REF_NAME" >> "$GITHUB_OUTPUT"
-            echo "primary_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
-            if [[ "$REF_NAME" == *-* ]]; then
-              echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            preview_ref=$(printf '%s' "$REF_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^[.-]+//; s/[.-]+$//')
-            if [[ -z "$preview_ref" ]]; then
-              echo "The selected ref cannot be converted to a safe OCI tag" >&2
-              exit 1
-            fi
-
-            echo "is_release=false" >> "$GITHUB_OUTPUT"
-            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "version=$preview_ref" >> "$GITHUB_OUTPUT"
-            echo "primary_tag=preview-$preview_ref" >> "$GITHUB_OUTPUT"
+      - name: Require a verified annotated release tag
+        if: steps.metadata.outputs.is_release == 'true'
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GIT_TAG: ${{ steps.metadata.outputs.git_tag }}
+        run: |
+          set -euo pipefail
+          tag_object=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GIT_TAG")
+          object_type=$(jq -r '.object.type' <<< "$tag_object")
+          tag_object_sha=$(jq -r '.object.sha' <<< "$tag_object")
+          if [[ "$object_type" != "tag" || ! "$tag_object_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Release tags must be annotated and signed" >&2
+            exit 1
           fi
+
+          tag_data=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object_sha")
+          if [[ $(jq -r '.verification.verified' <<< "$tag_data") != "true" ]]; then
+            echo "GitHub did not verify the release tag signature" >&2
+            exit 1
+          fi
+          if [[ $(jq -r '.tag' <<< "$tag_data") != "$GIT_TAG" ]]; then
+            echo "Signed tag name does not match the pushed release ref" >&2
+            exit 1
+          fi
+          if [[ $(jq -r '.object.type' <<< "$tag_data") != "commit" || $(jq -r '.object.sha' <<< "$tag_data") != "$COMMIT_SHA" ]]; then
+            echo "Release tag does not point directly to the workflow commit" >&2
+            exit 1
+          fi
+
+      - name: Log in to GHCR for immutable-tag checks
+        if: steps.metadata.outputs.is_release == 'true'
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Reject an existing immutable release
         if: steps.metadata.outputs.is_release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GIT_TAG: ${{ steps.metadata.outputs.git_tag }}
+          SHA_TAG: ${{ steps.metadata.outputs.sha_tag }}
           VERSION: ${{ steps.metadata.outputs.version }}
         run: |
           set -euo pipefail
 
-          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "GitHub Release $VERSION already exists" >&2
-            exit 1
-          fi
+          release_status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2026-03-10" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases/tags/${GIT_TAG}")
+          case "$release_status" in
+            200)
+              echo "GitHub Release $GIT_TAG already exists" >&2
+              exit 1
+              ;;
+            404) ;;
+            *)
+              echo "GitHub Release immutability check failed with HTTP $release_status" >&2
+              exit 1
+              ;;
+          esac
 
-          for image in web admin space live api proxy aio; do
-            if docker manifest inspect "${IMAGE_PREFIX}${image}:${VERSION}" >/dev/null 2>&1; then
-              echo "Immutable image tag already exists: ${IMAGE_PREFIX}${image}:${VERSION}" >&2
+          reject_existing_image_tag() {
+            local image_tag="$1"
+            local inspect_error
+            if inspect_error=$(docker manifest inspect "$image_tag" 2>&1); then
+              echo "Immutable image tag already exists: $image_tag" >&2
               exit 1
             fi
+            if ! grep -Eqi 'manifest unknown|no such manifest' <<< "$inspect_error"; then
+              echo "Could not prove that immutable image tag is unused: $image_tag" >&2
+              echo "$inspect_error" >&2
+              exit 1
+            fi
+          }
+
+          for image in web admin space live api proxy aio; do
+            reject_existing_image_tag "${IMAGE_PREFIX}${image}:${VERSION}"
+            reject_existing_image_tag "${IMAGE_PREFIX}${image}:${SHA_TAG}"
           done
 
   release_approval:
@@ -175,6 +229,9 @@ jobs:
             org.opencontainers.image.version=${{ needs.setup.outputs.version }}
             org.opencontainers.image.licenses=AGPL-3.0-only
             org.opencontainers.image.title=Hangar ${{ matrix.image }}
+            io.github.szymczag.hangar.release.tag=${{ needs.setup.outputs.git_tag }}
+            io.github.szymczag.hangar.upstream.repository=${{ needs.setup.outputs.upstream_repository }}
+            io.github.szymczag.hangar.upstream.revision=${{ needs.setup.outputs.upstream_revision }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: mode=max
@@ -263,6 +320,9 @@ jobs:
             org.opencontainers.image.version=${{ needs.setup.outputs.version }}
             org.opencontainers.image.licenses=AGPL-3.0-only
             org.opencontainers.image.title=Hangar aio
+            io.github.szymczag.hangar.release.tag=${{ needs.setup.outputs.git_tag }}
+            io.github.szymczag.hangar.upstream.repository=${{ needs.setup.outputs.upstream_repository }}
+            io.github.szymczag.hangar.upstream.revision=${{ needs.setup.outputs.upstream_revision }}
           cache-from: type=gha,scope=aio
           cache-to: type=gha,mode=max,scope=aio
           provenance: mode=max
@@ -345,18 +405,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
 
-      - name: Promote stable manifests
-        if: needs.setup.outputs.is_prerelease != 'true'
-        env:
-          VERSION: ${{ needs.setup.outputs.version }}
-        run: |
-          set -euo pipefail
-          for image in web admin space live api proxy aio; do
-            docker buildx imagetools create \
-              --tag "${IMAGE_PREFIX}${image}:stable" \
-              "${IMAGE_PREFIX}${image}:${VERSION}"
-          done
-
       - name: Stage release assets
         env:
           VERSION: ${{ needs.setup.outputs.version }}
@@ -371,15 +419,58 @@ jobs:
           cp deployments/swarm/community/swarm.sh release-assets/
           sed -i "s/\${APP_RELEASE:-stable}/\${APP_RELEASE:-${VERSION}}/g" release-assets/docker-compose.yml
 
+      - name: Write release notes
+        env:
+          GIT_TAG: ${{ needs.setup.outputs.git_tag }}
+          UPSTREAM_PACKAGE_VERSION: ${{ needs.setup.outputs.upstream_package_version }}
+          UPSTREAM_REPOSITORY: ${{ needs.setup.outputs.upstream_repository }}
+          UPSTREAM_REVISION: ${{ needs.setup.outputs.upstream_revision }}
+          UPSTREAM_SYNCED_AT: ${{ needs.setup.outputs.upstream_synced_at }}
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<EOF
+          ## Release metadata
+
+          - Hangar version: \`${VERSION}\`
+          - Git tag: \`${GIT_TAG}\`
+          - Hangar commit: \`${GITHUB_SHA}\`
+          - Upstream repository: \`${UPSTREAM_REPOSITORY}\`
+          - Upstream revision: \`${UPSTREAM_REVISION}\`
+          - Upstream package version: \`${UPSTREAM_PACKAGE_VERSION}\` (informational)
+          - Upstream sync date: \`${UPSTREAM_SYNCED_AT}\`
+
+          ## Containers
+
+          The \`web\`, \`admin\`, \`space\`, \`live\`, \`api\`, \`proxy\`, and \`aio\`
+          images are published at \`${IMAGE_PREFIX}<image>:${VERSION}\` for \`linux/amd64\`.
+
+          Each release image includes an SBOM and GitHub build-provenance attestation and is
+          signed keylessly with Cosign. Pin the verified image digest in production.
+          EOF
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.setup.outputs.version }}
+          GIT_TAG: ${{ needs.setup.outputs.git_tag }}
+          RELEASE_TITLE: ${{ needs.setup.outputs.release_title }}
           IS_PRERELEASE: ${{ needs.setup.outputs.is_prerelease }}
         run: |
           set -euo pipefail
-          args=(--repo "$GITHUB_REPOSITORY" --title "$VERSION" --target "$GITHUB_SHA" --generate-notes)
+          args=(--repo "$GITHUB_REPOSITORY" --title "$RELEASE_TITLE" --notes-file release-notes.md --verify-tag)
           if [[ "$IS_PRERELEASE" == "true" ]]; then
             args+=(--prerelease)
           fi
-          gh release create "$VERSION" release-assets/* "${args[@]}"
+          gh release create "$GIT_TAG" release-assets/* "${args[@]}"
+
+      - name: Promote stable manifests
+        if: needs.setup.outputs.is_prerelease != 'true'
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          set -euo pipefail
+          for image in web admin space live api proxy aio; do
+            docker buildx imagetools create \
+              --tag "${IMAGE_PREFIX}${image}:stable" \
+              "${IMAGE_PREFIX}${image}:${VERSION}"
+          done

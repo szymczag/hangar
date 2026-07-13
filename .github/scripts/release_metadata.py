@@ -191,12 +191,42 @@ def build_release_metadata(
             primary_tag=primary_tag,
             release_title=None,
             schema_version=1,
-            sha_tag=sha_tag,
+            sha_tag=f"preview-{sha_tag}",
             upstream=upstream,
             version=primary_tag.removeprefix("preview-"),
         )
 
     raise MetadataError("event name must be push or workflow_dispatch")
+
+
+def format_github_output(metadata: ReleaseMetadata) -> str:
+    """Serialize an allowlisted, single-line subset for GitHub Actions outputs."""
+
+    fields: tuple[tuple[str, str | bool | None], ...] = (
+        ("git_tag", metadata.git_tag),
+        ("is_prerelease", metadata.is_prerelease),
+        ("is_release", metadata.is_release),
+        ("primary_tag", metadata.primary_tag),
+        ("release_title", metadata.release_title),
+        ("sha_tag", metadata.sha_tag),
+        ("upstream_package_version", metadata.upstream.package_version),
+        ("upstream_repository", metadata.upstream.repository),
+        ("upstream_revision", metadata.upstream.revision),
+        ("upstream_synced_at", metadata.upstream.synced_at),
+        ("version", metadata.version),
+    )
+    output_lines = []
+    for name, raw_value in fields:
+        if isinstance(raw_value, bool):
+            value = str(raw_value).lower()
+        elif raw_value is None:
+            value = ""
+        else:
+            value = raw_value
+        if any(ord(character) < 32 or ord(character) == 127 for character in value):
+            raise MetadataError(f"GitHub Actions output {name} contains a control character")
+        output_lines.append(f"{name}={value}")
+    return "\n".join(output_lines)
 
 
 def _run_git(repository_root: Path, arguments: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -240,6 +270,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--commit-sha", required=True)
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--upstream-base", type=Path, default=Path("UPSTREAM_BASE.json"))
+    parser.add_argument("--format", choices=("json", "github-output"), default="json")
     return parser
 
 
@@ -269,7 +300,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"release metadata error: {exc}", file=sys.stderr)
         return 2
 
-    print(json.dumps(metadata.to_dict(), sort_keys=True, separators=(",", ":")))
+    if arguments.format == "github-output":
+        print(format_github_output(metadata))
+    else:
+        print(json.dumps(metadata.to_dict(), sort_keys=True, separators=(",", ":")))
     return 0
 
 

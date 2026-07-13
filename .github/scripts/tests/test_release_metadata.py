@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import importlib.util
+from dataclasses import replace
 import json
 from pathlib import Path
 import subprocess
@@ -47,6 +48,7 @@ class ReleaseTagTests(unittest.TestCase):
         self.assertEqual(metadata.version, "v1.2.3")
         self.assertEqual(metadata.primary_tag, "v1.2.3")
         self.assertEqual(metadata.release_title, "Hangar v1.2.3")
+        self.assertEqual(metadata.sha_tag, f"sha-{VALID_COMMIT}")
         self.assertTrue(metadata.is_release)
         self.assertFalse(metadata.is_prerelease)
 
@@ -101,6 +103,7 @@ class PreviewMetadataTests(unittest.TestCase):
 
         self.assertEqual(metadata.primary_tag, "preview-feature-release-safety")
         self.assertEqual(metadata.version, "feature-release-safety")
+        self.assertEqual(metadata.sha_tag, f"preview-sha-{VALID_COMMIT}")
         self.assertIsNone(metadata.git_tag)
         self.assertFalse(metadata.is_release)
         self.assertFalse(metadata.is_prerelease)
@@ -332,6 +335,29 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("release tag must use hangar-v", result.stderr)
         self.assertEqual(result.stdout, "")
+
+    def test_github_output_is_allowlisted_and_single_line(self):
+        metadata = release_metadata.build_release_metadata(
+            event_name="push",
+            ref_name="hangar-v0.1.0-rc.1",
+            commit_sha=VALID_COMMIT,
+            upstream=VALID_UPSTREAM,
+        )
+
+        output = release_metadata.format_github_output(metadata)
+        values = dict(line.split("=", 1) for line in output.splitlines())
+
+        self.assertEqual(values["git_tag"], "hangar-v0.1.0-rc.1")
+        self.assertEqual(values["is_prerelease"], "true")
+        self.assertEqual(values["primary_tag"], "v0.1.0-rc.1")
+        self.assertEqual(values["release_title"], "Hangar v0.1.0-rc.1")
+        self.assertEqual(values["upstream_revision"], VALID_UPSTREAM.revision)
+        self.assertNotIn("event_name", values)
+        self.assertNotIn("schema_version", values)
+
+        unsafe_metadata = replace(metadata, release_title="Hangar v0.1.0\nforged=true")
+        with self.assertRaisesRegex(MetadataError, "control character"):
+            release_metadata.format_github_output(unsafe_metadata)
 
 
 if __name__ == "__main__":
