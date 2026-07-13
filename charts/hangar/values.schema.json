@@ -227,10 +227,17 @@
     },
     "migrator": {
       "type": "object",
-      "required": ["activeDeadlineSeconds", "backoffLimit", "ttlSecondsAfterFinished", "resources"],
+      "required": [
+        "activeDeadlineSeconds",
+        "backoffLimit",
+        "databaseWaitSeconds",
+        "ttlSecondsAfterFinished",
+        "resources"
+      ],
       "properties": {
         "activeDeadlineSeconds": { "type": "integer", "minimum": 60, "maximum": 3600 },
         "backoffLimit": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "databaseWaitSeconds": { "type": "integer", "minimum": 30, "maximum": 600 },
         "ttlSecondsAfterFinished": { "type": "integer", "minimum": 60 },
         "resources": { "$ref": "#/definitions/resources" }
       }

@@ -504,7 +504,10 @@ are removed with a tested TTL and history policy.
 
 API, worker, and beat workloads wait for the migration state with bounded
 timeouts. The migration Job has an `activeDeadlineSeconds`, a small
-`backoffLimit`, structured logs, and no automatic database downgrade behavior.
+`backoffLimit`, a bounded database-connectivity wait before migration execution,
+structured logs, and no automatic database downgrade behavior. The wait parses
+`DATABASE_URL` without logging it and checks only the configured host and port;
+it requires no service-account token or additional image.
 Helm installation and upgrade instructions use `--wait --wait-for-jobs` with an
 explicit timeout.
 

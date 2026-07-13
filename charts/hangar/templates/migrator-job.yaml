@@ -1,3 +1,6 @@
+{{- if ge (int .Values.migrator.databaseWaitSeconds) (int .Values.migrator.activeDeadlineSeconds) }}
+{{- fail "migrator.databaseWaitSeconds must be less than migrator.activeDeadlineSeconds" }}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -28,7 +31,33 @@ spec:
           image: {{ include "hangar.image" .Values.api.image | quote }}
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           command:
-            - ./bin/docker-entrypoint-migrator.sh
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              python - <<'PY'
+              import os
+              import socket
+              import time
+              from urllib.parse import urlparse
+
+              database = urlparse(os.environ["DATABASE_URL"])
+              if not database.hostname:
+                  raise SystemExit("DATABASE_URL does not contain a hostname")
+
+              deadline = time.monotonic() + {{ .Values.migrator.databaseWaitSeconds }}
+              while True:
+                  try:
+                      with socket.create_connection(
+                          (database.hostname, database.port or 5432), timeout=3
+                      ):
+                          break
+                  except OSError:
+                      if time.monotonic() >= deadline:
+                          raise SystemExit("database did not become reachable before timeout")
+                      time.sleep(2)
+              PY
+              exec ./bin/docker-entrypoint-migrator.sh
           securityContext:
             {{- include "hangar.containerSecurityContext" (dict "uid" 10001 "gid" 10001) | nindent 12 }}
           envFrom:
