@@ -2,6 +2,12 @@ name: Publish Hangar Containers
 
 on:
   workflow_dispatch:
+    inputs:
+      run_helm_e2e:
+        description: Qualify the published preview images with the Helm Kubernetes E2E suite
+        required: false
+        default: false
+        type: boolean
   push:
     tags:
       - "hangar-v[0-9]+.[0-9]+.[0-9]+"
@@ -293,6 +299,23 @@ jobs:
             --certificate-identity "$CERTIFICATE_IDENTITY" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$IMAGE"
+
+  preview_helm_e2e:
+    name: Qualify preview Helm chart
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_helm_e2e == true &&
+      needs.setup.result == 'success' &&
+      needs.aio.result == 'success'
+    needs: [setup, aio]
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/helm-e2e.yml
+    with:
+      image_tag: ${{ needs.setup.outputs.primary_tag }}
+    secrets: inherit
 
   chart:
     name: Publish Helm Chart
