@@ -52,6 +52,7 @@ RUN pnpm turbo run build --filter=live
 # *****************************************************************************
 
 FROM base AS runner
+ARG APP_VERSION=v0.1.0
 WORKDIR /app
 
 # Remove go from Alpine APK database; not needed at runtime and carries stdlib CVEs
@@ -70,6 +71,7 @@ COPY --from=installer /app/apps/live/package.json ./apps/live/package.json
 RUN find /app/node_modules \( -name 'esbuild' -o -name 'tsgolint' \) -type f -delete 2>/dev/null || true
 
 ENV TURBO_TELEMETRY_DISABLED=1
+ENV APP_VERSION=${APP_VERSION}
 
 EXPOSE 3000
 

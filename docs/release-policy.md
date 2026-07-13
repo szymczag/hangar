@@ -221,6 +221,13 @@ Every release note contains these sections:
 6. release assets and image families; and
 7. digest, provenance, SBOM, and Cosign verification instructions.
 
+Security/privacy, migration/compatibility, and limitation/rollback content is
+maintainer-reviewed in `docs/releases/<hangar-tag>.md` before the signed tag is
+created. The workflow rejects a release when that exact file or any required
+section is missing. Commit lists, upstream comparisons, exact image digests, and
+verification commands are generated from the signed source, published Hangar
+release records, and GHCR manifests; they are not copied from inherited Plane tags.
+
 ## One-shot release rule
 
 A pushed release tag consumes that version. If publication partially succeeds or a

@@ -4,8 +4,9 @@
 
 # Python imports
 import json
-import secrets
 import os
+import re
+import secrets
 from urllib.parse import urlsplit
 
 import requests
@@ -21,6 +22,34 @@ from plane.utils.url_security import pinned_fetch
 
 MAX_RELEASE_RESPONSE_BYTES = 64 * 1024
 RELEASE_CHECK_URL_ENV = "HANGAR_RELEASE_CHECK_URL"
+DEFAULT_PRODUCT_VERSION = "v0.1.0"
+PRODUCT_VERSION_PATTERN_TEXT = (
+    r"v"
+    r"(?:0|[1-9][0-9]*)\."
+    r"(?:0|[1-9][0-9]*)\."
+    r"(?:0|[1-9][0-9]*)"
+    r"(?:-(?:alpha|beta|rc)\.(?:[1-9][0-9]*))?"
+)
+PRODUCT_VERSION_PATTERN = re.compile(rf"^{PRODUCT_VERSION_PATTERN_TEXT}$")
+HANGAR_RELEASE_TAG_PATTERN = re.compile(rf"^hangar-(?P<version>{PRODUCT_VERSION_PATTERN_TEXT})$")
+
+
+def normalize_product_version(value):
+    if not isinstance(value, str):
+        return None
+    if PRODUCT_VERSION_PATTERN.fullmatch(value):
+        return value
+    prefixed_value = f"v{value}"
+    if PRODUCT_VERSION_PATTERN.fullmatch(prefixed_value):
+        return prefixed_value
+    return None
+
+
+def normalize_hangar_release_tag(value):
+    if not isinstance(value, str) or value != value.strip() or len(value) > 255:
+        return None
+    match = HANGAR_RELEASE_TAG_PATTERN.fullmatch(value)
+    return match.group("version") if match is not None else None
 
 
 class Command(BaseCommand):
@@ -31,16 +60,17 @@ class Command(BaseCommand):
         parser.add_argument("machine_signature", type=str, help="Machine signature")
 
     def check_for_current_version(self):
-        if os.environ.get("APP_VERSION", False):
-            return os.environ.get("APP_VERSION")
+        app_version = normalize_product_version(os.environ.get("APP_VERSION"))
+        if app_version is not None:
+            return app_version
 
         try:
             with open("package.json", "r") as file:
                 data = json.load(file)
-                return data.get("version", "v0.1.0")
+                return normalize_product_version(data.get("version")) or DEFAULT_PRODUCT_VERSION
         except Exception:
             self.stdout.write("Error checking for current version")
-            return "v0.1.0"
+            return DEFAULT_PRODUCT_VERSION
 
     def check_for_latest_version(self, fallback_version):
         release_check_url = os.environ.get(RELEASE_CHECK_URL_ENV, "").strip()
@@ -83,10 +113,10 @@ class Command(BaseCommand):
 
             if not isinstance(data, dict):
                 raise ValueError("Release response must be a JSON object")
-            tag_name = data.get("tag_name")
-            if not isinstance(tag_name, str) or not tag_name.strip() or len(tag_name) > 255:
-                raise ValueError("Release response contains an invalid tag name")
-            return tag_name.strip()
+            release_version = normalize_hangar_release_tag(data.get("tag_name"))
+            if release_version is None:
+                raise ValueError("Release response contains an invalid Hangar tag name")
+            return release_version
         except (OSError, UnicodeError, ValueError, requests.RequestException, json.JSONDecodeError):
             self.stdout.write("Error checking for latest version")
             return fallback_version

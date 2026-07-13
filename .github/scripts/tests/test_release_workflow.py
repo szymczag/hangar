@@ -8,6 +8,8 @@ import unittest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "build-branch.yml"
+API_DOCKERFILE_PATH = REPOSITORY_ROOT / "apps" / "api" / "Dockerfile.api"
+LIVE_DOCKERFILE_PATH = REPOSITORY_ROOT / "apps" / "live" / "Dockerfile.live"
 
 
 class ReleaseWorkflowContractTests(unittest.TestCase):
@@ -39,6 +41,13 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertNotIn('gh release create "$VERSION"', self.workflow)
         self.assertNotIn("--generate-notes", self.workflow)
 
+    def test_release_notes_use_curated_input_and_published_evidence(self):
+        self.assertIn("Validate curated release notes", self.workflow)
+        self.assertIn("release_notes.py validate", self.workflow)
+        self.assertIn("release_notes.py generate", self.workflow)
+        self.assertIn("gh api --paginate --slurp", self.workflow)
+        self.assertIn("docker buildx imagetools inspect", self.workflow)
+
     def test_release_images_include_upstream_provenance(self):
         repository_label = (
             "io.github.szymczag.hangar.upstream.repository="
@@ -50,6 +59,15 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         )
         self.assertEqual(self.workflow.count(repository_label), 2)
         self.assertEqual(self.workflow.count(revision_label), 2)
+
+    def test_product_version_is_embedded_in_runtime_images(self):
+        self.assertIn("APP_VERSION=${{ needs.setup.outputs.version }}", self.workflow)
+        api_dockerfile = API_DOCKERFILE_PATH.read_text(encoding="utf-8")
+        live_dockerfile = LIVE_DOCKERFILE_PATH.read_text(encoding="utf-8")
+        self.assertIn("ARG APP_VERSION", api_dockerfile)
+        self.assertIn("ENV APP_VERSION=${APP_VERSION}", api_dockerfile)
+        self.assertIn("ARG APP_VERSION", live_dockerfile)
+        self.assertIn("ENV APP_VERSION=${APP_VERSION}", live_dockerfile)
 
     def test_stable_promotion_happens_after_release_creation(self):
         release_position = self.workflow.index("gh release create")

@@ -12,6 +12,8 @@ from plane.license.bgtasks.telemetry_metrics import _collect_and_push_metrics
 from plane.license.management.commands.register_instance import (
     MAX_RELEASE_RESPONSE_BYTES,
     Command,
+    normalize_hangar_release_tag,
+    normalize_product_version,
 )
 from plane.license.models import Instance
 
@@ -62,7 +64,7 @@ class TestReleaseCheckPrivacy:
     def test_release_check_uses_ssrf_safe_pinned_client(self, monkeypatch):
         url = "https://api.github.com/repos/szymczag/hangar/releases/latest"
         monkeypatch.setenv("HANGAR_RELEASE_CHECK_URL", url)
-        response = _Response({"tag_name": "v1.3.0"})
+        response = _Response({"tag_name": "hangar-v1.3.0"})
 
         with patch(
             "plane.license.management.commands.register_instance.pinned_fetch",
@@ -81,6 +83,65 @@ class TestReleaseCheckPrivacy:
             stream=True,
         )
         assert response.closed is True
+
+    @pytest.mark.parametrize(
+        ("tag_name", "expected"),
+        [
+            ("hangar-v1.3.0", "v1.3.0"),
+            ("hangar-v0.1.0-alpha.1", "v0.1.0-alpha.1"),
+            ("hangar-v0.1.0-beta.2", "v0.1.0-beta.2"),
+            ("hangar-v0.1.0-rc.3", "v0.1.0-rc.3"),
+            ("v1.3.0", None),
+            ("hangar-v01.3.0", None),
+            ("hangar-v1.3.0-dev.1", None),
+            (" hangar-v1.3.0", None),
+            ("hangar-v1.3.0\n", None),
+            (None, None),
+        ],
+    )
+    def test_release_tag_normalization_is_namespaced_and_strict(self, tag_name, expected):
+        assert normalize_hangar_release_tag(tag_name) == expected
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("v1.2.3", "v1.2.3"),
+            ("1.2.3", "v1.2.3"),
+            ("v0.1.0-rc.1", "v0.1.0-rc.1"),
+            ("hangar-v1.2.3", None),
+            ("1.2", None),
+            (None, None),
+        ],
+    )
+    def test_product_version_normalization(self, value, expected):
+        assert normalize_product_version(value) == expected
+
+    @pytest.mark.parametrize("tag_name", ["v1.3.0", "hangar-v1.3.0-dev.1", "hangar-v01.3.0"])
+    def test_release_check_rejects_untrusted_tag_names(self, monkeypatch, tag_name):
+        monkeypatch.setenv(
+            "HANGAR_RELEASE_CHECK_URL",
+            "https://api.github.com/repos/szymczag/hangar/releases/latest",
+        )
+        response = _Response({"tag_name": tag_name})
+
+        with patch(
+            "plane.license.management.commands.register_instance.pinned_fetch",
+            return_value=response,
+        ):
+            assert Command().check_for_latest_version("v1.2.3") == "v1.2.3"
+
+        assert response.closed is True
+
+    def test_current_version_prefers_packaged_hangar_version(self, monkeypatch):
+        monkeypatch.setenv("APP_VERSION", "v0.2.0-rc.1")
+
+        assert Command().check_for_current_version() == "v0.2.0-rc.1"
+
+    def test_current_version_rejects_invalid_environment_value(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("APP_VERSION", "hangar-v9.9.9")
+        monkeypatch.chdir(tmp_path)
+
+        assert Command().check_for_current_version() == "v0.1.0"
 
     def test_release_check_fails_closed_when_ssrf_validation_rejects_target(self, monkeypatch):
         monkeypatch.setenv("HANGAR_RELEASE_CHECK_URL", "https://metadata.example/latest")
