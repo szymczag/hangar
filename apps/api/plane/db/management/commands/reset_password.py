@@ -8,10 +8,8 @@ import getpass
 # Django imports
 from django.core.management import BaseCommand, CommandError
 
-# Third party imports
-from zxcvbn import zxcvbn
-
 # Module imports
+from plane.authentication.utils.password import is_password_strong
 from plane.db.models import User
 
 
@@ -53,10 +51,8 @@ class Command(BaseCommand):
             self.stderr.write("Error: Blank passwords aren't allowed.")
             return
 
-        results = zxcvbn(password)
-
-        if results["score"] < 3:
-            raise CommandError("Password is too common please set a complex password")
+        if not is_password_strong(password):
+            raise CommandError("Password must be at least 15 characters and hard to guess")
 
         # Set user password
         user.set_password(password)

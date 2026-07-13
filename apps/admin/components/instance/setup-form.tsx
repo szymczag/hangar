@@ -12,8 +12,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { API_BASE_URL, E_PASSWORD_STRENGTH } from "@plane/constants";
 import { Button } from "@plane/propel/button";
 import { AuthService } from "@plane/services";
-import { Checkbox, Input, PasswordStrengthIndicator, Spinner } from "@plane/ui";
-import { getPasswordStrength, validatePersonName, validateCompanyName } from "@plane/utils";
+import { Checkbox, Input, PasswordStrengthIndicator, Spinner, usePasswordStrength } from "@plane/ui";
+import { validatePersonName, validateCompanyName } from "@plane/utils";
 // components
 import { AuthHeader } from "@/app/(all)/(home)/auth-header";
 import { Banner } from "../common/banner";
@@ -78,6 +78,7 @@ export function InstanceSetupForm() {
   const [isPasswordInputFocused, setIsPasswordInputFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRetryPasswordInputFocused, setIsRetryPasswordInputFocused] = useState(false);
+  const passwordStrength = usePasswordStrength(formData.password);
 
   const handleShowPassword = (key: keyof typeof showPassword) =>
     setShowPassword((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -123,15 +124,13 @@ export function InstanceSetupForm() {
 
   const isButtonDisabled = useMemo(
     () =>
-      !isSubmitting &&
-      formData.first_name &&
-      formData.email &&
-      formData.password &&
-      getPasswordStrength(formData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
-      formData.password === formData.confirm_password
-        ? false
-        : true,
-    [formData.confirm_password, formData.email, formData.first_name, formData.password, isSubmitting]
+      isSubmitting ||
+      !formData.first_name ||
+      !formData.email ||
+      !formData.password ||
+      passwordStrength.strength !== E_PASSWORD_STRENGTH.STRENGTH_VALID ||
+      formData.password !== formData.confirm_password,
+    [formData.confirm_password, formData.email, formData.first_name, formData.password, isSubmitting, passwordStrength]
   );
 
   const password = formData?.password ?? "";
@@ -182,7 +181,6 @@ export function InstanceSetupForm() {
                     }
                   }}
                   autoComplete="off"
-                  autoFocus
                   maxLength={50}
                 />
               </div>
@@ -223,7 +221,7 @@ export function InstanceSetupForm() {
                 placeholder="name@company.com"
                 value={formData.email}
                 onChange={(e) => handleFormChange("email", e.target.value)}
-                hasError={errorData.type && errorData.type === EErrorCodes.INVALID_EMAIL ? true : false}
+                hasError={Boolean(errorData.type && errorData.type === EErrorCodes.INVALID_EMAIL)}
                 autoComplete="off"
               />
               {errorData.type && errorData.type === EErrorCodes.INVALID_EMAIL && errorData.message && (
@@ -267,7 +265,7 @@ export function InstanceSetupForm() {
                   placeholder="New password"
                   value={formData.password}
                   onChange={(e) => handleFormChange("password", e.target.value)}
-                  hasError={errorData.type && errorData.type === EErrorCodes.INVALID_PASSWORD ? true : false}
+                  hasError={Boolean(errorData.type && errorData.type === EErrorCodes.INVALID_PASSWORD)}
                   onFocus={() => setIsPasswordInputFocused(true)}
                   onBlur={() => setIsPasswordInputFocused(false)}
                   autoComplete="new-password"
@@ -295,7 +293,11 @@ export function InstanceSetupForm() {
               {errorData.type && errorData.type === EErrorCodes.INVALID_PASSWORD && errorData.message && (
                 <p className="px-1 text-11 text-danger-primary">{errorData.message}</p>
               )}
-              <PasswordStrengthIndicator password={formData.password} isFocused={isPasswordInputFocused} />
+              <PasswordStrengthIndicator
+                password={formData.password}
+                strengthResult={passwordStrength}
+                isFocused={isPasswordInputFocused}
+              />
             </div>
 
             <div className="w-full space-y-1">

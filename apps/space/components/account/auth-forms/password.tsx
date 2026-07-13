@@ -11,8 +11,7 @@ import { Eye, EyeOff, XCircle } from "lucide-react";
 import { API_BASE_URL, E_PASSWORD_STRENGTH } from "@plane/constants";
 import { Button } from "@plane/propel/button";
 import { AuthService } from "@plane/services";
-import { Input, Spinner, PasswordStrengthIndicator } from "@plane/ui";
-import { getPasswordStrength } from "@plane/utils";
+import { Input, Spinner, PasswordStrengthIndicator, usePasswordStrength } from "@plane/ui";
 // types
 import { EAuthModes, EAuthSteps } from "@/types/auth";
 
@@ -53,6 +52,7 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordInputFocused, setIsPasswordInputFocused] = useState(false);
   const [isRetryPasswordInputFocused, setIsRetryPasswordInputFocused] = useState(false);
+  const passwordStrength = usePasswordStrength(passwordFormData.password);
 
   const handleShowPassword = (key: keyof typeof showPassword) =>
     setShowPassword((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -73,21 +73,22 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
 
   const passwordSupport = passwordFormData.password.length > 0 &&
     mode === EAuthModes.SIGN_UP &&
-    getPasswordStrength(passwordFormData.password) != E_PASSWORD_STRENGTH.STRENGTH_VALID && (
-      <PasswordStrengthIndicator password={passwordFormData.password} isFocused={isPasswordInputFocused} />
+    passwordStrength.strength != E_PASSWORD_STRENGTH.STRENGTH_VALID && (
+      <PasswordStrengthIndicator
+        password={passwordFormData.password}
+        strengthResult={passwordStrength}
+        isFocused={isPasswordInputFocused}
+      />
     );
 
   const isButtonDisabled = useMemo(
     () =>
-      !isSubmitting &&
-      !!passwordFormData.password &&
-      (mode === EAuthModes.SIGN_UP
-        ? getPasswordStrength(passwordFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
-          passwordFormData.password === passwordFormData.confirm_password
-        : true)
-        ? false
-        : true,
-    [isSubmitting, mode, passwordFormData.confirm_password, passwordFormData.password]
+      isSubmitting ||
+      !passwordFormData.password ||
+      (mode === EAuthModes.SIGN_UP &&
+        (passwordStrength.strength !== E_PASSWORD_STRENGTH.STRENGTH_VALID ||
+          passwordFormData.password !== passwordFormData.confirm_password)),
+    [isSubmitting, mode, passwordFormData.confirm_password, passwordFormData.password, passwordStrength.strength]
   );
 
   const password = passwordFormData.password ?? "";
@@ -160,7 +161,6 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
             onFocus={() => setIsPasswordInputFocused(true)}
             onBlur={() => setIsPasswordInputFocused(false)}
             autoComplete="off"
-            autoFocus
           />
           {showPassword?.password ? (
             <EyeOff

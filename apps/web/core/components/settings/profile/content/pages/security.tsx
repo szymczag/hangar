@@ -13,8 +13,7 @@ import { E_PASSWORD_STRENGTH } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Input, PasswordStrengthIndicator } from "@plane/ui";
-import { getPasswordStrength } from "@plane/utils";
+import { Input, PasswordStrengthIndicator, usePasswordStrength } from "@plane/ui";
 // components
 import { ProfileSettingsHeading } from "@/components/settings/profile/heading";
 // helpers
@@ -66,6 +65,7 @@ export const SecurityProfileSettings = observer(function SecurityProfileSettings
   const password = watch("new_password");
   const confirmPassword = watch("confirm_password");
   const oldPasswordRequired = !currentUser?.is_password_autoset;
+  const passwordStrength = usePasswordStrength(password);
   // i18n
   const { t } = useTranslation();
 
@@ -116,17 +116,20 @@ export const SecurityProfileSettings = observer(function SecurityProfileSettings
   };
 
   const isButtonDisabled =
-    getPasswordStrength(password) != E_PASSWORD_STRENGTH.STRENGTH_VALID ||
+    passwordStrength.strength != E_PASSWORD_STRENGTH.STRENGTH_VALID ||
     (oldPasswordRequired && oldPassword.trim() === "") ||
     password.trim() === "" ||
     confirmPassword.trim() === "" ||
     password !== confirmPassword ||
     password === oldPassword;
 
-  const passwordSupport = password.length > 0 &&
-    getPasswordStrength(password) != E_PASSWORD_STRENGTH.STRENGTH_VALID && (
-      <PasswordStrengthIndicator password={password} isFocused={isPasswordInputFocused} />
-    );
+  const passwordSupport = password.length > 0 && passwordStrength.strength != E_PASSWORD_STRENGTH.STRENGTH_VALID && (
+    <PasswordStrengthIndicator
+      password={password}
+      strengthResult={passwordStrength}
+      isFocused={isPasswordInputFocused}
+    />
+  );
 
   const renderPasswordMatchError = !isRetryPasswordInputFocused || confirmPassword.length >= password.length;
 

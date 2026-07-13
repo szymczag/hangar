@@ -6,8 +6,9 @@
 
 import React, { useState } from "react";
 import type { E_PASSWORD_STRENGTH } from "@plane/constants";
-import { cn, getPasswordStrength } from "@plane/utils";
+import { cn } from "@plane/utils";
 import { PasswordStrengthIndicator } from "../form-fields/password/indicator";
+import { usePasswordStrength } from "../form-fields/password/use-password-strength";
 import { AuthInput } from "./auth-input";
 
 export type TAuthPasswordInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
@@ -51,12 +52,12 @@ export function AuthPasswordInput({
     setIsFocused(false);
   };
 
-  const passwordStrength = getPasswordStrength(value as string);
+  const passwordStrength = usePasswordStrength(value as string);
 
   // Notify parent of strength change
   React.useEffect(() => {
-    onPasswordStrengthChange?.(passwordStrength);
-  }, [passwordStrength, onPasswordStrengthChange]);
+    onPasswordStrengthChange?.(passwordStrength.strength);
+  }, [passwordStrength.strength, onPasswordStrengthChange]);
 
   return (
     <div className={cn("space-y-2", containerClassName)}>
@@ -75,7 +76,7 @@ export function AuthPasswordInput({
         autoComplete="off"
       />
       {showPasswordStrength && value && isFocused && (
-        <PasswordStrengthIndicator password={value as string} showCriteria />
+        <PasswordStrengthIndicator password={value as string} strengthResult={passwordStrength} showCriteria />
       )}
     </div>
   );

@@ -10,12 +10,10 @@ import { useSearchParams } from "next/navigation";
 // icons
 import { Eye, EyeOff } from "lucide-react";
 // ui
-import { API_BASE_URL, E_PASSWORD_STRENGTH } from "@plane/constants";
+import { API_BASE_URL, E_PASSWORD_STRENGTH, PASSWORD_MIN_LENGTH } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
-import { Input, PasswordStrengthIndicator } from "@plane/ui";
-// components
-import { getPasswordStrength } from "@plane/utils";
+import { Input, PasswordStrengthIndicator, usePasswordStrength } from "@plane/ui";
 // helpers
 import type { EAuthenticationErrorCodes, TAuthErrorInfo } from "@/helpers/authentication.helper";
 import { EErrorAlertType, authErrorHandler } from "@/helpers/authentication.helper";
@@ -60,6 +58,7 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
   const [isPasswordInputFocused, setIsPasswordInputFocused] = useState(false);
   const [isRetryPasswordInputFocused, setIsRetryPasswordInputFocused] = useState(false);
   const [errorInfo, setErrorInfo] = useState<TAuthErrorInfo | undefined>(undefined);
+  const passwordStrength = usePasswordStrength(resetFormData.password);
   // plane hooks
   const { t } = useTranslation();
 
@@ -76,12 +75,10 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
 
   const isButtonDisabled = useMemo(
     () =>
-      !!resetFormData.password &&
-      getPasswordStrength(resetFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
-      resetFormData.password === resetFormData.confirm_password
-        ? false
-        : true,
-    [resetFormData]
+      !resetFormData.password ||
+      passwordStrength.strength !== E_PASSWORD_STRENGTH.STRENGTH_VALID ||
+      resetFormData.password !== resetFormData.confirm_password,
+    [passwordStrength.strength, resetFormData]
   );
 
   useEffect(() => {
@@ -141,11 +138,10 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
               //hasError={Boolean(errors.password)}
               placeholder={t("auth.common.password.placeholder")}
               className="h-10 w-full border border-strong !bg-surface-1 pr-12 placeholder:text-placeholder"
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
               onFocus={() => setIsPasswordInputFocused(true)}
               onBlur={() => setIsPasswordInputFocused(false)}
               autoComplete="new-password"
-              autoFocus
             />
             {showPassword.password ? (
               <EyeOff
@@ -159,7 +155,11 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
               />
             )}
           </div>
-          <PasswordStrengthIndicator password={resetFormData.password} isFocused={isPasswordInputFocused} />
+          <PasswordStrengthIndicator
+            password={resetFormData.password}
+            strengthResult={passwordStrength}
+            isFocused={isPasswordInputFocused}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-13 font-medium text-tertiary" htmlFor="confirm_password">

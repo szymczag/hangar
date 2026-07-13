@@ -6,6 +6,7 @@
 from rest_framework import serializers
 
 # Module import
+from plane.authentication.utils.password import PASSWORD_MIN_LENGTH
 from plane.db.models import Account, Profile, User, Workspace, WorkspaceMemberInvite
 from plane.utils.url import contains_url
 
@@ -177,8 +178,8 @@ class ChangePasswordSerializer(serializers.Serializer):
     Serializer for password change endpoint.
     """
     old_password = serializers.CharField(required=True)
-    new_password = serializers.CharField(required=True, min_length=8)
-    confirm_password = serializers.CharField(required=True, min_length=8)
+    new_password = serializers.CharField(required=True, min_length=PASSWORD_MIN_LENGTH)
+    confirm_password = serializers.CharField(required=True, min_length=PASSWORD_MIN_LENGTH)
 
     def validate(self, data):
         if data.get("old_password") == data.get("new_password"):
@@ -195,7 +196,7 @@ class ResetPasswordSerializer(serializers.Serializer):
     Serializer for password change endpoint.
     """
 
-    new_password = serializers.CharField(required=True, min_length=8)
+    new_password = serializers.CharField(required=True, min_length=PASSWORD_MIN_LENGTH)
 
 
 class ProfileSerializer(BaseSerializer):

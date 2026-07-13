@@ -14,8 +14,7 @@ import { API_BASE_URL, E_PASSWORD_STRENGTH, AUTH_TRACKER_ELEMENTS } from "@plane
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { CloseIcon } from "@plane/propel/icons";
-import { Input, PasswordStrengthIndicator, Spinner } from "@plane/ui";
-import { getPasswordStrength } from "@plane/utils";
+import { Input, PasswordStrengthIndicator, Spinner, usePasswordStrength } from "@plane/ui";
 // components
 import { ForgotPasswordPopover } from "@/components/account/auth-forms/forgot-password-popover";
 // constants
@@ -63,6 +62,7 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
   const [isPasswordInputFocused, setIsPasswordInputFocused] = useState(false);
   const [isRetryPasswordInputFocused, setIsRetryPasswordInputFocused] = useState(false);
   const [isBannerMessage, setBannerMessage] = useState(false);
+  const passwordStrength = usePasswordStrength(passwordFormData.password);
 
   const handleShowPassword = (key: keyof typeof showPassword) =>
     setShowPassword((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -98,18 +98,20 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
       </div>
     ) : (
       passwordFormData.password.length > 0 &&
-      getPasswordStrength(passwordFormData.password) != E_PASSWORD_STRENGTH.STRENGTH_VALID && (
-        <PasswordStrengthIndicator password={passwordFormData.password} isFocused={isPasswordInputFocused} />
+      passwordStrength.strength != E_PASSWORD_STRENGTH.STRENGTH_VALID && (
+        <PasswordStrengthIndicator
+          password={passwordFormData.password}
+          strengthResult={passwordStrength}
+          isFocused={isPasswordInputFocused}
+        />
       )
     );
 
   const isButtonDisabled = useMemo(
     () =>
-      !isSubmitting &&
-      !!passwordFormData.password &&
-      (mode === EAuthModes.SIGN_UP ? passwordFormData.password === passwordFormData.confirm_password : true)
-        ? false
-        : true,
+      isSubmitting ||
+      !passwordFormData.password ||
+      (mode === EAuthModes.SIGN_UP && passwordFormData.password !== passwordFormData.confirm_password),
     [isSubmitting, mode, passwordFormData.confirm_password, passwordFormData.password]
   );
 
@@ -153,9 +155,7 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
           event.preventDefault(); // Prevent form from submitting by default
           await handleCSRFToken();
           const isPasswordValid =
-            mode === EAuthModes.SIGN_UP
-              ? getPasswordStrength(passwordFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID
-              : true;
+            mode === EAuthModes.SIGN_UP ? passwordStrength.strength === E_PASSWORD_STRENGTH.STRENGTH_VALID : true;
           if (isPasswordValid) {
             setIsSubmitting(true);
             if (formRef.current) formRef.current.submit(); // Manually submit the form if the condition is met
@@ -214,7 +214,6 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
               onFocus={() => setIsPasswordInputFocused(true)}
               onBlur={() => setIsPasswordInputFocused(false)}
               autoComplete="off"
-              autoFocus
             />
             <button
               type="button"

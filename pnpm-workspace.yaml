@@ -5,6 +5,9 @@ packages:
   - "!apps/proxy"
 
 catalog:
+  "@zxcvbn-ts/core": "4.1.2"
+  "@zxcvbn-ts/language-common": "4.1.2"
+  "@zxcvbn-ts/language-en": "4.1.1"
   "@atlaskit/pragmatic-drag-and-drop": "1.7.4"
   "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "1.4.0"
   "@atlaskit/pragmatic-drag-and-drop-hitbox": "1.1.0"
