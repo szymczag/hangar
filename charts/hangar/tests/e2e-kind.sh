@@ -476,12 +476,21 @@ if ((api_status >= 500)); then
   exit 1
 fi
 
-curl --noproxy '*' --silent --show-error --head \
+redirect_headers="$work_directory/http-redirect-headers"
+redirect_status=$(curl --noproxy '*' --silent --show-error --head \
+  --output /dev/null \
+  --dump-header "$redirect_headers" \
+  --write-out '%{http_code}' \
   --resolve "${PUBLIC_HOST}:8080:127.0.0.1" \
   --header "Host: ${PUBLIC_HOST}" \
-  "http://${PUBLIC_HOST}:8080/" \
-  | tr -d '\r' \
-  | grep -Eiq '^location: https://hangar\.test(/|$)'
+  "http://${PUBLIC_HOST}:8080/")
+redirect_location=$(tr -d '\r' <"$redirect_headers" | awk 'tolower($1) == "location:" { print $2; exit }')
+redirect_host_regex="${PUBLIC_HOST//./\\.}"
+if [[ ! "$redirect_status" =~ ^30(1|2|7|8)$ ]] || \
+  [[ ! "$redirect_location" =~ ^https://${redirect_host_regex}(:[0-9]+)?(/|$) ]]; then
+  echo "expected same-host HTTPS redirect, got HTTP $redirect_status location '$redirect_location'" >&2
+  exit 1
+fi
 
 set +e
 curl --noproxy '*' --silent --show-error --http1.1 --max-time 5 \
