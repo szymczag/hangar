@@ -701,9 +701,12 @@ chart, and installs that exact archive. Attestation, signing, and publication
 cannot begin until the archive passes. A separate manual `Qualify Hangar Helm
 Chart` workflow can repeat the same test against an existing release or preview
 image tag. Preview runs use a unique synthetic chart version while retaining the
-resolved preview image digests. The next CI expansion is the production profile
-with disposable external services, followed by authenticated uploads, background
-jobs, migration-failure recovery, and coordinated restore scenarios.
+resolved preview image digests. The container publication workflow can also
+invoke this reusable qualification workflow through its `run_helm_e2e` input,
+which permits end-to-end branch qualification before the standalone workflow is
+present on the default branch. The next CI expansion is the production profile
+with disposable external services, followed by authenticated uploads,
+background jobs, migration-failure recovery, and coordinated restore scenarios.
 
 ### Phase 7: OCI publication and release integration
 

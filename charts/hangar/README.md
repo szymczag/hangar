@@ -330,5 +330,8 @@ cluster on exit.
 The `Qualify Hangar Helm Chart` GitHub workflow performs the staging and live
 test for an existing image tag. Use the `preview-<branch>` tag produced by a
 manual `Publish Hangar Containers` run to qualify changes without creating a
-release tag. The release workflow runs the same test automatically and will not
-attest, sign, or publish the candidate chart if it fails.
+release tag. Before the qualification workflow is present on the default
+branch, enable `run_helm_e2e` on the manual container publication; the publisher
+invokes the same reusable qualification workflow after every preview image has
+been published. The release workflow runs the same test automatically and will
+not attest, sign, or publish the candidate chart if it fails.

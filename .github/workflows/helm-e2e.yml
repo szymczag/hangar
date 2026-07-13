@@ -1,6 +1,12 @@
 name: Qualify Hangar Helm Chart
 
 on:
+  workflow_call:
+    inputs:
+      image_tag:
+        description: Existing Hangar image tag
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       image_tag:
