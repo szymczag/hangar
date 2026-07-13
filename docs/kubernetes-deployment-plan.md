@@ -694,6 +694,11 @@ The qualification stack is deliberately versioned independently from Hangar:
 | Ingress controller       | F5 NGINX `5.5.1`; Helm chart `2.6.1` at OCI digest `sha256:fe6899d4087de3cdd809b5928b7373b0a97a58312f40733938dda84f4d571516` |
 | Ingress controller image | AMD64 image digest `sha256:0e23c34b1095aefb87d720d99a82528999cc93e53e74c0edd6339dba70d473bf`                                 |
 
+The qualification values use F5 NGINX's `nginx.org/ssl-redirect` and
+`nginx.org/websocket-services` annotations. The chart remains
+controller-neutral; operators configure equivalent HTTPS redirect and
+WebSocket forwarding behavior for their chosen ingress implementation.
+
 The harness refuses source-chart placeholder application digests. It creates a
 Restricted Pod Security namespace, generated non-default credentials, a
 short-lived self-signed test certificate, and four static retained volumes. The
