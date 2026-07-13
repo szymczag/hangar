@@ -82,6 +82,8 @@ for render in "$production_render" "$evaluation_render"; do
     [[ "$redis_url_consumers" -eq 5 ]] || fail "API, Live, workers, and migrator must each receive REDIS_URL in $render"
     api_probe_host_headers="$(grep -Ec '^[[:space:]]+- name: Host$' "$render")"
     [[ "$api_probe_host_headers" -eq 3 ]] || fail "every API HTTP probe must send the configured public host in $render"
+    assert_present '^              deadline = time\.monotonic\(\) \+ 300$' "$render" "migrator must wait a bounded time for its database"
+    assert_present '^              exec \./bin/docker-entrypoint-migrator\.sh$' "$render" "migrator entrypoint must run after its database wait"
 done
 
 assert_present '^  FILE_SIZE_LIMIT: "1073741824"$' "$boundary_render" "maximum file-size limit must render as an exact decimal integer"
@@ -117,6 +119,8 @@ assert_invalid "multiple API replicas" --set api.replicas=2
 assert_invalid "zero API workers" --set api.gunicornWorkers=0
 assert_invalid "multiple beat workers" --set beatWorker.replicas=2
 assert_invalid "zero upload limit" --set application.fileSizeLimit=0
+assert_invalid "short migrator database wait" --set migrator.databaseWaitSeconds=29
+assert_invalid "migrator wait exceeding Job deadline" --set migrator.activeDeadlineSeconds=300 --set migrator.databaseWaitSeconds=300
 assert_invalid "reserved Pod label override" --set-string global.podLabels.app\\.kubernetes\\.io/component=attacker
 assert_invalid "mutable evaluation image" --set-string evaluation-postgresql.image.tag=18.4
 assert_invalid "mutable evaluation object-storage image" --set-string evaluationObjectStorage.image.tag=4.39

@@ -221,6 +221,7 @@ beatWorker:
 migrator:
   activeDeadlineSeconds: 900
   backoffLimit: 2
+  databaseWaitSeconds: 300
   ttlSecondsAfterFinished: 86400
   resources:
     requests:

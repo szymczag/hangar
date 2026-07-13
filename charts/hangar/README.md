@@ -239,7 +239,10 @@ Before every upgrade:
 
 Use the same atomic command as installation with a new chart version. The
 migrator is a normal, revision-scoped Job with bounded retries and a 15-minute
-deadline.
+deadline. Before running the application migration entrypoint, it waits up to
+five minutes for the configured database host and port to accept connections.
+This absorbs normal controller and external-service startup ordering without
+granting the Job Kubernetes API access or exposing database credentials.
 
 `helm rollback` restores Kubernetes resources, but it cannot reverse a database
 migration. Roll back only when the application release declares the schema
