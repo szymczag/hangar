@@ -101,6 +101,17 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("chart-oci-digest.txt", self.workflow)
         self.assertIn('> "${chart_package}.sha256"', self.workflow)
 
+    def test_release_asset_staging_can_authenticate_to_ghcr(self):
+        stage_assets = self.workflow.split(
+            "      - name: Stage release assets", maxsplit=1
+        )[1].split("      - name: Generate release notes", maxsplit=1)[0]
+        self.assertIn(
+            "          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}", stage_assets
+        )
+        self.assertIn(
+            'printf \'%s\' "$GITHUB_TOKEN" | helm registry login', stage_assets
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

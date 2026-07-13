@@ -1,6 +1,6 @@
 # Evaluation dependency record
 
-This file records the resolved dependencies for Hangar chart `0.1.0-rc.2`.
+This file records the resolved dependencies for Hangar chart `0.1.0-rc.3`.
 The evaluation profile is for non-critical testing. These records do not turn
 single-replica dependencies into a production availability recommendation.
 
