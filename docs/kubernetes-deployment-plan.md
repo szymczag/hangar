@@ -98,9 +98,10 @@ external deployment assumptions, and Kubernetes commands that skip TLS
 verification. Its root job is now explicitly disabled and it is not reused for
 chart qualification or deployment.
 
-Hangar's release workflow publishes multi-architecture component images for
-`web`, `admin`, `space`, `live`, `api`, and `proxy`, plus an all-in-one image.
-The supported Kubernetes
+Hangar's release workflow publishes AMD64 component images for `web`, `admin`,
+`space`, `live`, `api`, and `proxy`, plus an all-in-one image. ARM64 is outside
+the supported release contract until every application and evaluation
+dependency is qualified for that architecture. The supported Kubernetes
 architecture will use:
 
 - `hangar-web`;
