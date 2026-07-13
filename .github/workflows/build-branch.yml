@@ -215,6 +215,10 @@ jobs:
 
   aio:
     name: Publish aio
+    if: >-
+      always() &&
+      needs.setup.result == 'success' &&
+      needs.components.result == 'success'
     needs: [setup, components]
     runs-on: ubuntu-22.04
     permissions:
