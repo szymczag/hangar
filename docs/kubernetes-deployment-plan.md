@@ -35,6 +35,9 @@ The migrator also receives `REDIS_URL` because Django imports the Celery module
 while loading settings for management commands. It receives only the cache URL
 in addition to its core application and database keys; queue and object-storage
 credentials remain outside the migration Job's trust boundary.
+API HTTP probes send the configured public hostname explicitly. Pod IPs must not
+be added to `ALLOWED_HOSTS` merely to accommodate kubelet probes, and the chart
+must not use a wildcard host policy.
 
 This implementation is intentionally still unsupported. The new ephemeral test
 must pass on an actual release run, and production-profile installation,

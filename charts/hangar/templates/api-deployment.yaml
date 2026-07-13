@@ -54,18 +54,27 @@ spec:
             httpGet:
               path: /
               port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.publicUrl.host | quote }}
             failureThreshold: 90
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /
               port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.publicUrl.host | quote }}
             periodSeconds: 10
             timeoutSeconds: 3
           livenessProbe:
             httpGet:
               path: /
               port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.publicUrl.host | quote }}
             periodSeconds: 30
             timeoutSeconds: 3
           resources:
