@@ -86,7 +86,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
             'charts/hangar/tests/e2e-kind.sh "${{ steps.package_chart.outputs.chart_package }}"'
         )
         publication_position = self.workflow.index(
-            'helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts'
+            'helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts 2>&1'
         )
         self.assertLess(prepare_position, qualification_position)
         self.assertLess(qualification_position, publication_position)
