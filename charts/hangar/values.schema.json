@@ -241,13 +241,16 @@
       "allOf": [
         { "$ref": "#/definitions/evaluationDependency" },
         {
-          "required": ["initImage", "rbac"],
+          "required": ["initImage", "rbac", "customConfig"],
           "properties": {
             "initImage": { "$ref": "#/definitions/dependencyImage" },
             "rbac": {
               "type": "object",
               "required": ["create"],
               "properties": { "create": { "const": false } }
+            },
+            "customConfig": {
+              "const": "deprecated_features.permit.transient_nonexcl_queues = true\n"
             }
           }
         }

@@ -699,6 +699,13 @@ dynamic provisioner's behavior for chart behavior. `hostPath` exists only in
 these cluster-owned test fixtures; rendered Hangar workloads remain subject to
 the repository policy that forbids host access.
 
+The evaluation profile schema-locks RabbitMQ 4.x's
+`deprecated_features.permit.transient_nonexcl_queues` compatibility permission.
+The current Celery/Kombu stack still declares this queue type; the permission is
+limited to the bundled broker and must be retired after the application
+dependency is upgraded. Qualification checks controller rollouts explicitly so
+completed migration Job Pods are not incorrectly expected to remain Ready.
+
 The live assertions currently cover:
 
 - evaluation installation with failed resources retained for diagnostics and
