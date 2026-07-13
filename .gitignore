@@ -111,6 +111,10 @@ build/
 temp/
 scripts/
 !packages/i18n/scripts/
+!.github/scripts/
+!.github/scripts/release_metadata.py
+!.github/scripts/tests/
+!.github/scripts/tests/test_release_metadata.py
 
 # i18n auto-generated types (regenerated on every build)
 packages/i18n/src/types/keys.generated.ts
