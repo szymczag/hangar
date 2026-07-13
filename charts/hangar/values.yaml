@@ -366,7 +366,10 @@ evaluation-valkey:
       mountPath: /etc/valkey-auth
   customStartupProbe: &valkeyProbe
     exec:
-      command: [sh, -ec, 'valkey-cli -u "$REDIS_URL" ping | grep -qx PONG']
+      command:
+        - sh
+        - -ec
+        - 'VALKEYCLI_AUTH="$VALKEY_PASSWORD" valkey-cli --no-auth-warning --user hangar -h 127.0.0.1 -p 6379 ping | grep -qx PONG'
     initialDelaySeconds: 5
     timeoutSeconds: 5
     failureThreshold: 30

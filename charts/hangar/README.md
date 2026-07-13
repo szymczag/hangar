@@ -113,7 +113,10 @@ in-place major-version upgrade path.
 2. Copy `examples/evaluation-secrets.example.yaml` outside the repository.
    Replace every `CHANGE_ME` value and place the populated manifest under secret
    management. The example assumes release name `hangar`; update its internal
-   service names if you choose another release name.
+   service names if you choose another release name. The evaluation
+   `hangar-cache` Secret requires `REDIS_URL`, `VALKEY_PASSWORD`, and `users.acl`.
+   `VALKEY_PASSWORD` is consumed only by the bundled Valkey loopback health
+   probes; application workloads continue to consume only `REDIS_URL`.
 3. Apply the managed Secret resources and install with the evaluation values.
 
 ```bash
