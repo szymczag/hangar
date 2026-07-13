@@ -27,7 +27,7 @@ env:
 
 jobs:
   qualify:
-    name: Kubernetes 1.35.5 evaluation profile
+    name: Kubernetes 1.36 compatibility (Kind 1.36.1)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:

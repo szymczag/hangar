@@ -18,6 +18,19 @@ application image digests. Evaluation dependencies render only lowercase
 DNS-compatible resource names, and the chart-owned object store consumes an
 existing Secret rather than generating credentials.
 
+The public `0.1.0-rc.3` prerelease is available from GHCR and its GitHub Release.
+[Publication run 29278653303](https://github.com/szymczag/hangar/actions/runs/29278653303)
+completed image and chart publication, the live evaluation gate, provenance
+attestation, keyless signing and verification, checksum generation, and release
+creation. Post-release checks confirmed anonymous chart access and full pulls of
+the five digest-pinned Kubernetes application images. A clean post-publication
+installation remains a separate open qualification gate.
+
+The `0.1.0-rc.4` candidate expands the declared Kubernetes range through 1.36.
+Both profiles render and validate against Kubernetes 1.36.2 schemas. The live
+evaluation harness uses Kind 0.32.0's official Kubernetes 1.36.1 node image and
+a checksum-pinned kubectl 1.36.2 client.
+
 The runtime images and entrypoints have also been hardened for fixed non-root
 identities, read-only-root-filesystem operation, stable self-managed identity,
 bounded dependency waits, and privacy-by-default startup.
@@ -49,9 +62,9 @@ second migration, post-upgrade health, uninstall, and retained PVCs.
 This implementation is intentionally still unsupported for production.
 Production-profile installation, application-level uploads and background work,
 coordinated backup/restore, migration-failure recovery, vulnerability, license,
-public-distribution, and supported-version matrix qualification remain release
-gates. Source-chart application digests are fail-closed placeholders and are
-replaced with resolved manifest digests only by the release workflow.
+post-publication installation, and supported-version matrix qualification remain
+release gates. Source-chart application digests are fail-closed placeholders and
+are replaced with resolved manifest digests only by the release workflow.
 
 ## Purpose and audience
 
@@ -358,8 +371,8 @@ without the leading `v`; `appVersion` contains the Hangar product version. For
 example:
 
 ```yaml
-version: 0.1.0-rc.3
-appVersion: v0.1.0-rc.3
+version: 0.1.0-rc.4
+appVersion: v0.1.0-rc.4
 ```
 
 Chart versions are immutable and coupled to the release defined in
@@ -386,7 +399,7 @@ global:
 api:
   image:
     repository: ghcr.io/szymczag/hangar-api
-    tag: v0.1.0-rc.3
+    tag: v0.1.0-rc.4
     digest: sha256:replace-with-release-digest
     pullPolicy: IfNotPresent
   replicas: 2
@@ -694,8 +707,8 @@ The qualification stack is deliberately versioned independently from Hangar:
 | Layer                    | Qualification pin                                                                                                            |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | Kind client              | `v0.32.0`, downloaded for the runner architecture and verified against a repository-owned SHA-256 pin                        |
-| Kubernetes node          | `kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95`                               |
-| kubectl                  | `v1.35.5`, downloaded from `dl.k8s.io` and verified against a repository-owned SHA-256 pin                                   |
+| Kubernetes node          | `kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5`                               |
+| Kubernetes schema/client | Kubernetes 1.36.2 schemas and `kubectl v1.36.2`; kubectl is verified against repository-owned SHA-256 pins                   |
 | Helm                     | `v4.2.0`, installed by a full-commit-pinned GitHub Action                                                                    |
 | CNI and policy engine    | Cilium `1.19.5`; OCI chart digest `sha256:557ea3b67b2380bdf91f3006ecea924e10e2963dbaf6085887652311e581460b`                  |
 | Ingress controller       | F5 NGINX `5.5.1`; Helm chart `2.6.1` at OCI digest `sha256:fe6899d4087de3cdd809b5928b7373b0a97a58312f40733938dda84f4d571516` |
@@ -793,7 +806,18 @@ published chart digest succeeds.
 
 ### Phase 8: operator documentation and inherited-path retirement
 
-Create separate task-oriented operator guides for:
+The initial task-oriented operator documentation is now organized under
+`docs/kubernetes/`:
+
+- [documentation landing page](kubernetes/README.md);
+- [evaluation installation](kubernetes/evaluation-install.md);
+- [production-profile preparation](kubernetes/production-install.md);
+- [configuration reference](kubernetes/configuration.md);
+- [operations](kubernetes/operations.md);
+- [security and artifact verification](kubernetes/security.md); and
+- [troubleshooting](kubernetes/troubleshooting.md).
+
+These guides cover:
 
 - production prerequisites and installation;
 - evaluation installation and limitations;
@@ -804,7 +828,7 @@ Create separate task-oriented operator guides for:
 - backup and restore;
 - upgrade, migration failure, and rollback decisions;
 - OCI digest, checksum, attestation, and signature verification;
-- air-gapped mirroring and installation; and
+- future air-gapped mirroring and installation; and
 - troubleshooting and support-bundle collection without credentials.
 
 Update the main README only after the tested path exists. At that point, replace
@@ -922,7 +946,8 @@ links every checked item to a CI run, report, digest, or signed manual exercise.
 - [ ] Rollback compatibility and database-restore requirements are documented for
       the release.
 - [ ] The OCI chart and all image/dependency digests match the evidence manifest.
-- [ ] Checksums, provenance, attestations, and keyless signatures verify.
+- [x] Checksums, provenance, attestations, and keyless signatures verify in
+      publication run 29278653303.
 - [ ] Public chart and image digest pulls and installation of the verified chart
       package succeed.
 - [ ] Operator documentation reproduces the qualified process.

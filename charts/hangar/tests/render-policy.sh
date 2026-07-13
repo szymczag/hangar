@@ -9,7 +9,7 @@ trap 'rm -rf "$tmp_dir"' EXIT
 production_render="$tmp_dir/production.yaml"
 evaluation_render="$tmp_dir/evaluation.yaml"
 boundary_render="$tmp_dir/boundary.yaml"
-kube_version="${KUBE_VERSION:-1.35.0}"
+kube_version="${KUBE_VERSION:-1.36.2}"
 
 fail() {
     echo "render-policy: $*" >&2
@@ -44,6 +44,17 @@ assert_invalid() {
         fail "schema accepted invalid values: $description"
     fi
 }
+
+# Exercise both declared compatibility edges and reject adjacent unsupported
+# minors so Chart.yaml cannot drift away from the tested range.
+helm template minimum-kubernetes "$chart_dir" --namespace hangar --kube-version 1.30.0 >/dev/null
+for unsupported_kube_version in 1.29.0 1.37.0; do
+    if helm template unsupported-kubernetes "$chart_dir" \
+        --namespace hangar \
+        --kube-version "$unsupported_kube_version" >/dev/null 2>&1; then
+        fail "Chart.yaml accepted unsupported Kubernetes $unsupported_kube_version"
+    fi
+done
 
 helm lint "$chart_dir" --kube-version "$kube_version"
 helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" >"$production_render"

@@ -103,7 +103,7 @@ web:
   replicas: 2
   image:
     repository: ghcr.io/szymczag/hangar-web
-    tag: v0.1.0-rc.3
+    tag: v0.1.0-rc.4
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
     pullPolicy: IfNotPresent
     pullSecrets: []
@@ -122,7 +122,7 @@ admin:
   replicas: 2
   image:
     repository: ghcr.io/szymczag/hangar-admin
-    tag: v0.1.0-rc.3
+    tag: v0.1.0-rc.4
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
     pullPolicy: IfNotPresent
     pullSecrets: []
@@ -141,7 +141,7 @@ space:
   replicas: 2
   image:
     repository: ghcr.io/szymczag/hangar-space
-    tag: v0.1.0-rc.3
+    tag: v0.1.0-rc.4
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
     pullPolicy: IfNotPresent
     pullSecrets: []
@@ -160,7 +160,7 @@ live:
   replicas: 2
   image:
     repository: ghcr.io/szymczag/hangar-live
-    tag: v0.1.0-rc.3
+    tag: v0.1.0-rc.4
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
     pullPolicy: IfNotPresent
     pullSecrets: []
@@ -179,7 +179,7 @@ api:
   replicas: 1
   image:
     repository: ghcr.io/szymczag/hangar-api
-    tag: v0.1.0-rc.3
+    tag: v0.1.0-rc.4
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
     pullPolicy: IfNotPresent
     pullSecrets: []
