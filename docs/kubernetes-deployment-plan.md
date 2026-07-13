@@ -704,7 +704,10 @@ image tag. Preview runs use a unique synthetic chart version while retaining the
 resolved preview image digests. The container publication workflow can also
 invoke this reusable qualification workflow through its `run_helm_e2e` input,
 which permits end-to-end branch qualification before the standalone workflow is
-present on the default branch. The next CI expansion is the production profile
+present on the default branch. A guarded `reuse_preview_images` input skips
+container publication for qualification-only retries; the E2E workflow still
+resolves every existing preview tag to an immutable digest before installation.
+The next CI expansion is the production profile
 with disposable external services, followed by authenticated uploads,
 background jobs, migration-failure recovery, and coordinated restore scenarios.
 
