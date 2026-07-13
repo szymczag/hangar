@@ -68,6 +68,17 @@ ingress:
   tls:
     secretName: hangar-tls
 
+gateway:
+  enabled: false
+  create: false
+  className: envoy
+  name: ""
+  namespace: ""
+  sectionName: https
+  annotations: {}
+  tls:
+    secretName: hangar-tls
+
 networkPolicy:
   enabled: true
   ingressController:

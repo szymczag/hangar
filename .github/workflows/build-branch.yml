@@ -48,6 +48,7 @@ jobs:
       upstream_revision: ${{ steps.metadata.outputs.upstream_revision }}
       upstream_synced_at: ${{ steps.metadata.outputs.upstream_synced_at }}
       version: ${{ steps.metadata.outputs.version }}
+      public_origin: ${{ steps.public_origin.outputs.value }}
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
@@ -67,6 +68,21 @@ jobs:
             --ref-name "$REF_NAME" \
             --commit-sha "$COMMIT_SHA" \
             --format github-output >> "$GITHUB_OUTPUT"
+
+      - name: Read canonical public origin
+        id: public_origin
+        run: |
+          set -euo pipefail
+          public_origin=$(awk '
+            /^publicUrl:$/ { in_public_url = 1; next }
+            in_public_url && /^  scheme:/ { scheme = $2; next }
+            in_public_url && /^  host:/ { host = $2; print scheme "://" host; exit }
+          ' charts/hangar/values.yaml)
+          if [[ ! "$public_origin" =~ ^https://[A-Za-z0-9.-]+$ ]]; then
+            echo "Invalid canonical public origin: $public_origin" >&2
+            exit 1
+          fi
+          echo "value=$public_origin" >> "$GITHUB_OUTPUT"
 
       - name: Validate curated release notes
         if: steps.metadata.outputs.is_release == 'true'
@@ -249,6 +265,11 @@ jobs:
             APP_VERSION=${{ needs.setup.outputs.version }}
             HANGAR_SOURCE_REVISION=${{ github.sha }}
             VITE_SOURCE_CODE_URL=${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}
+            VITE_ADMIN_BASE_URL=${{ needs.setup.outputs.public_origin }}
+            VITE_SPACE_BASE_URL=${{ needs.setup.outputs.public_origin }}
+            VITE_LIVE_BASE_URL=${{ needs.setup.outputs.public_origin }}
+            VITE_WEB_BASE_URL=${{ needs.setup.outputs.public_origin }}
+            VITE_API_BASE_URL=${{ needs.setup.outputs.public_origin }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}

@@ -5,6 +5,7 @@
  */
 
 import { E_PASSWORD_STRENGTH } from "@plane/constants";
+import type { PasswordStrengthResult } from "@plane/utils";
 
 export interface StrengthInfo {
   message: string;
@@ -15,7 +16,19 @@ export interface StrengthInfo {
 /**
  * Get strength information including message, color, and active fragments
  */
-export const getStrengthInfo = (strength: E_PASSWORD_STRENGTH): StrengthInfo => {
+export const getStrengthInfo = ({
+  score,
+  strength,
+  isLoading,
+}: PasswordStrengthResult & { isLoading?: boolean }): StrengthInfo => {
+  if (isLoading) {
+    return {
+      message: "Checking password strength",
+      textColor: "text-primary",
+      activeFragments: 0,
+    };
+  }
+
   switch (strength) {
     case E_PASSWORD_STRENGTH.EMPTY:
       return {
@@ -25,21 +38,21 @@ export const getStrengthInfo = (strength: E_PASSWORD_STRENGTH): StrengthInfo => 
       };
     case E_PASSWORD_STRENGTH.LENGTH_NOT_VALID:
       return {
-        message: "Password is too short",
+        message: "Use at least 15 characters",
         textColor: "text-danger-primary",
         activeFragments: 1,
       };
     case E_PASSWORD_STRENGTH.STRENGTH_NOT_VALID:
       return {
-        message: "Password is weak",
+        message: score <= 1 ? "Password is weak" : "Password is fair; make it harder to guess",
         textColor: "text-orange-500",
-        activeFragments: 2,
+        activeFragments: Math.max(1, score),
       };
     case E_PASSWORD_STRENGTH.STRENGTH_VALID:
       return {
-        message: "Password is strong",
+        message: score === 4 ? "Password is very strong" : "Password is strong",
         textColor: "text-success-primary",
-        activeFragments: 3,
+        activeFragments: score,
       };
     default:
       return {
@@ -64,6 +77,7 @@ export const getFragmentColor = (fragmentIndex: number, activeFragments: number)
     case 2:
       return "bg-orange-500";
     case 3:
+    case 4:
       return "bg-success-primary";
     default:
       return "bg-layer-1";

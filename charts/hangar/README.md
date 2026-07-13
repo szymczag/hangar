@@ -39,7 +39,7 @@ by incomplete release attempts. `0.1.0-rc.3` is the previous complete release.
 | `production` | Operator-managed external services                       | Durable deployment model       | Available for qualification, unsupported |
 
 Both profiles use the same Hangar application images, Restricted-compatible
-security contexts, pre-existing Secret interface, ingress routing, and
+security contexts, pre-existing Secret interface, public routing, and
 default-deny NetworkPolicies.
 
 ## Prerequisites
@@ -47,12 +47,12 @@ default-deny NetworkPolicies.
 - Kubernetes 1.30 through 1.36, including 1.36.2;
 - Helm 4.2;
 - AMD64 nodes;
-- a TLS-enabled ingress controller with WebSocket support;
+- a TLS-enabled ingress controller or Gateway API implementation with WebSocket support;
 - a CNI that enforces `NetworkPolicy`;
 - pre-existing application and TLS Secrets; and
 - a default `StorageClass` or explicit storage classes for evaluation.
 
-The chart does not install cluster infrastructure such as an ingress controller,
+The chart does not install cluster infrastructure such as an ingress/Gateway controller,
 cert-manager, CNI, CSI driver, external secret operator, or telemetry collector.
 
 Product help links are configured under `branding`. Documentation, issue, and
@@ -86,6 +86,20 @@ before admitting the package to a controlled environment.
 | `scripts/`                 | Dependency verification and release staging                      |
 | `tests/`                   | Render-policy and ephemeral-cluster qualification harnesses      |
 | `DEPENDENCIES.md`          | Dependency hashes, image digests, and qualification toolchain    |
+
+## Canonical public URL and Gateway API
+
+`publicUrl` is the installation's single external origin. The chart uses it for
+backend host/CORS settings, Live, all five frontend URL variables, TLS host
+matching, and a generated runtime `config.js`. Published frontend images also
+bake the default origin as a fallback, while the runtime file lets an operator
+change the hostname without rebuilding static assets.
+
+Set `gateway.enabled: true` to use Gateway API. This suppresses the NGINX
+`Ingress` and renders explicit routes for `/god-mode/`, `/spaces/`, `/live/`,
+`/api/`, and `/`; exact paths without their trailing slash receive a 308
+method-preserving redirect. See `examples/gateway-values.yaml` for an
+Envoy-backed Gateway with TLS termination.
 
 ## Validate a source change
 
@@ -122,7 +136,7 @@ Chart changes must preserve:
 - non-root, read-only, Restricted-compatible workloads;
 - no chart-created RBAC or ServiceAccount token mounts;
 - pre-existing Secrets rather than Helm-managed credential values;
-- mandatory TLS ingress and NetworkPolicy;
+- mandatory TLS ingress or Gateway routing and NetworkPolicy;
 - bounded, revision-scoped migration Jobs; and
 - privacy-by-default application configuration.
 

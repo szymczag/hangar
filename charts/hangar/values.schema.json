@@ -12,6 +12,7 @@
     "externalServices",
     "observability",
     "ingress",
+    "gateway",
     "networkPolicy",
     "podDefaults",
     "evaluation",
@@ -137,13 +138,35 @@
     },
     "ingress": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["enabled", "tls"],
       "properties": {
-        "enabled": { "const": true },
+        "enabled": { "type": "boolean" },
         "className": { "type": "string" },
         "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
         "tls": {
           "type": "object",
+          "additionalProperties": false,
+          "required": ["secretName"],
+          "properties": { "secretName": { "$ref": "#/definitions/nonEmptyString" } }
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "create", "className", "name", "namespace", "sectionName", "annotations", "tls"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "create": { "type": "boolean" },
+        "className": { "$ref": "#/definitions/nonEmptyString" },
+        "name": { "type": "string" },
+        "namespace": { "type": "string" },
+        "sectionName": { "$ref": "#/definitions/nonEmptyString" },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
           "required": ["secretName"],
           "properties": { "secretName": { "$ref": "#/definitions/nonEmptyString" } }
         }

@@ -22,6 +22,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
+        checksum/frontend-config: {{ include (print $root.Template.BasePath "/frontend-configmap.yaml") $root | sha256sum }}
         {{- with $root.Values.global.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -41,6 +42,17 @@ spec:
           imagePullPolicy: {{ $values.image.pullPolicy }}
           securityContext:
             {{- include "hangar.containerSecurityContext" (dict "uid" $component.uid "gid" $component.uid) | nindent 12 }}
+          env:
+            - name: VITE_ADMIN_BASE_URL
+              value: {{ include "hangar.publicOrigin" $root | quote }}
+            - name: VITE_SPACE_BASE_URL
+              value: {{ include "hangar.publicOrigin" $root | quote }}
+            - name: VITE_LIVE_BASE_URL
+              value: {{ include "hangar.publicOrigin" $root | quote }}
+            - name: VITE_WEB_BASE_URL
+              value: {{ include "hangar.publicOrigin" $root | quote }}
+            - name: VITE_API_BASE_URL
+              value: {{ include "hangar.publicOrigin" $root | quote }}
           ports:
             - name: http
               containerPort: 3000
@@ -68,10 +80,21 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if eq $component.name "web" }}
+            - name: frontend-config
+              mountPath: /usr/share/nginx/html/config.js
+              subPath: config.js
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 128Mi
+        {{- if eq $component.name "web" }}
+        - name: frontend-config
+          configMap:
+            name: {{ include "hangar.fullname" $root }}-frontend
+        {{- end }}
       {{- include "hangar.scheduling" $root | nindent 6 }}
 ---
 {{- end }}

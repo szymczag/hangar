@@ -31,6 +31,7 @@ configurations.
 | `externalServices`                        | Non-secret external object-storage settings                                                             |
 | `observability`                           | Optional OTLP endpoint and metrics protocol                                                             |
 | `ingress`                                 | Controller class, annotations, and TLS Secret                                                           |
+| `gateway`                                 | Gateway API creation/attachment, listener, class, and TLS Secret                                        |
 | `networkPolicy`                           | Ingress-controller/DNS selectors and private egress exceptions                                          |
 | `podDefaults`                             | Scheduling and termination defaults shared by application Pods                                          |
 | `web`, `admin`, `space`, `live`, `api`    | Images, replicas, resources, and PDBs for application services                                          |
@@ -38,7 +39,7 @@ configurations.
 | `migrator`                                | Migration timeouts, retries, retention, and resources                                                   |
 | `evaluation-*`, `evaluationObjectStorage` | Bundled dependency settings for evaluation only                                                         |
 
-## Public URL and ingress
+## Public URL and routing
 
 ```yaml
 publicUrl:
@@ -53,9 +54,10 @@ ingress:
     secretName: hangar-tls
 ```
 
-`ingress.enabled` and TLS are mandatory. The chart is controller-neutral and
-does not impose redirect, request-size, or WebSocket annotations. Configure
-equivalent behavior for your controller.
+`publicUrl` is canonical: it configures Django and Live, the frontend runtime
+`config.js`, and all five Vite URL fallbacks. Ingress mode terminates TLS using
+`ingress.tls.secretName`. The chart is controller-neutral and does not impose
+request-size or WebSocket annotations.
 
 The Ingress routes:
 
@@ -69,6 +71,14 @@ The Ingress routes:
 
 The most specific paths precede `/`. Preserve this ordering if extending the
 chart.
+
+For Gateway API/Envoy, use `charts/hangar/examples/gateway-values.yaml`.
+`gateway.enabled: true` suppresses the Ingress. With `gateway.create: true`, the
+chart creates an HTTPS listener that terminates TLS; otherwise `name`, optional
+`namespace`, and `sectionName` attach routes to an existing listener. Exact
+`/god-mode`, `/spaces`, `/live`, and `/api` requests are normalized with 308
+redirects, and the API route overwrites forwarded scheme, host, and port headers
+with the canonical HTTPS origin.
 
 ## Application policy
 
@@ -159,6 +169,9 @@ The default ingress-controller selector expects namespace `ingress-nginx` and
 Pods labeled `app.kubernetes.io/name=ingress-nginx`. The default DNS selector
 expects `kube-system` and `k8s-app=kube-dns`. Change both selectors to match the
 actual cluster labels.
+
+Gateway users must instead select the Envoy data-plane Pods that connect to the
+Hangar Services. Those labels are implementation- and installation-specific.
 
 ## Images and registry credentials
 

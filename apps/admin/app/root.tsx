@@ -17,9 +17,12 @@ import { AppProviders } from "@/providers";
 import type { Route } from "./+types/root";
 import { PRODUCT_REPOSITORY_URL, PRODUCT_TAGLINE } from "@plane/constants";
 // fonts
+// oxlint-disable-next-line import/no-unassigned-import -- registers the bundled font faces
 import "@fontsource-variable/inter";
 import interVariableWoff2 from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+// oxlint-disable-next-line import/no-unassigned-import -- registers the bundled icon font
 import "@fontsource/material-symbols-rounded";
+// oxlint-disable-next-line import/no-unassigned-import -- registers the bundled monospace font
 import "@fontsource/ibm-plex-mono";
 
 const APP_TITLE = "Hangar Admin | Self-hosted instance administration";
@@ -47,6 +50,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script src="/config.js" />
         <Meta />
         <Links />
       </head>

@@ -15,13 +15,13 @@ export enum E_PASSWORD_STRENGTH {
   STRENGTH_VALID = "strength_valid",
 }
 
-export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MIN_LENGTH = 15;
 
 export const SPACE_PASSWORD_CRITERIA = [
   {
-    key: "min_8_char",
-    label: "Min 8 characters",
-    isCriteriaValid: (password: string) => password.length >= PASSWORD_MIN_LENGTH,
+    key: "min_15_char",
+    label: "At least 15 characters",
+    isCriteriaValid: (password: string) => Array.from(password).length >= PASSWORD_MIN_LENGTH,
   },
   // {
   //   key: "min_1_upper_case",

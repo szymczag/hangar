@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 // plane imports
 import type { TAuthErrorInfo } from "@plane/constants";
-import { E_PASSWORD_STRENGTH, EErrorAlertType, EAuthErrorCodes } from "@plane/constants";
+import { E_PASSWORD_STRENGTH, EErrorAlertType, EAuthErrorCodes, PASSWORD_MIN_LENGTH } from "@plane/constants";
 
 /**
  * @description Password strength levels
@@ -20,29 +20,76 @@ export enum PasswordStrength {
   STRONG = "strong",
 }
 
+export type PasswordStrengthResult = {
+  score: 0 | 1 | 2 | 3 | 4;
+  strength: E_PASSWORD_STRENGTH;
+  warning: string | null;
+  suggestions: string[];
+};
+
+let passwordStrengthEstimatorPromise: Promise<import("@zxcvbn-ts/core").ZxcvbnFactory> | undefined;
+
+const getPasswordStrengthEstimator = async (): Promise<import("@zxcvbn-ts/core").ZxcvbnFactory> => {
+  passwordStrengthEstimatorPromise ??= Promise.all([
+    import("@zxcvbn-ts/core"),
+    import("@zxcvbn-ts/language-common"),
+    import("@zxcvbn-ts/language-en"),
+  ]).then(
+    ([{ ZxcvbnFactory }, common, english]) =>
+      new ZxcvbnFactory({
+        dictionary: {
+          ...common.dictionary,
+          ...english.dictionary,
+        },
+        graphs: common.adjacencyGraphs,
+        translations: english.translations,
+      })
+  );
+
+  return passwordStrengthEstimatorPromise;
+};
+
 /**
- * Calculate password strength based on various criteria
+ * Count Unicode code points rather than UTF-16 code units, as required by NIST SP 800-63B.
  */
-export const getPasswordStrength = (password: string): E_PASSWORD_STRENGTH => {
-  if (!password || password === "" || password.length <= 0) {
-    return E_PASSWORD_STRENGTH.EMPTY;
+export const getPasswordLength = (password: string): number => Array.from(password).length;
+
+/**
+ * Estimate password guessability and apply the password acceptance policy.
+ */
+export const getPasswordStrengthResult = async (
+  password: string,
+  userInputs: (string | number)[] = []
+): Promise<PasswordStrengthResult> => {
+  if (!password) {
+    return {
+      score: 0,
+      strength: E_PASSWORD_STRENGTH.EMPTY,
+      warning: null,
+      suggestions: [],
+    };
   }
 
-  if (password.length < 8) {
-    return E_PASSWORD_STRENGTH.LENGTH_NOT_VALID;
+  if (getPasswordLength(password) < PASSWORD_MIN_LENGTH) {
+    return {
+      score: 0,
+      strength: E_PASSWORD_STRENGTH.LENGTH_NOT_VALID,
+      warning: null,
+      suggestions: [],
+    };
   }
 
-  // Check all criteria
-  const hasUpperCase = /[A-Z]/.test(password);
-  const hasLowerCase = /[a-z]/.test(password);
-  const hasDigit = /[0-9]/.test(password);
-  const hasSpecialChar = /[!@#$%^&*()\-_+=\[\]{}|;:'",.<>?/]/.test(password);
+  const estimator = await getPasswordStrengthEstimator();
+  const result = estimator.check(password, userInputs);
 
-  if (hasUpperCase && hasLowerCase && hasDigit && hasSpecialChar) {
-    return E_PASSWORD_STRENGTH.STRENGTH_VALID;
-  }
+  const strength = result.score < 3 ? E_PASSWORD_STRENGTH.STRENGTH_NOT_VALID : E_PASSWORD_STRENGTH.STRENGTH_VALID;
 
-  return E_PASSWORD_STRENGTH.STRENGTH_NOT_VALID;
+  return {
+    score: result.score,
+    strength,
+    warning: result.feedback.warning,
+    suggestions: result.feedback.suggestions,
+  };
 };
 
 export type PasswordCriteria = {
@@ -54,31 +101,16 @@ export type PasswordCriteria = {
 /**
  * Get password criteria for validation display
  */
-export const getPasswordCriteria = (password: string): PasswordCriteria[] => [
+export const getPasswordCriteria = (password: string, strength: E_PASSWORD_STRENGTH): PasswordCriteria[] => [
   {
     key: "length",
-    label: "Min 8 characters",
-    isValid: password.length >= 8,
+    label: `At least ${PASSWORD_MIN_LENGTH} characters`,
+    isValid: getPasswordLength(password) >= PASSWORD_MIN_LENGTH,
   },
   {
-    key: "uppercase",
-    label: "Min 1 upper-case letter",
-    isValid: /[A-Z]/.test(password),
-  },
-  {
-    key: "lowercase",
-    label: "Min 1 lower-case letter",
-    isValid: /[a-z]/.test(password),
-  },
-  {
-    key: "number",
-    label: "Min 1 number",
-    isValid: /[0-9]/.test(password),
-  },
-  {
-    key: "special",
-    label: "Min 1 special character",
-    isValid: /[!@#$%^&*()\-_+=\[\]{}|;:'",.<>?/]/.test(password),
+    key: "guessability",
+    label: "Hard to guess",
+    isValid: strength === E_PASSWORD_STRENGTH.STRENGTH_VALID,
   },
 ];
 

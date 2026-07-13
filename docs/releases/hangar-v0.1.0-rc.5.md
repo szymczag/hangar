@@ -6,34 +6,57 @@ support now points to public GitHub issues, while sensitive vulnerability report
 point to GitHub private vulnerability reporting. No maintainer email address is
 presented as product support.
 
-Images and running applications now expose the exact Hangar source revision and
+`rc.5` also replaces password composition rules with a minimum of 15 Unicode
+code points and guessability-based validation. The browser meter and server-side
+password setters use zxcvbn dictionaries to reject common, predictable, and
+context-derived passwords without requiring digits, symbols, or mixed case.
+
+The frontend loads its canonical public origin from a no-store runtime
+configuration file, the backend trusts only the deployment's forwarded host,
+port, and TLS scheme settings, and bundled NGINX servers no longer disclose
+internal listener ports in redirects.
+
+Images and running applications expose the exact Hangar source revision and
 repository URL. Upstream Plane copyright, license, provenance, and compatibility
-identifiers remain intact. This release does not claim to remediate a specific
-security vulnerability, and the existing release-candidate production security
+identifiers remain intact. Existing release-candidate production security
 limitations still apply.
 
 ## Migrations and compatibility
 
-This release has no application database migration. It replaces public product
-copy, logos, favicons, social images, email branding, and translated Plane product
-references with Hangar equivalents. Internal `plane` modules, `@plane/*` packages,
-database contracts, and other compatibility-sensitive identifiers are unchanged.
+There is no database migration. This release replaces public product copy,
+logos, favicons, social images, email branding, and translated Plane product
+references with Hangar equivalents. Internal `plane` modules, `@plane/*`
+packages, database contracts, and other compatibility-sensitive identifiers are
+unchanged. New and reset passwords must satisfy the new 15-character and
+guessability policy; existing password hashes remain valid.
 
-The Helm chart adds validated branding metadata with Hangar defaults and passes
-the existing render-policy suite. Existing `rc.4` values remain compatible, so no
-operator configuration change is required. Normal upgrade precautions still
-apply: use `--wait-for-jobs` and take a coordinated PostgreSQL and object-storage
-backup before upgrading.
+The chart retains the validated branding metadata and Hangar defaults introduced
+with the rebrand. It also gains optional Gateway API resources for Envoy-style
+deployments. Set `gateway.enabled=true`, configure an existing Gateway parent or
+let the chart create one, and leave the NGINX Ingress disabled. The chart renders
+explicit routes for `/god-mode`, `/spaces`, `/live`, `/api`, and `/`, and
+normalizes the four application prefixes with relative-host 308 redirects.
+Existing Ingress deployments and `rc.4` values remain supported. Normal upgrade
+precautions still apply: use `--wait-for-jobs` and take a coordinated PostgreSQL
+and object-storage backup before upgrading.
 
 ## Known limitations and rollback
 
-Translations preserve the existing upstream wording and substitute the product
-identity; they have not all received native-speaker review. Some accurate Plane
-references intentionally remain in upstream attribution, license, source-history,
-and compatibility contexts. The branding regression check documents and enforces
-that boundary.
+The chart's runtime `config.js` supplies deployment-specific Vite URLs for Helm
+installs. Other packaging must either serve an equivalent file or build the
+static frontend images with all five `VITE_*_BASE_URL` variables set to the
+external origin.
 
-Rolling back application images and the Helm chart to `rc.4` restores the previous
-public branding and requires no reverse database migration. Helm rollback does not
-reverse external-service changes, and the broader production qualification gaps
+Gateway API redirect and request-header filters require a controller that
+implements the corresponding HTTPRoute features. Translations preserve the
+existing upstream wording and substitute the product identity; they have not all
+received native-speaker review. Some accurate Plane references intentionally
+remain in upstream attribution, license, source-history, and compatibility
+contexts. The branding regression check documents and enforces that boundary.
+
+Rolling back application images and the chart to `rc.4` restores the previous
+branding, password, and routing behavior. It does not invalidate passwords
+created under `rc.5`, require a reverse database migration, or reverse external
+Gateway resources managed outside the release. Helm rollback does not reverse
+external-service changes, and the broader production qualification gaps
 documented for earlier release candidates remain open.
