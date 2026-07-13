@@ -30,7 +30,7 @@ Create branch names that follow the convention `<type>/<work-item-id>-<short-des
 
 2. **Determine the work item ID**:
    - If the user gives one, use it
-   - If they reference a Plane work item (e.g., a URL or title), extract the ID
+   - If they reference a Hangar work item (e.g., a URL or title), extract the ID
    - If none exists, ask the user — don't invent one
 
 3. **Write the short description**:
@@ -63,5 +63,5 @@ perf/silo-1310-cache-workspace-lookup
 - Using underscores or camelCase instead of hyphens
 - Uppercasing the work item ID inside the branch name (it should be lowercase here, uppercased only when used as the PR title prefix)
 - Writing a long, narrative description — keep it scannable
-- Omitting the work item ID when one exists in Plane
+- Omitting the work item ID when one exists in Hangar
 - Using a type that won't match the eventual PR type (pick the type you'd use in the PR title)

@@ -7,14 +7,13 @@
 import { addons } from "storybook/manager-api";
 import { create } from "storybook/theming";
 
-const planeTheme = create({
+const hangarTheme = create({
   base: "dark",
-  brandTitle: "Plane UI",
-  brandUrl: "https://plane.so",
-  brandImage: "plane-lockup-light.svg",
+  brandTitle: "Hangar UI",
+  brandUrl: "https://github.com/szymczag/hangar",
   brandTarget: "_self",
 });
 
 addons.setConfig({
-  theme: planeTheme,
+  theme: hangarTheme,
 });

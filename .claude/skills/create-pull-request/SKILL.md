@@ -1,12 +1,12 @@
 ---
 name: create-pull-request
-description: Use when creating a pull request for the current branch — gathers branch context, generates a PR description following the repo's pull_request_template.md, and creates the PR with a Plane work item ID prefix in the title.
+description: Use when creating a pull request for the current branch — gathers branch context, generates a PR description following the repo's pull_request_template.md, and creates the PR with a Hangar work item ID prefix in the title.
 user_invocable: true
 ---
 
 # Create PR
 
-Create a pull request using the repo's PR template, a Plane work item ID as the title prefix, and a fully filled-out description based on the actual diff.
+Create a pull request using the repo's PR template, a Hangar work item ID as the title prefix, and a fully filled-out description based on the actual diff.
 
 ## Workflow
 

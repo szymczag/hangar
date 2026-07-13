@@ -82,7 +82,7 @@ WEBHOOK_ALLOWED_HOSTS = [
 # Webhook disallowed domains — comma-separated hostnames. Webhooks targeting
 # these domains or any of their subdomains are rejected (the request host is
 # always appended at validation time as a loop-back guard). Empty by default
-# for self-hosted deployments; set to e.g. "plane.so" to block specific domains.
+# for self-hosted deployments; set to e.g. "example.com" to block specific domains.
 _webhook_disallowed_domains_raw = os.environ.get("WEBHOOK_DISALLOWED_DOMAINS", "")
 WEBHOOK_DISALLOWED_DOMAINS = [
     _d.strip().rstrip(".").lower()

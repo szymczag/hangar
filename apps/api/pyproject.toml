@@ -1,7 +1,7 @@
 [project]
-name = "Plane"
+name = "Hangar"
 version = "0.24.0"
-description = "Open-source project management that unlocks customer value"
+description = "Open-source project management for self-hosted teams"
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.

@@ -55,6 +55,12 @@ default-deny NetworkPolicies.
 The chart does not install cluster infrastructure such as an ingress controller,
 cert-manager, CNI, CSI driver, external secret operator, or telemetry collector.
 
+Product help links are configured under `branding`. Documentation, issue, and
+private-security-report links default to the Hangar GitHub repository. Set
+`branding.termsUrl` and `branding.privacyUrl` only when the operator has applicable
+policies; empty values make the UI show the AGPL source notice instead of inventing
+vendor terms or a support relationship.
+
 ## Release packages and source checkouts
 
 Install only a published release package. Published packages contain immutable

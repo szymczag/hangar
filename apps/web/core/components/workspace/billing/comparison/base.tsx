@@ -10,7 +10,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { cn } from "@plane/utils";
 // constants
-import type { TPlanePlans } from "@/components/workspace/billing/comparison/plans";
+import type { THangarPlans } from "@/components/workspace/billing/comparison/plans";
 import { ComingSoonBadge, PLANE_PLANS, PLANS_LIST } from "@/components/workspace/billing/comparison/plans";
 // local imports
 import { PlanFeatureDetail } from "./feature-detail";
@@ -22,10 +22,10 @@ type TPlansComparisonBaseProps = {
   setIsCompareAllFeaturesSectionOpen: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export const shouldRenderPlanDetail = (planKey: TPlanePlans) => {
+export const shouldRenderPlanDetail = (planKey: THangarPlans) => {
   // Free plan is not required to be shown in the comparison
   if (planKey === "free") return false;
-  // Plane one plan is not longer available
+  // Hangar one plan is not longer available
   if (planKey === "one") return false;
   return true;
 };
@@ -35,10 +35,10 @@ export const PlansComparisonBase = observer(function PlansComparisonBase(props: 
   // plan details
   const { planDetails, planHighlights, planComparison } = PLANE_PLANS;
   const numberOfPlansToRender = Object.keys(planDetails).filter((planKey) =>
-    shouldRenderPlanDetail(planKey as TPlanePlans)
+    shouldRenderPlanDetail(planKey as THangarPlans)
   ).length;
 
-  const getSubscriptionType = (planKey: TPlanePlans) => planDetails[planKey].id;
+  const getSubscriptionType = (planKey: THangarPlans) => planDetails[planKey].id;
 
   return (
     <div className="horizontal-scrollbar scrollbar-sm size-full overflow-x-auto">
@@ -63,7 +63,7 @@ export const PlansComparisonBase = observer(function PlansComparisonBase(props: 
               <div className="col-span-1 p-3 text-body-sm-medium">Highlights</div>
               {Object.entries(planHighlights).map(
                 ([planKey, highlights]) =>
-                  shouldRenderPlanDetail(planKey as TPlanePlans) && (
+                  shouldRenderPlanDetail(planKey as THangarPlans) && (
                     <div key={planKey} className="col-span-1 p-3">
                       <ul className="list-disc space-y-1 text-body-xs-regular">
                         {highlights.map((highlight, index) => (

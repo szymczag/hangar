@@ -60,10 +60,10 @@ representative at an online or offline event.
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported privately to the project maintainer at
-[maciej@szymczak.at](mailto:maciej@szymczak.at).
-All complaints will be reviewed and investigated promptly and fairly.
+To report abusive, harassing, or otherwise unacceptable behavior, open a
+[GitHub issue](https://github.com/szymczag/hangar/issues) requesting maintainer
+contact. Do not include sensitive incident details in the public issue. Reports
+will be reviewed and handled as promptly and fairly as the project can provide.
 
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident.

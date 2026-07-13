@@ -1,0 +1,43 @@
+[
+  {
+    "pathPattern": "^(README\\.md|FORK\\.md|SECURITY\\.md|COPYRIGHT.*|LICENSE.*)$",
+    "rules": ["product-name", "plane-domain", "upstream-repository", "plane-email"],
+    "rationale": "License, attribution, fork, and upstream security references must remain factually accurate."
+  },
+  {
+    "pathPattern": "^(docs/|deployments/kubernetes/community/|charts/hangar/README\\.md)",
+    "rules": ["product-name", "plane-domain", "upstream-repository", "plane-email"],
+    "rationale": "Architecture and migration documentation may describe the upstream project historically."
+  },
+  {
+    "pathPattern": "^(CONTRIBUTING\\.md|UPSTREAM_BASE\\.json|\\.github/ISSUE_TEMPLATE/config\\.yaml|\\.github/scripts/release_(metadata|notes)\\.py)$",
+    "rules": ["product-name", "upstream-repository"],
+    "rationale": "Fork-routing guidance and release metadata must identify the approved upstream project accurately."
+  },
+  {
+    "pathPattern": "(^|/)tests?/|(^|/)__snapshots__/|\\.(test|spec)\\.",
+    "rules": ["product-name", "plane-domain", "upstream-repository", "plane-email"],
+    "rationale": "Compatibility fixtures and tests intentionally retain upstream-shaped sample data."
+  },
+  {
+    "pathPattern": "(^|/)AGENTS\\.md$|^apps/live/package\\.json$|^\\.github/workflows/feature-deployment\\.yml$",
+    "rules": ["product-name"],
+    "rationale": "Agent guidance, inherited package attribution, and the disabled upstream workflow are compatibility or attribution metadata."
+  },
+  {
+    "pathPattern": "^apps/api/plane/utils/email\\.py$",
+    "rules": ["plane-domain"],
+    "rationale": "The URL is part of an inherited proprietary license notice and must not be rewritten."
+  },
+  {
+    "pathPattern": "^apps/web/core/components/inbox/sidebar/inbox-list-item\\.tsx$",
+    "rules": ["plane-domain", "plane-email"],
+    "rationale": "Legacy intake-bot email recognition is a compatibility identifier, not a public support address."
+  },
+  {
+    "pathPattern": ".*",
+    "linePattern": "Copyright .*Plane Software|SPDX-(FileCopyrightText|License-Identifier):.*Plane|Plane Commercial License",
+    "rules": ["product-name"],
+    "rationale": "Copyright and license notices identify the upstream rightsholder and license."
+  }
+]

@@ -4,11 +4,11 @@
  * See the LICENSE file for details.
  */
 
-import { USER_TRACKER_ELEMENTS } from "@plane/constants";
+import { DOCUMENTATION_URL, ISSUE_TRACKER_URL, SOURCE_CODE_URL, USER_TRACKER_ELEMENTS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 // ui
 import { getButtonStyling } from "@plane/propel/button";
-import { PlaneLogo } from "@plane/propel/icons";
+import { HangarLogo } from "@plane/propel/icons";
 // helpers
 import { cn } from "@plane/utils";
 
@@ -18,7 +18,7 @@ export function ProductUpdatesFooter() {
     <div className="m-6 mb-4 flex flex-shrink-0 items-center justify-between gap-4">
       <div className="flex items-center gap-2">
         <a
-          href="https://go.plane.so/p-docs"
+          href={DOCUMENTATION_URL}
           target="_blank"
           className="text-13 text-secondary underline-offset-1 outline-none hover:text-primary hover:underline"
           rel="noreferrer"
@@ -30,7 +30,7 @@ export function ProductUpdatesFooter() {
         </svg>
         <a
           data-ph-element={USER_TRACKER_ELEMENTS.CHANGELOG_REDIRECTED}
-          href="https://go.plane.so/p-changelog"
+          href={`${SOURCE_CODE_URL}/releases`}
           target="_blank"
           className="text-13 text-secondary underline-offset-1 outline-none hover:text-primary hover:underline"
           rel="noreferrer"
@@ -41,27 +41,27 @@ export function ProductUpdatesFooter() {
           <circle cx={1} cy={1} r={1} />
         </svg>
         <a
-          href="mailto:support@plane.so"
+          href={ISSUE_TRACKER_URL}
           target="_blank"
           className="text-13 text-secondary underline-offset-1 outline-none hover:text-primary hover:underline"
           rel="noreferrer"
         >
-          {t("support")}
+          Open an issue
         </a>
         <svg viewBox="0 0 2 2" className="h-0.5 w-0.5 fill-current">
           <circle cx={1} cy={1} r={1} />
         </svg>
         <a
-          href="https://forum.plane.so"
+          href={SOURCE_CODE_URL}
           target="_blank"
           className="text-13 text-secondary underline-offset-1 outline-none hover:text-primary hover:underline"
           rel="noreferrer"
         >
-          Forum
+          Source
         </a>
       </div>
       <a
-        href="https://plane.so/pages"
+        href={SOURCE_CODE_URL}
         target="_blank"
         className={cn(
           getButtonStyling("secondary", "base"),
@@ -69,7 +69,7 @@ export function ProductUpdatesFooter() {
         )}
         rel="noreferrer"
       >
-        <PlaneLogo className="h-4 w-auto text-primary" />
+        <HangarLogo className="h-4 w-auto text-primary" />
         {t("powered_by_plane_pages")}
       </a>
     </div>

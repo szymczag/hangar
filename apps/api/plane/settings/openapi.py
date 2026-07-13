@@ -12,21 +12,20 @@ SPECTACULAR_SETTINGS = {
     # ========================================================================
     # Basic API Information
     # ========================================================================
-    "TITLE": "The Plane REST API",
+    "TITLE": "The Hangar REST API",
     "DESCRIPTION": (
-        "The Plane REST API\n\n"
-        "Visit our quick start guide and full API documentation at "
-        "[developers.plane.so](https://developers.plane.so/api-reference/introduction)."
+        "The Hangar REST API\n\n"
+        "See the Hangar repository for API documentation, deployment guidance, and source code: "
+        "[github.com/szymczag/hangar](https://github.com/szymczag/hangar)."
     ),
     "CONTACT": {
-        "name": "Plane",
-        "url": "https://plane.so",
-        "email": "support@plane.so",
+        "name": "Hangar",
+        "url": "https://github.com/szymczag/hangar/issues",
     },
     "VERSION": "0.0.1",
     "LICENSE": {
         "name": "GNU AGPLv3",
-        "url": "https://github.com/makeplane/plane/blob/preview/LICENSE.txt",
+        "url": "https://github.com/szymczag/hangar/blob/preview/LICENSE.txt",
     },
     # ========================================================================
     # Schema Generation Settings
@@ -45,7 +44,6 @@ SPECTACULAR_SETTINGS = {
     # ========================================================================
     "SERVERS": [
         {"url": "http://localhost:8000", "description": "Local"},
-        {"url": "https://api.plane.so", "description": "Production"},
     ],
     # ========================================================================
     # API Tag Definitions

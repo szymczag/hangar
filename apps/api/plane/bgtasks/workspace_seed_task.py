@@ -520,14 +520,15 @@ def workspace_seed(workspace_id: uuid.UUID) -> None:
         workspace = Workspace.objects.get(id=workspace_id)
 
         # Create a bot user for creating all the workspace data
+        bot_domain = urlparse(settings.WEB_URL or "http://hangar.local").hostname or "hangar.local"
         bot_user = User.objects.create(
             username=f"bot_user_{workspace.id}",
-            display_name="Plane",
-            first_name="Plane",
+            display_name="Hangar",
+            first_name="Hangar",
             last_name="",
             is_bot=True,
             bot_type=BotTypeEnum.WORKSPACE_SEED,
-            email=f"bot_user_{workspace.id}@{urlparse(settings.WEB_URL or 'https://plane.so').hostname or 'plane.so'}",
+            email=f"bot_user_{workspace.id}@{bot_domain}",
             password=make_password(uuid.uuid4().hex),
             is_password_autoset=True,
         )

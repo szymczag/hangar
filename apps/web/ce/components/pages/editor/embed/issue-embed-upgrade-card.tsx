@@ -5,6 +5,7 @@
  */
 
 // plane imports
+import { ISSUE_TRACKER_URL } from "@plane/constants";
 import { getButtonStyling } from "@plane/propel/button";
 import { cn } from "@plane/utils";
 // components
@@ -23,16 +24,16 @@ export function IssueEmbedUpgradeCard(props: any) {
       <div className="flex items-center gap-4">
         <ProIcon className="size-4 flex-shrink-0" />
         <p className="!text-14 text-secondary">
-          Embed and access issues in pages seamlessly, upgrade to Plane Pro now.
+          Issue embeds are not included in this Hangar build. Open a GitHub issue if you need this capability.
         </p>
       </div>
       <a
-        href="https://plane.so/pro"
+        href={ISSUE_TRACKER_URL}
         target="_blank"
         rel="noopener noreferrer"
         className={cn(getButtonStyling("primary", "base"), "no-underline")}
       >
-        Upgrade
+        Open an issue
       </a>
     </div>
   );

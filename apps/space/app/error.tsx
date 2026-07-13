@@ -5,6 +5,7 @@
  */
 
 // ui
+import { ISSUE_TRACKER_URL } from "@plane/constants";
 import { Button } from "@plane/propel/button";
 
 function ErrorPage() {
@@ -16,24 +17,21 @@ function ErrorPage() {
     <div className="grid h-screen place-items-center bg-surface-1 p-4">
       <div className="space-y-8 text-center">
         <div className="space-y-2">
-          <h3 className="text-16 font-semibold">Yikes! That doesn{"'"}t look good.</h3>
+          <h3 className="text-16 font-semibold">Hangar could not load this page</h3>
           <p className="mx-auto text-13 text-secondary md:w-1/2">
-            That crashed Plane, pun intended. No worries, though. Our engineers have been notified. If you have more
-            details, please write to{" "}
-            <a href="mailto:support@plane.so" className="text-accent-primary">
-              support@plane.so
-            </a>{" "}
-            or on our{" "}
-            <a href="https://forum.plane.so" target="_blank" className="text-accent-primary" rel="noopener noreferrer">
-              Forum
-            </a>
-            .
+            Refresh the page and try again. If the problem persists, open a GitHub issue with the steps that led here.
+            Do not include secrets or private workspace data.
           </p>
         </div>
         <div className="flex items-center justify-center gap-2">
           <Button variant="primary" size="lg" onClick={handleRetry}>
             Refresh
           </Button>
+          <a href={ISSUE_TRACKER_URL} target="_blank" rel="noreferrer">
+            <Button variant="secondary" size="lg">
+              Open a GitHub issue
+            </Button>
+          </a>
           {/* <Button variant="secondary" size="lg" onClick={() => {}}>
             Sign out
           </Button> */}

@@ -128,9 +128,9 @@ export function InstanceAIForm(props: IInstanceAIForm) {
         <div className="relative inline-flex items-center gap-1.5 rounded-sm border border-accent-subtle bg-accent-subtle px-4 py-2 text-caption-sm-regular text-accent-secondary">
           <Lightbulb className="size-4" />
           <div>
-            If you have a preferred AI models vendor, please get in{" "}
-            <a className="font-medium underline" href="https://plane.so/contact">
-              touch with us.
+            To request another AI model provider, open a{" "}
+            <a className="font-medium underline" href="https://github.com/szymczag/hangar/issues">
+              GitHub issue.
             </a>
           </div>
         </div>

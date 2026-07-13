@@ -1,10 +1,12 @@
-<br /><br />
+# Hangar Publish
 
-<p align="center">
-<a href="https://plane.so">
-  <img src="https://plane-marketing.s3.ap-south-1.amazonaws.com/plane-readme/plane_logo_.webp" alt="Plane Logo" width="70">
-</a>
-</p>
+Hangar Publish serves selected project views as read-only pages. It is part of the Hangar monorepo
+and uses the shared `@plane/*` compatibility packages internally.
 
-<h3 align="center"><b>Plane Space</b></h3>
-<p align="center"><b>Open-source, self-hosted project planning tool</b></p>
+Run it with the workspace development command:
+
+```bash
+pnpm dev
+```
+
+For help, open a [GitHub issue](https://github.com/szymczag/hangar/issues).

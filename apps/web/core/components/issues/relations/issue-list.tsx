@@ -9,7 +9,7 @@ import { observer } from "mobx-react";
 // plane imports
 import type { TIssue, TIssueServiceType } from "@plane/types";
 import { EIssueServiceType } from "@plane/types";
-// Plane-web imports
+// Hangar-web imports
 import type { TIssueRelationTypes } from "@plane/types";
 // local imports
 import { RelationIssueListItem } from "./issue-list-item";

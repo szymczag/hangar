@@ -8,7 +8,7 @@ import { useEffect } from "react";
 import { observer } from "mobx-react";
 import { Controller, useForm } from "react-hook-form";
 import { ArrowRight } from "lucide-react";
-// Plane Imports
+// Hangar Imports
 import { CYCLE_STATUS, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { ChevronRightIcon } from "@plane/propel/icons";
