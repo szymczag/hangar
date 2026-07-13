@@ -2,8 +2,8 @@ apiVersion: v2
 name: hangar
 description: Secure Kubernetes deployment for Hangar
 type: application
-version: 0.1.0-rc.2
-appVersion: v0.1.0-rc.2
+version: 0.1.0-rc.3
+appVersion: v0.1.0-rc.3
 kubeVersion: ">=1.30.0-0 <1.36.0-0"
 home: https://github.com/szymczag/hangar
 sources:

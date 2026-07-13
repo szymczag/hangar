@@ -582,6 +582,7 @@ jobs:
       - name: Stage release assets
         env:
           CHART_DIGEST: ${{ needs.chart.outputs.digest }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.setup.outputs.version }}
         run: |
           set -euo pipefail

@@ -358,8 +358,8 @@ without the leading `v`; `appVersion` contains the Hangar product version. For
 example:
 
 ```yaml
-version: 0.1.0-rc.2
-appVersion: v0.1.0-rc.2
+version: 0.1.0-rc.3
+appVersion: v0.1.0-rc.3
 ```
 
 Chart versions are immutable and coupled to the release defined in
@@ -386,7 +386,7 @@ global:
 api:
   image:
     repository: ghcr.io/szymczag/hangar-api
-    tag: v0.1.0-rc.2
+    tag: v0.1.0-rc.3
     digest: sha256:replace-with-release-digest
     pullPolicy: IfNotPresent
   replicas: 2
