@@ -74,6 +74,33 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         promotion_position = self.workflow.index("docker buildx imagetools create")
         self.assertLess(release_position, promotion_position)
 
+    def test_release_chart_is_immutable_and_qualified_before_publication(self):
+        self.assertIn(
+            'reject_existing_image_tag "ghcr.io/szymczag/charts/hangar:${VERSION#v}"',
+            self.workflow,
+        )
+        prepare_position = self.workflow.index(
+            'charts/hangar/scripts/prepare-release.sh "$chart_dir" "$VERSION"'
+        )
+        qualification_position = self.workflow.index(
+            'charts/hangar/tests/e2e-kind.sh "${{ steps.package_chart.outputs.chart_package }}"'
+        )
+        publication_position = self.workflow.index(
+            'helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts'
+        )
+        self.assertLess(prepare_position, qualification_position)
+        self.assertLess(qualification_position, publication_position)
+
+    def test_release_chart_is_signed_and_attached_as_evidence(self):
+        self.assertIn('cosign sign --yes "$chart_ref"', self.workflow)
+        self.assertIn('cosign verify \\', self.workflow)
+        self.assertIn(
+            'helm pull oci://ghcr.io/szymczag/charts/hangar --version "${VERSION#v}"',
+            self.workflow,
+        )
+        self.assertIn("chart-oci-digest.txt", self.workflow)
+        self.assertIn('> "${chart_package}.sha256"', self.workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
