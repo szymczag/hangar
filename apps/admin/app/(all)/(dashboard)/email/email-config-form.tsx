@@ -26,12 +26,11 @@ type IInstanceEmailForm = {
 
 type EmailFormValues = Record<TInstanceEmailConfigurationKeys, string>;
 
-type TEmailSecurityKeys = "EMAIL_USE_TLS" | "EMAIL_USE_SSL" | "NONE";
+type TEmailSecurityKeys = "EMAIL_USE_TLS" | "EMAIL_USE_SSL";
 
 const EMAIL_SECURITY_OPTIONS: { [key in TEmailSecurityKeys]: string } = {
   EMAIL_USE_TLS: "TLS",
   EMAIL_USE_SSL: "SSL",
-  NONE: "No email security",
 };
 
 export function InstanceEmailForm(props: IInstanceEmailForm) {
@@ -53,7 +52,7 @@ export function InstanceEmailForm(props: IInstanceEmailForm) {
       EMAIL_PORT: config["EMAIL_PORT"],
       EMAIL_HOST_USER: config["EMAIL_HOST_USER"],
       EMAIL_HOST_PASSWORD: config["EMAIL_HOST_PASSWORD"],
-      EMAIL_USE_TLS: config["EMAIL_USE_TLS"],
+      EMAIL_USE_TLS: config["EMAIL_USE_TLS"] === "1" || config["EMAIL_USE_SSL"] === "1" ? config["EMAIL_USE_TLS"] : "1",
       EMAIL_USE_SSL: config["EMAIL_USE_SSL"],
       EMAIL_FROM: config["EMAIL_FROM"],
       ENABLE_SMTP: config["ENABLE_SMTP"],
@@ -101,7 +100,7 @@ export function InstanceEmailForm(props: IInstanceEmailForm) {
       key: "EMAIL_HOST_PASSWORD",
       type: "password",
       label: "Password",
-      placeholder: "Password",
+      placeholder: "Leave blank to keep the current password",
       error: Boolean(errors.EMAIL_HOST_PASSWORD),
       required: false,
     },
@@ -109,6 +108,10 @@ export function InstanceEmailForm(props: IInstanceEmailForm) {
 
   const onSubmit = async (formData: EmailFormValues) => {
     const payload: Partial<EmailFormValues> = { ...formData, ENABLE_SMTP: "1" };
+    if (payload.EMAIL_USE_TLS !== "1" && payload.EMAIL_USE_SSL !== "1") {
+      payload.EMAIL_USE_TLS = "1";
+      payload.EMAIL_USE_SSL = "0";
+    }
 
     await updateInstanceConfigurations(payload)
       .then(() =>
@@ -126,7 +129,7 @@ export function InstanceEmailForm(props: IInstanceEmailForm) {
   const emailSecurityKey: TEmailSecurityKeys = useMemo(() => {
     if (useTLSValue === "1") return "EMAIL_USE_TLS";
     if (useSSLValue === "1") return "EMAIL_USE_SSL";
-    return "NONE";
+    return "EMAIL_USE_TLS";
   }, [useTLSValue, useSSLValue]);
 
   const handleEmailSecurityChange = (key: TEmailSecurityKeys) => {
@@ -136,10 +139,6 @@ export function InstanceEmailForm(props: IInstanceEmailForm) {
     }
     if (key === "EMAIL_USE_TLS") {
       setValue("EMAIL_USE_TLS", "1");
-      setValue("EMAIL_USE_SSL", "0");
-    }
-    if (key === "NONE") {
-      setValue("EMAIL_USE_TLS", "0");
       setValue("EMAIL_USE_SSL", "0");
     }
   };

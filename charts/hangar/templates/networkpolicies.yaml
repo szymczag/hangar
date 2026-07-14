@@ -99,7 +99,7 @@ spec:
     matchExpressions:
       - key: app.kubernetes.io/component
         operator: In
-        values: [space, live, api, worker, beat-worker, migrator]
+        values: [space, live, api, worker, beat-worker, mail-worker, migrator]
   policyTypes:
     - Egress
   egress:

@@ -10,6 +10,7 @@ from .configuration import (
     InstanceConfigurationEndpoint,
     DisableEmailFeatureEndpoint,
 )
+from .email_delivery import InstanceEmailDeliveryLogEndpoint, InstanceEmailSuppressionEndpoint
 
 
 from .admin import (

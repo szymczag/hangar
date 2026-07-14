@@ -1,15 +1,15 @@
 # Hangar Runner architecture and implementation plan
 
-Status: implementation in progress; the Phase 1 activation slice is implemented,
-but Runner execution is not implemented or supported.
+Status: the Phase 1 installation control-plane foundation is available on
+`preview`; Runner execution is not implemented or supported.
 
 Last reviewed: 2026-07-14.
 
 ## Implementation status
 
-The first Phase 1 slice is implemented on `feat/hangar-runner-foundation`; its
-security hardening is developed on the stacked
-`fix/hangar-runner-foundation-hardening` branch:
+The first Phase 1 slice landed through PRs
+[#46](https://github.com/szymczag/hangar/pull/46) and
+[#48](https://github.com/szymczag/hangar/pull/48):
 
 - `RUNNER_ENABLED` is a process-level operator gate and defaults to `0`; disabled
   endpoints fail closed with `404 runner_disabled`, and changing the setting

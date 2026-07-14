@@ -138,6 +138,13 @@ class EmailNotificationLog(BaseModel):
     # sent at
     processed_at = models.DateTimeField(null=True)
     sent_at = models.DateTimeField(null=True)
+    outbox = models.ForeignKey(
+        "db.EmailOutbox",
+        on_delete=models.SET_NULL,
+        related_name="notification_logs",
+        null=True,
+        blank=True,
+    )
     entity = models.CharField(max_length=200)
     old_value = models.CharField(max_length=300, blank=True, null=True)
     new_value = models.CharField(max_length=300, blank=True, null=True)

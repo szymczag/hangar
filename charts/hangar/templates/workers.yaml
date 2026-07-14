@@ -1,5 +1,9 @@
 {{- $root := . -}}
-{{- range $worker := list (dict "name" "worker" "values" .Values.worker "command" "./bin/docker-entrypoint-worker.sh") (dict "name" "beat-worker" "values" .Values.beatWorker "command" "./bin/docker-entrypoint-beat.sh") }}
+{{- $workers := list (dict "name" "worker" "values" .Values.worker "command" "./bin/docker-entrypoint-worker.sh") (dict "name" "beat-worker" "values" .Values.beatWorker "command" "./bin/docker-entrypoint-beat.sh") -}}
+{{- if .Values.mail.enabled -}}
+{{- $workers = append $workers (dict "name" "mail-worker" "values" .Values.mail.worker "command" "./bin/docker-entrypoint-worker.sh") -}}
+{{- end -}}
+{{- range $worker := $workers }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,7 +30,12 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      automountServiceAccountToken: false
+      automountServiceAccountToken: {{ if and (eq $worker.name "mail-worker") (or $root.Values.mail.serviceAccount.create $root.Values.mail.serviceAccount.name) }}true{{ else }}false{{ end }}
+      {{- if and (eq $worker.name "mail-worker") $root.Values.mail.serviceAccount.name }}
+      serviceAccountName: {{ $root.Values.mail.serviceAccount.name }}
+      {{- else if and (eq $worker.name "mail-worker") $root.Values.mail.serviceAccount.create }}
+      serviceAccountName: {{ include "hangar.fullname" $root }}-mail
+      {{- end }}
       enableServiceLinks: false
       terminationGracePeriodSeconds: {{ $root.Values.podDefaults.terminationGracePeriodSeconds }}
       securityContext:
@@ -51,6 +60,11 @@ spec:
             {{- include "hangar.celerySecretEnv" $root | nindent 12 }}
             {{- if eq $worker.name "worker" }}
             {{- include "hangar.objectStorageSecretEnv" $root | nindent 12 }}
+            {{- end }}
+            {{- if eq $worker.name "mail-worker" }}
+            {{- include "hangar.mailAWSSecretEnv" $root | nindent 12 }}
+            - name: HANGAR_WORKER_QUEUE
+              value: email
             {{- end }}
           startupProbe:
             exec:

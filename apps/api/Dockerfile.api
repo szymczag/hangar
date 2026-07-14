@@ -20,6 +20,7 @@ RUN apk add --no-cache --upgrade \
     "libpq" \
     "libxslt" \
     "xmlsec" \
+    "gnupg" \
     "ca-certificates" \
     "openssl"
 
@@ -56,9 +57,12 @@ COPY package.json package.json
 RUN apk --no-cache add "bash~=5.2"
 COPY ./bin ./bin/
 
-RUN mkdir -p /code/plane/logs
+RUN addgroup -g 10001 hangar && adduser -D -u 10001 -G hangar hangar
+RUN mkdir -p /code/plane/logs && chown -R hangar:hangar /code
 RUN chmod +x ./bin/*
-RUN chmod -R 777 /code
+RUN chmod -R u=rwX,g=rX,o=rX /code
+
+USER 10001:10001
 
 # Expose container port and run entry point script
 EXPOSE 8000

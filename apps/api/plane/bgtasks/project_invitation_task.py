@@ -3,24 +3,22 @@
 # See the LICENSE file for details.
 
 # Python imports
-import logging
-
 # Third party imports
 from celery import shared_task
+from django.db import OperationalError
 
 # Django imports
 # Third party imports
-from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 
 # Module imports
 from plane.db.models import Project, ProjectMemberInvite, User
-from plane.license.utils.instance_value import get_email_configuration
+from plane.mailer.service import enqueue_rendered_email
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 
 
-@shared_task
+@shared_task(autoretry_for=(OperationalError,), retry_backoff=True, retry_jitter=True, max_retries=5)
 def project_invitation(email, project_id, token, current_site, invitor):
     try:
         user = User.objects.get(email=invitor)
@@ -30,7 +28,7 @@ def project_invitation(email, project_id, token, current_site, invitor):
         relativelink = f"/project-invitations/?invitation_id={project_member_invite.id}&email={email}&slug={project.workspace.slug}&project_id={str(project_id)}"  # noqa: E501
         abs_url = current_site + relativelink
 
-        subject = f"{user.first_name or user.display_name or user.email} invited you to join {project.name} on Hangar"
+        subject = "You have a Hangar project invitation"
 
         context = {
             "email": email,
@@ -47,40 +45,21 @@ def project_invitation(email, project_id, token, current_site, invitor):
         project_member_invite.message = text_content
         project_member_invite.save()
 
-        # Configure email connection from the database
-        (
-            EMAIL_HOST,
-            EMAIL_HOST_USER,
-            EMAIL_HOST_PASSWORD,
-            EMAIL_PORT,
-            EMAIL_USE_TLS,
-            EMAIL_USE_SSL,
-            EMAIL_FROM,
-        ) = get_email_configuration()
-
-        connection = get_connection(
-            host=EMAIL_HOST,
-            port=int(EMAIL_PORT),
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_tls=EMAIL_USE_TLS == "1",
-            use_ssl=EMAIL_USE_SSL == "1",
-        )
-
-        msg = EmailMultiAlternatives(
+        recipient = User.objects.filter(email__iexact=email).first()
+        enqueue_rendered_email(
+            recipient_email=email,
+            recipient_user=recipient,
+            template_key="invitation.project_known" if recipient else "invitation.project",
             subject=subject,
-            body=text_content,
-            from_email=EMAIL_FROM,
-            to=[email],
-            connection=connection,
+            text_body=text_content,
+            html_body=html_content,
+            idempotency_key=f"project-invitation:{project_member_invite.id}",
         )
-
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
-        logging.getLogger("plane.worker").info("Email sent successfully.")
         return
     except (Project.DoesNotExist, ProjectMemberInvite.DoesNotExist):
         return
     except Exception as e:
         log_exception(e)
+        if isinstance(e, OperationalError):
+            raise
         return
