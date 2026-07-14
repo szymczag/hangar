@@ -2,11 +2,66 @@
 
 ## Scope and assessment boundary
 
-This document maps the security-relevant architecture of the Hangar fork at commit `231f8799dd` on the Runner hardening line. It covers the browser applications, Django APIs, Live collaboration service, asynchronous workers, persistence services, deployment manifests, external integrations, and the implemented Plane Runner installation foundation.
+This document maps the security-relevant architecture of the Hangar fork at commit `18873d09afbd14dba678184e4ef058f726f60504` on `origin/preview`. It covers the browser applications, Django APIs, Live collaboration service, asynchronous workers, persistence services, deployment manifests, external integrations, and the implemented Hangar Runner installation foundation.
+
+It also analyzes the two commits between Hangar's recorded upstream base, `d3d3de44cf13991025783c598d8b34229fb47729`, and the fetched `upstream/preview` tip, `bed58d9b17dbc8b221af9cde0cec9cec299d183b`, as of 2026-07-15. The incoming commits were inspected and rehearsed with a no-commit merge. They are not incorporated into the assessed Hangar revision or this analysis branch.
 
 This is the reconnaissance phase of a static application security assessment. It records reachable surfaces, data flows, privileges, trust boundaries, and controls visible in source. It does not test exploitability or prove the absence of vulnerabilities. Vulnerability-specific SAST phases and runtime validation are required for that conclusion.
 
 The current Runner scope is especially important: the repository implements a workspace-scoped installation lifecycle and audit trail, but it does not yet implement job dispatch, source checkout, build execution, a runner agent, sandboxing, artifact collection, or a runner-facing credential protocol. Consequently, no untrusted Runner workload is executable through the reviewed code.
+
+## Incoming upstream delta and security relevance
+
+| Order | Upstream commit | Scope | Security assessment | Integration recommendation |
+| ----- | --------------- | ----- | ------------------- | -------------------------- |
+| 1 | `e63f0c3b3404d669ae05dd9050aab72292f87e5c` — `[WEB-8066] fix: scope workspace asset get/patch/delete to project membership (#9372)` | Changes `WorkspaceFileAssetEndpoint` and adds a five-case contract test module. | Security remediation. Workspace authorization alone permits an active workspace member or guest to address a project-bound asset by UUID. The change adds an active `ProjectMember` check before `GET`, `PATCH`, and `DELETE`; it deliberately exempts assets with no project. Denied `GET` requests are tested to ensure that no presigned download URL is minted. | Preserve the upstream commit and test behavior without semantic modification. Land it before the admin cleanup, following upstream order. |
+| 2 | `bed58d9b17dbc8b221af9cde0cec9cec299d183b` — `chore: clean up React Doctor warnings in admin app (#9418)` | Updates 31 admin/lockfile paths, removes six unused compatibility/components/helpers, extracts the store context, removes three unused dependencies, and improves React purity and accessibility. | Not a direct vulnerability fix. It affects the instance-admin and authentication UI, so incorrect conflict resolution could still weaken or regress privileged configuration and sign-in behavior. The extracted context now defaults to `undefined`, making existing provider guards effective. | Merge after the asset fix. Accept structural cleanup and accessibility changes while retaining Hangar branding, Google-auth policy, password policy, and telemetry semantics. |
+
+The first commit is a follow-up in the asset object-authorization area previously covered by the published cross-workspace asset advisory `GHSA-qw87-v5w3-6vxx` / `CVE-2026-46558`. This reconnaissance treats the upstream change as a known remediation. It does not independently claim that every asset route or entity type is secure.
+
+### Asset authorization delta
+
+The current `WorkspaceFileAssetEndpoint` detail methods first require an authenticated active workspace Admin, Member, or Guest and then load the asset by both `asset_id` and workspace slug. A project-bound asset can represent an issue attachment, issue description, comment description, or page description. Before the incoming change, those detail methods do not independently establish that the requester belongs to the asset's project.
+
+The upstream helper keeps the workspace check as the first tenant boundary and adds a second object-scope decision:
+
+1. Load the asset only inside the authorized workspace.
+2. If `asset.project_id` is null, treat it as a workspace-level entity and retain workspace-member access.
+3. Otherwise require an active `ProjectMember` row matching the request user, asset workspace, and asset project.
+4. Return `403` before mutating metadata, soft-deleting the asset, or asking storage for a presigned URL.
+
+The accompanying contract tests cover non-project-member denial for all three detail operations, positive project-member download, the workspace-level exemption, state preservation after denied mutations, and absence of storage signing after a denied download. The change introduces no database migration or external configuration change.
+
+### Merge rehearsal and conflict plan
+
+A reversible `git merge --no-commit --no-ff upstream/preview` rehearsal against the assessed Hangar revision produced four conflicts:
+
+| Conflict | Cause | Planned resolution |
+| -------- | ----- | ------------------ |
+| `apps/admin/components/common/page-header.tsx` | Hangar changed branding while upstream deleted the now-unused component. | Accept the upstream deletion. No imports or symbol references remain. |
+| `apps/admin/components/instance/instance-not-ready.tsx` | Hangar changed branding while upstream deleted the now-unused component. | Accept the upstream deletion. No imports or symbol references remain. |
+| `apps/admin/components/instance/loading.tsx` | Hangar changed the loading logo while upstream deleted the now-unused component. | Accept the upstream deletion. No imports or symbol references remain. |
+| `apps/admin/components/instance/setup-form.tsx` | Hangar replaced vendor telemetry text with disabled-by-default, operator-configured OTLP wording; upstream edits the same block while adding accessibility fixes elsewhere. | Keep Hangar's telemetry wording and behavior. Accept upstream `aria-label` changes for both password visibility controls. |
+
+The other 10 overlapping paths merge textually. They still require semantic review because clean textual merges are not proof of preserved behavior:
+
+- Keep Hangar's Google authentication mode, allowed-domain handling, Spaces callback, and product wording while accepting hoisted static configuration and link labels.
+- Keep existing Gitea, GitHub, and GitLab fork-specific configuration and branding while accepting accessibility and React-purity changes.
+- Preserve Hangar sign-in, sidebar, setup, and AI configuration behavior while accepting native-button, stable-key, and accessibility cleanup.
+- Accept the new `providers/store-context.ts` split and updated store hooks as one atomic refactor.
+- Regenerate or frozen-install the lockfile and confirm Hangar's existing dependency changes remain while the unused admin dependencies `@tanstack/react-virtual`, `@tanstack/virtual-core`, and `axios` disappear.
+
+Use a normal merge of `upstream/preview` into a dedicated sync branch rather than cherry-picking. This preserves the exact upstream ancestry and both-commit ordering, makes the recorded upstream base truthful, and avoids replaying the same commits during the next sync. After resolving and verifying the merge, update `UPSTREAM_BASE.json` to revision `bed58d9b17dbc8b221af9cde0cec9cec299d183b` with the actual synchronization date. An emergency security-only release could take the first commit alone, but the normal synchronization should merge both commits.
+
+The merge should be accepted only after:
+
+1. The new API contract test passes in the repository's isolated Docker test stack, together with the existing asset authorization tests.
+2. Admin formatting, lint, type checking, and build pass after a frozen lockfile install.
+3. Targeted manual review confirms instance setup, telemetry defaults/copy, password controls, and every configured authentication provider.
+4. Branding and brand-asset checks pass, and no unresolved conflict markers or obsolete imports remain.
+5. `UPSTREAM_BASE.json`, the merge commit, and the pull-request base all identify the same upstream synchronization boundary.
+
+Because the security change has no schema or configuration dependency, it can be deployed with the API application and workers in the usual rollout. Rolling back that application commit would restore the known authorization gap, so a forward correction is preferable if deployment validation finds a regression.
 
 ## Technology Stack
 
@@ -134,6 +189,8 @@ The Live service also receives authenticated PDF-export requests using the brows
 
 File bytes leave the Django process but remain coupled to authorization metadata in PostgreSQL. Object-store credentials permit broad bucket access and are injected only into API/worker workloads that need them in the Helm profile.
 
+The V2 workspace asset detail route is a particularly important two-level authorization surface. `FileAsset` rows always carry an object identifier and may carry both a workspace and project relationship. The workspace slug prevents cross-workspace lookup, while the incoming upstream change adds the missing project-membership decision for project-bound detail operations. The database row is checked before the storage adapter signs a download, so denial occurs on the application side of the object-storage trust boundary.
+
 ### 6. Webhook and background-task flow
 
 1. An authorized workspace user configures an outbound webhook and event selection.
@@ -194,7 +251,7 @@ Authentication endpoints, public Spaces, intake routes, public assets, health ch
 
 ### Tenant and project boundary
 
-Workspace membership is the primary isolation control. Most application operations resolve a workspace slug plus active membership; project-level operations add project membership and role checks. Admin, Member, and Guest/Viewer privileges differ for mutations. Identifiers in paths are not sufficient authority by themselves. Runner is workspace-scoped and restricted to active workspace Admins.
+Workspace membership is the primary isolation control. Most application operations resolve a workspace slug plus active membership; project-level operations add project membership and role checks. Admin, Member, and Guest/Viewer privileges differ for mutations. Identifiers in paths are not sufficient authority by themselves. Assets illustrate why both scopes matter: a UUID and a valid workspace membership do not by themselves authorize access to a project-bound object. Runner is workspace-scoped and restricted to active workspace Admins.
 
 ### Application-service boundary
 
@@ -235,7 +292,7 @@ The implemented Runner boundary ends at installation state and audit evidence in
 | SAML assertions, IdP metadata, certificates, OIDC client secrets | Request/session state and instance configuration                 | SSO initiation/callback/metadata endpoints                                   | Parsed and validated by dedicated provider modules; configuration must remain operator-controlled                                               |
 | User personal data                                               | PostgreSQL                                                       | App/API/admin/notification flows                                             | Email, names, profile, IP/user-agent login history, locale, billing/profile metadata; scoped through identity and tenant permissions            |
 | Workspace/project/work-item content                              | PostgreSQL                                                       | Authenticated APIs, public Spaces, Live, exports, webhooks                   | Workspace/project membership controls; selected records may intentionally cross public/share/integration boundaries                             |
-| Uploaded files and exports                                       | S3-compatible object storage plus PostgreSQL metadata            | Asset endpoints, presigned operations, public/static variants, cleanup tasks | Workspace/user key prefixes, file-size/content-type conditions, time-bounded URLs, application authorization metadata                           |
+| Uploaded files and exports                                       | S3-compatible object storage plus PostgreSQL metadata            | Asset endpoints, presigned operations, public/static variants, cleanup tasks | Workspace/user key prefixes, file-size/content-type conditions, time-bounded URLs, and workspace/project authorization metadata; the incoming remediation adds project membership to V2 detail operations |
 | Webhook signing secrets                                          | PostgreSQL `webhooks`                                            | Webhook configuration and Celery delivery                                    | Used to HMAC-sign outbound payloads; regeneration endpoint exists; secret confidentiality depends on DB/API controls                            |
 | Webhook request/response logs                                    | PostgreSQL `webhook_logs`                                        | Workspace webhook log API and cleanup tasks                                  | May contain delivered tenant payloads and external response data; scheduled retention cleanup is configured                                     |
 | Integration and Slack credentials                                | PostgreSQL integration/account tables                            | Integration setup, bot API tokens, workers                                   | Includes API tokens, access tokens, webhook URLs/secrets, and provider metadata; grants external and tenant access                              |
@@ -253,4 +310,11 @@ The reconnaissance confirms that the current Runner installation control plane c
 
 At the platform level, the source also contains layered identity/permission checks, server-side sessions and API-key authentication, request throttling and size limits, signed object-storage operations, outbound-fetch policy utilities, secret separation, hardened Kubernetes pod defaults, and optional default-deny NetworkPolicies.
 
-These observations confirm control presence and architectural placement, not their universal correctness or resistance to bypass. Security cannot be confirmed as an absence of vulnerabilities from architecture reconnaissance alone. The next assessment phases should target authorization/IDOR and missing-auth coverage, authentication and token lifecycles, SSRF in webhooks/SSO/assets, file upload and object authorization, XSS in rich content/public Spaces, SQL/injection and execution sinks, secrets exposure, and Runner-specific business-logic races before any execution plane is introduced.
+These observations confirm control presence and architectural placement, not their universal correctness or resistance to bypass. Security cannot be confirmed as an absence of vulnerabilities from architecture reconnaissance alone. After the upstream merge, the highest-priority focused phase is authorization/IDOR analysis of every asset route and entity type, followed by missing-auth coverage. Subsequent phases should cover authentication and token lifecycles, SSRF in webhooks/SSO/assets, file upload and object authorization, XSS in rich content/public Spaces, SQL/injection and execution sinks, secrets exposure, and Runner-specific business-logic races before any execution plane is introduced.
+
+## Assessment references
+
+- Recorded Hangar upstream base: `UPSTREAM_BASE.json` at `d3d3de44cf13991025783c598d8b34229fb47729`.
+- Prospective upstream synchronization target: `bed58d9b17dbc8b221af9cde0cec9cec299d183b`.
+- Security remediation commit: `e63f0c3b3404d669ae05dd9050aab72292f87e5c`.
+- Published upstream asset advisory identifiers: `GHSA-qw87-v5w3-6vxx` / `CVE-2026-46558`.
