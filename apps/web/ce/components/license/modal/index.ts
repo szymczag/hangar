@@ -4,4 +4,4 @@
  * See the LICENSE file for details.
  */
 
-export * from "./upgrade-modal";
+export * from "./community-modal";
