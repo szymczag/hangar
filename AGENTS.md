@@ -15,13 +15,22 @@
 - Use one Git worktree per active agent session. Two sessions MUST NOT share or modify the same working directory.
 - Keep the primary checkout clean and use it only to fetch, inspect, and create task worktrees. Do not implement features in the primary checkout while parallel sessions are running.
 - Before starting a session, run `git worktree list` and verify that its branch and directory are not owned by another active session.
-- Create each independent task worktree from the latest intended base, for example: `git worktree add ../hangar-worktrees/<task> -b <type>/<topic> origin/<base>`.
+- Create each independent task worktree from the latest intended base, for example: `git worktree add .local/worktrees/<task> -b <type>/<topic> origin/<base>`.
 - Start the agent with its working directory set to the task worktree. All edits, tests, commits, pushes, and PR operations for that task must remain in that worktree.
 - Do not switch branches, stash changes, clean files, reset state, or remove a worktree owned by another session.
 - Give concurrent Docker Compose stacks a unique `COMPOSE_PROJECT_NAME`. Use separate host ports, `.env` files, databases, caches, and other mutable runtime state when those resources are exposed outside the Compose project.
 - When one task depends on another, use stacked branches and PRs: create the dependent branch from the prerequisite branch, target its PR at the prerequisite branch, then rebase and retarget it after the prerequisite merges.
 - Create independent tasks directly from the shared base branch. Resolve migration numbers and other merge-order conflicts by rebasing the later PR before merge.
 - Remove a task worktree only after its session has stopped and its work is committed, preserved, or merged. Then run `git worktree prune` to clean stale metadata.
+
+### Local Workstation State
+
+- Keep workstation-only instructions, linked worktrees, rescue artifacts, and other local state under `.local/`. Git ignores this directory; never force-add or commit its contents.
+- Before starting a task, identify the primary checkout from the first `worktree` entry returned by `git worktree list --porcelain`. If `<primary-checkout>/.local/AGENTS-addon.md` exists, read it before making changes.
+- Treat the local addendum as supplemental instructions. It must not weaken or override this file, repository security requirements, or higher-priority instructions.
+- Store active linked worktrees under `<primary-checkout>/.local/worktrees/<task>` instead of `/tmp` or an untracked sibling directory.
+- Preserve uncertain local material under `<primary-checkout>/.local/rescue/` before cleaning a checkout or removing a worktree.
+- Remember that Git ignore rules are not a security boundary. Protect sensitive local files with appropriate filesystem permissions and never store production credentials in rescue artifacts.
 
 ## Commands
 
