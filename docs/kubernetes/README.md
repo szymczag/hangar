@@ -42,6 +42,27 @@ The `0.1.0-rc.7` qualification boundary is:
 The chart does not install an ingress controller, cert-manager, a CNI, a CSI
 driver, an external secret operator, or observability infrastructure.
 
+## Secure email delivery
+
+Secure email delivery is disabled by default. When `mail.enabled=true`, the
+chart adds a dedicated `mail-worker` for Amazon SES API delivery, feedback
+processing, audit receipts, suppression handling, and optional OpenPGP
+encryption. The workload is isolated from the general workers and is the only
+application pod that receives the mail service account or optional SES and SQS
+credentials.
+
+Before enabling it, an operator must provide a verified SES identity, DKIM and
+DMARC DNS records, production SES access, configuration sets, an SNS topic, an
+SQS queue, least-privilege IAM, and the `hangar-mail` Secret. The chart does not
+create or validate those AWS resources.
+
+Use the [configuration reference](configuration.md#secure-email-delivery) for
+the Helm values and Secret contract. Follow the
+[Amazon SES operations guide](../aws-ses-email-operations.md) for provisioning,
+rollout, deliverability monitoring, suppression recovery, and incidents. The
+[email security model](../email-delivery-and-openpgp.md) explains data handling,
+retention, and OpenPGP policy.
+
 ## Release identity
 
 The product, chart, and Git identifiers are deliberately different:

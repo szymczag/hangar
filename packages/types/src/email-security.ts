@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026-present Maciej Szymczak and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
 /** Public metadata for a user's OpenPGP email key. The certificate is never returned. */
 export interface IOpenPGPEmailKey {
   id: string;
