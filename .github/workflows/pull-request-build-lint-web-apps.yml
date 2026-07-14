@@ -2,6 +2,9 @@ name: Build and lint web apps
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - "preview"
   pull_request:
     branches:
       - "preview"
@@ -21,10 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: |
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.requested_reviewers != null
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false &&
+       github.event.pull_request.requested_reviewers != null)
     env:
-      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
       TURBO_SCM_HEAD: ${{ github.sha }}
     steps:
       - name: Checkout code
@@ -55,7 +59,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check formatting
-        run: pnpm turbo run check:format --affected
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:format --affected
+          else
+            pnpm turbo run check:format
+          fi
 
   # Build packages - required for lint and type checks
   build:
@@ -63,10 +72,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: |
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.requested_reviewers != null
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false &&
+       github.event.pull_request.requested_reviewers != null)
     env:
-      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
       TURBO_SCM_HEAD: ${{ github.sha }}
       NODE_OPTIONS: "--max-old-space-size=4096"
     steps:
@@ -98,22 +108,27 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: .turbo
-          key: turbo-${{ runner.os }}-${{ github.event.pull_request.base.sha }}-${{ github.sha }}
+          key: turbo-${{ runner.os }}-${{ env.TURBO_SCM_BASE }}-${{ env.TURBO_SCM_HEAD }}
           restore-keys: |
-            turbo-${{ runner.os }}-${{ github.event.pull_request.base.sha }}-
+            turbo-${{ runner.os }}-${{ env.TURBO_SCM_BASE }}-
             turbo-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm turbo run build --affected
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run build --affected
+          else
+            pnpm turbo run build
+          fi
 
       - name: Save Turbo cache
         uses: actions/cache/save@v5
         with:
           path: .turbo
-          key: turbo-${{ runner.os }}-${{ github.event.pull_request.base.sha }}-${{ github.sha }}
+          key: turbo-${{ runner.os }}-${{ env.TURBO_SCM_BASE }}-${{ env.TURBO_SCM_HEAD }}
 
   # Lint check - no build dependency, OxLint is a standalone Rust binary
   check-lint:
@@ -121,10 +136,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: |
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.requested_reviewers != null
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false &&
+       github.event.pull_request.requested_reviewers != null)
     env:
-      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
       TURBO_SCM_HEAD: ${{ github.sha }}
     steps:
       - name: Checkout code
@@ -155,7 +171,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run check:lint
-        run: pnpm turbo run check:lint --affected
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:lint --affected
+          else
+            pnpm turbo run check:lint
+          fi
 
   # Type check depends on build artifacts
   check-types:
@@ -164,7 +185,7 @@ jobs:
     needs: build
     timeout-minutes: 15
     env:
-      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
       TURBO_SCM_HEAD: ${{ github.sha }}
       NODE_OPTIONS: "--max-old-space-size=4096"
     steps:
@@ -196,10 +217,15 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: .turbo
-          key: turbo-${{ runner.os }}-${{ github.event.pull_request.base.sha }}-${{ github.sha }}
+          key: turbo-${{ runner.os }}-${{ env.TURBO_SCM_BASE }}-${{ env.TURBO_SCM_HEAD }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Run check:types
-        run: pnpm turbo run check:types --affected
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:types --affected
+          else
+            pnpm turbo run check:types
+          fi
