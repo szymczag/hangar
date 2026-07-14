@@ -35,12 +35,15 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | OIDC administration and sign-in UI            | Available on `preview` | [#4](https://github.com/szymczag/hangar/pull/4)       |
 | SAML 2.0 backend                              | Available on `preview` | [#5](https://github.com/szymczag/hangar/pull/5)       |
 | SAML 2.0 administration and sign-in UI        | Available on `preview` | [#6](https://github.com/szymczag/hangar/pull/6)       |
+| Immutable federated SSO identity binding      | Available on `preview` | [#45](https://github.com/szymczag/hangar/pull/45)     |
 | Epics backend                                 | Available on `preview` | [#7](https://github.com/szymczag/hangar/pull/7)       |
 | Epics UI and required API surfaces            | Available on `preview` | [#9](https://github.com/szymczag/hangar/pull/9)       |
 | Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10)     |
 | Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11)     |
 | Time tracking and worklogs backend            | Available on `preview` | [#12](https://github.com/szymczag/hangar/pull/12)     |
 | Time tracking and worklogs UI                 | Available on `preview` | [#13](https://github.com/szymczag/hangar/pull/13)     |
+| Runner installation control-plane foundation  | Available on `preview` | [#46](https://github.com/szymczag/hangar/pull/46)     |
+| Secure SES delivery and optional OpenPGP      | Available on `preview` | [#44](https://github.com/szymczag/hangar/pull/44)     |
 | Helm chart evaluation profile                 | Public prerelease      | [Kubernetes documentation](docs/kubernetes/README.md) |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
@@ -50,10 +53,23 @@ the table marks them as available.
 ## Deployment
 
 - [Docker deployment](deployments/cli/community/README.md)
-- [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.4`
+- [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.7`
   evaluation release; production support gates remain open.
 - [Amazon SES, deliverability, and OpenPGP email](docs/aws-ses-email-operations.md)
   — secure transactional-email configuration and operations.
+
+## Feature and security documentation
+
+- [Hangar Runner architecture and implementation plan](docs/hangar-runner-architecture.md)
+  — implemented installation controls, security boundaries, and the execution
+  work that remains unsupported.
+- [Federated SSO security and migration](docs/federated-sso-security.md) — configure
+  Google, OIDC, and SAML identity binding; migrate existing users; and verify a
+  rollout without email-based account takeover.
+- [Email delivery and OpenPGP](docs/email-delivery-and-openpgp.md) — user-facing
+  behavior, data handling, threat boundaries, and verification guidance.
+- [Email delivery technical reference](docs/email-technical-implementation-plan.md)
+  — maintainer architecture, invariants, retention, and release evidence.
 
 The inherited Plane Community chart is not a Hangar release and is not supported
 for new Hangar installations.
