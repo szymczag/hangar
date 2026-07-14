@@ -53,6 +53,35 @@ deliverability monitoring, suppression recovery, and incident procedures.
 
 ## Upgrade a release
 
+### Upgrade from `rc.7` to `rc.8`
+
+Treat this upgrade as data-affecting. Before rendering the target release:
+
+1. take a coordinated PostgreSQL and object-storage backup and prove it can be
+   restored into an isolated environment;
+2. disable OIDC and SAML login and prepare authoritative stable-subject mappings
+   according to the
+   [federated SSO migration guide](../federated-sso-security.md); apply and review
+   the mappings after the schema migration and before re-enabling either provider;
+   do not infer bindings from matching email addresses;
+3. if secure email will be enabled, complete the SES, SQS, DNS, IAM, Secret, and
+   retention prerequisites in the
+   [SES operations guide](../aws-ses-email-operations.md); and
+4. if Todoist imports will be enabled, configure and verify the distinct private
+   import bucket described by the [configuration reference](configuration.md).
+
+The migration Job applies database migrations `db.0122` through `db.0124`,
+`license.0008`, and `ext.0004` through `ext.0006`. Runner hardening intentionally
+stops if existing installation or audit records lack required actor, target, or
+consent evidence. Investigate and preserve that evidence; do not delete records
+merely to make the migration pass.
+
+After the upgrade, verify ordinary and federated authentication, representative
+project writes, uploads, background work, and any enabled email or import path.
+Application rollback to `rc.7` is not qualified after these migrations. Restore
+the coordinated pre-upgrade recovery point into a clean environment if a return
+to `rc.7` is required.
+
 ### 1. Read release-specific constraints
 
 Read the target GitHub Release and the

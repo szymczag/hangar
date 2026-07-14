@@ -7,7 +7,7 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0-rc.7` (`appVersion: v0.1.0-rc.7`). Its
+The latest published chart is `0.1.0-rc.8` (`appVersion: v0.1.0-rc.8`). Its
 evaluation profile is live-qualified on AMD64. It is a prerelease and is not yet
 supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
@@ -27,11 +27,11 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.7
+  --version 0.1.0-rc.8
 ```
 
 Do not use `0.1.0-rc.1` or `0.1.0-rc.2`; those immutable versions were consumed
-by incomplete release attempts. `0.1.0-rc.6` is the previous complete release.
+by incomplete release attempts. `0.1.0-rc.7` is the previous complete release.
 
 ## Deployment profiles
 
@@ -84,8 +84,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0-rc.7` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.7)
+Release `0.1.0-rc.8` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.8)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
