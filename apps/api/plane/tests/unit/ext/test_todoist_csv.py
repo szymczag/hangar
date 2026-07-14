@@ -198,6 +198,14 @@ class TestTodoistCsvParser:
             (b"TYPE,TYPE,CONTENT,DESCRIPTION,PRIORITY,INDENT\ntask,task,Example,,4,1\n", "duplicate_columns"),
             (b"x" * (MAX_FILE_BYTES + 1), "file_too_large"),
         ],
+        ids=[
+            "empty-file",
+            "invalid-encoding",
+            "nul-byte",
+            "missing-columns",
+            "duplicate-columns",
+            "file-too-large",
+        ],
     )
     def test_rejects_invalid_files(self, content, code):
         with pytest.raises(TodoistImportParseError) as exc_info:
