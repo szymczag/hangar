@@ -44,7 +44,9 @@ export type TInstanceAuthenticationMethodKeys =
 export type TInstanceGoogleAuthenticationConfigurationKeys =
   | "GOOGLE_CLIENT_ID"
   | "GOOGLE_CLIENT_SECRET"
-  | "ENABLE_GOOGLE_SYNC";
+  | "ENABLE_GOOGLE_SYNC"
+  | "GOOGLE_AUTH_MODE"
+  | "GOOGLE_WORKSPACE_DOMAINS";
 
 export type TInstanceGithubAuthenticationConfigurationKeys =
   | "GITHUB_CLIENT_ID"
@@ -69,8 +71,7 @@ export type TInstanceOIDCAuthenticationConfigurationKeys =
   | "OIDC_ISSUER"
   | "OIDC_CLIENT_ID"
   | "OIDC_CLIENT_SECRET"
-  | "OIDC_PROVIDER_NAME"
-  | "OIDC_ALLOW_UNVERIFIED_EMAIL";
+  | "OIDC_PROVIDER_NAME";
 
 // Fork (see FORK.md): SAML configuration keys
 export type TInstanceSAMLAuthenticationConfigurationKeys =
@@ -80,7 +81,8 @@ export type TInstanceSAMLAuthenticationConfigurationKeys =
   | "SAML_PROVIDER_NAME"
   | "SAML_ATTR_EMAIL"
   | "SAML_ATTR_FIRST_NAME"
-  | "SAML_ATTR_LAST_NAME";
+  | "SAML_ATTR_LAST_NAME"
+  | "SAML_ATTR_SUBJECT";
 
 export type TInstanceAuthenticationConfigurationKeys =
   | TInstanceGoogleAuthenticationConfigurationKeys

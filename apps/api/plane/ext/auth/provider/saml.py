@@ -18,6 +18,7 @@ from onelogin.saml2.settings import OneLogin_Saml2_Settings
 # Module imports
 from plane.authentication.adapter.base import Adapter
 from plane.authentication.adapter.error import AuthenticationException
+from plane.authentication.services import ExternalIdentity
 from plane.license.utils.instance_value import get_configuration_value
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
@@ -59,6 +60,7 @@ class SAMLProvider(Adapter):
             SAML_ATTR_EMAIL,
             SAML_ATTR_FIRST_NAME,
             SAML_ATTR_LAST_NAME,
+            SAML_ATTR_SUBJECT,
         ) = get_configuration_value(
             [
                 {
@@ -89,6 +91,10 @@ class SAMLProvider(Adapter):
                     "key": "SAML_ATTR_LAST_NAME",
                     "default": os.environ.get("SAML_ATTR_LAST_NAME"),
                 },
+                {
+                    "key": "SAML_ATTR_SUBJECT",
+                    "default": os.environ.get("SAML_ATTR_SUBJECT"),
+                },
             ]
         )
 
@@ -101,13 +107,7 @@ class SAMLProvider(Adapter):
             )
 
         sso_url = urlparse(SAML_IDP_SSO_URL)
-        if (
-            sso_url.scheme != "https"
-            or not sso_url.netloc
-            or sso_url.username
-            or sso_url.password
-            or sso_url.fragment
-        ):
+        if sso_url.scheme != "https" or not sso_url.netloc or sso_url.username or sso_url.password or sso_url.fragment:
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["SAML_NOT_CONFIGURED"],
                 error_message="SAML_NOT_CONFIGURED",
@@ -120,6 +120,7 @@ class SAMLProvider(Adapter):
         self.attr_email = SAML_ATTR_EMAIL
         self.attr_first_name = SAML_ATTR_FIRST_NAME
         self.attr_last_name = SAML_ATTR_LAST_NAME
+        self.attr_subject = SAML_ATTR_SUBJECT
 
         scheme = "https" if request.is_secure() else "http"
         self.sp_base = f"{scheme}://{request.get_host()}"
@@ -217,15 +218,27 @@ class SAMLProvider(Adapter):
         if not first_name:
             first_name = (email or "").split("@")[0]
 
+        if self.attr_subject:
+            subject = self.__first_attribute(attributes, self.attr_subject, [])
+            subject_format = f"attribute:{self.attr_subject}"
+        else:
+            subject = auth.get_nameid()
+            subject_format = auth.get_nameid_format() or ""
+        if not subject or subject_format == "urn:oasis:names:tc:SAML:2.0:nameid-format:transient":
+            raise AuthenticationException(
+                error_code=EXT_AUTHENTICATION_ERROR_CODES["INVALID_SAML_RESPONSE"],
+                error_message="INVALID_SAML_RESPONSE",
+            )
+
+        legacy_provider_id = hashlib.sha256(f"{self.idp_entity_id}\0{subject}".encode()).hexdigest()
+
         self.set_user_data(
             {
                 "email": email,
                 "user": {
                     # NameID is scoped to the IdP. Hash the IdP/NameID pair so
                     # switching IdPs cannot collide with an existing account.
-                    "provider_id": hashlib.sha256(
-                        f"{self.idp_entity_id}\0{auth.get_nameid() or email}".encode()
-                    ).hexdigest(),
+                    "provider_id": legacy_provider_id,
                     "email": email,
                     "avatar": None,
                     "first_name": first_name,
@@ -233,5 +246,17 @@ class SAMLProvider(Adapter):
                     "is_password_autoset": True,
                 },
             }
+        )
+        self.set_external_identity(
+            ExternalIdentity(
+                provider=self.provider,
+                issuer=self.idp_entity_id,
+                subject=str(subject),
+                subject_format=subject_format,
+                email=email,
+                email_verified=True,
+                first_name=first_name,
+                last_name=last_name or "",
+            )
         )
         return self.complete_login_or_signup()

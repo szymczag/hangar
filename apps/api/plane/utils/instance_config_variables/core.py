@@ -37,6 +37,18 @@ workspace_management_config_variables = [
 
 google_config_variables = [
     {
+        "key": "GOOGLE_AUTH_MODE",
+        "value": os.environ.get("GOOGLE_AUTH_MODE", "generic"),
+        "category": "GOOGLE",
+        "is_encrypted": False,
+    },
+    {
+        "key": "GOOGLE_WORKSPACE_DOMAINS",
+        "value": os.environ.get("GOOGLE_WORKSPACE_DOMAINS", ""),
+        "category": "GOOGLE",
+        "is_encrypted": False,
+    },
+    {
         "key": "GOOGLE_CLIENT_ID",
         "value": os.environ.get("GOOGLE_CLIENT_ID"),
         "category": "GOOGLE",

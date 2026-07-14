@@ -20,7 +20,8 @@ from plane.bgtasks.user_activation_email_task import user_activation_email
 from plane.authentication.utils.password import is_password_strong
 
 # Module imports
-from plane.db.models import FileAsset, Profile, User, WorkspaceMemberInvite
+from plane.authentication.services.invitations import active_signup_invitations
+from plane.db.models import FileAsset, Profile, User
 from plane.license.utils.instance_value import get_configuration_value
 from plane.settings.storage import S3Storage
 from plane.utils.exception_logger import log_exception
@@ -39,6 +40,7 @@ class Adapter:
         self.callback = callback
         self.token_data = None
         self.user_data = None
+        self.external_identity = None
         self.logger = logging.getLogger("plane.authentication")
 
     def get_user_token(self, data, headers=None):
@@ -52,6 +54,13 @@ class Adapter:
 
     def set_user_data(self, data):
         self.user_data = data
+
+    def set_external_identity(self, identity):
+        self.external_identity = identity
+
+    @staticmethod
+    def new_username():
+        return uuid.uuid4().hex
 
     def create_update_account(self, user):
         raise NotImplementedError
@@ -96,16 +105,25 @@ class Adapter:
             )
         return
 
-    def __check_signup(self, email):
+    def _check_signup(self, email):
         """Check if sign up is enabled or not and raise exception if not enabled"""
 
         # Get configuration value
-        (ENABLE_SIGNUP,) = get_configuration_value([
-            {"key": "ENABLE_SIGNUP", "default": os.environ.get("ENABLE_SIGNUP", "1")}
-        ])
+        (ENABLE_SIGNUP,) = get_configuration_value(
+            [{"key": "ENABLE_SIGNUP", "default": os.environ.get("ENABLE_SIGNUP", "1")}]
+        )
 
         # Check if sign up is disabled and invite is present or not
-        if ENABLE_SIGNUP == "0" and not WorkspaceMemberInvite.objects.filter(email=email).exists():
+        if ENABLE_SIGNUP != "0":
+            return None
+
+        from django.db import connection
+
+        invitation = active_signup_invitations(
+            email,
+            for_update=connection.in_atomic_block,
+        ).first()
+        if invitation is None:
             self.logger.warning("Sign up is disabled and invite is not present")
             # Raise exception
             raise AuthenticationException(
@@ -114,7 +132,7 @@ class Adapter:
                 payload={"email": email},
             )
 
-        return True
+        return invitation
 
     def get_avatar_download_headers(self):
         return {}
@@ -244,10 +262,15 @@ class Adapter:
         user.is_active = True
         user.save()
         if was_inactive:
-            try:
-                user_activation_email.delay(base_host(request=self.request), user.id)
-            except Exception as e:
-                log_exception(e)
+            from django.db import transaction
+
+            def send_activation_email():
+                try:
+                    user_activation_email.delay(base_host(request=self.request), user.id)
+                except Exception as e:
+                    log_exception(e)
+
+            transaction.on_commit(send_activation_email)
         return user
 
     def delete_old_avatar(self, user):
@@ -304,6 +327,11 @@ class Adapter:
         return user
 
     def complete_login_or_signup(self):
+        if self.external_identity is not None:
+            from plane.authentication.services.federated_auth import authenticate_external_identity
+
+            return authenticate_external_identity(self).user
+
         # Get email
         email = self.user_data.get("email")
 
@@ -345,7 +373,7 @@ class Adapter:
         # If user is not present, create a new user
         if not user:
             # New user
-            self.__check_signup(email)
+            self._check_signup(email)
 
             # Initialize user
             user = User(email=email, username=uuid.uuid4().hex)

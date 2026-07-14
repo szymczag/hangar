@@ -11,9 +11,7 @@ import os
 # Enable OIDC automatically when the environment carries a full configuration,
 # mirroring how upstream derives its IS_<PROVIDER>_ENABLED flags. An explicit
 # IS_OIDC_ENABLED env var always wins; the admin UI can toggle it afterwards.
-_oidc_env_configured = all(
-    bool(os.environ.get(key)) for key in ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET")
-)
+_oidc_env_configured = all(bool(os.environ.get(key)) for key in ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"))
 
 oidc_config_variables = [
     {
@@ -43,12 +41,6 @@ oidc_config_variables = [
     {
         "key": "OIDC_PROVIDER_NAME",
         "value": os.environ.get("OIDC_PROVIDER_NAME", "OIDC"),
-        "category": "OIDC",
-        "is_encrypted": False,
-    },
-    {
-        "key": "OIDC_ALLOW_UNVERIFIED_EMAIL",
-        "value": os.environ.get("OIDC_ALLOW_UNVERIFIED_EMAIL", "0"),
         "category": "OIDC",
         "is_encrypted": False,
     },
@@ -107,6 +99,12 @@ saml_config_variables = [
     {
         "key": "SAML_ATTR_LAST_NAME",
         "value": os.environ.get("SAML_ATTR_LAST_NAME"),
+        "category": "SAML",
+        "is_encrypted": False,
+    },
+    {
+        "key": "SAML_ATTR_SUBJECT",
+        "value": os.environ.get("SAML_ATTR_SUBJECT"),
         "category": "SAML",
         "is_encrypted": False,
     },

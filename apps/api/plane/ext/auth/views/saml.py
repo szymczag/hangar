@@ -3,6 +3,10 @@
 # See the LICENSE file for details.
 
 # Python imports
+import hashlib
+import hmac
+import secrets
+import string
 import uuid
 from urllib.parse import urlencode, urljoin
 
@@ -35,6 +39,7 @@ from plane.ext.auth.provider.saml import SAMLProvider
 # in the session. The token only selects which pending AuthnRequest ID to
 # enforce InResponseTo against — trust still comes from the IdP signature.
 RELAY_STATE_TTL = 60 * 10
+SAML_CORRELATION_COOKIE_PATH = "/auth/saml/callback/"
 
 
 def _relay_key(token):
@@ -43,6 +48,23 @@ def _relay_key(token):
 
 def _relay_claim_key(token):
     return f"ext:saml:relay-claimed:{token}"
+
+
+def _correlation_cookie_name(token):
+    if len(token) != 32 or any(character not in string.hexdigits for character in token):
+        return None
+    return f"saml_flow_{token[:16].lower()}"
+
+
+def _clear_correlation_cookie(response, relay_token):
+    cookie_name = _correlation_cookie_name(relay_token)
+    if cookie_name:
+        response.delete_cookie(
+            cookie_name,
+            path=SAML_CORRELATION_COOKIE_PATH,
+            samesite="None",
+        )
+    return response
 
 
 def _error_redirect(host, exc_params, next_path):
@@ -77,6 +99,7 @@ class SAMLAuthInitiateEndpoint(View):
             provider = SAMLProvider(request=request)
             auth = provider.get_saml_auth()
             relay_token = uuid.uuid4().hex
+            browser_secret = secrets.token_urlsafe(32)
             login_url = auth.login(return_to=relay_token)
             cache.set(
                 _relay_key(relay_token),
@@ -84,10 +107,21 @@ class SAMLAuthInitiateEndpoint(View):
                     "request_id": auth.get_last_request_id(),
                     "host": host,
                     "next_path": str(validate_next_path(next_path)) if next_path else None,
+                    "browser_secret_digest": hashlib.sha256(browser_secret.encode("ascii")).hexdigest(),
                 },
                 RELAY_STATE_TTL,
             )
-            return HttpResponseRedirect(login_url)
+            response = HttpResponseRedirect(login_url)
+            response.set_cookie(
+                _correlation_cookie_name(relay_token),
+                browser_secret,
+                max_age=RELAY_STATE_TTL,
+                secure=True,
+                httponly=True,
+                samesite="None",
+                path=SAML_CORRELATION_COOKIE_PATH,
+            )
+            return response
         except AuthenticationException as e:
             return _error_redirect(host, e.get_error_dict(), next_path)
 
@@ -104,6 +138,21 @@ class SAMLCallbackEndpoint(View):
     def post(self, request):
         relay_token = request.POST.get("RelayState", "")
         flow = cache.get(_relay_key(relay_token)) if relay_token else None
+        cookie_name = _correlation_cookie_name(relay_token)
+        browser_secret = request.COOKIES.get(cookie_name, "") if cookie_name else ""
+        browser_secret_digest = hashlib.sha256(browser_secret.encode("utf-8")).hexdigest() if browser_secret else ""
+        expected_digest = (flow or {}).get("browser_secret_digest", "")
+
+        # Verify browser correlation before claiming the flow. A forwarded
+        # RelayState/SAMLResponse must not consume the initiating browser's
+        # legitimate transaction.
+        if (
+            not browser_secret_digest
+            or not expected_digest
+            or not hmac.compare_digest(browser_secret_digest, expected_digest)
+        ):
+            flow = None
+
         # cache.add is atomic across workers. Two concurrent requests may both
         # read the flow, but only one can claim and consume it.
         if flow and cache.add(_relay_claim_key(relay_token), "1", RELAY_STATE_TTL):
@@ -119,16 +168,19 @@ class SAMLCallbackEndpoint(View):
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["INVALID_SAML_RESPONSE"],
                 error_message="INVALID_SAML_RESPONSE",
             )
-            return _error_redirect(host, exc.get_error_dict(), next_path)
+            return _clear_correlation_cookie(
+                _error_redirect(host, exc.get_error_dict(), next_path),
+                relay_token,
+            )
 
         try:
             provider = SAMLProvider(request=request, callback=post_user_auth_workflow)
             user = provider.authenticate(request_id=flow.get("request_id"))
             user_login(request=request, user=user, is_app=True)
             path = str(validate_next_path(next_path)) if next_path else get_redirection_path(user=user)
-            return HttpResponseRedirect(urljoin(host, path))
+            return _clear_correlation_cookie(HttpResponseRedirect(urljoin(host, path)), relay_token)
         except AuthenticationException as e:
-            return _error_redirect(host, e.get_error_dict(), next_path)
+            return _clear_correlation_cookie(_error_redirect(host, e.get_error_dict(), next_path), relay_token)
 
 
 class SAMLMetadataEndpoint(View):

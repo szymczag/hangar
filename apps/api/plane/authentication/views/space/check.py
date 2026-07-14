@@ -24,6 +24,7 @@ from plane.authentication.adapter.error import (
 )
 from plane.authentication.rate_limit import AuthenticationThrottle
 from plane.license.utils.instance_value import get_configuration_value
+from plane.mailer.configuration import is_email_delivery_configured
 
 
 class EmailCheckSpaceEndpoint(APIView):
@@ -51,7 +52,7 @@ class EmailCheckSpaceEndpoint(APIView):
             ]
         )
 
-        smtp_configured = bool(EMAIL_HOST)
+        smtp_configured = is_email_delivery_configured(EMAIL_HOST)
         is_magic_login_enabled = ENABLE_MAGIC_LINK_LOGIN == "1"
 
         email = request.data.get("email", False)
