@@ -3,6 +3,9 @@
 # See the LICENSE file for details.
 
 from dataclasses import dataclass
+from ipaddress import ip_address
+import re
+from uuid import uuid4
 
 from django.conf import settings
 from django.db import transaction
@@ -34,6 +37,10 @@ class RunnerPermissionError(RunnerServiceError):
     code = "runner_admin_required"
 
 
+class RunnerNotFoundError(RunnerServiceError):
+    code = "runner_not_found"
+
+
 class RunnerConsentError(RunnerServiceError):
     code = "runner_consent_required"
 
@@ -46,7 +53,29 @@ class RunnerTransitionError(RunnerServiceError):
 class RunnerTransitionResult:
     installation: RunnerInstallation
     created: bool
-    changed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RunnerAuditContext:
+    request_id: str
+    source_ip: str | None = None
+    user_agent: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.is_valid_request_id(self.request_id):
+            raise ValueError("Runner audit request ID is invalid.")
+        if self.source_ip is not None:
+            ip_address(self.source_ip)
+        if len(self.user_agent) > 512 or any(not character.isprintable() for character in self.user_agent):
+            raise ValueError("Runner audit user agent is invalid.")
+
+    @staticmethod
+    def is_valid_request_id(request_id: str) -> bool:
+        return re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}", request_id) is not None
+
+    @classmethod
+    def new(cls) -> "RunnerAuditContext":
+        return cls(request_id=str(uuid4()))
 
 
 def current_runner_consent() -> RunnerConsentContract:
@@ -105,6 +134,7 @@ class RunnerInstallationService:
             member_id=actor.id,
             role=ROLE.ADMIN.value,
             is_active=True,
+            deleted_at__isnull=True,
         )
         if lock:
             memberships = memberships.select_for_update()
@@ -112,13 +142,30 @@ class RunnerInstallationService:
             raise RunnerPermissionError("An active workspace Admin is required.")
 
     @classmethod
-    def authorize_admin(cls, *, workspace: Workspace, actor: User) -> None:
+    def resolve_for_admin(cls, *, workspace_slug: str, actor: User) -> Workspace:
         require_runner_enabled()
-        cls._require_admin(workspace_id=workspace.id, actor=actor)
+        if actor is None or not actor.is_authenticated:
+            raise RunnerNotFoundError("Runner workspace was not found.")
+
+        workspace = (
+            Workspace.objects.filter(
+                slug=workspace_slug,
+                workspace_member__member_id=actor.id,
+                workspace_member__role=ROLE.ADMIN.value,
+                workspace_member__is_active=True,
+                workspace_member__deleted_at__isnull=True,
+            )
+            .distinct()
+            .first()
+        )
+        if workspace is None:
+            raise RunnerNotFoundError("Runner workspace was not found.")
+        return workspace
 
     @classmethod
     def get_for_admin(cls, *, workspace: Workspace, actor: User) -> RunnerInstallation | None:
-        cls.authorize_admin(workspace=workspace, actor=actor)
+        require_runner_enabled()
+        cls._require_admin(workspace_id=workspace.id, actor=actor)
         return RunnerInstallation.objects.filter(workspace=workspace).first()
 
     @staticmethod
@@ -136,8 +183,10 @@ class RunnerInstallationService:
         actor: User,
         action: RunnerAuditAction,
         previous_state: str,
+        audit_context: RunnerAuditContext | None,
     ) -> None:
         consent = current_runner_consent()
+        context = audit_context or RunnerAuditContext.new()
         metadata = {
             "previous_state": previous_state,
             "state": installation.state,
@@ -153,6 +202,9 @@ class RunnerInstallationService:
             target_type=RunnerAuditTarget.INSTALLATION,
             target_id=installation.id,
             schema_version=RUNNER_AUDIT_SCHEMA_VERSION,
+            request_id=context.request_id,
+            source_ip=context.source_ip,
+            user_agent=context.user_agent,
             metadata=metadata,
         )
 
@@ -165,6 +217,7 @@ class RunnerInstallationService:
         actor: User,
         consent_version: int,
         consent_digest: str,
+        audit_context: RunnerAuditContext | None = None,
     ) -> RunnerTransitionResult:
         require_runner_enabled()
         consent = current_runner_consent()
@@ -193,13 +246,14 @@ class RunnerInstallationService:
                 actor=actor,
                 action=RunnerAuditAction.INSTALLATION_ACTIVATED,
                 previous_state=RunnerEffectiveState.INACTIVE,
+                audit_context=audit_context,
             )
-            return RunnerTransitionResult(installation=installation, created=True, changed=True)
+            return RunnerTransitionResult(installation=installation, created=True)
 
         if installation.state == RunnerInstallationState.REVOKED:
             raise RunnerTransitionError("A revoked Runner installation cannot be reactivated.")
         if installation.state == RunnerInstallationState.ACTIVE and installation_has_current_consent(installation):
-            return RunnerTransitionResult(installation=installation, created=False, changed=False)
+            return RunnerTransitionResult(installation=installation, created=False)
 
         previous_state = installation_effective_state(installation)
         action = (
@@ -233,12 +287,19 @@ class RunnerInstallationService:
             actor=actor,
             action=action,
             previous_state=previous_state,
+            audit_context=audit_context,
         )
-        return RunnerTransitionResult(installation=installation, created=False, changed=True)
+        return RunnerTransitionResult(installation=installation, created=False)
 
     @classmethod
     @transaction.atomic
-    def suspend(cls, *, workspace: Workspace, actor: User) -> RunnerTransitionResult:
+    def suspend(
+        cls,
+        *,
+        workspace: Workspace,
+        actor: User,
+        audit_context: RunnerAuditContext | None = None,
+    ) -> RunnerTransitionResult:
         require_runner_enabled()
         locked_workspace = Workspace.objects.select_for_update().get(pk=workspace.pk)
         cls._require_admin(workspace_id=locked_workspace.id, actor=actor, lock=True)
@@ -248,7 +309,7 @@ class RunnerInstallationService:
         if installation.state == RunnerInstallationState.REVOKED:
             raise RunnerTransitionError("A revoked Runner installation cannot be suspended.")
         if installation.state == RunnerInstallationState.SUSPENDED:
-            return RunnerTransitionResult(installation=installation, created=False, changed=False)
+            return RunnerTransitionResult(installation=installation, created=False)
 
         previous_state = installation_effective_state(installation)
         installation.state = RunnerInstallationState.SUSPENDED
@@ -267,12 +328,19 @@ class RunnerInstallationService:
             actor=actor,
             action=RunnerAuditAction.INSTALLATION_SUSPENDED,
             previous_state=previous_state,
+            audit_context=audit_context,
         )
-        return RunnerTransitionResult(installation=installation, created=False, changed=True)
+        return RunnerTransitionResult(installation=installation, created=False)
 
     @classmethod
     @transaction.atomic
-    def revoke(cls, *, workspace: Workspace, actor: User) -> RunnerTransitionResult:
+    def revoke(
+        cls,
+        *,
+        workspace: Workspace,
+        actor: User,
+        audit_context: RunnerAuditContext | None = None,
+    ) -> RunnerTransitionResult:
         require_runner_enabled()
         locked_workspace = Workspace.objects.select_for_update().get(pk=workspace.pk)
         cls._require_admin(workspace_id=locked_workspace.id, actor=actor, lock=True)
@@ -280,7 +348,7 @@ class RunnerInstallationService:
         if installation is None:
             raise RunnerTransitionError("Runner has not been activated.")
         if installation.state == RunnerInstallationState.REVOKED:
-            return RunnerTransitionResult(installation=installation, created=False, changed=False)
+            return RunnerTransitionResult(installation=installation, created=False)
 
         previous_state = installation_effective_state(installation)
         installation.state = RunnerInstallationState.REVOKED
@@ -299,5 +367,6 @@ class RunnerInstallationService:
             actor=actor,
             action=RunnerAuditAction.INSTALLATION_REVOKED,
             previous_state=previous_state,
+            audit_context=audit_context,
         )
-        return RunnerTransitionResult(installation=installation, created=False, changed=True)
+        return RunnerTransitionResult(installation=installation, created=False)

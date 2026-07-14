@@ -4,11 +4,7 @@
 
 from enum import StrEnum
 
-from .consent import CURRENT_RUNNER_CONSENT
-
-
 RUNNER_AUDIT_SCHEMA_VERSION = 1
-RUNNER_CONSENT_VERSION = CURRENT_RUNNER_CONSENT.version
 
 
 class RunnerEffectiveState(StrEnum):

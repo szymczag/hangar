@@ -7,8 +7,10 @@ from threading import Barrier
 from uuid import uuid4
 
 import pytest
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, close_old_connections, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -17,6 +19,7 @@ from plane.db.models import User, Workspace, WorkspaceMember
 
 from plane.ext.runner.consent import (
     CURRENT_RUNNER_CONSENT,
+    RUNNER_CONSENT_CONTRACTS,
     RUNNER_CONSENT_TEXT,
     RUNNER_CONSENT_V1_DIGEST,
     consent_digest,
@@ -28,10 +31,12 @@ from plane.ext.runner.models import (
     RunnerInstallationState,
 )
 from plane.ext.runner.services import (
+    RunnerAuditContext,
     RunnerInstallationService,
     RunnerPermissionError,
     RunnerTransitionError,
 )
+from plane.ext.runner.throttles import RunnerMutationThrottle, RunnerUserMutationThrottle
 
 
 def installation_url(workspace):
@@ -88,6 +93,26 @@ class TestRunnerConsentContract:
         assert len(CURRENT_RUNNER_CONSENT.digest) == 64
         assert CURRENT_RUNNER_CONSENT.document_id.endswith(f"v{CURRENT_RUNNER_CONSENT.version}")
 
+    def test_published_consent_contracts_are_retained_in_an_immutable_registry(self):
+        assert RUNNER_CONSENT_CONTRACTS[1] is CURRENT_RUNNER_CONSENT
+        with pytest.raises(TypeError):
+            RUNNER_CONSENT_CONTRACTS[2] = CURRENT_RUNNER_CONSENT
+
+
+@pytest.mark.contract
+class TestRunnerAuditContext:
+    @pytest.mark.parametrize(
+        "values",
+        [
+            {"request_id": ""},
+            {"request_id": "valid", "source_ip": "not-an-ip"},
+            {"request_id": "valid", "user_agent": "invalid\nagent"},
+        ],
+    )
+    def test_rejects_unbounded_or_ambiguous_evidence(self, values):
+        with pytest.raises(ValueError):
+            RunnerAuditContext(**values)
+
 
 @pytest.mark.usefixtures("runner_disabled")
 @pytest.mark.contract
@@ -123,7 +148,8 @@ class TestRunnerInstallationAuthorization:
             client.post(revoke_url(workspace), {}, format="json"),
         ]
 
-        assert {response.status_code for response in responses} == {status.HTTP_403_FORBIDDEN}
+        assert {response.status_code for response in responses} == {status.HTTP_404_NOT_FOUND}
+        assert {response.data["code"] for response in responses} == {"runner_not_found"}
         assert not RunnerInstallation.objects.exists()
 
     @pytest.mark.django_db
@@ -141,7 +167,8 @@ class TestRunnerInstallationAuthorization:
             session_client.post(revoke_url(other_workspace), {}, format="json"),
         ]
 
-        assert {response.status_code for response in responses} == {status.HTTP_403_FORBIDDEN}
+        assert {response.status_code for response in responses} == {status.HTTP_404_NOT_FOUND}
+        assert {response.data["code"] for response in responses} == {"runner_not_found"}
         assert not RunnerInstallation.objects.filter(workspace=other_workspace).exists()
 
     @pytest.mark.django_db
@@ -164,8 +191,16 @@ class TestRunnerInstallationAuthorization:
 
         response = client.post(installation_url(workspace), {}, format="json")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert response.data["code"] == "runner_admin_required"
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data["code"] == "runner_not_found"
+
+        missing = client.post(
+            "/api/workspaces/runner-workspace-does-not-exist/runner/installation/",
+            {},
+            format="json",
+        )
+        assert missing.status_code == response.status_code
+        assert missing.data == response.data
 
     @pytest.mark.django_db
     def test_membership_revoked_before_service_authorization_is_rejected(self, workspace, create_user):
@@ -179,6 +214,26 @@ class TestRunnerInstallationAuthorization:
                 actor=create_user,
                 **activation_payload(),
             )
+
+    @pytest.mark.django_db
+    def test_user_throttle_cannot_be_bypassed_by_rotating_workspace_slugs(self, session_client, mocker):
+        cache.clear()
+        mocker.patch.object(RunnerUserMutationThrottle, "get_rate", return_value="1/minute")
+
+        first = session_client.post(
+            "/api/workspaces/missing-runner-one/runner/installation/",
+            activation_payload(),
+            format="json",
+        )
+        throttled = session_client.post(
+            "/api/workspaces/missing-runner-two/runner/installation/",
+            activation_payload(),
+            format="json",
+        )
+
+        assert first.status_code == status.HTTP_404_NOT_FOUND
+        assert throttled.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        cache.clear()
 
 
 @pytest.mark.usefixtures("runner_enabled")
@@ -230,7 +285,14 @@ class TestRunnerInstallationLifecycle:
 
     @pytest.mark.django_db
     def test_activation_is_idempotent_and_audited_once(self, session_client, workspace, create_user):
-        created = session_client.post(installation_url(workspace), activation_payload(), format="json")
+        created = session_client.post(
+            installation_url(workspace),
+            activation_payload(),
+            format="json",
+            HTTP_X_REQUEST_ID="runner-test-request-1",
+            HTTP_USER_AGENT="Hangar contract test\nignored-control",
+            REMOTE_ADDR="192.0.2.10",
+        )
         repeated = session_client.post(installation_url(workspace), activation_payload(), format="json")
 
         assert created.status_code == status.HTTP_201_CREATED
@@ -247,10 +309,25 @@ class TestRunnerInstallationLifecycle:
         )
         assert event.actor_id == create_user.id
         assert event.schema_version == 1
+        assert event.request_id == "runner-test-request-1"
+        assert event.source_ip == "192.0.2.10"
+        assert event.user_agent == "Hangar contract testignored-control"
         assert event.metadata["previous_state"] == "inactive"
         assert event.metadata["state"] == "active"
         assert event.metadata["consent_digest"] == CURRENT_RUNNER_CONSENT.digest
         assert RunnerAuditEvent.objects.count() == 1
+
+    @pytest.mark.django_db
+    def test_mutations_are_throttled_per_user_and_workspace(self, session_client, workspace, mocker):
+        cache.clear()
+        mocker.patch.object(RunnerMutationThrottle, "get_rate", return_value="1/minute")
+
+        first = session_client.post(installation_url(workspace), activation_payload(), format="json")
+        throttled = session_client.post(installation_url(workspace), activation_payload(), format="json")
+
+        assert first.status_code == status.HTTP_201_CREATED
+        assert throttled.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        cache.clear()
 
     @pytest.mark.django_db
     def test_suspend_then_reactivate_records_each_transition(self, session_client, workspace):
@@ -328,7 +405,73 @@ class TestRunnerInstallationLifecycle:
 
 @pytest.mark.usefixtures("runner_enabled")
 @pytest.mark.contract
+@pytest.mark.runner_migrations
 class TestRunnerDatabaseIntegrity:
+    @pytest.mark.django_db(transaction=True)
+    def test_additive_migration_upgrades_foundation_rows(self, workspace, create_user, request):
+        if (
+            request.config.getoption("nomigrations")
+            or "django_migrations" not in connection.introspection.table_names()
+        ):
+            pytest.skip("upgrade-path test requires pytest --migrations")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM django_migrations WHERE app = %s AND name = %s",
+                ["ext", "0005_runner_foundation_hardening"],
+            )
+            if cursor.fetchone() is None:
+                pytest.skip("upgrade-path test requires pytest --migrations")
+
+        second_workspace = Workspace.objects.create(
+            name="Runner migration workspace",
+            slug=f"runner-migration-{uuid4().hex[:8]}",
+            owner=create_user,
+        )
+        executor = MigrationExecutor(connection)
+        executor.migrate([("ext", "0004_runner_foundation")])
+        legacy_apps = executor.loader.project_state([("ext", "0004_runner_foundation")]).apps
+        LegacyInstallation = legacy_apps.get_model("ext", "RunnerInstallation")
+        LegacyAuditEvent = legacy_apps.get_model("ext", "RunnerAuditEvent")
+
+        LegacyInstallation.objects.create(workspace_id=workspace.id, state="inactive")
+        active = LegacyInstallation.objects.create(
+            workspace_id=second_workspace.id,
+            state="active",
+            consent_version=1,
+            activated_by_id=create_user.id,
+            activated_at=timezone.now(),
+            created_by_id=create_user.id,
+            updated_by_id=create_user.id,
+        )
+        legacy_event = LegacyAuditEvent.objects.create(
+            workspace_id=second_workspace.id,
+            actor_id=create_user.id,
+            action=RunnerAuditAction.INSTALLATION_ACTIVATED,
+            target_type="runner_installation",
+            target_id=active.id,
+            metadata=["legacy"],
+        )
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([("ext", "0005_runner_foundation_hardening")])
+
+        try:
+            assert not RunnerInstallation.objects.filter(workspace_id=workspace.id).exists()
+            upgraded = RunnerInstallation.objects.get(workspace_id=second_workspace.id)
+            assert upgraded.consent_document == CURRENT_RUNNER_CONSENT.document_id
+            assert upgraded.consent_digest == CURRENT_RUNNER_CONSENT.digest
+            assert upgraded.activated_by == create_user.id
+            event = RunnerAuditEvent.objects.get(pk=legacy_event.id)
+            assert event.workspace_id == second_workspace.id
+            assert event.actor_id == create_user.id
+            assert event.request_id == f"migration:{event.id}"
+            assert event.metadata == {"legacy_metadata": ["legacy"]}
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute("ALTER TABLE ext_runner_audit_events DISABLE TRIGGER ext_runner_audit_events_immutable")
+                cursor.execute("DELETE FROM ext_runner_audit_events WHERE id = %s", [legacy_event.id])
+                cursor.execute("ALTER TABLE ext_runner_audit_events ENABLE TRIGGER ext_runner_audit_events_immutable")
+
     @pytest.mark.django_db
     @pytest.mark.parametrize(
         "overrides",
@@ -375,15 +518,24 @@ class TestRunnerDatabaseIntegrity:
         assert not RunnerAuditEvent.objects.exists()
 
     @pytest.mark.django_db
-    def test_database_rejects_audit_event_without_target_id(self, workspace, create_user):
+    @pytest.mark.parametrize(
+        "overrides",
+        [
+            {"target_id": None},
+            {"request_id": ""},
+        ],
+    )
+    def test_database_rejects_incomplete_audit_evidence(self, workspace, create_user, overrides):
         fields = {
             "workspace_id": workspace.id,
             "actor_id": create_user.id,
             "action": RunnerAuditAction.INSTALLATION_ACTIVATED,
             "target_type": "runner_installation",
-            "target_id": None,
+            "target_id": uuid4(),
+            "request_id": str(uuid4()),
             "metadata": {},
         }
+        fields.update(overrides)
 
         with pytest.raises(IntegrityError), transaction.atomic():
             RunnerAuditEvent.objects.bulk_create([RunnerAuditEvent(**fields)])
@@ -396,6 +548,7 @@ class TestRunnerDatabaseIntegrity:
             "action": RunnerAuditAction.INSTALLATION_ACTIVATED,
             "target_type": "runner_installation",
             "target_id": uuid4(),
+            "request_id": str(uuid4()),
             "metadata": [],
         }
 

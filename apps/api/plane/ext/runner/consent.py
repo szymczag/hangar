@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass
 from hashlib import sha256
+from types import MappingProxyType
 
 
 RUNNER_CONSENT_TEXT = (
@@ -34,9 +35,11 @@ if consent_digest(RUNNER_CONSENT_TEXT) != RUNNER_CONSENT_V1_DIGEST:
     raise RuntimeError("Runner consent text changed without a versioned digest update.")
 
 
-CURRENT_RUNNER_CONSENT = RunnerConsentContract(
+RUNNER_CONSENT_V1 = RunnerConsentContract(
     version=1,
     document_id="hangar-runner-security-consent-v1",
     digest=RUNNER_CONSENT_V1_DIGEST,
     text=RUNNER_CONSENT_TEXT,
 )
+RUNNER_CONSENT_CONTRACTS = MappingProxyType({RUNNER_CONSENT_V1.version: RUNNER_CONSENT_V1})
+CURRENT_RUNNER_CONSENT = RUNNER_CONSENT_V1

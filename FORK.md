@@ -51,7 +51,7 @@ merge-conflict risk.
 
 | #   | File                                                                                                                                              | Phase | Nature                                                                                              |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------- |
-| 1   | `apps/api/plane/settings/common.py`                                                                                                               | 0, Runner 1 | append `plane.ext` to `INSTALLED_APPS`; add the default-off `RUNNER_ENABLED` process gate |
+| 1   | `apps/api/plane/settings/common.py`                                                                                                               | 0, Runner 1 | append `plane.ext` to `INSTALLED_APPS`; add the default-off Runner gate and scoped API rates |
 | 2   | `apps/api/plane/urls.py`                                                                                                                          | 0     | +2 lines: `include("plane.ext.urls")`, `include("plane.ext.auth_urls")`                             |
 | 3   | `docker-compose-test.yml`                                                                                                                         | 0     | +1 env var: raise `AUTHENTICATION_RATE_LIMIT` so the full suite passes from one IP (upstreamable)   |
 | 4   | `apps/api/plane/utils/instance_config_variables/extended.py`                                                                                      | 1     | designated empty hook — filled with OIDC + SAML config vars (including env-derived enable defaults) |
@@ -74,7 +74,8 @@ merge-conflict risk.
 | 21  | `apps/web/core/components/issues/issue-detail/`, `apps/web/core/components/issues/peek-overview/properties.tsx`                                  | 4     | propagate the effective worklog-read capability so guest clients do not fetch or render confidential time entries |
 | 22  | `apps/api/plane/license/`, `apps/api/plane/utils/otlp_endpoints.py`                                                                                | 5     | disable telemetry and release discovery by default; require an explicit OTLP endpoint and use the DNS-pinned SSRF-safe client for optional HTTPS release checks |
 | 23  | `apps/admin/components/instance/setup-form.tsx`, `apps/admin/app/(all)/(dashboard)/general/form.tsx`                                              | 5     | make telemetry an explicit opt-in and accurately disclose the exported instance/workspace metadata |
-| 24  | `.env.example`, `apps/api/.env.example`, `deployments/*/community/variables.env`                                                                  | 5, Runner 1 | document privacy-preserving defaults for telemetry/discovery and the disabled Runner process gate |
+| 24  | `.env.example`, `apps/api/.env.example`, `deployments/*/community/variables.env`                                                                  | 5, Runner 1 | document privacy-preserving defaults for telemetry/discovery plus Runner gate/rate defaults |
+| 25  | `.github/workflows/api-tests.yml`                                                                                                                 | Runner 1 | add a migration-enabled Runner invariant job alongside the fast no-migrations suite |
 
 Planned (added when the phase lands):
 

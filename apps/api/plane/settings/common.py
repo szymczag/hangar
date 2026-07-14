@@ -147,6 +147,10 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "30/minute",
         "asset_id": "5/minute",
+        "runner_user_read": os.environ.get("RUNNER_API_USER_READ_RATE", "240/minute"),
+        "runner_user_mutation": os.environ.get("RUNNER_API_USER_MUTATION_RATE", "60/minute"),
+        "runner_read": os.environ.get("RUNNER_API_READ_RATE", "120/minute"),
+        "runner_mutation": os.environ.get("RUNNER_API_MUTATION_RATE", "30/minute"),
     },
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),

@@ -117,8 +117,11 @@ class RunnerAuditEvent(models.Model):
     actor_id = models.UUIDField(db_index=True)
     action = models.CharField(max_length=96, choices=RunnerAuditAction.choices)
     target_type = models.CharField(max_length=64, choices=RunnerAuditTarget.choices)
-    target_id = models.UUIDField(null=True, blank=True)
+    target_id = models.UUIDField()
     schema_version = models.PositiveSmallIntegerField(default=1)
+    request_id = models.CharField(max_length=128)
+    source_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, blank=True, default="")
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -141,15 +144,12 @@ class RunnerAuditEvent(models.Model):
                 name="ext_runner_audit_valid_target",
             ),
             models.CheckConstraint(
-                check=models.Q(
-                    target_type=RunnerAuditTarget.INSTALLATION,
-                    target_id__isnull=False,
-                ),
-                name="ext_runner_audit_target_id",
-            ),
-            models.CheckConstraint(
                 check=models.Q(schema_version__gte=1),
                 name="ext_runner_audit_schema_version",
+            ),
+            models.CheckConstraint(
+                check=models.Q(request_id__regex=r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"),
+                name="ext_runner_audit_request_id",
             ),
         ]
 

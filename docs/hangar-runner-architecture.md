@@ -19,17 +19,23 @@ security hardening is developed on the stacked
   while stale consent produces the non-persisted effective state
   `consent_required`;
 - activation requires the exact current consent version and SHA-256 digest; the
-  canonical versioned text is returned by the read endpoint and all transitions
-  are serialized by a database lock on the workspace;
+  canonical versioned text is retained in an immutable contract registry and
+  returned by the read endpoint; all transitions are serialized by a database
+  lock on the workspace;
 - authorization is enforced in the service boundary and rechecked under the
-  mutation transaction; only active workspace Admins can read or change state;
+  mutation transaction; unauthorized and nonexistent workspace slugs return the
+  same response, and only active workspace Admins can read or change state;
+- read and mutation requests use separate aggregate-user and user/workspace rate
+  limits, configurable through the `RUNNER_API_*_RATE` settings;
 - state transitions and allow-listed audit events commit atomically; audit
-  records retain workspace and actor UUID evidence after source-row deletion,
-  and PostgreSQL rejects audit updates and deletes;
+  records retain workspace and actor UUID evidence plus bounded request context
+  after source-row deletion, and PostgreSQL rejects audit updates and deletes;
 - revocation cannot be reversed through the API; and
 - contract tests cover the instance gate, role and tenant boundaries, direct
   service authorization, consent renewal, lifecycle constraints, idempotency,
-  concurrency, audit rollback/retention, and database immutability.
+  throttling, concurrency, audit rollback/retention, and database immutability;
+  a separate CI job applies the real migration chain and exercises the additive
+  foundation-upgrade path, constraints, and trigger.
 
 The current API contract is:
 
@@ -1232,8 +1238,10 @@ Runner audit is append-only and records at least:
 The installation slice already enforces append-only behavior in both Django and
 PostgreSQL. Its records retain actor and workspace UUIDs even if the referenced
 user or workspace is deleted, state and audit writes share one transaction, and
-metadata is constrained to a JSON object. Because the immutability trigger also
-blocks ordinary deletion, retention must eventually use a separately authorized,
+metadata is constrained to a JSON object. Installation events also retain a
+validated or server-generated request ID, the directly observed peer IP, and a
+bounded printable user agent. Because the immutability trigger also blocks
+ordinary deletion, retention must eventually use a separately authorized,
 audited maintenance mechanism rather than application-model deletion.
 
 Audit records use stable action names and target identifiers, not prose-only
