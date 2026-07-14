@@ -13,12 +13,12 @@ import { Tooltip } from "@plane/propel/tooltip";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import packageJson from "package.json";
 // local components
-import { PaidPlanUpgradeModal } from "../license";
+import { HangarCommunityModal } from "../license";
 import { Button } from "@plane/propel/button";
 
 export const WorkspaceEditionBadge = observer(function WorkspaceEditionBadge() {
   // states
-  const [isPaidPlanPurchaseModalOpen, setIsPaidPlanPurchaseModalOpen] = useState(false);
+  const [isCommunityModalOpen, setIsCommunityModalOpen] = useState(false);
   // translation
   const { t } = useTranslation();
   // platform
@@ -26,19 +26,16 @@ export const WorkspaceEditionBadge = observer(function WorkspaceEditionBadge() {
 
   return (
     <>
-      <PaidPlanUpgradeModal
-        isOpen={isPaidPlanPurchaseModalOpen}
-        handleClose={() => setIsPaidPlanPurchaseModalOpen(false)}
-      />
+      <HangarCommunityModal isOpen={isCommunityModalOpen} handleClose={() => setIsCommunityModalOpen(false)} />
       <Tooltip tooltipContent={`Version: v${packageJson.version}`} isMobile={isMobile}>
         <Button
           variant="tertiary"
           size="lg"
-          onClick={() => setIsPaidPlanPurchaseModalOpen(true)}
+          onClick={() => setIsCommunityModalOpen(true)}
           aria-haspopup="dialog"
           aria-label={t("aria_labels.projects_sidebar.edition_badge")}
         >
-          Community
+          Hangar Community
         </Button>
       </Tooltip>
     </>

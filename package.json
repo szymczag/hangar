@@ -16,6 +16,7 @@
     "check": "turbo run check && pnpm check:branding",
     "check:branding": "git ls-files --cached | node scripts/check-branding.mjs --stdin",
     "test:branding": "node --test scripts/check-branding.test.mjs",
+    "test:community-modal": "node scripts/community-modal.test.mjs",
     "check:lint": "turbo run check:lint",
     "check:format": "turbo run check:format",
     "check:types": "turbo run check:types",

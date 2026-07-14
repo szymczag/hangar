@@ -35,6 +35,11 @@
     "rationale": "Legacy intake-bot email recognition is a compatibility identifier, not a public support address."
   },
   {
+    "pathPattern": "^apps/web/ce/components/license/modal/community-modal-content\\.json$",
+    "rules": ["product-name"],
+    "rationale": "The Community information modal carries a narrow factual upstream attribution and non-affiliation notice."
+  },
+  {
     "pathPattern": ".*",
     "linePattern": "Copyright .*Plane Software|SPDX-(FileCopyrightText|License-Identifier):.*Plane|Plane Commercial License",
     "rules": ["product-name"],
