@@ -16,15 +16,15 @@ producer task or API action
         ▼
 template registry + central policy
         │
-        ├── clear account mail
-        ├── PGP/MIME notification
+        ├── clear account MIME ───────────────► SES (memory only)
+        ├── PGP/MIME encryption
+        │          │
+        │          ▼
+        │  ciphertext-only outbox ──► dedicated Celery mail queue
+        │          ▲                              │
+        │          │ minute dispatcher            ▼
+        │          └──────────────────── SES v2 SendEmail
         └── suppressed receipt, with no payload
-        │
-        ▼
-encrypted EmailOutbox row ──► dedicated Celery mail queue
-        ▲                              │
-        │ minute dispatcher            ▼
-        └──────────────────── SES v2 SendEmail (raw MIME over HTTPS)
                                        │
                               SES configuration-set event
                                        │
@@ -44,7 +44,7 @@ The selected production transport is `ses_api`. It uses the SES v2 `SendEmail` o
 | Public enqueue API and rendering | `apps/api/plane/mailer/service.py` |
 | Policy classes and decisions | `apps/api/plane/mailer/policy.py`, `enums.py` |
 | Allowlisted templates | `apps/api/plane/mailer/registry.py` |
-| Stored-payload encryption and receipt codes | `apps/api/plane/mailer/crypto.py` |
+| Random receipt codes | `apps/api/plane/mailer/tokens.py` |
 | Clear and PGP/MIME construction | `apps/api/plane/mailer/mime.py` |
 | Constrained GnuPG adapter | `apps/api/plane/mailer/openpgp.py` |
 | SES API and SMTP transports | `apps/api/plane/mailer/transports/` |
@@ -79,14 +79,16 @@ The account-access path intentionally stays cleartext because a magic link, pass
 An outbox row is both a delivery state machine and a privacy-minimized receipt. Important invariants are:
 
 - `idempotency_key` uniquely identifies the domain intent;
-- `intent_digest` prevents one idempotency key from aliasing different recipient, template, or content data;
-- recipient and queued payload are encrypted with versioned authenticated encryption;
-- recipient lookup and intent hashes use a separate keyed HMAC;
+- an idempotency key is bound to its first committed recipient and template; a replay never replaces or resends it;
+- producers turn live authentication-token inputs into purpose-separated, opaque HMAC identifiers before persistence;
+- a protected message is converted to complete PGP/MIME before its outbox row is inserted;
+- clear account-message content exists only in process memory during immediate submission and is never stored in the outbox;
+- public certificates and normalized routing addresses are stored directly as public and operational data;
 - the sender, policy, template label, configuration set, delivery mode, Message-ID, and receipt code are immutable snapshots;
-- the receipt code is an 80-bit keyed value derived from the outbox UUID and is scoped to the user in the API;
+- the receipt code is an independent random 80-bit value and is scoped to the user in the API;
 - suppressed rows never contain a message payload;
-- a delivered or permanently failed row has no message payload; and
-- unsupported `payload_schema_version` values fail closed.
+- a delivered or permanently failed row has no encrypted message; and
+- malformed or structurally invalid stored PGP/MIME fails closed.
 
 The body is never copied into the audit API. An administrator can see recipient routing data and typed errors, while a user can see only their own receipt metadata.
 
@@ -106,7 +108,7 @@ suppressed_no_key | suppressed_bounce | suppressed_complaint |
 suppressed_preference | failed_permanent | delivered
 ```
 
-Only `queued`, `failed_retryable`, and an expired `processing` lease can be leased. Delivery attempts are bounded and back off with jitter. A read timeout after SES submission becomes `acceptance_unknown`; Hangar does not blindly retry because SES may already have accepted the message. A subsequent SES event can reconcile that state.
+Only OpenPGP rows in `queued`, `failed_retryable`, or expired `processing` state can be leased. Their delivery attempts are bounded and back off with jitter. Clear account mail is submitted once in the producer process; an interruption or lost provider response becomes `acceptance_unknown` and is never automatically retried because doing so could duplicate a live authentication token. A subsequent SES event can reconcile that state.
 
 The producer uses an on-commit Celery publication. RabbitMQ publisher confirms and bounded publish retries surface an initial publication failure. Independently, the minute dispatcher republishes due database rows, so a committed outbox row is not lost when a broker publication is missed.
 
@@ -129,7 +131,7 @@ The lifecycle is:
 1. The user recently authenticates and uploads a public certificate.
 2. Hangar invalidates any previous pending replacement and stores a new pending version.
 3. Hangar sends a random, expiring challenge through the real encrypted delivery path.
-4. Verification is serialized under database locks, uses a keyed digest and constant-time comparison, and permits five attempts.
+4. Verification is serialized under database locks, uses Django's salted password hashing, and permits five attempts.
 5. The previous active key becomes `replaced` only after the pending key is verified.
 6. Removal requires recent authentication, revokes the record, and consumes outstanding challenges.
 7. Activation and removal produce minimal cleartext security alerts.
@@ -140,28 +142,29 @@ There can be only one active and one pending, non-deleted key per user. In-fligh
 
 Encrypted mail uses `multipart/encrypted; protocol="application/pgp-encrypted"`. The outer subject is always `Encrypted Hangar notification`; the real subject, text/HTML alternatives, receipt, and attachments are inside the encrypted MIME entity.
 
-HTML is sanitized before storage. Remote images, embedded objects, scripts, forms, SVG, remote stylesheets, event handlers, dangerous URL schemes, and CSS network loads are removed. Subjects, reply addresses, sender configuration, attachment names, MIME types, counts, and total sizes are validated before persistence. Each recipient receives an independent message.
+HTML is sanitized before encryption. Remote images, embedded objects, scripts, forms, SVG, remote stylesheets, event handlers, dangerous URL schemes, and CSS network loads are removed. Subjects, reply addresses, sender configuration, attachment names, MIME types, counts, and total sizes are validated before encryption. Each recipient receives an independent message.
+Safe HTML structure and inline presentation styles remain available inside the encrypted MIME entity. Every message also contains a plain-text alternative.
 
 The receipt is appended to both text and HTML. In encrypted mail it is inside the encrypted entity. A receipt proves that the current Hangar instance recorded an email intent for this user; it is not a cryptographic signature over arbitrary content and does not replace DKIM or OpenPGP.
 
-When `EMAIL_DELIVERY_V2_ENABLED=0`, producers retain the pre-migration behavior: they validate and send directly through the configured transport without touching the secure outbox or requiring its cryptographic keys. This compatibility mode has no durable retries, OpenPGP, or receipt ledger. Enabling durable delivery is therefore an explicit, coordinated deployment change; do not enable the flag without the mail worker, database migrations, crypto secrets, and feedback infrastructure.
+When `EMAIL_DELIVERY_V2_ENABLED=0`, producers retain the pre-migration behavior: they validate and send directly through the configured transport without touching the outbox. This compatibility mode has no durable retries, OpenPGP, or receipt ledger. Enabling policy-aware delivery is therefore an explicit, coordinated deployment change; do not enable it without the mail worker, database migrations, and feedback infrastructure.
 
 ## API authorization
 
-All `/api/users/me/email-security/` endpoints use the authenticated user from the session and never accept a user identifier. Receipt queries are limited to the user's foreign-key rows or the keyed hash of their current email. Exact receipt search is supported, but global receipt enumeration is not.
+All `/api/users/me/email-security/` endpoints use the authenticated user from the session and never accept a user identifier. Receipt queries are limited to the user's foreign-key rows or their normalized current email. Exact receipt search is supported, but global receipt enumeration is not.
 
 Instance email-log and suppression endpoints use the existing instance-administrator permission. Suppression removal requires an exact suppression ID and a recorded operator reason of at least ten characters. The row is locked during review to prevent concurrent operators from overwriting the decision.
 
 ## Retention
 
-- queued payloads remain only while delivery is actionable;
-- delivered, suppressed, and permanently failed payloads are purged immediately;
-- accepted and acceptance-unknown payloads are purged after `EMAIL_OUTBOX_RETENTION_DAYS`;
+- queued OpenPGP ciphertext remains only while delivery is actionable;
+- clear and suppressed rows never contain message content;
+- delivered and permanently failed ciphertext is purged immediately;
+- accepted and acceptance-unknown ciphertext is purged after `EMAIL_OUTBOX_RETENTION_DAYS`;
 - privacy-minimized receipts remain through `EMAIL_AUDIT_RETENTION_DAYS`;
 - minimized provider events remain through `EMAIL_EVENT_RETENTION_DAYS`; and
 - expired challenges are removed after their short cleanup grace period.
 
-Rotate outbox encryption keys by prepending a new `version:base64url-key` entry and retaining old entries until every encrypted row using them has expired. Do not casually rotate the lookup HMAC key: receipt codes, address lookup, idempotency intent hashes, and local suppression correlation depend on it. A lookup-key rotation requires an explicit data migration and coexistence plan.
 
 ## Adding a template
 

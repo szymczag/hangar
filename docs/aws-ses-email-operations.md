@@ -4,7 +4,7 @@ Status: production configuration and maintenance runbook.
 
 Last reviewed: 2026-07-14.
 
-This how-to configures Hangar to submit raw MIME through the Amazon SES v2 API in Europe (Frankfurt), consume feedback through SNS and SQS, use a dedicated sending subdomain, and maintain deliverability. It does not require SMTP credentials, a paid mailbox, a stable source IP, or an IP allowlist.
+This how-to configures Hangar to submit raw MIME through the Amazon SES v2 API in Europe (Frankfurt), consume feedback through SNS and SQS, use a dedicated sending subdomain, and maintain deliverability. Hangar authenticates to AWS with workload identity or scoped API credentials and sends through the regional HTTPS endpoint.
 
 Read [Email delivery and OpenPGP](email-delivery-and-openpgp.md) before rollout. The controller must separately approve the provider agreement, transfer assessment, subprocessors, retention, transparency, and incident procedures. This runbook is not legal advice.
 
@@ -184,35 +184,7 @@ If workload identity is unavailable, create independent programmatic credentials
 
 Rotate static credentials by creating the replacement, updating the secret, restarting the mail worker, completing a controlled send and feedback test, then revoking the old key. Workload identity is preferred because it avoids this lifecycle.
 
-## 6. Create application cryptographic keys
-
-Generate two independent 32-byte values with a cryptographically secure generator. Base64url encoding must retain valid padding. Store:
-
-```text
-EMAIL_OUTBOX_ENCRYPTION_KEYS=v1:<base64url-encoded-32-byte-value>
-EMAIL_LOOKUP_HMAC_KEY=<different-base64url-encoded-32-byte-value>
-```
-
-The first setting is a comma-separated keyring. To rotate it, prepend `v2:new-key`, deploy, wait longer than all queued-payload and certificate migration requirements, and only then remove unused old versions.
-
-Do not rotate the lookup HMAC key as a routine secret rotation. Recipient hashes, suppression lookup, intent hashes, and receipt derivation depend on it. Rotation requires a purpose-built online migration and coexistence design.
-
-Create the Kubernetes secret without AWS keys when using workload identity:
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: hangar-mail
-type: Opaque
-stringData:
-  EMAIL_OUTBOX_ENCRYPTION_KEYS: "v1:<base64url-key>"
-  EMAIL_LOOKUP_HMAC_KEY: "<different-base64url-key>"
-```
-
-Encrypt the secret at rest, restrict RBAC, and prefer an external secret controller backed by the organization's secret manager.
-
-## 7. Configure the Helm release
+## 6. Configure the Helm release
 
 Use deployment-specific values outside the repository:
 
@@ -239,7 +211,7 @@ mail:
       eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/hangar-mail-worker
 ```
 
-The chart enables durable delivery, creates a dedicated mail worker, routes mail and feedback tasks to its queue, mounts only the required mail crypto secret, permits HTTPS egress, and fails schema validation for incomplete production mail values. It does not open SMTP port 587.
+The chart enables policy-aware delivery, creates a dedicated mail worker, routes encrypted notifications and feedback tasks to its queue, permits HTTPS egress, and fails schema validation for incomplete production mail values.
 
 Before applying:
 
@@ -250,14 +222,16 @@ helm template hangar charts/hangar -f <deployment-values.yaml> > /tmp/hangar-ren
 
 Review the rendered service account, mail-worker environment, network policy, secret references, and image security context. Do not commit the rendered file if it contains deployment identifiers.
 
-## 8. Validate before real traffic
+## 7. Validate before real traffic
 
 Complete all checks with controlled recipients:
 
 - a minimal cleartext account message has the security notice and receipt;
+- its outbox receipt contains no subject, body, attachment, or authentication token;
 - a confidential message with no verified key is suppressed and remains in-app;
 - an encrypted test is valid RFC 3156 PGP/MIME and decrypts in every supported client;
 - the real subject, body, attachment, and receipt are inside encryption;
+- the database contains only PGP/MIME ciphertext for a queued protected notification;
 - the outer subject is generic and no remote tracking is inserted;
 - DKIM, SPF, and DMARC pass and align;
 - SES events move through SNS/SQS and update the same outbox receipt;
@@ -270,7 +244,7 @@ Complete all checks with controlled recipients:
 
 Inspect the raw MIME source, not only the mail client's rendered view. Test Thunderbird, the approved command-line workflow, and the actual Workspace/Gmail workflow expected by users.
 
-## 9. Maintain deliverability
+## 8. Maintain deliverability
 
 ### Continuous monitoring
 

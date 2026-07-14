@@ -5,7 +5,6 @@
 """Privacy-minimized email receipt representations."""
 
 from plane.db.models import EmailOutbox
-from plane.mailer.crypto import decrypt_bytes
 
 
 def email_receipt(outbox: EmailOutbox, *, admin: bool = False) -> dict:
@@ -22,19 +21,11 @@ def email_receipt(outbox: EmailOutbox, *, admin: bool = False) -> dict:
         "key_fingerprint": outbox.openpgp_fingerprint or None,
     }
     if admin:
-        try:
-            recipient_email = decrypt_bytes(
-                outbox.recipient_email_ciphertext,
-                associated_data=f"email-outbox-recipient:{outbox.id}".encode(),
-            ).decode("utf-8")
-        except Exception:
-            recipient_email = None
         data.update(
             {
                 "id": outbox.id,
                 "recipient_user_id": outbox.recipient_id,
-                "recipient_email_hash": outbox.recipient_email_hash,
-                "recipient_email": recipient_email,
+                "recipient_email": outbox.recipient_email,
                 "template_key": outbox.template_key,
                 "policy_class": outbox.policy_class,
                 "configuration_set": outbox.configuration_set,

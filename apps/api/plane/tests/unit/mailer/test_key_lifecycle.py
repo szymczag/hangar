@@ -2,31 +2,28 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-import base64
 import uuid
 from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
 from django.test import override_settings
+from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from plane.app.views.user.email_security import EmailSecurityChallengeVerifyEndpoint, EmailSecurityKeyUploadEndpoint
 from plane.db.models import OpenPGPKeyChallenge, UserOpenPGPKey
-from plane.mailer.crypto import keyed_digest
 from plane.mailer.enums import OpenPGPKeyStatus
 from plane.mailer.exceptions import OpenPGPError
 from plane.tests.factories import UserFactory
-
-LOOKUP_KEY = base64.urlsafe_b64encode(b"k" * 32).decode("ascii")
 
 
 def _key(user, version, status):
     return UserOpenPGPKey.objects.create(
         user=user,
         version=version,
-        certificate_ciphertext="encrypted-public-certificate",
+        certificate="public certificate",
         primary_fingerprint=f"{version:040X}",
         encryption_subkey_fingerprint=f"{version + 100:040X}",
         primary_algorithm="RSA",
@@ -42,7 +39,7 @@ def _challenge(key, code="ABCD2345EFGH6789"):
     return OpenPGPKeyChallenge.objects.create(
         id=challenge_id,
         key=key,
-        token_digest=keyed_digest(code, purpose=f"openpgp-challenge:{challenge_id}"),
+        token_digest=make_password(code),
         expires_at=timezone.now() + timedelta(minutes=15),
         sent_at=timezone.now(),
     )
@@ -57,7 +54,7 @@ def _verify(user, key, code):
 
 @pytest.mark.unit
 @pytest.mark.django_db
-@override_settings(EMAIL_OPENPGP_ENABLED=True, EMAIL_LOOKUP_HMAC_KEY=LOOKUP_KEY)
+@override_settings(EMAIL_OPENPGP_ENABLED=True)
 def test_verified_replacement_is_atomic_and_challenge_cannot_be_replayed():
     user = UserFactory(email="key-owner@example.com", username="key-owner@example.com")
     active = _key(user, 1, OpenPGPKeyStatus.ACTIVE)
@@ -80,7 +77,7 @@ def test_verified_replacement_is_atomic_and_challenge_cannot_be_replayed():
 
 @pytest.mark.unit
 @pytest.mark.django_db
-@override_settings(EMAIL_OPENPGP_ENABLED=True, EMAIL_LOOKUP_HMAC_KEY=LOOKUP_KEY)
+@override_settings(EMAIL_OPENPGP_ENABLED=True)
 def test_challenge_is_consumed_after_five_failed_attempts():
     user = UserFactory(email="attempts@example.com", username="attempts@example.com")
     pending = _key(user, 1, OpenPGPKeyStatus.PENDING)

@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
             fields=audit_fields()
             + [
                 ("version", models.PositiveIntegerField()),
-                ("certificate_ciphertext", models.TextField()),
+                ("certificate", models.TextField()),
                 ("primary_fingerprint", models.CharField(db_index=True, max_length=64)),
                 ("encryption_subkey_fingerprint", models.CharField(max_length=64)),
                 ("primary_algorithm", models.CharField(max_length=64)),
@@ -101,7 +101,7 @@ class Migration(migrations.Migration):
             name="OpenPGPKeyChallenge",
             fields=audit_fields()
             + [
-                ("token_digest", models.CharField(max_length=64)),
+                ("token_digest", models.CharField(max_length=128)),
                 ("expires_at", models.DateTimeField(db_index=True)),
                 ("attempts", models.PositiveSmallIntegerField(default=0)),
                 ("sent_at", models.DateTimeField(blank=True, null=True)),
@@ -141,8 +141,7 @@ class Migration(migrations.Migration):
             name="EmailOutbox",
             fields=audit_fields()
             + [
-                ("recipient_email_ciphertext", models.TextField()),
-                ("recipient_email_hash", models.CharField(db_index=True, max_length=64)),
+                ("recipient_email", models.EmailField(db_index=True, max_length=320)),
                 (
                     "policy_class",
                     models.CharField(
@@ -159,8 +158,7 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("template_key", models.CharField(max_length=96)),
-                ("payload_ciphertext", models.TextField(blank=True)),
-                ("payload_schema_version", models.PositiveSmallIntegerField(default=1)),
+                ("encrypted_message", models.BinaryField(blank=True)),
                 ("idempotency_key", models.CharField(max_length=255, unique=True)),
                 ("message_id", models.CharField(max_length=255, unique=True)),
                 ("openpgp_fingerprint", models.CharField(blank=True, max_length=64)),
@@ -244,7 +242,7 @@ class Migration(migrations.Migration):
             name="EmailSuppression",
             fields=audit_fields()
             + [
-                ("email_hash", models.CharField(db_index=True, max_length=64)),
+                ("email_address", models.EmailField(db_index=True, max_length=320)),
                 (
                     "reason",
                     models.CharField(
@@ -381,7 +379,7 @@ class Migration(migrations.Migration):
             model_name="emailsuppression",
             constraint=models.UniqueConstraint(
                 condition=models.Q(("deleted_at__isnull", True), ("is_active", True)),
-                fields=("email_hash", "reason"),
+                fields=("email_address", "reason"),
                 name="uniq_active_email_suppression",
             ),
         ),

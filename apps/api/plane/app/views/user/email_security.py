@@ -4,13 +4,13 @@
 
 """Self-service OpenPGP key lifecycle endpoints."""
 
-import hmac
 import logging
 import secrets
 import uuid
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import transaction
 from django.db.models import Max, Q
 from django.utils import timezone
@@ -28,7 +28,6 @@ from plane.app.serializers.email_security import (
 from plane.app.views.base import BaseAPIView
 from plane.db.models import EmailOutbox, EmailSuppression, OpenPGPKeyChallenge, User, UserOpenPGPKey
 from plane.mailer.audit import email_receipt
-from plane.mailer.crypto import encrypt_bytes, keyed_digest
 from plane.mailer.enums import OpenPGPKeyStatus, OutboxStatus
 from plane.mailer.exceptions import MailerError, OpenPGPError
 from plane.mailer.openpgp import inspect_certificate
@@ -126,9 +125,11 @@ class EmailSecurityStatusEndpoint(BaseAPIView):
         keys = UserOpenPGPKey.objects.filter(user=request.user, status__in=["active", "pending"]).order_by("-version")
         active = next((key for key in keys if key.status == OpenPGPKeyStatus.ACTIVE), None)
         pending = next((key for key in keys if key.status == OpenPGPKeyStatus.PENDING), None)
-        email_hash = keyed_digest(request.user.email.strip().lower(), purpose="recipient-email")
+        recipient_email = request.user.email.strip().lower()
         suppressions = list(
-            EmailSuppression.objects.filter(email_hash=email_hash, is_active=True).values_list("reason", flat=True)
+            EmailSuppression.objects.filter(email_address=recipient_email, is_active=True).values_list(
+                "reason", flat=True
+            )
         )
         return Response(
             {
@@ -145,8 +146,8 @@ class EmailSecurityStatusEndpoint(BaseAPIView):
 
 class EmailSecurityReceiptEndpoint(BaseAPIView):
     def get(self, request):
-        email_hash = keyed_digest(request.user.email.strip().lower(), purpose="recipient-email")
-        queryset = EmailOutbox.objects.filter(Q(recipient=request.user) | Q(recipient_email_hash=email_hash))
+        recipient_email = request.user.email.strip().lower()
+        queryset = EmailOutbox.objects.filter(Q(recipient=request.user) | Q(recipient_email=recipient_email))
         receipt_code = request.query_params.get("receipt", "").strip().upper()
         if receipt_code:
             queryset = queryset.filter(receipt_code=receipt_code)
@@ -196,10 +197,7 @@ class EmailSecurityKeyUploadEndpoint(BaseAPIView):
                 id=key_id,
                 user=request.user,
                 version=next_version,
-                certificate_ciphertext=encrypt_bytes(
-                    info.normalized_certificate.encode("utf-8"),
-                    associated_data=f"openpgp-certificate:{key_id}".encode(),
-                ),
+                certificate=info.normalized_certificate,
                 primary_fingerprint=info.primary_fingerprint,
                 encryption_subkey_fingerprint=info.encryption_subkey_fingerprint,
                 primary_algorithm=info.primary_algorithm,
@@ -240,7 +238,7 @@ class EmailSecurityChallengeEndpoint(BaseAPIView):
             challenge = OpenPGPKeyChallenge.objects.create(
                 id=challenge_id,
                 key=key,
-                token_digest=keyed_digest(code, purpose=f"openpgp-challenge:{challenge_id}"),
+                token_digest=make_password(code),
                 expires_at=now + CHALLENGE_LIFETIME,
             )
         try:
@@ -312,12 +310,7 @@ class EmailSecurityChallengeVerifyEndpoint(BaseAPIView):
                     {"error": "The verification challenge is missing or expired."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            expected = challenge.token_digest
-            supplied = keyed_digest(
-                serializer.validated_data["code"].upper(),
-                purpose=f"openpgp-challenge:{challenge.id}",
-            )
-            if not hmac.compare_digest(expected, supplied):
+            if not check_password(serializer.validated_data["code"].upper(), challenge.token_digest):
                 challenge.attempts += 1
                 if challenge.attempts >= MAX_CHALLENGE_ATTEMPTS:
                     challenge.consumed_at = now

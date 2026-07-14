@@ -55,8 +55,6 @@ existingSecrets:
     secretAccessKeyKey: AWS_SECRET_ACCESS_KEY
   mail:
     name: hangar-mail
-    outboxEncryptionKeysKey: EMAIL_OUTBOX_ENCRYPTION_KEYS
-    lookupHmacKeyKey: EMAIL_LOOKUP_HMAC_KEY
     sesAccessKeyIdKey: EMAIL_SES_AWS_ACCESS_KEY_ID
     sesSecretAccessKeyKey: EMAIL_SES_AWS_SECRET_ACCESS_KEY
     sesSessionTokenKey: EMAIL_SES_AWS_SESSION_TOKEN

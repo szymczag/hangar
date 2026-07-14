@@ -130,19 +130,6 @@ app.kubernetes.io/part-of: hangar
       key: {{ .Values.existingSecrets.objectStorage.secretAccessKeyKey }}
 {{- end -}}
 
-{{- define "hangar.mailCryptoSecretEnv" -}}
-- name: EMAIL_OUTBOX_ENCRYPTION_KEYS
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.existingSecrets.mail.name }}
-      key: {{ .Values.existingSecrets.mail.outboxEncryptionKeysKey }}
-- name: EMAIL_LOOKUP_HMAC_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.existingSecrets.mail.name }}
-      key: {{ .Values.existingSecrets.mail.lookupHmacKeyKey }}
-{{- end -}}
-
 {{- define "hangar.mailAWSSecretEnv" -}}
 {{- range $name, $key := dict "EMAIL_SES_AWS_ACCESS_KEY_ID" .Values.existingSecrets.mail.sesAccessKeyIdKey "EMAIL_SES_AWS_SECRET_ACCESS_KEY" .Values.existingSecrets.mail.sesSecretAccessKeyKey "EMAIL_SES_AWS_SESSION_TOKEN" .Values.existingSecrets.mail.sesSessionTokenKey "EMAIL_EVENTS_AWS_ACCESS_KEY_ID" .Values.existingSecrets.mail.eventsAccessKeyIdKey "EMAIL_EVENTS_AWS_SECRET_ACCESS_KEY" .Values.existingSecrets.mail.eventsSecretAccessKeyKey "EMAIL_EVENTS_AWS_SESSION_TOKEN" .Values.existingSecrets.mail.eventsSessionTokenKey }}
 - name: {{ $name }}

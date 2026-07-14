@@ -109,7 +109,7 @@ The chart stores only Secret names and key names in the Helm release.
 | `existingSecrets.cache`         | `hangar-cache`          | `REDIS_URL`                                                                            |
 | `existingSecrets.queue`         | `hangar-queue`          | `AMQP_URL`                                                                             |
 | `existingSecrets.objectStorage` | `hangar-object-storage` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                           |
-| `existingSecrets.mail`          | `hangar-mail`           | Outbox encryption keyring, lookup HMAC key, and optional dedicated AWS credential keys |
+| `existingSecrets.mail`          | `hangar-mail`           | Optional dedicated SES and SQS static credential keys                                  |
 
 Evaluation adds dependency keys to the same resources:
 
@@ -153,11 +153,12 @@ mail:
       eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/hangar-mail-worker
 ```
 
-The `hangar-mail` Secret must always provide
-`EMAIL_OUTBOX_ENCRYPTION_KEYS` and `EMAIL_LOOKUP_HMAC_KEY`. AWS access-key
-entries are optional and should be absent when workload identity is available.
-Only the mail worker receives the SES/SQS identity; other workloads receive no
-mail AWS credentials.
+OpenPGP ciphertext is created before a protected notification enters the
+outbox, public certificates are stored as public material, and clear account
+mail retains receipt metadata only. Workload identity supplies the mail
+worker's SES/SQS permissions. Deployments using static AWS credentials map
+them from the optional `hangar-mail` Secret. Other workloads receive no mail
+AWS credentials.
 
 The schema requires the SES account, topic, and queue to be internally
 consistent enough for application startup validation. It cannot verify that

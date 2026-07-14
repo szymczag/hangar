@@ -58,9 +58,6 @@ spec:
           env:
             {{- include "hangar.coreSecretEnv" $root | nindent 12 }}
             {{- include "hangar.celerySecretEnv" $root | nindent 12 }}
-            {{- if $root.Values.mail.enabled }}
-            {{- include "hangar.mailCryptoSecretEnv" $root | nindent 12 }}
-            {{- end }}
             {{- if eq $worker.name "worker" }}
             {{- include "hangar.objectStorageSecretEnv" $root | nindent 12 }}
             {{- end }}

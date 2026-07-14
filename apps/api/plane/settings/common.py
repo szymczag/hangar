@@ -5,8 +5,6 @@
 """Global Settings"""
 
 # Python imports
-import base64
-import binascii
 import ipaddress
 import logging
 import os
@@ -477,8 +475,6 @@ EMAIL_SES_AWS_SESSION_TOKEN = os.environ.get("EMAIL_SES_AWS_SESSION_TOKEN", "").
 EMAIL_EVENTS_AWS_ACCESS_KEY_ID = os.environ.get("EMAIL_EVENTS_AWS_ACCESS_KEY_ID", "").strip()
 EMAIL_EVENTS_AWS_SECRET_ACCESS_KEY = os.environ.get("EMAIL_EVENTS_AWS_SECRET_ACCESS_KEY", "").strip()
 EMAIL_EVENTS_AWS_SESSION_TOKEN = os.environ.get("EMAIL_EVENTS_AWS_SESSION_TOKEN", "").strip()
-EMAIL_OUTBOX_ENCRYPTION_KEYS = os.environ.get("EMAIL_OUTBOX_ENCRYPTION_KEYS", "").strip()
-EMAIL_LOOKUP_HMAC_KEY = os.environ.get("EMAIL_LOOKUP_HMAC_KEY", "").strip()
 EMAIL_MESSAGE_ID_DOMAIN = os.environ.get("EMAIL_MESSAGE_ID_DOMAIN", "hangar.invalid").strip().lower()
 EMAIL_MAX_STORED_PAYLOAD_BYTES = int(os.environ.get("EMAIL_MAX_STORED_PAYLOAD_BYTES", 8388608))
 EMAIL_MAX_ATTACHMENT_BYTES = int(os.environ.get("EMAIL_MAX_ATTACHMENT_BYTES", 5242880))
@@ -504,24 +500,6 @@ if bool(EMAIL_EVENTS_AWS_ACCESS_KEY_ID) != bool(EMAIL_EVENTS_AWS_SECRET_ACCESS_K
     raise ImproperlyConfigured("SES event-consumer access key ID and secret must be configured together")
 if bool(EMAIL_SES_AWS_ACCESS_KEY_ID) != bool(EMAIL_SES_AWS_SECRET_ACCESS_KEY):
     raise ImproperlyConfigured("SES API access key ID and secret must be configured together")
-if (EMAIL_DELIVERY_V2_ENABLED or EMAIL_OPENPGP_ENABLED) and not EMAIL_OUTBOX_ENCRYPTION_KEYS:
-    raise ImproperlyConfigured("EMAIL_OUTBOX_ENCRYPTION_KEYS is required when secure email delivery is enabled")
-if (EMAIL_DELIVERY_V2_ENABLED or EMAIL_OPENPGP_ENABLED) and not EMAIL_LOOKUP_HMAC_KEY:
-    raise ImproperlyConfigured("EMAIL_LOOKUP_HMAC_KEY is required when secure email delivery is enabled")
-if EMAIL_DELIVERY_V2_ENABLED or EMAIL_OPENPGP_ENABLED:
-    try:
-        outbox_key_entries = [entry.strip() for entry in EMAIL_OUTBOX_ENCRYPTION_KEYS.split(",") if entry.strip()]
-        versions = [entry.split(":", 1)[0] for entry in outbox_key_entries]
-        outbox_keys = [
-            base64.b64decode(entry.split(":", 1)[1], altchars=b"-_", validate=True) for entry in outbox_key_entries
-        ]
-        lookup_key = base64.b64decode(EMAIL_LOOKUP_HMAC_KEY, altchars=b"-_", validate=True)
-    except (ValueError, IndexError, binascii.Error) as exc:
-        raise ImproperlyConfigured("Secure email encryption keys are malformed") from exc
-    if not versions or len(versions) != len(set(versions)) or any(not version for version in versions):
-        raise ImproperlyConfigured("Outbox encryption key versions must be present and unique")
-    if any(len(key) != 32 for key in outbox_keys) or len(lookup_key) != 32:
-        raise ImproperlyConfigured("Secure email encryption keys must decode to 32 bytes")
 if EMAIL_DELIVERY_V2_ENABLED and EMAIL_PROVIDER in {"ses_smtp", "ses_api"}:
     if not all(
         (

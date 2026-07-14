@@ -49,12 +49,15 @@ chart adds a dedicated `mail-worker` for Amazon SES API delivery, feedback
 processing, audit receipts, suppression handling, and optional OpenPGP
 encryption. The workload is isolated from the general workers and is the only
 application pod that receives the mail service account or optional SES and SQS
-credentials.
+credentials. OpenPGP notifications are encrypted to the recipient before
+durable storage, while unencrypted account messages are submitted directly
+and retain receipt metadata only.
 
 Before enabling it, an operator must provide a verified SES identity, DKIM and
 DMARC DNS records, production SES access, configuration sets, an SNS topic, an
-SQS queue, least-privilege IAM, and the `hangar-mail` Secret. The chart does not
-create or validate those AWS resources.
+SQS queue, and least-privilege IAM. A `hangar-mail` Secret is needed only for
+the optional static AWS credential fallback; workload identity requires no
+mail Secret values. The chart does not create or validate those AWS resources.
 
 Use the [configuration reference](configuration.md#secure-email-delivery) for
 the Helm values and Secret contract. Follow the

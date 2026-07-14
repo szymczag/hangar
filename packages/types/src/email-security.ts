@@ -48,7 +48,6 @@ export interface IEmailReceipt {
   key_fingerprint: string | null;
   id?: string;
   recipient_user_id?: string | null;
-  recipient_email_hash?: string;
   recipient_email?: string | null;
   template_key?: string;
   policy_class?: string;
@@ -71,7 +70,6 @@ export interface IEmailSuppression {
   id: string;
   recipient_user_id: string | null;
   recipient_email: string | null;
-  email_hash: string;
   reason: string;
   source: string;
   created_at: string;

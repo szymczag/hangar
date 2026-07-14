@@ -13,6 +13,7 @@ from plane.bgtasks.email_delivery_task import (
     cleanup_secure_email_records,
     consume_ses_email_events,
     dispatch_due_email_outbox,
+    recover_stale_email_outbox,
 )
 from plane.db.models import EmailOutbox
 from plane.mailer.enums import DeliveryMode, MailPolicyClass, OutboxStatus
@@ -23,16 +24,14 @@ from plane.mailer.enums import DeliveryMode, MailPolicyClass, OutboxStatus
 @override_settings(EMAIL_DELIVERY_V2_ENABLED=True)
 def test_due_dispatcher_recovers_a_missed_broker_publication():
     outbox = EmailOutbox.objects.create(
-        recipient_email_ciphertext="encrypted",
-        recipient_email_hash="a" * 64,
+        recipient_email="person@example.com",
         policy_class=MailPolicyClass.ACCOUNT_ACCESS,
         template_key="auth.magic_signin",
         audit_label="Login code",
         sender="Hangar <hello@hangar.example.com>",
-        delivery_mode=DeliveryMode.CLEAR,
-        payload_ciphertext="encrypted",
+        delivery_mode=DeliveryMode.OPENPGP,
+        encrypted_message=b"encrypted",
         idempotency_key="test:due-dispatch",
-        intent_digest="b" * 64,
         message_id="<due@hangar.example.com>",
         receipt_code="AAAA-BBBB-CCCC-DDDD-EEEE",
         status=OutboxStatus.QUEUED,
@@ -45,19 +44,46 @@ def test_due_dispatcher_recovers_a_missed_broker_publication():
 
 @pytest.mark.unit
 @pytest.mark.django_db
-@override_settings(EMAIL_OUTBOX_RETENTION_DAYS=7, EMAIL_AUDIT_RETENTION_DAYS=90, EMAIL_EVENT_RETENTION_DAYS=4)
-def test_cleanup_purges_payload_but_retains_recent_audit_receipt():
+@override_settings(EMAIL_DELIVERY_V2_ENABLED=True)
+def test_stale_clear_delivery_becomes_unknown_and_is_never_dispatched():
     outbox = EmailOutbox.objects.create(
-        recipient_email_ciphertext="encrypted",
-        recipient_email_hash="c" * 64,
+        recipient_email="person@example.com",
         policy_class=MailPolicyClass.ACCOUNT_ACCESS,
         template_key="auth.magic_signin",
         audit_label="Login code",
         sender="Hangar <hello@hangar.example.com>",
         delivery_mode=DeliveryMode.CLEAR,
-        payload_ciphertext="encrypted-payload",
+        encrypted_message=b"",
+        idempotency_key="test:stale-clear",
+        message_id="<stale-clear@hangar.example.com>",
+        receipt_code="AAAA-BBBB-CCCC-DDDD-EEEE",
+        status=OutboxStatus.PROCESSING,
+        lease_expires_at=timezone.now() - timedelta(seconds=1),
+    )
+
+    with patch("plane.bgtasks.email_delivery_task.deliver_email_outbox.delay") as delay:
+        recover_stale_email_outbox()
+
+    outbox.refresh_from_db()
+    assert outbox.status == OutboxStatus.ACCEPTANCE_UNKNOWN
+    assert outbox.next_attempt_at is None
+    assert outbox.lease_expires_at is None
+    delay.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(EMAIL_OUTBOX_RETENTION_DAYS=7, EMAIL_AUDIT_RETENTION_DAYS=90, EMAIL_EVENT_RETENTION_DAYS=4)
+def test_cleanup_purges_payload_but_retains_recent_audit_receipt():
+    outbox = EmailOutbox.objects.create(
+        recipient_email="person@example.com",
+        policy_class=MailPolicyClass.ACCOUNT_ACCESS,
+        template_key="auth.magic_signin",
+        audit_label="Login code",
+        sender="Hangar <hello@hangar.example.com>",
+        delivery_mode=DeliveryMode.OPENPGP,
+        encrypted_message=b"encrypted-payload",
         idempotency_key="test:audit-retention",
-        intent_digest="d" * 64,
         message_id="<retention@hangar.example.com>",
         receipt_code="1111-2222-3333-4444-5555",
         status=OutboxStatus.ACCEPTED,
@@ -67,7 +93,7 @@ def test_cleanup_purges_payload_but_retains_recent_audit_receipt():
     cleanup_secure_email_records()
 
     outbox.refresh_from_db()
-    assert outbox.payload_ciphertext == ""
+    assert bytes(outbox.encrypted_message) == b""
     assert outbox.receipt_code == "1111-2222-3333-4444-5555"
 
 
@@ -77,16 +103,14 @@ def test_cleanup_purges_payload_but_retains_recent_audit_receipt():
 @override_settings(EMAIL_OUTBOX_RETENTION_DAYS=7, EMAIL_AUDIT_RETENTION_DAYS=90, EMAIL_EVENT_RETENTION_DAYS=4)
 def test_cleanup_deletes_nonterminal_provider_receipts_after_audit_retention(delivery_status):
     outbox = EmailOutbox.objects.create(
-        recipient_email_ciphertext="encrypted",
-        recipient_email_hash="e" * 64,
+        recipient_email="person@example.com",
         policy_class=MailPolicyClass.ACCOUNT_ACCESS,
         template_key="auth.magic_signin",
         audit_label="Login code",
         sender="Hangar <hello@hangar.example.com>",
         delivery_mode=DeliveryMode.CLEAR,
-        payload_ciphertext="",
+        encrypted_message=b"",
         idempotency_key=f"test:expired-audit:{delivery_status}",
-        intent_digest="f" * 64,
         message_id=f"<expired-{delivery_status}@hangar.example.com>",
         receipt_code=(
             "AAAA-1111-BBBB-2222-CCCC" if delivery_status == OutboxStatus.ACCEPTED else "DDDD-3333-EEEE-4444-FFFF"
