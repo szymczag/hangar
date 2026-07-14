@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "計費與方案",
-        "description": "選擇您的方案、管理訂閱，並在需求增加時輕鬆升級。",
-        "title": "計費和方案",
-        "current_plan": "目前方案",
-        "free_plan": "您目前使用的是免費方案",
-        "view_plans": "檢視方案"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "匯出",

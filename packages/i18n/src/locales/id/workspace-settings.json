@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Penagihan & Rencana",
-        "description": "Pilih rencana Anda, kelola langganan, dan tingkatkan dengan mudah seiring pertumbuhan kebutuhan Anda.",
-        "title": "Penagihan & Rencana",
-        "current_plan": "Rencana saat ini",
-        "free_plan": "Anda saat ini menggunakan rencana gratis",
-        "view_plans": "Lihat rencana"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Ekspor",

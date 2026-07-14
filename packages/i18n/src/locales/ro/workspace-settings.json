@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Facturare și abonamente",
-        "description": "Alege abonamentul tău, gestionează abonamentele și actualizează cu ușurință pe măsură ce nevoile tale cresc.",
-        "title": "Facturare și Abonamente",
-        "current_plan": "Abonament curent",
-        "free_plan": "Folosești în prezent abonamentul gratuit",
-        "view_plans": "Vezi abonamentele"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Exporturi",

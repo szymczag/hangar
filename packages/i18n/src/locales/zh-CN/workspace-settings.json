@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "账单与计划",
-        "description": "选择您的计划、管理订阅，并随着需求增长轻松升级。",
-        "title": "账单与计划",
-        "current_plan": "当前计划",
-        "free_plan": "您目前使用的是免费计划",
-        "view_plans": "查看计划"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "导出",

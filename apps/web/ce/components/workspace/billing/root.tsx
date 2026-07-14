@@ -4,67 +4,43 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
 import { observer } from "mobx-react";
-// plane imports
-import { DEFAULT_PRODUCT_BILLING_FREQUENCY, SUBSCRIPTION_WITH_BILLING_FREQUENCY } from "@plane/constants";
-import { useTranslation } from "@plane/i18n";
-import type { TBillingFrequency, TProductBillingFrequency } from "@plane/types";
-import { EProductSubscriptionEnum } from "@plane/types";
+import { Check, Infinity as InfinityIcon } from "lucide-react";
 // components
-import { SettingsBoxedControlItem } from "@/components/settings/boxed-control-item";
 import { SettingsHeading } from "@/components/settings/heading";
-// local imports
-import { PlansComparison } from "./comparison/root";
 
 export const BillingRoot = observer(function BillingRoot() {
-  const [isCompareAllFeaturesSectionOpen, setIsCompareAllFeaturesSectionOpen] = useState(false);
-  const [productBillingFrequency, setProductBillingFrequency] = useState<TProductBillingFrequency>(
-    DEFAULT_PRODUCT_BILLING_FREQUENCY
-  );
-  const { t } = useTranslation();
-
-  /**
-   * Retrieves the billing frequency for a given subscription type
-   * @param {EProductSubscriptionEnum} subscriptionType - Type of subscription to get frequency for
-   * @returns {TBillingFrequency | undefined} - Billing frequency if subscription supports it, undefined otherwise
-   */
-  const getBillingFrequency = (subscriptionType: EProductSubscriptionEnum): TBillingFrequency | undefined =>
-    SUBSCRIPTION_WITH_BILLING_FREQUENCY.includes(subscriptionType)
-      ? productBillingFrequency[subscriptionType]
-      : undefined;
-
-  /**
-   * Updates the billing frequency for a specific subscription type
-   * @param {EProductSubscriptionEnum} subscriptionType - Type of subscription to update
-   * @param {TBillingFrequency} frequency - New billing frequency to set
-   * @returns {void}
-   */
-  const setBillingFrequency = (subscriptionType: EProductSubscriptionEnum, frequency: TBillingFrequency): void =>
-    setProductBillingFrequency({ ...productBillingFrequency, [subscriptionType]: frequency });
-
   return (
     <section className="relative scrollbar-hide size-full overflow-y-auto">
-      <div>
-        <SettingsHeading
-          title={t("workspace_settings.settings.billing_and_plans.heading")}
-          description={t("workspace_settings.settings.billing_and_plans.description")}
-        />
-        <div className="mt-6">
-          <SettingsBoxedControlItem
-            title="Community"
-            description="Unlimited projects, issues, cycles, modules, pages, and storage"
-          />
+      <SettingsHeading
+        title="Hangar Community"
+        description="One community edition. No subscriptions, upgrades, or paid tiers."
+      />
+
+      <div className="mt-6 overflow-hidden rounded-lg border border-subtle bg-layer-2">
+        <div className="flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-start sm:px-6 sm:py-7">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-accent-primary text-on-color">
+            <InfinityIcon className="size-7" aria-hidden="true" />
+          </div>
+
+          <div className="max-w-2xl">
+            <p className="tracking-wider text-caption-sm-medium text-accent-primary uppercase">Community edition</p>
+            <h2 className="mt-1 text-h4-semibold text-primary">Enjoy unlimited, free, community-based Hangar.</h2>
+            <p className="mt-2 text-body-sm-regular text-secondary">
+              Everything implemented in this fork is available to your workspace without a license key or paid
+              subscription. Your practical capacity depends only on the infrastructure operated by your administrator.
+            </p>
+          </div>
         </div>
-      </div>
-      <div className="mt-10 flex flex-col gap-y-3">
-        <h4 className="text-h6-semibold">All plans</h4>
-        <PlansComparison
-          isCompareAllFeaturesSectionOpen={isCompareAllFeaturesSectionOpen}
-          getBillingFrequency={getBillingFrequency}
-          setBillingFrequency={setBillingFrequency}
-          setIsCompareAllFeaturesSectionOpen={setIsCompareAllFeaturesSectionOpen}
-        />
+
+        <div className="grid divide-y divide-subtle border-t border-subtle bg-layer-1 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {["No paid tiers", "No upgrade prompts", "Community maintained"].map((benefit) => (
+            <div key={benefit} className="flex items-center gap-2 px-5 py-3 text-body-sm-medium text-primary sm:px-6">
+              <Check className="size-4 shrink-0 text-accent-primary" aria-hidden="true" />
+              <span>{benefit}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

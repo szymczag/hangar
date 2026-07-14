@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Faturamento e planos",
-        "description": "Escolha seu plano, gerencie assinaturas e faça upgrade facilmente conforme suas necessidades crescem.",
-        "title": "Faturamento e planos",
-        "current_plan": "Plano atual",
-        "free_plan": "Você está usando o plano gratuito atualmente",
-        "view_plans": "Ver planos"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Exportações",

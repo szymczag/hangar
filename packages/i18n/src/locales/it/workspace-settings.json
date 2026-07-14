@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Fatturazione e piani",
-        "description": "Scegli il tuo piano, gestisci gli abbonamenti e aggiorna facilmente man mano che le tue esigenze crescono.",
-        "title": "Fatturazione e Piani",
-        "current_plan": "Piano attuale",
-        "free_plan": "Stai attualmente utilizzando il piano gratuito",
-        "view_plans": "Visualizza piani"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Esportazioni",

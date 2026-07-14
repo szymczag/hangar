@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "請求とプラン",
-        "description": "プランを選択してサブスクリプションを管理し、ニーズの拡大に応じて簡単にアップグレードできます。",
-        "title": "請求とプラン",
-        "current_plan": "現在のプラン",
-        "free_plan": "現在フリープランを使用中です",
-        "view_plans": "プランを表示"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "エクスポート",
