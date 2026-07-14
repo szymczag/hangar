@@ -48,6 +48,16 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("gh api --paginate --slurp", self.workflow)
         self.assertIn("docker buildx imagetools inspect", self.workflow)
 
+    def test_release_requires_synchronized_kubernetes_documentation(self):
+        self.assertIn("Validate Kubernetes release documentation", self.workflow)
+        self.assertIn("docs/kubernetes/README.md", self.workflow)
+        self.assertIn("The current release is", self.workflow)
+        self.assertIn("qualification boundary is:", self.workflow)
+        self.assertIn("| Product version", self.workflow)
+        self.assertIn("| Helm chart version", self.workflow)
+        self.assertIn("| Git tag", self.workflow)
+        self.assertIn("| OCI chart", self.workflow)
+
     def test_release_images_include_upstream_provenance(self):
         repository_label = (
             "io.github.szymczag.hangar.upstream.repository="

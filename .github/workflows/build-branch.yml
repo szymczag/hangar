@@ -92,6 +92,31 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/release_notes.py validate --git-tag "$GIT_TAG"
 
+      - name: Validate Kubernetes release documentation
+        if: steps.metadata.outputs.is_release == 'true'
+        env:
+          GIT_TAG: ${{ steps.metadata.outputs.git_tag }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          chart_version="${VERSION#v}"
+          documentation=docs/kubernetes/README.md
+
+          require_literal() {
+            local expected="$1"
+            if ! grep --fixed-strings --quiet "$expected" "$documentation"; then
+              echo "$documentation is not synchronized with release $GIT_TAG: missing $expected" >&2
+              exit 1
+            fi
+          }
+
+          require_literal "The current release is \`$chart_version\`."
+          require_literal "The \`$chart_version\` qualification boundary is:"
+          require_literal "| Product version    | \`$VERSION\`"
+          require_literal "| Helm chart version | \`$chart_version\`"
+          require_literal "| Git tag            | \`$GIT_TAG\`"
+          require_literal "| OCI chart          | \`ghcr.io/szymczag/charts/hangar:$chart_version\`"
+
       - name: Require release commit on preview
         if: steps.metadata.outputs.is_release == 'true'
         env:
