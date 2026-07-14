@@ -5,7 +5,7 @@
 #
 # Usage:
 #   # Run the full suite (defaults to `pytest`):
-#   docker compose -f docker-compose-test.yml up --build --abort-on-container-exit --exit-code-from api-tests
+#   docker compose -f docker-compose-test.yml run --rm --build api-tests pytest
 #
 #   # Run a subset by overriding the command:
 #   docker compose -f docker-compose-test.yml run --rm --build api-tests pytest -m unit

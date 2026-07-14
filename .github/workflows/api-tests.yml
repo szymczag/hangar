@@ -33,8 +33,8 @@ jobs:
 
       - name: Run API test suite
         run: |
-          docker compose -f docker-compose-test.yml up \
-            --build --abort-on-container-exit --exit-code-from api-tests
+          docker compose -f docker-compose-test.yml run --rm --build \
+            api-tests pytest
 
       - name: Tear down
         if: always()

@@ -77,7 +77,7 @@ The Django/pytest suite for `apps/api` runs in an isolated stack defined by `doc
 
 Prereq (once): `./setup.sh` — generates `apps/api/.env` from `.env.example`.
 
-- Full suite: `docker compose -f docker-compose-test.yml up --build --abort-on-container-exit --exit-code-from api-tests`
+- Full suite: `docker compose -f docker-compose-test.yml run --rm --build api-tests pytest`
 - Subset: `docker compose -f docker-compose-test.yml run --rm api-tests pytest -m unit`
 - Teardown: `docker compose -f docker-compose-test.yml down -v`
 
