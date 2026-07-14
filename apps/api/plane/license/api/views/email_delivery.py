@@ -12,8 +12,6 @@ from rest_framework.response import Response
 
 from plane.db.models import EmailOutbox, EmailSuppression
 from plane.mailer.audit import email_receipt
-from plane.mailer.crypto import keyed_digest
-
 from .base import BaseAPIView
 
 
@@ -24,7 +22,7 @@ class InstanceEmailDeliveryLogEndpoint(BaseAPIView):
         receipt = request.query_params.get("receipt", "").strip().upper()
         delivery_status = request.query_params.get("status", "").strip()
         if recipient:
-            queryset = queryset.filter(recipient_email_hash=keyed_digest(recipient, purpose="recipient-email"))
+            queryset = queryset.filter(recipient_email=recipient)
         if receipt:
             queryset = queryset.filter(receipt_code=receipt)
         if delivery_status:
@@ -62,8 +60,7 @@ class InstanceEmailSuppressionEndpoint(BaseAPIView):
                     {
                         "id": row.id,
                         "recipient_user_id": row.recipient_id,
-                        "recipient_email": row.recipient.email if row.recipient_id else None,
-                        "email_hash": row.email_hash,
+                        "recipient_email": row.email_address,
                         "reason": row.reason,
                         "source": row.source,
                         "created_at": row.created_at,

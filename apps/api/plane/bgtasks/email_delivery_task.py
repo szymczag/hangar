@@ -27,7 +27,7 @@ from plane.db.models import (
     OpenPGPKeyChallenge,
     UserOpenPGPKey,
 )
-from plane.mailer.enums import OpenPGPKeyStatus, OutboxStatus, SuppressionReason
+from plane.mailer.enums import DeliveryMode, OpenPGPKeyStatus, OutboxStatus, SuppressionReason
 from plane.mailer.exceptions import MailAcceptanceUnknownError, MailPermanentError, MailRetryableError
 from plane.mailer.service import render_outbox_message
 from plane.mailer.transports import get_transport
@@ -54,13 +54,13 @@ def _lease_outbox(outbox_id: str) -> EmailOutbox | None:
     now = timezone.now()
     with transaction.atomic():
         outbox = EmailOutbox.objects.select_for_update().filter(pk=outbox_id).first()
-        if outbox is None or outbox.status not in LEASABLE_STATUSES:
+        if outbox is None or outbox.delivery_mode != DeliveryMode.OPENPGP or outbox.status not in LEASABLE_STATUSES:
             return None
         if outbox.expires_at and outbox.expires_at <= now:
             outbox.status = OutboxStatus.FAILED_PERMANENT
             outbox.last_error_code = "message_expired"
             outbox.last_error_detail = "The delivery validity window expired"
-            outbox.payload_ciphertext = ""
+            outbox.encrypted_message = b""
             outbox.terminal_at = now
             outbox.lease_expires_at = None
             outbox.save(
@@ -68,7 +68,7 @@ def _lease_outbox(outbox_id: str) -> EmailOutbox | None:
                     "status",
                     "last_error_code",
                     "last_error_detail",
-                    "payload_ciphertext",
+                    "encrypted_message",
                     "terminal_at",
                     "lease_expires_at",
                     "updated_at",
@@ -131,7 +131,7 @@ def deliver_email_outbox(outbox_id: str):
                 last_error_code="retry_exhausted",
                 last_error_detail=str(exc)[:255],
                 terminal_at=now,
-                payload_ciphertext="",
+                encrypted_message=b"",
             )
             return
         delay = _retry_delay(outbox.attempts)
@@ -155,7 +155,7 @@ def deliver_email_outbox(outbox_id: str):
             last_error_code="smtp_permanent",
             last_error_detail=str(exc)[:255],
             terminal_at=timezone.now(),
-            payload_ciphertext="",
+            encrypted_message=b"",
         )
         return
     except Exception as exc:
@@ -170,7 +170,7 @@ def deliver_email_outbox(outbox_id: str):
             last_error_code=type(exc).__name__[:64],
             last_error_detail="Delivery failed safely; inspect typed worker logs",
             terminal_at=timezone.now(),
-            payload_ciphertext="",
+            encrypted_message=b"",
         )
         return
 
@@ -192,10 +192,23 @@ def recover_stale_email_outbox():
     if not settings.EMAIL_DELIVERY_V2_ENABLED:
         return
     now = timezone.now()
+    EmailOutbox.objects.filter(
+        delivery_mode=DeliveryMode.CLEAR,
+        status=OutboxStatus.PROCESSING,
+        lease_expires_at__lte=now,
+    ).update(
+        status=OutboxStatus.ACCEPTANCE_UNKNOWN,
+        lease_expires_at=None,
+        next_attempt_at=None,
+        last_error_code="clear_delivery_interrupted",
+        last_error_detail="Clear account delivery was interrupted and will not be retried",
+    )
     stale_ids = list(
-        EmailOutbox.objects.filter(status=OutboxStatus.PROCESSING, lease_expires_at__lte=now).values_list(
-            "id", flat=True
-        )[:500]
+        EmailOutbox.objects.filter(
+            delivery_mode=DeliveryMode.OPENPGP,
+            status=OutboxStatus.PROCESSING,
+            lease_expires_at__lte=now,
+        ).values_list("id", flat=True)[:500]
     )
     EmailOutbox.objects.filter(id__in=stale_ids).update(
         status=OutboxStatus.FAILED_RETRYABLE,
@@ -220,6 +233,7 @@ def dispatch_due_email_outbox():
     now = timezone.now()
     due_ids = list(
         EmailOutbox.objects.filter(
+            delivery_mode=DeliveryMode.OPENPGP,
             status__in=[OutboxStatus.QUEUED, OutboxStatus.FAILED_RETRYABLE],
             next_attempt_at__lte=now,
         )
@@ -367,7 +381,7 @@ def process_ses_event(raw_message: str) -> None:
                     delivered_at=now,
                     terminal_at=now,
                     provider_message_id=provider_message_id,
-                    payload_ciphertext="",
+                    encrypted_message=b"",
                 )
             )
             if updated:
@@ -377,7 +391,7 @@ def process_ses_event(raw_message: str) -> None:
         ):
             reason = SuppressionReason.HARD_BOUNCE if event_type == "bounce" else SuppressionReason.COMPLAINT
             EmailSuppression.objects.get_or_create(
-                email_hash=outbox.recipient_email_hash,
+                email_address=outbox.recipient_email,
                 reason=reason,
                 is_active=True,
                 defaults={
@@ -392,7 +406,7 @@ def process_ses_event(raw_message: str) -> None:
                 provider_message_id=provider_message_id,
                 last_error_code=f"ses_{event_type}",
                 last_error_detail="SES reported a terminal recipient event",
-                payload_ciphertext="",
+                encrypted_message=b"",
             )
         elif event_type == "bounce":
             EmailOutbox.objects.filter(pk=outbox.id).update(
@@ -407,7 +421,7 @@ def process_ses_event(raw_message: str) -> None:
                 provider_message_id=provider_message_id,
                 last_error_code=f"ses_{event_type}",
                 last_error_detail="SES reported a terminal delivery event",
-                payload_ciphertext="",
+                encrypted_message=b"",
             )
         elif event_type == "deliverydelay":
             EmailOutbox.objects.filter(pk=outbox.id).update(
@@ -474,7 +488,7 @@ def cleanup_secure_email_records():
     EmailOutbox.all_objects.filter(
         status__in=[OutboxStatus.ACCEPTED, OutboxStatus.ACCEPTANCE_UNKNOWN],
         created_at__lte=outbox_cutoff,
-    ).exclude(payload_ciphertext="").update(payload_ciphertext="", updated_at=now)
+    ).exclude(encrypted_message=b"").update(encrypted_message=b"", updated_at=now)
     OpenPGPKeyChallenge.all_objects.filter(expires_at__lte=now - timedelta(days=1)).delete()
     UserOpenPGPKey.all_objects.filter(
         status__in=[

@@ -95,7 +95,9 @@ Hangar uses PGP/MIME (`multipart/encrypted` as defined by RFC 3156), not inline 
 Encrypted Hangar notification
 ```
 
-The real subject, text/HTML alternatives, receipt, and attachments are encrypted together. Remote images, trackers, embedded objects, forms, scripts, and CSS network loads are removed before the message is stored.
+The real subject, text/HTML alternatives, receipt, and attachments are encrypted together before the outbox row is inserted. Remote images, trackers, embedded objects, forms, scripts, and CSS network loads are removed before encryption.
+
+The encrypted HTML alternative retains normal email structure and safe inline styling, so protected notifications can use the same polished layouts as other transactional mail. A plain-text alternative remains present for accessibility and client compatibility.
 
 Each user receives a separate message encrypted to the exact encryption key version selected at enqueue time. Hangar never groups recipients with different keys and never accepts or stores a private key.
 
@@ -146,22 +148,23 @@ Administrators can search the instance delivery ledger by exact receipt or recip
 
 ## Privacy boundaries
 
-Hangar stores queued message bodies only in an application-encrypted outbox and purges them after delivery, permanent failure, or the short operational retention window. The longer-lived audit receipt contains routing metadata and status, not message content.
+Hangar encrypts protected notifications to the user's OpenPGP key before inserting them into the durable outbox. The database contains the complete PGP/MIME ciphertext and observable routing headers, never the protected subject, body, receipt, or attachments in plaintext. Clear account messages are submitted directly to the provider and only their routing and receipt metadata is retained.
 
 SES tags contain only an opaque outbox UUID and a low-cardinality policy class. Outer encrypted subjects are generic. Open/click tracking and message archiving must remain disabled. Raw SNS/SQS events must not be copied to logs; Hangar persists only bounded delivery metadata.
 
-Public certificates are not secrets, but they are personal security data and remain encrypted at rest in the application database. Access is limited to the owner-facing lifecycle and the mail worker that needs a selected certificate.
+Public certificates are stored as validated public material. Access remains limited to the owner-facing lifecycle and the code path that encrypts a selected message. Private keys remain solely with users and their mail clients.
 
 ## Failure behavior
 
-- A missed Celery publication is recovered from the database by the due-row dispatcher.
-- A temporary provider error is retried with a bounded lease and backoff.
+- A missed publication for an already encrypted notification is recovered from the database by the due-row dispatcher.
+- A temporary provider error for an encrypted notification is retried with a bounded lease and backoff.
+- Clear account mail is never durably queued or automatically retried; interruption becomes `acceptance_unknown` so a live token cannot be duplicated.
 - A response lost after SES submission becomes `acceptance_unknown` and is not blindly resent.
 - A provider event can reconcile accepted, delivered, bounced, complained, rejected, delayed, or rendering-failure state.
 - An older provider event cannot regress a newer state.
 - A hard bounce or complaint activates local suppression immediately.
 - A missing, revoked, or expired key never causes a cleartext fallback.
-- An unsupported payload version or corrupt encrypted row fails closed and purges no unrelated data.
+- A malformed or corrupt stored PGP/MIME row fails closed and purges no unrelated data.
 
 ## Remaining deployment responsibilities
 

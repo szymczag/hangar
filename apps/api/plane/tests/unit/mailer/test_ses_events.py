@@ -32,11 +32,10 @@ def accepted_outbox(db):
     identifier = uuid.uuid4()
     return EmailOutbox.objects.create(
         id=identifier,
-        recipient_email_ciphertext="encrypted",
-        recipient_email_hash="a" * 64,
+        recipient_email="person@example.com",
         policy_class=MailPolicyClass.PROJECT_NOTIFICATION,
         template_key="notification.issue_updates",
-        payload_ciphertext="encrypted",
+        encrypted_message=b"encrypted",
         idempotency_key=f"test:{identifier}",
         message_id=f"<{identifier}@hangar.example.com>",
         status=OutboxStatus.ACCEPTED,
@@ -54,7 +53,7 @@ def test_transient_bounce_does_not_suppress_recipient(accepted_outbox):
 
     accepted_outbox.refresh_from_db()
     assert accepted_outbox.last_error_code == "ses_transient_bounce"
-    assert not EmailSuppression.objects.filter(email_hash=accepted_outbox.recipient_email_hash).exists()
+    assert not EmailSuppression.objects.filter(email_address=accepted_outbox.recipient_email).exists()
 
 
 @pytest.mark.unit
@@ -68,9 +67,9 @@ def test_permanent_bounce_suppresses_and_purges_payload(accepted_outbox):
 
     accepted_outbox.refresh_from_db()
     assert accepted_outbox.status == OutboxStatus.FAILED_PERMANENT
-    assert accepted_outbox.payload_ciphertext == ""
+    assert bytes(accepted_outbox.encrypted_message) == b""
     assert EmailSuppression.objects.filter(
-        email_hash=accepted_outbox.recipient_email_hash,
+        email_address=accepted_outbox.recipient_email,
         reason=SuppressionReason.HARD_BOUNCE,
         is_active=True,
     ).exists()
@@ -84,7 +83,7 @@ def test_permanent_bounce_suppresses_and_purges_payload(accepted_outbox):
 )
 def test_new_permanent_bounce_reactivates_suppression_after_operator_removal(accepted_outbox):
     EmailSuppression.objects.create(
-        email_hash=accepted_outbox.recipient_email_hash,
+        email_address=accepted_outbox.recipient_email,
         reason=SuppressionReason.HARD_BOUNCE,
         is_active=False,
         deactivation_reason="Address was previously corrected",
@@ -93,7 +92,7 @@ def test_new_permanent_bounce_reactivates_suppression_after_operator_removal(acc
     process_ses_event(_event(accepted_outbox.id, "Permanent"))
 
     assert EmailSuppression.objects.filter(
-        email_hash=accepted_outbox.recipient_email_hash,
+        email_address=accepted_outbox.recipient_email,
         reason=SuppressionReason.HARD_BOUNCE,
         is_active=True,
     ).exists()
@@ -136,4 +135,4 @@ def test_older_event_cannot_regress_a_newer_delivery(accepted_outbox):
 
     accepted_outbox.refresh_from_db()
     assert accepted_outbox.status == OutboxStatus.DELIVERED
-    assert not EmailSuppression.objects.filter(email_hash=accepted_outbox.recipient_email_hash).exists()
+    assert not EmailSuppression.objects.filter(email_address=accepted_outbox.recipient_email).exists()

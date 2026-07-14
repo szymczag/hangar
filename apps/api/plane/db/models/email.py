@@ -20,7 +20,7 @@ class UserOpenPGPKey(BaseModel):
         related_name="openpgp_keys",
     )
     version = models.PositiveIntegerField()
-    certificate_ciphertext = models.TextField()
+    certificate = models.TextField()
     primary_fingerprint = models.CharField(max_length=64, db_index=True)
     encryption_subkey_fingerprint = models.CharField(max_length=64)
     primary_algorithm = models.CharField(max_length=64)
@@ -59,7 +59,7 @@ class UserOpenPGPKey(BaseModel):
 
 class OpenPGPKeyChallenge(BaseModel):
     key = models.ForeignKey(UserOpenPGPKey, on_delete=models.CASCADE, related_name="challenges")
-    token_digest = models.CharField(max_length=64)
+    token_digest = models.CharField(max_length=128)
     expires_at = models.DateTimeField(db_index=True)
     attempts = models.PositiveSmallIntegerField(default=0)
     sent_at = models.DateTimeField(null=True, blank=True)
@@ -79,17 +79,14 @@ class EmailOutbox(BaseModel):
         null=True,
         blank=True,
     )
-    recipient_email_ciphertext = models.TextField()
-    recipient_email_hash = models.CharField(max_length=64, db_index=True)
+    recipient_email = models.EmailField(max_length=320, db_index=True)
     policy_class = models.CharField(max_length=32, choices=MailPolicyClass.choices)
     template_key = models.CharField(max_length=96)
     audit_label = models.CharField(max_length=96)
     sender = models.CharField(max_length=320)
     delivery_mode = models.CharField(max_length=16, choices=DeliveryMode.choices)
-    payload_ciphertext = models.TextField(blank=True)
-    payload_schema_version = models.PositiveSmallIntegerField(default=1)
+    encrypted_message = models.BinaryField(blank=True)
     idempotency_key = models.CharField(max_length=255, unique=True)
-    intent_digest = models.CharField(max_length=64)
     message_id = models.CharField(max_length=255, unique=True)
     receipt_code = models.CharField(max_length=24, unique=True)
     openpgp_key = models.ForeignKey(
@@ -137,7 +134,7 @@ class EmailSuppression(BaseModel):
         null=True,
         blank=True,
     )
-    email_hash = models.CharField(max_length=64, db_index=True)
+    email_address = models.EmailField(max_length=320, db_index=True)
     reason = models.CharField(max_length=32, choices=SuppressionReason.choices)
     source = models.CharField(max_length=32, default="hangar")
     is_active = models.BooleanField(default=True, db_index=True)
@@ -150,7 +147,7 @@ class EmailSuppression(BaseModel):
         ordering = ("-created_at",)
         constraints = [
             models.UniqueConstraint(
-                fields=("email_hash", "reason"),
+                fields=("email_address", "reason"),
                 condition=Q(is_active=True, deleted_at__isnull=True),
                 name="uniq_active_email_suppression",
             )

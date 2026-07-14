@@ -590,8 +590,6 @@
       "additionalProperties": false,
       "required": [
         "name",
-        "outboxEncryptionKeysKey",
-        "lookupHmacKeyKey",
         "sesAccessKeyIdKey",
         "sesSecretAccessKeyKey",
         "sesSessionTokenKey",
@@ -601,8 +599,6 @@
       ],
       "properties": {
         "name": { "$ref": "#/definitions/nonEmptyString" },
-        "outboxEncryptionKeysKey": { "$ref": "#/definitions/nonEmptyString" },
-        "lookupHmacKeyKey": { "$ref": "#/definitions/nonEmptyString" },
         "sesAccessKeyIdKey": { "$ref": "#/definitions/nonEmptyString" },
         "sesSecretAccessKeyKey": { "$ref": "#/definitions/nonEmptyString" },
         "sesSessionTokenKey": { "$ref": "#/definitions/nonEmptyString" },

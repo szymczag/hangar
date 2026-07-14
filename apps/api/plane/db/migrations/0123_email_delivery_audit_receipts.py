@@ -49,12 +49,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="emailoutbox",
-            name="intent_digest",
-            field=models.CharField(default="", max_length=64),
-            preserve_default=False,
-        ),
-        migrations.AddField(
-            model_name="emailoutbox",
             name="audit_label",
             field=models.CharField(default="", max_length=96),
             preserve_default=False,

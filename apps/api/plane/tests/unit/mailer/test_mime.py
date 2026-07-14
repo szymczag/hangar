@@ -40,7 +40,7 @@ def test_encrypted_message_hides_subject_and_wraps_complete_inner_mime():
         message = build_encrypted_message(
             inner_subject="Confidential project title",
             text_body="Confidential body",
-            html_body="<p>Confidential body</p>",
+            html_body='<div style="padding:16px;color:#123456"><strong>Confidential body</strong></div>',
             sender="Hangar <hello@hangar.example.com>",
             recipient="person@example.com",
             message_id="<message@hangar.example.com>",
@@ -56,6 +56,9 @@ def test_encrypted_message_hides_subject_and_wraps_complete_inner_mime():
     inner = BytesParser(policy=policy.default).parsebytes(inner_bytes)
     assert inner["Subject"] == "Confidential project title"
     assert inner.get_body(preferencelist=("plain",)).get_content().startswith("Confidential body")
+    encrypted_html = inner.get_body(preferencelist=("html",)).get_content()
+    assert '<div style="padding:16px;color:#123456">' in encrypted_html
+    assert "<strong>Confidential body</strong>" in encrypted_html
     assert "AAAA-BBBB-CCCC-DDDD-EEEE" in inner.get_body(preferencelist=("plain",)).get_content()
     assert any(part.get_filename() == "report.csv" for part in inner.walk())
 
@@ -82,6 +85,7 @@ def test_email_html_cannot_load_remote_resources():
         '<p style="background:url(https://tracker.example/pixel)">Update</p>'
         '<img src="https://tracker.example/pixel" alt="tracking image">'
         '<script>alert("unsafe")</script><a href="javascript:alert(1)" onclick="alert(2)">Unsafe</a>'
+        '<div style="padding:16px;color:#123456">Styled content</div>'
         '<a href="https://hangar.example.com/project">Open project</a>'
     )
 
@@ -90,4 +94,5 @@ def test_email_html_cannot_load_remote_resources():
     assert "javascript:" not in sanitized
     assert "onclick" not in sanitized
     assert "<script" not in sanitized
+    assert 'style="padding:16px;color:#123456"' in sanitized
     assert "https://hangar.example.com/project" in sanitized

@@ -3,7 +3,6 @@
 # See the LICENSE file for details.
 
 # Python imports
-import hashlib
 from datetime import timedelta
 
 # Third party imports
@@ -17,6 +16,7 @@ from django.template.loader import render_to_string
 # Module imports
 from plane.db.models import User
 from plane.mailer.service import enqueue_rendered_email
+from plane.mailer.tokens import email_idempotency_token
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 
@@ -39,7 +39,7 @@ def magic_link(email, key, token):
             text_body=text_content,
             html_body=html_content,
             expires_in=timedelta(minutes=10),
-            idempotency_key=f"magic-signin:{hashlib.sha256(f'{key}:{token}'.encode()).hexdigest()}",
+            idempotency_key=f"magic-signin:{email_idempotency_token('magic-signin', key, token)}",
         )
         return
     except Exception as e:

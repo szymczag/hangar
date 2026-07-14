@@ -3,7 +3,6 @@
 # See the LICENSE file for details.
 
 # Python imports
-import hashlib
 from datetime import timedelta
 
 # Third party imports
@@ -16,6 +15,7 @@ from django.template.loader import render_to_string
 # Module imports
 from plane.db.models import User
 from plane.mailer.service import enqueue_rendered_email
+from plane.mailer.tokens import email_idempotency_token
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 
@@ -38,7 +38,7 @@ def send_email_update_magic_code(email, token):
             text_body=text_content,
             html_body=html_content,
             expires_in=timedelta(minutes=10),
-            idempotency_key=f"email-update-code:{hashlib.sha256(f'{email.lower()}:{token}'.encode()).hexdigest()}",
+            idempotency_key=f"email-update-code:{email_idempotency_token('email-update-code', email.lower(), token)}",
         )
         return
     except Exception as e:
@@ -72,7 +72,9 @@ def send_email_update_confirmation(email, event_id):
             subject=subject,
             text_body=text_content,
             html_body=html_content,
-            idempotency_key=f"email-updated:{event_id}:{hashlib.sha256(email.lower().encode()).hexdigest()}",
+            idempotency_key=(
+                f"email-updated:{event_id}:{email_idempotency_token('email-updated-recipient', email.lower())}"
+            ),
         )
         return
     except Exception as e:
