@@ -8,9 +8,10 @@ import csv
 from io import StringIO
 
 import pytest
+from django.utils import timezone
 
-from plane.db.models import Issue, IssueComment, Module, ModuleIssue, Project, ProjectMember, State
-from plane.ext.importers.todoist import execute_todoist_import
+from plane.db.models import Issue, IssueActivity, IssueComment, Module, ModuleIssue, Project, ProjectMember, State
+from plane.ext.importers.todoist import ImportCancelled, execute_todoist_import
 from plane.ext.models import ImportJob
 from plane.ext.utils.importers.todoist_csv import parse_todoist_csv
 
@@ -59,6 +60,7 @@ def import_csv() -> bytes:
                 "PRIORITY": "4",
                 "INDENT": "2",
                 "DATE": "every Monday",
+                "TIMEZONE": "Europe/Warsaw",
             },
         ]
     )
@@ -87,9 +89,7 @@ def import_project(db, workspace, create_user):
 @pytest.mark.unit
 @pytest.mark.django_db
 class TestTodoistImportExecution:
-    def test_creates_project_structure_and_preserves_metadata(
-        self, mocker, workspace, create_user, import_project
-    ):
+    def test_creates_project_structure_and_preserves_metadata(self, mocker, workspace, create_user, import_project):
         content = import_csv()
         preview = parse_todoist_csv(content)
         job = ImportJob.objects.create(
@@ -125,12 +125,11 @@ class TestTodoistImportExecution:
         assert ModuleIssue.objects.filter(module=module, issue__in=[parent, child]).count() == 2
         assert IssueComment.objects.filter(issue=parent, comment_html__contains="Imported task comment").exists()
         assert IssueComment.objects.filter(issue=child, comment_html__contains="Original schedule").exists()
+        assert IssueComment.objects.filter(issue=child, comment_html__contains="Europe/Warsaw").exists()
         assert import_project.module_view is True
         assert import_project.description == "Imported project context"
 
-    def test_existing_project_description_is_not_overwritten(
-        self, mocker, workspace, create_user, import_project
-    ):
+    def test_existing_project_description_is_not_overwritten(self, mocker, workspace, create_user, import_project):
         import_project.description = "Existing context"
         import_project.save(update_fields=["description"])
         content = import_csv()
@@ -167,6 +166,72 @@ class TestTodoistImportExecution:
         mocker.patch("plane.ext.importers.todoist.read_import_source", return_value=content)
 
         with pytest.raises(Exception, match="source_digest_mismatch"):
+            execute_todoist_import(job)
+
+        assert Issue.objects.filter(project=import_project).count() == 0
+
+    def test_retry_is_idempotent_for_created_entities(self, mocker, workspace, create_user, import_project):
+        content = import_csv()
+        preview = parse_todoist_csv(content)
+        job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_key="private/import.csv",
+            source_digest=preview.digest,
+            config={"assignee_mapping": {}, "module_conflicts": {}},
+        )
+        mocker.patch("plane.ext.importers.todoist.read_import_source", return_value=content)
+
+        execute_todoist_import(job)
+        entity_counts = (
+            Issue.objects.filter(project=import_project).count(),
+            Module.objects.filter(project=import_project).count(),
+            IssueComment.objects.filter(project=import_project).count(),
+            IssueActivity.objects.filter(project=import_project).count(),
+        )
+        execute_todoist_import(job)
+
+        assert entity_counts == (2, 1, 2, 4)
+        assert (
+            Issue.objects.filter(project=import_project).count(),
+            Module.objects.filter(project=import_project).count(),
+            IssueComment.objects.filter(project=import_project).count(),
+            IssueActivity.objects.filter(project=import_project).count(),
+        ) == entity_counts
+
+    def test_unexpected_row_failure_propagates_for_task_retry(self, mocker, workspace, create_user, import_project):
+        content = import_csv()
+        preview = parse_todoist_csv(content)
+        job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_key="private/import.csv",
+            source_digest=preview.digest,
+            config={"assignee_mapping": {}, "module_conflicts": {}},
+        )
+        mocker.patch("plane.ext.importers.todoist.read_import_source", return_value=content)
+        mocker.patch("plane.ext.importers.todoist._create_issue", side_effect=RuntimeError("database unavailable"))
+
+        with pytest.raises(RuntimeError, match="database unavailable"):
+            execute_todoist_import(job)
+
+    def test_processing_cancellation_stops_before_next_batch(self, mocker, workspace, create_user, import_project):
+        content = import_csv()
+        preview = parse_todoist_csv(content)
+        job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_key="private/import.csv",
+            source_digest=preview.digest,
+            config={"assignee_mapping": {}, "module_conflicts": {}},
+            cancel_requested_at=timezone.now(),
+        )
+        mocker.patch("plane.ext.importers.todoist.read_import_source", return_value=content)
+
+        with pytest.raises(ImportCancelled):
             execute_todoist_import(job)
 
         assert Issue.objects.filter(project=import_project).count() == 0

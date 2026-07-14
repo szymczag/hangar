@@ -135,8 +135,8 @@ At minimum, set:
 
 - `publicUrl.host`;
 - `ingress.className`, TLS Secret, and controller annotations;
-- `externalServices.objectStorage` internal/public endpoints, bucket, region,
-  and addressing mode;
+- `externalServices.objectStorage` internal/public endpoints, public upload
+  bucket, private import bucket, region, and addressing mode;
 - the `networkPolicy.ingressController` preset and DNS selectors for your
   cluster; and
 - `networkPolicy.privateEgress` for every private dependency address and port.

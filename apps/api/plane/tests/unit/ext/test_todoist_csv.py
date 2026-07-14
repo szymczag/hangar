@@ -163,6 +163,31 @@ class TestTodoistCsvParser:
         assert preview.counts["failed"] == 1
         assert [error.code for error in preview.errors] == ["invalid_date"]
 
+    def test_invalid_task_breaks_parent_chain_instead_of_reparenting_children(self):
+        preview = parse_todoist_csv(
+            make_csv(
+                {"TYPE": "task", "CONTENT": "Original parent", "PRIORITY": "4", "INDENT": "1"},
+                {"TYPE": "task", "CONTENT": "Invalid replacement", "PRIORITY": "9", "INDENT": "1"},
+                {"TYPE": "task", "CONTENT": "Must not be reparented", "PRIORITY": "4", "INDENT": "2"},
+            )
+        )
+
+        assert [record.content for record in preview.records] == ["Original parent"]
+        assert [error.code for error in preview.errors] == ["invalid_priority", "invalid_hierarchy"]
+
+    def test_duplicate_section_name_is_reported_and_resets_section_context(self):
+        preview = parse_todoist_csv(
+            make_csv(
+                {"TYPE": "section", "CONTENT": "Planning"},
+                {"TYPE": "section", "CONTENT": "planning"},
+                {"TYPE": "task", "CONTENT": "After duplicate", "PRIORITY": "4", "INDENT": "1"},
+            )
+        )
+
+        assert [error.code for error in preview.errors] == ["duplicate_section_name"]
+        task = next(record for record in preview.records if record.kind == "task")
+        assert task.section_row is None
+
     @pytest.mark.parametrize(
         ("content", "code"),
         [

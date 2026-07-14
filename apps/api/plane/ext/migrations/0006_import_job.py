@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("db", "0121_alter_estimate_type"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("ext", "0003_issue_worklog"),
+        ("ext", "0005_runner_foundation_hardening"),
     ]
 
     operations = [
@@ -47,6 +47,7 @@ class Migration(migrations.Migration):
                             ("queued", "Queued"),
                             ("processing", "Processing"),
                             ("completed", "Completed"),
+                            ("completed_with_errors", "Completed with errors"),
                             ("failed", "Failed"),
                             ("cancelled", "Cancelled"),
                         ],
@@ -61,7 +62,11 @@ class Migration(migrations.Migration):
                 ("stats", models.JSONField(blank=True, default=dict)),
                 ("errors", models.JSONField(blank=True, default=list)),
                 ("reason", models.CharField(blank=True, max_length=100)),
+                ("celery_task_id", models.CharField(blank=True, max_length=255)),
+                ("attempt_count", models.PositiveSmallIntegerField(default=0)),
                 ("started_at", models.DateTimeField(blank=True, null=True)),
+                ("heartbeat_at", models.DateTimeField(blank=True, null=True)),
+                ("cancel_requested_at", models.DateTimeField(blank=True, null=True)),
                 ("completed_at", models.DateTimeField(blank=True, null=True)),
                 ("source_deleted_at", models.DateTimeField(blank=True, null=True)),
                 (

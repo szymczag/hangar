@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import uuid4
 
 # Django imports
 from django.db import IntegrityError, transaction
@@ -42,6 +43,14 @@ ALLOWED_CONTENT_TYPES = {
     "text/plain",
 }
 ACTIVE_STATUSES = [ImportJob.Status.QUEUED, ImportJob.Status.PROCESSING]
+COMPLETED_STATUSES = [ImportJob.Status.COMPLETED, ImportJob.Status.COMPLETED_WITH_ERRORS]
+TERMINAL_STATUSES = [*COMPLETED_STATUSES, ImportJob.Status.FAILED, ImportJob.Status.CANCELLED]
+ALLOWED_CONFIG_KEYS = {
+    "allow_duplicate",
+    "allow_skipped_rows",
+    "assignee_mapping",
+    "module_conflicts",
+}
 
 
 def _error(code: str, message: str, response_status=status.HTTP_400_BAD_REQUEST) -> Response:
@@ -70,9 +79,13 @@ def _parse_upload(request) -> tuple[TodoistImportPreview | None, bytes | None, R
     try:
         return parse_todoist_csv(content or b""), content, None
     except TodoistImportParseError as exc:
-        return None, None, Response(
-            {"error": exc.diagnostic.as_dict()},
-            status=status.HTTP_400_BAD_REQUEST,
+        return (
+            None,
+            None,
+            Response(
+                {"error": exc.diagnostic.as_dict()},
+                status=status.HTTP_400_BAD_REQUEST,
+            ),
         )
 
 
@@ -111,7 +124,7 @@ def _preview_payload(preview: TodoistImportPreview, project: Project) -> dict[st
     duplicate = ImportJob.objects.filter(
         project=project,
         source_digest=preview.digest,
-        status=ImportJob.Status.COMPLETED,
+        status__in=COMPLETED_STATUSES,
     ).exists()
     return {
         "digest": preview.digest,
@@ -136,6 +149,12 @@ def _load_config(request) -> tuple[dict[str, Any] | None, Response | None]:
             return None, _error("invalid_config", "The import configuration is not valid JSON.")
     if not isinstance(config, dict):
         return None, _error("invalid_config", "The import configuration must be a JSON object.")
+    unknown_keys = sorted(set(config).difference(ALLOWED_CONFIG_KEYS))
+    if unknown_keys:
+        return None, _error("invalid_config", "The import configuration contains an unknown option.")
+    for flag in ("allow_duplicate", "allow_skipped_rows"):
+        if flag in config and not isinstance(config[flag], bool):
+            return None, _error("invalid_config", f"The {flag} option must be a boolean.")
     return config, None
 
 
@@ -147,6 +166,8 @@ def _validate_assignee_mapping(
     mapping = config.get("assignee_mapping", {})
     if not isinstance(mapping, dict):
         return _error("invalid_assignee_mapping", "The assignee mapping must be a JSON object.")
+    if any(not isinstance(key, str) or not isinstance(value, str) for key, value in mapping.items()):
+        return _error("invalid_assignee_mapping", "Assignee mapping keys and values must be strings.")
     if not set(mapping).issubset(preview.assignees):
         return _error("invalid_assignee_mapping", "The assignee mapping contains an unknown source identity.")
 
@@ -175,6 +196,9 @@ def _validate_module_conflicts(
     decisions = config.get("module_conflicts", {})
     if not isinstance(decisions, dict):
         return _error("invalid_module_conflicts", "Module conflict choices must be a JSON object.")
+    expected_rows = {str(conflict["row"]) for conflict in conflicts}
+    if set(decisions) != expected_rows:
+        return _error("invalid_module_conflicts", "Module conflict choices must match the preview exactly.")
 
     for conflict in conflicts:
         decision = decisions.get(str(conflict["row"]))
@@ -182,9 +206,13 @@ def _validate_module_conflicts(
             return _error("unresolved_module_conflict", "Resolve every module-name conflict before importing.")
         action = decision.get("action")
         if action == "reuse":
-            if str(decision.get("module_id")) != conflict["module_id"]:
+            if set(decision) != {"action", "module_id"}:
+                return _error("invalid_module_conflict", "The reuse choice contains an unknown option.")
+            if not isinstance(decision.get("module_id"), str) or decision["module_id"] != conflict["module_id"]:
                 return _error("invalid_module_conflict", "The selected module does not match the conflict.")
         elif action == "rename":
+            if set(decision) != {"action", "name"}:
+                return _error("invalid_module_conflict", "The rename choice contains an unknown option.")
             name = decision.get("name")
             if not isinstance(name, str) or not name.strip() or len(name.strip()) > 255:
                 return _error("invalid_module_name", "The replacement module name must contain 1 to 255 characters.")
@@ -232,6 +260,12 @@ class TodoistImportEndpoint(BaseAPIView):
         if config_error:
             return config_error
         assert config is not None
+        if preview.errors and config.get("allow_skipped_rows") is not True:
+            return _error(
+                "skipped_rows_not_confirmed",
+                "Confirm that rows with validation errors may be skipped before importing.",
+                status.HTTP_409_CONFLICT,
+            )
         mapping_error = _validate_assignee_mapping(preview, project, config)
         if mapping_error:
             return mapping_error
@@ -242,7 +276,7 @@ class TodoistImportEndpoint(BaseAPIView):
         duplicate = ImportJob.objects.filter(
             project=project,
             source_digest=preview.digest,
-            status=ImportJob.Status.COMPLETED,
+            status__in=COMPLETED_STATUSES,
         ).exists()
         if duplicate and config.get("allow_duplicate") is not True:
             return _error(
@@ -269,22 +303,43 @@ class TodoistImportEndpoint(BaseAPIView):
             "failed": preview.counts.get("failed", 0),
             "processed_tasks": 0,
         }
+        celery_task_id = str(uuid4())
         try:
             with transaction.atomic():
-                job = ImportJob.objects.create(
-                    workspace=workspace,
-                    project=project,
-                    initiated_by=request.user,
-                    status=ImportJob.Status.PROCESSING,
-                    source_digest=preview.digest,
-                    source_size=len(content or b""),
-                    config=config,
-                    stats=initial_stats,
-                    errors=[item.as_dict() for item in preview.diagnostics],
+                job = (
+                    ImportJob.objects.select_for_update()
+                    .filter(
+                        project=project,
+                        source_digest=preview.digest,
+                        status=ImportJob.Status.FAILED,
+                    )
+                    .order_by("-created_at")
+                    .first()
                 )
+                if job is None:
+                    job = ImportJob.objects.create(
+                        workspace=workspace,
+                        project=project,
+                        initiated_by=request.user,
+                        status=ImportJob.Status.PROCESSING,
+                        source_digest=preview.digest,
+                    )
+                job.initiated_by = request.user
+                job.status = ImportJob.Status.PROCESSING
+                job.source_size = len(content or b"")
+                job.config = config
+                job.stats = initial_stats
+                job.errors = [item.as_dict() for item in preview.diagnostics]
+                job.reason = ""
+                job.celery_task_id = celery_task_id
+                job.started_at = None
+                job.heartbeat_at = None
+                job.cancel_requested_at = None
+                job.completed_at = None
+                job.source_deleted_at = None
                 object_name = f"imports/{workspace.id}/{job.id}/source.csv"
-                ImportJob.objects.filter(pk=job.id).update(source_key=object_name)
                 job.source_key = object_name
+                job.save()
         except IntegrityError:
             return _error(
                 "import_in_progress",
@@ -305,11 +360,9 @@ class TodoistImportEndpoint(BaseAPIView):
                 status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        ImportJob.objects.filter(pk=job.id, status=ImportJob.Status.PROCESSING).update(
-            status=ImportJob.Status.QUEUED
-        )
+        ImportJob.objects.filter(pk=job.id, status=ImportJob.Status.PROCESSING).update(status=ImportJob.Status.QUEUED)
         try:
-            run_todoist_import.delay(str(job.id))
+            run_todoist_import.apply_async(args=[str(job.id)], task_id=celery_task_id)
         except Exception:  # noqa: BLE001 - return a stable error without leaking broker details
             source_deleted = delete_import_source(object_name)
             failure_updates = {
@@ -320,9 +373,7 @@ class TodoistImportEndpoint(BaseAPIView):
             }
             if source_deleted:
                 failure_updates.update(source_key="", source_deleted_at=timezone.now())
-            ImportJob.objects.filter(pk=job.id, status=ImportJob.Status.QUEUED).update(
-                **failure_updates
-            )
+            ImportJob.objects.filter(pk=job.id, status=ImportJob.Status.QUEUED).update(**failure_updates)
             return _error(
                 "queue_failed",
                 "The import could not be queued. Try again.",
@@ -338,9 +389,7 @@ class ImportJobListEndpoint(BaseAPIView):
     def get(self, request, slug):
         if not request.GET.get("cursor") or not request.GET.get("per_page"):
             return _error("missing_pagination", "The cursor and per_page parameters are required.")
-        queryset = ImportJob.objects.filter(workspace__slug=slug).select_related(
-            "project", "initiated_by"
-        )
+        queryset = ImportJob.objects.filter(workspace__slug=slug).select_related("project", "initiated_by")
         return self.paginate(
             request=request,
             queryset=queryset,
@@ -364,6 +413,12 @@ class ImportJobReportEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def get(self, request, slug, job_id):
         job = get_object_or_404(ImportJob, pk=job_id, workspace__slug=slug)
+        if job.status not in TERMINAL_STATUSES:
+            return _error(
+                "report_not_ready",
+                "The import report is available after the job finishes.",
+                status.HTTP_409_CONFLICT,
+            )
         response = JsonResponse(
             {
                 "id": str(job.id),
@@ -379,21 +434,48 @@ class ImportJobReportEndpoint(BaseAPIView):
             json_dumps_params={"indent": 2},
         )
         response["Content-Disposition"] = f'attachment; filename="import-{job.id}.json"'
+        response["Cache-Control"] = "no-store"
+        response["X-Content-Type-Options"] = "nosniff"
         return response
 
 
 class ImportJobCancelEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def post(self, request, slug, job_id):
-        job = get_object_or_404(ImportJob, pk=job_id, workspace__slug=slug)
-        cancelled = ImportJob.objects.filter(pk=job.id, status=ImportJob.Status.QUEUED).update(
-            status=ImportJob.Status.CANCELLED,
-            config={},
-            completed_at=timezone.now(),
-        )
-        if not cancelled:
-            return _error("cannot_cancel", "Only a queued import can be cancelled.", status.HTTP_409_CONFLICT)
-        if job.source_key and delete_import_source(job.source_key):
+        with transaction.atomic():
+            job = get_object_or_404(
+                ImportJob.objects.select_for_update(),
+                pk=job_id,
+                workspace__slug=slug,
+            )
+            if job.status == ImportJob.Status.QUEUED:
+                job.status = ImportJob.Status.CANCELLED
+                job.reason = "cancelled_by_user"
+                job.config = {}
+                job.cancel_requested_at = timezone.now()
+                job.completed_at = timezone.now()
+                job.save(
+                    update_fields=[
+                        "status",
+                        "reason",
+                        "config",
+                        "cancel_requested_at",
+                        "completed_at",
+                        "updated_at",
+                    ]
+                )
+                response_status = status.HTTP_200_OK
+            elif job.status == ImportJob.Status.PROCESSING:
+                job.cancel_requested_at = job.cancel_requested_at or timezone.now()
+                job.save(update_fields=["cancel_requested_at", "updated_at"])
+                response_status = status.HTTP_202_ACCEPTED
+            else:
+                return _error(
+                    "cannot_cancel",
+                    "Only a queued or processing import can be cancelled.",
+                    status.HTTP_409_CONFLICT,
+                )
+        if job.status == ImportJob.Status.CANCELLED and job.source_key and delete_import_source(job.source_key):
             ImportJob.objects.filter(pk=job.id).update(source_key="", source_deleted_at=timezone.now())
         job.refresh_from_db()
-        return Response(ImportJobSerializer(job).data, status=status.HTTP_200_OK)
+        return Response(ImportJobSerializer(job).data, status=response_status)

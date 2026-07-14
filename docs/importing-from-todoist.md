@@ -23,8 +23,9 @@ of the export until you have reviewed the completed import report.
 4. Select **Preview import**.
 
 The preview validates the schema without creating work items or retaining the
-file. It shows the number of tasks, sections, notes, and warnings that the job
-will process.
+file. It shows separate task, section, note, warning, and error counts. Expand
+the diagnostics to review every skipped row. If errors are present, you must
+explicitly confirm that valid rows may be imported while those rows are skipped.
 
 ## Review mappings
 
@@ -33,9 +34,10 @@ identity unmapped to create those tasks without an assignee. Hangar does not
 guess identities from names or email-like text.
 
 Todoist sections become Hangar modules. If a section has the same name as an
-existing module, keep its name to reuse that module or enter a unique name to
-create another one. Importing sections enables the Modules feature for the
-destination project.
+existing module, explicitly choose whether to reuse it or create a module under
+a unique replacement name. Importing sections enables the Modules feature for
+the destination project. Duplicate section names inside the source file are
+reported as row errors rather than merged implicitly.
 
 A Todoist project note becomes the destination project's description only when
 that description is empty. Existing project descriptions are never overwritten.
@@ -47,12 +49,21 @@ that description is empty. Existing project descriptions are never overwritten.
    want to import it again.
 3. Select **Start import**.
 4. Follow progress under **Recent imports**.
+   You can cancel queued or processing jobs; processing cancellation takes
+   effect at the next safe batch boundary.
 5. When the job finishes, select **Download report** to review totals and any
    row-level errors.
 
-Imports create new work items; they do not update existing work. Retrying the
-same export can therefore create duplicates. The exact-file warning is scoped
-to the selected destination project.
+An interrupted job is retried automatically with backoff. If it ultimately
+fails, uploading the same file again reuses that job identity and the objects
+already created by its earlier attempts, so the retry does not duplicate them.
+A completed or partially completed exact-file import is different: confirming
+the duplicate warning starts a new job and can intentionally create another set
+of work items. The warning is scoped to the destination project.
+
+The history distinguishes **Completed** from **Completed with errors**. Reports
+are downloadable only after a job reaches a terminal state and are returned
+with no-store response headers.
 
 ## Field mapping and limitations
 
@@ -77,7 +88,10 @@ be imported.
 ## Source-file privacy
 
 Preview requests are parsed in memory and are not retained. After you start an
-import, Hangar stores the source temporarily in private object storage, removes
-it when processing finishes, and also runs a daily cleanup for stale sources.
+import, Hangar stores the source temporarily in a dedicated private object
+storage bucket that is not routed through the public application endpoint. An
+upload fails closed if an anonymous object lookup succeeds. Hangar removes the
+source when processing finishes and also runs a daily cleanup for sources older
+than 24 hours.
 Import history and downloaded reports contain counts and safe diagnostics, not
 the original row contents or import configuration.

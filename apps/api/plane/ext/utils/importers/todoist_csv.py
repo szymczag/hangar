@@ -92,10 +92,31 @@ class TodoistImportParseError(ValueError):
         self.diagnostic = diagnostic
 
 
+@dataclass(slots=True)
+class _ParserState:
+    current_section_row: int | None = None
+    current_task_row: int | None = None
+    parent_stack: dict[int, int] = field(default_factory=dict)
+
+    def reset_task_chain(self, from_indent: int | None = None) -> None:
+        self.current_task_row = None
+        if from_indent is None:
+            self.parent_stack.clear()
+            return
+        for level in range(from_indent, 5):
+            self.parent_stack.pop(level, None)
+
+    def reset_section(self) -> None:
+        self.current_section_row = None
+        self.reset_task_chain()
+
+    def start_section(self, row: int) -> None:
+        self.current_section_row = row
+        self.reset_task_chain()
+
+
 def _fatal(code: str, message: str, *, row: int | None = None, field: str | None = None) -> None:
-    raise TodoistImportParseError(
-        ImportDiagnostic(level="error", code=code, message=message, row=row, field=field)
-    )
+    raise TodoistImportParseError(ImportDiagnostic(level="error", code=code, message=message, row=row, field=field))
 
 
 def _parse_date(
@@ -199,9 +220,8 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
         diagnostics: list[ImportDiagnostic] = []
         counts: Counter[str] = Counter()
         assignees: set[str] = set()
-        parent_stack: dict[int, int] = {}
-        current_section_row: int | None = None
-        current_task_row: int | None = None
+        state = _ParserState()
+        section_names: set[str] = set()
         row_count = 0
 
         try:
@@ -219,6 +239,7 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         )
                     )
                     counts["failed"] += 1
+                    state.reset_task_chain()
                     continue
 
                 row = _normalize_row(source_row)
@@ -232,11 +253,12 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         )
                     )
                     counts["failed"] += 1
+                    state.reset_task_chain()
                     continue
 
                 if not any(value.strip() for value in row.values()):
                     counts["blank"] += 1
-                    current_task_row = None
+                    state.reset_task_chain()
                     continue
 
                 row_type = row.get("type", "").strip().lower()
@@ -251,13 +273,13 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         )
                     )
                     counts["failed"] += 1
-                    current_task_row = None
+                    state.reset_task_chain()
                     continue
 
                 content_value = row.get("content", "").strip()
                 if row_type == "meta":
                     counts["meta"] += 1
-                    current_task_row = None
+                    state.reset_task_chain()
                     continue
 
                 if not content_value:
@@ -271,13 +293,18 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         )
                     )
                     counts["failed"] += 1
-                    current_task_row = None
+                    if row_type == "section":
+                        state.reset_section()
+                    elif row_type == "task":
+                        state.reset_task_chain()
+                    else:
+                        state.current_task_row = None
                     continue
 
                 if row_type == "project_note":
                     records.append(TodoistRecord(kind="project_note", row=index, content=content_value))
                     counts["project_note"] += 1
-                    current_task_row = None
+                    state.reset_task_chain()
                     continue
 
                 if row_type == "section":
@@ -292,17 +319,30 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                             )
                         )
                         counts["failed"] += 1
-                        current_task_row = None
+                        state.reset_section()
                         continue
+                    normalized_section_name = content_value.casefold()
+                    if normalized_section_name in section_names:
+                        diagnostics.append(
+                            ImportDiagnostic(
+                                level="error",
+                                code="duplicate_section_name",
+                                message="Section names must be unique within one import file.",
+                                row=index,
+                                field="content",
+                            )
+                        )
+                        counts["failed"] += 1
+                        state.reset_section()
+                        continue
+                    section_names.add(normalized_section_name)
                     records.append(TodoistRecord(kind="section", row=index, content=content_value))
                     counts["section"] += 1
-                    current_section_row = index
-                    current_task_row = None
-                    parent_stack.clear()
+                    state.start_section(index)
                     continue
 
                 if row_type == "note":
-                    if current_task_row is None:
+                    if state.current_task_row is None:
                         diagnostics.append(
                             ImportDiagnostic(
                                 level="error",
@@ -319,7 +359,7 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                             kind="note",
                             row=index,
                             content=content_value,
-                            task_row=current_task_row,
+                            task_row=state.current_task_row,
                             author=row.get("author", "").strip(),
                         )
                     )
@@ -337,7 +377,7 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         )
                     )
                     counts["failed"] += 1
-                    current_task_row = None
+                    state.reset_task_chain()
                     continue
 
                 priority_value = row.get("priority", "").strip() or "4"
@@ -352,7 +392,7 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         )
                     )
                     counts["failed"] += 1
-                    current_task_row = None
+                    state.reset_task_chain()
                     continue
 
                 indent_value = row.get("indent", "").strip() or "1"
@@ -371,10 +411,10 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         )
                     )
                     counts["failed"] += 1
-                    current_task_row = None
+                    state.reset_task_chain()
                     continue
 
-                parent_row = parent_stack.get(indent - 1) if indent > 1 else None
+                parent_row = state.parent_stack.get(indent - 1) if indent > 1 else None
                 if indent > 1 and parent_row is None:
                     diagnostics.append(
                         ImportDiagnostic(
@@ -386,9 +426,7 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         )
                     )
                     counts["failed"] += 1
-                    current_task_row = None
-                    for level in range(indent, 5):
-                        parent_stack.pop(level, None)
+                    state.reset_task_chain(indent)
                     continue
 
                 diagnostic_count = len(diagnostics)
@@ -400,9 +438,7 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                 )
                 if any(item.level == "error" for item in diagnostics[diagnostic_count:]):
                     counts["failed"] += 1
-                    current_task_row = None
-                    for level in range(indent, 5):
-                        parent_stack.pop(level, None)
+                    state.reset_task_chain(indent)
                     continue
                 responsible = row.get("responsible", "").strip()
                 if responsible:
@@ -417,7 +453,7 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                         priority=PRIORITY_MAP[priority_value],
                         indent=indent,
                         parent_row=parent_row,
-                        section_row=current_section_row,
+                        section_row=state.current_section_row,
                         author=row.get("author", "").strip(),
                         responsible=responsible,
                         scheduled_date=scheduled_date,
@@ -431,10 +467,10 @@ def parse_todoist_csv(content: bytes) -> TodoistImportPreview:
                     )
                 )
                 counts["task"] += 1
-                current_task_row = index
-                parent_stack[indent] = index
+                state.current_task_row = index
+                state.parent_stack[indent] = index
                 for level in range(indent + 1, 5):
-                    parent_stack.pop(level, None)
+                    state.parent_stack.pop(level, None)
         except csv.Error:
             _fatal("malformed_csv", "The CSV file is malformed and cannot be parsed.")
 

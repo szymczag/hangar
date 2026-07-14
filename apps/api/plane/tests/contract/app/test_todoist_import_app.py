@@ -14,7 +14,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from plane.db.models import Project, ProjectMember, User, Workspace, WorkspaceMember
+from plane.db.models import Module, Project, ProjectMember, User, Workspace, WorkspaceMember
 from plane.ext.models import ImportJob
 from plane.ext.utils.importers.todoist_csv import parse_todoist_csv
 
@@ -45,6 +45,14 @@ def csv_content() -> bytes:
             "RESPONSIBLE": "Owner (100)",
         }
     )
+    return output.getvalue().encode()
+
+
+def section_csv(name: str) -> bytes:
+    output = StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=HEADERS)
+    writer.writeheader()
+    writer.writerow({"TYPE": "section", "CONTENT": name})
     return output.getvalue().encode()
 
 
@@ -128,7 +136,7 @@ class TestTodoistImportAPI:
         content = csv_content()
         digest = parse_todoist_csv(content).digest
         upload_source = mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
-        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.delay")
+        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.apply_async")
 
         response = session_client.post(
             import_url(workspace),
@@ -146,7 +154,7 @@ class TestTodoistImportAPI:
         assert job.status == ImportJob.Status.QUEUED
         assert job.source_key.startswith(f"imports/{workspace.id}/{job.id}/")
         upload_source.assert_called_once()
-        enqueue.assert_called_once_with(str(job.id))
+        enqueue.assert_called_once_with(args=[str(job.id)], task_id=job.celery_task_id)
 
     def test_invalid_assignee_mapping_is_rejected(self, session_client, workspace, import_project):
         content = csv_content()
@@ -174,13 +182,31 @@ class TestTodoistImportAPI:
         assert response.data["error"]["code"] == "invalid_assignee_mapping"
         assert ImportJob.objects.count() == 0
 
-    def test_upload_failure_keeps_source_key_for_cleanup(
-        self, mocker, session_client, workspace, import_project
-    ):
+    def test_rows_with_errors_require_explicit_skip_confirmation(self, session_client, workspace, import_project):
+        content = csv_content().replace(b",4,1,", b",9,1,", 1)
+        preview = parse_todoist_csv(content)
+        assert preview.errors
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": preview.digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.data["error"]["code"] == "skipped_rows_not_confirmed"
+        assert ImportJob.objects.count() == 0
+
+    def test_upload_failure_keeps_source_key_for_cleanup(self, mocker, session_client, workspace, import_project):
         content = csv_content()
         digest = parse_todoist_csv(content).digest
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=False)
-        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.delay")
+        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.apply_async")
 
         response = session_client.post(
             import_url(workspace),
@@ -207,7 +233,7 @@ class TestTodoistImportAPI:
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
         mocker.patch("plane.ext.views.import_job.delete_import_source", return_value=False)
         mocker.patch(
-            "plane.ext.views.import_job.run_todoist_import.delay",
+            "plane.ext.views.import_job.run_todoist_import.apply_async",
             side_effect=RuntimeError("broker unavailable"),
         )
 
@@ -270,12 +296,14 @@ class TestTodoistImportAPI:
         response = session_client.get(f"/api/workspaces/{workspace.slug}/imports/{job.id}/report/")
 
         assert response.status_code == status.HTTP_200_OK
+        assert response["Cache-Control"] == "no-store"
+        assert response["X-Content-Type-Options"] == "nosniff"
         body = response.content.decode()
         assert "imported_tasks" in body
         assert "private-source-identity" not in body
         assert "private-member" not in body
 
-    def test_cancel_does_not_delete_source_after_worker_claims_job(
+    def test_processing_cancel_requests_worker_shutdown_without_deleting_source(
         self, mocker, session_client, workspace, import_project, create_user
     ):
         job = ImportJob.objects.create(
@@ -284,20 +312,106 @@ class TestTodoistImportAPI:
             initiated_by=create_user,
             source_digest="b" * 64,
             source_key="imports/source.csv",
-            status=ImportJob.Status.QUEUED,
+            status=ImportJob.Status.PROCESSING,
         )
         delete_source = mocker.patch("plane.ext.views.import_job.delete_import_source")
-        original_filter = ImportJob.objects.filter
-
-        def claim_before_compare_and_swap(*args, **kwargs):
-            queryset = original_filter(*args, **kwargs)
-            if kwargs.get("status") == ImportJob.Status.QUEUED:
-                original_filter(pk=job.id).update(status=ImportJob.Status.PROCESSING)
-            return queryset
-
-        mocker.patch.object(ImportJob.objects, "filter", side_effect=claim_before_compare_and_swap)
 
         response = session_client.post(f"/api/workspaces/{workspace.slug}/imports/{job.id}/cancel/")
 
-        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        job.refresh_from_db()
+        assert job.cancel_requested_at is not None
         delete_source.assert_not_called()
+
+    def test_unknown_configuration_option_is_rejected(self, session_client, workspace, import_project):
+        content = csv_content()
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": parse_todoist_csv(content).digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}, "unexpected": True}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["error"]["code"] == "invalid_config"
+
+    def test_nested_module_conflict_configuration_is_strict(self, session_client, workspace, import_project):
+        module = Module.objects.create(name="Existing", project=import_project)
+        content = section_csv(module.name)
+        preview = parse_todoist_csv(content)
+        conflict = preview.records[0]
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": preview.digest,
+                "config": json.dumps(
+                    {
+                        "assignee_mapping": {},
+                        "module_conflicts": {
+                            str(conflict.row): {
+                                "action": "reuse",
+                                "module_id": str(module.id),
+                                "unexpected": True,
+                            }
+                        },
+                    }
+                ),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["error"]["code"] == "invalid_module_conflict"
+
+    def test_failed_import_retry_reuses_job_identity(
+        self, mocker, session_client, workspace, import_project, create_user
+    ):
+        content = csv_content()
+        digest = parse_todoist_csv(content).digest
+        failed_job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest=digest,
+            status=ImportJob.Status.FAILED,
+        )
+        mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
+        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.apply_async")
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert ImportJob.objects.count() == 1
+        failed_job.refresh_from_db()
+        assert failed_job.status == ImportJob.Status.QUEUED
+        enqueue.assert_called_once_with(args=[str(failed_job.id)], task_id=failed_job.celery_task_id)
+
+    def test_report_is_not_available_while_processing(self, session_client, workspace, import_project, create_user):
+        job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest="c" * 64,
+            status=ImportJob.Status.PROCESSING,
+        )
+
+        response = session_client.get(f"/api/workspaces/{workspace.slug}/imports/{job.id}/report/")
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.data["error"]["code"] == "report_not_ready"

@@ -13,11 +13,16 @@ export class ImportService extends APIService {
     super(API_BASE_URL);
   }
 
-  async previewTodoist(workspaceSlug: string, projectId: string, file: File): Promise<TTodoistImportPreview> {
+  async previewTodoist(
+    workspaceSlug: string,
+    projectId: string,
+    file: File,
+    signal?: AbortSignal
+  ): Promise<TTodoistImportPreview> {
     const data = new FormData();
     data.append("project_id", projectId);
     data.append("file", file);
-    return this.post(`/api/workspaces/${workspaceSlug}/imports/todoist/preview/`, data)
+    return this.post(`/api/workspaces/${workspaceSlug}/imports/todoist/preview/`, data, { signal })
       .then((response) => response.data)
       .catch((error) => {
         throw error?.response?.data;
@@ -43,8 +48,16 @@ export class ImportService extends APIService {
       });
   }
 
-  async list(workspaceSlug: string): Promise<TImportJobList> {
-    return this.get(`/api/workspaces/${workspaceSlug}/imports/?cursor=20:0:0&per_page=20`)
+  async list(workspaceSlug: string, cursor = "20:0:0"): Promise<TImportJobList> {
+    return this.get(`/api/workspaces/${workspaceSlug}/imports/?cursor=${encodeURIComponent(cursor)}&per_page=20`)
+      .then((response) => response.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async cancel(workspaceSlug: string, jobId: string): Promise<TImportJob> {
+    return this.post(`/api/workspaces/${workspaceSlug}/imports/${jobId}/cancel/`)
       .then((response) => response.data)
       .catch((error) => {
         throw error?.response?.data;

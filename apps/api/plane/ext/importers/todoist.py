@@ -9,16 +9,17 @@ from typing import Any
 
 # Django imports
 from django.db import transaction
+from django.utils import timezone
 
 # Third party imports
 from crum import impersonate
+import mistune
 
 # Module imports
 from plane.app.serializers.issue import IssueCommentSerializer, IssueCreateSerializer
 from plane.app.serializers.project import ProjectSerializer
 from plane.db.models import Issue, IssueActivity, IssueComment, Module, ModuleIssue
 from plane.utils.content_validator import validate_html_content
-from plane.utils.markdown import markdown
 
 from plane.ext.models import ImportJob
 from plane.ext.utils.import_storage import read_import_source
@@ -26,6 +27,7 @@ from plane.ext.utils.importers.todoist_csv import TodoistRecord, parse_todoist_c
 
 
 EXTERNAL_SOURCE = "todoist_csv"
+_markdown = mistune.create_markdown()
 
 
 class ImportRowFailure(Exception):
@@ -33,6 +35,10 @@ class ImportRowFailure(Exception):
         super().__init__(code)
         self.code = code
         self.field = field
+
+
+class ImportCancelled(Exception):
+    pass
 
 
 def _diagnostic(row: int | None, code: str, field: str | None = None) -> dict[str, Any]:
@@ -46,7 +52,7 @@ def _diagnostic(row: int | None, code: str, field: str | None = None) -> dict[st
 
 
 def _render_markdown(value: str) -> str:
-    rendered = markdown(value or "") or "<p></p>"
+    rendered = _markdown(value or "") or "<p></p>"
     is_valid, _, sanitized = validate_html_content(rendered)
     if not is_valid:
         raise ImportRowFailure("invalid_html", "description")
@@ -60,6 +66,8 @@ def _metadata_comment(record: TodoistRecord) -> str | None:
     if record.duration:
         unit = f" {escape(record.duration_unit)}" if record.duration_unit else ""
         values.append(f"Original duration: {escape(record.duration)}{unit}")
+    if record.timezone:
+        values.append(f"Original timezone: {escape(record.timezone)}")
     if not values:
         return None
     items = "".join(f"<li>{value}</li>" for value in values)
@@ -67,6 +75,7 @@ def _metadata_comment(record: TodoistRecord) -> str | None:
 
 
 def _create_activity(issue: Issue, actor_id, *, comment: IssueComment | None = None) -> None:
+    """Record import activity without dispatching interactive-create notifications."""
     if comment is None:
         IssueActivity.objects.create(
             issue=issue,
@@ -250,7 +259,15 @@ def execute_todoist_import(job: ImportJob) -> tuple[dict[str, Any], list[dict[st
         job.project.save(update_fields=["module_view"])
 
     with impersonate(job.initiated_by):
-        for record in preview.records:
+        for record_index, record in enumerate(preview.records):
+            if (
+                record_index % 10 == 0
+                and ImportJob.objects.filter(
+                    pk=job.id,
+                    cancel_requested_at__isnull=False,
+                ).exists()
+            ):
+                raise ImportCancelled
             try:
                 with transaction.atomic():
                     if record.kind == "project_note":
@@ -306,16 +323,12 @@ def execute_todoist_import(job: ImportJob) -> tuple[dict[str, Any], list[dict[st
                 stats["failed"] += 1
                 if record.kind == "task":
                     stats["processed_tasks"] += 1
-            except Exception as exc:  # noqa: BLE001 - convert row failures to a safe report
-                diagnostics.append(_diagnostic(record.row, "row_import_failed"))
-                stats["failed"] += 1
-                if record.kind == "task":
-                    stats["processed_tasks"] += 1
-                # Do not include exception messages because serializers and
-                # database errors can echo private source values.
-                del exc
 
             if stats["processed_tasks"] and stats["processed_tasks"] % 25 == 0:
-                ImportJob.objects.filter(pk=job.id).update(stats=stats, errors=diagnostics)
+                ImportJob.objects.filter(pk=job.id).update(
+                    stats=stats,
+                    errors=diagnostics,
+                    heartbeat_at=timezone.now(),
+                )
 
     return stats, diagnostics

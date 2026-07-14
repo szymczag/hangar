@@ -57,7 +57,7 @@ export const WORKSPACE_SETTINGS: Record<TWorkspaceSettingsTabs, TWorkspaceSettin
   },
   imports: {
     key: "imports",
-    i18n_label: "workspace_settings.empty_state.imports.title",
+    i18n_label: "workspace_settings.settings.imports.title",
     href: `/settings/imports`,
     access: [EUserWorkspaceRoles.ADMIN],
     highlight: (pathname: string, baseUrl: string) => pathname === `${baseUrl}/settings/imports/`,

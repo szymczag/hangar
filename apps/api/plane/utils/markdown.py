@@ -4,4 +4,4 @@
 
 import mistune
 
-markdown = mistune.create_markdown()
+markdown = mistune.Markdown()

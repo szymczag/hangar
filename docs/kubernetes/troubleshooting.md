@@ -177,6 +177,11 @@ path fell through to the `/` route. Also confirm the
 Gateway data-plane Pods. Presigned URLs and request cookies are credentials;
 redact them from support output and invalidate them after accidental disclosure.
 
+The import bucket must not appear in any Ingress or HTTPRoute. If an import is
+rejected with `upload_failed`, verify that the configured import bucket differs
+from the upload bucket and that an unsigned `HeadObject` request is denied. Do
+not work around the check by adding a public route or bucket policy.
+
 ## NetworkPolicy failures
 
 Check whether the selected CNI enforces policy and whether DNS and ingress Pods

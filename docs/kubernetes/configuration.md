@@ -178,6 +178,7 @@ externalServices:
     endpoint: https://s3.example.com
     publicEndpoint: https://s3.example.com
     bucket: hangar
+    importBucket: hangar-imports
     region: eu-central-1
     pathStyle: false
 ```
@@ -188,6 +189,13 @@ browser-facing presigned URLs; leave it empty only when it is identical to
 provider. The production profile requires HTTPS for both endpoints. Credentials
 come from the object-storage Secret, not this block.
 
+`importBucket` is a separate private bucket for short-lived CSV import sources.
+Grant the API and worker read, write, and delete access to it, deny anonymous
+access, and do not expose it through an Ingress, Gateway, CDN, or public bucket
+policy. API startup creates the bucket when it is missing and the credentials
+allow bucket creation. Each upload also performs an unsigned object lookup and
+fails closed if anonymous access succeeds.
+
 The evaluation profile uses the bundled SeaweedFS service internally while
 presigning browser requests against the public Hangar origin. To complete that
 same-origin flow, the chart routes `/<bucket>` to the SeaweedFS S3 port and adds
@@ -195,6 +203,9 @@ a narrowly scoped ingress-controller NetworkPolicy rule for that Pod. For the
 default bucket, uploads therefore use `https://<public-host>/hangar`; the request
 does not go to the frontend service. Bucket names that collide with Hangar's
 reserved public route prefixes are rejected by the schema.
+
+The evaluation route applies only to `bucket`. `importBucket` remains reachable
+only by the API and workers over the internal object-storage Service.
 
 Production does not render this proxy route. Its `publicEndpoint` must be
 publicly reachable by browsers; `endpoint` may use a separate address reachable

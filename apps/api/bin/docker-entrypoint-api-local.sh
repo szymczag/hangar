@@ -17,6 +17,9 @@ python manage.py configure_instance
 # Create the default bucket
 python manage.py create_bucket
 
+# Create the dedicated private import-source bucket
+python manage.py create_import_bucket
+
 # Clear Cache before starting to remove stale values
 python manage.py clear_cache
 

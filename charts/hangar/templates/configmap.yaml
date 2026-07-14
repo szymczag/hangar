@@ -29,6 +29,7 @@ data:
   AWS_S3_ENDPOINT_URL: {{ $objectStorageEndpoint | quote }}
   AWS_S3_PUBLIC_ENDPOINT_URL: {{ $objectStoragePublicEndpoint | quote }}
   AWS_S3_BUCKET_NAME: {{ .Values.externalServices.objectStorage.bucket | quote }}
+  IMPORT_S3_BUCKET_NAME: {{ .Values.externalServices.objectStorage.importBucket | quote }}
   AWS_REGION: {{ .Values.externalServices.objectStorage.region | quote }}
   USE_MINIO: {{ ternary "1" "0" $objectStoragePathStyle | quote }}
   MINIO_ENDPOINT_SSL: {{ ternary "1" "0" (hasPrefix "https://" $objectStorageEndpoint) | quote }}

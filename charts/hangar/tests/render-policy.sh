@@ -108,6 +108,7 @@ for render in "$production_render" "$evaluation_render"; do
     assert_present '^  FILE_SIZE_LIMIT: "5242880"$' "$render" "file-size limit must render as an exact decimal integer"
     assert_present '^  SIGNED_URL_EXPIRATION: "3600"$' "$render" "signed-URL expiration must render as an exact decimal integer"
     assert_present '^  HARD_DELETE_AFTER_DAYS: "60"$' "$render" "hard-delete retention must render as an exact decimal integer"
+    assert_present '^  IMPORT_S3_BUCKET_NAME: "hangar-imports"$' "$render" "private import bucket must be configured"
     assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$render" "integer application settings must not use exponent notation"
     redis_url_consumers="$(grep -Ec '^[[:space:]]+- name: REDIS_URL$' "$render")"
     [[ "$redis_url_consumers" -eq 5 ]] || fail "API, Live, workers, and migrator must each receive REDIS_URL in $render"
@@ -164,6 +165,8 @@ assert_present 'AWS_S3_PUBLIC_ENDPOINT_URL: "https://hangar-evaluation.example.c
 assert_present 'AWS_S3_PUBLIC_ENDPOINT_URL: "https://s3.example.com"' "$production_render" "production presigning must use the public object-storage endpoint"
 evaluation_object_storage_ingress_paths="$(grep -Ec '^[[:space:]]+- path: "/hangar"$' "$evaluation_render")"
 [[ "$evaluation_object_storage_ingress_paths" -eq 1 ]] || fail "evaluation Ingress must route the presigned bucket path exactly once"
+assert_absent '^[[:space:]]+- path: "/hangar-imports"$' "$evaluation_render" "private import bucket must not have a public Ingress route"
+assert_absent '^[[:space:]]+value: /hangar-imports$' "$evaluation_gateway_render" "private import bucket must not have a public HTTPRoute"
 assert_present '^  name: hangar-hangar-evaluation-object-storage-ingress$' "$evaluation_render" "evaluation object storage must allow ingress-controller traffic"
 assert_absent '^[[:space:]]+- path: "/hangar"$' "$production_render" "production must not proxy object storage through the Hangar origin"
 valkey_probe_auth_uses="$(grep -Ec '^[[:space:]]+- VALKEYCLI_AUTH="\$VALKEY_PASSWORD" valkey-cli --no-auth-warning --user hangar -h$' "$evaluation_render")"
@@ -182,6 +185,8 @@ assert_invalid "evaluation bucket colliding with the API route" \
     --set-string externalServices.objectStorage.bucket=api
 assert_invalid "object-storage bucket containing a path separator" \
     --set-string externalServices.objectStorage.bucket=hangar/uploads
+assert_invalid "import bucket containing a path separator" \
+    --set-string externalServices.objectStorage.importBucket=hangar/imports
 assert_invalid "HTTP production origin" --set-string publicUrl.scheme=http
 assert_invalid "HTTP production object storage" --set-string externalServices.objectStorage.endpoint=http://s3.example.com
 assert_invalid "HTTP production public object storage" --set-string externalServices.objectStorage.publicEndpoint=http://s3.example.com

@@ -19,6 +19,7 @@ class ImportJob(BaseModel):
         QUEUED = "queued", "Queued"
         PROCESSING = "processing", "Processing"
         COMPLETED = "completed", "Completed"
+        COMPLETED_WITH_ERRORS = "completed_with_errors", "Completed with errors"
         FAILED = "failed", "Failed"
         CANCELLED = "cancelled", "Cancelled"
 
@@ -39,7 +40,11 @@ class ImportJob(BaseModel):
     stats = models.JSONField(default=dict, blank=True)
     errors = models.JSONField(default=list, blank=True)
     reason = models.CharField(max_length=100, blank=True)
+    celery_task_id = models.CharField(max_length=255, blank=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
     started_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    cancel_requested_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     source_deleted_at = models.DateTimeField(null=True, blank=True)
 

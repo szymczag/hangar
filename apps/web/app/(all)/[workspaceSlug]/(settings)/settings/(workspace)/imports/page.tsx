@@ -24,7 +24,7 @@ function ImportsPage() {
   const { t } = useTranslation();
   const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
   const pageTitle = currentWorkspace?.name
-    ? `${currentWorkspace.name} - ${t("workspace_settings.empty_state.imports.title")}`
+    ? `${currentWorkspace.name} - ${t("workspace_settings.settings.imports.title")}`
     : undefined;
 
   if (workspaceUserInfo && !isAdmin) return <NotAuthorizedView section="settings" className="h-auto" />;
@@ -34,8 +34,8 @@ function ImportsPage() {
       <PageHead title={pageTitle} />
       <div className="flex w-full flex-col gap-y-6">
         <SettingsHeading
-          title={t("workspace_settings.empty_state.imports.title")}
-          description="Bring Todoist tasks, sections, notes, dates, priorities, and assignments into an existing project."
+          title={t("workspace_settings.settings.imports.title")}
+          description={t("workspace_settings.settings.imports.description")}
         />
         {currentWorkspace?.slug && <TodoistImport workspaceSlug={currentWorkspace.slug} />}
       </div>
