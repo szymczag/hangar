@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: api-tests-importer-shards-${{ github.workflow }}-${{ github.ref }}
+  group: api-tests-importer-full-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
