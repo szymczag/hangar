@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 # Django imports
+from django.db import transaction
 from django.utils import timezone
 
 # Module imports
@@ -10,18 +11,18 @@ from plane.db.models import (
     ProjectMember,
     ProjectMemberInvite,
     WorkspaceMember,
-    WorkspaceMemberInvite,
 )
 from plane.utils.cache import invalidate_cache_directly
 from plane.bgtasks.event_tracking_task import track_event
 from plane.utils.analytics_events import USER_JOINED_WORKSPACE
+from plane.authentication.services.invitations import accepted_membership_invitations
 
 
-def process_workspace_project_invitations(user):
+def _process_workspace_project_invitations(user):
     """This function takes in User and adds him to all workspace and projects that the user has accepted invited of"""
 
     # Check if user has any accepted invites for workspace and add them to workspace
-    workspace_member_invites = WorkspaceMemberInvite.objects.filter(email=user.email, accepted=True)
+    workspace_member_invites = accepted_membership_invitations(user.email, for_update=True)
 
     WorkspaceMember.objects.bulk_create(
         [
@@ -36,24 +37,26 @@ def process_workspace_project_invitations(user):
     )
 
     for workspace_member_invite in workspace_member_invites:
-        invalidate_cache_directly(
-            path=f"/api/workspaces/{str(workspace_member_invite.workspace.slug)}/members/",
-            url_params=False,
-            user=False,
-            multiple=True,
-        )
-        track_event.delay(
-            user_id=user.id,
-            event_name=USER_JOINED_WORKSPACE,
-            slug=workspace_member_invite.workspace.slug,
-            event_properties={
+        cache_kwargs = {
+            "path": f"/api/workspaces/{str(workspace_member_invite.workspace.slug)}/members/",
+            "url_params": False,
+            "user": False,
+            "multiple": True,
+        }
+        transaction.on_commit(lambda kwargs=cache_kwargs: invalidate_cache_directly(**kwargs))
+        event_kwargs = {
+            "user_id": user.id,
+            "event_name": USER_JOINED_WORKSPACE,
+            "slug": workspace_member_invite.workspace.slug,
+            "event_properties": {
                 "user_id": user.id,
                 "workspace_id": workspace_member_invite.workspace.id,
                 "workspace_slug": workspace_member_invite.workspace.slug,
                 "role": workspace_member_invite.role,
                 "joined_at": str(timezone.now().isoformat()),
             },
-        )
+        }
+        transaction.on_commit(lambda kwargs=event_kwargs: track_event.delay(**kwargs))
 
     # Check if user has any project invites
     project_member_invites = ProjectMemberInvite.objects.filter(email=user.email, accepted=True)
@@ -87,5 +90,12 @@ def process_workspace_project_invitations(user):
     )
 
     # Delete all the invites
-    workspace_member_invites.delete()
+    consumed_at = timezone.now()
+    workspace_member_invites.update(consumed_at=consumed_at, deleted_at=consumed_at)
     project_member_invites.delete()
+
+
+def process_workspace_project_invitations(user):
+    """Consume accepted workspace/project invitations in one transaction."""
+    with transaction.atomic():
+        _process_workspace_project_invitations(user)

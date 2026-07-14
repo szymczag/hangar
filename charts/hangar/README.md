@@ -21,6 +21,7 @@ image digests from the release tag; source defaults remain fail-closed.
 - [Operations](../../docs/kubernetes/operations.md)
 - [Security and artifact verification](../../docs/kubernetes/security.md)
 - [Troubleshooting](../../docs/kubernetes/troubleshooting.md)
+- [Secure email and OpenPGP operations](../../docs/aws-ses-email-operations.md)
 
 Inspect the published chart without registry credentials:
 
@@ -42,6 +43,20 @@ by incomplete release attempts. `0.1.0-rc.6` is the previous complete release.
 Both profiles use the same Hangar application images, Restricted-compatible
 security contexts, pre-existing Secret interface, public routing, and
 default-deny NetworkPolicies.
+
+## Optional secure email workload
+
+Secure email is disabled by default. Setting `mail.enabled=true` adds a dedicated
+`mail-worker` for Amazon SES API submission, feedback processing, audit receipts,
+suppression handling, and optional OpenPGP encryption. Only that workload receives
+the mail service account or optional SES/SQS credential references; the chart does
+not create AWS identities, queues, topics, configuration sets, or DNS records.
+
+Before enabling it, read the
+[email security model](../../docs/email-delivery-and-openpgp.md), configure the
+required resources with the
+[SES operations guide](../../docs/aws-ses-email-operations.md), and review the
+[Helm values and Secret contract](../../docs/kubernetes/configuration.md#secure-email-delivery).
 
 ## Prerequisites
 

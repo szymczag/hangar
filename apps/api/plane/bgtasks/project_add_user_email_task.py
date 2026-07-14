@@ -3,25 +3,23 @@
 # See the LICENSE file for details.
 
 # Python imports
-import logging
-
 # Third party imports
 from celery import shared_task
+from django.db import OperationalError
 
 # Third party imports
-from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 
 
 # Module imports
-from plane.license.utils.instance_value import get_email_configuration
+from plane.mailer.service import enqueue_rendered_email
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 from plane.db.models import ProjectMember
 from plane.db.models import User
 
 
-@shared_task
+@shared_task(autoretry_for=(OperationalError,), retry_backoff=True, retry_jitter=True, max_retries=5)
 def project_add_user_email(current_site, project_member_id, invitor_id):
     try:
         # Get the invitor
@@ -43,47 +41,24 @@ def project_add_user_email(current_site, project_member_id, invitor_id):
             "project_url": project_url,
         }
 
-        # Get the email configuration
-        (
-            EMAIL_HOST,
-            EMAIL_HOST_USER,
-            EMAIL_HOST_PASSWORD,
-            EMAIL_PORT,
-            EMAIL_USE_TLS,
-            EMAIL_USE_SSL,
-            EMAIL_FROM,
-        ) = get_email_configuration()
-
         # Set the subject
         subject = "You have been invited to a Hangar project"
 
         # Render the email template
         html_content = render_to_string("emails/notifications/project_addition.html", context)
         text_content = generate_plain_text_from_html(html_content)
-        # Initialize the connection
-        connection = get_connection(
-            host=EMAIL_HOST,
-            port=int(EMAIL_PORT),
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_tls=EMAIL_USE_TLS == "1",
-            use_ssl=EMAIL_USE_SSL == "1",
-        )
-        # Send the email
-        msg = EmailMultiAlternatives(
+        enqueue_rendered_email(
+            recipient_email=member_email,
+            recipient_user=project_member.member,
+            template_key="project.member_added",
             subject=subject,
-            body=text_content,
-            from_email=EMAIL_FROM,
-            to=[member_email],
-            connection=connection,
+            text_body=text_content,
+            html_body=html_content,
+            idempotency_key=f"project-member-added:{project_member.id}",
         )
-        # Attach the html content
-        msg.attach_alternative(html_content, "text/html")
-        # Send the email
-        msg.send()
-        # Log the success
-        logging.getLogger("plane.worker").info("Email sent successfully.")
         return
     except Exception as e:
         log_exception(e)
+        if isinstance(e, OperationalError):
+            raise
         return

@@ -20,6 +20,15 @@ from plane.app.views import (
     ## Workspaces
     UserWorkSpacesEndpoint,
 )
+from plane.app.views.user.email_security import (
+    EmailSecurityChallengeEndpoint,
+    EmailSecurityChallengeVerifyEndpoint,
+    EmailSecurityKeyEndpoint,
+    EmailSecurityKeyUploadEndpoint,
+    EmailSecurityReceiptEndpoint,
+    EmailSecurityStatusEndpoint,
+    EmailSecurityTestEndpoint,
+)
 
 urlpatterns = [
     # User Profile
@@ -46,6 +55,33 @@ urlpatterns = [
     ),
     # Profile
     path("users/me/profile/", ProfileEndpoint.as_view(), name="accounts"),
+    path("users/me/email-security/", EmailSecurityStatusEndpoint.as_view(), name="email-security"),
+    path(
+        "users/me/email-security/receipts/",
+        EmailSecurityReceiptEndpoint.as_view(),
+        name="email-security-receipts",
+    ),
+    path("users/me/email-security/keys/", EmailSecurityKeyUploadEndpoint.as_view(), name="email-security-key-upload"),
+    path(
+        "users/me/email-security/keys/<uuid:key_id>/challenge/",
+        EmailSecurityChallengeEndpoint.as_view(),
+        name="email-security-key-challenge",
+    ),
+    path(
+        "users/me/email-security/keys/<uuid:key_id>/verify/",
+        EmailSecurityChallengeVerifyEndpoint.as_view(),
+        name="email-security-key-verify",
+    ),
+    path(
+        "users/me/email-security/keys/<uuid:key_id>/test/",
+        EmailSecurityTestEndpoint.as_view(),
+        name="email-security-key-test",
+    ),
+    path(
+        "users/me/email-security/keys/<uuid:key_id>/",
+        EmailSecurityKeyEndpoint.as_view(),
+        name="email-security-key",
+    ),
     # End profile
     # Accounts
     path("users/me/accounts/", AccountEndpoint.as_view(), name="accounts"),

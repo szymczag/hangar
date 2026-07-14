@@ -3,39 +3,31 @@
 # See the LICENSE file for details.
 
 # Python imports
-import logging
+from datetime import timedelta
 
 # Third party imports
 from celery import shared_task
+from django.db import OperationalError
 
 # Django imports
 # Third party imports
-from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 
 # Module imports
-from plane.license.utils.instance_value import get_email_configuration
+from plane.db.models import User
+from plane.mailer.service import enqueue_rendered_email
+from plane.mailer.tokens import email_idempotency_token
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 
 
-@shared_task
+@shared_task(autoretry_for=(OperationalError,), retry_backoff=True, retry_jitter=True, max_retries=5)
 def forgot_password(first_name, email, uidb64, token, current_site):
     try:
         relative_link = f"/accounts/reset-password/?uidb64={uidb64}&token={token}&email={email}"
         abs_url = str(current_site) + relative_link
 
-        (
-            EMAIL_HOST,
-            EMAIL_HOST_USER,
-            EMAIL_HOST_PASSWORD,
-            EMAIL_PORT,
-            EMAIL_USE_TLS,
-            EMAIL_USE_SSL,
-            EMAIL_FROM,
-        ) = get_email_configuration()
-
-        subject = "A new password to your Hangar account has been requested"
+        subject = "Reset your Hangar password"
 
         context = {
             "first_name": first_name,
@@ -47,26 +39,20 @@ def forgot_password(first_name, email, uidb64, token, current_site):
 
         text_content = generate_plain_text_from_html(html_content)
 
-        connection = get_connection(
-            host=EMAIL_HOST,
-            port=int(EMAIL_PORT),
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_tls=EMAIL_USE_TLS == "1",
-            use_ssl=EMAIL_USE_SSL == "1",
-        )
-
-        msg = EmailMultiAlternatives(
+        recipient = User.objects.filter(email__iexact=email).first()
+        enqueue_rendered_email(
+            recipient_email=email,
+            recipient_user=recipient,
+            template_key="auth.forgot_password",
             subject=subject,
-            body=text_content,
-            from_email=EMAIL_FROM,
-            to=[email],
-            connection=connection,
+            text_body=text_content,
+            html_body=html_content,
+            expires_in=timedelta(hours=1),
+            idempotency_key=f"forgot-password:{email_idempotency_token('forgot-password', uidb64, token)}",
         )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
-        logging.getLogger("plane.worker").info("Email sent successfully")
         return
     except Exception as e:
         log_exception(e)
+        if isinstance(e, OperationalError):
+            raise
         return

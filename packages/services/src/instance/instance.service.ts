@@ -13,6 +13,8 @@ import type {
   IInstanceConfiguration,
   IInstanceInfo,
   TPage,
+  IAdminEmailReceiptList,
+  IEmailSuppression,
 } from "@plane/types";
 // api service
 import { APIService } from "../api.service";
@@ -124,6 +126,35 @@ export class InstanceService extends APIService {
       receiver_email: receiverEmail,
     })
       .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async emailDeliveryLog(params?: {
+    recipient?: string;
+    receipt?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<IAdminEmailReceiptList> {
+    return this.get("/api/instances/email-delivery-log/", { params })
+      .then((response) => response.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async emailSuppressions(): Promise<{ results: IEmailSuppression[] }> {
+    return this.get("/api/instances/email-suppressions/")
+      .then((response) => response.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deactivateEmailSuppression(id: string, reason: string): Promise<void> {
+    return this.post("/api/instances/email-suppressions/", { id, reason })
+      .then(() => undefined)
       .catch((error) => {
         throw error?.response?.data;
       });

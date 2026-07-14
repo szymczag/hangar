@@ -9,6 +9,7 @@ from .issue_property import (
     IssuePropertyValue,
     PropertyTypeChoices,
 )
+from plane.ext.runner.models import RunnerAuditEvent, RunnerInstallation
 from .worklog import IssueWorkLog
 
 __all__ = [
@@ -18,4 +19,6 @@ __all__ = [
     "IssuePropertyValue",
     "IssueWorkLog",
     "PropertyTypeChoices",
+    "RunnerAuditEvent",
+    "RunnerInstallation",
 ]

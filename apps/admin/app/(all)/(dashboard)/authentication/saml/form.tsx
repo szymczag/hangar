@@ -60,6 +60,7 @@ export function InstanceSAMLConfigForm(props: Props) {
       SAML_ATTR_EMAIL: config["SAML_ATTR_EMAIL"],
       SAML_ATTR_FIRST_NAME: config["SAML_ATTR_FIRST_NAME"],
       SAML_ATTR_LAST_NAME: config["SAML_ATTR_LAST_NAME"],
+      SAML_ATTR_SUBJECT: config["SAML_ATTR_SUBJECT"],
     },
   });
 
@@ -107,6 +108,17 @@ export function InstanceSAMLConfigForm(props: Props) {
       description: <>Shown on the sign-in button, e.g. &quot;Continue with Okta&quot;.</>,
       placeholder: "Okta",
       error: Boolean(errors.SAML_PROVIDER_NAME),
+      required: false,
+    },
+    {
+      key: "SAML_ATTR_SUBJECT",
+      type: "text",
+      label: "Stable subject attribute (optional)",
+      description: (
+        <>Immutable directory/object identifier used for account binding. When empty, a non-transient NameID is used.</>
+      ),
+      placeholder: "object_id",
+      error: Boolean(errors.SAML_ATTR_SUBJECT),
       required: false,
     },
     {
@@ -188,6 +200,7 @@ export function InstanceSAMLConfigForm(props: Props) {
         SAML_ATTR_EMAIL: response.find((item) => item.key === "SAML_ATTR_EMAIL")?.value,
         SAML_ATTR_FIRST_NAME: response.find((item) => item.key === "SAML_ATTR_FIRST_NAME")?.value,
         SAML_ATTR_LAST_NAME: response.find((item) => item.key === "SAML_ATTR_LAST_NAME")?.value,
+        SAML_ATTR_SUBJECT: response.find((item) => item.key === "SAML_ATTR_SUBJECT")?.value,
       });
     } catch (err) {
       console.error(err);

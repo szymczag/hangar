@@ -18,6 +18,10 @@ import type {
   TIssuesResponse,
   TUserProfile,
   IEmailCheckResponse,
+  IEmailSecurityStatus,
+  IOpenPGPChallenge,
+  IOpenPGPEmailKey,
+  IEmailReceiptList,
 } from "@plane/types";
 import { APIService } from "@/services/api.service";
 // types
@@ -106,6 +110,64 @@ export class UserService extends APIService {
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response;
+      });
+  }
+
+  async getEmailSecurityStatus(): Promise<IEmailSecurityStatus> {
+    return this.get("/api/users/me/email-security/")
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async getEmailReceipts(receipt?: string): Promise<IEmailReceiptList> {
+    return this.get("/api/users/me/email-security/receipts/", {
+      params: receipt ? { receipt } : undefined,
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async uploadOpenPGPKey(certificate: string, password?: string): Promise<IOpenPGPEmailKey> {
+    return this.post("/api/users/me/email-security/keys/", { certificate, password })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async sendOpenPGPChallenge(keyId: string): Promise<IOpenPGPChallenge> {
+    return this.post(`/api/users/me/email-security/keys/${keyId}/challenge/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async verifyOpenPGPChallenge(keyId: string, code: string): Promise<IOpenPGPEmailKey> {
+    return this.post(`/api/users/me/email-security/keys/${keyId}/verify/`, { code })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async removeOpenPGPKey(keyId: string, password?: string): Promise<void> {
+    return this.delete(`/api/users/me/email-security/keys/${keyId}/`, { password })
+      .then(() => undefined)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async sendOpenPGPTest(keyId: string): Promise<{ status: string; outbox_id: string | null }> {
+    return this.post(`/api/users/me/email-security/keys/${keyId}/test/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
       });
   }
 

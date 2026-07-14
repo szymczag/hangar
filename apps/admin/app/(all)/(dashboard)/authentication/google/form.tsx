@@ -49,12 +49,34 @@ export function InstanceGoogleConfigForm(props: Props) {
       GOOGLE_CLIENT_ID: config["GOOGLE_CLIENT_ID"],
       GOOGLE_CLIENT_SECRET: config["GOOGLE_CLIENT_SECRET"],
       ENABLE_GOOGLE_SYNC: config["ENABLE_GOOGLE_SYNC"] || "0",
+      GOOGLE_AUTH_MODE: config["GOOGLE_AUTH_MODE"] || "generic",
+      GOOGLE_WORKSPACE_DOMAINS: config["GOOGLE_WORKSPACE_DOMAINS"] || "",
     },
   });
 
   const originURL = !isEmpty(API_BASE_URL) ? API_BASE_URL : typeof window !== "undefined" ? window.location.origin : "";
 
   const GOOGLE_FORM_FIELDS: TControllerInputFormField[] = [
+    {
+      key: "GOOGLE_AUTH_MODE",
+      type: "text",
+      label: "Authentication mode",
+      description: <>Use generic for any Google account, or workspace to enforce an allowed Google Workspace tenant.</>,
+      placeholder: "generic",
+      error: Boolean(errors.GOOGLE_AUTH_MODE),
+      required: true,
+    },
+    {
+      key: "GOOGLE_WORKSPACE_DOMAINS",
+      type: "text",
+      label: "Allowed Workspace domains",
+      description: (
+        <>Comma-separated hosted domains. Required in workspace mode and enforced from the signed ID token.</>
+      ),
+      placeholder: "example.com,subsidiary.example.com",
+      error: Boolean(errors.GOOGLE_WORKSPACE_DOMAINS),
+      required: false,
+    },
     {
       key: "GOOGLE_CLIENT_ID",
       type: "text",
@@ -148,6 +170,17 @@ export function InstanceGoogleConfigForm(props: Props) {
         </p>
       ),
     },
+    {
+      key: "Space_Callback_URI",
+      label: "Callback URI (spaces)",
+      url: `${originURL}/auth/spaces/google/callback/`,
+      description: (
+        <p>
+          Add this as a second <CodeBlock darkerShade>Authorized Redirect URI</CodeBlock> when public Spaces use Google
+          authentication.
+        </p>
+      ),
+    },
   ];
 
   const onSubmit = async (formData: GoogleConfigFormValues) => {
@@ -164,6 +197,8 @@ export function InstanceGoogleConfigForm(props: Props) {
         GOOGLE_CLIENT_ID: response.find((item) => item.key === "GOOGLE_CLIENT_ID")?.value,
         GOOGLE_CLIENT_SECRET: response.find((item) => item.key === "GOOGLE_CLIENT_SECRET")?.value,
         ENABLE_GOOGLE_SYNC: response.find((item) => item.key === "ENABLE_GOOGLE_SYNC")?.value,
+        GOOGLE_AUTH_MODE: response.find((item) => item.key === "GOOGLE_AUTH_MODE")?.value,
+        GOOGLE_WORKSPACE_DOMAINS: response.find((item) => item.key === "GOOGLE_WORKSPACE_DOMAINS")?.value,
       });
     } catch (err) {
       console.error(err);

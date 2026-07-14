@@ -16,6 +16,7 @@ import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { Input, PasswordStrengthIndicator, usePasswordStrength } from "@plane/ui";
 // components
 import { ProfileSettingsHeading } from "@/components/settings/profile/heading";
+import { EmailSecuritySettings } from "./email-security";
 // helpers
 import { authErrorHandler, EAuthenticationErrorCodes, passwordErrors } from "@/helpers/authentication.helper";
 // hooks
@@ -275,6 +276,7 @@ export const SecurityProfileSettings = observer(function SecurityProfileSettings
           </div>
         </div>
       </form>
+      <EmailSecuritySettings />
     </div>
   );
 });

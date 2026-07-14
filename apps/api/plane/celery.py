@@ -21,6 +21,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "plane.settings.production")
 
 ri = redis_instance()
 
+
 # Configurable metrics push interval (in minutes)
 # Default: 360 (6 hours), set to 5 for development/testing
 def _get_metrics_push_interval_minutes() -> int:
@@ -33,6 +34,7 @@ def _get_metrics_push_interval_minutes() -> int:
     except (ValueError, OverflowError):
         return 360
 
+
 METRICS_PUSH_INTERVAL_MINUTES = _get_metrics_push_interval_minutes()
 
 app = Celery("plane")
@@ -41,11 +43,48 @@ app = Celery("plane")
 # pickle the object when using Windows.
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
+# Producer tasks must be confirmed by RabbitMQ or fail back to their caller.
+# Once an EmailOutbox row exists, the database dispatcher is the durable
+# recovery path and no longer depends on a single broker publication.
+app.conf.task_publish_retry = True
+app.conf.task_publish_retry_policy = {
+    "max_retries": 5,
+    "interval_start": 0.2,
+    "interval_step": 0.5,
+    "interval_max": 2,
+}
+app.conf.broker_transport_options = {
+    **(app.conf.broker_transport_options or {}),
+    "confirm_publish": True,
+}
+
+# Mail delivery and provider feedback use a dedicated queue so production can
+# attach a narrowly scoped AWS identity only to the mail worker.
+app.conf.task_routes = {
+    "plane.bgtasks.email_delivery_task.*": {"queue": "email"},
+}
+
 app.conf.beat_schedule = {
     # Intra day recurring jobs
     "check-every-five-minutes-to-send-email-notifications": {
         "task": "plane.bgtasks.email_notification_task.stack_email_notification",
         "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    "recover-stale-secure-email-outbox": {
+        "task": "plane.bgtasks.email_delivery_task.recover_stale_email_outbox",
+        "schedule": crontab(minute="*/2"),
+    },
+    "dispatch-due-secure-email-outbox": {
+        "task": "plane.bgtasks.email_delivery_task.dispatch_due_email_outbox",
+        "schedule": crontab(minute="*"),
+    },
+    "expire-openpgp-keys": {
+        "task": "plane.bgtasks.email_delivery_task.expire_openpgp_keys",
+        "schedule": crontab(minute=15),
+    },
+    "consume-ses-email-events": {
+        "task": "plane.bgtasks.email_delivery_task.consume_ses_email_events",
+        "schedule": crontab(minute="*"),
     },
     "push-instance-metrics": {
         "task": "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
@@ -75,6 +114,10 @@ app.conf.beat_schedule = {
     "check-every-day-to-delete-email-notification-logs": {
         "task": "plane.bgtasks.cleanup_task.delete_email_notification_logs",
         "schedule": crontab(hour=2, minute=45),  # UTC 02:45
+    },
+    "check-every-day-to-delete-secure-email-records": {
+        "task": "plane.bgtasks.email_delivery_task.cleanup_secure_email_records",
+        "schedule": crontab(hour=2, minute=50),
     },
     "check-every-day-to-delete-page-versions": {
         "task": "plane.bgtasks.cleanup_task.delete_page_versions",

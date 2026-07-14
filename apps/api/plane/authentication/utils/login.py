@@ -5,6 +5,7 @@
 # Django imports
 from django.contrib.auth import login
 from django.conf import settings
+from django.utils import timezone
 
 # Module imports
 from plane.utils.host import base_host
@@ -24,5 +25,8 @@ def user_login(request, user, is_app=False, is_admin=False, is_space=False):
         "domain": base_host(request=request, is_app=is_app, is_admin=is_admin, is_space=is_space),
     }
     request.session["device_info"] = device_info
+    # Sensitive account operations can require proof that this session was
+    # authenticated recently without relying on the user's historic login time.
+    request.session["reauthenticated_at"] = timezone.now().isoformat()
     request.session.save()
     return

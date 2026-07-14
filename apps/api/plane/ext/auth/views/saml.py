@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 # Python imports
+import hmac
 import uuid
 from urllib.parse import urlencode, urljoin
 
@@ -35,6 +36,8 @@ from plane.ext.auth.provider.saml import SAMLProvider
 # in the session. The token only selects which pending AuthnRequest ID to
 # enforce InResponseTo against — trust still comes from the IdP signature.
 RELAY_STATE_TTL = 60 * 10
+SAML_CORRELATION_COOKIE_NAME = "hangar_saml_correlation"
+SAML_CORRELATION_COOKIE_PATH = "/auth/saml/callback/"
 
 
 def _relay_key(token):
@@ -43,6 +46,25 @@ def _relay_key(token):
 
 def _relay_claim_key(token):
     return f"ext:saml:relay-claimed:{token}"
+
+
+def _validated_relay_token(token):
+    if not isinstance(token, str) or len(token) != 32:
+        return ""
+    try:
+        normalized = uuid.UUID(hex=token).hex
+    except ValueError:
+        return ""
+    return normalized if hmac.compare_digest(token, normalized) else ""
+
+
+def _clear_correlation_cookie(response):
+    response.delete_cookie(
+        SAML_CORRELATION_COOKIE_NAME,
+        path=SAML_CORRELATION_COOKIE_PATH,
+        samesite="None",
+    )
+    return response
 
 
 def _error_redirect(host, exc_params, next_path):
@@ -87,7 +109,17 @@ class SAMLAuthInitiateEndpoint(View):
                 },
                 RELAY_STATE_TTL,
             )
-            return HttpResponseRedirect(login_url)
+            response = HttpResponseRedirect(login_url)
+            response.set_cookie(
+                SAML_CORRELATION_COOKIE_NAME,
+                relay_token,
+                max_age=RELAY_STATE_TTL,
+                secure=True,
+                httponly=True,
+                samesite="None",
+                path=SAML_CORRELATION_COOKIE_PATH,
+            )
+            return response
         except AuthenticationException as e:
             return _error_redirect(host, e.get_error_dict(), next_path)
 
@@ -102,8 +134,17 @@ class SAMLCallbackEndpoint(View):
     """
 
     def post(self, request):
-        relay_token = request.POST.get("RelayState", "")
+        relay_token = _validated_relay_token(request.POST.get("RelayState", ""))
         flow = cache.get(_relay_key(relay_token)) if relay_token else None
+        browser_relay_token = request.COOKIES.get(SAML_CORRELATION_COOKIE_NAME, "")
+        browser_correlated = bool(relay_token) and hmac.compare_digest(browser_relay_token, relay_token)
+
+        # Verify browser correlation before claiming the flow. A forwarded
+        # RelayState/SAMLResponse must not consume the initiating browser's
+        # legitimate transaction.
+        if not browser_correlated:
+            flow = None
+
         # cache.add is atomic across workers. Two concurrent requests may both
         # read the flow, but only one can claim and consume it.
         if flow and cache.add(_relay_claim_key(relay_token), "1", RELAY_STATE_TTL):
@@ -119,16 +160,17 @@ class SAMLCallbackEndpoint(View):
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["INVALID_SAML_RESPONSE"],
                 error_message="INVALID_SAML_RESPONSE",
             )
-            return _error_redirect(host, exc.get_error_dict(), next_path)
+            response = _error_redirect(host, exc.get_error_dict(), next_path)
+            return _clear_correlation_cookie(response) if browser_correlated else response
 
         try:
             provider = SAMLProvider(request=request, callback=post_user_auth_workflow)
             user = provider.authenticate(request_id=flow.get("request_id"))
             user_login(request=request, user=user, is_app=True)
             path = str(validate_next_path(next_path)) if next_path else get_redirection_path(user=user)
-            return HttpResponseRedirect(urljoin(host, path))
+            return _clear_correlation_cookie(HttpResponseRedirect(urljoin(host, path)))
         except AuthenticationException as e:
-            return _error_redirect(host, e.get_error_dict(), next_path)
+            return _clear_correlation_cookie(_error_redirect(host, e.get_error_dict(), next_path))
 
 
 class SAMLMetadataEndpoint(View):

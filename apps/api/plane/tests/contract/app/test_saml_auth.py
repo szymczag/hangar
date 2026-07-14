@@ -23,6 +23,7 @@ from plane.db.models import User
 from plane.license.models import Instance, InstanceConfiguration
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
+from plane.ext.auth.views.saml import SAML_CORRELATION_COOKIE_NAME, SAML_CORRELATION_COOKIE_PATH
 from plane.authentication.adapter.error import AUTHENTICATION_ERROR_CODES
 
 IDP_ENTITY_ID = "https://idp.test/metadata"
@@ -104,6 +105,8 @@ def saml_time(offset_seconds=0):
 def build_response(
     request_id,
     email="saml-user@hangar.test",
+    name_id=None,
+    name_id_format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
     sign_assertion=True,
     audience=SP_ENTITY_ID,
     destination=ACS_URL,
@@ -118,6 +121,12 @@ def build_response(
     expiry = saml_time(not_on_or_after)
 
     assertion = f"""<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{assertion_id}" Version="2.0" IssueInstant="{now}"><saml:Issuer>{issuer}</saml:Issuer><saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">{email}</saml:NameID><saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData InResponseTo="{request_id}" NotOnOrAfter="{expiry}" Recipient="{destination}"/></saml:SubjectConfirmation></saml:Subject><saml:Conditions NotBefore="{saml_time(-60)}" NotOnOrAfter="{expiry}"><saml:AudienceRestriction><saml:Audience>{audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions><saml:AuthnStatement AuthnInstant="{now}" SessionIndex="_s{uuid.uuid4().hex}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement><saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{email}</saml:AttributeValue></saml:Attribute><saml:Attribute Name="first_name"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Sally</saml:AttributeValue></saml:Attribute><saml:Attribute Name="last_name"><saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Assertion</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion>"""  # noqa: E501
+
+    if name_id is not None or name_id_format != "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress":
+        assertion = assertion.replace(
+            f'Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">{email}</saml:NameID>',
+            f'Format="{name_id_format}">{name_id or email}</saml:NameID>',
+        )
 
     if sign_assertion:
         signed = OneLogin_Saml2_Utils.add_sign(assertion, key_pem, cert_pem)
@@ -214,7 +223,14 @@ class TestSAMLInitiate:
 
     @pytest.mark.django_db
     def test_redirects_to_idp_with_relay_state(self, django_client, setup_instance, saml_config):
-        initiate(django_client)
+        relay_token, _, response = initiate(django_client)
+
+        correlation_cookie = response.cookies[SAML_CORRELATION_COOKIE_NAME]
+        assert correlation_cookie.value == relay_token
+        assert correlation_cookie["path"] == SAML_CORRELATION_COOKIE_PATH
+        assert correlation_cookie["secure"] is True
+        assert correlation_cookie["httponly"] is True
+        assert correlation_cookie["samesite"] == "None"
 
 
 @pytest.mark.contract
@@ -253,9 +269,7 @@ class TestSAMLCallback:
     @pytest.mark.django_db
     def test_wrong_audience_rejected(self, django_client, setup_instance, saml_config):
         relay_token, request_id, _ = initiate(django_client)
-        response = post_acs(
-            django_client, build_response(request_id, audience="https://other-sp.test/"), relay_token
-        )
+        response = post_acs(django_client, build_response(request_id, audience="https://other-sp.test/"), relay_token)
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["INVALID_SAML_RESPONSE"]
 
     @pytest.mark.django_db
@@ -266,9 +280,13 @@ class TestSAMLCallback:
 
     @pytest.mark.django_db
     def test_unknown_relay_state_rejected(self, django_client, setup_instance, saml_config):
-        _, request_id, _ = initiate(django_client)
-        response = post_acs(django_client, build_response(request_id), "not-a-real-token")
+        relay_token, request_id, _ = initiate(django_client)
+        saml_response = build_response(request_id)
+        response = post_acs(django_client, saml_response, "not-a-real-token")
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["INVALID_SAML_RESPONSE"]
+
+        accepted = post_acs(django_client, saml_response, relay_token)
+        assert error_code_of(accepted) is None
 
     @pytest.mark.django_db
     def test_relay_state_single_use(self, django_client, setup_instance, saml_config):
@@ -309,4 +327,68 @@ class TestSAMLCallback:
         response = post_acs(django_client, build_response(request_id), relay_token)
         assert response.status_code == 302
         assert error_code_of(response) is not None
+        assert not User.objects.filter(email="saml-user@hangar.test").exists()
+
+    @pytest.mark.django_db
+    def test_relay_state_is_bound_to_initiating_browser(self, django_client, setup_instance, saml_config):
+        relay_token, request_id, _ = initiate(django_client)
+        saml_response = build_response(request_id)
+        other_browser = Client(HTTP_USER_AGENT="Mozilla/5.0 victim", SERVER_NAME="hangar.test")
+
+        rejected = post_acs(other_browser, saml_response, relay_token)
+        assert error_code_of(rejected) == EXT_AUTHENTICATION_ERROR_CODES["INVALID_SAML_RESPONSE"]
+        assert cache.get(f"ext:saml:relay:{relay_token}") is not None
+        assert "_auth_user_id" not in other_browser.session
+
+        accepted = post_acs(django_client, saml_response, relay_token)
+        assert error_code_of(accepted) is None
+        assert django_client.session.get("_auth_user_id") is not None
+
+    @pytest.mark.django_db
+    def test_stable_subject_cannot_switch_to_another_users_email(self, django_client, setup_instance, saml_config):
+        subject = "stable-directory-object-123"
+        persistent = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+        relay_token, request_id, _ = initiate(django_client)
+        first = post_acs(
+            django_client,
+            build_response(
+                request_id,
+                email="original@hangar.test",
+                name_id=subject,
+                name_id_format=persistent,
+            ),
+            relay_token,
+        )
+        assert error_code_of(first) is None
+        bound = User.objects.get(email="original@hangar.test")
+        victim = User.objects.create(email="victim@hangar.test", username="victim")
+
+        second_relay, second_request_id, _ = initiate(django_client)
+        second = post_acs(
+            django_client,
+            build_response(
+                second_request_id,
+                email=victim.email,
+                name_id=subject,
+                name_id_format=persistent,
+            ),
+            second_relay,
+        )
+
+        assert error_code_of(second) is None
+        assert django_client.session.get("_auth_user_id") == str(bound.id)
+
+    @pytest.mark.django_db
+    def test_transient_name_id_is_rejected(self, django_client, setup_instance, saml_config):
+        relay_token, request_id, _ = initiate(django_client)
+        response = post_acs(
+            django_client,
+            build_response(
+                request_id,
+                name_id="transient-123",
+                name_id_format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient",
+            ),
+            relay_token,
+        )
+        assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["INVALID_SAML_RESPONSE"]
         assert not User.objects.filter(email="saml-user@hangar.test").exists()

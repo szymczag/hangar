@@ -50,6 +50,22 @@ data:
   OTLP_METRICS_PROTOCOL: {{ .Values.observability.metricsProtocol | quote }}
   DEPENDENCY_WAIT_TIMEOUT_SECONDS: "300"
   MIGRATION_WAIT_TIMEOUT_SECONDS: "600"
+  {{- if .Values.mail.enabled }}
+  EMAIL_PROVIDER: {{ .Values.mail.provider | quote }}
+  ENABLE_SMTP: "1"
+  EMAIL_FROM: {{ .Values.mail.sender | quote }}
+  EMAIL_REPLY_TO: {{ .Values.mail.replyTo | quote }}
+  EMAIL_MESSAGE_ID_DOMAIN: {{ .Values.mail.messageIdDomain | quote }}
+  EMAIL_SES_REGION: {{ .Values.mail.ses.region | quote }}
+  EMAIL_SES_ACCOUNT_ID: {{ .Values.mail.ses.accountId | quote }}
+  EMAIL_SES_CONFIGURATION_SET_AUTH: {{ .Values.mail.ses.authConfigurationSet | quote }}
+  EMAIL_SES_CONFIGURATION_SET_NOTIFICATIONS: {{ .Values.mail.ses.notificationConfigurationSet | quote }}
+  EMAIL_SES_EVENTS_QUEUE_URL: {{ .Values.mail.ses.eventsQueueUrl | quote }}
+  EMAIL_SES_EVENTS_TOPIC_ARN: {{ .Values.mail.ses.eventsTopicArn | quote }}
+  EMAIL_DELIVERY_V2_ENABLED: "1"
+  EMAIL_OPENPGP_ENABLED: {{ ternary "1" "0" .Values.mail.openpgp.enabled | quote }}
+  EMAIL_AUDIT_RETENTION_DAYS: {{ .Values.mail.auditRetentionDays | quote }}
+  {{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap

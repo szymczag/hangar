@@ -27,6 +27,7 @@ from django.conf import settings
 # Module imports
 from plane.authentication.adapter.oauth import OauthAdapter
 from plane.authentication.adapter.error import AuthenticationException
+from plane.authentication.services import ExternalIdentity
 from plane.license.utils.instance_value import get_configuration_value
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
@@ -259,7 +260,6 @@ class OIDCOAuthProvider(OauthAdapter):
             OIDC_ISSUER,
             OIDC_CLIENT_ID,
             OIDC_CLIENT_SECRET,
-            OIDC_ALLOW_UNVERIFIED_EMAIL,
         ) = get_configuration_value(
             [
                 {
@@ -271,10 +271,6 @@ class OIDCOAuthProvider(OauthAdapter):
                 {
                     "key": "OIDC_CLIENT_SECRET",
                     "default": os.environ.get("OIDC_CLIENT_SECRET"),
-                },
-                {
-                    "key": "OIDC_ALLOW_UNVERIFIED_EMAIL",
-                    "default": os.environ.get("OIDC_ALLOW_UNVERIFIED_EMAIL", "0"),
                 },
             ]
         )
@@ -297,7 +293,6 @@ class OIDCOAuthProvider(OauthAdapter):
 
         self.issuer = OIDC_ISSUER.rstrip("/")
         self.issuer_origin = issuer_target.origin
-        self.allow_unverified_email = OIDC_ALLOW_UNVERIFIED_EMAIL == "1"
         self.nonce = nonce
         self.code_verifier = code_verifier
 
@@ -534,21 +529,42 @@ class OIDCOAuthProvider(OauthAdapter):
             )
         claims = self.__validate_id_token(id_token)
 
-        email = claims.get("email")
-        email_verified = claims.get("email_verified")
-        if (not email or email_verified is None) and self.userinfo_url:
-            # Some IdPs keep profile claims out of the id_token; the userinfo
-            # endpoint is the fallback source.
+        id_token_email = claims.get("email")
+        id_token_email_verified = claims.get("email_verified")
+        profile_claims = claims
+        if id_token_email_verified is False:
+            raise AuthenticationException(
+                error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_UNVERIFIED_EMAIL"],
+                error_message="OIDC_UNVERIFIED_EMAIL",
+            )
+        if not id_token_email or id_token_email_verified is None:
+            if not self.userinfo_url:
+                raise AuthenticationException(
+                    error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_UNVERIFIED_EMAIL"],
+                    error_message="OIDC_UNVERIFIED_EMAIL",
+                )
             userinfo = self.get_user_response()
             if userinfo.get("sub") != claims.get("sub"):
                 raise AuthenticationException(
                     error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_TOKEN_VALIDATION_FAILED"],
                     error_message="OIDC_TOKEN_VALIDATION_FAILED",
                 )
-            email = email or userinfo.get("email")
-            if email_verified is None:
-                email_verified = userinfo.get("email_verified")
-            claims = {**userinfo, **{k: v for k, v in claims.items() if v is not None}}
+            userinfo_email = userinfo.get("email")
+            if (
+                id_token_email
+                and userinfo_email
+                and self.sanitize_email(id_token_email) != self.sanitize_email(userinfo_email)
+            ):
+                raise AuthenticationException(
+                    error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_TOKEN_VALIDATION_FAILED"],
+                    error_message="OIDC_TOKEN_VALIDATION_FAILED",
+                )
+            email = userinfo_email
+            email_verified = userinfo.get("email_verified")
+            profile_claims = {**claims, **userinfo}
+        else:
+            email = id_token_email
+            email_verified = id_token_email_verified
 
         if not email:
             raise AuthenticationException(
@@ -556,24 +572,21 @@ class OIDCOAuthProvider(OauthAdapter):
                 error_message="OIDC_PROVIDER_ERROR",
             )
 
-        # Never trust an unverified email — an IdP that lets users free-type
-        # their address would allow takeover of any existing account (same
-        # class of issue as GHSA-7j95-vh8g-f365). Deployments whose IdP omits
-        # the claim entirely can opt out via OIDC_ALLOW_UNVERIFIED_EMAIL.
-        if email_verified is not True and not self.allow_unverified_email:
+        if email_verified is not True:
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_UNVERIFIED_EMAIL"],
                 error_message="OIDC_UNVERIFIED_EMAIL",
             )
 
-        first_name = claims.get("given_name")
-        last_name = claims.get("family_name")
+        first_name = profile_claims.get("given_name")
+        last_name = profile_claims.get("family_name")
         if not first_name:
-            name = claims.get("name") or email.split("@")[0]
+            name = profile_claims.get("name") or email.split("@")[0]
             parts = name.split(" ", 1)
             first_name = parts[0]
             last_name = last_name or (parts[1] if len(parts) > 1 else "")
 
+        legacy_provider_id = hashlib.sha256(f"{self.issuer}\0{claims.get('sub')}".encode()).hexdigest()
         super().set_user_data(
             {
                 "email": email,
@@ -581,12 +594,26 @@ class OIDCOAuthProvider(OauthAdapter):
                     # `sub` is unique only within an issuer. Hash the pair into
                     # Account.provider_account_id so changing providers cannot
                     # collide with an account from a previous issuer.
-                    "provider_id": hashlib.sha256(f"{self.issuer}\0{claims.get('sub')}".encode()).hexdigest(),
+                    "provider_id": legacy_provider_id,
                     "email": email,
-                    "avatar": claims.get("picture"),
+                    "avatar": profile_claims.get("picture"),
                     "first_name": first_name,
                     "last_name": last_name or "",
                     "is_password_autoset": True,
                 },
             }
+        )
+        self.set_external_identity(
+            ExternalIdentity(
+                provider=self.provider,
+                issuer=self.issuer,
+                subject=str(claims.get("sub")),
+                subject_format="",
+                email=email,
+                email_verified=True,
+                first_name=first_name,
+                last_name=last_name or "",
+                avatar_url=profile_claims.get("picture") or "",
+                legacy_provider_account_id=legacy_provider_id,
+            )
         )

@@ -8,6 +8,7 @@
 import ipaddress
 import logging
 import os
+import re
 from urllib.parse import urlparse
 from urllib.parse import urljoin
 
@@ -16,6 +17,7 @@ import dj_database_url
 
 # Django imports
 from django.core.management.utils import get_random_secret_key
+from django.core.exceptions import ImproperlyConfigured
 from corsheaders.defaults import default_headers
 
 
@@ -52,6 +54,10 @@ DEBUG = int(os.environ.get("DEBUG", "0"))
 
 # Self-hosted mode
 IS_SELF_MANAGED = True
+
+# Hangar Runner is deny-by-default until an instance operator opts in. Workspace
+# administrators still need to activate it separately and accept current consent.
+RUNNER_ENABLED = os.environ.get("RUNNER_ENABLED", "0") == "1"
 
 # Webhook IP allowlist — comma-separated IPs or CIDR ranges that are allowed as
 # webhook targets even if they resolve to private networks.
@@ -143,6 +149,10 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "30/minute",
         "asset_id": "5/minute",
+        "runner_user_read": os.environ.get("RUNNER_API_USER_READ_RATE", "240/minute"),
+        "runner_user_mutation": os.environ.get("RUNNER_API_USER_MUTATION_RATE", "60/minute"),
+        "runner_read": os.environ.get("RUNNER_API_READ_RATE", "120/minute"),
+        "runner_mutation": os.environ.get("RUNNER_API_MUTATION_RATE", "30/minute"),
     },
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
@@ -344,6 +354,7 @@ CELERY_IMPORTS = (
     "plane.bgtasks.exporter_expired_task",
     "plane.bgtasks.file_asset_task",
     "plane.bgtasks.email_notification_task",
+    "plane.bgtasks.email_delivery_task",
     "plane.bgtasks.cleanup_task",
     "plane.license.bgtasks.telemetry_metrics",
     # management tasks
@@ -453,6 +464,69 @@ WEBHOOK_LOG_RETENTION_DAYS = _retention_days("WEBHOOK_LOG_RETENTION_DAYS", 14)
 
 # Email notification logs are retained on their own window.
 EMAIL_LOG_RETENTION_DAYS = _retention_days("EMAIL_LOG_RETENTION_DAYS", 7)
+
+# Policy-aware outbound email. These flags stage the migration; requiring
+# OpenPGP always suppresses confidential email when no verified key exists.
+EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "smtp").strip().lower()
+EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO", "").strip()
+EMAIL_SES_REGION = os.environ.get("EMAIL_SES_REGION", "eu-central-1").strip()
+EMAIL_SES_CONFIGURATION_SET_AUTH = os.environ.get("EMAIL_SES_CONFIGURATION_SET_AUTH", "hangar-auth").strip()
+EMAIL_SES_CONFIGURATION_SET_NOTIFICATIONS = os.environ.get(
+    "EMAIL_SES_CONFIGURATION_SET_NOTIFICATIONS", "hangar-notifications"
+).strip()
+EMAIL_SES_EVENTS_QUEUE_URL = os.environ.get("EMAIL_SES_EVENTS_QUEUE_URL", "").strip()
+EMAIL_SES_EVENTS_TOPIC_ARN = os.environ.get("EMAIL_SES_EVENTS_TOPIC_ARN", "").strip()
+EMAIL_SES_ACCOUNT_ID = os.environ.get("EMAIL_SES_ACCOUNT_ID", "").strip()
+EMAIL_SES_AWS_ACCESS_KEY_ID = os.environ.get("EMAIL_SES_AWS_ACCESS_KEY_ID", "").strip()
+EMAIL_SES_AWS_SECRET_ACCESS_KEY = os.environ.get("EMAIL_SES_AWS_SECRET_ACCESS_KEY", "").strip()
+EMAIL_SES_AWS_SESSION_TOKEN = os.environ.get("EMAIL_SES_AWS_SESSION_TOKEN", "").strip()
+EMAIL_EVENTS_AWS_ACCESS_KEY_ID = os.environ.get("EMAIL_EVENTS_AWS_ACCESS_KEY_ID", "").strip()
+EMAIL_EVENTS_AWS_SECRET_ACCESS_KEY = os.environ.get("EMAIL_EVENTS_AWS_SECRET_ACCESS_KEY", "").strip()
+EMAIL_EVENTS_AWS_SESSION_TOKEN = os.environ.get("EMAIL_EVENTS_AWS_SESSION_TOKEN", "").strip()
+EMAIL_MESSAGE_ID_DOMAIN = os.environ.get("EMAIL_MESSAGE_ID_DOMAIN", "hangar.invalid").strip().lower()
+EMAIL_MAX_STORED_PAYLOAD_BYTES = int(os.environ.get("EMAIL_MAX_STORED_PAYLOAD_BYTES", 8388608))
+EMAIL_MAX_ATTACHMENT_BYTES = int(os.environ.get("EMAIL_MAX_ATTACHMENT_BYTES", 5242880))
+EMAIL_SMTP_TIMEOUT_SECONDS = int(os.environ.get("EMAIL_SMTP_TIMEOUT_SECONDS", 30))
+EMAIL_GPG_BINARY = os.environ.get("EMAIL_GPG_BINARY", "gpg")
+EMAIL_OUTBOX_RETENTION_DAYS = _retention_days("EMAIL_OUTBOX_RETENTION_DAYS", 7)
+EMAIL_EVENT_RETENTION_DAYS = _retention_days("EMAIL_EVENT_RETENTION_DAYS", 4)
+EMAIL_AUDIT_RETENTION_DAYS = _retention_days("EMAIL_AUDIT_RETENTION_DAYS", 90)
+EMAIL_DELIVERY_V2_ENABLED = os.environ.get("EMAIL_DELIVERY_V2_ENABLED", "0") == "1"
+EMAIL_OPENPGP_ENABLED = os.environ.get("EMAIL_OPENPGP_ENABLED", "0") == "1"
+
+if EMAIL_PROVIDER == "ses":
+    EMAIL_PROVIDER = "ses_smtp"
+if EMAIL_PROVIDER not in {"smtp", "ses_smtp", "ses_api"}:
+    raise ImproperlyConfigured("EMAIL_PROVIDER must be 'smtp', 'ses_smtp', or 'ses_api'")
+if not re.fullmatch(r"[A-Za-z0-9.-]+", EMAIL_MESSAGE_ID_DOMAIN):
+    raise ImproperlyConfigured("EMAIL_MESSAGE_ID_DOMAIN must be a valid header-safe domain")
+if min(EMAIL_MAX_STORED_PAYLOAD_BYTES, EMAIL_MAX_ATTACHMENT_BYTES, EMAIL_SMTP_TIMEOUT_SECONDS) <= 0:
+    raise ImproperlyConfigured("Email payload limits and SMTP timeout must be positive")
+if EMAIL_OPENPGP_ENABLED and not EMAIL_DELIVERY_V2_ENABLED:
+    raise ImproperlyConfigured("EMAIL_OPENPGP_ENABLED requires durable email delivery")
+if bool(EMAIL_EVENTS_AWS_ACCESS_KEY_ID) != bool(EMAIL_EVENTS_AWS_SECRET_ACCESS_KEY):
+    raise ImproperlyConfigured("SES event-consumer access key ID and secret must be configured together")
+if bool(EMAIL_SES_AWS_ACCESS_KEY_ID) != bool(EMAIL_SES_AWS_SECRET_ACCESS_KEY):
+    raise ImproperlyConfigured("SES API access key ID and secret must be configured together")
+if EMAIL_DELIVERY_V2_ENABLED and EMAIL_PROVIDER in {"ses_smtp", "ses_api"}:
+    if not all(
+        (
+            EMAIL_SES_CONFIGURATION_SET_AUTH,
+            EMAIL_SES_CONFIGURATION_SET_NOTIFICATIONS,
+            EMAIL_SES_EVENTS_QUEUE_URL,
+            EMAIL_SES_EVENTS_TOPIC_ARN,
+            EMAIL_SES_ACCOUNT_ID,
+        )
+    ):
+        raise ImproperlyConfigured("SES delivery requires configuration sets, SQS, SNS, and an AWS account ID")
+    if not re.fullmatch(r"\d{12}", EMAIL_SES_ACCOUNT_ID):
+        raise ImproperlyConfigured("EMAIL_SES_ACCOUNT_ID must contain exactly 12 digits")
+    expected_topic_prefix = f"arn:aws:sns:{EMAIL_SES_REGION}:{EMAIL_SES_ACCOUNT_ID}:"
+    expected_queue_prefix = f"https://sqs.{EMAIL_SES_REGION}.amazonaws.com/{EMAIL_SES_ACCOUNT_ID}/"
+    if not EMAIL_SES_EVENTS_TOPIC_ARN.startswith(expected_topic_prefix):
+        raise ImproperlyConfigured("The SES event topic must match the configured region and account")
+    if not EMAIL_SES_EVENTS_QUEUE_URL.startswith(expected_queue_prefix):
+        raise ImproperlyConfigured("The SES event queue must match the configured region and account")
 
 # Instance Changelog URL
 INSTANCE_CHANGELOG_URL = os.environ.get("INSTANCE_CHANGELOG_URL", "")
