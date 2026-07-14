@@ -37,7 +37,6 @@ jobs:
             api-tests pytest \
             --ignore=plane/tests/contract/app/test_todoist_import_app.py \
             --ignore=plane/tests/unit/ext/test_import_storage.py \
-            --ignore=plane/tests/unit/ext/test_todoist_csv.py \
             --ignore=plane/tests/unit/ext/test_todoist_import_execution.py \
             --ignore=plane/tests/unit/ext/test_todoist_import_tasks.py
 
@@ -58,9 +57,6 @@ jobs:
             compose_args: ""
           - name: storage
             tests: plane/tests/unit/ext/test_import_storage.py
-            compose_args: --no-deps
-          - name: parser
-            tests: plane/tests/unit/ext/test_todoist_csv.py
             compose_args: --no-deps
           - name: execution
             tests: plane/tests/unit/ext/test_todoist_import_execution.py
