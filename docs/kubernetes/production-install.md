@@ -135,8 +135,10 @@ At minimum, set:
 
 - `publicUrl.host`;
 - `ingress.className`, TLS Secret, and controller annotations;
-- `externalServices.objectStorage` endpoint, bucket, region, and addressing mode;
-- `networkPolicy.ingressController` and DNS selectors for your cluster; and
+- `externalServices.objectStorage` internal/public endpoints, bucket, region,
+  and addressing mode;
+- the `networkPolicy.ingressController` preset and DNS selectors for your
+  cluster; and
 - `networkPolicy.privateEgress` for every private dependency address and port.
 
 Review the [configuration reference](configuration.md) before changing replicas,

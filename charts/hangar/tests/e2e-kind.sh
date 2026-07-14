@@ -393,6 +393,7 @@ ingress:
     secretName: hangar-tls
 networkPolicy:
   ingressController:
+    preset: custom
     namespaceSelector:
       matchLabels:
         kubernetes.io/metadata.name: ${INGRESS_NAMESPACE}

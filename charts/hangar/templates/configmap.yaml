@@ -1,7 +1,9 @@
 {{- $objectStorageEndpoint := .Values.externalServices.objectStorage.endpoint -}}
+{{- $objectStoragePublicEndpoint := default $objectStorageEndpoint .Values.externalServices.objectStorage.publicEndpoint -}}
 {{- $objectStoragePathStyle := .Values.externalServices.objectStorage.pathStyle -}}
 {{- if .Values.evaluation.enabled -}}
 {{- $objectStorageEndpoint = printf "http://%s-evaluation-object-storage:8333" (include "hangar.fullname" .) -}}
+{{- $objectStoragePublicEndpoint = include "hangar.publicOrigin" . -}}
 {{- $objectStoragePathStyle = true -}}
 {{- end -}}
 apiVersion: v1
@@ -25,6 +27,7 @@ data:
   LIVE_BASE_URL: {{ include "hangar.publicOrigin" . | quote }}
   LIVE_BASE_PATH: "/live"
   AWS_S3_ENDPOINT_URL: {{ $objectStorageEndpoint | quote }}
+  AWS_S3_PUBLIC_ENDPOINT_URL: {{ $objectStoragePublicEndpoint | quote }}
   AWS_S3_BUCKET_NAME: {{ .Values.externalServices.objectStorage.bucket | quote }}
   AWS_REGION: {{ .Values.externalServices.objectStorage.region | quote }}
   USE_MINIO: {{ ternary "1" "0" $objectStoragePathStyle | quote }}

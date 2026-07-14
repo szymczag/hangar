@@ -25,6 +25,13 @@ from plane.utils.porters.exporter import DataExporter
 from plane.utils.porters.serializers.issue import IssueExportSerializer
 
 
+def _public_s3_endpoint() -> str:
+    configured_endpoint = settings.AWS_S3_PUBLIC_ENDPOINT_URL
+    if configured_endpoint:
+        return str(configured_endpoint)
+    return f"{settings.AWS_S3_URL_PROTOCOL}//{str(settings.AWS_S3_CUSTOM_DOMAIN).replace('/uploads', '')}/"
+
+
 def create_zip_file(files: List[tuple[str, str | bytes]]) -> io.BytesIO:
     """
     Create a ZIP file from the provided files.
@@ -64,9 +71,7 @@ def upload_to_s3(zip_file: io.BytesIO, workspace_id: UUID, token_id: str, slug: 
         # Generate presigned url for the uploaded file with different base
         presign_s3 = boto3.client(
             "s3",
-            endpoint_url=(
-                f"{settings.AWS_S3_URL_PROTOCOL}//{str(settings.AWS_S3_CUSTOM_DOMAIN).replace('/uploads', '')}/"
-            ),
+            endpoint_url=_public_s3_endpoint(),
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             config=Config(signature_version="s3v4"),

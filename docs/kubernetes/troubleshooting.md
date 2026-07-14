@@ -49,6 +49,7 @@ Never collect or share:
 | Migration Job fails                  | Database, Secret, migration, or policy      | Job logs, database DNS/port, `DATABASE_URL` key presence  |
 | Frontend returns 404/503             | Ingress class, route, Service, or readiness | Ingress events, endpoints, controller logs                |
 | `/live` disconnects                  | WebSocket forwarding or Live readiness      | controller WebSocket settings, Live logs, endpoints       |
+| Presigned upload returns 404/405     | Object-storage bucket route or backend       | rendered bucket path, storage Service, policy, proxy logs |
 | Dependency timeout                   | DNS, NetworkPolicy, firewall, or TLS        | selectors, CIDRs, service endpoints, provider firewall    |
 | Read-only filesystem error           | Application writes outside allowed paths    | Container log and image version; do not disable hardening |
 | Upgrade rolled back                  | Migration or rollout failed                 | Helm history, revision Job, controller events             |
@@ -167,6 +168,14 @@ Confirm:
 
 Controller logs are outside the Hangar namespace. Review them under your
 cluster's access and redaction policy.
+
+For evaluation uploads, confirm the rendered Ingress or HTTPRoute sends
+`/<externalServices.objectStorage.bucket>` to the evaluation object-storage
+Service on port `8333`. A `405` response from the web frontend means the bucket
+path fell through to the `/` route. Also confirm the
+`evaluation-object-storage-ingress` NetworkPolicy selects the actual ingress or
+Gateway data-plane Pods. Presigned URLs and request cookies are credentials;
+redact them from support output and invalidate them after accidental disclosure.
 
 ## NetworkPolicy failures
 

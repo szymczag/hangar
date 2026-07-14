@@ -9,6 +9,59 @@ from plane.settings.storage import S3Storage
 
 
 @pytest.mark.unit
+class TestS3StorageEndpoints:
+    @patch.dict(
+        os.environ,
+        {
+            "AWS_S3_ENDPOINT_URL": "http://object-storage:8333",
+            "AWS_S3_PUBLIC_ENDPOINT_URL": "https://hangar.example.com",
+            "USE_MINIO": "1",
+        },
+        clear=True,
+    )
+    @patch("plane.settings.storage.boto3")
+    def test_request_scoped_client_uses_explicit_public_endpoint(self, mock_boto3):
+        request = Mock(scheme="https")
+
+        S3Storage(request=request)
+
+        assert mock_boto3.client.call_args.kwargs["endpoint_url"] == "https://hangar.example.com"
+        request.get_host.assert_not_called()
+
+    @patch.dict(
+        os.environ,
+        {
+            "AWS_S3_ENDPOINT_URL": "http://object-storage:8333",
+            "AWS_S3_PUBLIC_ENDPOINT_URL": "https://hangar.example.com",
+            "USE_MINIO": "1",
+        },
+        clear=True,
+    )
+    @patch("plane.settings.storage.boto3")
+    def test_server_scoped_client_uses_internal_endpoint(self, mock_boto3):
+        S3Storage()
+
+        assert mock_boto3.client.call_args.kwargs["endpoint_url"] == "http://object-storage:8333"
+
+    @patch.dict(
+        os.environ,
+        {
+            "AWS_S3_ENDPOINT_URL": "http://object-storage:8333",
+            "USE_MINIO": "1",
+        },
+        clear=True,
+    )
+    @patch("plane.settings.storage.boto3")
+    def test_request_host_fallback_is_preserved_without_public_endpoint(self, mock_boto3):
+        request = Mock(scheme="https")
+        request.get_host.return_value = "legacy.example.com"
+
+        S3Storage(request=request)
+
+        assert mock_boto3.client.call_args.kwargs["endpoint_url"] == "https://legacy.example.com"
+
+
+@pytest.mark.unit
 class TestS3StorageSignedURLExpiration:
     """Test the configurable signed URL expiration in S3Storage"""
 

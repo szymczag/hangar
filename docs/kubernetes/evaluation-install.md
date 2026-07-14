@@ -132,12 +132,7 @@ ingress:
 
 networkPolicy:
   ingressController:
-    namespaceSelector:
-      matchLabels:
-        kubernetes.io/metadata.name: ingress-nginx
-    podSelector:
-      matchLabels:
-        app.kubernetes.io/name: ingress-nginx
+    preset: nginx
 ```
 
 The maintained copy is
@@ -147,13 +142,18 @@ Edit these fields:
 
 - `publicUrl.host` to match `HANGAR_HOST`;
 - `ingress.className` and annotations for your ingress controller;
-- `networkPolicy.ingressController` selectors if the controller is not
-  `ingress-nginx`; and
+- `networkPolicy.ingressController.preset` if the controller is not the
+  community `ingress-nginx` controller; use `custom` with complete selectors
+  when no built-in preset matches; and
 - all four storage-class fields when the cluster has no suitable default class.
 
 The example uses annotations for the community ingress-nginx controller. Other
 controllers require equivalent HTTPS redirect, request-size, and WebSocket
 configuration.
+
+Direct browser uploads use a presigned same-origin path derived from the bucket
+name. With the default configuration, the chart routes `/hangar` to bundled
+SeaweedFS. Do not add a competing Ingress or HTTPRoute for that path.
 
 ## 6. Render and inspect the release
 

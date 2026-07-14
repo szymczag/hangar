@@ -114,10 +114,14 @@
         "objectStorage": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["endpoint", "bucket", "region", "pathStyle"],
+          "required": ["endpoint", "publicEndpoint", "bucket", "region", "pathStyle"],
           "properties": {
             "endpoint": { "type": "string", "pattern": "^https?://[^/\\s]+(:[0-9]+)?$" },
-            "bucket": { "$ref": "#/definitions/nonEmptyString" },
+            "publicEndpoint": {
+              "type": "string",
+              "anyOf": [{ "const": "" }, { "pattern": "^https?://[^/\\s]+(:[0-9]+)?$" }]
+            },
+            "bucket": { "$ref": "#/definitions/s3BucketName" },
             "region": { "$ref": "#/definitions/nonEmptyString" },
             "pathStyle": { "type": "boolean" }
           }
@@ -177,7 +181,7 @@
       "required": ["enabled", "ingressController", "dns", "clusterCIDRs", "privateEgress"],
       "properties": {
         "enabled": { "const": true },
-        "ingressController": { "$ref": "#/definitions/peerSelectors" },
+        "ingressController": { "$ref": "#/definitions/ingressController" },
         "dns": { "$ref": "#/definitions/peerSelectors" },
         "clusterCIDRs": {
           "type": "array",
@@ -343,7 +347,12 @@
           "externalServices": {
             "properties": {
               "objectStorage": {
-                "properties": { "endpoint": { "pattern": "^https://" } }
+                "properties": {
+                  "endpoint": { "pattern": "^https://" },
+                  "publicEndpoint": {
+                    "anyOf": [{ "const": "" }, { "pattern": "^https://" }]
+                  }
+                }
               }
             }
           }
@@ -355,6 +364,20 @@
       "then": {
         "properties": {
           "evaluation": { "properties": { "enabled": { "const": true } } },
+          "externalServices": {
+            "properties": {
+              "objectStorage": {
+                "properties": {
+                  "publicEndpoint": { "const": "" },
+                  "bucket": {
+                    "not": {
+                      "enum": ["api", "auth", "static", "live", "god-mode", "spaces", "assets", "config.js"]
+                    }
+                  }
+                }
+              }
+            }
+          },
           "existingSecrets": {
             "properties": {
               "database": { "properties": { "name": { "const": "hangar-database" } } },
@@ -365,10 +388,38 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "gateway": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        },
+        "required": ["gateway"]
+      },
+      "then": {
+        "properties": {
+          "networkPolicy": {
+            "properties": {
+              "ingressController": {
+                "properties": {
+                  "preset": { "enum": ["envoyGateway", "traefik", "custom"] }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {
     "nonEmptyString": { "type": "string", "minLength": 1 },
+    "s3BucketName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    },
     "httpUrl": { "type": "string", "pattern": "^https?://[^\\s]+$" },
     "optionalHttpUrl": {
       "type": "string",
@@ -425,25 +476,58 @@
         "secretAccessKeyKey": { "$ref": "#/definitions/nonEmptyString" }
       }
     },
+    "labelSelector": {
+      "type": "object",
+      "required": ["matchLabels"],
+      "properties": {
+        "matchLabels": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "emptySelector": {
+      "type": "object",
+      "maxProperties": 0
+    },
+    "ingressController": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preset", "namespaceSelector", "podSelector"],
+      "properties": {
+        "preset": {
+          "type": "string",
+          "enum": ["nginx", "envoyGateway", "traefik", "custom"]
+        },
+        "namespaceSelector": { "type": "object" },
+        "podSelector": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "preset": { "const": "custom" } } },
+          "then": {
+            "properties": {
+              "namespaceSelector": { "$ref": "#/definitions/labelSelector" },
+              "podSelector": { "$ref": "#/definitions/labelSelector" }
+            }
+          },
+          "else": {
+            "properties": {
+              "namespaceSelector": { "$ref": "#/definitions/emptySelector" },
+              "podSelector": { "$ref": "#/definitions/emptySelector" }
+            }
+          }
+        }
+      ]
+    },
     "peerSelectors": {
       "type": "object",
       "additionalProperties": false,
       "required": ["namespaceSelector", "podSelector"],
       "properties": {
-        "namespaceSelector": {
-          "type": "object",
-          "required": ["matchLabels"],
-          "properties": {
-            "matchLabels": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } }
-          }
-        },
-        "podSelector": {
-          "type": "object",
-          "required": ["matchLabels"],
-          "properties": {
-            "matchLabels": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } }
-          }
-        }
+        "namespaceSelector": { "$ref": "#/definitions/labelSelector" },
+        "podSelector": { "$ref": "#/definitions/labelSelector" }
       }
     },
     "image": {
