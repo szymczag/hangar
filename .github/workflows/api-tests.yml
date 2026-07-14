@@ -46,8 +46,21 @@ jobs:
         run: docker compose -f docker-compose-test.yml down -v
 
   todoist-import:
+    name: todoist-import (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: contract
+            tests: plane/tests/contract/app/test_todoist_import_app.py
+          - name: unit
+            tests: >-
+              plane/tests/unit/ext/test_import_storage.py
+              plane/tests/unit/ext/test_todoist_csv.py
+              plane/tests/unit/ext/test_todoist_import_execution.py
+              plane/tests/unit/ext/test_todoist_import_tasks.py
     steps:
       - name: Checkout
         # v6.0.2
@@ -61,12 +74,7 @@ jobs:
       - name: Run Todoist importer tests
         run: |
           docker compose -f docker-compose-test.yml run --rm --build \
-            api-tests pytest \
-            plane/tests/contract/app/test_todoist_import_app.py \
-            plane/tests/unit/ext/test_import_storage.py \
-            plane/tests/unit/ext/test_todoist_csv.py \
-            plane/tests/unit/ext/test_todoist_import_execution.py \
-            plane/tests/unit/ext/test_todoist_import_tasks.py
+            api-tests pytest ${{ matrix.tests }}
 
       - name: Tear down
         if: always()
