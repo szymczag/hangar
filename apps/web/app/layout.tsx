@@ -43,12 +43,12 @@ export const meta = () => [
     content: SITE_DESCRIPTION,
   },
   { property: "og:url", content: PRODUCT_REPOSITORY_URL },
-  { property: "og:image", content: "/hangar-og.svg" },
+  { property: "og:image", content: "/hangar-og.png" },
   { property: "og:image:width", content: "1200" },
   { property: "og:image:height", content: "630" },
   { property: "og:image:alt", content: "Hangar - Open-source project management for self-hosted teams" },
   { name: "twitter:card", content: "summary_large_image" },
-  { name: "twitter:image", content: "/hangar-og.svg" },
+  { name: "twitter:image", content: "/hangar-og.png" },
   { name: "twitter:image:width", content: "1200" },
   { name: "twitter:image:height", content: "630" },
   { name: "twitter:image:alt", content: "Hangar - Open-source project management for self-hosted teams" },
@@ -60,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <meta name="theme-color" content="#fff" />
+        <meta name="theme-color" content="#7080d0" />
         <link rel="icon" type="image/png" sizes="32x32" href={favicon32} />
         <link rel="icon" type="image/png" sizes="16x16" href={favicon16} />
         <link rel="manifest" href="/site.webmanifest.json" />
@@ -75,7 +75,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href={icon512} />
         <link rel="apple-touch-icon" sizes="180x180" href={icon180} />
         <link rel="apple-touch-icon" sizes="512x512" href={icon512} />
-        <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
         <div id="context-menu-portal" />

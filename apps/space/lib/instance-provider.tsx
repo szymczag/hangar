@@ -53,7 +53,7 @@ export const InstanceProvider = observer(function InstanceProvider({ children }:
           <div className="z-50 container mx-auto flex h-[110px] flex-shrink-0 items-center justify-between gap-5 px-5 lg:px-0">
             <div className="flex items-center gap-x-2 py-10">
               <Link to={`${SPACE_BASE_PATH}/`}>
-                <HangarLogo className="h-7 w-auto text-primary" />
+                <HangarLogo className="h-7 w-auto" />
               </Link>
             </div>
           </div>

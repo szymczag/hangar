@@ -13,8 +13,10 @@
     "fix": "turbo run fix",
     "fix:format": "turbo run fix:format",
     "fix:lint": "turbo run fix:lint",
-    "check": "turbo run check && pnpm check:branding",
+    "check": "turbo run check && pnpm check:branding && pnpm check:brand-assets",
     "check:branding": "git ls-files --cached | node scripts/check-branding.mjs --stdin",
+    "check:brand-assets": "node assets/branding/generate-brand-assets.mjs --check",
+    "generate:brand-assets": "node assets/branding/generate-brand-assets.mjs",
     "test:branding": "node --test scripts/check-branding.test.mjs",
     "check:lint": "turbo run check:lint",
     "check:format": "turbo run check:format",
@@ -28,6 +30,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "react-doctor": "^0.4.2",
+    "sharp": "catalog:",
     "turbo": "catalog:"
   },
   "lint-staged": {

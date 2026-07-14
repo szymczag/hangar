@@ -46,7 +46,6 @@ export const links: LinksFunction = () => [
   { rel: "apple-touch-icon", href: icon512 },
   { rel: "apple-touch-icon", sizes: "180x180", href: icon180 },
   { rel: "apple-touch-icon", sizes: "512x512", href: icon512 },
-  { rel: "manifest", href: "/manifest.json" },
   { rel: "stylesheet", href: globalStyles },
   {
     rel: "preload",
@@ -65,7 +64,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#fff" />
+        <meta name="theme-color" content="#7080d0" />
         {/* Meta info for PWA */}
         <meta name="application-name" content="Hangar" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/branding/hangar-wordmark.svg" alt="Hangar" width="480" />
+  <img src="./hangar-logo.png" alt="Hangar" width="720" />
 </p>
 
 <p align="center">

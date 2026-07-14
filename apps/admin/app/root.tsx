@@ -68,6 +68,12 @@ export const meta: Route.MetaFunction = () => [
   { property: "og:title", content: APP_TITLE },
   { property: "og:description", content: APP_DESCRIPTION },
   { property: "og:url", content: PRODUCT_REPOSITORY_URL },
+  { property: "og:image", content: "/hangar-og.png" },
+  { property: "og:image:width", content: "1200" },
+  { property: "og:image:height", content: "630" },
+  { property: "og:image:alt", content: "Hangar" },
+  { name: "twitter:card", content: "summary_large_image" },
+  { name: "twitter:image", content: "/hangar-og.png" },
   {
     name: "keywords",
     content:
