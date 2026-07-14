@@ -53,6 +53,10 @@ DEBUG = int(os.environ.get("DEBUG", "0"))
 # Self-hosted mode
 IS_SELF_MANAGED = True
 
+# Hangar Runner is deny-by-default until an instance operator opts in. Workspace
+# administrators still need to activate it separately and accept current consent.
+RUNNER_ENABLED = os.environ.get("RUNNER_ENABLED", "0") == "1"
+
 # Webhook IP allowlist — comma-separated IPs or CIDR ranges that are allowed as
 # webhook targets even if they resolve to private networks.
 # Example: "10.0.0.0/8,192.168.1.0/24,172.16.0.5"
@@ -143,6 +147,10 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "30/minute",
         "asset_id": "5/minute",
+        "runner_user_read": os.environ.get("RUNNER_API_USER_READ_RATE", "240/minute"),
+        "runner_user_mutation": os.environ.get("RUNNER_API_USER_MUTATION_RATE", "60/minute"),
+        "runner_read": os.environ.get("RUNNER_API_READ_RATE", "120/minute"),
+        "runner_mutation": os.environ.get("RUNNER_API_MUTATION_RATE", "30/minute"),
     },
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
