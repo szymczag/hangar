@@ -23,6 +23,7 @@ from plane.db.models import User
 from plane.license.models import Instance, InstanceConfiguration
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
+from plane.ext.auth.views.saml import SAML_CORRELATION_COOKIE_NAME, SAML_CORRELATION_COOKIE_PATH
 from plane.authentication.adapter.error import AUTHENTICATION_ERROR_CODES
 
 IDP_ENTITY_ID = "https://idp.test/metadata"
@@ -222,7 +223,14 @@ class TestSAMLInitiate:
 
     @pytest.mark.django_db
     def test_redirects_to_idp_with_relay_state(self, django_client, setup_instance, saml_config):
-        initiate(django_client)
+        relay_token, _, response = initiate(django_client)
+
+        correlation_cookie = response.cookies[SAML_CORRELATION_COOKIE_NAME]
+        assert correlation_cookie.value == relay_token
+        assert correlation_cookie["path"] == SAML_CORRELATION_COOKIE_PATH
+        assert correlation_cookie["secure"] is True
+        assert correlation_cookie["httponly"] is True
+        assert correlation_cookie["samesite"] == "None"
 
 
 @pytest.mark.contract
@@ -272,9 +280,13 @@ class TestSAMLCallback:
 
     @pytest.mark.django_db
     def test_unknown_relay_state_rejected(self, django_client, setup_instance, saml_config):
-        _, request_id, _ = initiate(django_client)
-        response = post_acs(django_client, build_response(request_id), "not-a-real-token")
+        relay_token, request_id, _ = initiate(django_client)
+        saml_response = build_response(request_id)
+        response = post_acs(django_client, saml_response, "not-a-real-token")
         assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["INVALID_SAML_RESPONSE"]
+
+        accepted = post_acs(django_client, saml_response, relay_token)
+        assert error_code_of(accepted) is None
 
     @pytest.mark.django_db
     def test_relay_state_single_use(self, django_client, setup_instance, saml_config):
