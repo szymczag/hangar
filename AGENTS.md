@@ -23,6 +23,22 @@
 - **Testing**: All features require unit tests, use existing test framework per package
 - **Components**: Build in `@plane/ui` with Storybook for isolated development
 
+## Kubernetes Chart Documentation
+
+- Every change under `charts/hangar/**` MUST include a substantive update to
+  `docs/kubernetes/README.md` in the same pull request. This applies to chart
+  metadata, templates, values, schemas, dependencies, examples, scripts, and tests.
+- Release-preparation changes MUST update `docs/kubernetes/README.md` with the exact
+  product version, chart version, Git tag, OCI chart reference, compatibility
+  boundary, and previous-release information for that release.
+- Review the rest of `docs/kubernetes/` and `charts/hangar/README.md` for affected
+  instructions whenever the chart contract or operator workflow changes. Update
+  every affected page; changing only the landing page is not sufficient when other
+  guidance has become inaccurate.
+- Do not satisfy the documentation requirement with whitespace, formatting-only,
+  or unrelated edits. A Kubernetes chart or release change is incomplete until the
+  documentation describes the resulting operator-visible behavior accurately.
+
 ## Backend tests (Docker)
 
 The Django/pytest suite for `apps/api` runs in an isolated stack defined by `docker-compose-test.yml` at the repo root.

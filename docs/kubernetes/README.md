@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.4`. It is qualified for evaluation on
+The current release is `0.1.0-rc.7`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -27,7 +27,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.4` qualification boundary is:
+The `0.1.0-rc.7` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -48,13 +48,13 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                               |
 | ------------------ | ------------------------------------------- |
-| Product version    | `v0.1.0-rc.4`                               |
-| Helm chart version | `0.1.0-rc.4`                                |
-| Git tag            | `hangar-v0.1.0-rc.4`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.4` |
+| Product version    | `v0.1.0-rc.7`                               |
+| Helm chart version | `0.1.0-rc.7`                                |
+| Git tag            | `hangar-v0.1.0-rc.7`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.7` |
 
 `rc.1` and `rc.2` were consumed by incomplete publication attempts. Do not use
-them. `rc.3` is the previous complete release. Published versions are immutable
+them. `rc.6` is the previous complete release. Published versions are immutable
 and are never repaired in place.
 
 ## Documentation
@@ -82,7 +82,7 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The public `rc.4` chart archive, OCI chart, and digest-pinned Hangar images are
+The public `rc.7` chart archive, OCI chart, and digest-pinned Hangar images are
 anonymously downloadable. The release workflow also created provenance
 attestations and keyless Cosign signatures.
 

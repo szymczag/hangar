@@ -49,7 +49,7 @@ Never collect or share:
 | Migration Job fails                  | Database, Secret, migration, or policy      | Job logs, database DNS/port, `DATABASE_URL` key presence  |
 | Frontend returns 404/503             | Ingress class, route, Service, or readiness | Ingress events, endpoints, controller logs                |
 | `/live` disconnects                  | WebSocket forwarding or Live readiness      | controller WebSocket settings, Live logs, endpoints       |
-| Presigned upload returns 404/405     | Object-storage bucket route or backend       | rendered bucket path, storage Service, policy, proxy logs |
+| Presigned upload returns 404/405     | Object-storage bucket route or backend      | rendered bucket path, storage Service, policy, proxy logs |
 | Dependency timeout                   | DNS, NetworkPolicy, firewall, or TLS        | selectors, CIDRs, service endpoints, provider firewall    |
 | Read-only filesystem error           | Application writes outside allowed paths    | Container log and image version; do not disable hardening |
 | Upgrade rolled back                  | Migration or rollout failed                 | Helm history, revision Job, controller events             |
@@ -60,7 +60,7 @@ Confirm the chart is public:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.4
+  --version 0.1.0-rc.7
 ```
 
 Confirm the node architecture:
@@ -69,7 +69,7 @@ Confirm the node architecture:
 kubectl get nodes --label-columns kubernetes.io/arch
 ```
 
-`0.1.0-rc.4` is AMD64-only. An ARM64-only cluster cannot schedule or run the
+`0.1.0-rc.7` is AMD64-only. An ARM64-only cluster cannot schedule or run the
 qualified images.
 
 Published charts use digest references. Inspect the failed Pod's image without

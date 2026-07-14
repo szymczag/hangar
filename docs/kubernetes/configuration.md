@@ -187,12 +187,12 @@ selector maps: the schema requires `namespaceSelector` and `podSelector` to
 remain empty, which prevents Helm's deep merge from retaining labels from
 another controller.
 
-| Preset          | Namespace                 | Pod label                                                                 |
-| --------------- | ------------------------- | ------------------------------------------------------------------------- |
-| `nginx`         | `ingress-nginx`           | `app.kubernetes.io/name=ingress-nginx`                                    |
-| `envoyGateway`  | `envoy-gateway-system`    | `gateway.envoyproxy.io/owning-gateway-name=<effective gateway.name>`       |
-| `traefik`       | `traefik`                 | `app.kubernetes.io/name=traefik`                                          |
-| `custom`        | operator-supplied selector | operator-supplied selector                                                |
+| Preset         | Namespace                  | Pod label                                                            |
+| -------------- | -------------------------- | -------------------------------------------------------------------- |
+| `nginx`        | `ingress-nginx`            | `app.kubernetes.io/name=ingress-nginx`                               |
+| `envoyGateway` | `envoy-gateway-system`     | `gateway.envoyproxy.io/owning-gateway-name=<effective gateway.name>` |
+| `traefik`      | `traefik`                  | `app.kubernetes.io/name=traefik`                                     |
+| `custom`       | operator-supplied selector | operator-supplied selector                                           |
 
 `nginx` is the default. Gateway API cannot be enabled with the `nginx` preset.
 The Envoy preset uses the explicit `gateway.name`, or the chart-generated
@@ -240,7 +240,7 @@ global:
 Use a component's `image.pullSecrets` for a narrower credential. Worker, beat,
 and migrator Pods use `api.image.pullSecrets` because they run the API image.
 Public release images currently pull anonymously, so a GHCR credential is not
-required for `0.1.0-rc.4`.
+required for `0.1.0-rc.7`.
 
 ## Replicas and disruption budgets
 
@@ -266,7 +266,7 @@ spread, and a termination grace period. Component templates combine these values
 with their security constraints.
 
 Evaluation dependencies are fixed to `kubernetes.io/arch: amd64`. All application
-images in `0.1.0-rc.4` are also AMD64-only.
+images in `0.1.0-rc.7` are also AMD64-only.
 
 ## Evaluation storage
 
