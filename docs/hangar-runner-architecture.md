@@ -7,29 +7,44 @@ Last reviewed: 2026-07-14.
 
 ## Implementation status
 
-The first Phase 1 slice is implemented on `feat/hangar-runner`:
+The first Phase 1 slice is implemented on `feat/hangar-runner-foundation`; its
+security hardening is developed on the stacked
+`fix/hangar-runner-foundation-hardening` branch:
 
-- `RUNNER_ENABLED` is an operator-controlled environment gate and defaults to
-  `0`; disabled endpoints fail closed with `404 runner_disabled`;
-- workspace Runner state is represented by one `RunnerInstallation` record with
-  explicit `inactive`, `active`, `suspended`, and terminal `revoked` states;
-- activation requires the current consent contract version and all transitions
-  are serialized by a database lock on the workspace;
-- only active workspace Admins can read or change installation state;
-- activation, suspension, and revocation create allow-listed, append-only audit
-  events; duplicate requests are idempotent and do not duplicate audit events;
+- `RUNNER_ENABLED` is a process-level operator gate and defaults to `0`; disabled
+  endpoints fail closed with `404 runner_disabled`, and changing the setting
+  requires an application restart;
+- absence of a `RunnerInstallation` row is the only inactive representation;
+  persisted lifecycle states are `active`, `suspended`, and terminal `revoked`,
+  while stale consent produces the non-persisted effective state
+  `consent_required`;
+- activation requires the exact current consent version and SHA-256 digest; the
+  canonical versioned text is retained in an immutable contract registry and
+  returned by the read endpoint; all transitions are serialized by a database
+  lock on the workspace;
+- authorization is enforced in the service boundary and rechecked under the
+  mutation transaction; unauthorized and nonexistent workspace slugs return the
+  same response, and only active workspace Admins can read or change state;
+- read and mutation requests use separate aggregate-user and user/workspace rate
+  limits, configurable through the `RUNNER_API_*_RATE` settings;
+- state transitions and allow-listed audit events commit atomically; audit
+  records retain workspace and actor UUID evidence plus bounded request context
+  after source-row deletion, and PostgreSQL rejects audit updates and deletes;
 - revocation cannot be reversed through the API; and
-- contract tests cover the instance gate, role and tenant boundaries, consent,
-  lifecycle transitions, idempotency, audit contents, and audit mutation guards.
+- contract tests cover the instance gate, role and tenant boundaries, direct
+  service authorization, consent renewal, lifecycle constraints, idempotency,
+  throttling, concurrency, audit rollback/retention, and database immutability;
+  a separate CI job applies the real migration chain and exercises the additive
+  foundation-upgrade path, constraints, and trigger.
 
 The current API contract is:
 
-| Method | Path                                                  | Behavior                            |
-| ------ | ----------------------------------------------------- | ----------------------------------- |
-| `GET`  | `/api/workspaces/{slug}/runner/installation/`         | Read effective installation state   |
-| `POST` | `/api/workspaces/{slug}/runner/installation/`         | Activate or reactivate with consent |
-| `POST` | `/api/workspaces/{slug}/runner/installation/suspend/` | Suspend new Runner activity         |
-| `POST` | `/api/workspaces/{slug}/runner/installation/revoke/`  | Irreversibly revoke installation    |
+| Method | Path                                                  | Behavior                                            |
+| ------ | ----------------------------------------------------- | --------------------------------------------------- |
+| `GET`  | `/api/workspaces/{slug}/runner/installation/`         | Read effective installation state                   |
+| `POST` | `/api/workspaces/{slug}/runner/installation/`         | Activate/reactivate with consent version and digest |
+| `POST` | `/api/workspaces/{slug}/runner/installation/suspend/` | Suspend new Runner activity                         |
+| `POST` | `/api/workspaces/{slug}/runner/installation/revoke/`  | Irreversibly revoke installation                    |
 
 This slice intentionally cannot accept, compile, dispatch, or execute source
 code. The remaining Phase 1 schema, crypto, protocol, execution-state, quota,
@@ -580,18 +595,18 @@ states and retention timestamps.
 
 ### Configuration and source models
 
-| Model                      | Important fields and constraints                                                                                                                                                                                                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RunnerInstallation`       | One per workspace; `state` (`inactive`, `active`, `suspended`, `revoked`), consent version, activated/revoked actor and time, default quotas, service identity; unique workspace                                                                                          |
-| `RunnerScript`             | Workspace, stable name/slug, description, status, current draft and published version IDs; unique live name per workspace                                                                                                                                                 |
-| `RunnerScriptVersion`      | Script, monotonic version, language, script type, source, source digest, schemas, requested capabilities, allowed domains, resource profile, runtime/SDK versions, build and publication state, approver/time; unique `(script, version)` and immutable after publication |
-| `RunnerFunction`           | Workspace, stable name, category, description, status, current draft/published version; unique live name per workspace                                                                                                                                                    |
-| `RunnerFunctionVersion`    | Function, monotonic version, source/digest, parameter and return schemas, build/publication metadata; immutable after publication                                                                                                                                         |
-| `RunnerFunctionDependency` | Owning script/function version, exact dependency version, alias, digest; unique alias per owner and acyclic graph validation                                                                                                                                              |
-| `RunnerArtifact`           | Kind, content digest, object key, size, canonical manifest, signature, signing key ID, compiler/runtime/SDK versions, verification status; digest-unique                                                                                                                  |
-| `RunnerBuild`              | Draft version, state, requested/started/finished times, artifact, diagnostics, sandbox attempt metadata, public error code; one active build per draft digest                                                                                                             |
-| `RunnerSecret`             | Workspace, normalized name, ciphertext, nonce, wrapped data-key metadata, key version, created/rotated/revoked metadata, last-used time; unique active name per workspace                                                                                                 |
-| `RunnerSecretBinding`      | Script version or trigger revision, public alias, secret ID; never returns secret value                                                                                                                                                                                   |
+| Model                      | Important fields and constraints                                                                                                                                                                                                                                                                                                        |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunnerInstallation`       | At most one per workspace; absence means inactive and persisted `state` is `active`, `suspended`, or terminal `revoked`; exact consent version/document/digest; immutable actor UUID and time evidence for lifecycle transitions; database coherence constraints; no soft deletion. Default quotas and service identity remain pending. |
+| `RunnerScript`             | Workspace, stable name/slug, description, status, current draft and published version IDs; unique live name per workspace                                                                                                                                                                                                               |
+| `RunnerScriptVersion`      | Script, monotonic version, language, script type, source, source digest, schemas, requested capabilities, allowed domains, resource profile, runtime/SDK versions, build and publication state, approver/time; unique `(script, version)` and immutable after publication                                                               |
+| `RunnerFunction`           | Workspace, stable name, category, description, status, current draft/published version; unique live name per workspace                                                                                                                                                                                                                  |
+| `RunnerFunctionVersion`    | Function, monotonic version, source/digest, parameter and return schemas, build/publication metadata; immutable after publication                                                                                                                                                                                                       |
+| `RunnerFunctionDependency` | Owning script/function version, exact dependency version, alias, digest; unique alias per owner and acyclic graph validation                                                                                                                                                                                                            |
+| `RunnerArtifact`           | Kind, content digest, object key, size, canonical manifest, signature, signing key ID, compiler/runtime/SDK versions, verification status; digest-unique                                                                                                                                                                                |
+| `RunnerBuild`              | Draft version, state, requested/started/finished times, artifact, diagnostics, sandbox attempt metadata, public error code; one active build per draft digest                                                                                                                                                                           |
+| `RunnerSecret`             | Workspace, normalized name, ciphertext, nonce, wrapped data-key metadata, key version, created/rotated/revoked metadata, last-used time; unique active name per workspace                                                                                                                                                               |
+| `RunnerSecretBinding`      | Script version or trigger revision, public alias, secret ID; never returns secret value                                                                                                                                                                                                                                                 |
 
 Source is stored as text in PostgreSQL for transactional versioning and access
 control. Compiled artifacts and optional source maps without embedded source are
@@ -622,14 +637,14 @@ retention period while retaining identifiers and audit metadata.
 
 ### Execution models
 
-| Model                    | Important fields and constraints                                                                                                                                                                                                |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RunnerExecution`        | Workspace, trigger/test requester, pinned script/artifact, event/schedule, kind, state, idempotency key, causality, quota decision, queued/started/finished times, terminal result/error summary, retention time                |
-| `RunnerExecutionAttempt` | Execution, attempt number, state, dispatch token ID, Controller/Job reference, runtime image digest, policy digest, timestamps, exit reason, resource usage, infrastructure diagnostic reference; unique `(execution, attempt)` |
-| `RunnerExecutionLog`     | Execution/attempt, object key or bounded chunks, byte/event counts, truncation flag, redaction version, digest; never raw secrets                                                                                               |
-| `RunnerCapabilityGrant`  | Execution, audience, capability set, workspace/project restriction, token ID, issued/expiry/consumed/revoked times; stores token digest, never bearer token                                                                     |
-| `RunnerAuditEvent`       | Append-only actor/service, workspace, action, target type/ID/version, before/after security metadata, request ID, IP/user agent where applicable, occurred time                                                                 |
-| `RunnerUsageBucket`      | Workspace, UTC period, builds/executions/CPU/request/log counters for durable quota accounting; unique workspace/period                                                                                                         |
+| Model                    | Important fields and constraints                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunnerExecution`        | Workspace, trigger/test requester, pinned script/artifact, event/schedule, kind, state, idempotency key, causality, quota decision, queued/started/finished times, terminal result/error summary, retention time                                                                                                                                                              |
+| `RunnerExecutionAttempt` | Execution, attempt number, state, dispatch token ID, Controller/Job reference, runtime image digest, policy digest, timestamps, exit reason, resource usage, infrastructure diagnostic reference; unique `(execution, attempt)`                                                                                                                                               |
+| `RunnerExecutionLog`     | Execution/attempt, object key or bounded chunks, byte/event counts, truncation flag, redaction version, digest; never raw secrets                                                                                                                                                                                                                                             |
+| `RunnerCapabilityGrant`  | Execution, audience, capability set, workspace/project restriction, token ID, issued/expiry/consumed/revoked times; stores token digest, never bearer token                                                                                                                                                                                                                   |
+| `RunnerAuditEvent`       | Append-only security evidence. The implemented installation subset stores durable workspace/actor UUIDs without cascading foreign keys, allow-listed versioned action/target values, required target ID, object-only metadata, and occurred time; application guards and a PostgreSQL trigger reject update/delete. Request context and broader Runner events remain pending. |
+| `RunnerUsageBucket`      | Workspace, UTC period, builds/executions/CPU/request/log counters for durable quota accounting; unique workspace/period                                                                                                                                                                                                                                                       |
 
 Execution states use a validated monotonic state machine:
 
@@ -695,6 +710,13 @@ There are two independent gates:
 2. A workspace Admin activates Runner and accepts the current workspace consent
    statement.
 
+The implemented `RUNNER_ENABLED` setting is the outer deployment gate, not an
+instant runtime kill switch: it is read by application processes and therefore
+requires their restart when changed. Before dispatch is implemented, Runner also
+requires a durable instance policy checked immediately before execution creation,
+dispatch, and every gateway call so emergency suspension cannot depend on process
+configuration convergence.
+
 Publication consent shows the exact SDK read/write capabilities, project scope,
 function graph, external host/port list, secret aliases, resource profile, and
 trigger types. A material change creates a new version and requires new approval.
@@ -759,30 +781,30 @@ apply object-level workspace scoping, and use explicit serializers rather than
 
 ### Public API surface
 
-| Method and route                                 | Purpose                                                        |
-| ------------------------------------------------ | -------------------------------------------------------------- |
-| `GET/POST /installation/`                        | Read activation state or activate with consent version         |
-| `POST /installation/suspend/`                    | Stop new builds/dispatches and revoke outstanding capabilities |
-| `GET/POST /scripts/`                             | List or create script shell/draft                              |
-| `GET/PATCH/DELETE /scripts/{id}/`                | Read, edit metadata, or tombstone script                       |
-| `POST /scripts/{id}/versions/`                   | Create a new draft version                                     |
-| `GET/PATCH /scripts/{id}/versions/{version}/`    | Read or update an unpublished draft                            |
-| `POST /scripts/{id}/versions/{version}/build/`   | Request isolated build                                         |
-| `POST /scripts/{id}/versions/{version}/publish/` | Approve exact build manifest and permissions                   |
-| `POST /scripts/{id}/versions/{version}/test/`    | Create isolated test execution                                 |
-| equivalent `/functions/...` routes               | Manage, build, test, publish, and retire functions             |
-| `GET/POST /secrets/`                             | List metadata or create write-only secret                      |
-| `PUT/DELETE /secrets/{id}/`                      | Rotate or revoke; never return plaintext                       |
-| `GET/POST /triggers/`                            | List or create trigger pinned to published version             |
-| `GET/PATCH/DELETE /triggers/{id}/`               | Read, revise, enable/disable, or tombstone trigger             |
-| `GET /events/catalog/`                           | Return supported versioned event schemas and fields            |
-| `GET /sdk/catalog/`                              | Return SDK/function declarations and capability mapping        |
-| `GET /executions/`                               | Cursor-paginated, bounded filters by script/trigger/state/time |
-| `GET /executions/{id}/`                          | Execution and attempt summary                                  |
-| `GET /executions/{id}/logs/`                     | Paginated/redacted bounded logs                                |
-| `POST /executions/{id}/cancel/`                  | Request cancellation and revoke capabilities                   |
-| `POST /executions/{id}/retry/`                   | Admin-created retry subject to policy and idempotency warning  |
-| `GET /audit/`                                    | Cursor-paginated Runner audit records                          |
+| Method and route                                 | Purpose                                                                             |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `GET/POST /installation/`                        | Read effective state/consent contract or activate with its exact version and digest |
+| `POST /installation/suspend/`                    | Stop new builds/dispatches and revoke outstanding capabilities                      |
+| `GET/POST /scripts/`                             | List or create script shell/draft                                                   |
+| `GET/PATCH/DELETE /scripts/{id}/`                | Read, edit metadata, or tombstone script                                            |
+| `POST /scripts/{id}/versions/`                   | Create a new draft version                                                          |
+| `GET/PATCH /scripts/{id}/versions/{version}/`    | Read or update an unpublished draft                                                 |
+| `POST /scripts/{id}/versions/{version}/build/`   | Request isolated build                                                              |
+| `POST /scripts/{id}/versions/{version}/publish/` | Approve exact build manifest and permissions                                        |
+| `POST /scripts/{id}/versions/{version}/test/`    | Create isolated test execution                                                      |
+| equivalent `/functions/...` routes               | Manage, build, test, publish, and retire functions                                  |
+| `GET/POST /secrets/`                             | List metadata or create write-only secret                                           |
+| `PUT/DELETE /secrets/{id}/`                      | Rotate or revoke; never return plaintext                                            |
+| `GET/POST /triggers/`                            | List or create trigger pinned to published version                                  |
+| `GET/PATCH/DELETE /triggers/{id}/`               | Read, revise, enable/disable, or tombstone trigger                                  |
+| `GET /events/catalog/`                           | Return supported versioned event schemas and fields                                 |
+| `GET /sdk/catalog/`                              | Return SDK/function declarations and capability mapping                             |
+| `GET /executions/`                               | Cursor-paginated, bounded filters by script/trigger/state/time                      |
+| `GET /executions/{id}/`                          | Execution and attempt summary                                                       |
+| `GET /executions/{id}/logs/`                     | Paginated/redacted bounded logs                                                     |
+| `POST /executions/{id}/cancel/`                  | Request cancellation and revoke capabilities                                        |
+| `POST /executions/{id}/retry/`                   | Admin-created retry subject to policy and idempotency warning                       |
+| `GET /audit/`                                    | Cursor-paginated Runner audit records                                               |
 
 Every mutation accepts an idempotency key and returns the created resource or
 existing matching result. Source, input, variable, result, and log endpoints have
@@ -1212,6 +1234,15 @@ Runner audit is append-only and records at least:
 - capability issue, consume, revoke, and policy rejection;
 - quota, loop, SSRF, signature, cross-scope, and sandbox policy violations; and
 - retention cleanup and key rotation.
+
+The installation slice already enforces append-only behavior in both Django and
+PostgreSQL. Its records retain actor and workspace UUIDs even if the referenced
+user or workspace is deleted, state and audit writes share one transaction, and
+metadata is constrained to a JSON object. Installation events also retain a
+validated or server-generated request ID, the directly observed peer IP, and a
+bounded printable user agent. Because the immutability trigger also blocks
+ordinary deletion, retention must eventually use a separately authorized,
+audited maintenance mechanism rather than application-model deletion.
 
 Audit records use stable action names and target identifiers, not prose-only
 messages. The UI may render friendly descriptions from the structured record.
