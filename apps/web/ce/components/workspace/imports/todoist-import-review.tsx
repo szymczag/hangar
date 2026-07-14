@@ -154,6 +154,7 @@ export function TodoistImportReview({
               <div key={sourceAssignee} className="grid items-center gap-3 p-3 sm:grid-cols-2">
                 <span className="truncate text-body-sm-regular text-primary">{sourceAssignee}</span>
                 <select
+                  aria-label={`${t("workspace_settings.settings.todoist_import.assignee_mapping")}: ${sourceAssignee}`}
                   className="rounded-md border border-subtle bg-surface-1 px-3 py-2 text-body-sm-regular text-primary outline-none focus:border-accent-strong"
                   value={assigneeMapping[sourceAssignee] ?? ""}
                   onChange={(event) => onAssigneeChange(sourceAssignee, event.target.value)}
@@ -186,6 +187,7 @@ export function TodoistImportReview({
                   {t("workspace_settings.settings.todoist_import.section")} “{conflict.name}”
                 </p>
                 <select
+                  aria-label={`${t("workspace_settings.settings.todoist_import.module_conflicts")}: ${conflict.name}`}
                   className="mt-2 w-full rounded-md border border-subtle bg-surface-1 px-3 py-2 text-body-sm-regular text-primary outline-none focus:border-accent-strong"
                   value={moduleActions[conflict.row] ?? "reuse"}
                   onChange={(event) => onModuleActionChange(conflict.row, event.target.value as TModuleAction)}
@@ -194,6 +196,7 @@ export function TodoistImportReview({
                   <option value="rename">{t("workspace_settings.settings.todoist_import.rename_module")}</option>
                 </select>
                 <input
+                  aria-label={`${t("workspace_settings.settings.todoist_import.rename_module")}: ${conflict.name}`}
                   className="mt-2 w-full rounded-md border border-subtle bg-surface-1 px-3 py-2 text-body-sm-regular text-primary outline-none focus:border-accent-strong disabled:opacity-50"
                   value={renamedModules[conflict.row] ?? conflict.name}
                   disabled={moduleActions[conflict.row] !== "rename"}
