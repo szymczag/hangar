@@ -4,7 +4,7 @@
 
 # Fork API endpoints, mounted under /api/ alongside plane.app.urls.
 
-from django.urls import path
+from django.urls import include, path
 
 from plane.ext.views.epic import (
     EpicActivityEndpoint,
@@ -42,6 +42,10 @@ PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
 EPIC_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>/epics"
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/runner/",
+        include("plane.ext.runner.urls"),
+    ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/epic-settings/",
         EpicSettingsEndpoint.as_view(),
