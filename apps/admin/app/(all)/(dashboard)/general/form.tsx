@@ -133,7 +133,8 @@ export const GeneralConfigurationForm = observer(function GeneralConfigurationFo
               </div>
               {telemetryConfiguration.collector_configured ? (
                 <div className="mt-1 text-11 leading-5 text-success-primary">
-                  Collector configured via deployment settings ({telemetryConfiguration.metrics_protocol?.toUpperCase()}).
+                  Collector configured via deployment settings ({telemetryConfiguration.metrics_protocol?.toUpperCase()}
+                  ).
                 </div>
               ) : (
                 <div className="mt-1 text-11 leading-5 text-warning-primary">
