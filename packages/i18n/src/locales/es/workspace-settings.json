@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Facturación y Hangars",
-        "description": "Elige tu plan, gestiona las suscripciones y actualiza fácilmente a medida que crecen tus necesidades.",
-        "title": "Facturación y Hangars",
-        "current_plan": "Plan actual",
-        "free_plan": "Actualmente estás usando el plan gratuito",
-        "view_plans": "Ver planes"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Exportaciones",

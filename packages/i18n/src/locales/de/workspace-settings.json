@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Abrechnung und Pläne",
-        "description": "Wählen Sie Ihren Plan, verwalten Sie Abonnements und führen Sie bei Bedarf ein Upgrade durch.",
-        "title": "Abrechnung und Pläne",
-        "current_plan": "Aktueller Plan",
-        "free_plan": "Sie nutzen den kostenlosen Plan",
-        "view_plans": "Pläne anzeigen"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Exporte",

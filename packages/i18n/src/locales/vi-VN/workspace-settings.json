@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Thanh toán và Kế hoạch",
-        "description": "Chọn gói của bạn, quản lý đăng ký và dễ dàng nâng cấp khi nhu cầu của bạn phát triển.",
-        "title": "Thanh toán và Kế hoạch",
-        "current_plan": "Kế hoạch hiện tại",
-        "free_plan": "Bạn đang sử dụng kế hoạch miễn phí",
-        "view_plans": "Xem kế hoạch"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Xuất",

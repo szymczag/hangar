@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "청구 및 플랜",
-        "description": "플랜을 선택하고, 구독을 관리하며, 필요에 따라 손쉽게 업그레이드하세요.",
-        "title": "청구 및 플랜",
-        "current_plan": "현재 플랜",
-        "free_plan": "현재 무료 플랜을 사용 중입니다",
-        "view_plans": "플랜 보기"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "내보내기",

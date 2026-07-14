@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Fakturace a plány",
-        "description": "Vyberte si plán, spravujte předplatná a snadno je upgradujte, jak rostou vaše potřeby.",
-        "title": "Fakturace a plány",
-        "current_plan": "Aktuální plán",
-        "free_plan": "Používáte bezplatný plán",
-        "view_plans": "Zobrazit plány"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Exporty",

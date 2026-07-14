@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Rozliczenia i plany",
-        "description": "Wybierz plan, zarządzaj subskrypcjami i łatwo dokonaj uaktualnienia w miarę rozwoju Twoich potrzeb.",
-        "title": "Rozliczenia i plany",
-        "current_plan": "Obecny plan",
-        "free_plan": "Używasz bezpłatnego planu",
-        "view_plans": "Wyświetl plany"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Eksporty",

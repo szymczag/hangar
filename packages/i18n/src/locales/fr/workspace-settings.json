@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Facturation & Plans",
-        "description": "Choisissez votre forfait, gérez vos abonnements et passez facilement à une version supérieure au fur et à mesure que vos besoins évoluent.",
-        "title": "Facturation & Plans",
-        "current_plan": "Plan actuel",
-        "free_plan": "Vous utilisez actuellement le plan gratuit",
-        "view_plans": "Voir les plans"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Exportations",

@@ -66,12 +66,7 @@
         }
       },
       "billing_and_plans": {
-        "heading": "Faturalandırma ve Planlar",
-        "description": "Planınızı seçin, abonelikleri yönetin ve ihtiyaçlarınız arttıkça kolayca yükseltin.",
-        "title": "Faturalandırma ve Planlar",
-        "current_plan": "Mevcut plan",
-        "free_plan": "Şu anda ücretsiz planı kullanıyorsunuz",
-        "view_plans": "Planları görüntüle"
+        "title": "Hangar Community"
       },
       "exports": {
         "heading": "Dışa Aktarımlar",
