@@ -55,12 +55,14 @@ jobs:
         include:
           - name: contract
             tests: plane/tests/contract/app/test_todoist_import_app.py
-          - name: unit
-            tests: >-
-              plane/tests/unit/ext/test_import_storage.py
-              plane/tests/unit/ext/test_todoist_csv.py
-              plane/tests/unit/ext/test_todoist_import_execution.py
-              plane/tests/unit/ext/test_todoist_import_tasks.py
+          - name: storage
+            tests: plane/tests/unit/ext/test_import_storage.py
+          - name: parser
+            tests: plane/tests/unit/ext/test_todoist_csv.py
+          - name: execution
+            tests: plane/tests/unit/ext/test_todoist_import_execution.py
+          - name: tasks
+            tests: plane/tests/unit/ext/test_todoist_import_tasks.py
     steps:
       - name: Checkout
         # v6.0.2
