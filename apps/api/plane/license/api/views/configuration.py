@@ -46,11 +46,63 @@ class InstanceConfigurationEndpoint(BaseAPIView):
                 {"error": "Secure email transport settings are managed by the deployment."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        normalized_values = {}
+        if "OIDC_ALLOW_UNVERIFIED_EMAIL" in request.data:
+            return Response(
+                {"error": "Unverified OIDC email is not supported."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if "GOOGLE_AUTH_MODE" in request.data or "GOOGLE_WORKSPACE_DOMAINS" in request.data:
+            current = {
+                item.key: item.value
+                for item in InstanceConfiguration.objects.filter(
+                    key__in=["GOOGLE_AUTH_MODE", "GOOGLE_WORKSPACE_DOMAINS"]
+                )
+            }
+            mode = str(request.data.get("GOOGLE_AUTH_MODE", current.get("GOOGLE_AUTH_MODE", "generic"))).strip().lower()
+            domains = str(
+                request.data.get("GOOGLE_WORKSPACE_DOMAINS", current.get("GOOGLE_WORKSPACE_DOMAINS", ""))
+            ).strip()
+            try:
+                domain_parse_failed = False
+                normalized_domains = [
+                    domain.strip().encode("idna").decode("ascii").lower()
+                    for domain in domains.split(",")
+                    if domain.strip()
+                ]
+            except UnicodeError:
+                domain_parse_failed = True
+                normalized_domains = []
+            domains_valid = all(
+                "." in domain
+                and not domain.startswith((".", "-"))
+                and not domain.endswith((".", "-"))
+                and "/" not in domain
+                and ":" not in domain
+                for domain in normalized_domains
+            )
+            if (
+                mode not in {"generic", "workspace"}
+                or domain_parse_failed
+                or not domains_valid
+                or (mode == "workspace" and not normalized_domains)
+            ):
+                return Response(
+                    {"error": "Google authentication mode must be generic, or workspace with allowed domains."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            normalized_values["GOOGLE_AUTH_MODE"] = mode
+            normalized_values["GOOGLE_WORKSPACE_DOMAINS"] = ",".join(normalized_domains)
+
         configurations = InstanceConfiguration.objects.filter(key__in=request.data.keys())
 
         bulk_configurations = []
         for configuration in configurations:
-            raw_value = request.data.get(configuration.key, configuration.value)
+            raw_value = normalized_values.get(
+                configuration.key,
+                request.data.get(configuration.key, configuration.value),
+            )
             value = "" if raw_value is None else str(raw_value).strip()
             if configuration.is_encrypted:
                 # An empty password means "keep the existing secret". This lets

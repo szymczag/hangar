@@ -18,8 +18,6 @@ import { CodeBlock } from "@/components/common/code-block";
 import { ConfirmDiscardModal } from "@/components/common/confirm-discard-modal";
 import type { TControllerInputFormField } from "@/components/common/controller-input";
 import { ControllerInput } from "@/components/common/controller-input";
-import type { TControllerSwitchFormField } from "@/components/common/controller-switch";
-import { ControllerSwitch } from "@/components/common/controller-switch";
 import type { TCopyField } from "@/components/common/copy-field";
 import { CopyField } from "@/components/common/copy-field";
 // hooks
@@ -30,11 +28,6 @@ type Props = {
 };
 
 type OIDCConfigFormValues = Record<TInstanceOIDCAuthenticationConfigurationKeys, string>;
-
-const OIDC_FORM_SWITCH_FIELD: TControllerSwitchFormField<OIDCConfigFormValues> = {
-  name: "OIDC_ALLOW_UNVERIFIED_EMAIL",
-  label: "Allow unverified email addresses",
-};
 
 export function InstanceOIDCConfigForm(props: Props) {
   const { config } = props;
@@ -54,7 +47,6 @@ export function InstanceOIDCConfigForm(props: Props) {
       OIDC_CLIENT_ID: config["OIDC_CLIENT_ID"],
       OIDC_CLIENT_SECRET: config["OIDC_CLIENT_SECRET"],
       OIDC_PROVIDER_NAME: config["OIDC_PROVIDER_NAME"] || "OIDC",
-      OIDC_ALLOW_UNVERIFIED_EMAIL: config["OIDC_ALLOW_UNVERIFIED_EMAIL"] || "0",
     },
   });
 
@@ -145,7 +137,6 @@ export function InstanceOIDCConfigForm(props: Props) {
         OIDC_CLIENT_ID: response.find((item) => item.key === "OIDC_CLIENT_ID")?.value,
         OIDC_CLIENT_SECRET: response.find((item) => item.key === "OIDC_CLIENT_SECRET")?.value,
         OIDC_PROVIDER_NAME: response.find((item) => item.key === "OIDC_PROVIDER_NAME")?.value,
-        OIDC_ALLOW_UNVERIFIED_EMAIL: response.find((item) => item.key === "OIDC_ALLOW_UNVERIFIED_EMAIL")?.value,
       });
     } catch (err) {
       console.error(err);
@@ -183,12 +174,6 @@ export function InstanceOIDCConfigForm(props: Props) {
                 required={field.required}
               />
             ))}
-            <ControllerSwitch control={control} field={OIDC_FORM_SWITCH_FIELD} />
-            <div className="text-13 text-tertiary">
-              Only enable this if your identity provider does not send the{" "}
-              <CodeBlock darkerShade>email_verified</CodeBlock> claim. With unverified emails, anyone who can register
-              an address at your IdP can take over the matching account here.
-            </div>
             <div className="flex flex-col gap-1 pt-4">
               <div className="flex items-center gap-4">
                 <Button

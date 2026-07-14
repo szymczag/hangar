@@ -5,6 +5,7 @@
 import ssl
 import time
 import uuid
+import hashlib
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
@@ -19,7 +20,7 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from plane.db.models import User
+from plane.db.models import Account, User
 from plane.license.models import Instance, InstanceConfiguration
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
@@ -135,6 +136,7 @@ def run_callback(
     token_response_overrides=None,
     state=None,
     code="auth-code",
+    userinfo_response=None,
 ):
     """Drive the callback with a canned token response signed by rsa_key."""
     session_state, nonce, _ = initiate(django_client)
@@ -153,6 +155,12 @@ def run_callback(
         patch("plane.ext.auth.provider.oidc._get_jwk_client", return_value=fake_jwk_client),
     ):
         params = {"code": code, "state": state if state is not None else session_state}
+        if userinfo_response is not None:
+            with patch(
+                "plane.ext.auth.provider.oidc.OIDCOAuthProvider.get_user_response",
+                return_value=userinfo_response,
+            ):
+                return django_client.get(reverse("oidc-callback"), params)
         return django_client.get(reverse("oidc-callback"), params)
 
 
@@ -335,11 +343,32 @@ class TestOIDCCallback:
         assert django_client.session.get("_auth_user_id") == str(user.id)
 
     @pytest.mark.django_db
-    def test_existing_user_logs_in(self, django_client, setup_instance, oidc_config):
+    def test_unbound_identity_cannot_claim_existing_user(self, django_client, setup_instance, oidc_config):
         existing = User.objects.create(email="oidc-user@hangar.test")
         response = run_callback(django_client, rsa_key=self._key())
+        assert error_code_of(response) == AUTHENTICATION_ERROR_CODES["SSO_ACCOUNT_LINK_REQUIRED"]
+        assert django_client.session.get("_auth_user_id") is None
+        assert User.objects.filter(email=existing.email).count() == 1
+
+    @pytest.mark.django_db
+    def test_legacy_provider_binding_resolves_before_email(self, django_client, setup_instance, oidc_config):
+        bound = User.objects.create(email="original@hangar.test", username="original")
+        provider_id = hashlib.sha256(f"{ISSUER}\0user-123".encode()).hexdigest()
+        Account.objects.create(
+            user=bound,
+            provider="oidc",
+            provider_account_id=provider_id,
+            access_token="legacy-token",
+        )
+
+        response = run_callback(
+            django_client,
+            rsa_key=self._key(),
+            token_overrides={"email": "oidc-user@hangar.test"},
+        )
+
         assert error_code_of(response) is None
-        assert django_client.session.get("_auth_user_id") == str(existing.id)
+        assert django_client.session.get("_auth_user_id") == str(bound.id)
 
     @pytest.mark.django_db
     def test_state_mismatch_rejected(self, django_client, setup_instance, oidc_config):
@@ -472,14 +501,44 @@ class TestOIDCCallback:
         assert not User.objects.filter(email="oidc-user@hangar.test").exists()
 
     @pytest.mark.django_db
-    def test_unverified_email_allowed_when_opted_in(self, django_client, setup_instance, oidc_config):
+    def test_unverified_email_setting_cannot_override_rejection(self, django_client, setup_instance, oidc_config):
         InstanceConfiguration.objects.update_or_create(
             key="OIDC_ALLOW_UNVERIFIED_EMAIL",
             defaults={"value": "1", "category": "OIDC", "is_encrypted": False},
         )
         response = run_callback(django_client, rsa_key=self._key(), token_overrides={"email_verified": False})
-        assert error_code_of(response) is None
-        assert User.objects.filter(email="oidc-user@hangar.test").exists()
+        assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_UNVERIFIED_EMAIL"]
+        assert not User.objects.filter(email="oidc-user@hangar.test").exists()
+
+    @pytest.mark.django_db
+    def test_id_token_and_userinfo_email_mismatch_rejected(self, django_client, setup_instance, oidc_config):
+        response = run_callback(
+            django_client,
+            rsa_key=self._key(),
+            token_overrides={"email": "victim@hangar.test", "email_verified": None},
+            userinfo_response={
+                "sub": "user-123",
+                "email": "attacker@hangar.test",
+                "email_verified": True,
+            },
+        )
+        assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_TOKEN_VALIDATION_FAILED"]
+        assert not User.objects.filter(email__in=["victim@hangar.test", "attacker@hangar.test"]).exists()
+
+    @pytest.mark.django_db
+    def test_userinfo_email_and_verification_are_used_as_pair(self, django_client, setup_instance, oidc_config):
+        response = run_callback(
+            django_client,
+            rsa_key=self._key(),
+            token_overrides={"email": None, "email_verified": True},
+            userinfo_response={
+                "sub": "user-123",
+                "email": "userinfo@hangar.test",
+                "email_verified": False,
+            },
+        )
+        assert error_code_of(response) == EXT_AUTHENTICATION_ERROR_CODES["OIDC_UNVERIFIED_EMAIL"]
+        assert not User.objects.filter(email="userinfo@hangar.test").exists()
 
     @pytest.mark.django_db
     def test_signup_disabled_without_invite_rejected(self, django_client, setup_instance, oidc_config):

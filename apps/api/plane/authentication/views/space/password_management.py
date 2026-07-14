@@ -26,6 +26,7 @@ from plane.bgtasks.forgot_password_task import forgot_password
 from plane.license.models import Instance
 from plane.db.models import User
 from plane.license.utils.instance_value import get_configuration_value
+from plane.mailer.configuration import is_email_delivery_configured
 from plane.authentication.utils.host import base_host
 from plane.authentication.adapter.error import (
     AuthenticationException,
@@ -73,7 +74,7 @@ class ForgotPasswordSpaceEndpoint(APIView):
             ]
         )
 
-        if not (EMAIL_HOST):
+        if not is_email_delivery_configured(EMAIL_HOST):
             exc = AuthenticationException(
                 error_message="SMTP_NOT_CONFIGURED",
                 error_code=AUTHENTICATION_ERROR_CODES["SMTP_NOT_CONFIGURED"],

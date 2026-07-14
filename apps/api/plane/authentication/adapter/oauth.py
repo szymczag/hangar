@@ -4,7 +4,6 @@
 
 # Python imports
 import requests
-from django.db import DatabaseError, IntegrityError
 
 # Django imports
 from django.utils import timezone
@@ -16,8 +15,6 @@ from plane.authentication.adapter.error import (
 
 # Module imports
 from plane.db.models import Account
-from plane.utils.exception_logger import log_exception
-
 from .base import Adapter
 
 
@@ -97,35 +94,38 @@ class OauthAdapter(Adapter):
     def set_user_data(self, data):
         self.user_data = data
 
-    def create_update_account(self, user):
-        try:
-            # Check if the account already exists
-            account = Account.objects.filter(
+    def create_update_account(self, user, identity=None):
+        provider_account_id = self.user_data.get("user", {}).get("provider_id")
+        accounts = Account.objects.select_for_update() if identity is not None else Account.objects
+        account = accounts.filter(
+            provider=self.provider,
+            provider_account_id=provider_account_id,
+        ).first()
+        if account and account.user_id != user.id:
+            raise AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["FEDERATED_IDENTITY_CONFLICT"],
+                error_message="FEDERATED_IDENTITY_CONFLICT",
+            )
+        if account:
+            account.access_token = self.token_data.get("access_token")
+            account.refresh_token = self.token_data.get("refresh_token", None)
+            account.access_token_expired_at = self.token_data.get("access_token_expired_at")
+            account.refresh_token_expired_at = self.token_data.get("refresh_token_expired_at")
+            account.last_connected_at = timezone.now()
+            account.id_token = self.token_data.get("id_token", "")
+            if identity is not None:
+                account.identity = identity
+            account.save()
+        else:
+            Account.objects.create(
                 user=user,
+                identity=identity,
                 provider=self.provider,
-                provider_account_id=self.user_data.get("user").get("provider_id"),
-            ).first()
-            # Update the account if it exists
-            if account:
-                account.access_token = self.token_data.get("access_token")
-                account.refresh_token = self.token_data.get("refresh_token", None)
-                account.access_token_expired_at = self.token_data.get("access_token_expired_at")
-                account.refresh_token_expired_at = self.token_data.get("refresh_token_expired_at")
-                account.last_connected_at = timezone.now()
-                account.id_token = self.token_data.get("id_token", "")
-                account.save()
-            # Create a new account if it does not exist
-            else:
-                Account.objects.create(
-                    user=user,
-                    provider=self.provider,
-                    provider_account_id=self.user_data.get("user", {}).get("provider_id"),
-                    access_token=self.token_data.get("access_token"),
-                    refresh_token=self.token_data.get("refresh_token", None),
-                    access_token_expired_at=self.token_data.get("access_token_expired_at"),
-                    refresh_token_expired_at=self.token_data.get("refresh_token_expired_at"),
-                    last_connected_at=timezone.now(),
-                    id_token=self.token_data.get("id_token", ""),
-                )
-        except (DatabaseError, IntegrityError) as e:
-            log_exception(e)
+                provider_account_id=provider_account_id,
+                access_token=self.token_data.get("access_token"),
+                refresh_token=self.token_data.get("refresh_token", None),
+                access_token_expired_at=self.token_data.get("access_token_expired_at"),
+                refresh_token_expired_at=self.token_data.get("refresh_token_expired_at"),
+                last_connected_at=timezone.now(),
+                id_token=self.token_data.get("id_token", ""),
+            )

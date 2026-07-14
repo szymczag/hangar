@@ -286,6 +286,13 @@ class Account(TimeAuditModel):
     last_connected_at = models.DateTimeField(default=timezone.now)
     id_token = models.TextField(blank=True)
     metadata = models.JSONField(default=dict)
+    identity = models.OneToOneField(
+        "db.FederatedIdentity",
+        on_delete=models.SET_NULL,
+        related_name="oauth_account",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         unique_together = ["provider", "provider_account_id"]
