@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: api-tests-isolated-${{ github.workflow }}-${{ github.ref }}
+  group: api-tests-importer-shards-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -55,14 +55,19 @@ jobs:
         include:
           - name: contract
             tests: plane/tests/contract/app/test_todoist_import_app.py
+            compose_args: ""
           - name: storage
             tests: plane/tests/unit/ext/test_import_storage.py
+            compose_args: --no-deps
           - name: parser
             tests: plane/tests/unit/ext/test_todoist_csv.py
+            compose_args: --no-deps
           - name: execution
             tests: plane/tests/unit/ext/test_todoist_import_execution.py
+            compose_args: ""
           - name: tasks
             tests: plane/tests/unit/ext/test_todoist_import_tasks.py
+            compose_args: ""
     steps:
       - name: Checkout
         # v6.0.2
@@ -75,7 +80,7 @@ jobs:
 
       - name: Run Todoist importer tests
         run: |
-          docker compose -f docker-compose-test.yml run --rm --build \
+          docker compose -f docker-compose-test.yml run ${{ matrix.compose_args }} --rm --build \
             api-tests pytest ${{ matrix.tests }}
 
       - name: Tear down
