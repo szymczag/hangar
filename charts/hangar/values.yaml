@@ -57,6 +57,7 @@ existingSecrets:
 externalServices:
   objectStorage:
     endpoint: https://s3.example.com
+    publicEndpoint: ""
     bucket: hangar
     region: us-east-1
     pathStyle: false
@@ -82,12 +83,9 @@ gateway:
 networkPolicy:
   enabled: true
   ingressController:
-    namespaceSelector:
-      matchLabels:
-        kubernetes.io/metadata.name: ingress-nginx
-    podSelector:
-      matchLabels:
-        app.kubernetes.io/name: ingress-nginx
+    preset: nginx
+    namespaceSelector: {}
+    podSelector: {}
   dns:
     namespaceSelector:
       matchLabels:

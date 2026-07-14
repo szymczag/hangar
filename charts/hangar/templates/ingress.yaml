@@ -42,6 +42,15 @@ spec:
                 name: {{ include "hangar.fullname" . }}-api
                 port:
                   name: http
+          {{- if .Values.evaluation.enabled }}
+          - path: {{ printf "/%s" .Values.externalServices.objectStorage.bucket | quote }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hangar.fullname" . }}-evaluation-object-storage
+                port:
+                  name: s3
+          {{- end }}
           - path: /live
             pathType: Prefix
             backend:

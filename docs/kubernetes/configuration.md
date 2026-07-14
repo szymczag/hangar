@@ -127,14 +127,29 @@ request.
 externalServices:
   objectStorage:
     endpoint: https://s3.example.com
+    publicEndpoint: https://s3.example.com
     bucket: hangar
     region: eu-central-1
     pathStyle: false
 ```
 
-Set `pathStyle: true` only when required by the S3-compatible provider. The
-production profile requires an HTTPS endpoint. Credentials come from the
-object-storage Secret, not this block.
+`endpoint` is used by API and worker Pods. `publicEndpoint` is used to construct
+browser-facing presigned URLs; leave it empty only when it is identical to
+`endpoint`. Set `pathStyle: true` only when required by the S3-compatible
+provider. The production profile requires HTTPS for both endpoints. Credentials
+come from the object-storage Secret, not this block.
+
+The evaluation profile uses the bundled SeaweedFS service internally while
+presigning browser requests against the public Hangar origin. To complete that
+same-origin flow, the chart routes `/<bucket>` to the SeaweedFS S3 port and adds
+a narrowly scoped ingress-controller NetworkPolicy rule for that Pod. For the
+default bucket, uploads therefore use `https://<public-host>/hangar`; the request
+does not go to the frontend service. Bucket names that collide with Hangar's
+reserved public route prefixes are rejected by the schema.
+
+Production does not render this proxy route. Its `publicEndpoint` must be
+publicly reachable by browsers; `endpoint` may use a separate address reachable
+only from the API and workers.
 
 ## NetworkPolicy
 
@@ -142,6 +157,7 @@ object-storage Secret, not this block.
 
 - default-deny ingress and egress for all release Pods;
 - ingress-controller access to public components only;
+- evaluation ingress-controller access to the bundled object-storage S3 port;
 - internal Live/Space access to the API;
 - application access to in-release dependencies;
 - DNS access through the configured namespace and Pod selectors;
@@ -165,13 +181,47 @@ allowlist. If a dependency address changes, update the CIDR before traffic moves
 Use CNI-specific FQDN or L7 policies outside this chart only after reviewing how
 they compose with the chart policies.
 
-The default ingress-controller selector expects namespace `ingress-nginx` and
-Pods labeled `app.kubernetes.io/name=ingress-nginx`. The default DNS selector
-expects `kube-system` and `k8s-app=kube-dns`. Change both selectors to match the
-actual cluster labels.
+Ingress-controller peers are selected atomically with
+`networkPolicy.ingressController.preset`. Named presets do not consume partial
+selector maps: the schema requires `namespaceSelector` and `podSelector` to
+remain empty, which prevents Helm's deep merge from retaining labels from
+another controller.
 
-Gateway users must instead select the Envoy data-plane Pods that connect to the
-Hangar Services. Those labels are implementation- and installation-specific.
+| Preset          | Namespace                 | Pod label                                                                 |
+| --------------- | ------------------------- | ------------------------------------------------------------------------- |
+| `nginx`         | `ingress-nginx`           | `app.kubernetes.io/name=ingress-nginx`                                    |
+| `envoyGateway`  | `envoy-gateway-system`    | `gateway.envoyproxy.io/owning-gateway-name=<effective gateway.name>`       |
+| `traefik`       | `traefik`                 | `app.kubernetes.io/name=traefik`                                          |
+| `custom`        | operator-supplied selector | operator-supplied selector                                                |
+
+`nginx` is the default. Gateway API cannot be enabled with the `nginx` preset.
+The Envoy preset uses the explicit `gateway.name`, or the chart-generated
+Gateway name when that field is empty. It selects the Envoy data-plane Pods,
+not the Envoy Gateway controller.
+
+Use `custom` when the controller is installed under different labels or in a
+different namespace. Both selectors are mandatory and each must contain at
+least one `matchLabels` entry:
+
+```yaml
+networkPolicy:
+  ingressController:
+    preset: custom
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: edge-system
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/component: edge-proxy
+```
+
+The DNS selector still defaults to `kube-system` and `k8s-app=kube-dns`; change
+it to match the actual cluster labels.
+
+When upgrading values that previously overrode either ingress selector, choose
+a named preset or set `preset: custom` and supply both complete selectors.
+Selector-only and partial overrides are rejected instead of being deep-merged
+with a controller preset.
 
 ## Images and registry credentials
 

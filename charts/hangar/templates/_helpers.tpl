@@ -50,6 +50,39 @@ app.kubernetes.io/part-of: hangar
   sectionName: {{ .Values.gateway.sectionName }}
 {{- end -}}
 
+{{- define "hangar.ingressControllerPeer" -}}
+{{- $preset := .Values.networkPolicy.ingressController.preset -}}
+{{- if eq $preset "nginx" -}}
+- namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: ingress-nginx
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+{{- else if eq $preset "envoyGateway" -}}
+- namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: envoy-gateway-system
+  podSelector:
+    matchLabels:
+      gateway.envoyproxy.io/owning-gateway-name: {{ include "hangar.gatewayName" . }}
+{{- else if eq $preset "traefik" -}}
+- namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: traefik
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+{{- else if eq $preset "custom" -}}
+- namespaceSelector:
+  {{- toYaml .Values.networkPolicy.ingressController.namespaceSelector | nindent 4 }}
+  podSelector:
+  {{- toYaml .Values.networkPolicy.ingressController.podSelector | nindent 4 }}
+{{- else -}}
+{{- fail (printf "unsupported networkPolicy.ingressController.preset %q" $preset) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "hangar.coreSecretEnv" -}}
 - name: SECRET_KEY
   valueFrom:

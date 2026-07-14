@@ -99,7 +99,13 @@ Set `gateway.enabled: true` to use Gateway API. This suppresses the NGINX
 `Ingress` and renders explicit routes for `/god-mode/`, `/spaces/`, `/live/`,
 `/api/`, and `/`; exact paths without their trailing slash receive a 308
 method-preserving redirect. See `examples/gateway-values.yaml` for an
-Envoy-backed Gateway with TLS termination.
+Envoy-backed Gateway with TLS termination. Gateway users must also choose the
+matching `networkPolicy.ingressController.preset`; the schema rejects Gateway
+API with the default `nginx` preset.
+
+Evaluation installs additionally route the configured `/<bucket>` path to the
+bundled SeaweedFS S3 service so browser presigned uploads do not fall through to
+the web frontend.
 
 ## Validate a source change
 

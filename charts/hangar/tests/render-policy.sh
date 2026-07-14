@@ -10,6 +10,8 @@ production_render="$tmp_dir/production.yaml"
 evaluation_render="$tmp_dir/evaluation.yaml"
 boundary_render="$tmp_dir/boundary.yaml"
 gateway_render="$tmp_dir/gateway.yaml"
+evaluation_gateway_render="$tmp_dir/evaluation-gateway.yaml"
+traefik_render="$tmp_dir/traefik.yaml"
 kube_version="${KUBE_VERSION:-1.36.2}"
 
 fail() {
@@ -67,7 +69,21 @@ helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_versi
     --set application.hardDeleteAfterDays=3650 >"$boundary_render"
 helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
     --set gateway.enabled=true \
-    --set gateway.create=true >"$gateway_render"
+    --set gateway.create=true \
+    --set-string gateway.name=public-mtls \
+    --set-string networkPolicy.ingressController.preset=envoyGateway >"$gateway_render"
+helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
+    --values "$chart_dir/ci/evaluation-values.yaml" \
+    --set gateway.enabled=true \
+    --set gateway.create=true \
+    --set-string gateway.name=public-mtls \
+    --set-string networkPolicy.ingressController.preset=envoyGateway >"$evaluation_gateway_render"
+helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
+    --set-string networkPolicy.ingressController.preset=traefik >"$traefik_render"
+helm template custom "$chart_dir" --namespace hangar --kube-version "$kube_version" \
+    --set-string networkPolicy.ingressController.preset=custom \
+    --set-string 'networkPolicy.ingressController.namespaceSelector.matchLabels.kubernetes\.io/metadata\.name=edge-system' \
+    --set-string networkPolicy.ingressController.podSelector.matchLabels.app=edge-proxy >/dev/null
 
 for render in "$production_render" "$evaluation_render"; do
     image_count="$(grep -Ec '^[[:space:]]+image:' "$render")"
@@ -119,6 +135,17 @@ assert_present '^[[:space:]]+statusCode: 308$' "$gateway_render" "Gateway traili
 assert_present '^[[:space:]]+- name: X-Forwarded-Proto$' "$gateway_render" "Gateway API route must set X-Forwarded-Proto"
 assert_present '^[[:space:]]+- name: X-Forwarded-Host$' "$gateway_render" "Gateway API route must set X-Forwarded-Host"
 assert_present '^[[:space:]]+- name: X-Forwarded-Port$' "$gateway_render" "Gateway API route must set X-Forwarded-Port"
+assert_present '^[[:space:]]+kubernetes\.io/metadata\.name: envoy-gateway-system$' "$gateway_render" "Envoy Gateway preset must select the data-plane namespace"
+assert_present '^[[:space:]]+gateway\.envoyproxy\.io/owning-gateway-name: public-mtls$' "$gateway_render" "Envoy Gateway preset must select Pods owned by the configured Gateway"
+assert_absent '^[[:space:]]+app\.kubernetes\.io/name: ingress-nginx$' "$gateway_render" "Envoy Gateway preset must not retain the NGINX Pod label"
+evaluation_gateway_route_count="$(grep -Ec '^kind: HTTPRoute$' "$evaluation_gateway_render")"
+[[ "$evaluation_gateway_route_count" -eq 7 ]] || fail "evaluation Gateway mode must add exactly one object-storage route"
+assert_present '^  name: hangar-hangar-object-storage$' "$evaluation_gateway_render" "evaluation Gateway mode must render an object-storage HTTPRoute"
+assert_present '^[[:space:]]+value: "/hangar"$' "$evaluation_gateway_render" "evaluation Gateway mode must route the presigned bucket path"
+assert_present '^[[:space:]]+port: 8333$' "$evaluation_gateway_render" "evaluation Gateway mode must route to the S3 service port"
+assert_present '^[[:space:]]+kubernetes\.io/metadata\.name: traefik$' "$traefik_render" "Traefik preset must select the conventional controller namespace"
+assert_present '^[[:space:]]+app\.kubernetes\.io/name: traefik$' "$traefik_render" "Traefik preset must select Traefik Pods"
+assert_absent '^[[:space:]]+app\.kubernetes\.io/name: ingress-nginx$' "$traefik_render" "Traefik preset must not retain the NGINX Pod label"
 for variable in VITE_ADMIN_BASE_URL VITE_SPACE_BASE_URL VITE_LIVE_BASE_URL VITE_WEB_BASE_URL VITE_API_BASE_URL; do
     assert_present "^[[:space:]]+${variable}: \\\"https://hangar.example.com\\\",?$" "$production_render" "frontend runtime config is missing ${variable}"
 done
@@ -133,6 +160,12 @@ assert_present '^automountServiceAccountToken: false$' "$evaluation_render" "eva
 dependency_service_account_uses="$(grep -Ec '^[[:space:]]+serviceAccountName: hangar-evaluation-dependencies$' "$evaluation_render")"
 [[ "$dependency_service_account_uses" -eq 4 ]] || fail "every evaluation dependency Pod must use the tokenless dependency ServiceAccount"
 assert_present 'AWS_S3_ENDPOINT_URL: "http://hangar-hangar-evaluation-object-storage:8333"' "$evaluation_render" "evaluation object storage endpoint is incorrect"
+assert_present 'AWS_S3_PUBLIC_ENDPOINT_URL: "https://hangar-evaluation.example.com"' "$evaluation_render" "evaluation presigning must use the routed public origin"
+assert_present 'AWS_S3_PUBLIC_ENDPOINT_URL: "https://s3.example.com"' "$production_render" "production presigning must use the public object-storage endpoint"
+evaluation_object_storage_ingress_paths="$(grep -Ec '^[[:space:]]+- path: "/hangar"$' "$evaluation_render")"
+[[ "$evaluation_object_storage_ingress_paths" -eq 1 ]] || fail "evaluation Ingress must route the presigned bucket path exactly once"
+assert_present '^  name: hangar-hangar-evaluation-object-storage-ingress$' "$evaluation_render" "evaluation object storage must allow ingress-controller traffic"
+assert_absent '^[[:space:]]+- path: "/hangar"$' "$production_render" "production must not proxy object storage through the Hangar origin"
 valkey_probe_auth_uses="$(grep -Ec '^[[:space:]]+- VALKEYCLI_AUTH="\$VALKEY_PASSWORD" valkey-cli --no-auth-warning --user hangar -h$' "$evaluation_render")"
 valkey_probe_loopback_uses="$(grep -Ec '^[[:space:]]+127\.0\.0\.1 -p 6379 ping \| grep -qx PONG$' "$evaluation_render")"
 [[ "$valkey_probe_auth_uses" -eq 3 && "$valkey_probe_loopback_uses" -eq 3 ]] || fail "every evaluation Valkey probe must authenticate over loopback"
@@ -143,10 +176,25 @@ assert_present '^  name: hangar-hangar-internal-api$' "$evaluation_render" "inte
 assert_invalid "unknown deployment profile" --set-string deploymentProfile=invalid
 assert_invalid "production with evaluation dependencies" --set evaluation.enabled=true
 assert_invalid "evaluation without bundled dependencies" --set-string deploymentProfile=evaluation
+assert_invalid "evaluation bucket colliding with the API route" \
+    --set-string deploymentProfile=evaluation \
+    --set evaluation.enabled=true \
+    --set-string externalServices.objectStorage.bucket=api
+assert_invalid "object-storage bucket containing a path separator" \
+    --set-string externalServices.objectStorage.bucket=hangar/uploads
 assert_invalid "HTTP production origin" --set-string publicUrl.scheme=http
 assert_invalid "HTTP production object storage" --set-string externalServices.objectStorage.endpoint=http://s3.example.com
+assert_invalid "HTTP production public object storage" --set-string externalServices.objectStorage.publicEndpoint=http://s3.example.com
 assert_invalid "HTTP telemetry collector" --set-string observability.otlpEndpoint=http://otel.example.com
 assert_invalid "disabled network policy" --set networkPolicy.enabled=false
+assert_invalid "unknown ingress-controller preset" --set-string networkPolicy.ingressController.preset=unknown
+assert_invalid "Gateway API with NGINX network-policy preset" --set gateway.enabled=true
+assert_invalid "custom ingress-controller preset without selectors" --set-string networkPolicy.ingressController.preset=custom
+assert_invalid "partial Envoy label override without selecting a preset" \
+    --set-string 'networkPolicy.ingressController.podSelector.matchLabels.gateway\.envoyproxy\.io/owning-gateway-name=public-mtls'
+assert_invalid "preset mixed with a custom selector" \
+    --set-string networkPolicy.ingressController.preset=envoyGateway \
+    --set-string networkPolicy.ingressController.podSelector.matchLabels.app=envoy
 assert_invalid "multiple API replicas" --set api.replicas=2
 assert_invalid "zero API workers" --set api.gunicornWorkers=0
 assert_invalid "multiple beat workers" --set beatWorker.replicas=2

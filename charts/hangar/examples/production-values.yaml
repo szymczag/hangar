@@ -17,6 +17,7 @@ ingress:
 externalServices:
   objectStorage:
     endpoint: https://s3.example.com
+    publicEndpoint: https://s3.example.com
     bucket: hangar
     region: eu-central-1
     pathStyle: false
@@ -24,6 +25,8 @@ externalServices:
 # Add only the private destinations that Hangar must reach. Public HTTPS egress
 # is already allowed; RFC1918 and cluster ranges are denied unless listed here.
 networkPolicy:
+  ingressController:
+    preset: nginx
   privateEgress:
     - cidr: 10.20.30.10/32
       ports:

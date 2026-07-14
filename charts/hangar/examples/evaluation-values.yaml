@@ -20,12 +20,7 @@ ingress:
 
 networkPolicy:
   ingressController:
-    namespaceSelector:
-      matchLabels:
-        kubernetes.io/metadata.name: ingress-nginx
-    podSelector:
-      matchLabels:
-        app.kubernetes.io/name: ingress-nginx
+    preset: nginx
 
 # When the cluster has no suitable default StorageClass, uncomment all four
 # settings and replace the example class with an available encrypted RWO class.

@@ -443,6 +443,7 @@ existingSecrets:
 externalServices:
   objectStorage:
     endpoint: https://s3.example.com
+    publicEndpoint: https://s3.example.com
     bucket: hangar
     region: eu-central-1
     tls:
@@ -451,12 +452,9 @@ externalServices:
 networkPolicy:
   enabled: true
   ingressController:
-    namespaceSelector:
-      matchLabels:
-        kubernetes.io/metadata.name: ingress-nginx
-    podSelector:
-      matchLabels:
-        app.kubernetes.io/name: ingress-nginx
+    preset: nginx
+    namespaceSelector: {}
+    podSelector: {}
   dns:
     namespaceSelector:
       matchLabels:

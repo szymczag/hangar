@@ -33,34 +33,37 @@ class S3Storage(S3Boto3Storage):
         self.aws_region = os.environ.get("AWS_REGION")
         # Use the AWS_S3_ENDPOINT_URL environment variable for the endpoint URL
         self.aws_s3_endpoint_url = os.environ.get("AWS_S3_ENDPOINT_URL") or os.environ.get("MINIO_ENDPOINT_URL")
+        # Use a separately configured browser-facing endpoint for presigned URLs.
+        # The internal endpoint can be a cluster-only Service address.
+        self.aws_s3_public_endpoint_url = os.environ.get("AWS_S3_PUBLIC_ENDPOINT_URL")
         # Use the SIGNED_URL_EXPIRATION environment variable for the expiration time (default: 3600 seconds)
         self.signed_url_expiration = int(os.environ.get("SIGNED_URL_EXPIRATION", "3600"))
 
+        endpoint_url = self.aws_s3_endpoint_url
+        if request and self.aws_s3_public_endpoint_url:
+            endpoint_url = self.aws_s3_public_endpoint_url
+        elif request and os.environ.get("USE_MINIO") == "1":
+            # Backwards compatibility for deployments that proxy the bucket path
+            # through the application origin but do not set an explicit public endpoint.
+            endpoint_protocol = "https" if os.environ.get("MINIO_ENDPOINT_SSL") == "1" else request.scheme
+            endpoint_url = f"{endpoint_protocol}://{request.get_host()}"
+
         if os.environ.get("USE_MINIO") == "1":
-            # Determine protocol based on environment variable
-            if os.environ.get("MINIO_ENDPOINT_SSL") == "1":
-                endpoint_protocol = "https"
-            else:
-                endpoint_protocol = request.scheme if request else "http"
-            # Create an S3 client for MinIO
-            self.s3_client = boto3.client(
-                "s3",
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-                region_name=self.aws_region,
-                endpoint_url=(f"{endpoint_protocol}://{request.get_host()}" if request else self.aws_s3_endpoint_url),
-                config=boto3.session.Config(signature_version="s3v4"),
+            client_config = boto3.session.Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},
             )
         else:
-            # Create an S3 client
-            self.s3_client = boto3.client(
-                "s3",
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-                region_name=self.aws_region,
-                endpoint_url=self.aws_s3_endpoint_url,
-                config=boto3.session.Config(signature_version="s3v4"),
-            )
+            client_config = boto3.session.Config(signature_version="s3v4")
+
+        self.s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+            region_name=self.aws_region,
+            endpoint_url=endpoint_url,
+            config=client_config,
+        )
 
     def generate_presigned_post(self, object_name, file_type, file_size, expiration=None):
         """Generate a presigned URL to upload an S3 object"""
