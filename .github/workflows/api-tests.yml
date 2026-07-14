@@ -56,7 +56,7 @@ jobs:
       - name: Generate API environment
         run: |
           cp apps/api/.env.example apps/api/.env
-          printf '\\nSECRET_KEY="%s"\\n' "$(openssl rand -hex 32)" >> apps/api/.env
+          printf '\nSECRET_KEY="%s"\n' "$(openssl rand -hex 32)" >> apps/api/.env
 
       - name: Run Todoist importer tests
         run: |
