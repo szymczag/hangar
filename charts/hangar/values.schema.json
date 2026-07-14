@@ -223,7 +223,7 @@
         "objectStorage": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["endpoint", "publicEndpoint", "bucket", "region", "pathStyle"],
+          "required": ["endpoint", "publicEndpoint", "bucket", "importBucket", "region", "pathStyle"],
           "properties": {
             "endpoint": { "type": "string", "pattern": "^https?://[^/\\s]+(:[0-9]+)?$" },
             "publicEndpoint": {
@@ -231,6 +231,7 @@
               "anyOf": [{ "const": "" }, { "pattern": "^https?://[^/\\s]+(:[0-9]+)?$" }]
             },
             "bucket": { "$ref": "#/definitions/s3BucketName" },
+            "importBucket": { "$ref": "#/definitions/s3BucketName" },
             "region": { "$ref": "#/definitions/nonEmptyString" },
             "pathStyle": { "type": "boolean" }
           }

@@ -4,7 +4,7 @@ Hangar is a fork of [makeplane/plane](https://github.com/makeplane/plane) (AGPL-
 implements additional features on top of the open-source core: hardened federated
 SSO (Google, OIDC, and SAML 2.0), Epics, custom issue types with custom properties,
 time tracking (worklogs), secure email/OpenPGP delivery, and the default-off Runner
-installation control plane.
+installation control plane, and Todoist CSV imports.
 
 All fork code is isolated so upstream syncs stay cheap:
 
@@ -84,6 +84,10 @@ admin pages) are listed for completeness but carry no merge-conflict risk.
 | 29  | `apps/api/plane/settings/common.py`, `apps/api/plane/utils/instance_config_variables/core.py`, `apps/api/plane/license/`                          | Mail          | add fail-closed SES/OpenPGP settings, secret classification, retention controls, and instance administration APIs                                               |
 | 30  | `apps/admin/app/(all)/(dashboard)/email/`, `apps/web/core/components/settings/profile/content/pages/`, `packages/{services,types}/src/`           | Mail          | expose operator delivery status plus user key lifecycle and receipt verification surfaces                                                                       |
 | 31  | `charts/hangar/`, `docs/kubernetes/`                                                                                                              | Mail          | add the isolated mail worker, workload identity/static-secret contract, egress policy, schema invariants, and operator documentation                            |
+| 32  | Import worker schedule, Markdown utility, dependency, workspace settings types/navigation                                                        | 6             | schedule source cleanup, render Markdown as HTML, and expose administrator imports                                                                              |
+
+Phase 6 new files implement the import model, parser, API, worker, tests, CE
+frontend, workspace settings route, and [administrator how-to](docs/importing-from-todoist.md).
 
 Planned (added when the phase lands):
 

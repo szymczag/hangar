@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: api-tests-${{ github.workflow }}-${{ github.ref }}
+  group: api-tests-importer-bounded-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -33,8 +33,51 @@ jobs:
 
       - name: Run API test suite
         run: |
-          docker compose -f docker-compose-test.yml up \
-            --build --abort-on-container-exit --exit-code-from api-tests
+          docker compose -f docker-compose-test.yml run --rm --build \
+            api-tests pytest \
+            --ignore=plane/tests/contract/app/test_todoist_import_app.py \
+            --ignore=plane/tests/unit/ext/test_import_storage.py \
+            --ignore=plane/tests/unit/ext/test_todoist_import_execution.py \
+            --ignore=plane/tests/unit/ext/test_todoist_import_tasks.py
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose-test.yml down -v
+
+  todoist-import:
+    name: todoist-import (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: contract
+            tests: plane/tests/contract/app/test_todoist_import_app.py
+            compose_args: ""
+          - name: storage
+            tests: plane/tests/unit/ext/test_import_storage.py
+            compose_args: --no-deps
+          - name: execution
+            tests: plane/tests/unit/ext/test_todoist_import_execution.py
+            compose_args: ""
+          - name: tasks
+            tests: plane/tests/unit/ext/test_todoist_import_tasks.py
+            compose_args: ""
+    steps:
+      - name: Checkout
+        # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Generate API environment
+        run: |
+          cp apps/api/.env.example apps/api/.env
+          printf '\nSECRET_KEY="%s"\n' "$(openssl rand -hex 32)" >> apps/api/.env
+
+      - name: Run Todoist importer tests
+        run: |
+          docker compose -f docker-compose-test.yml run ${{ matrix.compose_args }} --rm --build \
+            api-tests pytest ${{ matrix.tests }}
 
       - name: Tear down
         if: always()

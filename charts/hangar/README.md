@@ -121,7 +121,8 @@ API with the default `nginx` preset.
 
 Evaluation installs additionally route the configured `/<bucket>` path to the
 bundled SeaweedFS S3 service so browser presigned uploads do not fall through to
-the web frontend.
+the web frontend. The separate `externalServices.objectStorage.importBucket` is
+server-only and is never added to Ingress or Gateway routes.
 
 ## Validate a source change
 

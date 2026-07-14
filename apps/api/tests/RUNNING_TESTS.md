@@ -22,19 +22,16 @@ All commands are run from the repo root.
 ### Full suite
 
 ```bash
-docker compose -f docker-compose-test.yml up \
-  --build \
-  --abort-on-container-exit \
-  --exit-code-from api-tests
+docker compose -f docker-compose-test.yml run --rm --build api-tests pytest
 ```
 
 - `--build` rebuilds the `api-tests` image when `Dockerfile.dev` or `requirements/*.txt` change.
-- `--abort-on-container-exit` stops the dependency services as soon as `api-tests` exits.
-- `--exit-code-from api-tests` propagates pytest's exit code so this works in CI.
+- `--rm` removes the one-shot test container after pytest exits.
+- Compose propagates the one-shot container's exit code, so failures are reported correctly in CI without waiting for long-lived dependency services to stop.
 
 ### Filtered runs
 
-Use `docker compose run` to override the default `pytest` command. Anything you pass after the service name is forwarded to pytest.
+Pass pytest arguments after the service name to run a filtered selection.
 
 ```bash
 # Only unit tests (marker defined in pytest.ini)

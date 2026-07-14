@@ -97,6 +97,7 @@ externalServices:
     endpoint: https://s3.example.com
     publicEndpoint: ""
     bucket: hangar
+    importBucket: hangar-imports
     region: us-east-1
     pathStyle: false
 

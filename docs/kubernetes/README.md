@@ -19,6 +19,11 @@ AMD64 Kubernetes clusters. It is not yet a supported production release.
 | Profile      | Use it for                                           | Stateful services                                                       | Current status                      |
 | ------------ | ---------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------- |
 | `evaluation` | Labs, demonstrations, and compatibility testing      | Bundled single-replica PostgreSQL, Valkey, RabbitMQ, and object storage | Live-qualified on AMD64             |
+
+Both profiles use a dedicated private object-storage bucket for temporary import
+sources. The chart passes that bucket only to the API and workers; it never adds
+the bucket to public Ingress or Gateway routes. Operators must keep anonymous
+access disabled. See [configuration](configuration.md#external-object-storage).
 | `production` | Durable installations with operator-managed services | External PostgreSQL, Valkey, RabbitMQ, and S3-compatible storage        | Available for review, not supported |
 
 Start with the [evaluation installation tutorial](evaluation-install.md) to

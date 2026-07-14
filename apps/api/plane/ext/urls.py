@@ -32,6 +32,14 @@ from plane.ext.views.issue_type import (
     IssueTypeDetailEndpoint,
     IssueTypesEndpoint,
 )
+from plane.ext.views.import_job import (
+    ImportJobCancelEndpoint,
+    ImportJobDetailEndpoint,
+    ImportJobListEndpoint,
+    ImportJobReportEndpoint,
+    TodoistImportEndpoint,
+    TodoistImportPreviewEndpoint,
+)
 from plane.ext.views.worklog import (
     IssueWorkLogDetailEndpoint,
     IssueWorkLogsEndpoint,
@@ -45,6 +53,36 @@ urlpatterns = [
     path(
         "workspaces/<str:slug>/runner/",
         include("plane.ext.runner.urls"),
+    ),
+    path(
+        "workspaces/<str:slug>/imports/todoist/preview/",
+        TodoistImportPreviewEndpoint.as_view(),
+        name="todoist-import-preview",
+    ),
+    path(
+        "workspaces/<str:slug>/imports/todoist/",
+        TodoistImportEndpoint.as_view(),
+        name="todoist-import",
+    ),
+    path(
+        "workspaces/<str:slug>/imports/",
+        ImportJobListEndpoint.as_view(),
+        name="import-jobs",
+    ),
+    path(
+        "workspaces/<str:slug>/imports/<uuid:job_id>/",
+        ImportJobDetailEndpoint.as_view(),
+        name="import-job-detail",
+    ),
+    path(
+        "workspaces/<str:slug>/imports/<uuid:job_id>/report/",
+        ImportJobReportEndpoint.as_view(),
+        name="import-job-report",
+    ),
+    path(
+        "workspaces/<str:slug>/imports/<uuid:job_id>/cancel/",
+        ImportJobCancelEndpoint.as_view(),
+        name="import-job-cancel",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/epic-settings/",
