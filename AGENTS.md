@@ -1,5 +1,28 @@
 # Agent Development Guide
 
+## Git Workflow
+
+- Every new task MUST start on a new, dedicated branch created from the latest intended base branch.
+- Before changing files, verify the current branch, worktree status, base branch, and associated pull request. Do not begin new work on a default branch, detached HEAD, merged pull-request branch, deleted remote branch, or a branch used by another task.
+- Use one branch and one pull request per task. Keep unrelated changes out of the branch and PR.
+- Use a descriptive branch name such as `fix/<topic>`, `feat/<topic>`, `docs/<topic>`, or `chore/<topic>`.
+- Push the task branch and open or update its pull request after implementation and verification. Do not push task commits directly to the base branch.
+- If the worktree already contains changes when a new task begins, do not carry them onto a new branch or mix them into the task implicitly. Determine their ownership and ask the user whether to preserve, commit, stash, or separate them before proceeding.
+- Treat the branch and pull request as the deployment unit: changes must be reviewed, tested, and merged through the PR workflow before release.
+
+### Parallel Agent Sessions
+
+- Use one Git worktree per active agent session. Two sessions MUST NOT share or modify the same working directory.
+- Keep the primary checkout clean and use it only to fetch, inspect, and create task worktrees. Do not implement features in the primary checkout while parallel sessions are running.
+- Before starting a session, run `git worktree list` and verify that its branch and directory are not owned by another active session.
+- Create each independent task worktree from the latest intended base, for example: `git worktree add ../hangar-worktrees/<task> -b <type>/<topic> origin/<base>`.
+- Start the agent with its working directory set to the task worktree. All edits, tests, commits, pushes, and PR operations for that task must remain in that worktree.
+- Do not switch branches, stash changes, clean files, reset state, or remove a worktree owned by another session.
+- Give concurrent Docker Compose stacks a unique `COMPOSE_PROJECT_NAME`. Use separate host ports, `.env` files, databases, caches, and other mutable runtime state when those resources are exposed outside the Compose project.
+- When one task depends on another, use stacked branches and PRs: create the dependent branch from the prerequisite branch, target its PR at the prerequisite branch, then rebase and retarget it after the prerequisite merges.
+- Create independent tasks directly from the shared base branch. Resolve migration numbers and other merge-order conflicts by rebasing the later PR before merge.
+- Remove a task worktree only after its session has stopped and its work is committed, preserved, or merged. Then run `git worktree prune` to clean stale metadata.
+
 ## Commands
 
 - `pnpm dev` - Start all dev servers (web:3000, admin:3001)
