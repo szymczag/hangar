@@ -241,9 +241,10 @@ class UserEndpoint(BaseViewSet):
         logout(request)
 
         # Send confirmation email to the new email address
-        send_email_update_confirmation.delay(new_email)
+        email_change_event_id = uuid.uuid4().hex
+        send_email_update_confirmation.delay(new_email, email_change_event_id)
         # send the email to the old email address
-        send_email_update_confirmation.delay(old_email)
+        send_email_update_confirmation.delay(old_email, email_change_event_id)
 
         # Return updated user data
         serialized_data = UserMeSerializer(user).data

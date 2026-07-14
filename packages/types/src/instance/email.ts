@@ -5,6 +5,10 @@
  */
 
 export type TInstanceEmailConfigurationKeys =
+  | "EMAIL_PROVIDER"
+  | "EMAIL_DELIVERY_V2_ENABLED"
+  | "EMAIL_OPENPGP_ENABLED"
+  | "EMAIL_SES_REGION"
   | "EMAIL_HOST"
   | "EMAIL_PORT"
   | "EMAIL_HOST_USER"

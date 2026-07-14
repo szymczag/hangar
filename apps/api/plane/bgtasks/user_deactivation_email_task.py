@@ -3,28 +3,25 @@
 # See the LICENSE file for details.
 
 # Python imports
-import logging
-
-# Django imports
-from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 
 # Third party imports
 from celery import shared_task
+from django.db import OperationalError
 
 # Module imports
 from plane.db.models import User
-from plane.license.utils.instance_value import get_email_configuration
+from plane.mailer.service import enqueue_rendered_email
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 
 
-@shared_task
+@shared_task(autoretry_for=(OperationalError,), retry_backoff=True, retry_jitter=True, max_retries=5)
 def user_deactivation_email(current_site, user_id):
     try:
         # Send email to user when account is deactivated
         user = User.objects.get(id=user_id)
-        subject = f"{user.first_name or user.display_name or user.email} has been deactivated on Hangar"
+        subject = "Your Hangar account has been deactivated"
 
         context = {"email": str(user.email), "login_url": current_site + "/login"}
 
@@ -32,40 +29,18 @@ def user_deactivation_email(current_site, user_id):
         html_content = render_to_string("emails/user/user_deactivation.html", context)
 
         text_content = generate_plain_text_from_html(html_content)
-        # Configure email connection from the database
-        (
-            EMAIL_HOST,
-            EMAIL_HOST_USER,
-            EMAIL_HOST_PASSWORD,
-            EMAIL_PORT,
-            EMAIL_USE_TLS,
-            EMAIL_USE_SSL,
-            EMAIL_FROM,
-        ) = get_email_configuration()
-
-        connection = get_connection(
-            host=EMAIL_HOST,
-            port=int(EMAIL_PORT),
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_tls=EMAIL_USE_TLS == "1",
-            use_ssl=EMAIL_USE_SSL == "1",
-        )
-
-        # Send email
-        msg = EmailMultiAlternatives(
+        enqueue_rendered_email(
+            recipient_email=user.email,
+            recipient_user=user,
+            template_key="account.deactivation",
             subject=subject,
-            body=text_content,
-            from_email=EMAIL_FROM,
-            to=[user.email],
-            connection=connection,
+            text_body=text_content,
+            html_body=html_content,
+            idempotency_key=f"account-deactivation:{user.id}:{user.updated_at.isoformat()}",
         )
-
-        # Attach HTML content
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
-        logging.getLogger("plane.worker").info("Email sent successfully.")
         return
     except Exception as e:
         log_exception(e)
+        if isinstance(e, OperationalError):
+            raise
         return

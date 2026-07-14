@@ -146,6 +146,30 @@ gitea_config_variables = [
 
 smtp_config_variables = [
     {
+        "key": "EMAIL_PROVIDER",
+        "value": os.environ.get("EMAIL_PROVIDER", "smtp"),
+        "category": "SMTP",
+        "is_encrypted": False,
+    },
+    {
+        "key": "EMAIL_DELIVERY_V2_ENABLED",
+        "value": os.environ.get("EMAIL_DELIVERY_V2_ENABLED", "0"),
+        "category": "SMTP",
+        "is_encrypted": False,
+    },
+    {
+        "key": "EMAIL_OPENPGP_ENABLED",
+        "value": os.environ.get("EMAIL_OPENPGP_ENABLED", "0"),
+        "category": "SMTP",
+        "is_encrypted": False,
+    },
+    {
+        "key": "EMAIL_SES_REGION",
+        "value": os.environ.get("EMAIL_SES_REGION", ""),
+        "category": "SMTP",
+        "is_encrypted": False,
+    },
+    {
         "key": "ENABLE_SMTP",
         "value": os.environ.get("ENABLE_SMTP", "0"),
         "category": "SMTP",

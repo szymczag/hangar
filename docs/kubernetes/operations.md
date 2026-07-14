@@ -45,6 +45,12 @@ Then verify through the public origin:
 - an uploaded object can be downloaded; and
 - internal Services are not reachable outside the cluster.
 
+When `mail.enabled=true`, also verify the dedicated mail worker, one cleartext
+account receipt, one encrypted compatibility test, a simulated bounce, the
+SNS/SQS feedback path, and both the user and administrator delivery ledgers.
+Use [Amazon SES email operations](../aws-ses-email-operations.md) for rollout,
+deliverability monitoring, suppression recovery, and incident procedures.
+
 ## Upgrade a release
 
 ### 1. Read release-specific constraints

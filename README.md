@@ -52,6 +52,8 @@ the table marks them as available.
 - [Docker deployment](deployments/cli/community/README.md)
 - [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.4`
   evaluation release; production support gates remain open.
+- [Amazon SES, deliverability, and OpenPGP email](docs/aws-ses-email-operations.md)
+  — secure transactional-email configuration and operations.
 
 The inherited Plane Community chart is not a Hangar release and is not supported
 for new Hangar installations.

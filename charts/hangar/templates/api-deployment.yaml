@@ -44,6 +44,9 @@ spec:
                 name: {{ include "hangar.fullname" . }}-api
           env:
             {{- include "hangar.apiSecretEnv" . | nindent 12 }}
+            {{- if .Values.mail.enabled }}
+            {{- include "hangar.mailCryptoSecretEnv" . | nindent 12 }}
+            {{- end }}
             - name: GUNICORN_WORKERS
               value: {{ .Values.api.gunicornWorkers | quote }}
           ports:

@@ -28,6 +28,7 @@ configurations.
 | `publicUrl`                               | Canonical external scheme and host                                                                      |
 | `application`                             | Allowed hosts, upload limits, signed URLs, retention, API rate limits, and webhook destination controls |
 | `existingSecrets`                         | Names and keys of pre-existing Secret resources                                                         |
+| `mail`                                    | SES API delivery, feedback, OpenPGP, receipt retention, and dedicated mail-worker settings              |
 | `externalServices`                        | Non-secret external object-storage settings                                                             |
 | `observability`                           | Optional OTLP endpoint and metrics protocol                                                             |
 | `ingress`                                 | Controller class, annotations, and TLS Secret                                                           |
@@ -100,14 +101,15 @@ Coordinate the ingress controller's request-body limit with
 
 The chart stores only Secret names and key names in the Helm release.
 
-| Value                           | Default resource        | Default key                                  |
-| ------------------------------- | ----------------------- | -------------------------------------------- |
-| `existingSecrets.application`   | `hangar-application`    | `SECRET_KEY`                                 |
-| `existingSecrets.live`          | `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                     |
-| `existingSecrets.database`      | `hangar-database`       | `DATABASE_URL`                               |
-| `existingSecrets.cache`         | `hangar-cache`          | `REDIS_URL`                                  |
-| `existingSecrets.queue`         | `hangar-queue`          | `AMQP_URL`                                   |
-| `existingSecrets.objectStorage` | `hangar-object-storage` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
+| Value                           | Default resource        | Default key                                                                            |
+| ------------------------------- | ----------------------- | -------------------------------------------------------------------------------------- |
+| `existingSecrets.application`   | `hangar-application`    | `SECRET_KEY`                                                                           |
+| `existingSecrets.live`          | `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                                                               |
+| `existingSecrets.database`      | `hangar-database`       | `DATABASE_URL`                                                                         |
+| `existingSecrets.cache`         | `hangar-cache`          | `REDIS_URL`                                                                            |
+| `existingSecrets.queue`         | `hangar-queue`          | `AMQP_URL`                                                                             |
+| `existingSecrets.objectStorage` | `hangar-object-storage` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                           |
+| `existingSecrets.mail`          | `hangar-mail`           | Outbox encryption keyring, lookup HMAC key, and optional dedicated AWS credential keys |
 
 Evaluation adds dependency keys to the same resources:
 
@@ -120,6 +122,52 @@ Evaluation adds dependency keys to the same resources:
 Missing resources or keys appear as `CreateContainerConfigError`; Helm cannot
 validate their contents without Secret-reading RBAC, which the chart does not
 request.
+
+## Secure email delivery
+
+`mail.enabled` activates the durable outbox, Amazon SES v2 API transport,
+OpenPGP policy, feedback consumer, and a dedicated `mail-worker` Celery queue.
+The production chart accepts `ses_api`; it intentionally does not open SMTP
+port 587 or require a source-IP allowlist.
+
+```yaml
+mail:
+  enabled: true
+  provider: ses_api
+  sender: "Hangar <hello@hangar.example.com>"
+  replyTo: "support@example.com"
+  messageIdDomain: hangar.example.com
+  ses:
+    region: eu-central-1
+    accountId: "123456789012"
+    authConfigurationSet: hangar-auth
+    notificationConfigurationSet: hangar-notifications
+    eventsQueueUrl: https://sqs.eu-central-1.amazonaws.com/123456789012/hangar-mail-events
+    eventsTopicArn: arn:aws:sns:eu-central-1:123456789012:hangar-mail-events
+  openpgp:
+    enabled: true
+  auditRetentionDays: 90
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/hangar-mail-worker
+```
+
+The `hangar-mail` Secret must always provide
+`EMAIL_OUTBOX_ENCRYPTION_KEYS` and `EMAIL_LOOKUP_HMAC_KEY`. AWS access-key
+entries are optional and should be absent when workload identity is available.
+Only the mail worker receives the SES/SQS identity; other workloads receive no
+mail AWS credentials.
+
+The schema requires the SES account, topic, and queue to be internally
+consistent enough for application startup validation. It cannot verify that
+DNS, IAM, queue policy, configuration-set event destinations, or production
+access are correct.
+
+Follow [Amazon SES email operations](../aws-ses-email-operations.md) for the
+complete DNS, IAM, SNS/SQS, secret, rollout, monitoring, and deliverability
+procedure. The application security model is documented in
+[Email delivery and OpenPGP](../email-delivery-and-openpgp.md).
 
 ## External object storage
 

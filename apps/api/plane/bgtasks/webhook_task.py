@@ -17,7 +17,6 @@ from celery import shared_task
 # Django imports
 from django.conf import settings
 from django.db.models import Prefetch
-from django.core.mail import EmailMultiAlternatives, get_connection
 from django.core.serializers.json import DjangoJSONEncoder
 from django.template.loader import render_to_string
 from django.core.exceptions import ObjectDoesNotExist
@@ -49,7 +48,7 @@ from plane.db.models import (
     IssueLabel,
     IssueAssignee,
 )
-from plane.license.utils.instance_value import get_email_configuration
+from plane.mailer.service import enqueue_rendered_email
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 from plane.utils.url_security import pinned_fetch
@@ -180,16 +179,6 @@ def send_webhook_deactivation_email(webhook_id: str, receiver_id: str, current_s
         reason (str): Reason for webhook deactivation
     """
     try:
-        (
-            EMAIL_HOST,
-            EMAIL_HOST_USER,
-            EMAIL_HOST_PASSWORD,
-            EMAIL_PORT,
-            EMAIL_USE_TLS,
-            EMAIL_USE_SSL,
-            EMAIL_FROM,
-        ) = get_email_configuration()
-
         receiver = User.objects.get(pk=receiver_id)
         webhook = Webhook.objects.get(pk=webhook_id)
 
@@ -206,26 +195,15 @@ def send_webhook_deactivation_email(webhook_id: str, receiver_id: str, current_s
         html_content = render_to_string("emails/notifications/webhook-deactivate.html", context)
         text_content = generate_plain_text_from_html(html_content)
 
-        # Set the email connection
-        connection = get_connection(
-            host=EMAIL_HOST,
-            port=int(EMAIL_PORT),
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_tls=EMAIL_USE_TLS == "1",
-            use_ssl=EMAIL_USE_SSL == "1",
-        )
-
-        # Create the email message
-        msg = EmailMultiAlternatives(
+        enqueue_rendered_email(
+            recipient_email=receiver.email,
+            recipient_user=receiver,
+            template_key="operational.webhook_deactivated",
             subject=subject,
-            body=text_content,
-            from_email=EMAIL_FROM,
-            to=[receiver.email],
-            connection=connection,
+            text_body=text_content,
+            html_body=html_content,
+            idempotency_key=f"webhook-deactivated:{webhook.id}",
         )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
         logger.info("Email sent successfully.")
     except Exception as e:
         log_exception(e, warning=True)

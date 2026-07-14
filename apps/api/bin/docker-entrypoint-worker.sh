@@ -6,5 +6,9 @@ source "$(dirname "$0")/docker-entrypoint-common.sh"
 
 wait_for_database
 wait_for_migrations
-# Run the processes
-celery -A plane worker -l info
+# Run the processes. The dedicated mail worker is the only worker that needs
+# SES/SQS permissions; the default worker intentionally excludes that queue.
+if [ "${HANGAR_WORKER_QUEUE:-default}" = "email" ]; then
+    exec celery -A plane worker -l info -Q email -n email@%h
+fi
+exec celery -A plane worker -l info -Q celery

@@ -66,6 +66,9 @@ spec:
           env:
             {{- include "hangar.coreSecretEnv" . | nindent 12 }}
             {{- include "hangar.cacheSecretEnv" . | nindent 12 }}
+            {{- if .Values.mail.enabled }}
+            {{- include "hangar.mailCryptoSecretEnv" . | nindent 12 }}
+            {{- end }}
           resources:
             {{- toYaml .Values.migrator.resources | nindent 12 }}
           volumeMounts:

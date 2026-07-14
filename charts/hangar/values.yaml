@@ -53,6 +53,46 @@ existingSecrets:
     name: hangar-object-storage
     accessKeyIdKey: AWS_ACCESS_KEY_ID
     secretAccessKeyKey: AWS_SECRET_ACCESS_KEY
+  mail:
+    name: hangar-mail
+    outboxEncryptionKeysKey: EMAIL_OUTBOX_ENCRYPTION_KEYS
+    lookupHmacKeyKey: EMAIL_LOOKUP_HMAC_KEY
+    sesAccessKeyIdKey: EMAIL_SES_AWS_ACCESS_KEY_ID
+    sesSecretAccessKeyKey: EMAIL_SES_AWS_SECRET_ACCESS_KEY
+    sesSessionTokenKey: EMAIL_SES_AWS_SESSION_TOKEN
+    eventsAccessKeyIdKey: EMAIL_EVENTS_AWS_ACCESS_KEY_ID
+    eventsSecretAccessKeyKey: EMAIL_EVENTS_AWS_SECRET_ACCESS_KEY
+    eventsSessionTokenKey: EMAIL_EVENTS_AWS_SESSION_TOKEN
+
+mail:
+  enabled: false
+  provider: ses_api
+  sender: "Hangar <hello@hangar.example.com>"
+  replyTo: ""
+  messageIdDomain: hangar.example.com
+  ses:
+    region: eu-central-1
+    accountId: ""
+    authConfigurationSet: hangar-auth
+    notificationConfigurationSet: hangar-notifications
+    eventsQueueUrl: ""
+    eventsTopicArn: ""
+  openpgp:
+    enabled: true
+  auditRetentionDays: 90
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
+  worker:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
 
 externalServices:
   objectStorage:

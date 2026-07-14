@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup
 
 # Third party imports
 from celery import shared_task
-from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 
 # Django imports
@@ -18,7 +17,8 @@ from django.utils import timezone
 
 # Module imports
 from plane.db.models import EmailNotificationLog, Issue, User
-from plane.license.utils.instance_value import get_email_configuration
+from plane.mailer.enums import OutboxStatus
+from plane.mailer.service import enqueue_rendered_email
 from plane.settings.redis import redis_instance
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
@@ -53,7 +53,6 @@ def stack_email_notification():
 
     # Convert to unique receivers list
     receivers = list(set([str(notification.get("receiver_id")) for notification in email_notifications]))
-    processed_notifications = []
     # Loop through all the issues to create the emails
     for receiver_id in receivers:
         # Notification triggered for the receiver
@@ -62,14 +61,13 @@ def stack_email_notification():
         ]
         # create payload for all issues
         payload = {}
-        email_notification_ids = []
+        email_notification_ids_by_issue = {}
         for receiver_notification in receiver_notifications:
-            payload.setdefault(receiver_notification.get("entity_identifier"), {}).setdefault(
+            issue_identifier = receiver_notification.get("entity_identifier")
+            payload.setdefault(issue_identifier, {}).setdefault(
                 str(receiver_notification.get("triggered_by_id")), []
             ).append(receiver_notification.get("data"))
-            # append processed notifications
-            processed_notifications.append(receiver_notification.get("id"))
-            email_notification_ids.append(receiver_notification.get("id"))
+            email_notification_ids_by_issue.setdefault(issue_identifier, []).append(receiver_notification.get("id"))
 
         # Create emails for all the issues
         for issue_id, notification_data in payload.items():
@@ -77,11 +75,11 @@ def stack_email_notification():
                 issue_id=issue_id,
                 notification_data=notification_data,
                 receiver_id=receiver_id,
-                email_notification_ids=email_notification_ids,
+                email_notification_ids=email_notification_ids_by_issue.get(issue_id, []),
             )
 
-    # Update the email notification log
-    EmailNotificationLog.objects.filter(pk__in=processed_notifications).update(processed_at=timezone.now())
+    # Source rows remain unprocessed until a durable outbox row exists. Repeated
+    # stack runs are safe because the child uses a stable idempotency key.
 
 
 def create_payload(notification_data):
@@ -165,20 +163,10 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
 
             # Skip if base api is not present
             if not base_api:
+                release_lock(lock_id=lock_id)
                 return
 
             data = create_payload(notification_data=notification_data)
-
-            # Get email configurations
-            (
-                EMAIL_HOST,
-                EMAIL_HOST_USER,
-                EMAIL_HOST_PASSWORD,
-                EMAIL_PORT,
-                EMAIL_USE_TLS,
-                EMAIL_USE_SSL,
-                EMAIL_FROM,
-            ) = get_email_configuration()
 
             receiver = User.objects.get(pk=receiver_id)
             issue = Issue.objects.get(pk=issue_id)
@@ -263,28 +251,21 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
             text_content = generate_plain_text_from_html(html_content)
 
             try:
-                connection = get_connection(
-                    host=EMAIL_HOST,
-                    port=int(EMAIL_PORT),
-                    username=EMAIL_HOST_USER,
-                    password=EMAIL_HOST_PASSWORD,
-                    use_tls=EMAIL_USE_TLS == "1",
-                    use_ssl=EMAIL_USE_SSL == "1",
-                )
-
-                msg = EmailMultiAlternatives(
+                result = enqueue_rendered_email(
+                    recipient_email=receiver.email,
+                    recipient_user=receiver,
+                    template_key="notification.issue_updates",
                     subject=subject,
-                    body=text_content,
-                    from_email=EMAIL_FROM,
-                    to=[receiver.email],
-                    connection=connection,
+                    text_body=text_content,
+                    html_body=html_content,
+                    idempotency_key=f"issue-notification:{issue_id}:{receiver_id}:{ids_str}",
                 )
-                msg.attach_alternative(html_content, "text/html")
-                msg.send()
-                logging.getLogger("plane.worker").info("Email Sent Successfully")
-
-                # Update the logs
-                EmailNotificationLog.objects.filter(pk__in=email_notification_ids).update(sent_at=timezone.now())
+                updates = {"processed_at": timezone.now()}
+                if result.outbox_id:
+                    updates["outbox_id"] = result.outbox_id
+                if result.status == OutboxStatus.ACCEPTED:
+                    updates["sent_at"] = timezone.now()
+                EmailNotificationLog.objects.filter(pk__in=email_notification_ids).update(**updates)
 
                 # release the lock
                 release_lock(lock_id=lock_id)

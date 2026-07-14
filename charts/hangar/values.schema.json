@@ -9,6 +9,7 @@
     "application",
     "branding",
     "existingSecrets",
+    "mail",
     "externalServices",
     "observability",
     "ingress",
@@ -96,15 +97,123 @@
     "existingSecrets": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["application", "live", "database", "cache", "queue", "objectStorage"],
+      "required": ["application", "live", "database", "cache", "queue", "objectStorage", "mail"],
       "properties": {
         "application": { "$ref": "#/definitions/applicationSecret" },
         "live": { "$ref": "#/definitions/liveSecret" },
         "database": { "$ref": "#/definitions/urlSecret" },
         "cache": { "$ref": "#/definitions/urlSecret" },
         "queue": { "$ref": "#/definitions/urlSecret" },
-        "objectStorage": { "$ref": "#/definitions/objectStorageSecret" }
+        "objectStorage": { "$ref": "#/definitions/objectStorageSecret" },
+        "mail": { "$ref": "#/definitions/mailSecret" }
       }
+    },
+    "mail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "provider",
+        "sender",
+        "replyTo",
+        "messageIdDomain",
+        "ses",
+        "openpgp",
+        "auditRetentionDays",
+        "serviceAccount",
+        "worker"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "provider": { "type": "string", "enum": ["ses_api", "ses_smtp", "smtp"] },
+        "sender": { "type": "string", "minLength": 3, "maxLength": 320, "pattern": "^[^\\r\\n]+$" },
+        "replyTo": {
+          "type": "string",
+          "maxLength": 320,
+          "anyOf": [{ "const": "" }, { "pattern": "^[^\\r\\n]+@[^\\r\\n]+$" }]
+        },
+        "messageIdDomain": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" },
+        "ses": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "region",
+            "accountId",
+            "authConfigurationSet",
+            "notificationConfigurationSet",
+            "eventsQueueUrl",
+            "eventsTopicArn"
+          ],
+          "properties": {
+            "region": { "type": "string", "pattern": "^[a-z]{2}(-gov)?-[a-z]+-[1-9][0-9]*$" },
+            "accountId": { "type": "string", "anyOf": [{ "const": "" }, { "pattern": "^[0-9]{12}$" }] },
+            "authConfigurationSet": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+            "notificationConfigurationSet": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+            "eventsQueueUrl": { "type": "string" },
+            "eventsTopicArn": { "type": "string" }
+          }
+        },
+        "openpgp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "auditRetentionDays": { "type": "integer", "minimum": 1, "maximum": 3650 },
+        "serviceAccount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["create", "name", "annotations"],
+          "properties": {
+            "create": { "type": "boolean" },
+            "name": { "type": "string" },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["replicas", "resources"],
+          "properties": {
+            "replicas": { "type": "integer", "minimum": 1 },
+            "resources": { "$ref": "#/definitions/resources" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+          "then": {
+            "properties": {
+              "provider": { "const": "ses_api" },
+              "ses": {
+                "properties": {
+                  "accountId": { "pattern": "^[0-9]{12}$" },
+                  "eventsQueueUrl": { "pattern": "^https://sqs\\.[A-Za-z0-9-]+\\.amazonaws\\.com/[0-9]{12}/[^/\\s]+$" },
+                  "eventsTopicArn": { "pattern": "^arn:aws(-[a-z]+)?:sns:[A-Za-z0-9-]+:[0-9]{12}:[^:\\s]+$" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "enabled": { "const": true },
+              "serviceAccount": {
+                "properties": { "create": { "const": false } },
+                "required": ["create"]
+              }
+            },
+            "required": ["enabled", "serviceAccount"]
+          },
+          "then": {
+            "properties": {
+              "serviceAccount": { "properties": { "name": { "minLength": 1 } } }
+            }
+          }
+        }
+      ]
     },
     "externalServices": {
       "type": "object",
@@ -474,6 +583,32 @@
         "name": { "$ref": "#/definitions/nonEmptyString" },
         "accessKeyIdKey": { "$ref": "#/definitions/nonEmptyString" },
         "secretAccessKeyKey": { "$ref": "#/definitions/nonEmptyString" }
+      }
+    },
+    "mailSecret": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "outboxEncryptionKeysKey",
+        "lookupHmacKeyKey",
+        "sesAccessKeyIdKey",
+        "sesSecretAccessKeyKey",
+        "sesSessionTokenKey",
+        "eventsAccessKeyIdKey",
+        "eventsSecretAccessKeyKey",
+        "eventsSessionTokenKey"
+      ],
+      "properties": {
+        "name": { "$ref": "#/definitions/nonEmptyString" },
+        "outboxEncryptionKeysKey": { "$ref": "#/definitions/nonEmptyString" },
+        "lookupHmacKeyKey": { "$ref": "#/definitions/nonEmptyString" },
+        "sesAccessKeyIdKey": { "$ref": "#/definitions/nonEmptyString" },
+        "sesSecretAccessKeyKey": { "$ref": "#/definitions/nonEmptyString" },
+        "sesSessionTokenKey": { "$ref": "#/definitions/nonEmptyString" },
+        "eventsAccessKeyIdKey": { "$ref": "#/definitions/nonEmptyString" },
+        "eventsSecretAccessKeyKey": { "$ref": "#/definitions/nonEmptyString" },
+        "eventsSessionTokenKey": { "$ref": "#/definitions/nonEmptyString" }
       }
     },
     "labelSelector": {

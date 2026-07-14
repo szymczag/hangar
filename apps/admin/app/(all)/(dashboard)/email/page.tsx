@@ -17,6 +17,7 @@ import { useInstance } from "@/hooks/store";
 import type { Route } from "./+types/page";
 // local
 import { InstanceEmailForm } from "./email-config-form";
+import { EmailDeliveryLog } from "./email-delivery-log";
 
 const InstanceEmailPage = observer(function InstanceEmailPage(_props: Route.ComponentProps) {
   // store
@@ -26,6 +27,8 @@ const InstanceEmailPage = observer(function InstanceEmailPage(_props: Route.Comp
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSMTPEnabled, setIsSMTPEnabled] = useState(false);
+  const isManagedDelivery =
+    formattedConfig?.EMAIL_DELIVERY_V2_ENABLED === "1" && formattedConfig?.EMAIL_PROVIDER === "ses_api";
 
   const handleToggle = async () => {
     if (isSMTPEnabled) {
@@ -60,13 +63,12 @@ const InstanceEmailPage = observer(function InstanceEmailPage(_props: Route.Comp
   return (
     <PageWrapper
       header={{
-        title: "Secure emails from your own instance",
+        title: "Email delivery",
         description: (
           <>
-            Hangar can send useful emails to you and your users from your own instance without talking to the Internet.
+            Hangar records durable delivery receipts and can encrypt confidential notifications with OpenPGP.
             <div className="text-13 font-regular text-tertiary">
-              Set it up below and please test your settings before you save them.&nbsp;
-              <span className="text-danger-primary">Misconfigs can lead to email bounces and errors.</span>
+              Use a dedicated sending subdomain and monitor bounces, complaints, queue health, and sender reputation.
             </div>
           </>
         ),
@@ -74,26 +76,62 @@ const InstanceEmailPage = observer(function InstanceEmailPage(_props: Route.Comp
           <Loader>
             <Loader.Item width="24px" height="16px" className="rounded-full" />
           </Loader>
+        ) : isManagedDelivery ? (
+          <span className="rounded-md border border-subtle bg-layer-2 px-2.5 py-1 text-11 font-medium text-secondary">
+            Deployment managed
+          </span>
         ) : (
           <ToggleSwitch value={isSMTPEnabled} onChange={handleToggle} size="sm" disabled={isSubmitting} />
         ),
       }}
     >
-      {isSMTPEnabled && !isLoading && (
-        <>
-          {formattedConfig ? (
-            <InstanceEmailForm config={formattedConfig} />
-          ) : (
-            <Loader className="space-y-10">
-              <Loader.Item height="50px" width="75%" />
-              <Loader.Item height="50px" width="75%" />
-              <Loader.Item height="50px" width="40%" />
-              <Loader.Item height="50px" width="40%" />
-              <Loader.Item height="50px" width="20%" />
-            </Loader>
-          )}
-        </>
-      )}
+      <>
+        {isManagedDelivery && !isLoading && formattedConfig && (
+          <section className="max-w-4xl rounded-md border border-subtle bg-layer-2 p-5">
+            <div className="text-13 font-medium text-primary">Amazon SES API delivery is active</div>
+            <p className="mt-1 text-12 text-secondary">
+              Credentials, region, feedback queue, cryptographic keys, and feature flags are controlled by the
+              deployment. Change them in the Helm values and secret store, not in this browser.
+            </p>
+            <dl className="mt-4 grid gap-3 text-12 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <dt className="text-tertiary">Provider</dt>
+                <dd className="mt-1 font-medium text-primary">SES API over HTTPS</dd>
+              </div>
+              <div>
+                <dt className="text-tertiary">Region</dt>
+                <dd className="font-mono mt-1 text-primary">{formattedConfig.EMAIL_SES_REGION}</dd>
+              </div>
+              <div>
+                <dt className="text-tertiary">Sender</dt>
+                <dd className="mt-1 text-primary">{formattedConfig.EMAIL_FROM || "Deployment default"}</dd>
+              </div>
+              <div>
+                <dt className="text-tertiary">Confidential email</dt>
+                <dd className="mt-1 font-medium text-primary">
+                  {formattedConfig.EMAIL_OPENPGP_ENABLED === "1" ? "OpenPGP required" : "OpenPGP disabled"}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        )}
+        {!isManagedDelivery && isSMTPEnabled && !isLoading && (
+          <>
+            {formattedConfig ? (
+              <InstanceEmailForm config={formattedConfig} />
+            ) : (
+              <Loader className="space-y-10">
+                <Loader.Item height="50px" width="75%" />
+                <Loader.Item height="50px" width="75%" />
+                <Loader.Item height="50px" width="40%" />
+                <Loader.Item height="50px" width="40%" />
+                <Loader.Item height="50px" width="20%" />
+              </Loader>
+            )}
+          </>
+        )}
+        <EmailDeliveryLog />
+      </>
     </PageWrapper>
   );
 });
