@@ -2,6 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-from .import_job import ImportJobSerializer
+from .todoist import execute_todoist_import
 
-__all__ = ["ImportJobSerializer"]
+__all__ = ["execute_todoist_import"]

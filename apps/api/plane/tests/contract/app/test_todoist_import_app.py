@@ -1,0 +1,303 @@
+# Copyright (c) 2026-present Maciej Szymczak and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+
+from __future__ import annotations
+
+import csv
+import json
+from io import StringIO
+from uuid import uuid4
+
+import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from plane.db.models import Project, ProjectMember, User, Workspace, WorkspaceMember
+from plane.ext.models import ImportJob
+from plane.ext.utils.importers.todoist_csv import parse_todoist_csv
+
+
+HEADERS = [
+    "TYPE",
+    "CONTENT",
+    "DESCRIPTION",
+    "PRIORITY",
+    "INDENT",
+    "RESPONSIBLE",
+    "DATE",
+    "DEADLINE",
+]
+
+
+def csv_content() -> bytes:
+    output = StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=HEADERS)
+    writer.writeheader()
+    writer.writerow(
+        {
+            "TYPE": "task",
+            "CONTENT": "Synthetic task",
+            "DESCRIPTION": "Synthetic description",
+            "PRIORITY": "4",
+            "INDENT": "1",
+            "RESPONSIBLE": "Owner (100)",
+        }
+    )
+    return output.getvalue().encode()
+
+
+def upload(content: bytes | None = None, *, content_type: str = "text/csv") -> SimpleUploadedFile:
+    return SimpleUploadedFile("template.csv", content or csv_content(), content_type=content_type)
+
+
+@pytest.fixture
+def import_project(db, workspace, create_user):
+    project = Project.objects.create(
+        name="Import Project",
+        identifier="IMP",
+        workspace=workspace,
+    )
+    ProjectMember.objects.create(project=project, member=create_user, role=20, is_active=True)
+    return project
+
+
+def preview_url(workspace):
+    return f"/api/workspaces/{workspace.slug}/imports/todoist/preview/"
+
+
+def import_url(workspace):
+    return f"/api/workspaces/{workspace.slug}/imports/todoist/"
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestTodoistImportAPI:
+    def test_admin_can_preview_without_persisting_source(self, session_client, workspace, import_project):
+        response = session_client.post(
+            preview_url(workspace),
+            {"project_id": str(import_project.id), "file": upload()},
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["counts"]["task"] == 1
+        assert response.data["assignees"] == ("Owner (100)",)
+        assert response.data["duplicate"] is False
+        assert ImportJob.objects.count() == 0
+
+    def test_workspace_member_cannot_preview(self, workspace, import_project):
+        email = f"member-{uuid4().hex[:8]}@hangar.test"
+        user = User.objects.create(email=email, username=email)
+        WorkspaceMember.objects.create(workspace=workspace, member=user, role=15, is_active=True)
+        ProjectMember.objects.create(project=import_project, member=user, role=15, is_active=True)
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        response = client.post(
+            preview_url(workspace),
+            {"project_id": str(import_project.id), "file": upload()},
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_cross_workspace_project_is_rejected(self, session_client, workspace, create_user):
+        other_workspace = Workspace.objects.create(
+            name="Other",
+            slug=f"other-{uuid4().hex[:8]}",
+            owner=create_user,
+        )
+        other_project = Project.objects.create(
+            name="Other project",
+            identifier="OTH",
+            workspace=other_workspace,
+        )
+
+        response = session_client.post(
+            preview_url(workspace),
+            {"project_id": str(other_project.id), "file": upload()},
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["error"]["code"] == "invalid_project"
+
+    def test_start_queues_private_import(self, mocker, session_client, workspace, import_project):
+        content = csv_content()
+        digest = parse_todoist_csv(content).digest
+        upload_source = mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
+        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.delay")
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        job = ImportJob.objects.get()
+        assert job.status == ImportJob.Status.QUEUED
+        assert job.source_key.startswith(f"imports/{workspace.id}/{job.id}/")
+        upload_source.assert_called_once()
+        enqueue.assert_called_once_with(str(job.id))
+
+    def test_invalid_assignee_mapping_is_rejected(self, session_client, workspace, import_project):
+        content = csv_content()
+        digest = parse_todoist_csv(content).digest
+        email = f"outsider-{uuid4().hex[:8]}@hangar.test"
+        outsider = User.objects.create(email=email, username=email)
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": digest,
+                "config": json.dumps(
+                    {
+                        "assignee_mapping": {"Owner (100)": str(outsider.id)},
+                        "module_conflicts": {},
+                    }
+                ),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["error"]["code"] == "invalid_assignee_mapping"
+        assert ImportJob.objects.count() == 0
+
+    def test_upload_failure_keeps_source_key_for_cleanup(
+        self, mocker, session_client, workspace, import_project
+    ):
+        content = csv_content()
+        digest = parse_todoist_csv(content).digest
+        mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=False)
+        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.delay")
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        job = ImportJob.objects.get()
+        assert job.status == ImportJob.Status.FAILED
+        assert job.source_key
+        enqueue.assert_not_called()
+
+    def test_queue_failure_keeps_source_key_when_immediate_cleanup_fails(
+        self, mocker, session_client, workspace, import_project
+    ):
+        content = csv_content()
+        digest = parse_todoist_csv(content).digest
+        mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
+        mocker.patch("plane.ext.views.import_job.delete_import_source", return_value=False)
+        mocker.patch(
+            "plane.ext.views.import_job.run_todoist_import.delay",
+            side_effect=RuntimeError("broker unavailable"),
+        )
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        job = ImportJob.objects.get()
+        assert job.status == ImportJob.Status.FAILED
+        assert job.source_key
+        assert job.config == {}
+
+    def test_exact_duplicate_requires_confirmation(self, session_client, workspace, import_project, create_user):
+        content = csv_content()
+        digest = parse_todoist_csv(content).digest
+        ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest=digest,
+            status=ImportJob.Status.COMPLETED,
+        )
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.data["error"]["code"] == "duplicate_import"
+
+    def test_report_is_scoped_and_excludes_private_job_configuration(
+        self, session_client, workspace, import_project, create_user
+    ):
+        job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest="a" * 64,
+            config={"private-source-identity": "private-member"},
+            stats={"imported_tasks": 1},
+            errors=[],
+            status=ImportJob.Status.COMPLETED,
+        )
+
+        response = session_client.get(f"/api/workspaces/{workspace.slug}/imports/{job.id}/report/")
+
+        assert response.status_code == status.HTTP_200_OK
+        body = response.content.decode()
+        assert "imported_tasks" in body
+        assert "private-source-identity" not in body
+        assert "private-member" not in body
+
+    def test_cancel_does_not_delete_source_after_worker_claims_job(
+        self, mocker, session_client, workspace, import_project, create_user
+    ):
+        job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest="b" * 64,
+            source_key="imports/source.csv",
+            status=ImportJob.Status.QUEUED,
+        )
+        delete_source = mocker.patch("plane.ext.views.import_job.delete_import_source")
+        original_filter = ImportJob.objects.filter
+
+        def claim_before_compare_and_swap(*args, **kwargs):
+            queryset = original_filter(*args, **kwargs)
+            if kwargs.get("status") == ImportJob.Status.QUEUED:
+                original_filter(pk=job.id).update(status=ImportJob.Status.PROCESSING)
+            return queryset
+
+        mocker.patch.object(ImportJob.objects, "filter", side_effect=claim_before_compare_and_swap)
+
+        response = session_client.post(f"/api/workspaces/{workspace.slug}/imports/{job.id}/cancel/")
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        delete_source.assert_not_called()
