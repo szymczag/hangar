@@ -83,7 +83,7 @@ export const OnboardingHeader = observer(function OnboardingHeader(props: Onboar
               <ChevronLeftIcon className="size-6 text-placeholder" />
             </button>
           )}
-          <HangarLogo height={20} width={95} className="text-primary" />
+          <HangarLogo height={20} width={95} />
         </div>
         <SwitchAccountDropdown fullName={userName} />
       </div>
