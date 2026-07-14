@@ -23,6 +23,7 @@ from plane.license.api.serializers import InstanceSerializer
 from plane.license.models import Instance
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.cache import cache_response, invalidate_cache
+from plane.utils.otlp_endpoints import get_otlp_metric_export_configuration
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_control
 
@@ -204,7 +205,6 @@ class InstanceEndpoint(BaseAPIView):
 
         data["instance_changelog_url"] = settings.INSTANCE_CHANGELOG_URL
         data["is_self_managed"] = settings.IS_SELF_MANAGED
-
         instance_data = serializer.data
         instance_data["workspaces_exist"] = Workspace.objects.count() >= 1
 
@@ -217,9 +217,35 @@ class InstanceEndpoint(BaseAPIView):
         instance = Instance.objects.first()
         serializer = InstanceSerializer(instance, data=request.data, partial=True)
         if serializer.is_valid():
+            if (
+                serializer.validated_data.get("is_telemetry_enabled")
+                and not get_otlp_metric_export_configuration().is_configured
+            ):
+                return Response(
+                    {
+                        "is_telemetry_enabled": [
+                            "Configure a valid OTLP collector in deployment settings before enabling telemetry."
+                        ]
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class InstanceTelemetryEndpoint(BaseAPIView):
+    permission_classes = [InstanceAdminPermission]
+
+    def get(self, request):
+        configuration = get_otlp_metric_export_configuration()
+        return Response(
+            {
+                "collector_configured": configuration.is_configured,
+                "metrics_protocol": configuration.protocol if configuration.is_configured else None,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class SignUpScreenVisitedEndpoint(BaseAPIView):

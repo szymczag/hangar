@@ -5,6 +5,7 @@
 import pytest
 
 from plane.utils.otlp_endpoints import (
+    get_otlp_metric_export_configuration,
     get_otlp_grpc_endpoint,
     get_otlp_http_metrics_url,
     grpc_endpoint_from_url,
@@ -52,3 +53,39 @@ class TestOTLPEndpoints:
         monkeypatch.setenv("OTLP_ENDPOINT", "https://otel.example.com/root/")
 
         assert get_otlp_http_metrics_url() == "https://otel.example.com/root/v1/metrics"
+
+    def test_metrics_configuration_resolves_grpc_collector(self, monkeypatch):
+        monkeypatch.setenv("OTLP_ENDPOINT", "https://otel.example.com")
+        monkeypatch.setenv("OTLP_METRICS_PROTOCOL", "grpc")
+
+        configuration = get_otlp_metric_export_configuration()
+
+        assert configuration.is_configured is True
+        assert configuration.protocol == "grpc"
+        assert configuration.endpoint == "otel.example.com:443"
+
+    def test_metrics_configuration_resolves_http_collector(self, monkeypatch):
+        monkeypatch.setenv("OTLP_ENDPOINT", "https://otel.example.com/root")
+        monkeypatch.setenv("OTLP_METRICS_PROTOCOL", "http")
+
+        configuration = get_otlp_metric_export_configuration()
+
+        assert configuration.is_configured is True
+        assert configuration.protocol == "http"
+        assert configuration.endpoint == "https://otel.example.com/root/v1/metrics"
+
+    @pytest.mark.parametrize(
+        ("endpoint", "protocol"),
+        [
+            ("", "grpc"),
+            ("collector.example.com", "http"),
+            ("https://otel.example.com", "unknown"),
+        ],
+    )
+    def test_metrics_configuration_fails_closed_for_invalid_collector(self, monkeypatch, endpoint, protocol):
+        monkeypatch.setenv("OTLP_ENDPOINT", endpoint)
+        monkeypatch.setenv("OTLP_METRICS_PROTOCOL", protocol)
+
+        configuration = get_otlp_metric_export_configuration()
+
+        assert configuration.is_configured is False

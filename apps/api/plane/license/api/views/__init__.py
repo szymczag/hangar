@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-from .instance import InstanceEndpoint, SignUpScreenVisitedEndpoint
+from .instance import InstanceEndpoint, InstanceTelemetryEndpoint, SignUpScreenVisitedEndpoint
 
 
 from .configuration import (

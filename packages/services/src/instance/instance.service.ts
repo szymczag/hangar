@@ -12,6 +12,7 @@ import type {
   IInstanceAdmin,
   IInstanceConfiguration,
   IInstanceInfo,
+  IInstanceTelemetryConfiguration,
   TPage,
   IAdminEmailReceiptList,
   IEmailSuppression,
@@ -86,6 +87,11 @@ export class InstanceService extends APIService {
       .catch((error) => {
         throw error?.response?.data;
       });
+  }
+
+  /** Retrieves live, deployment-managed telemetry collector status for instance administrators. */
+  async telemetry(): Promise<IInstanceTelemetryConfiguration> {
+    return this.get("/api/instances/telemetry/").then((response) => response.data);
   }
 
   /**

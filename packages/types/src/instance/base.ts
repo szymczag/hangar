@@ -20,6 +20,11 @@ export interface IInstanceInfo {
   config: IInstanceConfig;
 }
 
+export interface IInstanceTelemetryConfiguration {
+  collector_configured: boolean;
+  metrics_protocol: "grpc" | "http" | null;
+}
+
 export interface IProductMetadata {
   name: "Hangar";
   version: string;

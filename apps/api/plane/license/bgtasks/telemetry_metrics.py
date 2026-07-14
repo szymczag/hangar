@@ -16,7 +16,7 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 
 # Module imports
-from plane.utils.otlp_endpoints import get_otlp_grpc_endpoint, get_otlp_http_metrics_url
+from plane.utils.otlp_endpoints import get_otlp_metric_export_configuration
 from plane.license.models import Instance
 from plane.db.models import (
     User,
@@ -78,24 +78,14 @@ def _collect_and_push_metrics() -> None:
         logger.debug("Telemetry disabled, skipping metrics push")
         return
 
-    if not os.environ.get("OTLP_ENDPOINT", "").strip():
-        logger.warning("Telemetry enabled without OTLP_ENDPOINT; skipping metrics push")
-        return
-
-    # Configure OTEL metrics (gRPC default, or HTTP if OTLP_METRICS_PROTOCOL=http)
-    protocol = (os.environ.get("OTLP_METRICS_PROTOCOL") or "grpc").strip().lower()
-    if protocol not in {"grpc", "http"}:
-        logger.warning("Unsupported OTLP metrics protocol; skipping metrics push")
-        return
-
-    try:
-        export_endpoint = get_otlp_grpc_endpoint() if protocol == "grpc" else get_otlp_http_metrics_url()
-    except ValueError:
-        logger.warning("Invalid OTLP endpoint; skipping metrics push")
-        return
-
-    if export_endpoint is None:
+    configuration = get_otlp_metric_export_configuration()
+    if not configuration.is_configured:
         logger.warning("Telemetry enabled without an OTLP endpoint; skipping metrics push")
+        return
+    protocol = configuration.protocol
+    export_endpoint = configuration.endpoint
+    if protocol is None or export_endpoint is None:
+        logger.warning("Invalid OTLP metrics configuration; skipping metrics push")
         return
 
     service_name = os.environ.get("SERVICE_NAME", "hangar-api")
