@@ -13,6 +13,16 @@ import { InstanceService } from "@plane/services";
 import { Input } from "@plane/ui";
 
 const instanceService = new InstanceService();
+const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "UTC",
+});
+
+const formatTimestamp = (value: string): string => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown" : `${TIMESTAMP_FORMATTER.format(date)} UTC`;
+};
 
 export const EmailDeliveryLog = () => {
   const [recipient, setRecipient] = useState("");
@@ -110,7 +120,7 @@ export const EmailDeliveryLog = () => {
             {(data?.results ?? []).map((row) => (
               <tr key={row.receipt_code}>
                 <td className="px-3 py-3 whitespace-nowrap text-secondary">
-                  {new Date(row.created_at).toLocaleString()}
+                  <time dateTime={row.created_at}>{formatTimestamp(row.created_at)}</time>
                 </td>
                 <td className="font-mono px-3 py-3 text-primary">{row.receipt_code}</td>
                 <td className="px-3 py-3 text-primary">{row.mail_type}</td>

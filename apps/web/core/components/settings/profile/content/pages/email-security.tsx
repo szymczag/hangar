@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import { Check, KeyRound, LockKeyhole, MailCheck, ShieldAlert, Trash2 } from "lucide-react";
 import useSWR from "swr";
 import type { IEmailSecurityStatus, IOpenPGPEmailKey } from "@plane/types";
@@ -20,6 +20,24 @@ import { EmailReceiptLedger } from "./email-receipts";
 
 const userService = new UserService();
 const STATUS_KEY = "CURRENT_USER_EMAIL_SECURITY";
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" });
+const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "UTC",
+});
+
+const formatDate = (value: string): string => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown" : `${DATE_FORMATTER.format(date)} UTC`;
+};
+
+const formatTimestamp = (value: string): string => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown" : `${TIMESTAMP_FORMATTER.format(date)} UTC`;
+};
+
+const busyActionReducer = (_current: string | null, next: string | null): string | null => next;
 
 const errorMessage = (error: unknown): string => {
   if (error && typeof error === "object" && "error" in error && typeof error.error === "string") {
@@ -51,20 +69,16 @@ const KeySummary = ({ value }: { value: IOpenPGPEmailKey }) => (
     </div>
     <div>
       <dt className="text-secondary">Created</dt>
-      <dd className="mt-1 text-primary">
-        {value.key_created_at ? new Date(value.key_created_at).toLocaleDateString() : "Unknown"}
-      </dd>
+      <dd className="mt-1 text-primary">{value.key_created_at ? formatDate(value.key_created_at) : "Unknown"}</dd>
     </div>
     <div>
       <dt className="text-secondary">Expires</dt>
-      <dd className="mt-1 text-primary">
-        {value.key_expires_at ? new Date(value.key_expires_at).toLocaleDateString() : "No expiry"}
-      </dd>
+      <dd className="mt-1 text-primary">{value.key_expires_at ? formatDate(value.key_expires_at) : "No expiry"}</dd>
     </div>
     {value.verified_at && (
       <div>
         <dt className="text-secondary">Verified</dt>
-        <dd className="mt-1 text-primary">{new Date(value.verified_at).toLocaleString()}</dd>
+        <dd className="mt-1 text-primary">{formatTimestamp(value.verified_at)}</dd>
       </div>
     )}
   </dl>
@@ -106,11 +120,11 @@ export const EmailSecuritySettings = () => {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [showReplacement, setShowReplacement] = useState(false);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [busyAction, dispatchBusyAction] = useReducer(busyActionReducer, null);
   const [confirmRemoval, setConfirmRemoval] = useState<string | null>(null);
 
   const run = async (action: string, operation: () => Promise<unknown>, success: string) => {
-    setBusyAction(action);
+    dispatchBusyAction(action);
     try {
       await operation();
       await mutate();
@@ -118,7 +132,7 @@ export const EmailSecuritySettings = () => {
     } catch (error) {
       setToast({ type: TOAST_TYPE.ERROR, title: "Email security update failed", message: errorMessage(error) });
     } finally {
-      setBusyAction(null);
+      dispatchBusyAction(null);
     }
   };
 

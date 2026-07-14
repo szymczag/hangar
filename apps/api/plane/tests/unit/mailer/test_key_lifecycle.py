@@ -12,10 +12,11 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from plane.app.views.user.email_security import EmailSecurityChallengeVerifyEndpoint
+from plane.app.views.user.email_security import EmailSecurityChallengeVerifyEndpoint, EmailSecurityKeyUploadEndpoint
 from plane.db.models import OpenPGPKeyChallenge, UserOpenPGPKey
 from plane.mailer.crypto import keyed_digest
 from plane.mailer.enums import OpenPGPKeyStatus
+from plane.mailer.exceptions import OpenPGPError
 from plane.tests.factories import UserFactory
 
 LOOKUP_KEY = base64.urlsafe_b64encode(b"k" * 32).decode("ascii")
@@ -95,3 +96,36 @@ def test_challenge_is_consumed_after_five_failed_attempts():
 
     correct_after_lockout = _verify(user, pending, "ABCD2345EFGH6789")
     assert correct_after_lockout.status_code == 400
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(EMAIL_OPENPGP_ENABLED=True)
+def test_key_upload_never_exposes_openpgp_exception_details():
+    user = UserFactory(
+        email="upload-owner@example.com",
+        username="upload-owner@example.com",
+        is_password_autoset=True,
+    )
+    request = APIRequestFactory().post(
+        "/api/users/me/email-security/keys/",
+        {"certificate": "-----BEGIN PGP PUBLIC KEY BLOCK-----"},
+        format="json",
+    )
+    request.session = {"reauthenticated_at": timezone.now().isoformat()}
+    force_authenticate(request, user=user)
+
+    with patch(
+        "plane.app.views.user.email_security.inspect_certificate",
+        side_effect=OpenPGPError("INTERNAL_PARSER_SENTINEL"),
+    ):
+        response = EmailSecurityKeyUploadEndpoint.as_view()(request)
+
+    assert response.status_code == 400
+    assert response.data == {
+        "error": (
+            "The public certificate could not be accepted. Verify that it is a valid ASCII-armored OpenPGP public "
+            "certificate with a supported encryption key."
+        )
+    }
+    assert "INTERNAL_PARSER_SENTINEL" not in str(response.data)

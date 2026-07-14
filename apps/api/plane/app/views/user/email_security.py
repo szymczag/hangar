@@ -39,6 +39,10 @@ REAUTHENTICATION_WINDOW = timedelta(minutes=15)
 CHALLENGE_LIFETIME = timedelta(minutes=15)
 MAX_CHALLENGE_ATTEMPTS = 5
 CHALLENGE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+PUBLIC_CERTIFICATE_ERROR = (
+    "The public certificate could not be accepted. Verify that it is a valid ASCII-armored OpenPGP public "
+    "certificate with a supported encryption key."
+)
 
 
 class OpenPGPUploadThrottle(UserRateThrottle):
@@ -167,8 +171,8 @@ class EmailSecurityKeyUploadEndpoint(BaseAPIView):
             return reauth_error
         try:
             info = inspect_certificate(serializer.validated_data["certificate"])
-        except OpenPGPError as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except OpenPGPError:
+            return Response({"error": PUBLIC_CERTIFICATE_ERROR}, status=status.HTTP_400_BAD_REQUEST)
 
         key_id = uuid.uuid4()
         now = timezone.now()

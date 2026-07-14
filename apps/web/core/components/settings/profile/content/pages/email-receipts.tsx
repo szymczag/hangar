@@ -14,6 +14,16 @@ import { cn } from "@plane/utils";
 import { UserService } from "@/services/user.service";
 
 const userService = new UserService();
+const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "UTC",
+});
+
+const formatTimestamp = (value: string): string => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown" : `${TIMESTAMP_FORMATTER.format(date)} UTC`;
+};
 
 const stateLabel = (receipt: IEmailReceipt) => {
   if (receipt.delivery_mode === "suppressed") return "Not sent";
@@ -114,7 +124,7 @@ export const EmailReceiptLedger = () => {
                 </div>
                 <div className="text-left text-secondary sm:text-right">
                   <div>{stateLabel(receipt)}</div>
-                  <time dateTime={receipt.created_at}>{new Date(receipt.created_at).toLocaleString()}</time>
+                  <time dateTime={receipt.created_at}>{formatTimestamp(receipt.created_at)}</time>
                 </div>
               </li>
             ))}
