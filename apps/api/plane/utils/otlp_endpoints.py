@@ -8,11 +8,24 @@ configured collector when both are enabled.
 """
 
 import os
+from dataclasses import dataclass
 from urllib.parse import urlparse
 
 # When no port in URL: https -> 443 (ingress), http -> 4317 (OTLP gRPC default)
 OTLP_GRPC_DEFAULT_PORT = "4317"
 HTTPS_DEFAULT_PORT = "443"
+
+
+@dataclass(frozen=True)
+class OTLPMetricExportConfiguration:
+    """Resolved metrics-export configuration safe to expose as status only."""
+
+    protocol: str | None
+    endpoint: str | None
+
+    @property
+    def is_configured(self) -> bool:
+        return self.endpoint is not None
 
 
 def grpc_endpoint_from_url(url: str) -> str:
@@ -65,3 +78,22 @@ def get_otlp_http_metrics_url() -> str | None:
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ValueError("OTLP HTTP endpoint must be an absolute http(s) URL")
     return f"{base.rstrip('/')}/v1/metrics"
+
+
+def get_otlp_metric_export_configuration() -> OTLPMetricExportConfiguration:
+    """
+    Resolve the configured metrics collector once for both the API status and exporter.
+
+    The endpoint deliberately remains process configuration: callers may expose only
+    ``is_configured`` and ``protocol``, never the collector URL.
+    """
+    protocol = (os.environ.get("OTLP_METRICS_PROTOCOL") or "grpc").strip().lower()
+    if protocol not in {"grpc", "http"}:
+        return OTLPMetricExportConfiguration(protocol=None, endpoint=None)
+
+    try:
+        endpoint = get_otlp_grpc_endpoint() if protocol == "grpc" else get_otlp_http_metrics_url()
+    except ValueError:
+        endpoint = None
+
+    return OTLPMetricExportConfiguration(protocol=protocol, endpoint=endpoint)

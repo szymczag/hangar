@@ -5,6 +5,7 @@
  */
 
 import { observer } from "mobx-react";
+import useSWR from "swr";
 // components
 import { PageWrapper } from "@/components/common/page-wrapper";
 // hooks
@@ -15,7 +16,8 @@ import { GeneralConfigurationForm } from "./form";
 import type { Route } from "./+types/page";
 
 function GeneralPage() {
-  const { instance, instanceAdmins } = useInstance();
+  const { fetchTelemetryConfiguration, instance, instanceAdmins, telemetryConfiguration } = useInstance();
+  useSWR("INSTANCE_TELEMETRY_CONFIGURATION", () => fetchTelemetryConfiguration());
 
   return (
     <PageWrapper
@@ -25,7 +27,13 @@ function GeneralPage() {
           "Change the name of your instance and instance admin e-mail addresses. Enable or disable telemetry in your instance.",
       }}
     >
-      {instance && instanceAdmins && <GeneralConfigurationForm instance={instance} instanceAdmins={instanceAdmins} />}
+      {instance && instanceAdmins && telemetryConfiguration && (
+        <GeneralConfigurationForm
+          instance={instance}
+          instanceAdmins={instanceAdmins}
+          telemetryConfiguration={telemetryConfiguration}
+        />
+      )}
     </PageWrapper>
   );
 }

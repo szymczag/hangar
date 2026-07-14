@@ -12,6 +12,7 @@ from plane.license.api.views import (
     InstanceConfigurationEndpoint,
     DisableEmailFeatureEndpoint,
     InstanceEndpoint,
+    InstanceTelemetryEndpoint,
     SignUpScreenVisitedEndpoint,
     InstanceAdminUserMeEndpoint,
     InstanceAdminSignOutEndpoint,
@@ -24,6 +25,7 @@ from plane.license.api.views import (
 
 urlpatterns = [
     path("", InstanceEndpoint.as_view(), name="instance"),
+    path("telemetry/", InstanceTelemetryEndpoint.as_view(), name="instance-telemetry"),
     path("admins/", InstanceAdminEndpoint.as_view(), name="instance-admins"),
     path("admins/me/", InstanceAdminUserMeEndpoint.as_view(), name="instance-admins"),
     path(

@@ -17,6 +17,7 @@ import type {
   IFormattedInstanceConfiguration,
   IInstanceInfo,
   IInstanceConfig,
+  IInstanceTelemetryConfiguration,
 } from "@plane/types";
 // root store
 import type { RootStore } from "@/store/root.store";
@@ -28,6 +29,7 @@ export interface IInstanceStore {
   instanceStatus: TInstanceStatus | undefined;
   instance: IInstance | undefined;
   config: IInstanceConfig | undefined;
+  telemetryConfiguration: IInstanceTelemetryConfiguration | undefined;
   instanceAdmins: IInstanceAdmin[] | undefined;
   instanceConfigurations: IInstanceConfiguration[] | undefined;
   // computed
@@ -35,6 +37,7 @@ export interface IInstanceStore {
   // action
   hydrate: (data: IInstanceInfo) => void;
   fetchInstanceInfo: () => Promise<IInstanceInfo | undefined>;
+  fetchTelemetryConfiguration: () => Promise<IInstanceTelemetryConfiguration | undefined>;
   updateInstanceInfo: (data: Partial<IInstance>) => Promise<IInstance | undefined>;
   fetchInstanceAdmins: () => Promise<IInstanceAdmin[] | undefined>;
   fetchInstanceConfigurations: () => Promise<IInstanceConfiguration[] | undefined>;
@@ -48,6 +51,7 @@ export class InstanceStore implements IInstanceStore {
   instanceStatus: TInstanceStatus | undefined = undefined;
   instance: IInstance | undefined = undefined;
   config: IInstanceConfig | undefined = undefined;
+  telemetryConfiguration: IInstanceTelemetryConfiguration | undefined = undefined;
   instanceAdmins: IInstanceAdmin[] | undefined = undefined;
   instanceConfigurations: IInstanceConfiguration[] | undefined = undefined;
   // service
@@ -60,6 +64,7 @@ export class InstanceStore implements IInstanceStore {
       error: observable.ref,
       instanceStatus: observable,
       instance: observable,
+      telemetryConfiguration: observable,
       instanceAdmins: observable,
       instanceConfigurations: observable,
       // computed
@@ -67,6 +72,7 @@ export class InstanceStore implements IInstanceStore {
       // actions
       hydrate: action,
       fetchInstanceInfo: action,
+      fetchTelemetryConfiguration: action,
       fetchInstanceAdmins: action,
       updateInstanceInfo: action,
       fetchInstanceConfigurations: action,
@@ -121,6 +127,19 @@ export class InstanceStore implements IInstanceStore {
       this.instanceStatus = {
         status: EInstanceStatus.ERROR,
       };
+      throw error;
+    }
+  };
+
+  fetchTelemetryConfiguration = async () => {
+    try {
+      const telemetryConfiguration = await this.instanceService.telemetry();
+      runInAction(() => {
+        this.telemetryConfiguration = telemetryConfiguration;
+      });
+      return telemetryConfiguration;
+    } catch (error) {
+      console.error("Error fetching telemetry configuration");
       throw error;
     }
   };

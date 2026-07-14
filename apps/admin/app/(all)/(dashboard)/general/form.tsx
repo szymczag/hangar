@@ -10,7 +10,7 @@ import { Telescope } from "lucide-react";
 // plane imports
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { IInstance, IInstanceAdmin } from "@plane/types";
+import type { IInstance, IInstanceAdmin, IInstanceTelemetryConfiguration } from "@plane/types";
 import { Input, ToggleSwitch } from "@plane/ui";
 // components
 import { ControllerInput } from "@/components/common/controller-input";
@@ -20,10 +20,11 @@ import { useInstance } from "@/hooks/store";
 export interface IGeneralConfigurationForm {
   instance: IInstance;
   instanceAdmins: IInstanceAdmin[];
+  telemetryConfiguration: IInstanceTelemetryConfiguration;
 }
 
 export const GeneralConfigurationForm = observer(function GeneralConfigurationForm(props: IGeneralConfigurationForm) {
-  const { instance, instanceAdmins } = props;
+  const { instance, instanceAdmins, telemetryConfiguration } = props;
   // hooks
   const { updateInstanceInfo } = useInstance();
 
@@ -40,6 +41,15 @@ export const GeneralConfigurationForm = observer(function GeneralConfigurationFo
   });
 
   const onSubmit = async (formData: Partial<IInstance>) => {
+    if (formData.is_telemetry_enabled && !telemetryConfiguration.collector_configured) {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "OTLP collector required",
+        message: "Configure a valid OTLP collector in your deployment settings before enabling telemetry.",
+      });
+      return;
+    }
+
     const payload: Partial<IInstance> = { ...formData };
 
     await updateInstanceInfo(payload)
@@ -50,7 +60,14 @@ export const GeneralConfigurationForm = observer(function GeneralConfigurationFo
           message: "Settings updated successfully",
         })
       )
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error(err);
+        setToast({
+          type: TOAST_TYPE.ERROR,
+          title: "Unable to save settings",
+          message: "Verify the OTLP collector configuration and try again.",
+        });
+      });
   };
 
   return (
@@ -112,8 +129,19 @@ export const GeneralConfigurationForm = observer(function GeneralConfigurationFo
               </div>
               <div className="text-11 leading-5 font-regular text-tertiary">
                 Disabled by default. Enabling this sends instance and workspace identifiers, names, domain, version, and
-                usage counts only to the operator-configured OTLP endpoint. Without an endpoint, Hangar sends nothing.
+                usage counts only to the operator-configured OTLP endpoint.
               </div>
+              {telemetryConfiguration.collector_configured ? (
+                <div className="mt-1 text-11 leading-5 text-success-primary">
+                  Collector configured via deployment settings ({telemetryConfiguration.metrics_protocol?.toUpperCase()}
+                  ).
+                </div>
+              ) : (
+                <div className="mt-1 text-11 leading-5 text-warning-primary">
+                  No valid collector is configured. Set OTLP_ENDPOINT and OTLP_METRICS_PROTOCOL in your deployment; this
+                  setting cannot enable telemetry until then.
+                </div>
+              )}
             </div>
           </div>
           <div className={`shrink-0 ${isSubmitting && "opacity-70"}`}>

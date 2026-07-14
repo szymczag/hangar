@@ -116,6 +116,10 @@ domain, version and setup state; workspace IDs and slugs; and aggregate user,
 workspace, project, work-item, module, cycle, page, and membership counts. Review
 that payload and your collector's retention policy before opting in.
 
+The administration screen reports whether a valid collector is available, but does
+not reveal or edit its URL. Configure the collector through deployment settings so
+the outbound destination remains under operator control.
+
 ```env
 # Optional. Leave empty to keep telemetry offline.
 OTLP_ENDPOINT=

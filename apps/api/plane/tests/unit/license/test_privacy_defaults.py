@@ -200,11 +200,11 @@ class TestTelemetryPrivacy:
 
         with (
             patch("plane.license.bgtasks.telemetry_metrics.Instance.objects.first", return_value=instance),
-            patch("plane.license.bgtasks.telemetry_metrics.get_otlp_grpc_endpoint") as endpoint,
+            patch("plane.license.bgtasks.telemetry_metrics.get_otlp_metric_export_configuration") as configuration,
         ):
             _collect_and_push_metrics()
 
-        endpoint.assert_not_called()
+        configuration.assert_not_called()
 
     def test_registration_creates_offline_hangar_instance(self, monkeypatch):
         monkeypatch.delenv("HANGAR_RELEASE_CHECK_URL", raising=False)

@@ -356,4 +356,6 @@ observability:
 
 An empty endpoint keeps telemetry export offline. Export requires both an
 explicit HTTPS endpoint and application-level opt-in. `metricsProtocol` accepts
-`grpc` or `http`. The chart does not install an OpenTelemetry collector.
+`grpc` or `http`. The General settings page reports whether these deployment
+settings provide a valid collector, but never displays or edits its URL. The chart
+does not install an OpenTelemetry collector.
