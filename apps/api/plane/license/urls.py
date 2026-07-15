@@ -19,6 +19,7 @@ from plane.license.api.views import (
     InstanceAdminUserSessionEndpoint,
     InstanceWorkSpaceAvailabilityCheckEndpoint,
     InstanceWorkSpaceEndpoint,
+    InstanceEmailDeliveryConfigurationEndpoint,
     InstanceEmailDeliveryLogEndpoint,
     InstanceEmailSuppressionEndpoint,
 )
@@ -68,6 +69,11 @@ urlpatterns = [
         "email-credentials-check/",
         EmailCredentialCheckEndpoint.as_view(),
         name="email-credential-check",
+    ),
+    path(
+        "email-delivery/",
+        InstanceEmailDeliveryConfigurationEndpoint.as_view(),
+        name="email-delivery-configuration",
     ),
     path("email-delivery-log/", InstanceEmailDeliveryLogEndpoint.as_view(), name="email-delivery-log"),
     path("email-suppressions/", InstanceEmailSuppressionEndpoint.as_view(), name="email-suppressions"),

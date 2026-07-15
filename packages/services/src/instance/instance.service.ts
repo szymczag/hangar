@@ -11,6 +11,7 @@ import type {
   IInstance,
   IInstanceAdmin,
   IInstanceConfiguration,
+  IInstanceEmailDeliveryConfiguration,
   IInstanceInfo,
   IInstanceTelemetryConfiguration,
   TPage,
@@ -92,6 +93,11 @@ export class InstanceService extends APIService {
   /** Retrieves live, deployment-managed telemetry collector status for instance administrators. */
   async telemetry(): Promise<IInstanceTelemetryConfiguration> {
     return this.get("/api/instances/telemetry/").then((response) => response.data);
+  }
+
+  /** Retrieves the effective, non-secret email delivery configuration for instance administrators. */
+  async emailDelivery(): Promise<IInstanceEmailDeliveryConfiguration> {
+    return this.get("/api/instances/email-delivery/").then((response) => response.data);
   }
 
   /**

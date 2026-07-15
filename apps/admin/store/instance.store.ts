@@ -14,6 +14,7 @@ import type {
   IInstance,
   IInstanceAdmin,
   IInstanceConfiguration,
+  IInstanceEmailDeliveryConfiguration,
   IFormattedInstanceConfiguration,
   IInstanceInfo,
   IInstanceConfig,
@@ -30,6 +31,7 @@ export interface IInstanceStore {
   instance: IInstance | undefined;
   config: IInstanceConfig | undefined;
   telemetryConfiguration: IInstanceTelemetryConfiguration | undefined;
+  emailDeliveryConfiguration: IInstanceEmailDeliveryConfiguration | undefined;
   instanceAdmins: IInstanceAdmin[] | undefined;
   instanceConfigurations: IInstanceConfiguration[] | undefined;
   // computed
@@ -38,6 +40,7 @@ export interface IInstanceStore {
   hydrate: (data: IInstanceInfo) => void;
   fetchInstanceInfo: () => Promise<IInstanceInfo | undefined>;
   fetchTelemetryConfiguration: () => Promise<IInstanceTelemetryConfiguration | undefined>;
+  fetchEmailDeliveryConfiguration: () => Promise<IInstanceEmailDeliveryConfiguration | undefined>;
   updateInstanceInfo: (data: Partial<IInstance>) => Promise<IInstance | undefined>;
   fetchInstanceAdmins: () => Promise<IInstanceAdmin[] | undefined>;
   fetchInstanceConfigurations: () => Promise<IInstanceConfiguration[] | undefined>;
@@ -52,6 +55,7 @@ export class InstanceStore implements IInstanceStore {
   instance: IInstance | undefined = undefined;
   config: IInstanceConfig | undefined = undefined;
   telemetryConfiguration: IInstanceTelemetryConfiguration | undefined = undefined;
+  emailDeliveryConfiguration: IInstanceEmailDeliveryConfiguration | undefined = undefined;
   instanceAdmins: IInstanceAdmin[] | undefined = undefined;
   instanceConfigurations: IInstanceConfiguration[] | undefined = undefined;
   // service
@@ -65,6 +69,7 @@ export class InstanceStore implements IInstanceStore {
       instanceStatus: observable,
       instance: observable,
       telemetryConfiguration: observable,
+      emailDeliveryConfiguration: observable,
       instanceAdmins: observable,
       instanceConfigurations: observable,
       // computed
@@ -140,6 +145,19 @@ export class InstanceStore implements IInstanceStore {
       return telemetryConfiguration;
     } catch (error) {
       console.error("Error fetching telemetry configuration");
+      throw error;
+    }
+  };
+
+  fetchEmailDeliveryConfiguration = async () => {
+    try {
+      const emailDeliveryConfiguration = await this.instanceService.emailDelivery();
+      runInAction(() => {
+        this.emailDeliveryConfiguration = emailDeliveryConfiguration;
+      });
+      return emailDeliveryConfiguration;
+    } catch (error) {
+      console.error("Error fetching email delivery configuration");
       throw error;
     }
   };

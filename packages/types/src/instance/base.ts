@@ -25,6 +25,24 @@ export interface IInstanceTelemetryConfiguration {
   metrics_protocol: "grpc" | "http" | null;
 }
 
+export interface IInstanceEmailDeliveryConfiguration {
+  provider: "smtp" | "ses_smtp" | "ses_api";
+  is_deployment_managed: boolean;
+  durable_delivery_enabled: boolean;
+  openpgp_enabled: boolean;
+  sender: string;
+  reply_to: string;
+  ses: {
+    region: string;
+    account_id: string;
+    access_key_id: string;
+    auth_configuration_set: string;
+    notification_configuration_set: string;
+    events_queue_url: string;
+    events_topic_arn: string;
+  } | null;
+}
+
 export interface IProductMetadata {
   name: "Hangar";
   version: string;

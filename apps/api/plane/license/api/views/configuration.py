@@ -35,6 +35,21 @@ class InstanceConfigurationEndpoint(BaseAPIView):
     @invalidate_cache(path="/api/instances/configurations/", user=False)
     @invalidate_cache(path="/api/instances/", user=False)
     def patch(self, request):
+        smtp_configuration_keys = {
+            "EMAIL_HOST",
+            "EMAIL_HOST_USER",
+            "EMAIL_HOST_PASSWORD",
+            "EMAIL_PORT",
+            "EMAIL_USE_TLS",
+            "EMAIL_USE_SSL",
+            "EMAIL_FROM",
+            "ENABLE_SMTP",
+        }
+        if settings.EMAIL_PROVIDER == "ses_api" and smtp_configuration_keys.intersection(request.data):
+            return Response(
+                {"error": "SMTP settings are unavailable while Amazon SES API delivery is deployment managed."},
+                status=status.HTTP_409_CONFLICT,
+            )
         deployment_managed_email_keys = {
             "EMAIL_PROVIDER",
             "EMAIL_DELIVERY_V2_ENABLED",

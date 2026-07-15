@@ -177,3 +177,13 @@ The code cannot provision or approve external controls. Before production, the o
 - test raw PGP/MIME with supported clients and controlled recipient providers;
 - define a monitored Reply-To address, abuse/security contacts, and suppression recovery process; and
 - monitor reputation, queue health, delivery failures, key expiry, and DNS continuously.
+
+## Administrator settings view
+
+When Amazon SES API delivery is active, God Mode → Email delivery shows the effective non-secret deployment
+configuration: sender and reply-to, AWS region and account ID, access key ID when static credentials are used,
+configuration-set names, and SNS/SQS feedback endpoints. It never displays an AWS secret access key or session token.
+
+This view is read-only. Configure SES API delivery only through the deployment `.env` file, Helm values, and deployment
+secret store. SMTP remains the in-application configurable delivery mode. The same page reports whether OpenPGP is
+available; users add and verify their own public certificate in Profile → Security.
