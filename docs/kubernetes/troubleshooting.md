@@ -198,8 +198,9 @@ safe `limit` field identifies active user jobs, active workspace jobs, active
 workspace source bytes, or workspace rows in the 24-hour window. A generic `429`
 with a retry delay can instead be an API user/workspace throttle. Verify terminal
 jobs released active reservations once and inspect append-only quota rejection
-events; do not decrement ledger rows manually. A Valkey failure also fails closed
-for throttled requests and must be repaired rather than bypassed.
+events; do not decrement ledger rows manually. Request counters are atomic across
+API replicas. A Valkey failure returns `503` before upload parsing and must be
+repaired rather than bypassed.
 
 If an importer setting prevents startup, compare the effective values with the
 [validated ranges](configuration.md#todoist-import-admission-and-worker). Rates

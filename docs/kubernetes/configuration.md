@@ -248,9 +248,11 @@ worker available.
 
 Rates use strict `<positive integer>/(second|minute|hour|day)` syntax. The user
 and workspace rates are separate cache keys, with workspace identity resolved by
-the server rather than accepted from a client-controlled identifier. Valkey
-outages fail closed for throttled requests. Numeric settings are range-validated
-by the values schema and again at application startup.
+the server rather than accepted from a client-controlled identifier. Atomic
+fixed-window increments serialize admissions across API replicas. Valkey outages
+fail closed with `503` before upload parsing for throttled requests. Numeric
+settings are range-validated by the values schema and again at application
+startup.
 
 The active-job and source-byte settings are concurrent hard limits. The row
 setting sums an append-only per-workspace admission ledger over the preceding 24

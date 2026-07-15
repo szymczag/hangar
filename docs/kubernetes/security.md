@@ -33,8 +33,10 @@ When Todoist imports are enabled, the chart renders a dedicated non-root,
 read-only `import-worker` for the isolated `imports` queue. Only API and
 import-capable workers receive the object-storage credential interface; the
 private import bucket is never routed publicly. User/workspace throttles limit
-request abuse, while PostgreSQL row-locked budgets enforce concurrent jobs,
-active source bytes, and rolling rows independently of cache correctness.
+request abuse with atomic Valkey/Redis counters shared by API replicas, while
+PostgreSQL row-locked budgets enforce concurrent jobs, active source bytes, and
+rolling rows independently of cache correctness. A throttle-store outage fails
+closed before CSV parsing or source retention.
 Append-only audit events record safe admission and transition metadata without
 CSV rows, filenames, mappings, object keys, source digests, or raw exceptions.
 

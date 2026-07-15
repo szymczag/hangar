@@ -78,6 +78,8 @@ the table marks them as available.
   and remains hidden until the operator opts in. Execute traffic uses a
   dedicated queue, while PostgreSQL admission budgets and per-user/workspace
   throttles bound concurrent work, retained source bytes, and rolling row use.
+  The request throttles use atomic Valkey/Redis counters across API replicas and
+  fail closed before parsing an upload when that dependency is unavailable.
 
 The inherited Plane Community chart is not a Hangar release and is not supported
 for new Hangar installations.

@@ -4,10 +4,13 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import csv
 from datetime import timedelta
 import json
 from io import StringIO
+from threading import Barrier
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -146,6 +149,7 @@ class TestTodoistImportAPI:
     ):
         settings.TODOIST_IMPORTS_ENABLED = False
         parse_upload = mocker.patch("plane.ext.views.import_job._parse_upload")
+        redis_connection = mocker.patch("plane.ext.imports.throttles.get_redis_connection")
 
         response = session_client.post(
             preview_url(workspace),
@@ -156,6 +160,7 @@ class TestTodoistImportAPI:
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert response.data["error"]["code"] == "importer_disabled"
         parse_upload.assert_not_called()
+        redis_connection.assert_not_called()
         assert ImportJob.objects.count() == 0
 
     def test_execute_requires_valid_csrf_token(self, workspace, import_project, create_user):
@@ -540,6 +545,47 @@ class TestTodoistImportAPI:
 
         assert first.status_code == status.HTTP_200_OK
         assert second.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+    def test_preview_user_throttle_is_atomic_under_concurrency(self, mocker):
+        request = SimpleNamespace(
+            user=SimpleNamespace(is_authenticated=True, pk=uuid4()),
+        )
+        workers = 20
+        barrier = Barrier(workers)
+        mocker.patch.object(TodoistPreviewUserThrottle, "get_rate", return_value="1/minute")
+
+        def attempt_preview():
+            throttle = TodoistPreviewUserThrottle()
+            barrier.wait()
+            return throttle.allow_request(request, None)
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            admitted = list(executor.map(lambda _index: attempt_preview(), range(workers)))
+
+        assert sum(admitted) == 1
+
+    def test_preview_throttle_dependency_failure_fails_before_parsing(
+        self,
+        mocker,
+        session_client,
+        workspace,
+        import_project,
+    ):
+        parse_upload = mocker.patch("plane.ext.views.import_job._parse_upload")
+        mocker.patch(
+            "plane.ext.imports.throttles.get_redis_connection",
+            side_effect=ConnectionError("Redis unavailable"),
+        )
+
+        response = session_client.post(
+            preview_url(workspace),
+            {"project_id": str(import_project.id), "file": upload()},
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert response.data == {"detail": "Todoist import admission is temporarily unavailable."}
+        parse_upload.assert_not_called()
 
     def test_ambiguous_publish_keeps_durable_queued_source(self, mocker, session_client, workspace, import_project):
         content = csv_content()

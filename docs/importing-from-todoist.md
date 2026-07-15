@@ -99,7 +99,10 @@ non-sensitive limit code and creates an append-only admission audit event; it
 does not upload the source or create a job. API throttles independently limit
 preview and execute requests by authenticated user and by server-resolved
 workspace identity, so rotating workspace slugs or accounts does not bypass the
-corresponding boundary.
+corresponding boundary. Each rate boundary is enforced by one atomic
+Valkey/Redis operation, so concurrent API replicas cannot admit requests from a
+stale cache history. If the throttle store is unavailable, preview and execute
+return `503` before parsing the CSV, retaining the source, or creating a job.
 
 The history distinguishes **Completed** from **Completed with errors**. Reports
 are downloadable only after a job reaches a terminal state and are returned
@@ -175,10 +178,10 @@ Request throttles use strict Django REST Framework rate syntax:
 Rates must match `<positive integer>/(second|minute|hour|day)`. Invalid integers,
 out-of-range values, and invalid rates prevent API and worker startup; Hangar
 does not clamp, disable, or silently make these limits unlimited. Throttle state
-uses the configured Django cache and fails closed when that dependency is
-unavailable. Hard admission reservations and the append-only rolling usage
-ledger are serialized in PostgreSQL and remain authoritative under concurrent
-requests.
+uses atomic fixed-window counters in the configured Valkey/Redis Django cache
+and fails closed with `503` when that dependency is unavailable. Hard admission
+reservations and the append-only rolling usage ledger are serialized in
+PostgreSQL and remain authoritative under concurrent requests.
 
 Todoist work is routed only to the `imports` Celery queue. Run at least one
 dedicated import worker with `HANGAR_WORKER_QUEUE=imports`; general and email
