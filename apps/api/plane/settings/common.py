@@ -58,6 +58,7 @@ IS_SELF_MANAGED = True
 # Hangar Runner is deny-by-default until an instance operator opts in. Workspace
 # administrators still need to activate it separately and accept current consent.
 RUNNER_ENABLED = os.environ.get("RUNNER_ENABLED", "0") == "1"
+TODOIST_IMPORTS_ENABLED = os.environ.get("TODOIST_IMPORTS_ENABLED", "0") == "1"
 
 # Webhook IP allowlist — comma-separated IPs or CIDR ranges that are allowed as
 # webhook targets even if they resolve to private networks.

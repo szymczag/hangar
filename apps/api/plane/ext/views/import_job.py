@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from functools import wraps
 import json
 from typing import Any
 from uuid import uuid4
@@ -21,8 +22,10 @@ from rest_framework.response import Response
 # Module imports
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.views.base import BaseAPIView
+from plane.authentication.session import CsrfEnforcedSessionAuthentication
 from plane.db.models import Module, Project, ProjectMember, Workspace
 
+from plane.ext.imports import todoist_imports_enabled
 from plane.ext.models import ImportJob
 from plane.ext.serializers import ImportJobSerializer
 from plane.ext.tasks import run_todoist_import
@@ -55,6 +58,22 @@ ALLOWED_CONFIG_KEYS = {
 
 def _error(code: str, message: str, response_status=status.HTTP_400_BAD_REQUEST) -> Response:
     return Response({"error": {"code": code, "message": message}}, status=response_status)
+
+
+def todoist_imports_enabled_endpoint(view_method):
+    """Fail closed before request payload validation when imports are disabled."""
+
+    @wraps(view_method)
+    def wrapped(instance, request, *args, **kwargs):
+        if not todoist_imports_enabled():
+            return _error(
+                "importer_disabled",
+                "The Todoist importer is not enabled on this instance.",
+                status.HTTP_404_NOT_FOUND,
+            )
+        return view_method(instance, request, *args, **kwargs)
+
+    return wrapped
 
 
 def _read_upload(request) -> tuple[bytes | None, Response | None]:
@@ -226,6 +245,7 @@ def _validate_module_conflicts(
 
 
 class TodoistImportPreviewEndpoint(BaseAPIView):
+    @todoist_imports_enabled_endpoint
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def post(self, request, slug):
         project, project_error = _project(request, slug)
@@ -240,6 +260,9 @@ class TodoistImportPreviewEndpoint(BaseAPIView):
 
 
 class TodoistImportEndpoint(BaseAPIView):
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @todoist_imports_enabled_endpoint
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def post(self, request, slug):
         project, project_error = _project(request, slug)
@@ -440,6 +463,9 @@ class ImportJobReportEndpoint(BaseAPIView):
 
 
 class ImportJobCancelEndpoint(BaseAPIView):
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @todoist_imports_enabled_endpoint
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def post(self, request, slug, job_id):
         with transaction.atomic():

@@ -44,7 +44,7 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Time tracking and worklogs UI                 | Available on `preview` | [#13](https://github.com/szymczag/hangar/pull/13)     |
 | Runner installation control-plane foundation  | Available on `preview` | [#46](https://github.com/szymczag/hangar/pull/46)     |
 | Secure SES delivery and optional OpenPGP      | Available on `preview` | [#44](https://github.com/szymczag/hangar/pull/44)     |
-| Todoist CSV importer                          | Available on `preview` | [#50](https://github.com/szymczag/hangar/pull/50)     |
+| Todoist CSV importer                          | Available; opt-in      | [#50](https://github.com/szymczag/hangar/pull/50)     |
 | Helm chart evaluation profile                 | Public prerelease      | [Kubernetes documentation](docs/kubernetes/README.md) |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not

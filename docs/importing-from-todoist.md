@@ -4,10 +4,19 @@ Workspace administrators can import a Todoist project export into an existing
 Hangar project. The importer previews the file first, lets you resolve identity
 and module mappings, then creates the work in a background job.
 
+The importer is disabled by default. An operator must provision the dedicated
+private import bucket, confirm that API and worker processes share the same
+configuration, and set `TODOIST_IMPORTS_ENABLED=1` before it appears in
+**Workspace settings**. Leave the flag disabled during maintenance or whenever
+the private bucket is unavailable. Disabling it immediately rejects new preview,
+start, and cancellation requests and prevents queued workers from mutating data;
+existing history and reports remain available for recovery and audit.
+
 ## Before you begin
 
 You need:
 
+- an instance where the operator has enabled Todoist imports;
 - workspace administrator access;
 - a destination project that already exists; and
 - a CSV file exported from Todoist using UTF-8 encoding.

@@ -9,3 +9,7 @@ class BaseSessionAuthentication(SessionAuthentication):
     # Disable csrf for the rest apis
     def enforce_csrf(self, request):
         return
+
+
+class CsrfEnforcedSessionAuthentication(SessionAuthentication):
+    """Session authentication with DRF's standard CSRF validation enabled."""

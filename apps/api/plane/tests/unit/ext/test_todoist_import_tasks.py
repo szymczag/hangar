@@ -28,6 +28,31 @@ def import_project(db, workspace, create_user):
 @pytest.mark.unit
 @pytest.mark.django_db
 class TestTodoistImportTask:
+    @pytest.fixture(autouse=True)
+    def enable_todoist_imports(self, settings):
+        settings.TODOIST_IMPORTS_ENABLED = True
+
+    def test_disabled_importer_does_not_claim_or_mutate_job(
+        self, mocker, settings, workspace, create_user, import_project
+    ):
+        settings.TODOIST_IMPORTS_ENABLED = False
+        job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest="d" * 64,
+            status=ImportJob.Status.QUEUED,
+            celery_task_id="disabled-task",
+        )
+        execute = mocker.patch("plane.ext.tasks.execute_todoist_import")
+
+        run_todoist_import.run(str(job.id))
+
+        job.refresh_from_db()
+        assert job.status == ImportJob.Status.QUEUED
+        assert job.attempt_count == 0
+        execute.assert_not_called()
+
     def test_broker_redelivery_recovers_job_after_worker_loss(self, workspace, create_user, import_project):
         job = ImportJob.objects.create(
             workspace=workspace,

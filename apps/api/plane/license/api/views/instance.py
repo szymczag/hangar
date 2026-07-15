@@ -175,6 +175,7 @@ class InstanceEndpoint(BaseAPIView):
         data["oidc_provider_name"] = str(OIDC_PROVIDER_NAME)
         data["is_saml_enabled"] = IS_SAML_ENABLED == "1"
         data["saml_provider_name"] = str(SAML_PROVIDER_NAME)
+        data["is_todoist_imports_enabled"] = settings.TODOIST_IMPORTS_ENABLED
 
         # Github app name
         data["github_app_name"] = str(GITHUB_APP_NAME)

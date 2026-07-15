@@ -82,6 +82,96 @@ def import_url(workspace):
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestTodoistImportAPI:
+    @pytest.fixture(autouse=True)
+    def enable_todoist_imports(self, settings):
+        settings.TODOIST_IMPORTS_ENABLED = True
+
+    def test_disabled_importer_fails_closed_before_parsing(
+        self, mocker, settings, session_client, workspace, import_project
+    ):
+        settings.TODOIST_IMPORTS_ENABLED = False
+        parse_upload = mocker.patch("plane.ext.views.import_job._parse_upload")
+
+        response = session_client.post(
+            preview_url(workspace),
+            {"project_id": str(import_project.id), "file": upload()},
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data["error"]["code"] == "importer_disabled"
+        parse_upload.assert_not_called()
+        assert ImportJob.objects.count() == 0
+
+    def test_execute_requires_valid_csrf_token(self, workspace, import_project, create_user):
+        client = APIClient(enforce_csrf_checks=True)
+        client.force_login(create_user)
+        content = csv_content()
+        payload = {
+            "project_id": str(import_project.id),
+            "preview_digest": parse_todoist_csv(content).digest,
+            "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+            "file": upload(content),
+        }
+
+        rejected = client.post(import_url(workspace), payload, format="multipart")
+
+        assert rejected.status_code == status.HTTP_403_FORBIDDEN
+        assert ImportJob.objects.count() == 0
+
+    def test_execute_accepts_valid_csrf_token(self, mocker, workspace, import_project, create_user):
+        client = APIClient(enforce_csrf_checks=True)
+        client.force_login(create_user)
+        csrf_response = client.get("/auth/get-csrf-token/")
+        csrf_token = csrf_response.data["csrf_token"]
+        content = csv_content()
+        mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
+        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.apply_async")
+
+        response = client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": parse_todoist_csv(content).digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        enqueue.assert_called_once()
+
+    def test_cancel_requires_valid_csrf_token(self, mocker, workspace, import_project, create_user):
+        client = APIClient(enforce_csrf_checks=True)
+        client.force_login(create_user)
+        job = ImportJob.objects.create(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest="e" * 64,
+            source_key="imports/source.csv",
+            status=ImportJob.Status.QUEUED,
+        )
+
+        rejected = client.post(f"/api/workspaces/{workspace.slug}/imports/{job.id}/cancel/")
+
+        assert rejected.status_code == status.HTTP_403_FORBIDDEN
+        job.refresh_from_db()
+        assert job.status == ImportJob.Status.QUEUED
+
+        csrf_response = client.get("/auth/get-csrf-token/")
+        mocker.patch("plane.ext.views.import_job.delete_import_source", return_value=True)
+        accepted = client.post(
+            f"/api/workspaces/{workspace.slug}/imports/{job.id}/cancel/",
+            HTTP_X_CSRFTOKEN=csrf_response.data["csrf_token"],
+        )
+
+        assert accepted.status_code == status.HTTP_200_OK
+        job.refresh_from_db()
+        assert job.status == ImportJob.Status.CANCELLED
+
     def test_admin_can_preview_without_persisting_source(self, session_client, workspace, import_project):
         response = session_client.post(
             preview_url(workspace),

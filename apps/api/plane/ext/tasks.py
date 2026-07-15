@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from plane.ext.importers import execute_todoist_import
 from plane.ext.importers.todoist import ImportCancelled, ImportRowFailure
+from plane.ext.imports import todoist_imports_enabled
 from plane.ext.models import ImportJob
 from plane.ext.utils.import_storage import delete_import_source
 from plane.ext.utils.importers.todoist_csv import TodoistImportParseError
@@ -85,6 +86,10 @@ def _finish_job(job: ImportJob, *, status: str, reason: str = "", errors=None, s
 
 @shared_task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3)
 def run_todoist_import(self, job_id: str) -> None:
+    if not todoist_imports_enabled():
+        logger.warning("Todoist import task ignored because the importer is disabled")
+        return
+
     delivery_info = self.request.delivery_info or {}
     job = _claim_job(
         job_id,
