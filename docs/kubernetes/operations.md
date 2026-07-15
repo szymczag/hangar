@@ -59,6 +59,64 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.10` to `rc.11`
+
+This upgrade replaces the separate Epic web collection with the canonical Work
+Items state and API path. It also provisions stable Task and Epic system types,
+backfills active untyped work items, and enforces project-scoped type and hierarchy
+invariants on the server. Treat the upgrade as data-affecting and keep old and new
+application versions from accepting concurrent project or work-item writes during
+the migration window.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. stop or externally block project and work-item mutations, then allow active
+   background tasks to reach a safe boundary before the migration Job starts;
+3. confirm the target package is `0.1.0-rc.11`, its application version is
+   `v0.1.0-rc.11`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc11); and
+4. render the existing values against the target chart and review the migration
+   Job, immutable image digests, and unchanged Secret and NetworkPolicy contract.
+
+The migration Job applies `db.0127_issue_type_system_keys`. For every active
+project it creates or repairs a canonical Task type at level 0 and a canonical
+Epic type at level 1, links Task as the project default, and assigns Task to active
+work items that have no type. A user-defined type is not claimed merely because
+its display name is `Task`; stable `system_key` values identify the two system
+types. The migration reuses the oldest active legacy Epic type when possible and
+does not delete other custom or legacy type rows.
+
+The schema and data changes are one atomic PostgreSQL migration. Provisioning can
+create deferred foreign-key checks, so the migration explicitly settles those
+checks before creating the partial unique index and system-invariant constraint.
+Any failure rolls back the new column, provisioning, backfill, and constraints
+together. The index and project-wide backfill can hold database locks; qualify the
+runtime against a restored production-sized database before scheduling the live
+maintenance window.
+
+After the rollout, verify:
+
+- **Project settings → Work item types** shows one canonical default Task and one
+  canonical Epic at level 1;
+- an Epic can be created, filtered, opened, updated, archived, and restored from
+  the ordinary Work Items surfaces;
+- a Task can be attached below an Epic, while cross-project parents, Epic parents,
+  direct cycles, and indirect cycles are rejected without a partial mutation;
+- existing active work items that previously had no type now use the canonical
+  Task type; and
+- the former project `/epics` web route redirects to Work Items while legacy Epic
+  API clients remain scoped to Epic records.
+
+Rolling the application back to `rc.10` restores its separate Epic client model
+and does not undo the new type rows, project links, or work-item assignments. The
+reverse migration removes the `system_key` schema and constraints but intentionally
+does not delete provisioned data. Prefer a forward correction and redeploy
+`rc.11`. For an exact rollback, stop all newer Pods, restore the coordinated
+pre-upgrade PostgreSQL backup, and deploy the `0.1.0-rc.10` chart and images as one
+revision before accepting writes.
+
 ### Upgrade from `rc.9` to `rc.10`
 
 This upgrade repairs the Epic collection contract and normal work-item/comment

@@ -36,7 +36,7 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | SAML 2.0 backend                              | Available on `preview`              | [#5](https://github.com/szymczag/hangar/pull/5)       |
 | SAML 2.0 administration and sign-in UI        | Available on `preview`              | [#6](https://github.com/szymczag/hangar/pull/6)       |
 | Immutable federated SSO identity binding      | Available on `preview`              | [#45](https://github.com/szymczag/hangar/pull/45)     |
-| Epics as level-1 work items                   | In review                           | [Feature guide](docs/epics-as-work-items.md)          |
+| Epics as level-1 work items                   | Available on `preview`              | [Feature guide](docs/epics-as-work-items.md)          |
 | Legacy Epic API compatibility                 | Available on `preview`              | [Feature guide](docs/epics-as-work-items.md)          |
 | Custom work-item types and properties backend | Available on `preview`              | [#10](https://github.com/szymczag/hangar/pull/10)     |
 | Custom work-item types and properties UI      | Available on `preview`              | [#11](https://github.com/szymczag/hangar/pull/11)     |
@@ -54,7 +54,7 @@ the table marks them as available.
 ## Deployment
 
 - [Docker deployment](deployments/cli/community/README.md)
-- [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.10`
+- [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.11`
   evaluation release; production support gates remain open.
 - [Amazon SES, deliverability, and OpenPGP email](docs/aws-ses-email-operations.md)
   — secure transactional-email configuration and operations.
@@ -170,7 +170,7 @@ Install Cosign, obtain the digest for the version you intend to deploy, and veri
 both the exact workflow identity and GitHub's OIDC issuer:
 
 ```sh
-VERSION=v0.1.0-rc.10
+VERSION=v0.1.0-rc.11
 GIT_TAG=hangar-$VERSION
 DIGEST=sha256:replace-with-the-published-digest
 IMAGE=ghcr.io/szymczag/hangar-api
