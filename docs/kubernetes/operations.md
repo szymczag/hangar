@@ -51,6 +51,12 @@ SNS/SQS feedback path, and both the user and administrator delivery ledgers.
 Use [Amazon SES email operations](../aws-ses-email-operations.md) for rollout,
 deliverability monitoring, suppression recovery, and incident procedures.
 
+When `todoistImports.enabled=true`, also verify that the `import-worker`
+Deployment is Ready, consumes only the `imports` queue, receives the API
+ConfigMap and object-storage Secret references, and can complete a synthetic
+preview/import/report cycle without exposing the private bucket publicly. Confirm
+that one over-limit request returns `429` without creating a job or source.
+
 ## Upgrade a release
 
 ### Upgrade from `rc.7` to `rc.8`
@@ -237,7 +243,7 @@ Updating a Secret does not automatically restart its consumers.
 | `DATABASE_URL`             | API, worker, beat worker, and the next migrator Job                   |
 | `REDIS_URL`                | API, Live, worker, beat worker, and the next migrator Job             |
 | `AMQP_URL`                 | API, worker, beat worker                                              |
-| Object-storage credentials | API and worker                                                        |
+| Object-storage credentials | API, general worker, and enabled Todoist import worker                |
 
 Use the dependency provider's overlap procedure when old and new credentials can
 coexist:
@@ -266,6 +272,8 @@ Change replicas through a values file and `helm upgrade`, not with an imperative
 `kubectl scale`, so Helm remains the source of desired state.
 
 - Web, admin, space, Live, and task workers accept one or more replicas.
+- The Todoist import worker accepts one or more replicas only when imports are
+  enabled; its process concurrency and prefetch remain separately bounded.
 - API replicas are fixed at one for this release.
 - Beat worker replicas are fixed at one because scheduler leader election is not
   implemented.
@@ -273,6 +281,44 @@ Change replicas through a values file and `helm upgrade`, not with an imperative
 
 Review resource usage, database connections, queue throughput, PDB behavior, and
 node capacity before increasing replicas.
+
+## Operate Todoist imports
+
+Keep API, import-worker, and Beat on the same chart revision and importer
+configuration. Before enabling the feature, apply the chart's database migration,
+verify the private bucket rejects anonymous reads, and confirm PostgreSQL,
+Valkey, RabbitMQ, and Beat health. Render the target values and verify that the
+private import bucket has no Ingress or HTTPRoute.
+
+Inspect workload and queue state without printing environment or Secret values:
+
+```bash
+kubectl --namespace "$NAMESPACE" get deployment,pod \
+  --selector app.kubernetes.io/component=import-worker
+kubectl --namespace "$NAMESPACE" logs deployment/"$RELEASE_NAME"-hangar-import-worker \
+  --since=15m
+```
+
+Use the actual rendered Deployment name if name overrides are configured. Log
+output may contain identifiers; keep it inside the incident boundary and do not
+add CSV rows, filenames, mappings, object keys, digests, presigned URLs, or raw
+exceptions to tickets.
+
+Monitor active jobs by state, oldest pending dispatch, import queue depth, lease
+age/recovery/loss, cancellation latency, quota and throttle denials, source age,
+deletion failures, terminal duration/result, and imported/reused/failed counts.
+Page an operator when a dispatch remains pending for five minutes, a lease
+expires without recovery, a source exceeds retention plus cleanup grace,
+cleanup failures repeat, or workspace denials spike.
+
+For immediate containment, set `todoistImports.enabled=false` and perform a
+normal Helm upgrade. This rejects new mutations and prevents queued execution;
+history, reports, durable jobs, dispatch records, quota ledgers, and audit events
+remain for recovery. Do not delete jobs, budget rows, audit events, or private
+objects manually to make the UI look healthy. Diagnose the dependency, restore
+the same validated settings across API/import-worker/Beat, then re-enable and
+verify recovery. Beat must remain single-replica and available for dispatch,
+lease recovery, and source reconciliation.
 
 ## Uninstall
 

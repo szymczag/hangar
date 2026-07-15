@@ -3,7 +3,10 @@
 set -euo pipefail
 
 chart_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-tmp_dir="$(mktemp -d)"
+repo_root="$(cd "$chart_dir/../.." && pwd)"
+tmp_parent="${TMPDIR:-$repo_root/.local/chart-tests}"
+mkdir -p "$tmp_parent"
+tmp_dir="$(mktemp -d "$tmp_parent/render-policy.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 production_render="$tmp_dir/production.yaml"
@@ -12,6 +15,7 @@ boundary_render="$tmp_dir/boundary.yaml"
 gateway_render="$tmp_dir/gateway.yaml"
 evaluation_gateway_render="$tmp_dir/evaluation-gateway.yaml"
 traefik_render="$tmp_dir/traefik.yaml"
+imports_render="$tmp_dir/imports.yaml"
 kube_version="${KUBE_VERSION:-1.36.2}"
 
 fail() {
@@ -80,12 +84,16 @@ helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_versi
     --set-string networkPolicy.ingressController.preset=envoyGateway >"$evaluation_gateway_render"
 helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
     --set-string networkPolicy.ingressController.preset=traefik >"$traefik_render"
+helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
+    --set todoistImports.enabled=true \
+    --set todoistImports.worker.replicas=2 \
+    --set todoistImports.worker.pdb.enabled=true >"$imports_render"
 helm template custom "$chart_dir" --namespace hangar --kube-version "$kube_version" \
     --set-string networkPolicy.ingressController.preset=custom \
     --set-string 'networkPolicy.ingressController.namespaceSelector.matchLabels.kubernetes\.io/metadata\.name=edge-system' \
     --set-string networkPolicy.ingressController.podSelector.matchLabels.app=edge-proxy >/dev/null
 
-for render in "$production_render" "$evaluation_render"; do
+for render in "$production_render" "$evaluation_render" "$imports_render"; do
     image_count="$(grep -Ec '^[[:space:]]+image:' "$render")"
     restricted_count="$(grep -Ec '^[[:space:]]+allowPrivilegeEscalation: false$' "$render")"
     readonly_count="$(grep -Ec '^[[:space:]]+readOnlyRootFilesystem: true$' "$render")"
@@ -111,12 +119,22 @@ for render in "$production_render" "$evaluation_render"; do
     assert_present '^  IMPORT_S3_BUCKET_NAME: "hangar-imports"$' "$render" "private import bucket must be configured"
     assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$render" "integer application settings must not use exponent notation"
     redis_url_consumers="$(grep -Ec '^[[:space:]]+- name: REDIS_URL$' "$render")"
-    [[ "$redis_url_consumers" -eq 5 ]] || fail "API, Live, workers, and migrator must each receive REDIS_URL in $render"
+    expected_redis_consumers=5
+    [[ "$render" != "$imports_render" ]] || expected_redis_consumers=6
+    [[ "$redis_url_consumers" -eq "$expected_redis_consumers" ]] || fail "API, Live, workers, and migrator must each receive REDIS_URL in $render"
     api_probe_host_headers="$(grep -Ec '^[[:space:]]+- name: Host$' "$render")"
     [[ "$api_probe_host_headers" -eq 3 ]] || fail "every API HTTP probe must send the configured public host in $render"
     assert_present '^              deadline = time\.monotonic\(\) \+ 300$' "$render" "migrator must wait a bounded time for its database"
     assert_present '^              exec \./bin/docker-entrypoint-migrator\.sh$' "$render" "migrator entrypoint must run after its database wait"
 done
+
+assert_absent '^  name: hangar-hangar-import-worker$' "$production_render" "disabled imports must not render an import worker"
+assert_present '^  name: hangar-hangar-import-worker$' "$imports_render" "enabled imports must render the dedicated worker"
+assert_present '^[[:space:]]+value: imports$' "$imports_render" "the dedicated worker must consume only the imports queue"
+assert_present '^  TODOIST_IMPORTS_ENABLED: "1"$' "$imports_render" "enabled imports must reach every application workload"
+assert_present '^  TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE: "10485760"$' "$imports_render" "import byte limits must render as exact decimal integers"
+assert_present '^kind: PodDisruptionBudget$' "$imports_render" "the enabled multi-replica import worker must render a PDB"
+assert_absent '^[[:space:]]+TODOIST_IMPORT_[A-Z_]+: "?[-+0-9.]+[eE][-+0-9]+' "$imports_render" "import integer settings must not use exponent notation"
 
 assert_present '^  FILE_SIZE_LIMIT: "1073741824"$' "$boundary_render" "maximum file-size limit must render as an exact decimal integer"
 assert_present '^  SIGNED_URL_EXPIRATION: "86400"$' "$boundary_render" "maximum signed-URL expiration must render as an exact decimal integer"
@@ -202,6 +220,9 @@ assert_invalid "preset mixed with a custom selector" \
     --set-string networkPolicy.ingressController.podSelector.matchLabels.app=envoy
 assert_invalid "multiple API replicas" --set api.replicas=2
 assert_invalid "zero API workers" --set api.gunicornWorkers=0
+assert_invalid "invalid Todoist preview rate" --set-string todoistImports.previewUserRate=unlimited
+assert_invalid "zero Todoist active-user limit" --set todoistImports.maxActivePerUser=0
+assert_invalid "excessive Todoist import worker concurrency" --set todoistImports.worker.concurrency=33
 assert_invalid "multiple beat workers" --set beatWorker.replicas=2
 assert_invalid "zero upload limit" --set application.fileSizeLimit=0
 assert_invalid "short migrator database wait" --set migrator.databaseWaitSeconds=29

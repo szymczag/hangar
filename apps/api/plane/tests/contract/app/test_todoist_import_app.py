@@ -11,13 +11,24 @@ from io import StringIO
 from uuid import uuid4
 
 import pytest
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from plane.db.models import Module, Project, ProjectMember, User, Workspace, WorkspaceMember
-from plane.ext.models import ImportJob
+from plane.ext.imports.throttles import (
+    TodoistPreviewUserThrottle,
+    TodoistPreviewWorkspaceThrottle,
+)
+from plane.ext.models import (
+    ImportAdmissionUsage,
+    ImportAuditEvent,
+    ImportJob,
+    ImportUserBudget,
+    ImportWorkspaceBudget,
+)
 from plane.ext.utils.importers.todoist_csv import parse_todoist_csv
 
 
@@ -100,12 +111,35 @@ def secure_state_fields(job_status: str) -> dict:
     return fields
 
 
+def record_admission_usage(*, workspace, project, user, accepted_at):
+    job = ImportJob.objects.create(
+        workspace=workspace,
+        project=project,
+        initiated_by=user,
+        status=ImportJob.Status.COMPLETED,
+        source_digest="b" * 64,
+        source_size=100,
+        stats={"source_rows": 1},
+        completed_at=accepted_at,
+        manifest_digest="0" * 64,
+    )
+    ImportAdmissionUsage.objects.create(
+        workspace=workspace,
+        user=user,
+        job=job,
+        source_rows=1,
+        accepted_at=accepted_at,
+    )
+    return job
+
+
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestTodoistImportAPI:
     @pytest.fixture(autouse=True)
     def enable_todoist_imports(self, settings):
         settings.TODOIST_IMPORTS_ENABLED = True
+        cache.clear()
 
     def test_disabled_importer_fails_closed_before_parsing(
         self, mocker, settings, session_client, workspace, import_project
@@ -265,6 +299,12 @@ class TestTodoistImportAPI:
         job = ImportJob.objects.get()
         assert job.status == ImportJob.Status.QUEUED
         assert job.source_key.startswith(f"imports/{workspace.id}/{job.id}/")
+        workspace_budget = ImportWorkspaceBudget.objects.get(workspace=workspace)
+        user_budget = ImportUserBudget.objects.get(workspace=workspace, user=job.initiated_by)
+        assert workspace_budget.active_jobs == 1
+        assert workspace_budget.active_source_bytes == len(content)
+        assert workspace_budget.accepted_rows == 1
+        assert user_budget.active_jobs == 1
         upload_source.assert_called_once()
         enqueue.assert_called_once_with(
             args=[str(job.id), job.execution_generation],
@@ -338,11 +378,170 @@ class TestTodoistImportAPI:
         job = ImportJob.objects.get()
         assert job.status == ImportJob.Status.FAILED
         assert job.source_key
+        assert job.quota_released_at is not None
+        assert ImportWorkspaceBudget.objects.get(workspace=workspace).active_jobs == 0
         enqueue.assert_not_called()
 
-    def test_ambiguous_publish_keeps_durable_queued_source(
-        self, mocker, session_client, workspace, import_project
+    def test_hard_workspace_row_limit_rejects_before_source_upload(
+        self,
+        mocker,
+        settings,
+        session_client,
+        workspace,
+        import_project,
+        create_user,
     ):
+        settings.TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H = 1
+        prior_job = record_admission_usage(
+            workspace=workspace,
+            project=import_project,
+            user=create_user,
+            accepted_at=timezone.now() - timedelta(hours=23),
+        )
+        upload_source = mocker.patch("plane.ext.views.import_job.upload_import_source")
+        content = csv_content()
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": parse_todoist_csv(content).digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS, response.data
+        assert response.data["error"] == {
+            "code": "import_quota_exceeded",
+            "message": "The Todoist import admission limit was reached.",
+            "limit": "workspace_rows_24h",
+        }
+        event = ImportAuditEvent.objects.get(action=ImportAuditEvent.Action.QUOTA_REJECTED)
+        assert event.workspace_id == workspace.id
+        assert event.project_id == import_project.id
+        assert event.actor_id == create_user.id
+        assert event.job_id is None
+        assert event.resulting_status == "rejected"
+        assert event.metadata == {"reason": "workspace_rows_24h"}
+        assert list(ImportJob.objects.values_list("id", flat=True)) == [prior_job.id]
+        upload_source.assert_not_called()
+
+    def test_workspace_row_limit_excludes_usage_older_than_24_hours(
+        self,
+        mocker,
+        settings,
+        session_client,
+        workspace,
+        import_project,
+        create_user,
+    ):
+        settings.TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H = 1
+        record_admission_usage(
+            workspace=workspace,
+            project=import_project,
+            user=create_user,
+            accepted_at=timezone.now() - timedelta(hours=24, seconds=1),
+        )
+        mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
+        enqueue = mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
+        content = csv_content()
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_digest": parse_todoist_csv(content).digest,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_202_ACCEPTED, response.data
+        assert ImportAdmissionUsage.objects.filter(workspace=workspace).count() == 2
+        enqueue.assert_called_once()
+
+    def test_preview_user_throttle_cannot_be_bypassed_by_workspace_slug(
+        self,
+        mocker,
+        session_client,
+        workspace,
+        import_project,
+    ):
+        mocker.patch.object(TodoistPreviewUserThrottle, "get_rate", return_value="1/minute")
+        mocker.patch.object(TodoistPreviewWorkspaceThrottle, "get_rate", return_value="100/minute")
+        other_workspace = Workspace.objects.create(
+            name="Other import workspace",
+            slug="other-import-workspace",
+            owner=workspace.owner,
+        )
+        WorkspaceMember.objects.create(
+            workspace=other_workspace,
+            member=workspace.owner,
+            role=20,
+            is_active=True,
+        )
+        other_project = Project.objects.create(
+            name="Other import project",
+            identifier="OIP",
+            workspace=other_workspace,
+        )
+
+        first = session_client.post(
+            preview_url(workspace),
+            {"project_id": str(import_project.id), "file": upload()},
+            format="multipart",
+        )
+        second = session_client.post(
+            preview_url(other_workspace),
+            {"project_id": str(other_project.id), "file": upload()},
+            format="multipart",
+        )
+
+        assert first.status_code == status.HTTP_200_OK
+        assert second.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        assert "Retry-After" in second
+
+    def test_preview_workspace_throttle_aggregates_different_admins(
+        self,
+        mocker,
+        workspace,
+        import_project,
+    ):
+        mocker.patch.object(TodoistPreviewUserThrottle, "get_rate", return_value="100/minute")
+        mocker.patch.object(TodoistPreviewWorkspaceThrottle, "get_rate", return_value="1/minute")
+        second_admin = User.objects.create(
+            email="second-import-admin@example.com",
+            username="second-import-admin",
+        )
+        WorkspaceMember.objects.create(
+            workspace=workspace,
+            member=second_admin,
+            role=20,
+            is_active=True,
+        )
+        first_client = APIClient()
+        first_client.force_authenticate(user=workspace.owner)
+        second_client = APIClient()
+        second_client.force_authenticate(user=second_admin)
+
+        first = first_client.post(
+            preview_url(workspace),
+            {"project_id": str(import_project.id), "file": upload()},
+            format="multipart",
+        )
+        second = second_client.post(
+            preview_url(workspace),
+            {"project_id": str(import_project.id), "file": upload()},
+            format="multipart",
+        )
+
+        assert first.status_code == status.HTTP_200_OK
+        assert second.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+    def test_ambiguous_publish_keeps_durable_queued_source(self, mocker, session_client, workspace, import_project):
         content = csv_content()
         digest = parse_todoist_csv(content).digest
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)

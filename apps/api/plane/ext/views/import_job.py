@@ -24,7 +24,13 @@ from plane.app.views.base import BaseAPIView
 from plane.authentication.session import CsrfEnforcedSessionAuthentication
 from plane.db.models import Module, Project, ProjectMember, Workspace
 
-from plane.ext.imports import ImportRetryMismatch, ImportTransitionError, todoist_imports_enabled
+from plane.ext.imports import (
+    ImportQuotaExceeded,
+    ImportRetryMismatch,
+    ImportTransitionError,
+    audit_quota_rejection,
+    todoist_imports_enabled,
+)
 from plane.ext.imports.dispatcher import publish_import_dispatch
 from plane.ext.imports.services import (
     fail_preparing_job,
@@ -32,6 +38,12 @@ from plane.ext.imports.services import (
     mark_source_stored,
     request_cancellation,
     reserve_job,
+)
+from plane.ext.imports.throttles import (
+    TodoistExecuteUserThrottle,
+    TodoistExecuteWorkspaceThrottle,
+    TodoistPreviewUserThrottle,
+    TodoistPreviewWorkspaceThrottle,
 )
 from plane.ext.models import ImportJob
 from plane.ext.serializers import ImportJobSerializer
@@ -271,6 +283,8 @@ def _validate_module_conflicts(
 
 
 class TodoistImportPreviewEndpoint(BaseAPIView):
+    throttle_classes = [TodoistPreviewUserThrottle, TodoistPreviewWorkspaceThrottle]
+
     @todoist_imports_enabled_endpoint
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def post(self, request, slug):
@@ -287,6 +301,7 @@ class TodoistImportPreviewEndpoint(BaseAPIView):
 
 class TodoistImportEndpoint(BaseAPIView):
     authentication_classes = [CsrfEnforcedSessionAuthentication]
+    throttle_classes = [TodoistExecuteUserThrottle, TodoistExecuteWorkspaceThrottle]
 
     @todoist_imports_enabled_endpoint
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
@@ -382,6 +397,24 @@ class TodoistImportEndpoint(BaseAPIView):
                 "invalid_retry",
                 "The failed import no longer matches this source, destination, actor, or configuration.",
                 status.HTTP_409_CONFLICT,
+            )
+        except ImportQuotaExceeded as error:
+            audit_quota_rejection(
+                workspace_id=workspace.id,
+                project_id=project.id,
+                actor_id=request.user.id,
+                limit=error.limit,
+                request_id=request.headers.get("X-Request-ID"),
+            )
+            return Response(
+                {
+                    "error": {
+                        "code": error.code,
+                        "message": "The Todoist import admission limit was reached.",
+                        "limit": error.limit,
+                    }
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
         except IntegrityError:
             return _error(

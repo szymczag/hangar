@@ -91,6 +91,16 @@ returns the durable **Queued** job and the dispatcher republishes the same task
 identity. This may delay processing, but it does not turn a stored source into a
 false failure or delete it prematurely.
 
+Admission is bounded before the source is retained. The default policy permits
+one active import per administrator, two per workspace, 50,000 accepted source
+rows per workspace in the preceding 24 hours, and 10 MiB of active retained
+source data per workspace. A rejected request returns `429` with a stable,
+non-sensitive limit code and creates an append-only admission audit event; it
+does not upload the source or create a job. API throttles independently limit
+preview and execute requests by authenticated user and by server-resolved
+workspace identity, so rotating workspace slugs or accounts does not bypass the
+corresponding boundary.
+
 The history distinguishes **Completed** from **Completed with errors**. Reports
 are downloadable only after a job reaches a terminal state and are returned
 with no-store response headers.
@@ -139,20 +149,56 @@ losing or replayed transaction reports reuse instead.
 the same value; keep it disabled while applying migrations or investigating an
 import incident. Existing history and reports remain readable while disabled.
 
-The execution controls default to:
+The execution and admission controls default to:
 
-| Environment variable | Default | Accepted runtime range | Purpose |
-| --- | ---: | ---: | --- |
-| `TODOIST_IMPORT_LEASE_SECONDS` | `120` | 30–900 seconds | Exclusive worker ownership window |
-| `TODOIST_IMPORT_RECOVERY_GRACE_SECONDS` | `30` | 0–300 seconds | Delay before an expired owner is fenced and recovered |
-| `TODOIST_IMPORT_SOURCE_RETENTION_HOURS` | `24` | 1–168 hours | Maximum configured source retention before reconciliation |
+| Environment variable                                   |    Default | Accepted runtime range | Purpose                                                           |
+| ------------------------------------------------------ | ---------: | ---------------------: | ----------------------------------------------------------------- |
+| `TODOIST_IMPORT_LEASE_SECONDS`                         |      `120` |         30–900 seconds | Exclusive worker ownership window                                 |
+| `TODOIST_IMPORT_RECOVERY_GRACE_SECONDS`                |       `30` |          0–300 seconds | Delay before an expired owner is fenced and recovered             |
+| `TODOIST_IMPORT_SOURCE_RETENTION_HOURS`                |       `24` |            1–168 hours | Maximum configured source retention before reconciliation         |
+| `TODOIST_IMPORT_MAX_ACTIVE_PER_USER`                   |        `1` |                  1–100 | Concurrent imports reserved by one administrator in one workspace |
+| `TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE`              |        `2` |                1–1,000 | Concurrent imports reserved across a workspace                    |
+| `TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H`            |    `50000` |           1–10,000,000 | Accepted source rows in the preceding workspace 24 hours          |
+| `TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE` | `10485760` | 1–10,737,418,240 bytes | Source bytes reserved by active workspace imports                 |
+| `TODOIST_IMPORT_WORKER_CONCURRENCY`                    |        `2` |                   1–32 | Processes in the dedicated `imports` queue worker                 |
+| `TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER`            |        `1` |                    1–4 | Broker reservations per import worker process                     |
 
-Invalid non-integer values prevent API/worker startup instead of silently
-disabling ownership or retention controls. Values outside the accepted range are
-clamped to the documented safety boundary. Beat must run for durable broker
-redispatch, lease recovery, and source cleanup; disabling Beat leaves new jobs
-durable but can prevent automatic recovery.
+Request throttles use strict Django REST Framework rate syntax:
+
+| Environment variable                    |     Default | Boundary                             |
+| --------------------------------------- | ----------: | ------------------------------------ |
+| `TODOIST_IMPORT_PREVIEW_USER_RATE`      | `10/minute` | Authenticated user across workspaces |
+| `TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE` | `30/minute` | Workspace across administrators      |
+| `TODOIST_IMPORT_EXECUTE_USER_RATE`      |    `3/hour` | Authenticated user across workspaces |
+| `TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE` |   `10/hour` | Workspace across administrators      |
+
+Rates must match `<positive integer>/(second|minute|hour|day)`. Invalid integers,
+out-of-range values, and invalid rates prevent API and worker startup; Hangar
+does not clamp, disable, or silently make these limits unlimited. Throttle state
+uses the configured Django cache and fails closed when that dependency is
+unavailable. Hard admission reservations and the append-only rolling usage
+ledger are serialized in PostgreSQL and remain authoritative under concurrent
+requests.
+
+Todoist work is routed only to the `imports` Celery queue. Run at least one
+dedicated import worker with `HANGAR_WORKER_QUEUE=imports`; general and email
+workers do not consume that queue. Beat must run for durable broker redispatch,
+lease recovery, and source cleanup. Disabling Beat leaves new jobs durable but
+can prevent automatic recovery.
 
 Importer transitions also create append-only audit events containing identifiers,
 states, generations, safe reason codes, and counts. They never contain CSV rows,
 filenames, object keys, source digests, mapping contents, or raw exceptions.
+Quota rejection events intentionally have no job identifier because admission
+was denied before a job existed.
+
+Monitor the oldest pending dispatch, import queue depth, active jobs by state,
+expired leases, recovery and lease-loss counts, quota/throttle denials, terminal
+duration/result, source-cleanup age, and deletion failures. Alert when a pending
+dispatch exceeds five minutes, a lease expires without recovery, a source
+survives its retention deadline plus cleanup grace, cleanup repeatedly fails, or
+workspace denials spike. During an incident, disable `TODOIST_IMPORTS_ENABLED`
+on API, import-worker, and Beat workloads together; preserve PostgreSQL audit and
+job records, then diagnose the broker, cache, database, and private bucket
+without logging source rows, filenames, object keys, mappings, digests, or raw
+exceptions.

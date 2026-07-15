@@ -182,6 +182,30 @@ rejected with `upload_failed`, verify that the configured import bucket differs
 from the upload bucket and that an unsigned `HeadObject` request is denied. Do
 not work around the check by adding a public route or bucket policy.
 
+If the Imports page is absent or returns `404`, confirm
+`todoistImports.enabled=true` in the effective Helm values and verify that API,
+import-worker, and Beat rolled out from the same revision. Do not expose the
+route by bypassing the feature gate. A Ready private bucket alone does not enable
+the feature.
+
+For jobs that remain queued, verify the dedicated `import-worker` exists and is
+Ready, its `HANGAR_WORKER_QUEUE` is `imports`, RabbitMQ is reachable, and Beat is
+running. General and mail workers intentionally do not consume import jobs. Do
+not retarget imports to the general queue as an incident workaround.
+
+An `import_quota_exceeded` response is a hard PostgreSQL admission denial. The
+safe `limit` field identifies active user jobs, active workspace jobs, active
+workspace source bytes, or workspace rows in the 24-hour window. A generic `429`
+with a retry delay can instead be an API user/workspace throttle. Verify terminal
+jobs released active reservations once and inspect append-only quota rejection
+events; do not decrement ledger rows manually. A Valkey failure also fails closed
+for throttled requests and must be repaired rather than bypassed.
+
+If an importer setting prevents startup, compare the effective values with the
+[validated ranges](configuration.md#todoist-import-admission-and-worker). Rates
+must use `<positive integer>/(second|minute|hour|day)`. Numeric values outside
+the schema/runtime range are rejected rather than clamped.
+
 ## NetworkPolicy failures
 
 Check whether the selected CNI enforces policy and whether DNS and ingress Pods

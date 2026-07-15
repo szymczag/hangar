@@ -62,6 +62,7 @@ app.conf.broker_transport_options = {
 # attach a narrowly scoped AWS identity only to the mail worker.
 app.conf.task_routes = {
     "plane.bgtasks.email_delivery_task.*": {"queue": "email"},
+    "plane.ext.tasks.run_todoist_import": {"queue": "imports"},
 }
 
 app.conf.beat_schedule = {

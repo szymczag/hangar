@@ -1,20 +1,25 @@
 {{- $root := . -}}
-{{- range $component := list "web" "admin" "space" "live" "api" "worker" }}
-{{- $values := index $root.Values $component }}
+{{- $components := list (dict "name" "web" "values" .Values.web) (dict "name" "admin" "values" .Values.admin) (dict "name" "space" "values" .Values.space) (dict "name" "live" "values" .Values.live) (dict "name" "api" "values" .Values.api) (dict "name" "worker" "values" .Values.worker) -}}
+{{- if .Values.todoistImports.enabled -}}
+{{- $components = append $components (dict "name" "import-worker" "values" .Values.todoistImports.worker) -}}
+{{- end -}}
+{{- range $component := $components }}
+{{- $name := $component.name }}
+{{- $values := $component.values }}
 {{- if and $values.pdb.enabled (gt (int $values.replicas) 1) }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "hangar.fullname" $root }}-{{ $component }}
+  name: {{ include "hangar.fullname" $root }}-{{ $name }}
   labels:
     {{- include "hangar.labels" $root | nindent 4 }}
-    app.kubernetes.io/component: {{ $component }}
+    app.kubernetes.io/component: {{ $name }}
 spec:
   maxUnavailable: {{ $values.pdb.maxUnavailable }}
   unhealthyPodEvictionPolicy: AlwaysAllow
   selector:
     matchLabels:
-      {{- include "hangar.selectorLabels" (dict "component" $component "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) | nindent 6 }}
+      {{- include "hangar.selectorLabels" (dict "component" $name "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) | nindent 6 }}
 ---
 {{- end }}
 {{- end }}

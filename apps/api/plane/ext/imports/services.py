@@ -9,17 +9,30 @@ from dataclasses import dataclass
 from datetime import timedelta
 from hashlib import sha256
 import json
+import logging
 import re
 from collections.abc import Iterator
 from typing import Any
 from uuid import UUID, uuid4
 
 from django.conf import settings
-from django.db import transaction
+from django.core.exceptions import ImproperlyConfigured
+from django.db import IntegrityError, transaction
+from django.db.models import Count, Sum
 from django.utils import timezone
 
 from plane.db.models import Project, ProjectMember, User, WorkspaceMember
-from plane.ext.models import ImportAuditEvent, ImportDispatch, ImportJob
+from plane.ext.models import (
+    ImportAdmissionUsage,
+    ImportAuditEvent,
+    ImportDispatch,
+    ImportJob,
+    ImportUserBudget,
+    ImportWorkspaceBudget,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 ACTIVE_STATUSES = {
@@ -83,6 +96,14 @@ class ImportRetryMismatch(ImportServiceError):
     code = "import_retry_mismatch"
 
 
+class ImportQuotaExceeded(ImportServiceError):
+    code = "import_quota_exceeded"
+
+    def __init__(self, limit: str):
+        super().__init__("The Todoist import admission limit was reached.")
+        self.limit = limit
+
+
 @dataclass(frozen=True, slots=True)
 class ExecutionClaim:
     job: ImportJob
@@ -112,19 +133,101 @@ class GuardedMutation:
         self._errors = errors
 
 
+@dataclass(frozen=True, slots=True)
+class LockedBudgets:
+    workspace: ImportWorkspaceBudget
+    user: ImportUserBudget | None
+
+
+def _bounded_runtime_setting(name: str, minimum: int, maximum: int) -> int:
+    try:
+        value = int(getattr(settings, name))
+    except (AttributeError, TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"{name} must be an integer") from error
+    if value < minimum or value > maximum:
+        raise ImproperlyConfigured(f"{name} must be between {minimum} and {maximum}")
+    return value
+
+
 def lease_duration() -> timedelta:
-    seconds = int(getattr(settings, "TODOIST_IMPORT_LEASE_SECONDS", 120))
-    return timedelta(seconds=max(30, min(seconds, 900)))
+    return timedelta(seconds=_bounded_runtime_setting("TODOIST_IMPORT_LEASE_SECONDS", 30, 900))
 
 
 def recovery_grace() -> timedelta:
-    seconds = int(getattr(settings, "TODOIST_IMPORT_RECOVERY_GRACE_SECONDS", 30))
-    return timedelta(seconds=max(0, min(seconds, 300)))
+    return timedelta(seconds=_bounded_runtime_setting("TODOIST_IMPORT_RECOVERY_GRACE_SECONDS", 0, 300))
 
 
 def source_retention() -> timedelta:
-    hours = int(getattr(settings, "TODOIST_IMPORT_SOURCE_RETENTION_HOURS", 24))
-    return timedelta(hours=max(1, min(hours, 168)))
+    return timedelta(hours=_bounded_runtime_setting("TODOIST_IMPORT_SOURCE_RETENTION_HOURS", 1, 168))
+
+
+def _create_budget_row(model, **values) -> None:
+    try:
+        with transaction.atomic():
+            model.objects.create(**values)
+    except IntegrityError:
+        # Another request created the unique budget row. The outer transaction
+        # remains usable because the collision was isolated in a savepoint.
+        pass
+
+
+def _lock_budgets(*, workspace_id: UUID, user_id: UUID | None) -> LockedBudgets:
+    if not transaction.get_connection().in_atomic_block:
+        raise RuntimeError("Import budgets must be locked inside a transaction.")
+    if not ImportWorkspaceBudget.objects.filter(workspace_id=workspace_id).exists():
+        _create_budget_row(ImportWorkspaceBudget, workspace_id=workspace_id)
+    workspace_budget = ImportWorkspaceBudget.objects.select_for_update().get(workspace_id=workspace_id)
+
+    user_budget = None
+    if user_id is not None:
+        if not ImportUserBudget.objects.filter(workspace_id=workspace_id, user_id=user_id).exists():
+            _create_budget_row(
+                ImportUserBudget,
+                workspace_id=workspace_id,
+                user_id=user_id,
+            )
+        user_budget = ImportUserBudget.objects.select_for_update().get(
+            workspace_id=workspace_id,
+            user_id=user_id,
+        )
+    return LockedBudgets(workspace=workspace_budget, user=user_budget)
+
+
+def _lock_job_and_budgets(job_id: UUID) -> tuple[ImportJob, LockedBudgets]:
+    identity = ImportJob.objects.filter(pk=job_id).values("workspace_id", "initiated_by_id").first()
+    if identity is None:
+        raise ImportJob.DoesNotExist
+    budgets = _lock_budgets(
+        workspace_id=identity["workspace_id"],
+        user_id=identity["initiated_by_id"],
+    )
+    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    return job, budgets
+
+
+def _release_quota_locked(job: ImportJob, budgets: LockedBudgets, *, now) -> None:
+    if job.quota_released_at is not None:
+        return
+    workspace_budget = budgets.workspace
+    workspace_budget.active_jobs = max(0, workspace_budget.active_jobs - 1)
+    workspace_budget.active_source_bytes = max(0, workspace_budget.active_source_bytes - job.source_size)
+    workspace_budget.save(update_fields=["active_jobs", "active_source_bytes", "updated_at"])
+    if budgets.user is not None:
+        budgets.user.active_jobs = max(0, budgets.user.active_jobs - 1)
+        budgets.user.save(update_fields=["active_jobs", "updated_at"])
+    job.quota_released_at = now
+
+
+@transaction.atomic
+def release_quota_once(*, job_id: UUID) -> bool:
+    """Release a job's hard admission reservation at most once."""
+
+    job, budgets = _lock_job_and_budgets(job_id)
+    if job.quota_released_at is not None:
+        return False
+    _release_quota_locked(job, budgets, now=timezone.now())
+    job.save(update_fields=["quota_released_at", "updated_at"])
+    return True
 
 
 def build_manifest_digest(
@@ -168,6 +271,27 @@ def _request_id(value: str | None = None) -> str:
     return candidate
 
 
+def _safe_log_code(value: Any) -> str:
+    candidate = str(value or "")
+    return candidate if re.fullmatch(r"[A-Za-z0-9_.:-]{0,100}", candidate) else "invalid"
+
+
+def _log_audit_event(event: ImportAuditEvent) -> None:
+    logger.info(
+        "todoist_import_event action=%s workspace_id=%s project_id=%s job_id=%s "
+        "actor_id=%s generation=%s previous_status=%s resulting_status=%s reason=%s",
+        _safe_log_code(event.action),
+        event.workspace_id,
+        event.project_id,
+        event.job_id or "",
+        event.actor_id or "",
+        event.execution_generation,
+        _safe_log_code(event.previous_status),
+        _safe_log_code(event.resulting_status),
+        _safe_log_code(event.metadata.get("reason", "")),
+    )
+
+
 def _audit(
     *,
     job: ImportJob,
@@ -182,7 +306,7 @@ def _audit(
         raise ValueError("Import audit metadata contains a prohibited field.")
     if any(not isinstance(value, (str, int, bool, type(None))) for value in safe_metadata.values()):
         raise ValueError("Import audit metadata contains a prohibited value.")
-    ImportAuditEvent.objects.create(
+    event = ImportAuditEvent.objects.create(
         workspace_id=job.workspace_id,
         project_id=job.project_id,
         job_id=job.id,
@@ -194,6 +318,32 @@ def _audit(
         request_id=_request_id(request_id),
         metadata=safe_metadata,
     )
+    transaction.on_commit(lambda: _log_audit_event(event))
+
+
+def audit_quota_rejection(
+    *,
+    workspace_id: UUID,
+    project_id: UUID,
+    actor_id: UUID,
+    limit: str,
+    request_id: str | None = None,
+) -> None:
+    """Record a denied admission without creating a misleading ImportJob."""
+
+    event = ImportAuditEvent.objects.create(
+        workspace_id=workspace_id,
+        project_id=project_id,
+        job_id=None,
+        actor_id=actor_id,
+        action=ImportAuditEvent.Action.QUOTA_REJECTED,
+        previous_status="",
+        resulting_status="rejected",
+        execution_generation=0,
+        request_id=_request_id(request_id),
+        metadata={"reason": limit},
+    )
+    transaction.on_commit(lambda: _log_audit_event(event))
 
 
 @transaction.atomic
@@ -210,6 +360,41 @@ def reserve_job(
     request_id: str | None = None,
     retry_of_id: UUID | None = None,
 ) -> ImportJob:
+    source_rows = stats.get("source_rows", 0) if isinstance(stats, dict) else 0
+    if not isinstance(source_rows, int) or source_rows < 0:
+        raise ValueError("Import source row count must be a non-negative integer.")
+    now = timezone.now()
+    budgets = _lock_budgets(workspace_id=workspace.id, user_id=initiated_by.id)
+    assert budgets.user is not None
+    rolling_cutoff = now - timedelta(hours=24)
+    workspace_usage = ImportAdmissionUsage.objects.filter(
+        workspace_id=workspace.id,
+        accepted_at__gt=rolling_cutoff,
+    ).aggregate(jobs=Count("id"), rows=Sum("source_rows"))
+    user_usage = ImportAdmissionUsage.objects.filter(
+        workspace_id=workspace.id,
+        user_id=initiated_by.id,
+        accepted_at__gt=rolling_cutoff,
+    ).aggregate(jobs=Count("id"), rows=Sum("source_rows"))
+    workspace_rows = workspace_usage["rows"] or 0
+
+    if budgets.user.active_jobs >= _bounded_runtime_setting("TODOIST_IMPORT_MAX_ACTIVE_PER_USER", 1, 100):
+        raise ImportQuotaExceeded("active_user_imports")
+    if budgets.workspace.active_jobs >= _bounded_runtime_setting("TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE", 1, 1000):
+        raise ImportQuotaExceeded("active_workspace_imports")
+    if budgets.workspace.active_source_bytes + source_size > _bounded_runtime_setting(
+        "TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE",
+        1,
+        10 * 1024 * 1024 * 1024,
+    ):
+        raise ImportQuotaExceeded("active_workspace_source_bytes")
+    if workspace_rows + source_rows > _bounded_runtime_setting(
+        "TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H",
+        1,
+        10_000_000,
+    ):
+        raise ImportQuotaExceeded("workspace_rows_24h")
+
     manifest_digest = build_manifest_digest(
         provider=ImportJob.Provider.TODOIST_CSV,
         workspace_id=workspace.id,
@@ -235,6 +420,35 @@ def reserve_job(
             raise ImportRetryMismatch("The requested retry does not match the failed import decision.")
         idempotency_namespace = retry_of.idempotency_namespace
 
+    budgets.workspace.active_jobs += 1
+    budgets.workspace.active_source_bytes += source_size
+    budgets.workspace.window_started_at = rolling_cutoff
+    budgets.workspace.accepted_jobs = workspace_usage["jobs"] + 1
+    budgets.workspace.accepted_rows = workspace_rows + source_rows
+    budgets.workspace.save(
+        update_fields=[
+            "active_jobs",
+            "active_source_bytes",
+            "window_started_at",
+            "accepted_jobs",
+            "accepted_rows",
+            "updated_at",
+        ]
+    )
+    budgets.user.active_jobs += 1
+    budgets.user.window_started_at = rolling_cutoff
+    budgets.user.accepted_jobs = user_usage["jobs"] + 1
+    budgets.user.accepted_rows = (user_usage["rows"] or 0) + source_rows
+    budgets.user.save(
+        update_fields=[
+            "active_jobs",
+            "window_started_at",
+            "accepted_jobs",
+            "accepted_rows",
+            "updated_at",
+        ]
+    )
+
     job = ImportJob.objects.create(
         workspace=workspace,
         project=project,
@@ -251,6 +465,13 @@ def reserve_job(
     )
     job.source_key = f"imports/{workspace.id}/{job.id}/source.csv"
     job.save(update_fields=["source_key", "updated_at"])
+    ImportAdmissionUsage.objects.create(
+        workspace=workspace,
+        user=initiated_by,
+        job=job,
+        source_rows=source_rows,
+        accepted_at=now,
+    )
     _audit(
         job=job,
         action=ImportAuditEvent.Action.CREATED,
@@ -264,7 +485,7 @@ def reserve_job(
 
 @transaction.atomic
 def fail_preparing_job(*, job_id: UUID, reason: str) -> ImportJob:
-    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    job, budgets = _lock_job_and_budgets(job_id)
     if job.status == ImportJob.Status.CANCELLED:
         return job
     if job.status != ImportJob.Status.PREPARING:
@@ -275,7 +496,7 @@ def fail_preparing_job(*, job_id: UUID, reason: str) -> ImportJob:
     job.reason = reason
     job.config = {}
     job.completed_at = now
-    job.quota_released_at = now
+    _release_quota_locked(job, budgets, now=now)
     job.save(update_fields=["status", "reason", "config", "completed_at", "quota_released_at", "updated_at"])
     _audit(
         job=job,
@@ -387,8 +608,11 @@ def claim_execution(*, job_id: UUID, generation: int, task_id: str | None) -> Ex
         parsed_task_id = UUID(task_id)
     except (TypeError, ValueError):
         return None
-    job = ImportJob.objects.select_for_update().filter(pk=job_id).first()
-    if job is None or job.status != ImportJob.Status.QUEUED or job.execution_generation != generation:
+    try:
+        job, budgets = _lock_job_and_budgets(job_id)
+    except ImportJob.DoesNotExist:
+        return None
+    if job.status != ImportJob.Status.QUEUED or job.execution_generation != generation:
         return None
     dispatch_filter = {
         "job": job,
@@ -419,7 +643,7 @@ def claim_execution(*, job_id: UUID, generation: int, task_id: str | None) -> Ex
         job.completed_at = now
         job.config = {}
         job.celery_task_id = ""
-        job.quota_released_at = job.quota_released_at or now
+        _release_quota_locked(job, budgets, now=now)
         job.save()
         dispatch.state = ImportDispatch.State.SUPERSEDED
         dispatch.save(update_fields=["state", "updated_at"])
@@ -584,7 +808,7 @@ def finish_execution(
 ) -> ImportJob:
     if status not in TERMINAL_STATUSES:
         raise ValueError("Import execution can only finish in a terminal state.")
-    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    job, budgets = _lock_job_and_budgets(job_id)
     _require_owner(job, generation=generation, lease_token=lease_token)
     previous_status = job.status
     if job.status == ImportJob.Status.CANCELLING or job.cancel_requested_at is not None:
@@ -599,7 +823,7 @@ def finish_execution(
     job.lease_token = None
     job.lease_expires_at = None
     job.celery_task_id = ""
-    job.quota_released_at = job.quota_released_at or now
+    _release_quota_locked(job, budgets, now=now)
     if errors is not None:
         job.errors = errors
     if stats is not None:
@@ -716,7 +940,7 @@ def recover_expired_execution(*, job_id: UUID) -> ImportDispatch | None:
 
 @transaction.atomic
 def request_cancellation(*, job_id: UUID, actor_id: UUID, request_id: str | None = None) -> tuple[ImportJob, bool]:
-    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    job, budgets = _lock_job_and_budgets(job_id)
     if job.status not in ACTIVE_STATUSES:
         raise ImportTransitionError("Only an active import can be cancelled.")
     previous_status = job.status
@@ -729,7 +953,7 @@ def request_cancellation(*, job_id: UUID, actor_id: UUID, request_id: str | None
         job.completed_at = now
         job.config = {}
         job.celery_task_id = ""
-        job.quota_released_at = job.quota_released_at or now
+        _release_quota_locked(job, budgets, now=now)
         ImportDispatch.objects.filter(
             job=job,
             state__in=[ImportDispatch.State.PENDING, ImportDispatch.State.PUBLISHED],
@@ -749,8 +973,9 @@ def request_cancellation(*, job_id: UUID, actor_id: UUID, request_id: str | None
 
 @transaction.atomic
 def expire_source(*, job_id: UUID) -> ImportJob | None:
-    job = ImportJob.objects.select_for_update().filter(pk=job_id).first()
-    if job is None:
+    try:
+        job, budgets = _lock_job_and_budgets(job_id)
+    except ImportJob.DoesNotExist:
         return None
     if job.status in TERMINAL_STATUSES:
         return job
@@ -770,7 +995,7 @@ def expire_source(*, job_id: UUID) -> ImportJob | None:
     job.lease_token = None
     job.lease_expires_at = None
     job.celery_task_id = ""
-    job.quota_released_at = job.quota_released_at or now
+    _release_quota_locked(job, budgets, now=now)
     job.save()
     ImportDispatch.objects.filter(
         job=job,

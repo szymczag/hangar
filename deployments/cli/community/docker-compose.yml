@@ -70,6 +70,16 @@ x-app-env: &app-env
   TODOIST_IMPORT_LEASE_SECONDS: ${TODOIST_IMPORT_LEASE_SECONDS:-120}
   TODOIST_IMPORT_RECOVERY_GRACE_SECONDS: ${TODOIST_IMPORT_RECOVERY_GRACE_SECONDS:-30}
   TODOIST_IMPORT_SOURCE_RETENTION_HOURS: ${TODOIST_IMPORT_SOURCE_RETENTION_HOURS:-24}
+  TODOIST_IMPORT_PREVIEW_USER_RATE: ${TODOIST_IMPORT_PREVIEW_USER_RATE:-10/minute}
+  TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE: ${TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE:-30/minute}
+  TODOIST_IMPORT_EXECUTE_USER_RATE: ${TODOIST_IMPORT_EXECUTE_USER_RATE:-3/hour}
+  TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE: ${TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE:-10/hour}
+  TODOIST_IMPORT_MAX_ACTIVE_PER_USER: ${TODOIST_IMPORT_MAX_ACTIVE_PER_USER:-1}
+  TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE: ${TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE:-2}
+  TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H: ${TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H:-50000}
+  TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE: ${TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE:-10485760}
+  TODOIST_IMPORT_WORKER_CONCURRENCY: ${TODOIST_IMPORT_WORKER_CONCURRENCY:-2}
+  TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER: ${TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER:-1}
 
 services:
   web:
@@ -142,6 +152,24 @@ services:
       - logs_worker:/code/plane/logs
     environment:
       <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+    depends_on:
+      - api
+      - plane-db
+      - plane-redis
+      - plane-mq
+
+  import-worker:
+    image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-api:${APP_RELEASE:-stable}
+    command: ./bin/docker-entrypoint-worker.sh
+    deploy:
+      replicas: ${IMPORT_WORKER_REPLICAS:-1}
+      restart_policy:
+        condition: any
+    volumes:
+      - logs_import-worker:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+      HANGAR_WORKER_QUEUE: imports
     depends_on:
       - api
       - plane-db
@@ -260,6 +288,7 @@ volumes:
   uploads:
   logs_api:
   logs_worker:
+  logs_import-worker:
   logs_beat-worker:
   logs_migrator:
   rabbitmq_data:

@@ -219,7 +219,9 @@ class ImportAuditEvent(models.Model):
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)
     project_id = models.UUIDField(db_index=True)
-    job_id = models.UUIDField(db_index=True)
+    # Admission rejections happen before an ImportJob exists. Keep the field
+    # nullable instead of inventing an identifier that looks like a real job.
+    job_id = models.UUIDField(null=True, blank=True, db_index=True)
     actor_id = models.UUIDField(null=True, blank=True, db_index=True)
     action = models.CharField(max_length=64, choices=Action.choices)
     previous_status = models.CharField(max_length=32, blank=True)
@@ -274,3 +276,111 @@ class ImportAuditEvent(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Import audit events are immutable.")
+
+
+class ImportWorkspaceBudget(BaseModel):
+    workspace = models.OneToOneField(
+        "db.WorkSpace",
+        on_delete=models.CASCADE,
+        related_name="ext_import_budget",
+    )
+    active_jobs = models.PositiveIntegerField(default=0)
+    active_source_bytes = models.PositiveBigIntegerField(default=0)
+    window_started_at = models.DateTimeField(default=timezone.now)
+    accepted_jobs = models.PositiveBigIntegerField(default=0)
+    accepted_rows = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        db_table = "ext_import_workspace_budgets"
+        constraints = [
+            models.CheckConstraint(check=Q(active_jobs__gte=0), name="ext_imp_ws_budget_jobs_nonnegative"),
+            models.CheckConstraint(
+                check=Q(active_source_bytes__gte=0),
+                name="ext_imp_ws_budget_bytes_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=Q(accepted_jobs__gte=0, accepted_rows__gte=0),
+                name="ext_imp_ws_budget_usage_nonnegative",
+            ),
+        ]
+
+
+class ImportUserBudget(BaseModel):
+    workspace = models.ForeignKey(
+        "db.WorkSpace",
+        on_delete=models.CASCADE,
+        related_name="ext_import_user_budgets",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="ext_import_budgets",
+    )
+    active_jobs = models.PositiveIntegerField(default=0)
+    window_started_at = models.DateTimeField(default=timezone.now)
+    accepted_jobs = models.PositiveBigIntegerField(default=0)
+    accepted_rows = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        db_table = "ext_import_user_budgets"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "user"],
+                name="ext_imp_user_budget_workspace_user",
+            ),
+            models.CheckConstraint(check=Q(active_jobs__gte=0), name="ext_imp_user_budget_jobs_nonnegative"),
+            models.CheckConstraint(
+                check=Q(accepted_jobs__gte=0, accepted_rows__gte=0),
+                name="ext_imp_user_budget_usage_nonnegative",
+            ),
+        ]
+
+
+class ImmutableImportAdmissionUsageQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Import admission usage is immutable.")
+
+    def delete(self):
+        raise ValidationError("Import admission usage is immutable.")
+
+
+class ImportAdmissionUsage(models.Model):
+    """Append-only facts used for an exact rolling workspace row budget."""
+
+    id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
+    workspace = models.ForeignKey(
+        "db.WorkSpace",
+        on_delete=models.CASCADE,
+        related_name="ext_import_admission_usage",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ext_import_admission_usage",
+    )
+    job = models.OneToOneField(
+        ImportJob,
+        on_delete=models.CASCADE,
+        related_name="admission_usage",
+    )
+    source_rows = models.PositiveBigIntegerField()
+    accepted_at = models.DateTimeField(default=timezone.now)
+
+    objects = ImmutableImportAdmissionUsageQuerySet.as_manager()
+
+    class Meta:
+        db_table = "ext_import_admission_usage"
+        indexes = [
+            models.Index(fields=["workspace", "accepted_at"], name="ext_imp_usage_ws_time_idx"),
+            models.Index(fields=["user", "accepted_at"], name="ext_imp_usage_user_time_idx"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Import admission usage is immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Import admission usage is immutable.")

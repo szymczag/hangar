@@ -3,27 +3,38 @@
 # See the LICENSE file for details.
 
 from datetime import timedelta
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from uuid import uuid4
 
 import pytest
-from django.core.exceptions import ValidationError
-from django.db import DatabaseError, connection, transaction
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.db import DatabaseError, close_old_connections, connection, transaction
 from django.utils import timezone
 
 from plane.db.models import Project, ProjectMember, State, WorkspaceMember
 from plane.ext.importers.todoist import ImportCancelled
 from plane.ext.imports.services import (
     ImportLeaseLost,
+    ImportQuotaExceeded,
     ImportRetryMismatch,
     claim_execution,
     fail_preparing_job,
     finish_execution,
+    lease_duration,
     mark_source_stored,
     recover_expired_execution,
+    release_quota_once,
     request_cancellation,
     reserve_job,
 )
-from plane.ext.models import ImportAuditEvent, ImportDispatch, ImportJob
+from plane.ext.models import (
+    ImportAuditEvent,
+    ImportDispatch,
+    ImportJob,
+    ImportUserBudget,
+    ImportWorkspaceBudget,
+)
 from plane.ext.tasks import run_todoist_import
 
 
@@ -66,6 +77,17 @@ class TestTodoistImportTask:
     @pytest.fixture(autouse=True)
     def enable_todoist_imports(self, settings):
         settings.TODOIST_IMPORTS_ENABLED = True
+
+    def test_todoist_task_routes_only_to_dedicated_queue(self):
+        from plane.celery import app
+
+        assert app.conf.task_routes["plane.ext.tasks.run_todoist_import"] == {"queue": "imports"}
+
+    def test_out_of_range_runtime_setting_fails_closed(self, settings):
+        settings.TODOIST_IMPORT_LEASE_SECONDS = 10
+
+        with pytest.raises(ImproperlyConfigured, match="between 30 and 900"):
+            lease_duration()
 
     def test_disabled_importer_does_not_claim_or_mutate_job(self, mocker, settings, queued_job):
         settings.TODOIST_IMPORTS_ENABLED = False
@@ -299,6 +321,23 @@ class TestTodoistImportTask:
         assert finished_job.reason == "cancelled_by_user"
         assert finished_job.lease_token is None
         assert finished_job.completed_at is not None
+        assert ImportWorkspaceBudget.objects.get(workspace=finished_job.workspace).active_jobs == 0
+        assert (
+            ImportUserBudget.objects.get(
+                workspace=finished_job.workspace,
+                user=create_user,
+            ).active_jobs
+            == 0
+        )
+
+        with pytest.raises(ImportLeaseLost):
+            finish_execution(
+                job_id=job.id,
+                generation=claim.generation,
+                lease_token=claim.lease_token,
+                status=ImportJob.Status.COMPLETED,
+            )
+        assert ImportWorkspaceBudget.objects.get(workspace=finished_job.workspace).active_jobs == 0
 
     def test_wrong_lease_token_cannot_finish_execution(self, queued_job):
         job, dispatch = queued_job(digest="f" * 64)
@@ -333,6 +372,18 @@ class TestTodoistImportTask:
             ImportAuditEvent.objects.filter(pk=event.id).update(action=ImportAuditEvent.Action.CLEANUP_FAILED)
         with pytest.raises(ValidationError):
             event.delete()
+
+    def test_admission_usage_rejects_application_mutation(self, queued_job):
+        job, _ = queued_job(digest="4" * 64)
+        usage = job.admission_usage
+
+        usage.source_rows = 999
+        with pytest.raises(ValidationError):
+            usage.save()
+        with pytest.raises(ValidationError):
+            type(usage).objects.filter(pk=usage.id).update(source_rows=999)
+        with pytest.raises(ValidationError):
+            usage.delete()
 
 
 @pytest.mark.unit
@@ -395,3 +446,152 @@ def test_todoist_idempotency_indexes_are_unique_and_partial(request):
         assert "deleted_at IS NULL" in definition
         assert "external_source" in definition and "todoist_csv" in definition
         assert "external_id IS NOT NULL" in definition
+
+
+@pytest.mark.unit
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_reservations_enforce_user_limit_atomically(settings, workspace, create_user):
+    settings.TODOIST_IMPORT_MAX_ACTIVE_PER_USER = 1
+    settings.TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE = 2
+    projects = [
+        Project.objects.create(
+            name=f"Concurrent import {index}",
+            identifier=f"CI{index}",
+            workspace=workspace,
+        )
+        for index in range(2)
+    ]
+    barrier = Barrier(2)
+
+    def reserve(project_id):
+        close_old_connections()
+        try:
+            barrier.wait()
+            return reserve_job(
+                workspace=type(workspace).objects.get(pk=workspace.id),
+                project=Project.objects.get(pk=project_id),
+                initiated_by=type(create_user).objects.get(pk=create_user.id),
+                source_digest=str(project_id).replace("-", "") * 2,
+                source_size=128,
+                config={},
+                stats={"source_rows": 1},
+                errors=[],
+            ).id
+        except ImportQuotaExceeded as error:
+            return error.limit
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(reserve, [project.id for project in projects]))
+
+    assert results.count("active_user_imports") == 1
+    assert ImportJob.objects.filter(status=ImportJob.Status.PREPARING).count() == 1
+    assert ImportWorkspaceBudget.objects.get(workspace=workspace).active_jobs == 1
+    assert ImportUserBudget.objects.get(workspace=workspace, user=create_user).active_jobs == 1
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_workspace_active_limit_applies_across_users(settings, workspace, create_user):
+    settings.TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE = 1
+    second_user = type(create_user).objects.create(
+        email=f"second-{uuid4().hex}@hangar.test",
+        username=f"second-{uuid4().hex}@hangar.test",
+    )
+    projects = [
+        Project.objects.create(name=f"Workspace limit {index}", identifier=f"WL{index}", workspace=workspace)
+        for index in range(2)
+    ]
+    reserve_job(
+        workspace=workspace,
+        project=projects[0],
+        initiated_by=create_user,
+        source_digest="1" * 64,
+        source_size=128,
+        config={},
+        stats={"source_rows": 1},
+        errors=[],
+    )
+
+    with pytest.raises(ImportQuotaExceeded) as error:
+        reserve_job(
+            workspace=workspace,
+            project=projects[1],
+            initiated_by=second_user,
+            source_digest="2" * 64,
+            source_size=128,
+            config={},
+            stats={"source_rows": 1},
+            errors=[],
+        )
+
+    assert error.value.limit == "active_workspace_imports"
+    assert ImportWorkspaceBudget.objects.get(workspace=workspace).active_jobs == 1
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_workspace_source_byte_limit_is_reserved_atomically(settings, workspace, create_user):
+    settings.TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE = 200
+    second_user = type(create_user).objects.create(
+        email=f"source-{uuid4().hex}@hangar.test",
+        username=f"source-{uuid4().hex}@hangar.test",
+    )
+    projects = [
+        Project.objects.create(name=f"Source limit {index}", identifier=f"SL{index}", workspace=workspace)
+        for index in range(2)
+    ]
+    reserve_job(
+        workspace=workspace,
+        project=projects[0],
+        initiated_by=create_user,
+        source_digest="3" * 64,
+        source_size=128,
+        config={},
+        stats={"source_rows": 1},
+        errors=[],
+    )
+
+    with pytest.raises(ImportQuotaExceeded) as error:
+        reserve_job(
+            workspace=workspace,
+            project=projects[1],
+            initiated_by=second_user,
+            source_digest="4" * 64,
+            source_size=100,
+            config={},
+            stats={"source_rows": 1},
+            errors=[],
+        )
+
+    assert error.value.limit == "active_workspace_source_bytes"
+    budget = ImportWorkspaceBudget.objects.get(workspace=workspace)
+    assert budget.active_jobs == 1
+    assert budget.active_source_bytes == 128
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_quota_release_is_exactly_once(workspace, create_user, import_project):
+    job = reserve_job(
+        workspace=workspace,
+        project=import_project,
+        initiated_by=create_user,
+        source_digest="5" * 64,
+        source_size=128,
+        config={},
+        stats={"source_rows": 1},
+        errors=[],
+    )
+
+    assert release_quota_once(job_id=job.id) is True
+    assert release_quota_once(job_id=job.id) is False
+
+    job.refresh_from_db()
+    workspace_budget = ImportWorkspaceBudget.objects.get(workspace=workspace)
+    user_budget = ImportUserBudget.objects.get(workspace=workspace, user=create_user)
+    assert job.quota_released_at is not None
+    assert workspace_budget.active_jobs == 0
+    assert workspace_budget.active_source_bytes == 0
+    assert user_budget.active_jobs == 0

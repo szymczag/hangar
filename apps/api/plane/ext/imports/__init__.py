@@ -9,8 +9,10 @@ from .services import (
     ImportDecisionDrift,
     ImportLeaseLost,
     ImportProjectUnavailable,
+    ImportQuotaExceeded,
     ImportRetryMismatch,
     ImportTransitionError,
+    audit_quota_rejection,
 )
 
 __all__ = [
@@ -19,7 +21,9 @@ __all__ = [
     "ImportDecisionDrift",
     "ImportLeaseLost",
     "ImportProjectUnavailable",
+    "ImportQuotaExceeded",
     "ImportRetryMismatch",
     "ImportTransitionError",
+    "audit_quota_rejection",
     "todoist_imports_enabled",
 ]

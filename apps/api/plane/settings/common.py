@@ -29,6 +29,25 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 _logger = logging.getLogger("plane")
 
+
+def _bounded_integer_setting(name: str, default: int, minimum: int, maximum: int) -> int:
+    raw_value = os.environ.get(name, str(default))
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise ImproperlyConfigured(f"{name} must be an integer") from error
+    if value < minimum or value > maximum:
+        raise ImproperlyConfigured(f"{name} must be between {minimum} and {maximum}")
+    return value
+
+
+def _rate_setting(name: str, default: str) -> str:
+    value = os.environ.get(name, default)
+    if re.fullmatch(r"[1-9][0-9]*/(second|minute|hour|day)", value) is None:
+        raise ImproperlyConfigured(f"{name} must use DRF rate syntax such as '10/minute'")
+    return value
+
+
 # Secret Key — use `or` so an explicitly empty env var is treated the same as unset,
 # falling back to a random key rather than passing "" to Django (GHSA-cmwv-pjmw-8483).
 SECRET_KEY = os.environ.get("SECRET_KEY") or get_random_secret_key()
@@ -46,7 +65,7 @@ if SECRET_KEY in _INSECURE_SECRET_KEYS:
         "This makes your installation vulnerable to session forgery, CSRF bypass, and "
         "password-reset token forging. Set a unique SECRET_KEY before deploying to production. "
         "Generate one with: "
-        "python3 -c \"from django.utils.crypto import get_random_secret_key; print(get_random_secret_key())\""
+        'python3 -c "from django.utils.crypto import get_random_secret_key; print(get_random_secret_key())"'
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -59,9 +78,27 @@ IS_SELF_MANAGED = True
 # administrators still need to activate it separately and accept current consent.
 RUNNER_ENABLED = os.environ.get("RUNNER_ENABLED", "0") == "1"
 TODOIST_IMPORTS_ENABLED = os.environ.get("TODOIST_IMPORTS_ENABLED", "0") == "1"
-TODOIST_IMPORT_LEASE_SECONDS = int(os.environ.get("TODOIST_IMPORT_LEASE_SECONDS", "120"))
-TODOIST_IMPORT_RECOVERY_GRACE_SECONDS = int(os.environ.get("TODOIST_IMPORT_RECOVERY_GRACE_SECONDS", "30"))
-TODOIST_IMPORT_SOURCE_RETENTION_HOURS = int(os.environ.get("TODOIST_IMPORT_SOURCE_RETENTION_HOURS", "24"))
+TODOIST_IMPORT_LEASE_SECONDS = _bounded_integer_setting("TODOIST_IMPORT_LEASE_SECONDS", 120, 30, 900)
+TODOIST_IMPORT_RECOVERY_GRACE_SECONDS = _bounded_integer_setting("TODOIST_IMPORT_RECOVERY_GRACE_SECONDS", 30, 0, 300)
+TODOIST_IMPORT_SOURCE_RETENTION_HOURS = _bounded_integer_setting("TODOIST_IMPORT_SOURCE_RETENTION_HOURS", 24, 1, 168)
+TODOIST_IMPORT_MAX_ACTIVE_PER_USER = _bounded_integer_setting("TODOIST_IMPORT_MAX_ACTIVE_PER_USER", 1, 1, 100)
+TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE = _bounded_integer_setting(
+    "TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE", 2, 1, 1000
+)
+TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H = _bounded_integer_setting(
+    "TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H", 50_000, 1, 10_000_000
+)
+TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE = _bounded_integer_setting(
+    "TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE", 10 * 1024 * 1024, 1, 10 * 1024 * 1024 * 1024
+)
+TODOIST_IMPORT_PREVIEW_USER_RATE = _rate_setting("TODOIST_IMPORT_PREVIEW_USER_RATE", "10/minute")
+TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE = _rate_setting("TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE", "30/minute")
+TODOIST_IMPORT_EXECUTE_USER_RATE = _rate_setting("TODOIST_IMPORT_EXECUTE_USER_RATE", "3/hour")
+TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE = _rate_setting("TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE", "10/hour")
+TODOIST_IMPORT_WORKER_CONCURRENCY = _bounded_integer_setting("TODOIST_IMPORT_WORKER_CONCURRENCY", 2, 1, 32)
+TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER = _bounded_integer_setting(
+    "TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER", 1, 1, 4
+)
 
 # Webhook IP allowlist — comma-separated IPs or CIDR ranges that are allowed as
 # webhook targets even if they resolve to private networks.
@@ -84,9 +121,7 @@ for _cidr in _webhook_allowed_ips_raw.split(","):
 # Example: "silo,silo.namespace.svc.cluster.local,internal-api.lan"
 _webhook_allowed_hosts_raw = os.environ.get("WEBHOOK_ALLOWED_HOSTS", "")
 WEBHOOK_ALLOWED_HOSTS = [
-    _host.strip().rstrip(".").lower()
-    for _host in _webhook_allowed_hosts_raw.split(",")
-    if _host.strip()
+    _host.strip().rstrip(".").lower() for _host in _webhook_allowed_hosts_raw.split(",") if _host.strip()
 ]
 
 # Webhook disallowed domains — comma-separated hostnames. Webhooks targeting
@@ -95,9 +130,7 @@ WEBHOOK_ALLOWED_HOSTS = [
 # for self-hosted deployments; set to e.g. "example.com" to block specific domains.
 _webhook_disallowed_domains_raw = os.environ.get("WEBHOOK_DISALLOWED_DOMAINS", "")
 WEBHOOK_DISALLOWED_DOMAINS = [
-    _d.strip().rstrip(".").lower()
-    for _d in _webhook_disallowed_domains_raw.split(",")
-    if _d.strip()
+    _d.strip().rstrip(".").lower() for _d in _webhook_disallowed_domains_raw.split(",") if _d.strip()
 ]
 
 # Allowed Hosts
@@ -157,6 +190,10 @@ REST_FRAMEWORK = {
         "runner_user_mutation": os.environ.get("RUNNER_API_USER_MUTATION_RATE", "60/minute"),
         "runner_read": os.environ.get("RUNNER_API_READ_RATE", "120/minute"),
         "runner_mutation": os.environ.get("RUNNER_API_MUTATION_RATE", "30/minute"),
+        "todoist_preview_user": TODOIST_IMPORT_PREVIEW_USER_RATE,
+        "todoist_preview_workspace": TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE,
+        "todoist_execute_user": TODOIST_IMPORT_EXECUTE_USER_RATE,
+        "todoist_execute_workspace": TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE,
     },
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
