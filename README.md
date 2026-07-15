@@ -38,6 +38,7 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Immutable federated SSO identity binding      | Available on `preview`              | [#45](https://github.com/szymczag/hangar/pull/45)     |
 | Epics backend                                 | Available on `preview`              | [#7](https://github.com/szymczag/hangar/pull/7)       |
 | Epics UI and required API surfaces            | Available on `preview`              | [#9](https://github.com/szymczag/hangar/pull/9)       |
+| Epic pagination and terminal load errors      | Available on `preview`              | [#62](https://github.com/szymczag/hangar/pull/62)     |
 | Custom work-item types and properties backend | Available on `preview`              | [#10](https://github.com/szymczag/hangar/pull/10)     |
 | Custom work-item types and properties UI      | Available on `preview`              | [#11](https://github.com/szymczag/hangar/pull/11)     |
 | Time tracking and worklogs backend            | Available on `preview`              | [#12](https://github.com/szymczag/hangar/pull/12)     |
@@ -54,7 +55,7 @@ the table marks them as available.
 ## Deployment
 
 - [Docker deployment](deployments/cli/community/README.md)
-- [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.9`
+- [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.10`
   evaluation release; production support gates remain open.
 - [Amazon SES, deliverability, and OpenPGP email](docs/aws-ses-email-operations.md)
   — secure transactional-email configuration and operations.
@@ -167,7 +168,7 @@ Install Cosign, obtain the digest for the version you intend to deploy, and veri
 both the exact workflow identity and GitHub's OIDC issuer:
 
 ```sh
-VERSION=v0.1.0-rc.9
+VERSION=v0.1.0-rc.10
 GIT_TAG=hangar-$VERSION
 DIGEST=sha256:replace-with-the-published-digest
 IMAGE=ghcr.io/szymczag/hangar-api
