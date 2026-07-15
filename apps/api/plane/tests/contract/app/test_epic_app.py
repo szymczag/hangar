@@ -404,6 +404,21 @@ class TestUnifiedEpicWorkItems:
         parent.refresh_from_db()
         assert parent.parent_id is None
 
+    @pytest.mark.django_db
+    def test_standard_sub_issues_endpoint_bounds_bulk_assignment(
+        self, session_client, workspace, project, default_state
+    ):
+        parent = Issue.objects.create(name="Parent", project=project, workspace=workspace, state=default_state)
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{parent.id}/sub-issues/",
+            {"sub_issue_ids": [str(uuid4()) for _ in range(101)]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "sub_issue_ids" in response.data
+
 
 @pytest.mark.contract
 class TestEpicScoping:
@@ -594,6 +609,16 @@ class TestEpicWebContracts:
         assert session_client.post(url).status_code == status.HTTP_200_OK
         assert session_client.delete(url).status_code == status.HTTP_204_NO_CONTENT
         assert Issue.objects.get(pk=epic_id).archived_at is None
+
+    @pytest.mark.django_db
+    def test_epic_uses_standard_archive_surface(self, session_client, workspace, project, completed_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(completed_state.id)).data["id"]
+        url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{epic_id}/archive/"
+
+        assert session_client.post(url).status_code == status.HTTP_200_OK
+        assert session_client.get(url).status_code == status.HTTP_200_OK
+        assert session_client.delete(url).status_code == status.HTTP_204_NO_CONTENT
 
     @pytest.mark.django_db
     def test_epic_filters_do_not_mutate_work_item_filters(self, session_client, create_user, workspace, project):

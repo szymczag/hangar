@@ -36,6 +36,7 @@ from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
 )
+from plane.ext.services import project_default_issue_type
 
 
 class IssueStateFlatSerializer(BaseSerializer):
@@ -308,6 +309,7 @@ class IssueCreateSerializer(BaseSerializer):
         workspace_id = self.context["workspace_id"]
         default_assignee_id = self.context["default_assignee_id"]
 
+        validated_data.setdefault("type", project_default_issue_type(project_id))
         issue = Issue.objects.create(**validated_data, project_id=project_id)
 
         # Issue Audit Users

@@ -24,6 +24,9 @@ class IssueType(BaseModel):
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     level = models.FloatField(default=0)
+    # Stable system identity is authoritative. The legacy is_epic,
+    # is_default, and level columns remain materialized for older consumers;
+    # database constraints keep their system-type values synchronized.
     system_key = models.CharField(max_length=32, choices=SystemKey.choices, null=True, blank=True)
     external_source = models.CharField(max_length=255, null=True, blank=True)
     external_id = models.CharField(max_length=255, blank=True, null=True)
@@ -65,6 +68,9 @@ class IssueType(BaseModel):
 
 
 class ProjectIssueType(ProjectBaseModel):
+    # Project-scoped availability, hierarchy level, and default selection live
+    # on this link. System-type provisioning repairs the legacy IssueType
+    # mirrors at the same transaction boundary.
     issue_type = models.ForeignKey("db.IssueType", related_name="project_issue_types", on_delete=models.CASCADE)
     level = models.PositiveIntegerField(default=0)
     is_default = models.BooleanField(default=False)

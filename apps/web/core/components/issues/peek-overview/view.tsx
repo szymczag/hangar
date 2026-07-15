@@ -69,7 +69,6 @@ export const IssueView = observer(function IssueView(props: IIssueView) {
     isAnyModalOpen,
     issue: { getIssueById },
   } = useIssueDetail();
-  const { isAnyModalOpen: isAnyEpicModalOpen } = useIssueDetail(EIssueServiceType.EPICS);
   const issue = getIssueById(issueId);
   // remove peek id
   const removeRoutePeekId = () => {
@@ -90,7 +89,7 @@ export const IssueView = observer(function IssueView(props: IIssueView) {
     () => {
       const isAnyDropbarOpen = editorRef.current?.isAnyDropbarOpen();
       if (!embedIssue) {
-        if (!isAnyModalOpen && !isAnyEpicModalOpen && !isAnyLocalModalOpen && !isAnyDropbarOpen) {
+        if (!isAnyModalOpen && !isAnyLocalModalOpen && !isAnyDropbarOpen) {
           removeRoutePeekId();
         }
       }

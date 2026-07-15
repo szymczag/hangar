@@ -251,11 +251,7 @@ class EpicDetailViewSet(BaseAPIView):
 
 
 class EpicPaginatedViewSet(IssuePaginatedViewSet):
-    """v2 paginated epic list — the surface the web epic store fetches.
-
-    Mirrors IssuePaginatedViewSet.get_queryset with the epic base queryset
-    (issue_objects excludes epics; see the fork note in IssueManager).
-    """
+    """Compatibility-only paginated Epic list for older API clients."""
 
     def get_base_queryset(self):
         return epic_queryset(self.kwargs.get("slug"), self.kwargs.get("project_id"))

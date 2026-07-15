@@ -8,17 +8,18 @@ web application.
 This page explains the user workflow, the hierarchy rules, and the compatibility
 contract for installations upgrading from the earlier dedicated Epic feature.
 
-## Enable Task and Epic types
+## Task and Epic provisioning
 
-A project administrator can enable the canonical system types from **Project
-settings → Work item types**. Enabling the feature creates or repairs both types:
+New projects receive the canonical system types automatically. Upgraded projects
+receive them during migration. If either type is missing or damaged, a project
+administrator can repair both from **Project settings → Work item types**:
 
 | System type | Level | Default | May have a parent |
 | ----------- | ----- | ------- | ----------------- |
 | Task        | 0     | Yes     | Yes               |
 | Epic        | 1     | No      | No                |
 
-The operation is idempotent. Repeating it does not create duplicate system types.
+The repair operation is idempotent. Repeating it does not create duplicate system types.
 It also restores the canonical levels and default selection if an older deployment
 left inconsistent metadata.
 
@@ -26,6 +27,12 @@ System identity, hierarchy level, and default semantics cannot be changed throug
 the issue-type API. Display fields, such as the type name and description, can be
 edited. Task and Epic cannot be deactivated or deleted. Administrators can add
 custom level-0 types after the system types have been enabled.
+
+`IssueType.system_key` is the stable identity for the two system types.
+`ProjectIssueType` is authoritative for whether a type is available to a project,
+its project level, and the project default. The older `is_epic`, `is_default`, and
+`level` fields on `IssueType` remain as constrained compatibility mirrors; clients
+cannot write them for system types.
 
 ## Create and find an Epic
 
@@ -54,8 +61,14 @@ Hangar enforces these invariants on the server, independent of the client:
 - parent and child must belong to the same project and workspace;
 - a multi-item attachment is atomic—one invalid identifier rejects the complete
   request;
+- one request can attach at most 100 sub-work-items and hierarchy depth is capped
+  at 100 levels;
 - concurrent hierarchy changes are serialized per project and lock the affected
   work-item rows.
+
+Parent ancestry is evaluated by one bounded, parameterized recursive database
+query. Validation cost therefore does not grow into one application/database
+round trip per ancestor.
 
 Type assignment and direct parent-change checks apply to both the authenticated
 application API and the public API. The authenticated sub-work-item endpoint adds
@@ -78,6 +91,8 @@ POST /api/workspaces/{workspace_slug}/projects/{project_id}/issue-types/enable/
 
 The enable endpoint requires project-administrator permission. Type assignment is
 accepted only when the type is active and linked to the target project.
+Standard detail, sub-work-item, archive, cycle, module, and intake surfaces all
+include Epic work items; there is no separate manager-level collection.
 
 The older `/epics`, `/v2/epics`, and Epic sub-resource endpoints remain as server
 compatibility adapters. They preserve Epic-only collection scoping and force the
@@ -85,17 +100,32 @@ canonical Epic type on legacy create requests. New clients must not depend on th
 routes; they are retained to support upgrades and older integrations while the
 normal Work Items API is the source of truth.
 
+The web application does not maintain an Epic collection, service, or detail store.
+Compatibility store names resolve to the ordinary project Work Items store so
+extensions compiled against the former interface do not create a second state graph.
+
 ## Upgrade behavior
 
 Database migration `0127_issue_type_system_keys` assigns stable `task` and `epic`
-system keys. For projects that already use work-item types or contain Epics, the
-migration:
+system keys. It provisions every active project, including projects that did not
+previously enable work-item types. The migration:
 
 - reuses the oldest active workspace Epic type when possible;
-- creates a canonical Task type when one does not exist;
+- creates a distinct canonical Task type and does not convert a user-defined type
+  merely because it is named `Task`;
 - links Task at level 0 and Epic at level 1;
 - makes Task the project default and clears conflicting default links; and
-- assigns the canonical Task type to existing untyped work items in those projects.
+- assigns the canonical Task type to existing untyped work items.
+
+Workspace seed and dummy-data jobs also provision the system types before they
+create projects or work items, so post-upgrade maintenance jobs cannot reintroduce
+untyped records.
+
+On PostgreSQL, the migration commits its atomic data-provisioning operation before
+building the new type constraints. This operation boundary is required so deferred
+foreign-key triggers are settled before the partial unique index is created. If the
+constraint step fails, correct the database condition and rerun the migration; the
+idempotent provisioning step safely repairs the same rows again.
 
 Existing work items, Epic relationships, comments, attachments, activities, and
 custom property data are retained. The migration does not delete legacy type rows.

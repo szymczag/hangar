@@ -9,12 +9,14 @@ from django.utils import timezone
 
 from plane.db.models import (
     Project,
+    IssueType,
     ProjectMember,
     ProjectUserProperty,
     State,
     WorkspaceMember,
     User,
 )
+from plane.db.models.issue_type import ProjectIssueType
 
 
 class TestProjectBase:
@@ -95,6 +97,18 @@ class TestProjectAPIPost(TestProjectBase):
         expected_states = ["Backlog", "Todo", "In Progress", "Done", "Cancelled"]
         state_names = list(states.values_list("name", flat=True))
         assert set(state_names) == set(expected_states)
+
+        system_type_links = ProjectIssueType.objects.filter(project=project).select_related("issue_type")
+        assert system_type_links.filter(
+            issue_type__system_key=IssueType.SystemKey.TASK,
+            is_default=True,
+            level=0,
+        ).exists()
+        assert system_type_links.filter(
+            issue_type__system_key=IssueType.SystemKey.EPIC,
+            is_default=False,
+            level=1,
+        ).exists()
 
     @pytest.mark.django_db
     def test_create_project_with_project_lead(self, session_client, workspace, create_user):

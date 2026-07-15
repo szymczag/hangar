@@ -64,12 +64,7 @@ export const IssueDetailsPage = observer(function IssueDetailsPage({ params }: R
   const issueLoader = !issue || isLoading;
   const pageTitle = project && issue ? `${project?.identifier}-${issue?.sequence_id} ${issue?.name}` : undefined;
 
-  useWorkItemProperties(
-    projectId,
-    workspaceSlug.toString(),
-    issueId,
-    issue?.is_epic ? EIssueServiceType.EPICS : EIssueServiceType.ISSUES
-  );
+  useWorkItemProperties(projectId, workspaceSlug.toString(), issueId, EIssueServiceType.ISSUES);
 
   useEffect(() => {
     const handleToggleIssueDetailSidebar = () => {

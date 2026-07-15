@@ -23,7 +23,6 @@ import { CreateUpdateIssueModal } from "@/components/issues/issue-modal/modal";
 import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 // plane-web
-import { CreateUpdateEpicModal } from "@/plane-web/components/epics/epic-modal";
 // Hangar-web
 import { WorkFlowGroupTree } from "@/plane-web/components/workflow";
 
@@ -55,7 +54,6 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
     addIssuesToView,
     selectionHelpers,
     handleCollapsedGroups,
-    isEpic = false,
   } = props;
   // states
   const [isOpen, setIsOpen] = useState(false);
@@ -114,7 +112,8 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
           {icon ?? <CircleDashed className="size-3.5" strokeWidth={2} />}
         </div>
 
-        <div
+        <button
+          type="button"
           className="relative flex w-full cursor-pointer flex-row items-center gap-1 overflow-hidden"
           onClick={() => handleCollapsedGroups(groupID)}
         >
@@ -123,7 +122,7 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
           <div className="px-2.5">
             <WorkFlowGroupTree groupBy={groupBy} groupId={groupID} />
           </div>
-        </div>
+        </button>
 
         {!disableIssueCreation &&
           (renderExistingIssueModal ? (
@@ -150,26 +149,23 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
               </CustomMenu.MenuItem>
             </CustomMenu>
           ) : (
-            <div
+            <button
+              type="button"
               className="flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xs transition-all hover:bg-layer-1"
               onClick={() => {
                 setIsOpen(true);
               }}
             >
               <PlusIcon width={14} strokeWidth={2} />
-            </div>
+            </button>
           ))}
 
-        {isEpic ? (
-          <CreateUpdateEpicModal isOpen={isOpen} onClose={() => setIsOpen(false)} data={issuePayload} />
-        ) : (
-          <CreateUpdateIssueModal
-            isOpen={isOpen}
-            onClose={() => setIsOpen(false)}
-            data={issuePayload}
-            storeType={storeType}
-          />
-        )}
+        <CreateUpdateIssueModal
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          data={issuePayload}
+          storeType={storeType}
+        />
 
         {renderExistingIssueModal && (
           <ExistingIssuesListModal

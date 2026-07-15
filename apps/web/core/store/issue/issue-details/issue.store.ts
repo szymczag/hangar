@@ -8,7 +8,6 @@ import { makeObservable, observable } from "mobx";
 import { computedFn } from "mobx-utils";
 // types
 import type { TIssue, TIssueServiceType } from "@plane/types";
-import { EIssueServiceType } from "@plane/types";
 // services
 import { IssueArchiveService, WorkspaceDraftService, IssueService } from "@/services/issue";
 // types
@@ -177,31 +176,18 @@ export class IssueStore implements IIssueStore {
   };
 
   updateIssue = async (workspaceSlug: string, projectId: string, issueId: string, data: Partial<TIssue>) => {
-    const currentStore =
-      this.serviceType === EIssueServiceType.EPICS
-        ? this.rootIssueDetailStore.rootIssueStore.projectEpics
-        : this.rootIssueDetailStore.rootIssueStore.projectIssues;
-
     await Promise.all([
-      currentStore.updateIssue(workspaceSlug, projectId, issueId, data),
+      this.rootIssueDetailStore.rootIssueStore.projectIssues.updateIssue(workspaceSlug, projectId, issueId, data),
       this.rootIssueDetailStore.activity.fetchActivities(workspaceSlug, projectId, issueId),
     ]);
   };
 
   removeIssue = async (workspaceSlug: string, projectId: string, issueId: string) => {
-    const currentStore =
-      this.serviceType === EIssueServiceType.EPICS
-        ? this.rootIssueDetailStore.rootIssueStore.projectEpics
-        : this.rootIssueDetailStore.rootIssueStore.projectIssues;
-    currentStore.removeIssue(workspaceSlug, projectId, issueId);
+    this.rootIssueDetailStore.rootIssueStore.projectIssues.removeIssue(workspaceSlug, projectId, issueId);
   };
 
   archiveIssue = async (workspaceSlug: string, projectId: string, issueId: string) => {
-    const currentStore =
-      this.serviceType === EIssueServiceType.EPICS
-        ? this.rootIssueDetailStore.rootIssueStore.projectEpics
-        : this.rootIssueDetailStore.rootIssueStore.projectIssues;
-    currentStore.archiveIssue(workspaceSlug, projectId, issueId);
+    this.rootIssueDetailStore.rootIssueStore.projectIssues.archiveIssue(workspaceSlug, projectId, issueId);
   };
 
   addCycleToIssue = async (workspaceSlug: string, projectId: string, cycleId: string, issueId: string) => {

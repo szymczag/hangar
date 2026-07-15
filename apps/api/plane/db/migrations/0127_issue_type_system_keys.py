@@ -11,23 +11,27 @@ def provision_system_types(apps, schema_editor):
     Project = apps.get_model("db", "Project")
     ProjectIssueType = apps.get_model("db", "ProjectIssueType")
 
-    active_links = ProjectIssueType.objects.filter(deleted_at__isnull=True).values_list("project_id", flat=True)
-    project_ids = set(active_links)
-    project_ids.update(
-        Issue.objects.filter(type__is_epic=True, deleted_at__isnull=True).values_list("project_id", flat=True)
-    )
-
-    projects = Project.objects.filter(id__in=project_ids, deleted_at__isnull=True).only("id", "workspace_id")
+    projects = Project.objects.filter(deleted_at__isnull=True).only("id", "workspace_id")
     for project in projects.iterator():
         epic_type = (
             IssueType.objects.filter(
                 workspace_id=project.workspace_id,
-                is_epic=True,
+                system_key="epic",
                 deleted_at__isnull=True,
             )
             .order_by("created_at")
             .first()
         )
+        if epic_type is None:
+            epic_type = (
+                IssueType.objects.filter(
+                    workspace_id=project.workspace_id,
+                    is_epic=True,
+                    deleted_at__isnull=True,
+                )
+                .order_by("created_at")
+                .first()
+            )
         if epic_type is None:
             epic_type = IssueType.objects.create(
                 workspace_id=project.workspace_id,
@@ -54,8 +58,7 @@ def provision_system_types(apps, schema_editor):
         task_type = (
             IssueType.objects.filter(
                 workspace_id=project.workspace_id,
-                is_epic=False,
-                name__iexact="Task",
+                system_key="task",
                 deleted_at__isnull=True,
             )
             .order_by("created_at")
@@ -113,12 +116,19 @@ def provision_system_types(apps, schema_editor):
         ProjectIssueType.objects.filter(
             project_id=project.id, issue_type__is_epic=True, deleted_at__isnull=True
         ).update(level=1, is_default=False)
-        Issue.objects.filter(project_id=project.id, type_id__isnull=True, deleted_at__isnull=True).update(
+        # Issue's custom manager is not serialized into historical migration
+        # state. The base manager is always available on the historical model.
+        Issue._base_manager.filter(project_id=project.id, type_id__isnull=True, deleted_at__isnull=True).update(
             type_id=task_type.id
         )
 
 
 class Migration(migrations.Migration):
+    # PostgreSQL cannot build the IssueType partial index while deferred FK
+    # trigger events from ProjectIssueType provisioning are pending. Commit the
+    # atomic data backfill before applying the constraints.
+    atomic = False
+
     dependencies = [("db", "0126_optional_issue_external_identifiers")]
 
     operations = [
@@ -132,7 +142,7 @@ class Migration(migrations.Migration):
                 null=True,
             ),
         ),
-        migrations.RunPython(provision_system_types, migrations.RunPython.noop),
+        migrations.RunPython(provision_system_types, migrations.RunPython.noop, atomic=True),
         migrations.AddConstraint(
             model_name="issuetype",
             constraint=models.UniqueConstraint(

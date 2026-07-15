@@ -10,8 +10,6 @@ import type { TIssueMap } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 import { StoreContext } from "@/lib/store-context";
 // plane web types
-import type { IProjectEpics, IProjectEpicsFilter } from "@/plane-web/store/issue/epic";
-// types
 import type { ITeamIssues, ITeamIssuesFilter } from "@/plane-web/store/issue/team";
 import type { ITeamProjectWorkItemsFilter, ITeamProjectWorkItems } from "@/plane-web/store/issue/team-project";
 import type { ITeamViewIssues, ITeamViewIssuesFilter } from "@/plane-web/store/issue/team-views";
@@ -76,8 +74,8 @@ export type TStoreIssues = {
     issuesFilter: IProjectIssuesFilter;
   };
   [EIssuesStoreType.EPIC]: defaultIssueStore & {
-    issues: IProjectEpics;
-    issuesFilter: IProjectEpicsFilter;
+    issues: IProjectIssues;
+    issuesFilter: IProjectIssuesFilter;
   };
   [EIssuesStoreType.TEAM_PROJECT_WORK_ITEMS]: defaultIssueStore & {
     issues: ITeamProjectWorkItems;

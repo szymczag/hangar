@@ -25,6 +25,7 @@ from plane.db.models import (
 from plane.utils.content_validator import (
     validate_html_content,
 )
+from plane.ext.services import ensure_project_system_types
 
 
 class ProjectSerializer(BaseSerializer):
@@ -91,6 +92,7 @@ class ProjectSerializer(BaseSerializer):
         workspace_id = self.context["workspace_id"]
 
         project = Project.objects.create(**validated_data, workspace_id=workspace_id)
+        ensure_project_system_types(project)
 
         ProjectIdentifier.objects.create(name=project.identifier, project=project, workspace_id=workspace_id)
 

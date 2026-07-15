@@ -215,7 +215,8 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
   // data
   const { issueTypes, isLoading, mutate } = useIssueTypes(workspaceSlug, projectId);
   // derived values
-  const hasSystemTypes = (issueTypes ?? []).some((type) => type.system_key === "task" || type.system_key === "epic");
+  const systemKeys = new Set((issueTypes ?? []).map((type) => type.system_key));
+  const hasSystemTypes = systemKeys.has("task") && systemKeys.has("epic");
 
   const enableTypes = async () => {
     if (!isAdmin || isEnabling) return;

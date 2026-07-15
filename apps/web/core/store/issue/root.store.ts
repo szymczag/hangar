@@ -10,8 +10,6 @@ import { autorun, makeObservable, observable } from "mobx";
 import type { ICycle, IIssueLabel, IModule, IProject, IState, IUserLite, TIssueServiceType } from "@plane/types";
 import { EIssueServiceType } from "@plane/types";
 // plane web store
-import type { IProjectEpics, IProjectEpicsFilter } from "@/plane-web/store/issue/epic";
-import { ProjectEpics, ProjectEpicsFilter } from "@/plane-web/store/issue/epic";
 import type { IIssueDetail } from "@/plane-web/store/issue/issue-details/root.store";
 import { IssueDetail } from "@/plane-web/store/issue/issue-details/root.store";
 import type { ITeamIssuesFilter, ITeamIssues } from "@/plane-web/store/issue/team";
@@ -115,8 +113,8 @@ export interface IIssueRootStore {
   issueKanBanView: IIssueKanBanViewStore;
   issueCalendarView: ICalendarStore;
 
-  projectEpicsFilter: IProjectEpicsFilter;
-  projectEpics: IProjectEpics;
+  projectEpicsFilter: IProjectIssuesFilter;
+  projectEpics: IProjectIssues;
 }
 
 export class IssueRootStore implements IIssueRootStore {
@@ -183,8 +181,8 @@ export class IssueRootStore implements IIssueRootStore {
   issueKanBanView: IIssueKanBanViewStore;
   issueCalendarView: ICalendarStore;
 
-  projectEpicsFilter: IProjectEpicsFilter;
-  projectEpics: IProjectEpics;
+  projectEpicsFilter: IProjectIssuesFilter;
+  projectEpics: IProjectIssues;
 
   constructor(rootStore: RootStore, serviceType: TIssueServiceType = EIssueServiceType.ISSUES) {
     makeObservable(this, {
@@ -236,7 +234,7 @@ export class IssueRootStore implements IIssueRootStore {
     this.issues = new IssueStore();
 
     this.issueDetail = new IssueDetail(this, EIssueServiceType.ISSUES);
-    this.epicDetail = new IssueDetail(this, EIssueServiceType.EPICS);
+    this.epicDetail = this.issueDetail;
 
     this.workspaceIssuesFilter = new WorkspaceIssuesFilter(this);
     this.workspaceIssues = new WorkspaceIssues(this, this.workspaceIssuesFilter);
@@ -274,7 +272,7 @@ export class IssueRootStore implements IIssueRootStore {
     this.issueKanBanView = new IssueKanBanViewStore(this);
     this.issueCalendarView = new CalendarStore(this);
 
-    this.projectEpicsFilter = new ProjectEpicsFilter(this);
-    this.projectEpics = new ProjectEpics(this, this.projectEpicsFilter);
+    this.projectEpicsFilter = this.projectIssuesFilter;
+    this.projectEpics = this.projectIssues;
   }
 }

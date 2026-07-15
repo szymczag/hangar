@@ -43,6 +43,7 @@ from plane.db.models import (
     User,
     BotTypeEnum,
 )
+from plane.ext.services import ensure_project_system_types, project_default_issue_type
 
 logger = logging.getLogger("plane.worker")
 
@@ -111,6 +112,7 @@ def create_project_and_member(workspace: Workspace, bot_user: User) -> Dict[int,
             issue_views_view=True,
         )
         project.save(created_by_id=bot_user.id, disable_auto_set_user=True)
+        ensure_project_system_types(project)
 
         # Create project members
         ProjectMember.objects.bulk_create(
@@ -267,6 +269,8 @@ def create_project_issues(
     if not issue_seeds:
         return
 
+    default_type_ids = {project_id: project_default_issue_type(project_id).id for project_id in project_map.values()}
+
     for issue_seed in issue_seeds:
         required_fields = ["id", "labels", "project_id", "state_id"]
         # get the values
@@ -288,6 +292,7 @@ def create_project_issues(
             state_id=states_map[state_id],
             project_id=project_map[project_id],
             workspace=workspace,
+            type_id=default_type_ids[project_map[project_id]],
             created_by_id=bot_user.id,
         )
         issue.save(created_by_id=bot_user.id, disable_auto_set_user=True)

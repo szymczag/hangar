@@ -67,7 +67,7 @@ export const SubIssuesListRoot = observer(function SubIssuesListRoot(props: Prop
     groupBy: group_by as GroupByColumnTypes,
     includeNone: true,
     isWorkspaceLevel: isWorkspaceLevel(storeType),
-    isEpic: issueServiceType === EIssueServiceType.EPICS,
+    isEpic: false,
     projectId,
   });
 
@@ -83,24 +83,14 @@ export const SubIssuesListRoot = observer(function SubIssuesListRoot(props: Prop
     [isRootLevel, subIssuesByIssueId, rootIssueId, getGroupedSubWorkItems, parentIssueId]
   );
 
-  const isSubWorkItems = issueServiceType === EIssueServiceType.ISSUES;
-
   return (
     <div className="relative">
       {isRootLevel && filteredSubWorkItemsCount === 0 ? (
         <SectionEmptyState
-          title={
-            !isSubWorkItems
-              ? t("sub_work_item.empty_state.list_filters.title")
-              : t("sub_work_item.empty_state.sub_list_filters.title")
-          }
-          description={
-            !isSubWorkItems
-              ? t("sub_work_item.empty_state.list_filters.description")
-              : t("sub_work_item.empty_state.sub_list_filters.description")
-          }
+          title={t("sub_work_item.empty_state.sub_list_filters.title")}
+          description={t("sub_work_item.empty_state.sub_list_filters.description")}
           icon={<ListFilter />}
-          customClassName={storeType !== EIssuesStoreType.EPIC ? "border-none" : ""}
+          customClassName="border-none"
           actionElement={
             <Button variant="secondary" onClick={() => resetFilters(rootIssueId)}>
               {t("sub_work_item.empty_state.list_filters.action")}

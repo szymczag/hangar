@@ -39,6 +39,7 @@ from plane.db.models import (
     IntakeIssue,
 )
 from plane.db.models.intake import SourceType
+from plane.ext.services import ensure_project_system_types, project_default_issue_type
 
 
 def create_project(workspace, user_id):
@@ -53,6 +54,7 @@ def create_project(workspace, user_id):
         created_by_id=user_id,
         intake_view=True,
     )
+    ensure_project_system_types(project)
 
     # Add current member as project member
     _ = ProjectMember.objects.create(project=project, member_id=user_id, role=20)
@@ -276,6 +278,7 @@ def create_issues(workspace, project, user_id, issue_count):
     creators = ProjectMember.objects.filter(workspace=workspace, project=project).values_list("member_id", flat=True)
 
     issues = []
+    default_issue_type = project_default_issue_type(project.id)
 
     # Get the maximum sequence_id
     last_id = IssueSequence.objects.filter(project=project).aggregate(largest=Max("sequence"))["largest"]
@@ -306,6 +309,7 @@ def create_issues(workspace, project, user_id, issue_count):
                 state_id=states[random.randint(0, len(states) - 1)],
                 project=project,
                 workspace=workspace,
+                type=default_issue_type,
                 name=text[:254],
                 description_html=f"<p>{text}</p>",
                 description_stripped=text,

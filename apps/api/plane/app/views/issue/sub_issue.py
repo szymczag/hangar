@@ -30,6 +30,9 @@ from plane.utils.timezone_converter import user_timezone_converter
 from collections import defaultdict
 from plane.utils.host import base_host
 from plane.utils.order_queryset import order_issue_queryset
+from plane.ext.services import WorkItemInvariantError, parent_ancestry_ids
+
+MAX_SUB_ISSUES_PER_REQUEST = 100
 
 
 class SubIssuesEndpoint(BaseAPIView):
@@ -214,7 +217,11 @@ class SubIssuesEndpoint(BaseAPIView):
     # Assign multiple sub issues
     @transaction.atomic
     def post(self, request, slug, project_id, issue_id):
-        id_list = serializers.ListField(child=serializers.UUIDField(), allow_empty=False)
+        id_list = serializers.ListField(
+            child=serializers.UUIDField(),
+            allow_empty=False,
+            max_length=MAX_SUB_ISSUES_PER_REQUEST,
+        )
         try:
             sub_issue_ids = id_list.run_validation(request.data.get("sub_issue_ids"))
         except serializers.ValidationError as exc:
@@ -263,25 +270,23 @@ class SubIssuesEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        parent_by_id = dict(
-            Issue.objects.filter(project_id=project_id, workspace__slug=slug).values_list("id", "parent_id")
-        )
-        for sub_issue in sub_issues:
-            ancestor_id = parent_issue.id
-            visited = set()
-            while ancestor_id is not None:
-                if ancestor_id == sub_issue.id:
-                    return Response(
-                        {"sub_issue_ids": "Parent assignment would create a cycle"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                if ancestor_id in visited:
-                    return Response(
-                        {"sub_issue_ids": "The existing parent hierarchy contains a cycle"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                visited.add(ancestor_id)
-                ancestor_id = parent_by_id.get(ancestor_id)
+        try:
+            ancestor_ids = parent_ancestry_ids(
+                parent_id=parent_issue.id,
+                project_id=project_id,
+                workspace_id=parent_issue.workspace_id,
+            )
+        except WorkItemInvariantError as exc:
+            return Response(
+                {"sub_issue_ids": exc.message},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if any(sub_issue.id in ancestor_ids for sub_issue in sub_issues):
+            return Response(
+                {"sub_issue_ids": "Parent assignment would create a cycle"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         previous_parents = {sub_issue.id: sub_issue.parent_id for sub_issue in sub_issues}
 
@@ -300,23 +305,23 @@ class SubIssuesEndpoint(BaseAPIView):
             .annotate(state_group=F("state__group"))
         )
 
-        # Track the issue
-        _ = [
-            issue_activity.delay(
-                type="issue.activity.updated",
-                requested_data=json.dumps({"parent": str(issue_id)}),
-                actor_id=str(request.user.id),
-                issue_id=str(sub_issue_id),
-                project_id=str(project_id),
-                current_instance=json.dumps(
-                    {"parent": str(previous_parents[sub_issue_id]) if previous_parents[sub_issue_id] else None}
-                ),
-                epoch=int(timezone.now().timestamp()),
-                notification=True,
-                origin=base_host(request=request, is_app=True),
-            )
-            for sub_issue_id in sub_issue_ids
-        ]
+        def dispatch_activities():
+            for sub_issue_id in sub_issue_ids:
+                issue_activity.delay(
+                    type="issue.activity.updated",
+                    requested_data=json.dumps({"parent": str(issue_id)}),
+                    actor_id=str(request.user.id),
+                    issue_id=str(sub_issue_id),
+                    project_id=str(project_id),
+                    current_instance=json.dumps(
+                        {"parent": str(previous_parents[sub_issue_id]) if previous_parents[sub_issue_id] else None}
+                    ),
+                    epoch=int(timezone.now().timestamp()),
+                    notification=True,
+                    origin=base_host(request=request, is_app=True),
+                )
+
+        transaction.on_commit(dispatch_activities)
 
         # create's a dict with state group name with their respective issue id's
         result = defaultdict(list)

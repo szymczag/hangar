@@ -8,7 +8,8 @@ from uuid import uuid4
 import pytest
 from rest_framework import status
 
-from plane.db.models import Project, ProjectMember, State, User, WorkspaceMember
+from plane.db.models import IssueType, Project, ProjectMember, State, User, WorkspaceMember
+from plane.db.models.issue_type import ProjectIssueType
 
 
 @pytest.fixture
@@ -120,6 +121,18 @@ class TestProjectListCreateAPIEndpoint:
         project = Project.objects.get(id=response.data["id"])
         assert ProjectMember.objects.filter(project=project, member=create_user, role=20).count() == 1
         assert State.objects.filter(project=project).count() == 5
+        assert ProjectIssueType.objects.filter(
+            project=project,
+            issue_type__system_key=IssueType.SystemKey.TASK,
+            is_default=True,
+            level=0,
+        ).exists()
+        assert ProjectIssueType.objects.filter(
+            project=project,
+            issue_type__system_key=IssueType.SystemKey.EPIC,
+            is_default=False,
+            level=1,
+        ).exists()
 
     @pytest.mark.django_db
     def test_create_project_with_lead_not_in_workspace_returns_400(self, api_key_client, workspace, outsider_user):

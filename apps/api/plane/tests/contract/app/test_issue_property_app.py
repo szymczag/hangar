@@ -3,8 +3,10 @@
 # See the LICENSE file for details.
 
 from uuid import uuid4
+from importlib import import_module
 
 import pytest
+from django.apps import apps as django_apps
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -54,6 +56,27 @@ def make_role_client(workspace, project, role):
     client = APIClient()
     client.force_authenticate(user=user)
     return client, user
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_system_type_migration_provisions_every_project_without_hijacking_custom_task(workspace, project, state):
+    custom_task = IssueType.objects.create(workspace=workspace, name="Task")
+    ProjectIssueType.objects.create(project=project, issue_type=custom_task)
+    untyped = Issue.objects.create(name="Untyped", workspace=workspace, project=project, state=state)
+
+    migration = import_module("plane.db.migrations.0127_issue_type_system_keys")
+    migration.provision_system_types(django_apps, None)
+
+    custom_task.refresh_from_db()
+    untyped.refresh_from_db()
+    canonical_task = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.TASK)
+    canonical_epic = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.EPIC)
+
+    assert custom_task.system_key is None
+    assert canonical_task.id != custom_task.id
+    assert untyped.type_id == canonical_task.id
+    assert ProjectIssueType.objects.filter(project=project, issue_type=canonical_epic, level=1).exists()
 
 
 @pytest.mark.contract

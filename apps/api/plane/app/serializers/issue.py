@@ -44,7 +44,7 @@ from plane.db.models import (
     EstimatePoint,
     IssueType,
 )
-from plane.db.models.issue_type import ProjectIssueType
+from plane.ext.services import WorkItemInvariantError, project_default_issue_type, validate_work_item_assignment
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
@@ -116,6 +116,9 @@ class IssueCreateSerializer(BaseSerializer):
             "created_at",
             "updated_at",
             "completed_at",
+            "state",
+            "parent",
+            "type",
         ]
 
     def to_representation(self, instance):
@@ -180,42 +183,20 @@ class IssueCreateSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("State is not valid please pass a valid state_id")
 
-        # Check parent issue is from workspace as it can be cross workspace
-        if (
-            attrs.get("parent")
-            and not Issue.objects.filter(
-                project_id=self.context.get("project_id"),
-                pk=attrs.get("parent").id,
-            ).exists()
-        ):
-            raise serializers.ValidationError("Parent is not valid issue_id please pass a valid issue_id")
-
         effective_type = attrs.get("type", getattr(self.instance, "type", None))
-        if effective_type and (
-            not effective_type.is_active
-            or not ProjectIssueType.objects.filter(
-                project_id=self.context.get("project_id"),
-                issue_type=effective_type,
-            ).exists()
-        ):
-            raise serializers.ValidationError({"type_id": "Work item type is not active for this project"})
-
         effective_parent = attrs.get("parent", getattr(self.instance, "parent", None))
-        if effective_type and effective_type.is_epic and effective_parent is not None:
-            raise serializers.ValidationError({"parent_id": "Epic work items cannot have a parent"})
-
-        if self.instance and effective_parent and effective_parent.pk == self.instance.pk:
-            raise serializers.ValidationError({"parent_id": "A work item cannot be its own parent"})
-
-        ancestor = effective_parent
-        visited = set()
-        while self.instance and ancestor is not None:
-            if ancestor.pk == self.instance.pk:
-                raise serializers.ValidationError({"parent_id": "Parent assignment would create a cycle"})
-            if ancestor.pk in visited:
-                raise serializers.ValidationError({"parent_id": "The existing parent hierarchy contains a cycle"})
-            visited.add(ancestor.pk)
-            ancestor = ancestor.parent
+        try:
+            scoped_parent = validate_work_item_assignment(
+                project_id=self.context.get("project_id"),
+                workspace_id=self.context.get("workspace_id"),
+                issue_type=effective_type,
+                parent=effective_parent,
+                issue_id=self.instance.pk if self.instance else None,
+            )
+        except WorkItemInvariantError as exc:
+            raise serializers.ValidationError({exc.field: exc.message}) from exc
+        if "parent" in attrs:
+            attrs["parent"] = scoped_parent
 
         if (
             attrs.get("estimate_point")
@@ -242,17 +223,9 @@ class IssueCreateSerializer(BaseSerializer):
             if default_state is not None:
                 validated_data["state"] = default_state
         if "type" not in validated_data:
-            default_type = (
-                ProjectIssueType.objects.filter(
-                    project_id=project_id,
-                    is_default=True,
-                    issue_type__is_active=True,
-                )
-                .select_related("issue_type")
-                .first()
-            )
+            default_type = project_default_issue_type(project_id)
             if default_type is not None:
-                validated_data["type"] = default_type.issue_type
+                validated_data["type"] = default_type
 
         issue = Issue.objects.create(**validated_data, project_id=project_id)
 
