@@ -27,25 +27,25 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 
 ## Project status
 
-| Capability                                    | Status                 | Tracking                                              |
-| --------------------------------------------- | ---------------------- | ----------------------------------------------------- |
-| Fork maintenance guide and CI baseline        | Available on `preview` | [FORK.md](FORK.md)                                    |
-| Isolated backend extension scaffold           | Available on `preview` | [#2](https://github.com/szymczag/hangar/pull/2)       |
-| OIDC backend                                  | Available on `preview` | [#3](https://github.com/szymczag/hangar/pull/3)       |
-| OIDC administration and sign-in UI            | Available on `preview` | [#4](https://github.com/szymczag/hangar/pull/4)       |
-| SAML 2.0 backend                              | Available on `preview` | [#5](https://github.com/szymczag/hangar/pull/5)       |
-| SAML 2.0 administration and sign-in UI        | Available on `preview` | [#6](https://github.com/szymczag/hangar/pull/6)       |
-| Immutable federated SSO identity binding      | Available on `preview` | [#45](https://github.com/szymczag/hangar/pull/45)     |
-| Epics backend                                 | Available on `preview` | [#7](https://github.com/szymczag/hangar/pull/7)       |
-| Epics UI and required API surfaces            | Available on `preview` | [#9](https://github.com/szymczag/hangar/pull/9)       |
-| Custom work-item types and properties backend | Available on `preview` | [#10](https://github.com/szymczag/hangar/pull/10)     |
-| Custom work-item types and properties UI      | Available on `preview` | [#11](https://github.com/szymczag/hangar/pull/11)     |
-| Time tracking and worklogs backend            | Available on `preview` | [#12](https://github.com/szymczag/hangar/pull/12)     |
-| Time tracking and worklogs UI                 | Available on `preview` | [#13](https://github.com/szymczag/hangar/pull/13)     |
-| Runner installation control-plane foundation  | Available on `preview` | [#46](https://github.com/szymczag/hangar/pull/46)     |
-| Secure SES delivery and optional OpenPGP      | Available on `preview` | [#44](https://github.com/szymczag/hangar/pull/44)     |
-| Todoist CSV importer                          | Available on `preview` | [#50](https://github.com/szymczag/hangar/pull/50)     |
-| Helm chart evaluation profile                 | Public prerelease      | [Kubernetes documentation](docs/kubernetes/README.md) |
+| Capability                                    | Status                              | Tracking                                              |
+| --------------------------------------------- | ----------------------------------- | ----------------------------------------------------- |
+| Fork maintenance guide and CI baseline        | Available on `preview`              | [FORK.md](FORK.md)                                    |
+| Isolated backend extension scaffold           | Available on `preview`              | [#2](https://github.com/szymczag/hangar/pull/2)       |
+| OIDC backend                                  | Available on `preview`              | [#3](https://github.com/szymczag/hangar/pull/3)       |
+| OIDC administration and sign-in UI            | Available on `preview`              | [#4](https://github.com/szymczag/hangar/pull/4)       |
+| SAML 2.0 backend                              | Available on `preview`              | [#5](https://github.com/szymczag/hangar/pull/5)       |
+| SAML 2.0 administration and sign-in UI        | Available on `preview`              | [#6](https://github.com/szymczag/hangar/pull/6)       |
+| Immutable federated SSO identity binding      | Available on `preview`              | [#45](https://github.com/szymczag/hangar/pull/45)     |
+| Epics backend                                 | Available on `preview`              | [#7](https://github.com/szymczag/hangar/pull/7)       |
+| Epics UI and required API surfaces            | Available on `preview`              | [#9](https://github.com/szymczag/hangar/pull/9)       |
+| Custom work-item types and properties backend | Available on `preview`              | [#10](https://github.com/szymczag/hangar/pull/10)     |
+| Custom work-item types and properties UI      | Available on `preview`              | [#11](https://github.com/szymczag/hangar/pull/11)     |
+| Time tracking and worklogs backend            | Available on `preview`              | [#12](https://github.com/szymczag/hangar/pull/12)     |
+| Time tracking and worklogs UI                 | Available on `preview`              | [#13](https://github.com/szymczag/hangar/pull/13)     |
+| Runner installation control-plane foundation  | Available on `preview`              | [#46](https://github.com/szymczag/hangar/pull/46)     |
+| Secure SES delivery and optional OpenPGP      | Available on `preview`              | [#44](https://github.com/szymczag/hangar/pull/44)     |
+| Todoist CSV importer                          | Available; opt-in and quota-bounded | [#50](https://github.com/szymczag/hangar/pull/50)     |
+| Helm chart evaluation profile                 | Public prerelease                   | [Kubernetes documentation](docs/kubernetes/README.md) |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
 plan a deployment around those capabilities until their pull requests have merged and
@@ -72,7 +72,14 @@ the table marks them as available.
 - [Email delivery technical reference](docs/email-technical-implementation-plan.md)
   — maintainer architecture, invariants, retention, and release evidence.
 - [Importing from Todoist](docs/importing-from-todoist.md) — administrator workflow,
-  CSV validation behavior, private source-file handling, recovery, and troubleshooting.
+  CSV validation behavior, private source-file handling, durable dispatch,
+  fenced per-row authorization, database idempotency, immutable retry/audit
+  history, recovery, and troubleshooting. The importer is disabled by default
+  and remains hidden until the operator opts in. Execute traffic uses a
+  dedicated queue, while PostgreSQL admission budgets and per-user/workspace
+  throttles bound concurrent work, retained source bytes, and rolling row use.
+  The request throttles use atomic Valkey/Redis counters across API replicas and
+  fail closed before parsing an upload when that dependency is unavailable.
 
 The inherited Plane Community chart is not a Hangar release and is not supported
 for new Hangar installations.

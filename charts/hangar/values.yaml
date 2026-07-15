@@ -92,6 +92,34 @@ mail:
         cpu: 2000m
         memory: 2Gi
 
+todoistImports:
+  enabled: false
+  leaseSeconds: 120
+  recoveryGraceSeconds: 30
+  sourceRetentionHours: 24
+  previewUserRate: 10/minute
+  previewWorkspaceRate: 30/minute
+  executeUserRate: 3/hour
+  executeWorkspaceRate: 10/hour
+  maxActivePerUser: 1
+  maxActivePerWorkspace: 2
+  maxRowsPerWorkspace24h: 50000
+  maxActiveSourceBytesPerWorkspace: 10485760
+  worker:
+    replicas: 1
+    concurrency: 2
+    prefetchMultiplier: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    pdb:
+      enabled: false
+      maxUnavailable: 1
+
 externalServices:
   objectStorage:
     endpoint: https://s3.example.com

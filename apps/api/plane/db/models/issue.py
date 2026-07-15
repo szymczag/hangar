@@ -179,6 +179,17 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         verbose_name_plural = "Issues"
         db_table = "issues"
         ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "external_source", "external_id"],
+                condition=models.Q(
+                    deleted_at__isnull=True,
+                    external_source="todoist_csv",
+                    external_id__isnull=False,
+                ),
+                name="todoist_issue_external_uidx",
+            )
+        ]
 
     def save(self, *args, **kwargs):
         self._ensure_default_state()
@@ -537,6 +548,17 @@ class IssueComment(ChangeTrackerMixin, ProjectBaseModel):
         verbose_name_plural = "Issue Comments"
         db_table = "issue_comments"
         ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["issue", "external_source", "external_id"],
+                condition=models.Q(
+                    deleted_at__isnull=True,
+                    external_source="todoist_csv",
+                    external_id__isnull=False,
+                ),
+                name="todoist_comment_external_uidx",
+            )
+        ]
 
     def __str__(self):
         """Return issue of the comment"""

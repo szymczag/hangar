@@ -58,6 +58,22 @@ required resources with the
 [SES operations guide](../../docs/aws-ses-email-operations.md), and review the
 [Helm values and Secret contract](../../docs/kubernetes/configuration.md#secure-email-delivery).
 
+## Optional Todoist import workload
+
+Todoist imports are disabled by default. Setting `todoistImports.enabled=true`
+renders a dedicated `import-worker` that consumes only the `imports` queue and
+receives the private import-bucket credential interface. The values contract
+also bounds API rates, concurrent user/workspace jobs, rolling workspace rows,
+active source bytes, worker concurrency/prefetch, resources, replicas, and an
+optional PDB. Invalid rates or numeric ranges are rejected during rendering.
+
+Before enabling it, provision and test the distinct private import bucket, apply
+the database migration, and verify PostgreSQL, Valkey, RabbitMQ, the Beat worker,
+and the import worker. Follow the
+[operator configuration](../../docs/kubernetes/configuration.md#todoist-import-admission-and-worker),
+[runbook](../../docs/kubernetes/operations.md#operate-todoist-imports), and
+[user/security guide](../../docs/importing-from-todoist.md).
+
 ## Prerequisites
 
 - Kubernetes 1.30 through 1.36, including 1.36.2;
@@ -143,8 +159,9 @@ application digests are invalid by design. Maintainers stage release or preview
 image digests with `charts/hangar/scripts/prepare-release.sh`, then run:
 
 ```bash
-charts/hangar/tests/install-e2e-tools.sh /tmp/hangar-e2e-bin
-PATH="/tmp/hangar-e2e-bin:$PATH" \
+mkdir -p .local/hangar-e2e-bin
+charts/hangar/tests/install-e2e-tools.sh .local/hangar-e2e-bin
+PATH="$PWD/.local/hangar-e2e-bin:$PATH" \
   charts/hangar/tests/e2e-kind.sh /path/to/staged/hangar-chart
 ```
 

@@ -32,13 +32,22 @@ export type TTodoistImportPreview = {
 export type TImportJob = {
   id: string;
   provider: "todoist_csv";
-  status: "queued" | "processing" | "completed" | "completed_with_errors" | "failed" | "cancelled";
+  status:
+    | "preparing"
+    | "queued"
+    | "processing"
+    | "cancelling"
+    | "completed"
+    | "completed_with_errors"
+    | "failed"
+    | "cancelled";
   project: string;
   project_detail: { id: string; name: string; identifier: string };
   stats: Record<string, number>;
   errors: TImportDiagnostic[];
   reason: string;
   attempt_count: number;
+  retry_of: string | null;
   started_at: string | null;
   cancel_requested_at: string | null;
   completed_at: string | null;

@@ -13,12 +13,14 @@ import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view
 import { PageHead } from "@/components/core/page-title";
 import { SettingsContentWrapper } from "@/components/settings/content-wrapper";
 import { SettingsHeading } from "@/components/settings/heading";
+import { useInstance } from "@/hooks/store/use-instance";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUserPermissions } from "@/hooks/store/user";
 import { TodoistImport } from "@/plane-web/components/workspace/imports/todoist-import";
 import { ImportsWorkspaceSettingsHeader } from "./header";
 
 function ImportsPage() {
+  const { config } = useInstance();
   const { workspaceUserInfo, allowPermissions } = useUserPermissions();
   const { currentWorkspace } = useWorkspace();
   const { t } = useTranslation();
@@ -27,7 +29,9 @@ function ImportsPage() {
     ? `${currentWorkspace.name} - ${t("workspace_settings.settings.imports.title")}`
     : undefined;
 
-  if (workspaceUserInfo && !isAdmin) return <NotAuthorizedView section="settings" className="h-auto" />;
+  if (!config) return null;
+  if (!config.is_todoist_imports_enabled || (workspaceUserInfo && !isAdmin))
+    return <NotAuthorizedView section="settings" className="h-auto" />;
 
   return (
     <SettingsContentWrapper header={<ImportsWorkspaceSettingsHeader />} hugging>

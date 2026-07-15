@@ -11,4 +11,9 @@ wait_for_migrations
 if [ "${HANGAR_WORKER_QUEUE:-default}" = "email" ]; then
     exec celery -A plane worker -l info -Q email -n email@%h
 fi
+if [ "${HANGAR_WORKER_QUEUE:-default}" = "imports" ]; then
+    exec celery -A plane worker -l info -Q imports -n imports@%h \
+        --concurrency="${TODOIST_IMPORT_WORKER_CONCURRENCY:-2}" \
+        --prefetch-multiplier="${TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER:-1}"
+fi
 exec celery -A plane worker -l info -Q celery

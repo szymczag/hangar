@@ -13,20 +13,24 @@ import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { importService } from "@/plane-web/services/import.service";
 import type { TImportJob } from "@/plane-web/types/import";
 
-const ACTIVE_STATUSES = new Set(["queued", "processing"]);
+const ACTIVE_STATUSES = new Set(["preparing", "queued", "processing", "cancelling"]);
+const CANCELLABLE_STATUSES = new Set(["preparing", "queued", "processing"]);
 const REPORT_STATUSES = new Set(["completed", "completed_with_errors", "failed", "cancelled"]);
 
 type Props = {
   workspaceSlug: string;
   errorMessage: (error: unknown) => string;
   refreshToken: number;
+  onRetry: (job: TImportJob) => void;
 };
 
-export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken }: Props) {
+export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken, onRetry }: Props) {
   const { t } = useTranslation();
   const statusLabels: Record<TImportJob["status"], string> = {
+    preparing: t("workspace_settings.settings.todoist_import.history.status.preparing"),
     queued: t("workspace_settings.settings.todoist_import.history.status.queued"),
     processing: t("workspace_settings.settings.todoist_import.history.status.processing"),
+    cancelling: t("workspace_settings.settings.todoist_import.history.status.cancelling"),
     completed: t("workspace_settings.settings.todoist_import.history.status.completed"),
     completed_with_errors: t("workspace_settings.settings.todoist_import.history.status.completed_with_errors"),
     failed: t("workspace_settings.settings.todoist_import.history.status.failed"),
@@ -84,49 +88,72 @@ export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken
           </div>
         ) : (
           <div className="divide-y divide-subtle">
-            {data.results.map((job) => (
-              <div key={job.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-start gap-3">
-                  {job.status === "completed" ? (
-                    <CheckCircle2 className="mt-0.5 size-4 text-success-primary" />
-                  ) : ACTIVE_STATUSES.has(job.status) ? (
-                    <Loader2 className="mt-0.5 size-4 animate-spin text-accent-primary" />
-                  ) : (
-                    <AlertTriangle className="mt-0.5 size-4 text-warning-primary" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-body-sm-medium text-primary">{job.project_detail.name}</p>
-                    <p className="mt-0.5 text-body-xs-regular text-secondary">
-                      {statusLabels[job.status]} · {job.stats.imported_tasks ?? 0}{" "}
-                      {t("workspace_settings.settings.todoist_import.history.of")} {job.stats.planned_tasks ?? 0}{" "}
-                      {t("workspace_settings.settings.todoist_import.tasks").toLocaleLowerCase()}
-                    </p>
+            {data.results.map((job) => {
+              const statusLabel =
+                (statusLabels as Record<string, string>)[job.status] ??
+                t("workspace_settings.settings.todoist_import.history.status.unknown");
+              const importedTasks = job.stats.imported_tasks ?? 0;
+              const reusedTasks = job.stats.reused_tasks ?? 0;
+              return (
+                <div key={job.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    {job.status === "completed" ? (
+                      <CheckCircle2 className="mt-0.5 size-4 text-success-primary" />
+                    ) : ACTIVE_STATUSES.has(job.status) ? (
+                      <Loader2 className="mt-0.5 size-4 animate-spin text-accent-primary" />
+                    ) : (
+                      <AlertTriangle className="mt-0.5 size-4 text-warning-primary" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-body-sm-medium text-primary">{job.project_detail.name}</p>
+                      <p className="mt-0.5 text-body-xs-regular text-secondary">
+                        {statusLabel} · {importedTasks + reusedTasks}{" "}
+                        {t("workspace_settings.settings.todoist_import.history.of")} {job.stats.planned_tasks ?? 0}{" "}
+                        {t("workspace_settings.settings.todoist_import.tasks").toLocaleLowerCase()}
+                      </p>
+                      {reusedTasks > 0 && (
+                        <p className="mt-0.5 text-body-xs-regular text-secondary">
+                          {importedTasks} {t("workspace_settings.settings.todoist_import.history.imported")} ·{" "}
+                          {reusedTasks} {t("workspace_settings.settings.todoist_import.history.reused")}
+                        </p>
+                      )}
+                      {job.retry_of && (
+                        <p className="mt-0.5 text-body-xs-regular text-secondary">
+                          {t("workspace_settings.settings.todoist_import.history.retry_of")} {job.retry_of.slice(0, 8)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {job.status === "failed" && (
+                      <Button variant="secondary" size="sm" onClick={() => onRetry(job)}>
+                        {t("workspace_settings.settings.todoist_import.history.retry")}
+                      </Button>
+                    )}
+                    {CANCELLABLE_STATUSES.has(job.status) && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={cancellingJobId === job.id || Boolean(job.cancel_requested_at)}
+                        onClick={() => void cancel(job.id)}
+                      >
+                        {job.cancel_requested_at
+                          ? t("workspace_settings.settings.todoist_import.history.cancellation_requested")
+                          : t("workspace_settings.settings.todoist_import.history.cancel")}
+                      </Button>
+                    )}
+                    {REPORT_STATUSES.has(job.status) && (
+                      <a
+                        className="text-body-xs-medium text-accent-primary hover:underline"
+                        href={importService.reportUrl(workspaceSlug, job.id)}
+                      >
+                        {t("workspace_settings.settings.todoist_import.history.download_report")}
+                      </a>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  {ACTIVE_STATUSES.has(job.status) && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={cancellingJobId === job.id || Boolean(job.cancel_requested_at)}
-                      onClick={() => void cancel(job.id)}
-                    >
-                      {job.cancel_requested_at
-                        ? t("workspace_settings.settings.todoist_import.history.cancellation_requested")
-                        : t("workspace_settings.settings.todoist_import.history.cancel")}
-                    </Button>
-                  )}
-                  {REPORT_STATUSES.has(job.status) && (
-                    <a
-                      className="text-body-xs-medium text-accent-primary hover:underline"
-                      href={importService.reportUrl(workspaceSlug, job.id)}
-                    >
-                      {t("workspace_settings.settings.todoist_import.history.download_report")}
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

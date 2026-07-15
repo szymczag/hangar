@@ -94,6 +94,7 @@ export interface IInstanceConfig {
   oidc_provider_name: string | undefined;
   is_saml_enabled: boolean;
   saml_provider_name: string | undefined;
+  is_todoist_imports_enabled?: boolean;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;

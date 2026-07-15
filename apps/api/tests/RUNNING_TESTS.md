@@ -48,16 +48,18 @@ docker compose -f docker-compose-test.yml run --rm api-tests \
 
 The available markers (`unit`, `contract`, `smoke`, `slow`) are declared in `apps/api/pytest.ini`.
 
-### Migration-backed Runner invariants
+### Migration-backed security invariants
 
-The default suite uses `--nomigrations` for speed. Runner's additive upgrade path,
-PostgreSQL constraints, and append-only trigger must also be tested against the
-real migration chain:
+The default suite uses `--nomigrations` for speed. Runner's additive upgrade path
+and the Runner and Todoist importer PostgreSQL constraints and append-only audit
+triggers must also be tested against the real migration chain:
 
 ```bash
 docker compose -f docker-compose-test.yml run --rm --build api-tests \
-  pytest --migrations --create-db -m runner_migrations \
-  plane/tests/contract/app/test_runner_installation_app.py
+  pytest --migrations --create-db \
+  -m "runner_migrations or todoist_migrations" \
+  plane/tests/contract/app/test_runner_installation_app.py \
+  plane/tests/unit/ext/test_todoist_import_tasks.py
 ```
 
 Run this command from a clean test stack. CI executes it in a dedicated job so

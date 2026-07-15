@@ -65,6 +65,16 @@ services:
       RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-plane}
     tmpfs:
       - /var/lib/rabbitmq
+    # Rootless Podman can pre-create the image cookie as root. Generate the
+    # disposable cookie with its final ownership before dropping privileges.
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        head -c 48 /dev/urandom | base64 > /var/lib/rabbitmq/.erlang.cookie
+        chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie
+        chmod 0600 /var/lib/rabbitmq/.erlang.cookie
+        exec su-exec rabbitmq rabbitmq-server
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s

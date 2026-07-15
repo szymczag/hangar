@@ -30,6 +30,20 @@ data:
   AWS_S3_PUBLIC_ENDPOINT_URL: {{ $objectStoragePublicEndpoint | quote }}
   AWS_S3_BUCKET_NAME: {{ .Values.externalServices.objectStorage.bucket | quote }}
   IMPORT_S3_BUCKET_NAME: {{ .Values.externalServices.objectStorage.importBucket | quote }}
+  TODOIST_IMPORTS_ENABLED: {{ ternary "1" "0" .Values.todoistImports.enabled | quote }}
+  TODOIST_IMPORT_LEASE_SECONDS: {{ printf "%d" (int64 .Values.todoistImports.leaseSeconds) | quote }}
+  TODOIST_IMPORT_RECOVERY_GRACE_SECONDS: {{ printf "%d" (int64 .Values.todoistImports.recoveryGraceSeconds) | quote }}
+  TODOIST_IMPORT_SOURCE_RETENTION_HOURS: {{ printf "%d" (int64 .Values.todoistImports.sourceRetentionHours) | quote }}
+  TODOIST_IMPORT_PREVIEW_USER_RATE: {{ .Values.todoistImports.previewUserRate | quote }}
+  TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE: {{ .Values.todoistImports.previewWorkspaceRate | quote }}
+  TODOIST_IMPORT_EXECUTE_USER_RATE: {{ .Values.todoistImports.executeUserRate | quote }}
+  TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE: {{ .Values.todoistImports.executeWorkspaceRate | quote }}
+  TODOIST_IMPORT_MAX_ACTIVE_PER_USER: {{ printf "%d" (int64 .Values.todoistImports.maxActivePerUser) | quote }}
+  TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE: {{ printf "%d" (int64 .Values.todoistImports.maxActivePerWorkspace) | quote }}
+  TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H: {{ printf "%d" (int64 .Values.todoistImports.maxRowsPerWorkspace24h) | quote }}
+  TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE: {{ printf "%d" (int64 .Values.todoistImports.maxActiveSourceBytesPerWorkspace) | quote }}
+  TODOIST_IMPORT_WORKER_CONCURRENCY: {{ printf "%d" (int64 .Values.todoistImports.worker.concurrency) | quote }}
+  TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER: {{ printf "%d" (int64 .Values.todoistImports.worker.prefetchMultiplier) | quote }}
   AWS_REGION: {{ .Values.externalServices.objectStorage.region | quote }}
   USE_MINIO: {{ ternary "1" "0" $objectStoragePathStyle | quote }}
   MINIO_ENDPOINT_SSL: {{ ternary "1" "0" (hasPrefix "https://" $objectStorageEndpoint) | quote }}

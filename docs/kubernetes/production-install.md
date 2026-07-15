@@ -137,6 +137,9 @@ At minimum, set:
 - `ingress.className`, TLS Secret, and controller annotations;
 - `externalServices.objectStorage` internal/public endpoints, public upload
   bucket, private import bucket, region, and addressing mode;
+- `todoistImports`, leaving it disabled unless the private bucket, PostgreSQL,
+  Valkey, RabbitMQ, Beat, dedicated worker capacity, and monitoring have been
+  qualified together;
 - the `networkPolicy.ingressController` preset and DNS selectors for your
   cluster; and
 - `networkPolicy.privateEgress` for every private dependency address and port.
@@ -163,6 +166,8 @@ The review must confirm that:
 - all expected NetworkPolicies render with correct selectors and CIDRs;
 - the Ingress uses the intended hostname, class, TLS Secret, and annotations;
 - resource requests and limits match the capacity plan; and
+- `todoistImports.enabled=true` renders exactly one dedicated `imports`-queue
+  worker group with bounded concurrency/prefetch and no public import-bucket route;
 - no Secret value appears in `rendered.yaml`.
 
 Run policy and admission checks used by the target cluster against this rendered

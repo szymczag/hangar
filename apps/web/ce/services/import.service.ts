@@ -13,6 +13,13 @@ export class ImportService extends APIService {
     super(API_BASE_URL);
   }
 
+  private async csrfToken(): Promise<string> {
+    const response = await this.get("/auth/get-csrf-token/");
+    const token = response.data?.csrf_token;
+    if (!token) throw new Error("CSRF token not found");
+    return token;
+  }
+
   async previewTodoist(
     workspaceSlug: string,
     projectId: string,
@@ -34,14 +41,19 @@ export class ImportService extends APIService {
     projectId: string,
     file: File,
     previewDigest: string,
-    config: TTodoistImportConfig
+    config: TTodoistImportConfig,
+    retryJobId?: string | null
   ): Promise<TImportJob> {
+    const csrfToken = await this.csrfToken();
     const data = new FormData();
     data.append("project_id", projectId);
     data.append("file", file);
     data.append("preview_digest", previewDigest);
     data.append("config", JSON.stringify(config));
-    return this.post(`/api/workspaces/${workspaceSlug}/imports/todoist/`, data)
+    if (retryJobId) data.append("retry_job_id", retryJobId);
+    return this.post(`/api/workspaces/${workspaceSlug}/imports/todoist/`, data, {
+      headers: { "X-CSRFTOKEN": csrfToken },
+    })
       .then((response) => response.data)
       .catch((error) => {
         throw error?.response?.data;
@@ -57,7 +69,10 @@ export class ImportService extends APIService {
   }
 
   async cancel(workspaceSlug: string, jobId: string): Promise<TImportJob> {
-    return this.post(`/api/workspaces/${workspaceSlug}/imports/${jobId}/cancel/`)
+    const csrfToken = await this.csrfToken();
+    return this.post(`/api/workspaces/${workspaceSlug}/imports/${jobId}/cancel/`, undefined, {
+      headers: { "X-CSRFTOKEN": csrfToken },
+    })
       .then((response) => response.data)
       .catch((error) => {
         throw error?.response?.data;

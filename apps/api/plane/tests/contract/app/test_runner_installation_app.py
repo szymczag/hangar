@@ -490,10 +490,18 @@ class TestRunnerDatabaseIntegrity:
             assert event.request_id == f"migration:{event.id}"
             assert event.metadata == {"legacy_metadata": ["legacy"]}
         finally:
-            with connection.cursor() as cursor:
-                cursor.execute("ALTER TABLE ext_runner_audit_events DISABLE TRIGGER ext_runner_audit_events_immutable")
-                cursor.execute("DELETE FROM ext_runner_audit_events WHERE id = %s", [legacy_event.id])
-                cursor.execute("ALTER TABLE ext_runner_audit_events ENABLE TRIGGER ext_runner_audit_events_immutable")
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "ALTER TABLE ext_runner_audit_events DISABLE TRIGGER ext_runner_audit_events_immutable"
+                    )
+                    cursor.execute("DELETE FROM ext_runner_audit_events WHERE id = %s", [legacy_event.id])
+                    cursor.execute(
+                        "ALTER TABLE ext_runner_audit_events ENABLE TRIGGER ext_runner_audit_events_immutable"
+                    )
+            finally:
+                executor = MigrationExecutor(connection)
+                executor.migrate(executor.loader.graph.leaf_nodes("ext"))
 
     @pytest.mark.django_db
     @pytest.mark.parametrize(

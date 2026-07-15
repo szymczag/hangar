@@ -22,7 +22,7 @@ AMD64 Kubernetes clusters. It is not yet a supported production release.
 | `production` | Durable installations with operator-managed services | External PostgreSQL, Valkey, RabbitMQ, and S3-compatible storage        | Available for review, not supported |
 
 Both profiles use a dedicated private object-storage bucket for temporary import
-sources. The chart passes that bucket only to the API and workers; it never adds
+sources. The chart passes that bucket only to the API and import-capable workers; it never adds
 the bucket to public Ingress or Gateway routes. Operators must keep anonymous
 access disabled. See [configuration](configuration.md#external-object-storage).
 
@@ -70,6 +70,26 @@ the Helm values and Secret contract. Follow the
 rollout, deliverability monitoring, suppression recovery, and incidents. The
 [email security model](../email-delivery-and-openpgp.md) explains data handling,
 retention, and OpenPGP policy.
+
+## Todoist import isolation
+
+Todoist imports are disabled by default. Setting `todoistImports.enabled=true`
+exposes the administrator workflow and renders a dedicated `import-worker` that
+consumes only the `imports` Celery queue. General and mail workers cannot consume
+import jobs. The import worker receives the private object-storage credentials,
+uses the same Restricted-compatible security context and egress policy as other
+API workloads, and has explicit concurrency, prefetch, resource, replica, and
+optional PDB settings.
+
+The API applies independent user/workspace preview and execute throttles. Hard
+PostgreSQL admission budgets serialize concurrent user/workspace jobs, active
+workspace source bytes, and accepted workspace rows in a 24-hour window. The
+chart schema rejects malformed rates and unsafe numeric ranges, while application
+startup rejects invalid environment values. Enabling imports therefore requires
+the private bucket, Valkey-backed throttling, PostgreSQL migrations, RabbitMQ,
+the import worker, and the single Beat scheduler to be healthy together. See the
+[configuration reference](configuration.md#todoist-import-admission-and-worker)
+and [operations runbook](operations.md#operate-todoist-imports).
 
 ## Release identity
 

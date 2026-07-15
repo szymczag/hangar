@@ -227,6 +227,9 @@
         "start_error": "Could not start import",
         "queued_title": "Import queued",
         "queued_message": "Your tasks are being added in the background.",
+        "retrying_job": "Retrying failed job",
+        "retry_help": "Choose the same CSV and reproduce the reviewed mappings; changed decisions are rejected.",
+        "cancel_retry": "Cancel retry",
         "history": {
           "title": "Recent imports",
           "description": "Background progress and row-level reports for this workspace.",
@@ -234,13 +237,20 @@
           "error": "Import history could not be loaded.",
           "empty": "No imports have been started yet.",
           "status": {
+            "preparing": "Preparing",
             "queued": "Queued",
             "processing": "Processing",
+            "cancelling": "Cancelling",
             "completed": "Completed",
             "completed_with_errors": "Completed with errors",
             "failed": "Failed",
-            "cancelled": "Cancelled"
+            "cancelled": "Cancelled",
+            "unknown": "Unknown status—refresh or contact an administrator"
           },
+          "imported": "imported",
+          "reused": "reused",
+          "retry": "Retry",
+          "retry_of": "Retry of",
           "of": "of",
           "cancel": "Cancel",
           "cancellation_requested": "Cancellation requested",

@@ -101,15 +101,15 @@ Coordinate the ingress controller's request-body limit with
 
 The chart stores only Secret names and key names in the Helm release.
 
-| Value                           | Default resource        | Default key                                                                            |
-| ------------------------------- | ----------------------- | -------------------------------------------------------------------------------------- |
-| `existingSecrets.application`   | `hangar-application`    | `SECRET_KEY`                                                                           |
-| `existingSecrets.live`          | `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                                                               |
-| `existingSecrets.database`      | `hangar-database`       | `DATABASE_URL`                                                                         |
-| `existingSecrets.cache`         | `hangar-cache`          | `REDIS_URL`                                                                            |
-| `existingSecrets.queue`         | `hangar-queue`          | `AMQP_URL`                                                                             |
-| `existingSecrets.objectStorage` | `hangar-object-storage` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                           |
-| `existingSecrets.mail`          | `hangar-mail`           | Optional dedicated SES and SQS static credential keys                                  |
+| Value                           | Default resource        | Default key                                           |
+| ------------------------------- | ----------------------- | ----------------------------------------------------- |
+| `existingSecrets.application`   | `hangar-application`    | `SECRET_KEY`                                          |
+| `existingSecrets.live`          | `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                              |
+| `existingSecrets.database`      | `hangar-database`       | `DATABASE_URL`                                        |
+| `existingSecrets.cache`         | `hangar-cache`          | `REDIS_URL`                                           |
+| `existingSecrets.queue`         | `hangar-queue`          | `AMQP_URL`                                            |
+| `existingSecrets.objectStorage` | `hangar-object-storage` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`          |
+| `existingSecrets.mail`          | `hangar-mail`           | Optional dedicated SES and SQS static credential keys |
 
 Evaluation adds dependency keys to the same resources:
 
@@ -211,6 +211,59 @@ Production does not render this proxy route. Its `publicEndpoint` must be
 publicly reachable by browsers; `endpoint` may use a separate address reachable
 only from the API and workers.
 
+## Todoist import admission and worker
+
+```yaml
+todoistImports:
+  enabled: false
+  leaseSeconds: 120
+  recoveryGraceSeconds: 30
+  sourceRetentionHours: 24
+  previewUserRate: 10/minute
+  previewWorkspaceRate: 30/minute
+  executeUserRate: 3/hour
+  executeWorkspaceRate: 10/hour
+  maxActivePerUser: 1
+  maxActivePerWorkspace: 2
+  maxRowsPerWorkspace24h: 50000
+  maxActiveSourceBytesPerWorkspace: 10485760
+  worker:
+    replicas: 1
+    concurrency: 2
+    prefetchMultiplier: 1
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: 2000m, memory: 2Gi }
+    pdb:
+      enabled: false
+      maxUnavailable: 1
+```
+
+`enabled=false` is fail-closed: the chart does not render the import worker and
+the API does not expose preview, execute, or cancellation mutations. Existing
+history and reports remain available for incident recovery. When enabled, the
+dedicated worker receives `HANGAR_WORKER_QUEUE=imports`; general and mail workers
+do not consume that queue. Keep at least one import-worker and exactly one Beat
+worker available.
+
+Rates use strict `<positive integer>/(second|minute|hour|day)` syntax. The user
+and workspace rates are separate cache keys, with workspace identity resolved by
+the server rather than accepted from a client-controlled identifier. Atomic
+fixed-window increments serialize admissions across API replicas. Valkey outages
+fail closed with `503` before upload parsing for throttled requests. Numeric
+settings are range-validated by the values schema and again at application
+startup.
+
+The active-job and source-byte settings are concurrent hard limits. The row
+setting sums an append-only per-workspace admission ledger over the preceding 24
+hours and is not a concurrency estimate. PostgreSQL row locks serialize
+reservations and release each active reservation once at terminalization. A denied admission returns
+`429`, stores no source, creates no job, and writes an append-only audit event.
+Size the worker only after reviewing PostgreSQL connections, RabbitMQ queue
+depth, Valkey availability, private-bucket capacity, source retention, and the
+downstream write load. Increasing replicas or concurrency does not bypass the
+admission budgets.
+
 ## NetworkPolicy
 
 `networkPolicy.enabled` is fixed to `true`. The chart renders:
@@ -304,13 +357,14 @@ required for `0.1.0-rc.8`.
 
 ## Replicas and disruption budgets
 
-| Component               | Replica rule              | Notes                                                                       |
-| ----------------------- | ------------------------- | --------------------------------------------------------------------------- |
-| Web, admin, space, Live | One or more               | Defaults to two; PDB enabled by default                                     |
-| API                     | Exactly one               | Startup side effects must be removed before horizontal scaling is supported |
-| Task worker             | One or more               | Scale only after queue and database capacity review                         |
-| Beat worker             | Exactly one               | No scheduler leader election                                                |
-| Migrator                | One Job per Helm revision | Bounded by deadline and retry values                                        |
+| Component               | Replica rule              | Notes                                                                         |
+| ----------------------- | ------------------------- | ----------------------------------------------------------------------------- |
+| Web, admin, space, Live | One or more               | Defaults to two; PDB enabled by default                                       |
+| API                     | Exactly one               | Startup side effects must be removed before horizontal scaling is supported   |
+| Task worker             | One or more               | Scale only after queue and database capacity review                           |
+| Todoist import worker   | One or more when enabled  | Dedicated `imports` queue; concurrency and prefetch are independently bounded |
+| Beat worker             | Exactly one               | No scheduler leader election                                                  |
+| Migrator                | One Job per Helm revision | Bounded by deadline and retry values                                          |
 
 Every component has resource requests and limits. Treat defaults as starting
 points for evaluation, not a production sizing guarantee. Observe CPU,

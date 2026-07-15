@@ -10,6 +10,7 @@
     "branding",
     "existingSecrets",
     "mail",
+    "todoistImports",
     "externalServices",
     "observability",
     "ingress",
@@ -234,6 +235,55 @@
             "importBucket": { "$ref": "#/definitions/s3BucketName" },
             "region": { "$ref": "#/definitions/nonEmptyString" },
             "pathStyle": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "todoistImports": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "leaseSeconds",
+        "recoveryGraceSeconds",
+        "sourceRetentionHours",
+        "previewUserRate",
+        "previewWorkspaceRate",
+        "executeUserRate",
+        "executeWorkspaceRate",
+        "maxActivePerUser",
+        "maxActivePerWorkspace",
+        "maxRowsPerWorkspace24h",
+        "maxActiveSourceBytesPerWorkspace",
+        "worker"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "leaseSeconds": { "type": "integer", "minimum": 30, "maximum": 900 },
+        "recoveryGraceSeconds": { "type": "integer", "minimum": 0, "maximum": 300 },
+        "sourceRetentionHours": { "type": "integer", "minimum": 1, "maximum": 168 },
+        "previewUserRate": { "$ref": "#/definitions/rate" },
+        "previewWorkspaceRate": { "$ref": "#/definitions/rate" },
+        "executeUserRate": { "$ref": "#/definitions/rate" },
+        "executeWorkspaceRate": { "$ref": "#/definitions/rate" },
+        "maxActivePerUser": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "maxActivePerWorkspace": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "maxRowsPerWorkspace24h": { "type": "integer", "minimum": 1, "maximum": 10000000 },
+        "maxActiveSourceBytesPerWorkspace": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10737418240
+        },
+        "worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["replicas", "concurrency", "prefetchMultiplier", "resources", "pdb"],
+          "properties": {
+            "replicas": { "type": "integer", "minimum": 1 },
+            "concurrency": { "type": "integer", "minimum": 1, "maximum": 32 },
+            "prefetchMultiplier": { "type": "integer", "minimum": 1, "maximum": 4 },
+            "resources": { "$ref": "#/definitions/resources" },
+            "pdb": { "$ref": "#/definitions/pdb" }
           }
         }
       }
@@ -688,6 +738,10 @@
         "requests": { "type": "object", "required": ["cpu", "memory"] },
         "limits": { "type": "object", "required": ["cpu", "memory"] }
       }
+    },
+    "rate": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*/(second|minute|hour|day)$"
     },
     "component": {
       "type": "object",
