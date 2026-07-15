@@ -57,6 +57,7 @@ export enum EIssueGroupedAction {
 export interface IBaseIssuesStore {
   // observable
   loader: Record<string, TLoader>;
+  fetchError: boolean;
 
   groupedIssueIds: TGroupedIssues | TSubGroupedIssues | undefined; // object to store Issue Ids based on group or subgroup
   groupedIssueCount: TGroupedIssueCount; // map of groupId/subgroup and issue count of that particular group/subgroup
@@ -176,6 +177,7 @@ const ISSUE_ORDERBY_KEY: Record<TIssueOrderByOptions, keyof TIssue> = {
 
 export abstract class BaseIssuesStore implements IBaseIssuesStore {
   loader: Record<string, TLoader> = {};
+  fetchError = false;
   groupedIssueIds: TIssues | undefined = undefined;
   issuePaginationData: TIssuePaginationData = {};
 
@@ -205,6 +207,7 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
     makeObservable(this, {
       // observable
       loader: observable,
+      fetchError: observable,
       groupedIssueIds: observable,
       issuePaginationData: observable,
       groupedIssueCount: observable,

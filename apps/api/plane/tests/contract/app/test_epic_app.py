@@ -124,7 +124,7 @@ class TestEpicCRUD:
     def test_create_epic(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
         response = create_epic(session_client, workspace, project, state_id=str(default_state.id))
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_201_CREATED, response.data
         epic = Issue.objects.get(pk=response.data["id"])
         assert epic.type.is_epic is True
 
@@ -147,7 +147,7 @@ class TestEpicCRUD:
         response = create_epic(
             session_client, workspace, project, state_id=str(default_state.id), type=str(rogue_type.id)
         )
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_201_CREATED, response.data
         epic = Issue.objects.get(pk=response.data["id"])
         assert epic.type.is_epic is True
         assert epic.type_id != rogue_type.id
@@ -171,7 +171,7 @@ class TestEpicCRUD:
             archived_at="2026-01-01",
             deleted_at="2026-01-01T00:00:00Z",
         )
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_201_CREATED, response.data
         epic = Issue.objects.get(pk=response.data["id"])
         assert epic.parent_id is None
         assert epic.is_draft is False
@@ -231,7 +231,8 @@ class TestEpicCRUD:
         # Epic list contains only the epic
         response = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/")
         assert response.status_code == status.HTTP_200_OK
-        ids = {item["id"] for item in response.data}
+        assert response.data["total_count"] == 1
+        ids = {item["id"] for item in response.data["results"]}
         assert str(epic_id) in {str(i) for i in ids}
         assert str(issue.id) not in {str(i) for i in ids}
 
@@ -353,6 +354,38 @@ class TestEpicScoping:
 
 @pytest.mark.contract
 class TestEpicWebContracts:
+    @pytest.mark.django_db
+    def test_paginated_lists_count_only_epics(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
+        Issue.objects.create(name="Ordinary", project=project, workspace=workspace, state=default_state)
+
+        for path in ("epics/", "v2/epics/"):
+            response = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/{path}")
+
+            assert response.status_code == status.HTTP_200_OK, (path, response.data)
+            count_key = "total_results" if path.startswith("v2/") else "total_count"
+            assert response.data[count_key] == 1, (path, response.data)
+            assert {str(item["id"]) for item in response.data["results"]} == {str(epic_id)}
+
+    @pytest.mark.django_db
+    def test_epic_collection_supports_grouped_web_response(
+        self, session_client, workspace, project, default_state
+    ):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
+
+        response = session_client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/",
+            {"group_by": "state_id"},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["total_count"] == 1
+        state_group = response.data["results"][str(default_state.id)]
+        assert state_group["total_results"] == 1
+        assert {str(item["id"]) for item in state_group["results"]} == {str(epic_id)}
+
     @pytest.mark.django_db
     def test_bulk_list_returns_only_requested_epics(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)

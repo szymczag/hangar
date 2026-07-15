@@ -5,7 +5,9 @@
  */
 
 import { observer } from "mobx-react";
+import { TriangleAlert } from "lucide-react";
 // plane imports
+import { Button } from "@plane/propel/button";
 import { EIssueLayoutTypes } from "@plane/types";
 // components
 import { CalendarLayoutLoader } from "@/components/ui/loader/layouts/calendar-layout-loader";
@@ -49,6 +51,26 @@ export const IssueLayoutHOC = observer(function IssueLayoutHOC(props: Props) {
   const { issues } = useIssues(storeType);
 
   const issueCount = issues.getGroupIssueCount(undefined, undefined, false);
+  const fetchError = "fetchError" in issues && issues.fetchError;
+
+  if (fetchError) {
+    return (
+      <div className="grid size-full place-items-center">
+        <div className="flex max-w-md flex-col items-center gap-4 px-6 text-center">
+          <TriangleAlert className="size-10 text-tertiary" aria-hidden="true" />
+          <div>
+            <h2 className="text-16 font-semibold text-primary">Work items could not be loaded</h2>
+            <p className="mt-1 text-13 text-tertiary">
+              The server returned an error or an incompatible response. Reload the page to try again.
+            </p>
+          </div>
+          <Button variant="secondary" onClick={() => window.location.reload()}>
+            Reload page
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (issues?.getIssueLoader() === "init-loader" || issueCount === undefined) {
     return <ActiveLoader layout={layout} />;

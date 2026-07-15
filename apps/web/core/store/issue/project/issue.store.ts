@@ -110,26 +110,41 @@ export class ProjectIssues extends BaseIssuesStore implements IProjectIssues {
     options: IssuePaginationOptions,
     isExistingPaginationOptions: boolean = false
   ) => {
+    let requestController: AbortController | undefined;
     try {
       // set loader and clear store
       runInAction(() => {
+        this.fetchError = false;
         this.setLoader(loadType);
         this.clear(!isExistingPaginationOptions); // clear while fetching from server.
       });
+      requestController = this.controller;
 
       // get params from pagination options
       const params = this.issueFilterStore?.getFilterParams(options, projectId, undefined, undefined, undefined);
       // call the fetch issues API with the params
       const response = await this.issueService.getIssues(workspaceSlug, projectId, params, {
-        signal: this.controller.signal,
+        signal: requestController.signal,
       });
+      if (!response || response.results === undefined || typeof response.total_count !== "number") {
+        throw new Error("The issue collection response does not match the paginated API contract");
+      }
 
       // after fetching issues, call the base method to process the response further
+      runInAction(() => {
+        this.fetchError = false;
+      });
       this.onfetchIssues(response, options, workspaceSlug, projectId, undefined, !isExistingPaginationOptions);
       return response;
     } catch (error) {
-      // set loader to undefined if errored out
-      this.setLoader(undefined);
+      // A superseded request is aborted by clear(); it must not overwrite the
+      // loading or error state of the newer request.
+      if (!requestController?.signal.aborted) {
+        runInAction(() => {
+          this.setLoader(undefined);
+          this.fetchError = true;
+        });
+      }
       throw error;
     }
   };

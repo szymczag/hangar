@@ -9,7 +9,7 @@ from uuid import UUID
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Count, Q, OuterRef, Subquery
+from django.db.models import Count, OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -24,6 +24,7 @@ from plane.app.views import (
     IssueActivityEndpoint,
     IssueAttachmentV2Endpoint,
     IssueCommentViewSet,
+    IssueViewSet,
     IssueLinkViewSet,
     IssueReactionViewSet,
     IssueSubscriberViewSet,
@@ -158,29 +159,15 @@ class EpicUserPropertyEndpoint(BaseAPIView):
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-class EpicViewSet(BaseAPIView):
-    """List/create epics for a project."""
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
-    def get(self, request, slug, project_id):
-        epics = (
-            epic_queryset(slug, project_id)
-            .select_related("workspace", "project", "state", "parent")
-            .prefetch_related("assignees", "labels")
-            .annotate(
-                sub_issues_count=Count(
-                    "parent_issue",
-                    filter=Q(parent_issue__deleted_at__isnull=True) & ~Q(parent_issue__type__is_epic=True),
-                    distinct=True,
-                )
-            )
-            .order_by("-created_at")
-        )
-        serializer = IssueSerializer(epics, many=True, fields=self.fields, expand=self.expand)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+class EpicViewSet(IssueViewSet):
+    """Paginated Epic collection with Epic-specific creation rules."""
+
+    def get_queryset(self):
+        return epic_queryset(self.kwargs.get("slug"), self.kwargs.get("project_id")).distinct()
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
-    def post(self, request, slug, project_id):
+    def create(self, request, slug, project_id):
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
         epic_type = project_epic_type(project)
         if epic_type is None:
@@ -292,8 +279,11 @@ class EpicPaginatedViewSet(IssuePaginatedViewSet):
     (issue_objects excludes epics; see the fork note in IssueManager).
     """
 
+    def get_base_queryset(self):
+        return epic_queryset(self.kwargs.get("slug"), self.kwargs.get("project_id"))
+
     def get_queryset(self):
-        queryset = epic_queryset(self.kwargs.get("slug"), self.kwargs.get("project_id"))
+        queryset = self.get_base_queryset()
         return (
             queryset.select_related("state")
             .annotate(cycle_id=Subquery(CycleIssue.objects.filter(issue=OuterRef("id")).values("cycle_id")[:1]))
