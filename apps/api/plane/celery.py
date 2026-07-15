@@ -135,9 +135,17 @@ app.conf.beat_schedule = {
         "task": "plane.bgtasks.exporter_expired_task.delete_old_s3_link",
         "schedule": crontab(hour=3, minute=45),  # UTC 03:45
     },
-    "check-every-day-to-delete-import-sources": {
+    "reconcile-expired-import-sources": {
         "task": "plane.ext.tasks.cleanup_import_sources",
-        "schedule": crontab(hour=4, minute=0),  # UTC 04:00
+        "schedule": 300.0,
+    },
+    "dispatch-pending-todoist-imports": {
+        "task": "plane.ext.tasks.dispatch_pending_imports",
+        "schedule": 30.0,
+    },
+    "recover-expired-todoist-import-leases": {
+        "task": "plane.ext.tasks.recover_expired_import_leases",
+        "schedule": 30.0,
     },
 }
 

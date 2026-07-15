@@ -7,13 +7,11 @@ from __future__ import annotations
 from functools import wraps
 import json
 from typing import Any
-from uuid import uuid4
 
 # Django imports
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 
 # Third party imports
 from rest_framework import status
@@ -25,10 +23,17 @@ from plane.app.views.base import BaseAPIView
 from plane.authentication.session import CsrfEnforcedSessionAuthentication
 from plane.db.models import Module, Project, ProjectMember, Workspace
 
-from plane.ext.imports import todoist_imports_enabled
+from plane.ext.imports import ImportTransitionError, todoist_imports_enabled
+from plane.ext.imports.dispatcher import publish_import_dispatch
+from plane.ext.imports.services import (
+    fail_preparing_job,
+    mark_source_deleted,
+    mark_source_stored,
+    request_cancellation,
+    reserve_job,
+)
 from plane.ext.models import ImportJob
 from plane.ext.serializers import ImportJobSerializer
-from plane.ext.tasks import run_todoist_import
 from plane.ext.utils.import_storage import delete_import_source, upload_import_source
 from plane.ext.utils.importers.todoist_csv import (
     MAX_FILE_BYTES,
@@ -45,7 +50,12 @@ ALLOWED_CONTENT_TYPES = {
     "text/csv",
     "text/plain",
 }
-ACTIVE_STATUSES = [ImportJob.Status.QUEUED, ImportJob.Status.PROCESSING]
+ACTIVE_STATUSES = [
+    ImportJob.Status.PREPARING,
+    ImportJob.Status.QUEUED,
+    ImportJob.Status.PROCESSING,
+    ImportJob.Status.CANCELLING,
+]
 COMPLETED_STATUSES = [ImportJob.Status.COMPLETED, ImportJob.Status.COMPLETED_WITH_ERRORS]
 TERMINAL_STATUSES = [*COMPLETED_STATUSES, ImportJob.Status.FAILED, ImportJob.Status.CANCELLED]
 ALLOWED_CONFIG_KEYS = {
@@ -326,43 +336,18 @@ class TodoistImportEndpoint(BaseAPIView):
             "failed": preview.counts.get("failed", 0),
             "processed_tasks": 0,
         }
-        celery_task_id = str(uuid4())
         try:
-            with transaction.atomic():
-                job = (
-                    ImportJob.objects.select_for_update()
-                    .filter(
-                        project=project,
-                        source_digest=preview.digest,
-                        status=ImportJob.Status.FAILED,
-                    )
-                    .order_by("-created_at")
-                    .first()
-                )
-                if job is None:
-                    job = ImportJob.objects.create(
-                        workspace=workspace,
-                        project=project,
-                        initiated_by=request.user,
-                        status=ImportJob.Status.PROCESSING,
-                        source_digest=preview.digest,
-                    )
-                job.initiated_by = request.user
-                job.status = ImportJob.Status.PROCESSING
-                job.source_size = len(content or b"")
-                job.config = config
-                job.stats = initial_stats
-                job.errors = [item.as_dict() for item in preview.diagnostics]
-                job.reason = ""
-                job.celery_task_id = celery_task_id
-                job.started_at = None
-                job.heartbeat_at = None
-                job.cancel_requested_at = None
-                job.completed_at = None
-                job.source_deleted_at = None
-                object_name = f"imports/{workspace.id}/{job.id}/source.csv"
-                job.source_key = object_name
-                job.save()
+            job = reserve_job(
+                workspace=workspace,
+                project=project,
+                initiated_by=request.user,
+                source_digest=preview.digest,
+                source_size=len(content),
+                config=config,
+                stats=initial_stats,
+                errors=[item.as_dict() for item in preview.diagnostics],
+                request_id=request.headers.get("X-Request-ID"),
+            )
         except IntegrityError:
             return _error(
                 "import_in_progress",
@@ -370,40 +355,26 @@ class TodoistImportEndpoint(BaseAPIView):
                 status.HTTP_409_CONFLICT,
             )
 
-        if not upload_import_source(content or b"", object_name):
-            ImportJob.objects.filter(pk=job.id).update(
-                status=ImportJob.Status.FAILED,
-                config={},
-                reason="upload_failed",
-                completed_at=timezone.now(),
-            )
+        object_name = job.source_key
+        if not upload_import_source(content, object_name):
+            fail_preparing_job(job_id=job.id, reason="upload_failed")
             return _error(
                 "upload_failed",
                 "The import source could not be stored. Try again.",
                 status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        ImportJob.objects.filter(pk=job.id, status=ImportJob.Status.PROCESSING).update(status=ImportJob.Status.QUEUED)
         try:
-            run_todoist_import.apply_async(args=[str(job.id)], task_id=celery_task_id)
-        except Exception:  # noqa: BLE001 - return a stable error without leaking broker details
-            source_deleted = delete_import_source(object_name)
-            failure_updates = {
-                "status": ImportJob.Status.FAILED,
-                "config": {},
-                "reason": "queue_failed",
-                "completed_at": timezone.now(),
-            }
-            if source_deleted:
-                failure_updates.update(source_key="", source_deleted_at=timezone.now())
-            ImportJob.objects.filter(pk=job.id, status=ImportJob.Status.QUEUED).update(**failure_updates)
+            job, dispatch = mark_source_stored(job_id=job.id, source_key=object_name)
+        except ImportTransitionError:
+            delete_import_source(object_name)
             return _error(
-                "queue_failed",
-                "The import could not be queued. Try again.",
-                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "import_state_changed",
+                "The import was cancelled before it could be queued.",
+                status.HTTP_409_CONFLICT,
             )
 
-        job.refresh_from_db()
+        publish_import_dispatch(dispatch.id)
         return Response(ImportJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
@@ -468,40 +439,20 @@ class ImportJobCancelEndpoint(BaseAPIView):
     @todoist_imports_enabled_endpoint
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def post(self, request, slug, job_id):
-        with transaction.atomic():
-            job = get_object_or_404(
-                ImportJob.objects.select_for_update(),
-                pk=job_id,
-                workspace__slug=slug,
+        job = get_object_or_404(ImportJob, pk=job_id, workspace__slug=slug)
+        try:
+            job, terminal = request_cancellation(
+                job_id=job.id,
+                actor_id=request.user.id,
+                request_id=request.headers.get("X-Request-ID"),
             )
-            if job.status == ImportJob.Status.QUEUED:
-                job.status = ImportJob.Status.CANCELLED
-                job.reason = "cancelled_by_user"
-                job.config = {}
-                job.cancel_requested_at = timezone.now()
-                job.completed_at = timezone.now()
-                job.save(
-                    update_fields=[
-                        "status",
-                        "reason",
-                        "config",
-                        "cancel_requested_at",
-                        "completed_at",
-                        "updated_at",
-                    ]
-                )
-                response_status = status.HTTP_200_OK
-            elif job.status == ImportJob.Status.PROCESSING:
-                job.cancel_requested_at = job.cancel_requested_at or timezone.now()
-                job.save(update_fields=["cancel_requested_at", "updated_at"])
-                response_status = status.HTTP_202_ACCEPTED
-            else:
-                return _error(
-                    "cannot_cancel",
-                    "Only a queued or processing import can be cancelled.",
-                    status.HTTP_409_CONFLICT,
-                )
-        if job.status == ImportJob.Status.CANCELLED and job.source_key and delete_import_source(job.source_key):
-            ImportJob.objects.filter(pk=job.id).update(source_key="", source_deleted_at=timezone.now())
-        job.refresh_from_db()
+        except ImportTransitionError:
+            return _error(
+                "cannot_cancel",
+                "Only an active import can be cancelled.",
+                status.HTTP_409_CONFLICT,
+            )
+        response_status = status.HTTP_200_OK if terminal else status.HTTP_202_ACCEPTED
+        if terminal and job.source_key and delete_import_source(job.source_key):
+            job = mark_source_deleted(job_id=job.id)
         return Response(ImportJobSerializer(job).data, status=response_status)

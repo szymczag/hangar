@@ -72,7 +72,9 @@ the table marks them as available.
 - [Email delivery technical reference](docs/email-technical-implementation-plan.md)
   — maintainer architecture, invariants, retention, and release evidence.
 - [Importing from Todoist](docs/importing-from-todoist.md) — administrator workflow,
-  CSV validation behavior, private source-file handling, recovery, and troubleshooting.
+  CSV validation behavior, private source-file handling, durable dispatch,
+  execution leases, immutable audit history, recovery, and troubleshooting. The
+  importer is disabled by default and remains hidden until the operator opts in.
 
 The inherited Plane Community chart is not a Hangar release and is not supported
 for new Hangar installations.

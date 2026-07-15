@@ -1,0 +1,608 @@
+# Copyright (c) 2026-present Maciej Szymczak and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import timedelta
+from hashlib import sha256
+import json
+import re
+from typing import Any
+from uuid import UUID, uuid4
+
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
+
+from plane.ext.models import ImportAuditEvent, ImportDispatch, ImportJob
+
+
+ACTIVE_STATUSES = {
+    ImportJob.Status.PREPARING,
+    ImportJob.Status.QUEUED,
+    ImportJob.Status.PROCESSING,
+    ImportJob.Status.CANCELLING,
+}
+TERMINAL_STATUSES = {
+    ImportJob.Status.COMPLETED,
+    ImportJob.Status.COMPLETED_WITH_ERRORS,
+    ImportJob.Status.FAILED,
+    ImportJob.Status.CANCELLED,
+}
+SAFE_AUDIT_METADATA_KEYS = {
+    "error_code",
+    "publish_attempts",
+    "reason",
+    "recovered_generation",
+    "source_size",
+}
+
+
+class ImportServiceError(Exception):
+    code = "import_service_error"
+
+
+class ImportTransitionError(ImportServiceError):
+    code = "invalid_import_transition"
+
+
+class ImportLeaseLost(ImportServiceError):
+    code = "import_lease_lost"
+
+
+class ImportDispatchUnavailable(ImportServiceError):
+    code = "import_dispatch_unavailable"
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionClaim:
+    job: ImportJob
+    generation: int
+    lease_token: UUID
+    task_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchAttempt:
+    dispatch_id: UUID
+    job_id: UUID
+    generation: int
+    task_id: UUID
+
+
+def lease_duration() -> timedelta:
+    seconds = int(getattr(settings, "TODOIST_IMPORT_LEASE_SECONDS", 120))
+    return timedelta(seconds=max(30, min(seconds, 900)))
+
+
+def recovery_grace() -> timedelta:
+    seconds = int(getattr(settings, "TODOIST_IMPORT_RECOVERY_GRACE_SECONDS", 30))
+    return timedelta(seconds=max(0, min(seconds, 300)))
+
+
+def source_retention() -> timedelta:
+    hours = int(getattr(settings, "TODOIST_IMPORT_SOURCE_RETENTION_HOURS", 24))
+    return timedelta(hours=max(1, min(hours, 168)))
+
+
+def build_manifest_digest(
+    *,
+    provider: str,
+    workspace_id: UUID,
+    project_id: UUID,
+    source_digest: str,
+    initiated_by_id: UUID,
+    config: dict[str, Any],
+) -> str:
+    manifest = {
+        "config": config,
+        "initiated_by_id": str(initiated_by_id),
+        "project_id": str(project_id),
+        "provider": provider,
+        "source_digest": source_digest,
+        "workspace_id": str(workspace_id),
+    }
+    canonical = json.dumps(manifest, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+    return sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _request_id(value: str | None = None) -> str:
+    candidate = value or str(uuid4())
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}", candidate) is None:
+        return str(uuid4())
+    return candidate
+
+
+def _audit(
+    *,
+    job: ImportJob,
+    action: str,
+    previous_status: str,
+    actor_id: UUID | None = None,
+    request_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    safe_metadata = metadata or {}
+    if not set(safe_metadata).issubset(SAFE_AUDIT_METADATA_KEYS):
+        raise ValueError("Import audit metadata contains a prohibited field.")
+    if any(not isinstance(value, (str, int, bool, type(None))) for value in safe_metadata.values()):
+        raise ValueError("Import audit metadata contains a prohibited value.")
+    ImportAuditEvent.objects.create(
+        workspace_id=job.workspace_id,
+        project_id=job.project_id,
+        job_id=job.id,
+        actor_id=actor_id,
+        action=action,
+        previous_status=previous_status,
+        resulting_status=job.status,
+        execution_generation=job.execution_generation,
+        request_id=_request_id(request_id),
+        metadata=safe_metadata,
+    )
+
+
+@transaction.atomic
+def reserve_job(
+    *,
+    workspace,
+    project,
+    initiated_by,
+    source_digest: str,
+    source_size: int,
+    config: dict[str, Any],
+    stats: dict[str, Any],
+    errors: list[dict[str, Any]],
+    request_id: str | None = None,
+) -> ImportJob:
+    manifest_digest = build_manifest_digest(
+        provider=ImportJob.Provider.TODOIST_CSV,
+        workspace_id=workspace.id,
+        project_id=project.id,
+        source_digest=source_digest,
+        initiated_by_id=initiated_by.id,
+        config=config,
+    )
+    job = ImportJob.objects.create(
+        workspace=workspace,
+        project=project,
+        initiated_by=initiated_by,
+        status=ImportJob.Status.PREPARING,
+        source_digest=source_digest,
+        source_size=source_size,
+        config=config,
+        stats=stats,
+        errors=errors,
+        manifest_digest=manifest_digest,
+    )
+    job.source_key = f"imports/{workspace.id}/{job.id}/source.csv"
+    job.save(update_fields=["source_key", "updated_at"])
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.CREATED,
+        previous_status="",
+        actor_id=initiated_by.id,
+        request_id=request_id,
+        metadata={"source_size": source_size},
+    )
+    return job
+
+
+@transaction.atomic
+def fail_preparing_job(*, job_id: UUID, reason: str) -> ImportJob:
+    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    if job.status == ImportJob.Status.CANCELLED:
+        return job
+    if job.status != ImportJob.Status.PREPARING:
+        raise ImportTransitionError("Only a preparing import can fail during source storage.")
+    previous_status = job.status
+    now = timezone.now()
+    job.status = ImportJob.Status.FAILED
+    job.reason = reason
+    job.config = {}
+    job.completed_at = now
+    job.quota_released_at = now
+    job.save(update_fields=["status", "reason", "config", "completed_at", "quota_released_at", "updated_at"])
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.TERMINALIZED,
+        previous_status=previous_status,
+        actor_id=job.initiated_by_id,
+        metadata={"reason": reason},
+    )
+    return job
+
+
+@transaction.atomic
+def mark_source_stored(*, job_id: UUID, source_key: str) -> tuple[ImportJob, ImportDispatch]:
+    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    if job.status != ImportJob.Status.PREPARING:
+        raise ImportTransitionError("Only a preparing import can be queued.")
+    previous_status = job.status
+    now = timezone.now()
+    task_id = uuid4()
+    job.status = ImportJob.Status.QUEUED
+    job.source_key = source_key
+    job.queued_at = now
+    job.retention_expires_at = now + source_retention()
+    job.celery_task_id = str(task_id)
+    job.save(
+        update_fields=[
+            "status",
+            "source_key",
+            "queued_at",
+            "retention_expires_at",
+            "celery_task_id",
+            "updated_at",
+        ]
+    )
+    dispatch = ImportDispatch.objects.create(
+        job=job,
+        generation=job.execution_generation,
+        task_id=task_id,
+    )
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.SOURCE_STORED,
+        previous_status=previous_status,
+        actor_id=job.initiated_by_id,
+        metadata={"source_size": job.source_size},
+    )
+    return job, dispatch
+
+
+@transaction.atomic
+def prepare_dispatch_attempt(*, dispatch_id: UUID, allow_stale_published: bool = False) -> DispatchAttempt:
+    dispatch = ImportDispatch.objects.select_for_update().select_related("job").get(pk=dispatch_id)
+    now = timezone.now()
+    permitted = dispatch.state == ImportDispatch.State.PENDING or (
+        allow_stale_published and dispatch.state == ImportDispatch.State.PUBLISHED
+    )
+    if not permitted or dispatch.available_at > now or dispatch.publish_attempts >= 100:
+        raise ImportDispatchUnavailable("The import dispatch is not publishable.")
+    if dispatch.job.status != ImportJob.Status.QUEUED or dispatch.job.execution_generation != dispatch.generation:
+        if dispatch.state != ImportDispatch.State.SUPERSEDED:
+            dispatch.state = ImportDispatch.State.SUPERSEDED
+            dispatch.save(update_fields=["state", "updated_at"])
+        raise ImportDispatchUnavailable("The import dispatch generation is no longer active.")
+    dispatch.publish_attempts += 1
+    dispatch.last_error_code = ""
+    dispatch.save(update_fields=["publish_attempts", "last_error_code", "updated_at"])
+    _audit(
+        job=dispatch.job,
+        action=ImportAuditEvent.Action.DISPATCH_ATTEMPTED,
+        previous_status=dispatch.job.status,
+        actor_id=dispatch.job.initiated_by_id,
+        metadata={"publish_attempts": dispatch.publish_attempts},
+    )
+    return DispatchAttempt(
+        dispatch_id=dispatch.id,
+        job_id=dispatch.job_id,
+        generation=dispatch.generation,
+        task_id=dispatch.task_id,
+    )
+
+
+@transaction.atomic
+def mark_dispatch_published(*, dispatch_id: UUID) -> None:
+    dispatch = ImportDispatch.objects.select_for_update().get(pk=dispatch_id)
+    if dispatch.state not in {ImportDispatch.State.PENDING, ImportDispatch.State.PUBLISHED}:
+        return
+    dispatch.state = ImportDispatch.State.PUBLISHED
+    dispatch.published_at = timezone.now()
+    dispatch.last_error_code = ""
+    dispatch.save(update_fields=["state", "published_at", "last_error_code", "updated_at"])
+
+
+@transaction.atomic
+def mark_dispatch_failed(*, dispatch_id: UUID, error_code: str) -> None:
+    if error_code not in ImportDispatch.ErrorCode.values or not error_code:
+        raise ValueError("Unknown import dispatch error code.")
+    dispatch = ImportDispatch.objects.select_for_update().filter(pk=dispatch_id).first()
+    if dispatch is None or dispatch.state in {ImportDispatch.State.CONSUMED, ImportDispatch.State.SUPERSEDED}:
+        return
+    dispatch.last_error_code = error_code
+    dispatch.save(update_fields=["last_error_code", "updated_at"])
+
+
+@transaction.atomic
+def claim_execution(*, job_id: UUID, generation: int, task_id: str | None) -> ExecutionClaim | None:
+    if not task_id:
+        return None
+    try:
+        parsed_task_id = UUID(task_id)
+    except (TypeError, ValueError):
+        return None
+    job = (
+        ImportJob.objects.select_for_update(of=("self",))
+        .select_related("project", "workspace", "initiated_by")
+        .filter(pk=job_id)
+        .first()
+    )
+    if job is None or job.status != ImportJob.Status.QUEUED or job.execution_generation != generation:
+        return None
+    dispatch = (
+        ImportDispatch.objects.select_for_update()
+        .filter(
+            job=job,
+            generation=generation,
+            task_id=parsed_task_id,
+            state__in=[ImportDispatch.State.PENDING, ImportDispatch.State.PUBLISHED],
+        )
+        .first()
+    )
+    if dispatch is None:
+        return None
+    previous_status = job.status
+    now = timezone.now()
+    token = uuid4()
+    job.status = ImportJob.Status.PROCESSING
+    job.attempt_count += 1
+    job.lease_token = token
+    job.lease_expires_at = now + lease_duration()
+    job.heartbeat_at = now
+    job.started_at = job.started_at or now
+    job.celery_task_id = str(parsed_task_id)
+    job.reason = ""
+    job.save(
+        update_fields=[
+            "status",
+            "attempt_count",
+            "lease_token",
+            "lease_expires_at",
+            "heartbeat_at",
+            "started_at",
+            "celery_task_id",
+            "reason",
+            "updated_at",
+        ]
+    )
+    dispatch.state = ImportDispatch.State.CONSUMED
+    dispatch.published_at = dispatch.published_at or now
+    dispatch.consumed_at = now
+    dispatch.save(update_fields=["state", "published_at", "consumed_at", "updated_at"])
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.CLAIMED,
+        previous_status=previous_status,
+        actor_id=job.initiated_by_id,
+    )
+    return ExecutionClaim(job=job, generation=generation, lease_token=token, task_id=parsed_task_id)
+
+
+def _require_owner(job: ImportJob, *, generation: int, lease_token: UUID) -> None:
+    if (
+        job.execution_generation != generation
+        or job.lease_token != lease_token
+        or job.status not in {ImportJob.Status.PROCESSING, ImportJob.Status.CANCELLING}
+        or job.lease_expires_at is None
+        or job.lease_expires_at <= timezone.now()
+    ):
+        raise ImportLeaseLost("The import execution lease is no longer valid.")
+
+
+@transaction.atomic
+def finish_execution(
+    *,
+    job_id: UUID,
+    generation: int,
+    lease_token: UUID,
+    status: str,
+    reason: str = "",
+    errors: list[dict[str, Any]] | None = None,
+    stats: dict[str, Any] | None = None,
+) -> ImportJob:
+    if status not in TERMINAL_STATUSES:
+        raise ValueError("Import execution can only finish in a terminal state.")
+    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    _require_owner(job, generation=generation, lease_token=lease_token)
+    previous_status = job.status
+    if job.status == ImportJob.Status.CANCELLING or job.cancel_requested_at is not None:
+        status = ImportJob.Status.CANCELLED
+        reason = "cancelled_by_user"
+    now = timezone.now()
+    job.status = status
+    job.reason = reason
+    job.completed_at = now
+    job.heartbeat_at = now
+    job.config = {}
+    job.lease_token = None
+    job.lease_expires_at = None
+    job.celery_task_id = ""
+    job.quota_released_at = job.quota_released_at or now
+    if errors is not None:
+        job.errors = errors
+    if stats is not None:
+        job.stats = stats
+    job.save()
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.TERMINALIZED,
+        previous_status=previous_status,
+        actor_id=job.initiated_by_id,
+        metadata={"reason": reason},
+    )
+    return job
+
+
+@transaction.atomic
+def schedule_retry(
+    *,
+    job_id: UUID,
+    generation: int,
+    lease_token: UUID,
+    delay: timedelta,
+) -> ImportDispatch:
+    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    _require_owner(job, generation=generation, lease_token=lease_token)
+    if job.status == ImportJob.Status.CANCELLING or job.cancel_requested_at is not None:
+        raise ImportTransitionError("A cancelling import cannot be retried.")
+    previous_status = job.status
+    job.execution_generation += 1
+    task_id = uuid4()
+    job.status = ImportJob.Status.QUEUED
+    job.reason = "retrying"
+    job.lease_token = None
+    job.lease_expires_at = None
+    job.heartbeat_at = None
+    job.celery_task_id = str(task_id)
+    job.save(
+        update_fields=[
+            "execution_generation",
+            "status",
+            "reason",
+            "lease_token",
+            "lease_expires_at",
+            "heartbeat_at",
+            "celery_task_id",
+            "updated_at",
+        ]
+    )
+    dispatch = ImportDispatch.objects.create(
+        job=job,
+        generation=job.execution_generation,
+        task_id=task_id,
+        available_at=timezone.now() + delay,
+    )
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.RETRY_SCHEDULED,
+        previous_status=previous_status,
+        actor_id=job.initiated_by_id,
+    )
+    return dispatch
+
+
+@transaction.atomic
+def recover_expired_execution(*, job_id: UUID) -> ImportDispatch | None:
+    job = ImportJob.objects.select_for_update().filter(pk=job_id).first()
+    now = timezone.now()
+    if (
+        job is None
+        or job.status != ImportJob.Status.PROCESSING
+        or job.lease_expires_at is None
+        or job.lease_expires_at + recovery_grace() > now
+    ):
+        return None
+    previous_status = job.status
+    recovered_generation = job.execution_generation
+    job.execution_generation += 1
+    task_id = uuid4()
+    job.status = ImportJob.Status.QUEUED
+    job.reason = "lease_recovered"
+    job.lease_token = None
+    job.lease_expires_at = None
+    job.heartbeat_at = None
+    job.celery_task_id = str(task_id)
+    job.save(
+        update_fields=[
+            "execution_generation",
+            "status",
+            "reason",
+            "lease_token",
+            "lease_expires_at",
+            "heartbeat_at",
+            "celery_task_id",
+            "updated_at",
+        ]
+    )
+    dispatch = ImportDispatch.objects.create(job=job, generation=job.execution_generation, task_id=task_id)
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.LEASE_RECOVERED,
+        previous_status=previous_status,
+        actor_id=job.initiated_by_id,
+        metadata={"recovered_generation": recovered_generation},
+    )
+    return dispatch
+
+
+@transaction.atomic
+def request_cancellation(*, job_id: UUID, actor_id: UUID, request_id: str | None = None) -> tuple[ImportJob, bool]:
+    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    if job.status not in ACTIVE_STATUSES:
+        raise ImportTransitionError("Only an active import can be cancelled.")
+    previous_status = job.status
+    now = timezone.now()
+    job.cancel_requested_at = job.cancel_requested_at or now
+    terminal = job.status in {ImportJob.Status.PREPARING, ImportJob.Status.QUEUED}
+    if terminal:
+        job.status = ImportJob.Status.CANCELLED
+        job.reason = "cancelled_by_user"
+        job.completed_at = now
+        job.config = {}
+        job.celery_task_id = ""
+        job.quota_released_at = job.quota_released_at or now
+        ImportDispatch.objects.filter(
+            job=job,
+            state__in=[ImportDispatch.State.PENDING, ImportDispatch.State.PUBLISHED],
+        ).update(state=ImportDispatch.State.SUPERSEDED)
+    else:
+        job.status = ImportJob.Status.CANCELLING
+    job.save()
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.CANCELLATION_REQUESTED,
+        previous_status=previous_status,
+        actor_id=actor_id,
+        request_id=request_id,
+    )
+    return job, terminal
+
+
+@transaction.atomic
+def expire_source(*, job_id: UUID) -> ImportJob | None:
+    job = ImportJob.objects.select_for_update().filter(pk=job_id).first()
+    if job is None:
+        return None
+    if job.status in TERMINAL_STATUSES:
+        return job
+    now = timezone.now()
+    if (
+        job.status in {ImportJob.Status.PROCESSING, ImportJob.Status.CANCELLING}
+        and job.lease_expires_at is not None
+        and job.lease_expires_at + recovery_grace() > now
+    ):
+        return None
+    previous_status = job.status
+    cancelled = job.cancel_requested_at is not None or job.status == ImportJob.Status.CANCELLING
+    job.status = ImportJob.Status.CANCELLED if cancelled else ImportJob.Status.FAILED
+    job.reason = "cancelled_by_user" if cancelled else "source_expired"
+    job.completed_at = now
+    job.config = {}
+    job.lease_token = None
+    job.lease_expires_at = None
+    job.celery_task_id = ""
+    job.quota_released_at = job.quota_released_at or now
+    job.save()
+    ImportDispatch.objects.filter(
+        job=job,
+        state__in=[ImportDispatch.State.PENDING, ImportDispatch.State.PUBLISHED],
+    ).update(state=ImportDispatch.State.SUPERSEDED)
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.TERMINALIZED,
+        previous_status=previous_status,
+        actor_id=job.initiated_by_id,
+        metadata={"reason": job.reason},
+    )
+    return job
+
+
+@transaction.atomic
+def mark_source_deleted(*, job_id: UUID) -> ImportJob:
+    job = ImportJob.objects.select_for_update().get(pk=job_id)
+    if job.status not in TERMINAL_STATUSES:
+        raise ImportTransitionError("An active import source cannot be deleted.")
+    previous_status = job.status
+    job.source_key = ""
+    job.source_deleted_at = timezone.now()
+    job.save(update_fields=["source_key", "source_deleted_at", "updated_at"])
+    _audit(
+        job=job,
+        action=ImportAuditEvent.Action.SOURCE_DELETED,
+        previous_status=previous_status,
+        actor_id=job.initiated_by_id,
+    )
+    return job

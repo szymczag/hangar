@@ -234,8 +234,10 @@
           "error": "Import history could not be loaded.",
           "empty": "No imports have been started yet.",
           "status": {
+            "preparing": "Preparing",
             "queued": "Queued",
             "processing": "Processing",
+            "cancelling": "Cancelling",
             "completed": "Completed",
             "completed_with_errors": "Completed with errors",
             "failed": "Failed",

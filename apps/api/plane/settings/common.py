@@ -59,6 +59,9 @@ IS_SELF_MANAGED = True
 # administrators still need to activate it separately and accept current consent.
 RUNNER_ENABLED = os.environ.get("RUNNER_ENABLED", "0") == "1"
 TODOIST_IMPORTS_ENABLED = os.environ.get("TODOIST_IMPORTS_ENABLED", "0") == "1"
+TODOIST_IMPORT_LEASE_SECONDS = int(os.environ.get("TODOIST_IMPORT_LEASE_SECONDS", "120"))
+TODOIST_IMPORT_RECOVERY_GRACE_SECONDS = int(os.environ.get("TODOIST_IMPORT_RECOVERY_GRACE_SECONDS", "30"))
+TODOIST_IMPORT_SOURCE_RETENTION_HOURS = int(os.environ.get("TODOIST_IMPORT_SOURCE_RETENTION_HOURS", "24"))
 
 # Webhook IP allowlist — comma-separated IPs or CIDR ranges that are allowed as
 # webhook targets even if they resolve to private networks.

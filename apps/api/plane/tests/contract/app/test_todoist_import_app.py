@@ -5,12 +5,14 @@
 from __future__ import annotations
 
 import csv
+from datetime import timedelta
 import json
 from io import StringIO
 from uuid import uuid4
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -79,6 +81,25 @@ def import_url(workspace):
     return f"/api/workspaces/{workspace.slug}/imports/todoist/"
 
 
+def secure_state_fields(job_status: str) -> dict:
+    fields = {"manifest_digest": "0" * 64}
+    if job_status in {
+        ImportJob.Status.COMPLETED,
+        ImportJob.Status.COMPLETED_WITH_ERRORS,
+        ImportJob.Status.FAILED,
+        ImportJob.Status.CANCELLED,
+    }:
+        fields["completed_at"] = timezone.now()
+    if job_status == ImportJob.Status.PROCESSING:
+        fields.update(
+            celery_task_id=str(uuid4()),
+            lease_token=uuid4(),
+            lease_expires_at=timezone.now() + timedelta(minutes=2),
+            started_at=timezone.now(),
+        )
+    return fields
+
+
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestTodoistImportAPI:
@@ -126,7 +147,7 @@ class TestTodoistImportAPI:
         csrf_token = csrf_response.data["csrf_token"]
         content = csv_content()
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
-        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.apply_async")
+        enqueue = mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
 
         response = client.post(
             import_url(workspace),
@@ -153,6 +174,7 @@ class TestTodoistImportAPI:
             source_digest="e" * 64,
             source_key="imports/source.csv",
             status=ImportJob.Status.QUEUED,
+            **secure_state_fields(ImportJob.Status.QUEUED),
         )
 
         rejected = client.post(f"/api/workspaces/{workspace.slug}/imports/{job.id}/cancel/")
@@ -226,7 +248,7 @@ class TestTodoistImportAPI:
         content = csv_content()
         digest = parse_todoist_csv(content).digest
         upload_source = mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
-        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.apply_async")
+        enqueue = mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
 
         response = session_client.post(
             import_url(workspace),
@@ -244,7 +266,10 @@ class TestTodoistImportAPI:
         assert job.status == ImportJob.Status.QUEUED
         assert job.source_key.startswith(f"imports/{workspace.id}/{job.id}/")
         upload_source.assert_called_once()
-        enqueue.assert_called_once_with(args=[str(job.id)], task_id=job.celery_task_id)
+        enqueue.assert_called_once_with(
+            args=[str(job.id), job.execution_generation],
+            task_id=job.celery_task_id,
+        )
 
     def test_invalid_assignee_mapping_is_rejected(self, session_client, workspace, import_project):
         content = csv_content()
@@ -296,7 +321,7 @@ class TestTodoistImportAPI:
         content = csv_content()
         digest = parse_todoist_csv(content).digest
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=False)
-        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.apply_async")
+        enqueue = mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
 
         response = session_client.post(
             import_url(workspace),
@@ -315,7 +340,7 @@ class TestTodoistImportAPI:
         assert job.source_key
         enqueue.assert_not_called()
 
-    def test_queue_failure_keeps_source_key_when_immediate_cleanup_fails(
+    def test_ambiguous_publish_keeps_durable_queued_source(
         self, mocker, session_client, workspace, import_project
     ):
         content = csv_content()
@@ -323,7 +348,7 @@ class TestTodoistImportAPI:
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
         mocker.patch("plane.ext.views.import_job.delete_import_source", return_value=False)
         mocker.patch(
-            "plane.ext.views.import_job.run_todoist_import.apply_async",
+            "plane.ext.tasks.run_todoist_import.apply_async",
             side_effect=RuntimeError("broker unavailable"),
         )
 
@@ -338,11 +363,11 @@ class TestTodoistImportAPI:
             format="multipart",
         )
 
-        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert response.status_code == status.HTTP_202_ACCEPTED
         job = ImportJob.objects.get()
-        assert job.status == ImportJob.Status.FAILED
+        assert job.status == ImportJob.Status.QUEUED
         assert job.source_key
-        assert job.config == {}
+        assert job.config
 
     def test_exact_duplicate_requires_confirmation(self, session_client, workspace, import_project, create_user):
         content = csv_content()
@@ -353,6 +378,7 @@ class TestTodoistImportAPI:
             initiated_by=create_user,
             source_digest=digest,
             status=ImportJob.Status.COMPLETED,
+            **secure_state_fields(ImportJob.Status.COMPLETED),
         )
 
         response = session_client.post(
@@ -381,6 +407,7 @@ class TestTodoistImportAPI:
             stats={"imported_tasks": 1},
             errors=[],
             status=ImportJob.Status.COMPLETED,
+            **secure_state_fields(ImportJob.Status.COMPLETED),
         )
 
         response = session_client.get(f"/api/workspaces/{workspace.slug}/imports/{job.id}/report/")
@@ -403,6 +430,7 @@ class TestTodoistImportAPI:
             source_digest="b" * 64,
             source_key="imports/source.csv",
             status=ImportJob.Status.PROCESSING,
+            **secure_state_fields(ImportJob.Status.PROCESSING),
         )
         delete_source = mocker.patch("plane.ext.views.import_job.delete_import_source")
 
@@ -460,7 +488,7 @@ class TestTodoistImportAPI:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["error"]["code"] == "invalid_module_conflict"
 
-    def test_failed_import_retry_reuses_job_identity(
+    def test_new_attempt_preserves_failed_job_identity(
         self, mocker, session_client, workspace, import_project, create_user
     ):
         content = csv_content()
@@ -471,9 +499,10 @@ class TestTodoistImportAPI:
             initiated_by=create_user,
             source_digest=digest,
             status=ImportJob.Status.FAILED,
+            **secure_state_fields(ImportJob.Status.FAILED),
         )
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
-        enqueue = mocker.patch("plane.ext.views.import_job.run_todoist_import.apply_async")
+        enqueue = mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
 
         response = session_client.post(
             import_url(workspace),
@@ -487,10 +516,15 @@ class TestTodoistImportAPI:
         )
 
         assert response.status_code == status.HTTP_202_ACCEPTED
-        assert ImportJob.objects.count() == 1
+        assert ImportJob.objects.count() == 2
         failed_job.refresh_from_db()
-        assert failed_job.status == ImportJob.Status.QUEUED
-        enqueue.assert_called_once_with(args=[str(failed_job.id)], task_id=failed_job.celery_task_id)
+        assert failed_job.status == ImportJob.Status.FAILED
+        new_job = ImportJob.objects.exclude(pk=failed_job.id).get()
+        assert new_job.status == ImportJob.Status.QUEUED
+        enqueue.assert_called_once_with(
+            args=[str(new_job.id), new_job.execution_generation],
+            task_id=new_job.celery_task_id,
+        )
 
     def test_report_is_not_available_while_processing(self, session_client, workspace, import_project, create_user):
         job = ImportJob.objects.create(
@@ -499,6 +533,7 @@ class TestTodoistImportAPI:
             initiated_by=create_user,
             source_digest="c" * 64,
             status=ImportJob.Status.PROCESSING,
+            **secure_state_fields(ImportJob.Status.PROCESSING),
         )
 
         response = session_client.get(f"/api/workspaces/{workspace.slug}/imports/{job.id}/report/")

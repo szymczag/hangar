@@ -3,5 +3,6 @@
 # See the LICENSE file for details.
 
 from .feature import todoist_imports_enabled
+from .services import ImportLeaseLost, ImportTransitionError
 
-__all__ = ["todoist_imports_enabled"]
+__all__ = ["ImportLeaseLost", "ImportTransitionError", "todoist_imports_enabled"]

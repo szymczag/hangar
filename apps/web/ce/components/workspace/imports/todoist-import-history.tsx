@@ -13,7 +13,8 @@ import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { importService } from "@/plane-web/services/import.service";
 import type { TImportJob } from "@/plane-web/types/import";
 
-const ACTIVE_STATUSES = new Set(["queued", "processing"]);
+const ACTIVE_STATUSES = new Set(["preparing", "queued", "processing", "cancelling"]);
+const CANCELLABLE_STATUSES = new Set(["preparing", "queued", "processing"]);
 const REPORT_STATUSES = new Set(["completed", "completed_with_errors", "failed", "cancelled"]);
 
 type Props = {
@@ -25,8 +26,10 @@ type Props = {
 export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken }: Props) {
   const { t } = useTranslation();
   const statusLabels: Record<TImportJob["status"], string> = {
+    preparing: t("workspace_settings.settings.todoist_import.history.status.preparing"),
     queued: t("workspace_settings.settings.todoist_import.history.status.queued"),
     processing: t("workspace_settings.settings.todoist_import.history.status.processing"),
+    cancelling: t("workspace_settings.settings.todoist_import.history.status.cancelling"),
     completed: t("workspace_settings.settings.todoist_import.history.status.completed"),
     completed_with_errors: t("workspace_settings.settings.todoist_import.history.status.completed_with_errors"),
     failed: t("workspace_settings.settings.todoist_import.history.status.failed"),
@@ -104,7 +107,7 @@ export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  {ACTIVE_STATUSES.has(job.status) && (
+                  {CANCELLABLE_STATUSES.has(job.status) && (
                     <Button
                       variant="secondary"
                       size="sm"

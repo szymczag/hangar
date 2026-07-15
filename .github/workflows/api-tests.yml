@@ -83,7 +83,7 @@ jobs:
         if: always()
         run: docker compose -f docker-compose-test.yml down -v
 
-  runner-migrations:
+  security-migrations:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -96,11 +96,13 @@ jobs:
           cp apps/api/.env.example apps/api/.env
           printf '\nSECRET_KEY="%s"\n' "$(openssl rand -hex 32)" >> apps/api/.env
 
-      - name: Verify Runner migrations and database invariants
+      - name: Verify security migrations and database invariants
         run: |
           docker compose -f docker-compose-test.yml run --rm --build api-tests \
-            pytest --migrations --create-db -m runner_migrations \
-            plane/tests/contract/app/test_runner_installation_app.py
+            pytest --migrations --create-db \
+            -m "runner_migrations or todoist_migrations" \
+            plane/tests/contract/app/test_runner_installation_app.py \
+            plane/tests/unit/ext/test_todoist_import_tasks.py
 
       - name: Tear down
         if: always()

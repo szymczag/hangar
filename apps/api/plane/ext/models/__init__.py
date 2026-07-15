@@ -3,7 +3,7 @@
 # See the LICENSE file for details.
 
 from .epic import EpicUserProperty
-from .import_job import ImportJob
+from .import_job import ImportAuditEvent, ImportDispatch, ImportJob
 from .issue_property import (
     IssueProperty,
     IssuePropertyOption,
@@ -16,6 +16,8 @@ from .worklog import IssueWorkLog
 __all__ = [
     "EpicUserProperty",
     "ImportJob",
+    "ImportDispatch",
+    "ImportAuditEvent",
     "IssueProperty",
     "IssuePropertyOption",
     "IssuePropertyValue",

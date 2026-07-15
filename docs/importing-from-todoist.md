@@ -58,17 +58,27 @@ that description is empty. Existing project descriptions are never overwritten.
    want to import it again.
 3. Select **Start import**.
 4. Follow progress under **Recent imports**.
-   You can cancel queued or processing jobs; processing cancellation takes
-   effect at the next safe batch boundary.
+   **Preparing**, **Queued**, **Processing**, and **Cancelling** are active
+   states. You can cancel a preparing, queued, or processing job. A queued job
+   stops immediately; a processing cancellation takes precedence over a worker
+   completion and becomes terminal at the next cooperative boundary.
 5. When the job finishes, select **Download report** to review totals and any
    row-level errors.
 
-An interrupted job is retried automatically with backoff. If it ultimately
-fails, uploading the same file again reuses that job identity and the objects
-already created by its earlier attempts, so the retry does not duplicate them.
-A completed or partially completed exact-file import is different: confirming
-the duplicate warning starts a new job and can intentionally create another set
-of work items. The warning is scoped to the destination project.
+An interrupted job is retried automatically with bounded backoff. Each internal
+attempt has a new durable dispatch identity and execution generation, so a stale
+or duplicate worker cannot claim ownership or overwrite the final result. If an
+import ultimately fails, uploading the file again creates a new history record;
+the failed record is never reset or overwritten. Until the history explicitly
+reports reused entities, treat a new attempt or a confirmed exact-file duplicate
+as capable of creating additional work items. The duplicate warning is scoped to
+the destination project.
+
+Starting an import commits the queued job and a durable dispatch record before
+contacting the task broker. If broker confirmation is lost, the request still
+returns the durable **Queued** job and the dispatcher republishes the same task
+identity. This may delay processing, but it does not turn a stored source into a
+false failure or delete it prematurely.
 
 The history distinguishes **Completed** from **Completed with errors**. Reports
 are downloadable only after a job reaches a terminal state and are returned
@@ -100,7 +110,33 @@ Preview requests are parsed in memory and are not retained. After you start an
 import, Hangar stores the source temporarily in a dedicated private object
 storage bucket that is not routed through the public application endpoint. An
 upload fails closed if an anonymous object lookup succeeds. Hangar removes the
-source when processing finishes and also runs a daily cleanup for sources older
-than 24 hours.
+source when processing finishes. A reconciler runs every five minutes and fences
+expired execution ownership before removing a source whose 24-hour retention
+deadline has passed. Failed object deletion remains retryable and the database
+record keeps the source reference until storage confirms deletion.
 Import history and downloaded reports contain counts and safe diagnostics, not
 the original row contents or import configuration.
+
+## Operator controls and recovery
+
+`TODOIST_IMPORTS_ENABLED` defaults to `0`. API and worker processes must receive
+the same value; keep it disabled while applying migrations or investigating an
+import incident. Existing history and reports remain readable while disabled.
+
+The execution controls default to:
+
+| Environment variable | Default | Accepted runtime range | Purpose |
+| --- | ---: | ---: | --- |
+| `TODOIST_IMPORT_LEASE_SECONDS` | `120` | 30–900 seconds | Exclusive worker ownership window |
+| `TODOIST_IMPORT_RECOVERY_GRACE_SECONDS` | `30` | 0–300 seconds | Delay before an expired owner is fenced and recovered |
+| `TODOIST_IMPORT_SOURCE_RETENTION_HOURS` | `24` | 1–168 hours | Maximum configured source retention before reconciliation |
+
+Invalid non-integer values prevent API/worker startup instead of silently
+disabling ownership or retention controls. Values outside the accepted range are
+clamped to the documented safety boundary. Beat must run for durable broker
+redispatch, lease recovery, and source cleanup; disabling Beat leaves new jobs
+durable but can prevent automatic recovery.
+
+Importer transitions also create append-only audit events containing identifiers,
+states, generations, safe reason codes, and counts. They never contain CSV rows,
+filenames, object keys, source digests, mapping contents, or raw exceptions.

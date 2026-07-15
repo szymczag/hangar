@@ -98,6 +98,7 @@ class TestTodoistImportExecution:
             initiated_by=create_user,
             source_key="private/import.csv",
             source_digest=preview.digest,
+            manifest_digest="0" * 64,
             source_size=len(content),
             config={"assignee_mapping": {"Owner (100)": str(create_user.id)}, "module_conflicts": {}},
         )
@@ -140,6 +141,7 @@ class TestTodoistImportExecution:
             initiated_by=create_user,
             source_key="private/import.csv",
             source_digest=preview.digest,
+            manifest_digest="0" * 64,
             source_size=len(content),
             config={"assignee_mapping": {}, "module_conflicts": {}},
         )
@@ -160,6 +162,7 @@ class TestTodoistImportExecution:
             initiated_by=create_user,
             source_key="private/import.csv",
             source_digest="0" * 64,
+            manifest_digest="0" * 64,
             source_size=len(content),
             config={},
         )
@@ -179,6 +182,7 @@ class TestTodoistImportExecution:
             initiated_by=create_user,
             source_key="private/import.csv",
             source_digest=preview.digest,
+            manifest_digest="0" * 64,
             config={"assignee_mapping": {}, "module_conflicts": {}},
         )
         mocker.patch("plane.ext.importers.todoist.read_import_source", return_value=content)
@@ -209,6 +213,7 @@ class TestTodoistImportExecution:
             initiated_by=create_user,
             source_key="private/import.csv",
             source_digest=preview.digest,
+            manifest_digest="0" * 64,
             config={"assignee_mapping": {}, "module_conflicts": {}},
         )
         mocker.patch("plane.ext.importers.todoist.read_import_source", return_value=content)
@@ -226,6 +231,7 @@ class TestTodoistImportExecution:
             initiated_by=create_user,
             source_key="private/import.csv",
             source_digest=preview.digest,
+            manifest_digest="0" * 64,
             config={"assignee_mapping": {}, "module_conflicts": {}},
             cancel_requested_at=timezone.now(),
         )

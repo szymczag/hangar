@@ -151,6 +151,15 @@ Below are the most import keys you must refer to. _<span style="color: #fcba03">
 
 > `CORS_ALLOWED_ORIGINS` - This is default set to `http://localhost`. Change this to the FQDN you plan to use along with LISTEN_HTTP_PORT (eg. `https://plane.example.com:8080` or `http://[IP-ADDRESS]:8080`)
 
+> `TODOIST_IMPORTS_ENABLED` - This defaults to `0`. Enable it only after the
+> dedicated private import bucket is verified and API, worker, and Beat services
+> share the same configuration. `TODOIST_IMPORT_LEASE_SECONDS=120`,
+> `TODOIST_IMPORT_RECOVERY_GRACE_SECONDS=30`, and
+> `TODOIST_IMPORT_SOURCE_RETENTION_HOURS=24` control fenced worker recovery and
+> bounded source cleanup. Beat is required for durable redispatch, lease recovery,
+> and the five-minute cleanup reconciler. See
+> [Importing from Todoist](../../../docs/importing-from-todoist.md#operator-controls-and-recovery).
+
 There are many other settings you can play with, but we suggest you configure `EMAIL SETTINGS` as it will enable you to invite your teammates onto the platform.
 
 ---
