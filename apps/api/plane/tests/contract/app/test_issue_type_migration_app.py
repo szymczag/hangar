@@ -1,6 +1,8 @@
 # Copyright (c) 2026-present Maciej Szymczak and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
+from importlib import import_module
+
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -22,6 +24,9 @@ def test_issue_type_migration_upgrades_legacy_projects_without_claiming_custom_t
         )
         if cursor.fetchone() is None:
             pytest.skip("upgrade-path test requires the issue type migration")
+
+    migration_module = import_module("plane.db.migrations.0127_issue_type_system_keys")
+    assert getattr(migration_module.Migration, "atomic", True) is True
 
     executor = MigrationExecutor(connection)
     executor.migrate([("db", "0126_optional_issue_external_identifiers")])
