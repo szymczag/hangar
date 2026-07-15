@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from html import escape
 from typing import Any
 from uuid import UUID
@@ -44,6 +45,13 @@ class ImportRowFailure(Exception):
 
 class ImportCancelled(Exception):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class ModuleBinding:
+    module_id: UUID
+    expected_name: str
+    expected_status: str
 
 
 def _diagnostic(row: int | None, code: str, field: str | None = None) -> dict[str, Any]:
@@ -212,6 +220,35 @@ def _create_module(job: ImportJob, record: TodoistRecord) -> tuple[Module, bool]
         raise ImportRowFailure("module_name_conflict", "content") from None
 
 
+def _module_binding(module: Module) -> ModuleBinding:
+    return ModuleBinding(
+        module_id=module.id,
+        expected_name=module.name,
+        expected_status=module.status,
+    )
+
+
+def _lock_bound_module(job: ImportJob, binding: ModuleBinding) -> Module:
+    """Revalidate a section decision in the task-row mutation transaction."""
+
+    module = (
+        Module.objects.select_for_update()
+        .filter(
+            id=binding.module_id,
+            project=job.project,
+        )
+        .first()
+    )
+    if (
+        module is None
+        or module.name != binding.expected_name
+        or module.status != binding.expected_status
+        or module.archived_at is not None
+    ):
+        raise ImportRowFailure("module_decision_stale", "content")
+    return module
+
+
 def _create_issue(
     job: ImportJob,
     record: TodoistRecord,
@@ -325,7 +362,7 @@ def execute_todoist_import(
         "processed_tasks": 0,
     }
     issues_by_row: dict[int, Issue] = {}
-    modules_by_row: dict[int, Module] = {}
+    modules_by_row: dict[int, ModuleBinding] = {}
 
     enables_modules = any(record.kind == "section" for record in preview.records)
 
@@ -361,7 +398,7 @@ def execute_todoist_import(
                                 )
                         elif record.kind == "section":
                             module, created = _create_module(job, record)
-                            modules_by_row[record.row] = module
+                            modules_by_row[record.row] = _module_binding(module)
                             stats["imported_sections" if created else "reused_sections"] += 1
                         elif record.kind == "note":
                             issue = issues_by_row.get(record.task_row or -1)
@@ -377,9 +414,10 @@ def execute_todoist_import(
                                     raise ImportRowFailure("parent_dependency_failed", "indent")
                             issue, created = _create_issue(job, record, parent)
                             if record.section_row is not None:
-                                module = modules_by_row.get(record.section_row)
-                                if module is None:
+                                module_binding = modules_by_row.get(record.section_row)
+                                if module_binding is None:
                                     raise ImportRowFailure("module_dependency_failed", "type")
+                                module = _lock_bound_module(job, module_binding)
                                 ModuleIssue.objects.get_or_create(
                                     module=module,
                                     issue=issue,

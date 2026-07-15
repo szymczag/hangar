@@ -448,3 +448,56 @@ class TestTodoistImportExecution:
         assert Issue.objects.filter(project=import_project).count() == 0
         assert stats["failed"] >= 1
         assert "module_decision_stale" in [item["code"] for item in diagnostics]
+
+    def test_reused_module_drift_between_section_and_task_fails_closed(
+        self,
+        mocker,
+        workspace,
+        create_user,
+        import_project,
+    ):
+        existing_module = Module.objects.create(
+            name="Imported section",
+            project=import_project,
+            status="planned",
+        )
+        content = import_csv()
+        section = next(record for record in parse_todoist_csv(content).records if record.kind == "section")
+        claim = claimed_import_job(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            content=content,
+            config={
+                "assignee_mapping": {},
+                "module_conflicts": {
+                    str(section.row): {
+                        "action": "reuse",
+                        "module_id": str(existing_module.id),
+                        "expected_name": existing_module.name,
+                        "expected_status": existing_module.status,
+                        "expected_archived_at": None,
+                    }
+                },
+            },
+        )
+        original_create_module = todoist_importer._create_module
+
+        def drift_after_section(job, record):
+            module, created = original_create_module(job, record)
+            Module.objects.filter(pk=module.id).update(status="paused")
+            return module, created
+
+        mocker.patch("plane.ext.importers.todoist.read_import_source", return_value=content)
+        mocker.patch("plane.ext.importers.todoist._create_module", side_effect=drift_after_section)
+
+        stats, diagnostics = execute_todoist_import(
+            claim.job,
+            generation=claim.generation,
+            lease_token=claim.lease_token,
+        )
+
+        assert Issue.objects.filter(project=import_project).count() == 0
+        assert ModuleIssue.objects.filter(module=existing_module).count() == 0
+        assert stats["failed"] >= 1
+        assert "module_decision_stale" in [item["code"] for item in diagnostics]
