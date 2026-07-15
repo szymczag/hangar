@@ -32,11 +32,14 @@ from plane.ext.runner.models import (
 )
 from plane.ext.runner.services import (
     RunnerAuditContext,
+    RunnerConsentError,
     RunnerInstallationService,
     RunnerPermissionError,
+    RunnerServiceError,
     RunnerTransitionError,
 )
 from plane.ext.runner.throttles import RunnerMutationThrottle, RunnerUserMutationThrottle
+from plane.ext.runner.views import runner_error_response
 
 
 def installation_url(workspace):
@@ -112,6 +115,26 @@ class TestRunnerAuditContext:
     def test_rejects_unbounded_or_ambiguous_evidence(self, values):
         with pytest.raises(ValueError):
             RunnerAuditContext(**values)
+
+
+@pytest.mark.contract
+class TestRunnerErrorResponse:
+    @pytest.mark.parametrize(
+        ("error", "expected_message"),
+        [
+            (RunnerConsentError("sensitive-consent-digest"), "The current Runner consent must be accepted."),
+            (RunnerServiceError("sensitive-stack-trace-detail"), "Runner request could not be completed."),
+        ],
+    )
+    def test_does_not_expose_service_error_details(self, error, expected_message):
+        response = runner_error_response(error)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data == {
+            "error": expected_message,
+            "code": error.code,
+        }
+        assert str(error) not in response.data["error"]
 
 
 @pytest.mark.usefixtures("runner_disabled")
