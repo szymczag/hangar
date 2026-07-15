@@ -59,6 +59,48 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.8` to `rc.9`
+
+Treat this upgrade as data-affecting and schedule an import maintenance window.
+Before rendering the target release:
+
+1. prevent workspace administrators from starting, cancelling, or retrying
+   Todoist imports, then wait for existing jobs to reach a terminal state;
+2. record active import jobs, oldest pending dispatch, queue depth, retained
+   source objects, and any unresolved cleanup failures without copying sensitive
+   source identifiers into the change record;
+3. take a coordinated PostgreSQL and object-storage backup and prove it can be
+   restored into an isolated environment; and
+4. render the `rc.9` values with `todoistImports.enabled=false` for the first
+   upgrade. Enable imports only after the migration and post-upgrade checks pass.
+
+The migration Job applies `db.0125` and `ext.0007` through `ext.0010`.
+`db.0125` deliberately stops before creating its partial unique indexes if active
+Todoist-created tasks, comments, or modules contain duplicate external IDs. Do not
+delete arbitrary duplicates merely to make the migration pass. Preserve the
+affected records, identify the authoritative import result, test a reviewed repair
+against a restored copy, and repeat the coordinated backup after remediation.
+
+`ext.0007` fails any still-active import with the safe reason
+`security_upgrade_required`, clears its retained execution configuration and
+broker task identifier, and installs the fenced lease, retry, dispatch, retention,
+and audit state. `ext.0008` through `ext.0010` initialize admission budgets and a
+rolling 24-hour usage ledger from existing jobs. A migration-failed job is not
+resumed automatically; review its history and project effects before creating an
+explicit retry.
+
+After the upgrade, verify authentication, representative project writes, uploads,
+background work, Runner error handling, and the deployment-managed telemetry and
+email status. Before enabling Todoist imports, verify the private bucket, Valkey,
+PostgreSQL, RabbitMQ, Beat, and the dedicated `imports` worker; then complete the
+synthetic preview/import/report and over-limit checks in
+[release verification](#verify-a-release).
+
+Application rollback to `rc.8` is not qualified after these migrations. Helm
+rollback does not reverse transformed job state or the new database protocol. To
+return to `rc.8`, restore the coordinated pre-upgrade PostgreSQL and object-storage
+recovery point into clean services and deploy the `0.1.0-rc.8` chart.
+
 ### Upgrade from `rc.7` to `rc.8`
 
 Treat this upgrade as data-affecting. Before rendering the target release:
