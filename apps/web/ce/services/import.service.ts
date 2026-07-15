@@ -41,7 +41,8 @@ export class ImportService extends APIService {
     projectId: string,
     file: File,
     previewDigest: string,
-    config: TTodoistImportConfig
+    config: TTodoistImportConfig,
+    retryJobId?: string | null
   ): Promise<TImportJob> {
     const csrfToken = await this.csrfToken();
     const data = new FormData();
@@ -49,6 +50,7 @@ export class ImportService extends APIService {
     data.append("file", file);
     data.append("preview_digest", previewDigest);
     data.append("config", JSON.stringify(config));
+    if (retryJobId) data.append("retry_job_id", retryJobId);
     return this.post(`/api/workspaces/${workspaceSlug}/imports/todoist/`, data, {
       headers: { "X-CSRFTOKEN": csrfToken },
     })

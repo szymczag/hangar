@@ -47,6 +47,7 @@ export type TImportJob = {
   errors: TImportDiagnostic[];
   reason: string;
   attempt_count: number;
+  retry_of: string | null;
   started_at: string | null;
   cancel_requested_at: string | null;
   completed_at: string | null;

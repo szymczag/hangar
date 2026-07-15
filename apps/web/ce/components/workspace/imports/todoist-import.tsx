@@ -14,7 +14,7 @@ import { CustomSelect } from "@plane/ui";
 import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
 import { importService } from "@/plane-web/services/import.service";
-import type { TTodoistImportConfig, TTodoistImportPreview } from "@/plane-web/types/import";
+import type { TImportJob, TTodoistImportConfig, TTodoistImportPreview } from "@/plane-web/types/import";
 import { TodoistImportHistory } from "./todoist-import-history";
 import { TodoistImportReview, type TModuleAction } from "./todoist-import-review";
 
@@ -38,6 +38,7 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
   const [moduleActions, setModuleActions] = useState<Record<number, TModuleAction>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
+  const [retryJobId, setRetryJobId] = useState<string | null>(null);
   const previewRequestId = useRef(0);
   const previewAbortController = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -119,11 +120,12 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
     };
     setIsSubmitting(true);
     try {
-      await importService.startTodoist(workspaceSlug, projectId, file, preview.digest, config);
+      await importService.startTodoist(workspaceSlug, projectId, file, preview.digest, config, retryJobId);
       setHistoryRefreshToken((current) => current + 1);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       resetPreview();
+      setRetryJobId(null);
       setToast({
         type: TOAST_TYPE.SUCCESS,
         title: t("workspace_settings.settings.todoist_import.queued_title"),
@@ -141,6 +143,15 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
   };
 
   const handleChooseAnother = () => {
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    resetPreview();
+    setRetryJobId(null);
+  };
+
+  const handleRetry = (job: TImportJob) => {
+    setProjectId(job.project);
+    setRetryJobId(job.id);
     setFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     resetPreview();
@@ -184,6 +195,7 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
               value={projectId}
               onChange={(value: string) => {
                 setProjectId(value);
+                setRetryJobId(null);
                 resetPreview();
               }}
               label={
@@ -199,6 +211,20 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
               ))}
             </CustomSelect>
           </label>
+
+          {retryJobId && (
+            <div className="rounded-lg border border-subtle bg-layer-2 p-3 text-body-xs-regular text-secondary">
+              {t("workspace_settings.settings.todoist_import.retrying_job")} {retryJobId.slice(0, 8)}.{" "}
+              {t("workspace_settings.settings.todoist_import.retry_help")}
+              <button
+                type="button"
+                className="ml-2 text-body-xs-medium text-accent-primary hover:underline"
+                onClick={() => setRetryJobId(null)}
+              >
+                {t("workspace_settings.settings.todoist_import.cancel_retry")}
+              </button>
+            </div>
+          )}
 
           <label className="flex flex-col gap-2 text-body-sm-medium text-primary">
             {t("workspace_settings.settings.todoist_import.csv_file")}
@@ -268,6 +294,7 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
         workspaceSlug={workspaceSlug}
         errorMessage={(error) => errorMessage(error, t("workspace_settings.settings.todoist_import.request_failed"))}
         refreshToken={historyRefreshToken}
+        onRetry={handleRetry}
       />
     </div>
   );
