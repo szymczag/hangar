@@ -31,6 +31,15 @@ from .throttles import (
 )
 
 
+RUNNER_PUBLIC_ERROR_MESSAGES = {
+    RunnerDisabledError: "Runner is not available.",
+    RunnerNotFoundError: "Runner workspace was not found.",
+    RunnerPermissionError: "You do not have permission to manage Runner.",
+    RunnerConsentError: "The current Runner consent must be accepted.",
+    RunnerTransitionError: "This Runner state change is not allowed.",
+}
+
+
 def runner_error_response(error: RunnerServiceError) -> Response:
     if isinstance(error, RunnerDisabledError):
         response_status = status.HTTP_404_NOT_FOUND
@@ -44,8 +53,18 @@ def runner_error_response(error: RunnerServiceError) -> Response:
         response_status = status.HTTP_409_CONFLICT
     else:
         response_status = status.HTTP_400_BAD_REQUEST
+
+    public_message = "Runner request could not be completed."
+    for error_type, message in RUNNER_PUBLIC_ERROR_MESSAGES.items():
+        if isinstance(error, error_type):
+            public_message = message
+            break
+
     return Response(
-        {"error": str(error), "code": error.code},
+        {
+            "error": public_message,
+            "code": error.code,
+        },
         status=response_status,
     )
 
