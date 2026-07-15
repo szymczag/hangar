@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Instance-administrator email delivery audit and suppression controls."""
+"""Instance-administrator email delivery configuration, audit, and suppression controls."""
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
@@ -11,8 +12,42 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from plane.db.models import EmailOutbox, EmailSuppression
+from plane.license.utils.instance_value import get_email_configuration
 from plane.mailer.audit import email_receipt
 from .base import BaseAPIView
+
+
+class InstanceEmailDeliveryConfigurationEndpoint(BaseAPIView):
+    """Return the effective non-secret deployment configuration for email delivery."""
+
+    def get(self, request):
+        _host, _username, _password, _port, _use_tls, _use_ssl, sender = get_email_configuration()
+        is_ses_api = settings.EMAIL_PROVIDER == "ses_api"
+
+        return Response(
+            {
+                "provider": settings.EMAIL_PROVIDER,
+                "is_deployment_managed": is_ses_api,
+                "durable_delivery_enabled": settings.EMAIL_DELIVERY_V2_ENABLED,
+                "openpgp_enabled": settings.EMAIL_OPENPGP_ENABLED,
+                "sender": sender,
+                "reply_to": settings.EMAIL_REPLY_TO,
+                "ses": (
+                    {
+                        "region": settings.EMAIL_SES_REGION,
+                        "account_id": settings.EMAIL_SES_ACCOUNT_ID,
+                        "access_key_id": settings.EMAIL_SES_AWS_ACCESS_KEY_ID,
+                        "auth_configuration_set": settings.EMAIL_SES_CONFIGURATION_SET_AUTH,
+                        "notification_configuration_set": settings.EMAIL_SES_CONFIGURATION_SET_NOTIFICATIONS,
+                        "events_queue_url": settings.EMAIL_SES_EVENTS_QUEUE_URL,
+                        "events_topic_arn": settings.EMAIL_SES_EVENTS_TOPIC_ARN,
+                    }
+                    if is_ses_api
+                    else None
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class InstanceEmailDeliveryLogEndpoint(BaseAPIView):
