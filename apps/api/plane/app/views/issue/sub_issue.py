@@ -7,7 +7,9 @@ import json
 
 # Django imports
 from django.utils import timezone
-from django.db.models import OuterRef, F, Value, UUIDField, Subquery, Count, IntegerField
+from django.db import transaction
+from django.db.models import BooleanField, OuterRef, F, Value, UUIDField, Subquery, Count, IntegerField
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.gzip import gzip_page
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -16,18 +18,21 @@ from django.db.models.functions import Coalesce
 
 # Third Party imports
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import serializers, status
 
 # Module imports
 from .. import BaseAPIView
 from plane.app.serializers import IssueSerializer
 from plane.app.permissions import ProjectEntityPermission
-from plane.db.models import Issue, IssueLink, FileAsset, CycleIssue, IssueLabel, IssueAssignee, ModuleIssue
+from plane.db.models import Issue, IssueLink, FileAsset, CycleIssue, IssueLabel, IssueAssignee, ModuleIssue, Project
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.utils.timezone_converter import user_timezone_converter
 from collections import defaultdict
 from plane.utils.host import base_host
 from plane.utils.order_queryset import order_issue_queryset
+from plane.ext.services import WorkItemInvariantError, parent_ancestry_ids
+
+MAX_SUB_ISSUES_PER_REQUEST = 100
 
 
 class SubIssuesEndpoint(BaseAPIView):
@@ -35,8 +40,14 @@ class SubIssuesEndpoint(BaseAPIView):
 
     @method_decorator(gzip_page)
     def get(self, request, slug, project_id, issue_id):
+        get_object_or_404(
+            Issue.issue_objects,
+            pk=issue_id,
+            workspace__slug=slug,
+            project_id=project_id,
+        )
         sub_issues = (
-            Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug)
+            Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug, project_id=project_id)
             .annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
@@ -128,6 +139,7 @@ class SubIssuesEndpoint(BaseAPIView):
                 ),
             )
             .annotate(state_group=F("state__group"))
+            .annotate(is_epic=Coalesce(F("type__is_epic"), Value(False), output_field=BooleanField()))
         )
 
         # Ordering
@@ -151,6 +163,8 @@ class SubIssuesEndpoint(BaseAPIView):
                 "sequence_id",
                 "project_id",
                 "parent_id",
+                "type_id",
+                "is_epic",
                 "cycle_id",
                 "module_ids",
                 "label_ids",
@@ -201,41 +215,113 @@ class SubIssuesEndpoint(BaseAPIView):
         )
 
     # Assign multiple sub issues
+    @transaction.atomic
     def post(self, request, slug, project_id, issue_id):
-        parent_issue = Issue.issue_objects.get(pk=issue_id)
-        sub_issue_ids = request.data.get("sub_issue_ids", [])
+        id_list = serializers.ListField(
+            child=serializers.UUIDField(),
+            allow_empty=False,
+            max_length=MAX_SUB_ISSUES_PER_REQUEST,
+        )
+        try:
+            sub_issue_ids = id_list.run_validation(request.data.get("sub_issue_ids"))
+        except serializers.ValidationError as exc:
+            return Response({"sub_issue_ids": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not len(sub_issue_ids):
+        if len(set(sub_issue_ids)) != len(sub_issue_ids):
             return Response(
-                {"error": "Sub Issue IDs are required"},
+                {"sub_issue_ids": "Duplicate work item IDs are not allowed"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Scope to workspace to prevent cross-tenant IDOR
-        sub_issues = Issue.issue_objects.filter(id__in=sub_issue_ids, workspace__slug=slug)
+        # Serialize hierarchy mutations per project. The exact project scope on
+        # both parent and children prevents cross-project IDOR and partial writes.
+        get_object_or_404(
+            Project.objects.select_for_update(),
+            pk=project_id,
+            workspace__slug=slug,
+        )
+        parent_issue = get_object_or_404(
+            Issue.objects.select_for_update(),
+            pk=issue_id,
+            workspace__slug=slug,
+            project_id=project_id,
+        )
+        locked_sub_issue_ids = list(
+            Issue.objects.select_for_update()
+            .filter(id__in=sub_issue_ids, workspace__slug=slug, project_id=project_id)
+            .values_list("id", flat=True)
+        )
+        if len(locked_sub_issue_ids) != len(sub_issue_ids):
+            return Response(
+                {"sub_issue_ids": "Every work item must exist in this project"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        sub_issues = list(Issue.objects.filter(id__in=locked_sub_issue_ids).select_related("type"))
+
+        if parent_issue.id in sub_issue_ids:
+            return Response(
+                {"sub_issue_ids": "A work item cannot be its own parent"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if any(sub_issue.type_id and sub_issue.type.is_epic for sub_issue in sub_issues):
+            return Response(
+                {"sub_issue_ids": "Epic work items cannot have a parent"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            ancestor_ids = parent_ancestry_ids(
+                parent_id=parent_issue.id,
+                project_id=project_id,
+                workspace_id=parent_issue.workspace_id,
+            )
+        except WorkItemInvariantError as exc:
+            return Response(
+                {"sub_issue_ids": exc.message},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if any(sub_issue.id in ancestor_ids for sub_issue in sub_issues):
+            return Response(
+                {"sub_issue_ids": "Parent assignment would create a cycle"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        previous_parents = {sub_issue.id: sub_issue.parent_id for sub_issue in sub_issues}
 
         for sub_issue in sub_issues:
             sub_issue.parent = parent_issue
 
-        _ = Issue.objects.bulk_update(sub_issues, ["parent"], batch_size=10)
+        Issue.objects.bulk_update(sub_issues, ["parent"], batch_size=10)
 
-        updated_sub_issues = Issue.issue_objects.filter(id__in=sub_issue_ids).annotate(state_group=F("state__group"))
-
-        # Track the issue
-        _ = [
-            issue_activity.delay(
-                type="issue.activity.updated",
-                requested_data=json.dumps({"parent": str(issue_id)}),
-                actor_id=str(request.user.id),
-                issue_id=str(sub_issue_id),
-                project_id=str(project_id),
-                current_instance=json.dumps({"parent": str(sub_issue_id)}),
-                epoch=int(timezone.now().timestamp()),
-                notification=True,
-                origin=base_host(request=request, is_app=True),
+        updated_sub_issues = (
+            Issue.issue_objects.filter(
+                id__in=sub_issue_ids,
+                workspace__slug=slug,
+                project_id=project_id,
             )
-            for sub_issue_id in sub_issue_ids
-        ]
+            .select_related("type")
+            .annotate(state_group=F("state__group"))
+        )
+
+        def dispatch_activities():
+            for sub_issue_id in sub_issue_ids:
+                issue_activity.delay(
+                    type="issue.activity.updated",
+                    requested_data=json.dumps({"parent": str(issue_id)}),
+                    actor_id=str(request.user.id),
+                    issue_id=str(sub_issue_id),
+                    project_id=str(project_id),
+                    current_instance=json.dumps(
+                        {"parent": str(previous_parents[sub_issue_id]) if previous_parents[sub_issue_id] else None}
+                    ),
+                    epoch=int(timezone.now().timestamp()),
+                    notification=True,
+                    origin=base_host(request=request, is_app=True),
+                )
+
+        transaction.on_commit(dispatch_activities)
 
         # create's a dict with state group name with their respective issue id's
         result = defaultdict(list)

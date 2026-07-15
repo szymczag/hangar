@@ -3,8 +3,10 @@
 # See the LICENSE file for details.
 
 from uuid import uuid4
+from importlib import import_module
 
 import pytest
+from django.apps import apps as django_apps
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -39,9 +41,7 @@ def issue_type(db, workspace, project):
 
 @pytest.fixture
 def issue(db, project, workspace, state, issue_type):
-    return Issue.objects.create(
-        name="Some bug", project=project, workspace=workspace, state=state, type=issue_type
-    )
+    return Issue.objects.create(name="Some bug", project=project, workspace=workspace, state=state, type=issue_type)
 
 
 def base_url(workspace, project):
@@ -59,7 +59,103 @@ def make_role_client(workspace, project, role):
 
 
 @pytest.mark.contract
+@pytest.mark.django_db
+def test_system_type_migration_provisions_every_project_without_hijacking_custom_task(workspace, project, state):
+    custom_task = IssueType.objects.create(workspace=workspace, name="Task")
+    ProjectIssueType.objects.create(project=project, issue_type=custom_task)
+    untyped = Issue.objects.create(name="Untyped", workspace=workspace, project=project, state=state)
+
+    migration = import_module("plane.db.migrations.0127_issue_type_system_keys")
+    migration.provision_system_types(django_apps, None)
+
+    custom_task.refresh_from_db()
+    untyped.refresh_from_db()
+    canonical_task = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.TASK)
+    canonical_epic = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.EPIC)
+
+    assert custom_task.system_key is None
+    assert canonical_task.id != custom_task.id
+    assert untyped.type_id == canonical_task.id
+    assert ProjectIssueType.objects.filter(project=project, issue_type=canonical_epic, level=1).exists()
+
+
+@pytest.mark.contract
 class TestIssueTypeCRUD:
+    @pytest.mark.django_db
+    def test_admin_enables_canonical_task_and_epic_types(self, session_client, workspace, project):
+        url = f"{base_url(workspace, project)}/issue-types/enable/"
+
+        first = session_client.post(url, {}, format="json")
+        second = session_client.post(url, {}, format="json")
+
+        assert first.status_code == status.HTTP_200_OK
+        assert second.status_code == status.HTTP_200_OK
+        assert {item["system_key"] for item in first.data} == {"task", "epic"}
+        assert IssueType.objects.filter(workspace=workspace, system_key__isnull=False).count() == 2
+        links = {
+            link.issue_type.system_key: link
+            for link in ProjectIssueType.objects.filter(
+                project=project, issue_type__system_key__isnull=False
+            ).select_related("issue_type")
+        }
+        assert links["task"].level == 0
+        assert links["task"].is_default is True
+        assert links["epic"].level == 1
+        assert links["epic"].is_default is False
+
+    @pytest.mark.django_db
+    def test_enable_repairs_system_type_and_default_link_drift(self, session_client, workspace, project):
+        url = f"{base_url(workspace, project)}/issue-types/enable/"
+        session_client.post(url, {}, format="json")
+        task_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.TASK)
+        epic_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.EPIC)
+        custom_type = IssueType.objects.create(workspace=workspace, name="Incident")
+        ProjectIssueType.objects.create(project=project, issue_type=custom_type, is_default=True)
+
+        response = session_client.post(url, {}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        task_type.refresh_from_db()
+        epic_type.refresh_from_db()
+        assert (task_type.is_active, task_type.is_default, task_type.level) == (True, True, 0)
+        assert (epic_type.is_active, epic_type.is_default, epic_type.level) == (True, False, 1)
+        assert ProjectIssueType.objects.get(project=project, issue_type=task_type).is_default is True
+        assert ProjectIssueType.objects.get(project=project, issue_type=epic_type).level == 1
+        assert ProjectIssueType.objects.get(project=project, issue_type=custom_type).is_default is False
+
+    @pytest.mark.django_db
+    def test_system_type_identity_fields_are_immutable(self, session_client, workspace, project):
+        session_client.post(f"{base_url(workspace, project)}/issue-types/enable/", {}, format="json")
+        epic_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.EPIC)
+
+        response = session_client.patch(
+            f"{base_url(workspace, project)}/issue-types/{epic_type.id}/",
+            {"name": "Initiative", "is_epic": False, "is_default": True, "level": 0},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        epic_type.refresh_from_db()
+        assert epic_type.name == "Initiative"
+        assert epic_type.system_key == IssueType.SystemKey.EPIC
+        assert epic_type.is_epic is True
+        assert epic_type.is_default is False
+        assert epic_type.level == 1
+
+    @pytest.mark.django_db
+    def test_system_type_cannot_be_deactivated_or_deleted(self, session_client, workspace, project):
+        session_client.post(f"{base_url(workspace, project)}/issue-types/enable/", {}, format="json")
+        task_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.TASK)
+        detail_url = f"{base_url(workspace, project)}/issue-types/{task_type.id}/"
+
+        deactivated = session_client.patch(detail_url, {"is_active": "false"}, format="json")
+        deleted = session_client.delete(detail_url)
+
+        assert deactivated.status_code == status.HTTP_400_BAD_REQUEST
+        assert deleted.status_code == status.HTTP_400_BAD_REQUEST
+        task_type.refresh_from_db()
+        assert task_type.is_active is True
+
     @pytest.mark.django_db
     def test_admin_creates_type(self, session_client, workspace, project):
         response = session_client.post(
@@ -67,9 +163,7 @@ class TestIssueTypeCRUD:
         )
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["is_epic"] is False
-        assert ProjectIssueType.objects.filter(
-            project=project, issue_type_id=response.data["id"]
-        ).exists()
+        assert ProjectIssueType.objects.filter(project=project, issue_type_id=response.data["id"]).exists()
 
     @pytest.mark.django_db
     def test_member_cannot_create_type(self, workspace, project):
@@ -152,9 +246,7 @@ class TestIssueProperties:
     @pytest.mark.django_db
     def test_cross_project_property_access_denied(self, session_client, workspace, project, issue_type):
         # A type linked to a different project in the same workspace
-        other_project = Project.objects.create(
-            name="Other", identifier="OTH", workspace=workspace, created_by=None
-        )
+        other_project = Project.objects.create(name="Other", identifier="OTH", workspace=workspace, created_by=None)
         other_type = IssueType.objects.create(workspace=workspace, name="Other Type")
         ProjectIssueType.objects.create(project=other_project, issue_type=other_type)
         other_prop = IssueProperty.objects.create(
@@ -234,9 +326,7 @@ class TestPropertyValues:
         foreign_prop = IssueProperty.objects.create(
             workspace=workspace, issue_type=select_prop.issue_type, display_name="Other", property_type="select"
         )
-        foreign_option = IssuePropertyOption.objects.create(
-            workspace=workspace, property=foreign_prop, name="Foreign"
-        )
+        foreign_option = IssuePropertyOption.objects.create(workspace=workspace, property=foreign_prop, name="Foreign")
         response = session_client.post(
             self.values_url(workspace, project, issue),
             {str(select_prop.id): [str(foreign_option.id)]},
@@ -270,9 +360,7 @@ class TestPropertyValues:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
-    def test_omitted_required_property_rejected(
-        self, session_client, workspace, project, issue, issue_type
-    ):
+    def test_omitted_required_property_rejected(self, session_client, workspace, project, issue, issue_type):
         IssueProperty.objects.create(
             workspace=workspace,
             issue_type=issue_type,
@@ -288,9 +376,7 @@ class TestPropertyValues:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
-    def test_property_from_different_issue_type_rejected(
-        self, session_client, workspace, project, issue
-    ):
+    def test_property_from_different_issue_type_rejected(self, session_client, workspace, project, issue):
         other_type = IssueType.objects.create(workspace=workspace, name="Task")
         ProjectIssueType.objects.create(project=project, issue_type=other_type)
         foreign_prop = IssueProperty.objects.create(
@@ -307,9 +393,7 @@ class TestPropertyValues:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
-    def test_values_from_previous_issue_type_are_removed(
-        self, session_client, workspace, project, issue, text_prop
-    ):
+    def test_values_from_previous_issue_type_are_removed(self, session_client, workspace, project, issue, text_prop):
         IssuePropertyValue.objects.create(
             workspace=workspace,
             project=project,
@@ -332,9 +416,7 @@ class TestPropertyValues:
         assert not IssuePropertyValue.objects.filter(issue=issue).exists()
 
     @pytest.mark.django_db
-    def test_deleted_property_values_are_not_returned(
-        self, session_client, workspace, project, issue, text_prop
-    ):
+    def test_deleted_property_values_are_not_returned(self, session_client, workspace, project, issue, text_prop):
         IssuePropertyValue.objects.create(
             workspace=workspace,
             project=project,
@@ -371,15 +453,11 @@ class TestPropertyValues:
 
     @pytest.mark.django_db
     def test_unknown_property_rejected(self, session_client, workspace, project, issue):
-        response = session_client.post(
-            self.values_url(workspace, project, issue), {str(uuid4()): ["x"]}, format="json"
-        )
+        response = session_client.post(self.values_url(workspace, project, issue), {str(uuid4()): ["x"]}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
     def test_guest_cannot_write_values(self, workspace, project, issue, text_prop):
         client, _ = make_role_client(workspace, project, role=5)
-        response = client.post(
-            self.values_url(workspace, project, issue), {str(text_prop.id): ["hi"]}, format="json"
-        )
+        response = client.post(self.values_url(workspace, project, issue), {str(text_prop.id): ["hi"]}, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN

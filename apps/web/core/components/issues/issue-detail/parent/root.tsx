@@ -5,7 +5,6 @@
  */
 
 import { observer } from "mobx-react";
-import { useRouter } from "next/navigation";
 import { MinusCircle } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import type { TIssue } from "@plane/types";
@@ -36,8 +35,6 @@ export type TIssueParentDetail = {
 
 export const IssueParentDetail = observer(function IssueParentDetail(props: TIssueParentDetail) {
   const { workspaceSlug, projectId, issueId, issue, issueOperations } = props;
-  // router
-  const router = useRouter();
   const { t } = useTranslation();
   // hooks
   const { issueMap } = useIssues();
@@ -68,8 +65,7 @@ export const IssueParentDetail = observer(function IssueParentDetail(props: TIss
   });
 
   const handleParentIssueClick = () => {
-    if (isParentEpic) router.push(workItemLink);
-    else handleRedirection(workspaceSlug, parentIssue, isMobile);
+    handleRedirection(workspaceSlug, parentIssue, isMobile);
   };
 
   return (

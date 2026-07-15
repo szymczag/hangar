@@ -8,7 +8,6 @@ import { makeObservable, observable } from "mobx";
 import { computedFn } from "mobx-utils";
 // types
 import type { TIssue, TIssueServiceType } from "@plane/types";
-import { EIssueServiceType } from "@plane/types";
 // services
 import { IssueArchiveService, WorkspaceDraftService, IssueService } from "@/services/issue";
 // types
@@ -48,7 +47,6 @@ export class IssueStore implements IIssueStore {
   // services
   serviceType;
   issueService;
-  epicService;
   issueArchiveService;
   draftWorkItemService;
 
@@ -61,7 +59,6 @@ export class IssueStore implements IIssueStore {
     // services
     this.serviceType = serviceType;
     this.issueService = new IssueService(serviceType);
-    this.epicService = new IssueService(EIssueServiceType.EPICS);
     this.issueArchiveService = new IssueArchiveService(serviceType);
     this.draftWorkItemService = new WorkspaceDraftService();
   }
@@ -102,7 +99,7 @@ export class IssueStore implements IIssueStore {
     // parent
     if (issue && issue?.parent && issue?.parent?.id && issue?.parent?.project_id) {
       this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue?.parent?.id).then((res) => {
-        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
+        return this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
       });
     }
     // assignees
@@ -179,31 +176,18 @@ export class IssueStore implements IIssueStore {
   };
 
   updateIssue = async (workspaceSlug: string, projectId: string, issueId: string, data: Partial<TIssue>) => {
-    const currentStore =
-      this.serviceType === EIssueServiceType.EPICS
-        ? this.rootIssueDetailStore.rootIssueStore.projectEpics
-        : this.rootIssueDetailStore.rootIssueStore.projectIssues;
-
     await Promise.all([
-      currentStore.updateIssue(workspaceSlug, projectId, issueId, data),
+      this.rootIssueDetailStore.rootIssueStore.projectIssues.updateIssue(workspaceSlug, projectId, issueId, data),
       this.rootIssueDetailStore.activity.fetchActivities(workspaceSlug, projectId, issueId),
     ]);
   };
 
   removeIssue = async (workspaceSlug: string, projectId: string, issueId: string) => {
-    const currentStore =
-      this.serviceType === EIssueServiceType.EPICS
-        ? this.rootIssueDetailStore.rootIssueStore.projectEpics
-        : this.rootIssueDetailStore.rootIssueStore.projectIssues;
-    currentStore.removeIssue(workspaceSlug, projectId, issueId);
+    this.rootIssueDetailStore.rootIssueStore.projectIssues.removeIssue(workspaceSlug, projectId, issueId);
   };
 
   archiveIssue = async (workspaceSlug: string, projectId: string, issueId: string) => {
-    const currentStore =
-      this.serviceType === EIssueServiceType.EPICS
-        ? this.rootIssueDetailStore.rootIssueStore.projectEpics
-        : this.rootIssueDetailStore.rootIssueStore.projectIssues;
-    currentStore.archiveIssue(workspaceSlug, projectId, issueId);
+    this.rootIssueDetailStore.rootIssueStore.projectIssues.archiveIssue(workspaceSlug, projectId, issueId);
   };
 
   addCycleToIssue = async (workspaceSlug: string, projectId: string, cycleId: string, issueId: string) => {
@@ -275,9 +259,7 @@ export class IssueStore implements IIssueStore {
     const issueIdentifier = `${project_identifier}-${sequence_id}`;
     const issueId = issue?.id;
     const projectId = issue?.project_id;
-    const rootWorkItemDetailStore = issue?.is_epic
-      ? this.rootIssueDetailStore.rootIssueStore.epicDetail
-      : this.rootIssueDetailStore.rootIssueStore.issueDetail;
+    const rootWorkItemDetailStore = this.rootIssueDetailStore.rootIssueStore.issueDetail;
 
     if (!issue || !projectId || !issueId) throw new Error("Issue not found");
 
@@ -287,7 +269,7 @@ export class IssueStore implements IIssueStore {
     // handle parent issue if exists
     if (issue?.parent && issue?.parent?.id && issue?.parent?.project_id) {
       this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue.parent.id).then((res) => {
-        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
+        return this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
       });
     }
 

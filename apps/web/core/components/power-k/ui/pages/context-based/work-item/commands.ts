@@ -24,7 +24,7 @@ import { useTranslation } from "@plane/i18n";
 import { LinkIcon, TrashIcon, ContrastIcon, DiceIcon, DoubleCircleIcon } from "@plane/propel/icons";
 import { setToast, TOAST_TYPE } from "@plane/propel/toast";
 import type { ICycle, IIssueLabel, IModule, TIssue, TIssuePriorities } from "@plane/types";
-import { EIssueServiceType, EUserPermissions } from "@plane/types";
+import { EUserPermissions } from "@plane/types";
 import { copyTextToClipboard } from "@plane/utils";
 // components
 import type { TPowerKCommandConfig } from "@/components/power-k/core/types";
@@ -50,16 +50,7 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
     issue: { getIssueById, getIssueIdByIdentifier, addCycleToIssue, removeIssueFromCycle, changeModulesInIssue },
     subscription: { getSubscriptionByIssueId, createSubscription, removeSubscription },
     updateIssue,
-  } = useIssueDetail(EIssueServiceType.ISSUES);
-  const {
-    issue: {
-      addCycleToIssue: addCycleToEpic,
-      removeIssueFromCycle: removeEpicFromCycle,
-      changeModulesInIssue: changeModulesInEpic,
-    },
-    subscription: { createSubscription: createEpicSubscription, removeSubscription: removeEpicSubscription },
-    updateIssue: updateEpic,
-  } = useIssueDetail(EIssueServiceType.EPICS);
+  } = useIssueDetail();
   // derived values
   const entityId = entityIdentifier ? getIssueIdByIdentifier(entityIdentifier.toString()) : null;
   const entityDetails = entityId ? getIssueById(entityId) : null;
@@ -73,9 +64,6 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
   // translation
   const { t } = useTranslation();
   // handlers
-  const updateEntity = isEpic ? updateEpic : updateIssue;
-  const createEntitySubscription = isEpic ? createEpicSubscription : createSubscription;
-  const removeEntitySubscription = isEpic ? removeEpicSubscription : removeSubscription;
   // permission
   const isEditingAllowed =
     allowPermissions(
@@ -88,15 +76,15 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
   const handleUpdateEntity = useCallback(
     async (formData: Partial<TIssue>) => {
       if (!workspaceSlug || !entityDetails || !entityDetails.project_id) return;
-      await updateEntity(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id, formData).catch(() => {
-        setToast({
+      await updateIssue(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id, formData).catch(() => {
+        return setToast({
           type: TOAST_TYPE.ERROR,
           title: "Error!",
           message: `${isEpic ? "Epic" : "Work item"} could not be updated. Please try again.`,
         });
       });
     },
-    [entityDetails, isEpic, updateEntity, workspaceSlug]
+    [entityDetails, isEpic, updateIssue, workspaceSlug]
   );
 
   const handleUpdateAssignee = useCallback(
@@ -117,9 +105,9 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
 
     try {
       if (isSubscribed) {
-        await removeEntitySubscription(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id);
+        await removeSubscription(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id);
       } else {
-        await createEntitySubscription(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id);
+        await createSubscription(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id);
       }
       setToast({
         type: TOAST_TYPE.SUCCESS,
@@ -136,7 +124,7 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createEntitySubscription, entityDetails, isSubscribed, removeEntitySubscription, workspaceSlug]);
+  }, [createSubscription, entityDetails, isSubscribed, removeSubscription, workspaceSlug]);
 
   const handleDeleteWorkItem = useCallback(() => {
     toggleDeleteIssueModal(true);
@@ -146,13 +134,13 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
     const id = `${projectDetails?.identifier}-${entityDetails?.sequence_id}`;
     copyTextToClipboard(id)
       .then(() => {
-        setToast({
+        return setToast({
           type: TOAST_TYPE.SUCCESS,
           title: t("power_k.contextual_actions.work_item.copy_id_toast_success"),
         });
       })
       .catch(() => {
-        setToast({
+        return setToast({
           type: TOAST_TYPE.ERROR,
           title: t("power_k.contextual_actions.work_item.copy_id_toast_error"),
         });
@@ -163,13 +151,13 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
   const copyWorkItemTitleToClipboard = useCallback(() => {
     copyTextToClipboard(entityDetails?.name ?? "")
       .then(() => {
-        setToast({
+        return setToast({
           type: TOAST_TYPE.SUCCESS,
           title: t("power_k.contextual_actions.work_item.copy_title_toast_success"),
         });
       })
       .catch(() => {
-        setToast({
+        return setToast({
           type: TOAST_TYPE.ERROR,
           title: t("power_k.contextual_actions.work_item.copy_title_toast_error"),
         });
@@ -181,13 +169,13 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
     const url = new URL(window.location.href);
     copyTextToClipboard(url.href)
       .then(() => {
-        setToast({
+        return setToast({
           type: TOAST_TYPE.SUCCESS,
           title: t("power_k.contextual_actions.work_item.copy_url_toast_success"),
         });
       })
       .catch(() => {
-        setToast({
+        return setToast({
           type: TOAST_TYPE.ERROR,
           title: t("power_k.contextual_actions.work_item.copy_url_toast_error"),
         });
@@ -303,15 +291,11 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
         const cycleId = (data as ICycle)?.id;
         if (!workspaceSlug || !entityDetails || !entityDetails.project_id) return;
         if (entityDetails.cycle_id === cycleId) return;
-        // handlers
-        const addCycleToEntity = entityDetails.is_epic ? addCycleToEpic : addCycleToIssue;
-        const removeCycleFromEntity = entityDetails.is_epic ? removeEpicFromCycle : removeIssueFromCycle;
-
         try {
           if (cycleId) {
-            addCycleToEntity(workspaceSlug.toString(), entityDetails.project_id, cycleId, entityDetails.id);
+            addCycleToIssue(workspaceSlug.toString(), entityDetails.project_id, cycleId, entityDetails.id);
           } else {
-            removeCycleFromEntity(
+            removeIssueFromCycle(
               workspaceSlug.toString(),
               entityDetails.project_id,
               entityDetails.cycle_id ?? "",
@@ -342,13 +326,11 @@ export const usePowerKWorkItemContextBasedCommands = (): TPowerKCommandConfig[] 
       onSelect: (data) => {
         const moduleId = (data as IModule)?.id;
         if (!workspaceSlug || !entityDetails || !entityDetails.project_id) return;
-        // handlers
-        const changeModulesInEntity = entityDetails.is_epic ? changeModulesInEpic : changeModulesInIssue;
         try {
           if (entityDetails.module_ids?.includes(moduleId)) {
-            changeModulesInEntity(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id, [], [moduleId]);
+            changeModulesInIssue(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id, [], [moduleId]);
           } else {
-            changeModulesInEntity(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id, [moduleId], []);
+            changeModulesInIssue(workspaceSlug.toString(), entityDetails.project_id, entityDetails.id, [moduleId], []);
           }
         } catch {
           setToast({

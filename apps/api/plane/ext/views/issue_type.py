@@ -19,6 +19,7 @@ from plane.ext.models import IssueProperty, IssuePropertyOption, IssuePropertyVa
 from plane.ext.serializers.issue_property import IssuePropertyOptionSerializer, IssuePropertySerializer
 from plane.ext.serializers.issue_type import IssueTypeSerializer
 from plane.ext.utils.property_validators import validate_property_values
+from plane.ext.services import ensure_project_system_types
 
 
 def project_issue_types(slug, project_id):
@@ -26,6 +27,7 @@ def project_issue_types(slug, project_id):
     return IssueType.objects.filter(
         workspace__slug=slug,
         project_issue_types__project_id=project_id,
+        project_issue_types__deleted_at__isnull=True,
     ).distinct()
 
 
@@ -59,14 +61,28 @@ class IssueTypesEndpoint(BaseAPIView):
         from plane.db.models import Project
 
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        ensure_project_system_types(project)
         serializer = IssueTypeSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        # Custom types are never epics — the epic type is managed by the
-        # epic-settings endpoint.
+        # System types have stable identities; additional types are custom
+        # level-0 work item types unless promoted by a future hierarchy API.
         issue_type = serializer.save(workspace=project.workspace, is_epic=False)
         ProjectIssueType.objects.create(project=project, issue_type=issue_type)
         return Response(IssueTypeSerializer(issue_type).data, status=status.HTTP_201_CREATED)
+
+
+class EnableIssueTypesEndpoint(BaseAPIView):
+    @allow_permission([ROLE.ADMIN])
+    def post(self, request, slug, project_id):
+        from plane.db.models import Project
+
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        task_type, epic_type = ensure_project_system_types(project)
+        return Response(
+            IssueTypeSerializer([task_type, epic_type], many=True).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class IssueTypeDetailEndpoint(BaseAPIView):
@@ -81,23 +97,23 @@ class IssueTypeDetailEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN])
     def patch(self, request, slug, project_id, type_id):
         issue_type = self.get_type(slug, project_id, type_id)
-        if issue_type.is_epic:
-            return Response(
-                {"error": "The epic type is managed via epic settings"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         serializer = IssueTypeSerializer(issue_type, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save(is_epic=False)
+        if issue_type.system_key and serializer.validated_data.get("is_active") is False:
+            return Response(
+                {"is_active": "System work item types cannot be deactivated"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN])
     def delete(self, request, slug, project_id, type_id):
         issue_type = self.get_type(slug, project_id, type_id)
-        if issue_type.is_epic:
+        if issue_type.system_key:
             return Response(
-                {"error": "The epic type is managed via epic settings"},
+                {"error": "System work item types cannot be deleted"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if Issue.objects.filter(type=issue_type).exists():

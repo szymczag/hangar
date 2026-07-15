@@ -50,12 +50,7 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
   const storeType = issueStoreFromProps ?? issueStoreType;
   const { issues } = useIssues(storeType);
 
-  useWorkItemProperties(
-    peekIssue?.projectId,
-    peekIssue?.workspaceSlug,
-    peekIssue?.issueId,
-    storeType === EIssuesStoreType.EPIC ? EIssueServiceType.EPICS : EIssueServiceType.ISSUES
-  );
+  useWorkItemProperties(peekIssue?.projectId, peekIssue?.workspaceSlug, peekIssue?.issueId, EIssueServiceType.ISSUES);
   // state
   const [error, setError] = useState(false);
 
@@ -70,9 +65,9 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
         try {
           setError(false);
           await fetchIssue(workspaceSlug, projectId, issueId);
-        } catch (error) {
+        } catch (caughtError) {
           setError(true);
-          console.error("Error fetching the parent issue", error);
+          console.error("Error fetching the parent issue", caughtError);
         }
       },
       update: async (workspaceSlug: string, projectId: string, issueId: string, data: Partial<TIssue>) => {
@@ -110,8 +105,8 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
         try {
           if (!issues?.archiveIssue) return;
           await issues.archiveIssue(workspaceSlug, projectId, issueId);
-        } catch (error) {
-          console.error("Error archiving the issue", error);
+        } catch (caughtError) {
+          console.error("Error archiving the issue", caughtError);
         }
       },
       restore: async (workspaceSlug: string, projectId: string, issueId: string) => {
@@ -169,8 +164,8 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
           });
           await removeFromCyclePromise;
           fetchActivities(workspaceSlug, projectId, issueId);
-        } catch (error) {
-          console.error("Error removing issue from cycle", error);
+        } catch (caughtError) {
+          console.error("Error removing issue from cycle", caughtError);
         }
       },
       changeModulesInIssue: async (
@@ -206,8 +201,8 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
           });
           await removeFromModulePromise;
           fetchActivities(workspaceSlug, projectId, issueId);
-        } catch (error) {
-          console.error("Error removing issue from module", error);
+        } catch (caughtError) {
+          console.error("Error removing issue from module", caughtError);
         }
       },
     }),

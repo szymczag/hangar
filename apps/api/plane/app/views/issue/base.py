@@ -10,6 +10,7 @@ import json
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.db.models import (
     Count,
     Exists,
@@ -91,7 +92,11 @@ class IssueListEndpoint(BaseAPIView):
         issue_ids = [issue_id for issue_id in issue_ids.split(",") if issue_id != ""]
 
         # Base queryset with basic filters
-        queryset = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issue_ids)
+        queryset = Issue.issue_objects.filter(
+            workspace__slug=slug,
+            project_id=project_id,
+            pk__in=issue_ids,
+        ).select_related("type")
 
         # Apply filtering from filterset
         queryset = self.filter_queryset(queryset)
@@ -173,6 +178,8 @@ class IssueListEndpoint(BaseAPIView):
                 "sequence_id",
                 "project_id",
                 "parent_id",
+                "type_id",
+                "is_epic",
                 "cycle_id",
                 "module_ids",
                 "label_ids",
@@ -204,10 +211,14 @@ class IssueViewSet(BaseViewSet):
         return IssueCreateSerializer if self.action in ["create", "update", "partial_update"] else IssueSerializer
 
     def get_queryset(self):
-        issues = Issue.issue_objects.filter(
-            project_id=self.kwargs.get("project_id"),
-            workspace__slug=self.kwargs.get("slug"),
-        ).distinct()
+        issues = (
+            Issue.issue_objects.filter(
+                project_id=self.kwargs.get("project_id"),
+                workspace__slug=self.kwargs.get("slug"),
+            )
+            .select_related("type")
+            .distinct()
+        )
 
         return issues
 
@@ -391,7 +402,7 @@ class IssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
-        project = Project.objects.get(pk=project_id)
+        project = Project.objects.get(pk=project_id, workspace__slug=slug)
 
         serializer = IssueCreateSerializer(
             data=request.data,
@@ -438,6 +449,8 @@ class IssueViewSet(BaseViewSet):
                     "sequence_id",
                     "project_id",
                     "parent_id",
+                    "type_id",
+                    "is_epic",
                     "cycle_id",
                     "module_ids",
                     "label_ids",
@@ -477,6 +490,28 @@ class IssueViewSet(BaseViewSet):
             return Response(issue, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], creator=True, model=Issue)
+    @transaction.atomic
+    def update(self, request, slug, project_id, pk=None):
+        project = Project.objects.select_for_update().get(pk=project_id, workspace__slug=slug)
+        issue = self.get_queryset().filter(pk=pk).first()
+        if issue is None:
+            return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = IssueCreateSerializer(
+            issue,
+            data=request.data,
+            context={
+                "project_id": project_id,
+                "workspace_id": project.workspace_id,
+                "default_assignee_id": project.default_assignee_id,
+            },
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], creator=True, model=Issue)
     def retrieve(self, request, slug, project_id, pk=None):
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
@@ -487,7 +522,7 @@ class IssueViewSet(BaseViewSet):
                 workspace__slug=self.kwargs.get("slug"),
                 pk=pk,
             )
-            .select_related("state")
+            .select_related("state", "type")
             .annotate(cycle_id=Subquery(CycleIssue.objects.filter(issue=OuterRef("id")).values("cycle_id")[:1]))
             .annotate(
                 link_count=Subquery(
@@ -613,7 +648,9 @@ class IssueViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], creator=True, model=Issue)
+    @transaction.atomic
     def partial_update(self, request, slug, project_id, pk=None):
+        Project.objects.select_for_update().get(pk=project_id, workspace__slug=slug)
         queryset = self.get_queryset()
         queryset = self.apply_annotations(queryset)
 

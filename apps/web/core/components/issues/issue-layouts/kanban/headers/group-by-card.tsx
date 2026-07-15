@@ -19,7 +19,6 @@ import { ExistingIssuesListModal } from "@/components/core/modals/existing-issue
 import { CreateUpdateIssueModal } from "@/components/issues/issue-modal/modal";
 // constants
 import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
-import { CreateUpdateEpicModal } from "@/plane-web/components/epics/epic-modal";
 // types
 // Hangar-web
 import { WorkFlowGroupTree } from "@/plane-web/components/workflow";
@@ -52,7 +51,6 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
     issuePayload,
     disableIssueCreation,
     addIssuesToView,
-    isEpic = false,
   } = props;
   const verticalAlignPosition = sub_group_by ? false : collapsedGroups?.group_by.includes(column_id);
   // states
@@ -90,16 +88,12 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
 
   return (
     <>
-      {isEpic ? (
-        <CreateUpdateEpicModal isOpen={isOpen} onClose={() => setIsOpen(false)} data={issuePayload} />
-      ) : (
-        <CreateUpdateIssueModal
-          isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
-          data={issuePayload}
-          storeType={storeType}
-        />
-      )}
+      <CreateUpdateIssueModal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        data={issuePayload}
+        storeType={storeType}
+      />
 
       {renderExistingIssueModal && (
         <ExistingIssuesListModal

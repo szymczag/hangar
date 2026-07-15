@@ -43,7 +43,7 @@ export function IssueTypeSelect<T extends Partial<TIssueFields>>(props: TIssueTy
   // data
   const { issueTypes } = useIssueTypes(workspaceSlug?.toString(), projectId);
   // derived values
-  const availableTypes = (issueTypes ?? []).filter((type) => !type.is_epic && type.is_active);
+  const availableTypes = (issueTypes ?? []).filter((type) => type.is_active);
 
   if (!projectId || availableTypes.length === 0) return <></>;
 

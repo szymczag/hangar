@@ -143,7 +143,7 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
 
   const getIssueTypeIdOnProjectChange = useCallback(
     (projectId: string) => {
-      const types = getProjectTypes(projectId).filter((type) => !type.is_epic && type.is_active);
+      const types = getProjectTypes(projectId).filter((type) => type.is_active);
       return types.find((type) => type.is_default)?.id ?? null;
     },
     [getProjectTypes]

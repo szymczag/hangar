@@ -24,6 +24,7 @@ from plane.app.serializers import (
     IssueStateIntakeSerializer,
 )
 from plane.utils.content_validator import validate_html_content
+from plane.ext.services import project_default_issue_type
 from plane.utils.issue_filters import issue_filters
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models.intake import SourceType
@@ -155,6 +156,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
             priority=request.data.get("issue", {}).get("priority", "low"),
             project_id=project_deploy_board.project_id,
             state_id=triage_state.id,
+            type=project_default_issue_type(project_deploy_board.project_id),
         )
 
         # Create an Issue Activity

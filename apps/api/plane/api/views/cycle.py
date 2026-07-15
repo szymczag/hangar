@@ -871,6 +871,7 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
             .select_related("workspace")
             .select_related("state")
             .select_related("parent")
+            .select_related("type")
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(order_by)

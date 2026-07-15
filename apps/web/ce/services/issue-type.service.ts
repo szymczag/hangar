@@ -24,6 +24,14 @@ export class IssueTypeService extends APIService {
       });
   }
 
+  async enableIssueTypes(workspaceSlug: string, projectId: string): Promise<TIssueTypeExt[]> {
+    return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/issue-types/enable/`, {})
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
   async createIssueType(workspaceSlug: string, projectId: string, data: Partial<TIssueTypeExt>) {
     return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/issue-types/`, data)
       .then((response) => response?.data)

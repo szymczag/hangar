@@ -24,6 +24,7 @@ from plane.ext.views.epic import (
     EpicViewSet,
 )
 from plane.ext.views.issue_type import (
+    EnableIssueTypesEndpoint,
     IssuePropertiesEndpoint,
     IssuePropertyDetailEndpoint,
     IssuePropertyOptionDetailEndpoint,
@@ -93,6 +94,11 @@ urlpatterns = [
         f"{PROJECT_BASE}/issue-types/",
         IssueTypesEndpoint.as_view(),
         name="issue-types",
+    ),
+    path(
+        f"{PROJECT_BASE}/issue-types/enable/",
+        EnableIssueTypesEndpoint.as_view(),
+        name="enable-issue-types",
     ),
     path(
         f"{PROJECT_BASE}/issue-types/<uuid:type_id>/",
@@ -188,9 +194,7 @@ urlpatterns = [
     ),
     path(
         f"{EPIC_BASE}/<uuid:issue_id>/subscribe/",
-        EpicSubscriberViewSet.as_view(
-            {"get": "subscription_status", "post": "subscribe", "delete": "unsubscribe"}
-        ),
+        EpicSubscriberViewSet.as_view({"get": "subscription_status", "post": "subscribe", "delete": "unsubscribe"}),
         name="epic-subscribe",
     ),
     path(

@@ -7,6 +7,7 @@ import json
 
 # Django import
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Q, Count, OuterRef, Func, F, Prefetch, Subquery
 from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -332,7 +333,9 @@ class IntakeIssueViewSet(BaseViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=Issue)
+    @transaction.atomic
     def partial_update(self, request, slug, project_id, pk):
+        Project.objects.select_for_update().get(pk=project_id, workspace__slug=slug)
         skip_activity = request.data.pop("skip_activity", False)
         is_description_update = request.data.get("description_html") is not None
 

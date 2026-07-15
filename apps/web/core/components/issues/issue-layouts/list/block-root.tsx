@@ -14,7 +14,6 @@ import { observer } from "mobx-react";
 import { useOutsideClickDetector } from "@plane/hooks";
 // types
 import type { IIssueDisplayProperties, TIssue, TIssueMap } from "@plane/types";
-import { EIssueServiceType } from "@plane/types";
 // components
 import { DropIndicator } from "@plane/ui";
 import RenderIfVisible from "@/components/core/render-if-visible-HOC";
@@ -77,7 +76,7 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
   // hooks
   const { isMobile } = usePlatformOS();
   // store hooks
-  const { subIssues: subIssuesStore } = useIssueDetail(isEpic ? EIssueServiceType.EPICS : EIssueServiceType.ISSUES);
+  const { subIssues: subIssuesStore } = useIssueDetail();
 
   const isSubIssue = nestingLevel !== 0;
 

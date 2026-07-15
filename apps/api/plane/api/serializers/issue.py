@@ -27,6 +27,7 @@ from plane.db.models import (
     User,
     EstimatePoint,
 )
+from plane.ext.services import WorkItemInvariantError, project_default_issue_type, validate_work_item_assignment
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
@@ -63,13 +64,33 @@ class IssueSerializer(BaseSerializer):
         write_only=True,
         required=False,
     )
-    type_id = serializers.PrimaryKeyRelatedField(
-        source="type", queryset=IssueType.objects.all(), required=False, allow_null=True
+    state_id = serializers.PrimaryKeyRelatedField(
+        source="state", queryset=State.all_state_objects.all(), required=False, allow_null=True
     )
+    parent_id = serializers.PrimaryKeyRelatedField(
+        source="parent", queryset=Issue.objects.all(), required=False, allow_null=True
+    )
+    type_id = serializers.PrimaryKeyRelatedField(
+        source="type", queryset=IssueType.objects.all(), required=False, allow_null=False
+    )
+    is_epic = serializers.SerializerMethodField()
+
+    def get_is_epic(self, obj):
+        return bool(obj.type_id and obj.type.is_epic)
 
     class Meta:
         model = Issue
-        read_only_fields = ["id", "workspace", "project", "updated_by", "updated_at", "completed_at"]
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "updated_by",
+            "updated_at",
+            "completed_at",
+            "state",
+            "parent",
+            "type",
+        ]
         exclude = ["description_json", "description_stripped"]
 
     def validate(self, data):
@@ -125,16 +146,20 @@ class IssueSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("State is not valid please pass a valid state_id")
 
-        # Check parent issue is from workspace as it can be cross workspace
-        if (
-            data.get("parent")
-            and not Issue.objects.filter(
-                workspace_id=self.context.get("workspace_id"),
+        effective_type = data.get("type", getattr(self.instance, "type", None))
+        effective_parent = data.get("parent", getattr(self.instance, "parent", None))
+        try:
+            scoped_parent = validate_work_item_assignment(
                 project_id=self.context.get("project_id"),
-                pk=data.get("parent").id,
-            ).exists()
-        ):
-            raise serializers.ValidationError("Parent is not valid issue_id please pass a valid issue_id")
+                workspace_id=self.context.get("workspace_id"),
+                issue_type=effective_type,
+                parent=effective_parent,
+                issue_id=self.instance.pk if self.instance else None,
+            )
+        except WorkItemInvariantError as exc:
+            raise serializers.ValidationError({exc.field: exc.message}) from exc
+        if "parent" in data:
+            data["parent"] = scoped_parent
 
         if (
             data.get("estimate_point")
@@ -160,8 +185,7 @@ class IssueSerializer(BaseSerializer):
 
         if not issue_type:
             # Get default issue type
-            issue_type = IssueType.objects.filter(project_issue_types__project_id=project_id, is_default=True).first()
-            issue_type = issue_type
+            issue_type = project_default_issue_type(project_id)
 
         issue = Issue.objects.create(**validated_data, project_id=project_id, type=issue_type)
 
@@ -328,9 +352,14 @@ class IssueLiteSerializer(BaseSerializer):
     references, and performance-critical operations.
     """
 
+    is_epic = serializers.SerializerMethodField()
+
+    def get_is_epic(self, obj):
+        return bool(obj.type_id and obj.type.is_epic)
+
     class Meta:
         model = Issue
-        fields = ["id", "sequence_id", "project_id"]
+        fields = ["id", "sequence_id", "project_id", "type_id", "is_epic"]
         read_only_fields = fields
 
 

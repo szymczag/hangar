@@ -16,6 +16,7 @@ from plane.db.models import Project, ProjectIdentifier, WorkspaceMember, State, 
 from plane.utils.content_validator import (
     validate_html_content,
 )
+from plane.ext.services import ensure_project_system_types
 from .base import BaseSerializer
 
 
@@ -159,6 +160,7 @@ class ProjectCreateSerializer(BaseSerializer):
             }
 
         project = Project.objects.create(**validated_data, workspace_id=self.context["workspace_id"])
+        ensure_project_system_types(project)
         return project
 
 
@@ -289,6 +291,7 @@ class ProjectSerializer(BaseSerializer):
             raise serializers.ValidationError(detail="Project Identifier is taken")
 
         project = Project.objects.create(**validated_data, workspace_id=self.context["workspace_id"])
+        ensure_project_system_types(project)
         _ = ProjectIdentifier.objects.create(
             name=project.identifier,
             project=project,

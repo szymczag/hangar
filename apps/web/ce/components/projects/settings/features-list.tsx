@@ -5,16 +5,13 @@
  */
 
 // Fork (see FORK.md): wraps the core features list and appends the fork's
-// Epics and Time tracking toggles. Epics enablement is not a Project
-// boolean — it is derived from the epic ProjectIssueType link, managed via
-// the epic-settings endpoint. Time tracking is the Project's
-// is_time_tracking_enabled flag, updated through the regular project API.
+// Time tracking toggle. Epic is a work item type configured under Work item
+// types, not a separately enabled project feature.
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-import useSWR from "swr";
 // icons
-import { Layers, Timer } from "lucide-react";
+import { Timer } from "lucide-react";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
@@ -24,68 +21,12 @@ import { ProjectFeaturesList as CoreProjectFeaturesList } from "@/components/pro
 import { SettingsBoxedControlItem } from "@/components/settings/boxed-control-item";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
-// plane web
-import { epicService } from "@/plane-web/services/epic.service";
 
 type Props = {
   workspaceSlug: string;
   projectId: string;
   isAdmin: boolean;
 };
-
-const EpicsFeatureToggle = observer(function EpicsFeatureToggle(props: Props) {
-  const { workspaceSlug, projectId, isAdmin } = props;
-  // state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  // fetch current state
-  const { data, mutate } = useSWR(
-    workspaceSlug && projectId ? `EPIC_SETTINGS_${workspaceSlug}_${projectId}` : null,
-    () => epicService.getSettings(workspaceSlug, projectId),
-    { revalidateOnFocus: false }
-  );
-
-  const handleToggle = async () => {
-    if (!isAdmin || isSubmitting || !data) return;
-    setIsSubmitting(true);
-    const next = !data.is_epic_enabled;
-    try {
-      await epicService.updateSettings(workspaceSlug, projectId, { is_epic_enabled: next });
-      await mutate();
-      setToast({
-        type: TOAST_TYPE.SUCCESS,
-        title: "Success!",
-        message: `Epics ${next ? "enabled" : "disabled"} for this project.`,
-      });
-    } catch (error) {
-      console.error(error);
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to update the epics setting." });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="mt-4">
-      <SettingsBoxedControlItem
-        title={
-          <span className="flex items-center gap-2">
-            <Layers className="h-5 w-5 flex-shrink-0 text-tertiary" />
-            Epics
-          </span>
-        }
-        description="Group large bodies of work spanning multiple cycles into epics and track their progress."
-        control={
-          <ToggleSwitch
-            value={Boolean(data?.is_epic_enabled)}
-            onChange={handleToggle}
-            disabled={!isAdmin || isSubmitting || !data}
-            size="sm"
-          />
-        }
-      />
-    </div>
-  );
-});
 
 const TimeTrackingFeatureToggle = observer(function TimeTrackingFeatureToggle(props: Props) {
   const { workspaceSlug, projectId, isAdmin } = props;
@@ -144,7 +85,6 @@ export const ProjectFeaturesList = observer(function ProjectFeaturesList(props: 
   return (
     <>
       <CoreProjectFeaturesList {...props} />
-      <EpicsFeatureToggle {...props} />
       <TimeTrackingFeatureToggle {...props} />
     </>
   );

@@ -61,13 +61,13 @@ export const RelationIssueListItem = observer(function RelationIssueListItem(pro
     removeRelation,
     toggleCreateIssueModal,
     toggleDeleteIssueModal,
-  } = useIssueDetail(issueServiceType);
+  } = useIssueDetail();
   const project = useProject();
   const { isMobile } = usePlatformOS();
   // derived values
   const issue = getIssueById(relationIssueId);
   const { handleRedirection } = useIssuePeekOverviewRedirection(!!issue?.is_epic);
-  const issueOperations = useRelationOperations(issue?.is_epic ? EIssueServiceType.EPICS : EIssueServiceType.ISSUES);
+  const issueOperations = useRelationOperations();
   const projectDetail = (issue && issue.project_id && project.getProjectById(issue.project_id)) || undefined;
   const projectId = issue?.project_id;
 
@@ -83,13 +83,8 @@ export const RelationIssueListItem = observer(function RelationIssueListItem(pro
   });
 
   // handlers
-  const handleIssuePeekOverview = (issue: TIssue) => {
-    if (issue.is_epic) {
-      // open epics in new tab
-      window.open(workItemLink, "_blank");
-      return;
-    }
-    handleRedirection(workspaceSlug, issue, isMobile);
+  const handleIssuePeekOverview = (targetIssue: TIssue) => {
+    handleRedirection(workspaceSlug, targetIssue, isMobile);
   };
 
   const handleEditIssue = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
@@ -150,8 +145,12 @@ export const RelationIssueListItem = observer(function RelationIssueListItem(pro
             </div>
             <div
               className="flex-shrink-0 text-13"
+              role="presentation"
               onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
+              }}
+              onKeyDown={(e) => {
                 e.stopPropagation();
               }}
             >

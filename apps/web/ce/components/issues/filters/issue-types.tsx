@@ -31,7 +31,7 @@ export const FilterIssueTypes = observer(function FilterIssueTypes(props: Props)
   // data
   const { issueTypes } = useIssueTypes(workspaceSlug?.toString(), projectId?.toString());
   // derived values
-  const availableTypes = (issueTypes ?? []).filter((type) => !type.is_epic && type.is_active);
+  const availableTypes = (issueTypes ?? []).filter((type) => type.is_active);
   const filteredTypes = availableTypes.filter((type) => type.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const appliedFilterIds = new Set(appliedFilters ?? []);
   const appliedFiltersCount = appliedFilters?.length ?? 0;

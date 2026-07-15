@@ -41,5 +41,6 @@ export type TIssueTypeExt = {
   is_default: boolean;
   is_active: boolean;
   level: number;
+  system_key: "task" | "epic" | null;
   properties?: TIssuePropertyExt[];
 };

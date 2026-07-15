@@ -43,9 +43,7 @@ def default_state(db, project, workspace):
 
 @pytest.fixture
 def completed_state(db, project, workspace):
-    return State.objects.create(
-        name="Done", group="completed", color="#00ff00", project=project, workspace=workspace
-    )
+    return State.objects.create(name="Done", group="completed", color="#00ff00", project=project, workspace=workspace)
 
 
 def make_role_client(workspace, project, role):
@@ -93,7 +91,7 @@ class TestEpicSettings:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     @pytest.mark.django_db
-    def test_disable_keeps_epics(self, session_client, workspace, project, default_state):
+    def test_system_epic_type_cannot_be_disabled(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
         create_epic(session_client, workspace, project, state_id=str(default_state.id))
         response = session_client.patch(
@@ -101,21 +99,19 @@ class TestEpicSettings:
             {"is_epic_enabled": False},
             format="json",
         )
-        assert response.status_code == status.HTTP_200_OK
-        assert not ProjectIssueType.objects.filter(project=project, issue_type__is_epic=True).exists()
-        # Data retained
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert ProjectIssueType.objects.filter(project=project, issue_type__is_epic=True).exists()
         assert Issue.objects.filter(project=project, type__is_epic=True).exists()
 
     @pytest.mark.django_db
-    def test_string_false_disables_epics(self, session_client, workspace, project, default_state):
+    def test_string_false_is_rejected(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
         response = session_client.patch(
             f"/api/workspaces/{workspace.slug}/projects/{project.id}/epic-settings/",
             {"is_epic_enabled": "false"},
             format="json",
         )
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["is_epic_enabled"] is False
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.contract
@@ -221,12 +217,10 @@ class TestEpicCRUD:
         assert epic.deleted_at is None
 
     @pytest.mark.django_db
-    def test_epics_and_issues_are_separated(self, session_client, workspace, project, default_state):
+    def test_epics_are_in_the_work_item_manager(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
         epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
-        issue = Issue.objects.create(
-            name="Normal work item", project=project, workspace=workspace, state=default_state
-        )
+        issue = Issue.objects.create(name="Normal work item", project=project, workspace=workspace, state=default_state)
 
         # Epic list contains only the epic
         response = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/")
@@ -236,12 +230,194 @@ class TestEpicCRUD:
         assert str(epic_id) in {str(i) for i in ids}
         assert str(issue.id) not in {str(i) for i in ids}
 
-        # Work-item manager excludes epics (drives every issue list surface)
-        work_item_ids = set(
-            Issue.issue_objects.filter(project=project).values_list("id", flat=True)
-        )
+        # Epic is an ordinary work-item type and shares the same manager.
+        work_item_ids = set(Issue.issue_objects.filter(project=project).values_list("id", flat=True))
         assert issue.id in work_item_ids
-        assert str(epic_id) not in {str(i) for i in work_item_ids}
+        assert str(epic_id) in {str(i) for i in work_item_ids}
+
+    @pytest.mark.django_db
+    def test_epic_uses_default_state_when_not_supplied(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+
+        response = create_epic(session_client, workspace, project)
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        assert Issue.objects.get(pk=response.data["id"]).state_id == default_state.id
+
+
+@pytest.mark.contract
+class TestUnifiedEpicWorkItems:
+    @pytest.mark.django_db
+    def test_create_list_and_retrieve_epic_through_work_items(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.EPIC)
+
+        created = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/",
+            {"name": "Unified epic", "state_id": str(default_state.id), "type_id": str(epic_type.id)},
+            format="json",
+        )
+
+        assert created.status_code == status.HTTP_201_CREATED, created.data
+        assert created.data["type_id"] == epic_type.id
+        assert created.data["is_epic"] is True
+
+        listing = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/")
+        assert listing.status_code == status.HTTP_200_OK
+        listed = next(item for item in listing.data["results"] if str(item["id"]) == str(created.data["id"]))
+        assert listed["type_id"] == epic_type.id
+        assert listed["is_epic"] is True
+
+        detail = session_client.get(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{created.data['id']}/"
+        )
+        assert detail.status_code == status.HTTP_200_OK
+        assert detail.data["type_id"] == epic_type.id
+        assert detail.data["is_epic"] is True
+
+    @pytest.mark.django_db
+    def test_work_item_endpoint_rejects_unlinked_type(self, session_client, workspace, project, default_state):
+        rogue_type = IssueType.objects.create(workspace=workspace, name="Rogue")
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/",
+            {"name": "Invalid", "state_id": str(default_state.id), "type_id": str(rogue_type.id)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "type_id" in response.data
+
+    @pytest.mark.django_db
+    def test_work_item_endpoint_rejects_null_type(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/",
+            {"name": "Untyped", "state_id": str(default_state.id), "type_id": None},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "type_id" in response.data
+
+    @pytest.mark.django_db
+    def test_work_item_endpoint_rejects_epic_parent(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project).data["id"]
+        parent = Issue.objects.create(name="Parent", project=project, workspace=workspace, state=default_state)
+
+        response = session_client.patch(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{epic_id}/",
+            {"parent_id": str(parent.id)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "parent_id" in response.data
+
+    @pytest.mark.django_db
+    def test_full_update_uses_the_same_epic_hierarchy_validation(
+        self, session_client, workspace, project, default_state
+    ):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project).data["id"]
+        epic_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.EPIC)
+        parent = Issue.objects.create(name="Parent", project=project, workspace=workspace, state=default_state)
+
+        response = session_client.put(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{epic_id}/",
+            {
+                "name": "Epic",
+                "state_id": str(default_state.id),
+                "type_id": str(epic_type.id),
+                "parent_id": str(parent.id),
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "parent_id" in response.data
+
+    @pytest.mark.django_db
+    def test_guest_cannot_full_update_work_item(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project).data["id"]
+        guest_client, _ = make_role_client(workspace, project, role=5)
+
+        response = guest_client.put(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{epic_id}/",
+            {"name": "Changed by guest", "state_id": str(default_state.id)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.django_db
+    def test_standard_sub_issues_endpoint_attaches_child(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project).data["id"]
+        child = Issue.objects.create(name="Child", project=project, workspace=workspace, state=default_state)
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{epic_id}/sub-issues/",
+            {"sub_issue_ids": [str(child.id)]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK, response.data
+        child.refresh_from_db()
+        assert str(child.parent_id) == str(epic_id)
+        assert {str(item["id"]) for item in response.data["sub_issues"]} == {str(child.id)}
+
+    @pytest.mark.django_db
+    def test_standard_sub_issues_endpoint_rejects_epic_as_child(
+        self, session_client, workspace, project, default_state
+    ):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, name="Child epic").data["id"]
+        parent = Issue.objects.create(name="Parent", project=project, workspace=workspace, state=default_state)
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{parent.id}/sub-issues/",
+            {"sub_issue_ids": [str(epic_id)]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert Issue.objects.get(pk=epic_id).parent_id is None
+
+    @pytest.mark.django_db
+    def test_standard_sub_issues_endpoint_rejects_cycle(self, session_client, workspace, project, default_state):
+        parent = Issue.objects.create(name="Parent", project=project, workspace=workspace, state=default_state)
+        child = Issue.objects.create(
+            name="Child", project=project, workspace=workspace, state=default_state, parent=parent
+        )
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{child.id}/sub-issues/",
+            {"sub_issue_ids": [str(parent.id)]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        parent.refresh_from_db()
+        assert parent.parent_id is None
+
+    @pytest.mark.django_db
+    def test_standard_sub_issues_endpoint_bounds_bulk_assignment(
+        self, session_client, workspace, project, default_state
+    ):
+        parent = Issue.objects.create(name="Parent", project=project, workspace=workspace, state=default_state)
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{parent.id}/sub-issues/",
+            {"sub_issue_ids": [str(uuid4()) for _ in range(101)]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "sub_issue_ids" in response.data
 
 
 @pytest.mark.contract
@@ -277,7 +453,9 @@ class TestEpicScoping:
         assert response.status_code in (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND)
 
     @pytest.mark.django_db
-    def test_children_progress(self, session_client, workspace, project, default_state, completed_state):
+    def test_legacy_children_url_uses_standard_contract(
+        self, session_client, workspace, project, default_state, completed_state
+    ):
         enable_epics(session_client, workspace, project)
         epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
         Issue.objects.create(
@@ -287,18 +465,13 @@ class TestEpicScoping:
             name="Child 2", project=project, workspace=workspace, state=completed_state, parent_id=epic_id
         )
 
-        response = session_client.get(
-            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/issues/"
-        )
+        response = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/issues/")
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["progress"]["total_issues"] == 2
-        assert response.data["progress"]["completed_issues"] == 1
-        assert len(response.data["issues"]) == 2
+        assert len(response.data["sub_issues"]) == 2
+        assert len(response.data["state_distribution"]["completed"]) == 1
 
     @pytest.mark.django_db
-    def test_children_exclude_other_projects(
-        self, session_client, workspace, project, default_state
-    ):
+    def test_children_exclude_other_projects(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
         epic_id = create_epic(
             session_client,
@@ -327,17 +500,44 @@ class TestEpicScoping:
             parent_id=epic_id,
         )
 
-        response = session_client.get(
-            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/issues/"
-        )
+        response = session_client.get(f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/issues/")
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["progress"]["total_issues"] == 0
-        assert response.data["issues"] == []
+        assert response.data["sub_issues"] == []
 
     @pytest.mark.django_db
-    def test_epic_subresources_reject_ordinary_issue(
-        self, session_client, workspace, project, default_state
-    ):
+    def test_attach_children_is_atomic_and_project_scoped(self, session_client, workspace, project, default_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project).data["id"]
+        valid_child = Issue.objects.create(
+            name="Valid child", project=project, workspace=workspace, state=default_state
+        )
+        other_project = Project.objects.create(
+            name="Other project",
+            identifier="OTH",
+            workspace=workspace,
+            created_by=project.created_by,
+        )
+        other_state = State.objects.create(
+            name="Other todo", group="unstarted", color="#fff", project=other_project, workspace=workspace
+        )
+        foreign_child = Issue.objects.create(
+            name="Foreign child", project=other_project, workspace=workspace, state=other_state
+        )
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/epics/{epic_id}/issues/",
+            {"sub_issue_ids": [str(valid_child.id), str(foreign_child.id)]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        valid_child.refresh_from_db()
+        foreign_child.refresh_from_db()
+        assert valid_child.parent_id is None
+        assert foreign_child.parent_id is None
+
+    @pytest.mark.django_db
+    def test_epic_subresources_reject_ordinary_issue(self, session_client, workspace, project, default_state):
         issue = Issue.objects.create(
             name="Ordinary work item",
             project=project,
@@ -369,9 +569,7 @@ class TestEpicWebContracts:
             assert {str(item["id"]) for item in response.data["results"]} == {str(epic_id)}
 
     @pytest.mark.django_db
-    def test_epic_collection_supports_grouped_web_response(
-        self, session_client, workspace, project, default_state
-    ):
+    def test_epic_collection_supports_grouped_web_response(self, session_client, workspace, project, default_state):
         enable_epics(session_client, workspace, project)
         epic_id = create_epic(session_client, workspace, project, state_id=str(default_state.id)).data["id"]
 
@@ -411,6 +609,16 @@ class TestEpicWebContracts:
         assert session_client.post(url).status_code == status.HTTP_200_OK
         assert session_client.delete(url).status_code == status.HTTP_204_NO_CONTENT
         assert Issue.objects.get(pk=epic_id).archived_at is None
+
+    @pytest.mark.django_db
+    def test_epic_uses_standard_archive_surface(self, session_client, workspace, project, completed_state):
+        enable_epics(session_client, workspace, project)
+        epic_id = create_epic(session_client, workspace, project, state_id=str(completed_state.id)).data["id"]
+        url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{epic_id}/archive/"
+
+        assert session_client.post(url).status_code == status.HTTP_200_OK
+        assert session_client.get(url).status_code == status.HTTP_200_OK
+        assert session_client.delete(url).status_code == status.HTTP_204_NO_CONTENT
 
     @pytest.mark.django_db
     def test_epic_filters_do_not_mutate_work_item_filters(self, session_client, create_user, workspace, project):
