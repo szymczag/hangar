@@ -121,11 +121,11 @@ Workspace seed and dummy-data jobs also provision the system types before they
 create projects or work items, so post-upgrade maintenance jobs cannot reintroduce
 untyped records.
 
-On PostgreSQL, the migration commits its atomic data-provisioning operation before
-building the new type constraints. This operation boundary is required so deferred
-foreign-key triggers are settled before the partial unique index is created. If the
-constraint step fails, correct the database condition and rerun the migration; the
-idempotent provisioning step safely repairs the same rows again.
+On PostgreSQL, the migration explicitly settles deferred foreign-key checks after
+provisioning and before it creates the partial unique index. The complete schema
+and data migration remains atomic: a failure rolls back the new column, provisioned
+rows, backfill, and constraints together. The provisioning logic is also idempotent
+so controlled test and recovery runs converge on the same canonical rows.
 
 Existing work items, Epic relationships, comments, attachments, activities, and
 custom property data are retained. The migration does not delete legacy type rows.

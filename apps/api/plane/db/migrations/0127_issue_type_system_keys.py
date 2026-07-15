@@ -123,12 +123,14 @@ def provision_system_types(apps, schema_editor):
         )
 
 
-class Migration(migrations.Migration):
-    # PostgreSQL cannot build the IssueType partial index while deferred FK
-    # trigger events from ProjectIssueType provisioning are pending. Commit the
-    # atomic data backfill before applying the constraints.
-    atomic = False
+def flush_deferred_constraints(apps, schema_editor):
+    """Settle PostgreSQL FK triggers before creating an index on IssueType."""
 
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+
+
+class Migration(migrations.Migration):
     dependencies = [("db", "0126_optional_issue_external_identifiers")]
 
     operations = [
@@ -142,7 +144,8 @@ class Migration(migrations.Migration):
                 null=True,
             ),
         ),
-        migrations.RunPython(provision_system_types, migrations.RunPython.noop, atomic=True),
+        migrations.RunPython(provision_system_types, migrations.RunPython.noop),
+        migrations.RunPython(flush_deferred_constraints, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name="issuetype",
             constraint=models.UniqueConstraint(
