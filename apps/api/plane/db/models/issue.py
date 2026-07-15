@@ -162,8 +162,8 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
     completed_at = models.DateTimeField(null=True)
     archived_at = models.DateField(null=True)
     is_draft = models.BooleanField(default=False)
-    external_source = models.CharField(max_length=255, null=True, blank=True)
-    external_id = models.CharField(max_length=255, blank=True, null=True)
+    external_source = models.CharField(max_length=255, null=True, blank=True, default=None)
+    external_id = models.CharField(max_length=255, blank=True, null=True, default=None)
     type = models.ForeignKey(
         "db.IssueType",
         on_delete=models.SET_NULL,
@@ -483,8 +483,8 @@ class IssueComment(ChangeTrackerMixin, ProjectBaseModel):
         default="INTERNAL",
         max_length=100,
     )
-    external_source = models.CharField(max_length=255, null=True, blank=True)
-    external_id = models.CharField(max_length=255, blank=True, null=True)
+    external_source = models.CharField(max_length=255, null=True, blank=True, default=None)
+    external_id = models.CharField(max_length=255, blank=True, null=True, default=None)
     edited_at = models.DateTimeField(null=True, blank=True)
     parent = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="parent_issue_comment"

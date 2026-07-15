@@ -141,7 +141,7 @@ urlpatterns = [
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/epics/",
-        EpicViewSet.as_view(),
+        EpicViewSet.as_view({"get": "list", "post": "create"}),
         name="epics",
     ),
     path(f"{EPIC_BASE}/list/", EpicListEndpoint.as_view(), name="epics-list"),

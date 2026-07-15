@@ -10,8 +10,8 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
 import { ALL_ISSUES, EIssueFilterType, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
-import type { EIssuesStoreType, IIssueDisplayFilterOptions } from "@plane/types";
-import { EIssueLayoutTypes } from "@plane/types";
+import type { IIssueDisplayFilterOptions } from "@plane/types";
+import { EIssueLayoutTypes, EIssuesStoreType } from "@plane/types";
 // hooks
 import { useIssues } from "@/hooks/store/use-issues";
 import { useUserPermissions } from "@/hooks/store/user";
@@ -40,11 +40,18 @@ interface IBaseSpreadsheetRoot {
 }
 
 export const BaseSpreadsheetRoot = observer(function BaseSpreadsheetRoot(props: IBaseSpreadsheetRoot) {
-  const { QuickActions, canEditPropertiesBasedOnProject, isCompletedCycle = false, viewId, isEpic = false } = props;
+  const {
+    QuickActions,
+    canEditPropertiesBasedOnProject,
+    isCompletedCycle = false,
+    viewId,
+    isEpic: isEpicOverride,
+  } = props;
   // router
   const { projectId } = useParams();
   // store hooks
   const storeType = useIssueStoreType() as SpreadsheetStoreType;
+  const isEpic = isEpicOverride ?? storeType === EIssuesStoreType.EPIC;
   const { allowPermissions } = useUserPermissions();
   const { issues, issuesFilter } = useIssues(storeType);
   const {

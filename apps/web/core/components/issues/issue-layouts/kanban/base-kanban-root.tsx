@@ -12,8 +12,7 @@ import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-sc
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { EIssueFilterType, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
-import type { EIssuesStoreType } from "@plane/types";
-import { EIssueServiceType, EIssueLayoutTypes } from "@plane/types";
+import { EIssueServiceType, EIssueLayoutTypes, EIssuesStoreType } from "@plane/types";
 //hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useIssues } from "@/hooks/store/use-issues";
@@ -59,12 +58,13 @@ export const BaseKanBanRoot = observer(function BaseKanBanRoot(props: IBaseKanBa
     canEditPropertiesBasedOnProject,
     isCompletedCycle = false,
     viewId,
-    isEpic = false,
+    isEpic: isEpicOverride,
   } = props;
   // router
   const { workspaceSlug, projectId } = useParams();
   // store hooks
   const storeType = useIssueStoreType() as KanbanStoreType;
+  const isEpic = isEpicOverride ?? storeType === EIssuesStoreType.EPIC;
   const { allowPermissions } = useUserPermissions();
   const { issueMap, issuesFilter, issues } = useIssues(storeType);
   const {

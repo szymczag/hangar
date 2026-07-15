@@ -802,11 +802,14 @@ class DeletedIssuesListViewSet(BaseAPIView):
 
 
 class IssuePaginatedViewSet(BaseViewSet):
-    def get_queryset(self):
+    def get_base_queryset(self):
         workspace_slug = self.kwargs.get("slug")
         project_id = self.kwargs.get("project_id")
 
-        issue_queryset = Issue.issue_objects.filter(workspace__slug=workspace_slug, project_id=project_id)
+        return Issue.issue_objects.filter(workspace__slug=workspace_slug, project_id=project_id)
+
+    def get_queryset(self):
+        issue_queryset = self.get_base_queryset()
 
         return (
             issue_queryset.select_related("state")
@@ -889,7 +892,7 @@ class IssuePaginatedViewSet(BaseViewSet):
             required_fields.append("description_html")
 
         # querying issues
-        base_queryset = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id)
+        base_queryset = self.get_base_queryset()
 
         base_queryset = base_queryset.order_by("updated_at")
         queryset = self.get_queryset().order_by("updated_at")

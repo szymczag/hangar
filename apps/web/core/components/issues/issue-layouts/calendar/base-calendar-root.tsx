@@ -48,7 +48,7 @@ export const BaseCalendarRoot = observer(function BaseCalendarRoot(props: IBaseC
     addIssuesToView,
     isCompletedCycle = false,
     viewId,
-    isEpic = false,
+    isEpic: isEpicOverride,
     canEditPropertiesBasedOnProject,
   } = props;
 
@@ -57,6 +57,7 @@ export const BaseCalendarRoot = observer(function BaseCalendarRoot(props: IBaseC
 
   // hooks
   const fallbackStoreType = useIssueStoreType() as CalendarStoreType;
+  const isEpic = isEpicOverride ?? fallbackStoreType === EIssuesStoreType.EPIC;
   const storeType = isEpic ? EIssuesStoreType.EPIC : fallbackStoreType;
   const { allowPermissions } = useUserPermissions();
   const { issues, issuesFilter, issueMap } = useIssues(storeType);

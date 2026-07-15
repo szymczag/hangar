@@ -11,8 +11,8 @@ import { useParams } from "next/navigation";
 import { ALL_ISSUES, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { EIssuesStoreType, IBlockUpdateData, TIssue } from "@plane/types";
-import { EIssueLayoutTypes, GANTT_TIMELINE_TYPE } from "@plane/types";
+import type { IBlockUpdateData, TIssue } from "@plane/types";
+import { EIssueLayoutTypes, EIssuesStoreType, GANTT_TIMELINE_TYPE } from "@plane/types";
 import { renderFormattedPayloadDate } from "@plane/utils";
 // components
 import { TimeLineTypeContext } from "@/components/gantt-chart/contexts";
@@ -44,12 +44,13 @@ export type GanttStoreType =
   | EIssuesStoreType.EPIC;
 
 export const BaseGanttRoot = observer(function BaseGanttRoot(props: IBaseGanttRoot) {
-  const { viewId, isCompletedCycle = false, isEpic = false } = props;
+  const { viewId, isCompletedCycle = false, isEpic: isEpicOverride } = props;
   const { t } = useTranslation();
   // router
   const { workspaceSlug, projectId } = useParams();
 
   const storeType = useIssueStoreType() as GanttStoreType;
+  const isEpic = isEpicOverride ?? storeType === EIssuesStoreType.EPIC;
   const { issues, issuesFilter } = useIssues(storeType);
   const { fetchIssues, fetchNextIssues, updateIssue, quickAddIssue } = useIssuesActions(storeType);
   const { initGantt } = useTimeLineChart(GANTT_TIMELINE_TYPE.ISSUE);
