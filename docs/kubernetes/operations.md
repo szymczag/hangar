@@ -59,6 +59,53 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.9` to `rc.10`
+
+This upgrade repairs the Epic collection contract and normal work-item/comment
+creation after the Todoist idempotency constraints introduced in `rc.9`. Keep
+Todoist import workers and the API on one release during the rollout; the partial
+unique indexes remain active and mixed application versions are not a supported
+steady state.
+
+Before upgrading:
+
+1. take a PostgreSQL backup and record the current Helm revision and application
+   image digests;
+2. allow active Todoist imports to reach a terminal state, or disable new import
+   mutations and record the remaining jobs before replacing API and worker Pods;
+3. confirm the target package is `0.1.0-rc.10`, its application version is
+   `v0.1.0-rc.10`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc10); and
+4. render the existing values against the target chart and review the migration
+   Job and image changes before applying them.
+
+The migration Job applies `db.0126_optional_issue_external_identifiers`. It makes
+the already-nullable `external_source` and `external_id` fields explicitly
+default to `None` in Django's model state for work items and comments. It does not
+rewrite existing rows, relax the Todoist-only partial unique indexes from
+`db.0125`, or make external identifiers operator-controlled through the ordinary
+create API. The default restores the serializer contract: normal work items,
+Epics, and comments do not need importer identifiers, while Todoist-created rows
+remain idempotent.
+
+After the rollout, verify:
+
+- an ordinary work item and comment can be created without either external field;
+- the Epics page reaches a terminal rendered or explicit error state rather than
+  loading indefinitely;
+- Epic list, grouped, and paginated views contain only Epic work items and report
+  counts that match the visible filter; and
+- if imports are enabled, one synthetic preview/import/report cycle still creates
+  no duplicate work items, comments, or modules when delivery is retried.
+
+The forward migration is schema-compatible with the `rc.9` database layout, but
+rolling the application back to `rc.9` reintroduces its serializer and Epic
+collection defects. Do not treat that rollback as a repair. Prefer correcting the
+rollout or configuration and completing the forward upgrade. If an emergency
+application rollback is unavoidable, keep the PostgreSQL backup, do not reverse
+`db.0126` while newer Pods are running, and repeat the creation and importer
+integrity checks after returning to `rc.10`.
+
 ### Upgrade from `rc.8` to `rc.9`
 
 Treat this upgrade as data-affecting and schedule an import maintenance window.
