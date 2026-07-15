@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.8`. It is qualified for evaluation on
+The current release is `0.1.0-rc.9`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -32,7 +32,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.8` qualification boundary is:
+The `0.1.0-rc.9` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -97,18 +97,18 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                               |
 | ------------------ | ------------------------------------------- |
-| Product version    | `v0.1.0-rc.8`                               |
-| Helm chart version | `0.1.0-rc.8`                                |
-| Git tag            | `hangar-v0.1.0-rc.8`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.8` |
+| Product version    | `v0.1.0-rc.9`                               |
+| Helm chart version | `0.1.0-rc.9`                                |
+| Git tag            | `hangar-v0.1.0-rc.9`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.9` |
 
 `rc.1` and `rc.2` were consumed by incomplete publication attempts. Do not use
-them. `rc.7` is the previous complete release. Published versions are immutable
+them. `rc.8` is the previous complete release. Published versions are immutable
 and are never repaired in place.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.8` notes](../releases/hangar-v0.1.0-rc.8.md) — review
+- [Release `v0.1.0-rc.9` notes](../releases/hangar-v0.1.0-rc.9.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -133,7 +133,7 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The public `rc.8` chart archive, OCI chart, and digest-pinned Hangar images are
+The public `rc.9` chart archive, OCI chart, and digest-pinned Hangar images are
 anonymously downloadable. The release workflow also created provenance
 attestations and keyless Cosign signatures.
 
