@@ -48,7 +48,6 @@ export class IssueStore implements IIssueStore {
   // services
   serviceType;
   issueService;
-  epicService;
   issueArchiveService;
   draftWorkItemService;
 
@@ -61,7 +60,6 @@ export class IssueStore implements IIssueStore {
     // services
     this.serviceType = serviceType;
     this.issueService = new IssueService(serviceType);
-    this.epicService = new IssueService(EIssueServiceType.EPICS);
     this.issueArchiveService = new IssueArchiveService(serviceType);
     this.draftWorkItemService = new WorkspaceDraftService();
   }
@@ -102,7 +100,7 @@ export class IssueStore implements IIssueStore {
     // parent
     if (issue && issue?.parent && issue?.parent?.id && issue?.parent?.project_id) {
       this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue?.parent?.id).then((res) => {
-        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
+        return this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
       });
     }
     // assignees
@@ -275,9 +273,7 @@ export class IssueStore implements IIssueStore {
     const issueIdentifier = `${project_identifier}-${sequence_id}`;
     const issueId = issue?.id;
     const projectId = issue?.project_id;
-    const rootWorkItemDetailStore = issue?.is_epic
-      ? this.rootIssueDetailStore.rootIssueStore.epicDetail
-      : this.rootIssueDetailStore.rootIssueStore.issueDetail;
+    const rootWorkItemDetailStore = this.rootIssueDetailStore.rootIssueStore.issueDetail;
 
     if (!issue || !projectId || !issueId) throw new Error("Issue not found");
 
@@ -287,7 +283,7 @@ export class IssueStore implements IIssueStore {
     // handle parent issue if exists
     if (issue?.parent && issue?.parent?.id && issue?.parent?.project_id) {
       this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue.parent.id).then((res) => {
-        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
+        return this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
       });
     }
 

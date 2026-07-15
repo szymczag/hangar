@@ -137,6 +137,11 @@ const TypeCard = observer(function TypeCard(props: {
           <Shapes className="h-5 w-5 text-tertiary" />
           <span className="text-16 font-medium">{issueType.name}</span>
           {issueType.is_default && <span className="text-11 text-tertiary">default</span>}
+          {issueType.system_key && (
+            <span className="rounded-sm bg-layer-1 px-1.5 py-0.5 text-11 text-tertiary">
+              {issueType.system_key === "epic" ? "level 1" : "level 0"}
+            </span>
+          )}
         </div>
         {isAdmin && (
           <Button variant="secondary" size="sm" onClick={() => setIsAddingProperty((prev) => !prev)}>
@@ -206,10 +211,29 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
   // state
   const [newTypeName, setNewTypeName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isEnabling, setIsEnabling] = useState(false);
   // data
-  const { issueTypes, mutate } = useIssueTypes(workspaceSlug, projectId);
+  const { issueTypes, isLoading, mutate } = useIssueTypes(workspaceSlug, projectId);
   // derived values
-  const customTypes = (issueTypes ?? []).filter((type) => !type.is_epic);
+  const hasSystemTypes = (issueTypes ?? []).some((type) => type.system_key === "task" || type.system_key === "epic");
+
+  const enableTypes = async () => {
+    if (!isAdmin || isEnabling) return;
+    setIsEnabling(true);
+    try {
+      await issueTypeService.enableIssueTypes(workspaceSlug, projectId);
+      await mutate();
+      setToast({
+        type: TOAST_TYPE.SUCCESS,
+        title: "Work item types enabled",
+        message: "Task and Epic are now available in this project.",
+      });
+    } catch {
+      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to enable work item types." });
+    } finally {
+      setIsEnabling(false);
+    }
+  };
 
   const createType = async () => {
     if (!newTypeName.trim() || isCreating) return;
@@ -231,10 +255,10 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
         <div>
           <h3 className="text-18 font-medium">Work item types</h3>
           <p className="text-13 text-tertiary">
-            Define custom work item types with their own properties for this project.
+            Organize work with Task, Epic, and custom types. Epics are level 1 work items and appear in Work Items.
           </p>
         </div>
-        {isAdmin && (
+        {isAdmin && hasSystemTypes && (
           <div className="flex items-center gap-2">
             <Input
               id="new-type-name"
@@ -254,8 +278,22 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
           </div>
         )}
       </div>
-      {customTypes.length === 0 && <span className="text-13 text-tertiary">No custom work item types yet.</span>}
-      {customTypes.map((issueType) => (
+      {!isLoading && !hasSystemTypes && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-subtle p-4">
+          <div>
+            <p className="text-14 font-medium">Work item types are not enabled</p>
+            <p className="text-13 text-tertiary">
+              Enable them to create Tasks and Epics from the shared Work Items views.
+            </p>
+          </div>
+          {isAdmin && (
+            <Button variant="primary" size="sm" onClick={() => void enableTypes()} disabled={isEnabling}>
+              {isEnabling ? "Enabling…" : "Enable work item types"}
+            </Button>
+          )}
+        </div>
+      )}
+      {(issueTypes ?? []).map((issueType) => (
         <TypeCard
           key={issueType.id}
           issueType={issueType}

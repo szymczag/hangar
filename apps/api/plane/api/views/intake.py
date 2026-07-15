@@ -7,6 +7,7 @@ import json
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.utils import timezone
 from django.db.models import Q, Value, UUIDField
 from django.db.models.functions import Coalesce
@@ -305,6 +306,7 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
             400: INVALID_REQUEST_RESPONSE,
         },
     )
+    @transaction.atomic
     def patch(self, request, slug, project_id, issue_id):
         """Update intake work item
 
@@ -313,7 +315,7 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
         """
         intake = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
 
-        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        project = Project.objects.select_for_update().get(workspace__slug=slug, pk=project_id)
 
         # Intake view
         if intake is None and not project.intake_view:
@@ -384,7 +386,12 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
                     "description_json": description_json,
                 }
 
-            issue_serializer = IssueSerializer(issue, data=issue_data, partial=True)
+            issue_serializer = IssueSerializer(
+                issue,
+                data=issue_data,
+                partial=True,
+                context={"project_id": project_id, "workspace_id": project.workspace_id},
+            )
 
             if not issue_serializer.is_valid():
                 return Response(issue_serializer.errors, status=status.HTTP_400_BAD_REQUEST)

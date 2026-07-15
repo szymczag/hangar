@@ -8,7 +8,6 @@ from uuid import UUID
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import transaction
 from django.db.models import Count, OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -28,20 +27,21 @@ from plane.app.views import (
     IssueLinkViewSet,
     IssueReactionViewSet,
     IssueSubscriberViewSet,
+    SubIssuesEndpoint,
     WorkItemDescriptionVersionEndpoint,
 )
 from plane.app.views.base import BaseAPIView
 from plane.app.views.issue.base import IssuePaginatedViewSet
 from plane.bgtasks.issue_activities_task import issue_activity
-from plane.db.models import CycleIssue, FileAsset, Issue, IssueLink, IssueType, Project, Workspace
+from plane.db.models import CycleIssue, FileAsset, Issue, IssueLink, IssueType, Project
 from plane.db.models.issue_type import ProjectIssueType
 from plane.db.models.state import StateGroup
 from plane.utils.host import base_host
 
 from plane.ext.models import EpicUserProperty
 from plane.ext.serializers.issue_type import EpicSettingsSerializer, EpicUserPropertySerializer
+from plane.ext.services import ensure_project_system_types
 
-EPIC_TYPE_NAME = "Epic"
 MAX_BULK_EPICS = 100
 EPIC_IMMUTABLE_FIELDS = {
     "archived_at",
@@ -57,7 +57,11 @@ EPIC_IMMUTABLE_FIELDS = {
 def project_epic_type(project):
     """The active epic IssueType linked to this project, or None."""
     link = (
-        ProjectIssueType.objects.filter(project=project, issue_type__is_epic=True, issue_type__is_active=True)
+        ProjectIssueType.objects.filter(
+            project=project,
+            issue_type__system_key=IssueType.SystemKey.EPIC,
+            issue_type__is_active=True,
+        )
         .select_related("issue_type")
         .first()
     )
@@ -67,28 +71,20 @@ def project_epic_type(project):
 def epic_queryset(slug, project_id):
     """Epics are issues typed with an epic IssueType.
 
-    Issue.issue_objects excludes epics (see the fork note in IssueManager), so
-    epic surfaces query the base soft-delete manager and mirror its other
-    exclusions explicitly.
+    This remains as a compatibility queryset while Epic moves onto the normal
+    work-item surfaces.
     """
-    return (
-        Issue.objects.filter(
-            workspace__slug=slug,
-            project_id=project_id,
-            type__is_epic=True,
-        )
-        .exclude(state__group=StateGroup.TRIAGE.value)
-        .exclude(archived_at__isnull=False)
-        .exclude(project__archived_at__isnull=False)
-        .exclude(is_draft=True)
+    return Issue.issue_objects.select_related("type").filter(
+        workspace__slug=slug,
+        project_id=project_id,
+        type__is_epic=True,
     )
 
 
 class EpicSettingsEndpoint(BaseAPIView):
-    """Enable/disable epics for a project.
+    """Legacy adapter for enabling the canonical work item types.
 
-    Enabled == the project has an active epic ProjectIssueType. Disabling
-    unlinks the type (soft delete); existing epics are retained.
+    Epic is a system work item type and cannot be disabled independently.
     """
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
@@ -104,36 +100,14 @@ class EpicSettingsEndpoint(BaseAPIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         enable = serializer.validated_data["is_epic_enabled"]
 
-        with transaction.atomic():
-            # Serialize epic-type creation across projects in one workspace;
-            # IssueType has no uniqueness constraint for the is_epic flag.
-            Workspace.objects.select_for_update().get(pk=project.workspace_id)
-            if enable:
-                epic_type = IssueType.objects.filter(
-                    workspace=project.workspace,
-                    is_epic=True,
-                    is_active=True,
-                ).first()
-                if epic_type is None:
-                    epic_type = IssueType.objects.create(
-                        workspace=project.workspace,
-                        name=EPIC_TYPE_NAME,
-                        is_epic=True,
-                        is_active=True,
-                    )
-                if not ProjectIssueType.objects.filter(
-                    project=project,
-                    issue_type=epic_type,
-                ).exists():
-                    ProjectIssueType.objects.create(project=project, issue_type=epic_type)
-            else:
-                # Soft delete the link; epics and their data are retained.
-                ProjectIssueType.objects.filter(
-                    project=project,
-                    issue_type__is_epic=True,
-                ).delete()
+        if not enable:
+            return Response(
+                {"is_epic_enabled": "Epic is a system work item type and cannot be disabled"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        return Response({"is_epic_enabled": enable}, status=status.HTTP_200_OK)
+        ensure_project_system_types(project)
+        return Response({"is_epic_enabled": True}, status=status.HTTP_200_OK)
 
 
 class EpicUserPropertyEndpoint(BaseAPIView):
@@ -176,8 +150,12 @@ class EpicViewSet(IssueViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Compatibility endpoint identity is server-controlled. Strip fields
+        # that the legacy contract has always ignored before normal work-item
+        # validation runs, then force the canonical Epic invariants on save.
+        requested_data = {key: value for key, value in request.data.items() if key not in EPIC_IMMUTABLE_FIELDS}
         serializer = IssueCreateSerializer(
-            data=request.data,
+            data=requested_data,
             context={
                 "project_id": project_id,
                 "workspace_id": project.workspace_id,
@@ -402,30 +380,20 @@ class EpicArchiveEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class EpicIssuesEndpoint(BaseAPIView):
-    """Work items grouped under an epic (children via the parent FK), with
-    progress counts."""
+class EpicIssuesEndpoint(SubIssuesEndpoint):
+    """Compatibility adapter for legacy Epic child URLs.
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    The response and mutation contract intentionally matches the ordinary work
+    item sub-issues endpoint. New clients should use that endpoint directly.
+    """
+
     def get(self, request, slug, project_id, pk):
-        # Validate the epic within the project scope
-        epic_queryset(slug, project_id).get(pk=pk)
+        get_object_or_404(epic_queryset(slug, project_id), pk=pk)
+        return super().get(request, slug, project_id, issue_id=pk)
 
-        children = Issue.issue_objects.filter(
-            workspace__slug=slug,
-            project_id=project_id,
-            parent_id=pk,
-        ).select_related("state", "project")
-        total = children.count()
-        completed = children.filter(state__group=StateGroup.COMPLETED.value).count()
-        serializer = IssueSerializer(children, many=True, fields=self.fields, expand=self.expand)
-        return Response(
-            {
-                "issues": serializer.data,
-                "progress": {"total_issues": total, "completed_issues": completed},
-            },
-            status=status.HTTP_200_OK,
-        )
+    def post(self, request, slug, project_id, pk):
+        get_object_or_404(epic_queryset(slug, project_id), pk=pk)
+        return super().post(request, slug, project_id, issue_id=pk)
 
 
 class EpicResourceScopeMixin:

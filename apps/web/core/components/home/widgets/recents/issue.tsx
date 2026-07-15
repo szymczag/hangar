@@ -9,7 +9,6 @@ import { observer } from "mobx-react";
 import { PriorityIcon, StateGroupIcon, WorkItemsIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";
 import type { TActivityEntityData, TIssueEntityData } from "@plane/types";
-import { EIssueServiceType } from "@plane/types";
 // plane ui
 import { calculateTimeAgo, generateWorkItemLink } from "@plane/utils";
 // components
@@ -33,7 +32,6 @@ export const RecentIssue = observer(function RecentIssue(props: BlockProps) {
   // hooks
   const { getStateById } = useProjectState();
   const { setPeekIssue } = useIssueDetail();
-  const { setPeekIssue: setPeekEpic } = useIssueDetail(EIssueServiceType.EPICS);
   const { getProjectIdentifierById } = useProject();
   // derived values
   const issueDetails: TIssueEntityData = activity.entity_data as TIssueEntityData;
@@ -60,8 +58,7 @@ export const RecentIssue = observer(function RecentIssue(props: BlockProps) {
       projectId: issueDetails?.project_id,
       issueId: activity.entity_data.id,
     };
-    if (issueDetails?.is_epic) setPeekEpic(peekDetails);
-    else setPeekIssue(peekDetails);
+    setPeekIssue(peekDetails);
   };
 
   return (

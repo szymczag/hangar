@@ -8,7 +8,7 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
 import type { TIssue } from "@plane/types";
-import { EIssueServiceType, EIssuesStoreType } from "@plane/types";
+import { EIssuesStoreType } from "@plane/types";
 // components
 import { BulkDeleteIssuesModal } from "@/components/core/modals/bulk-delete-issues-modal";
 import { DeleteIssueModal } from "@/components/issues/delete-issue-modal";
@@ -38,7 +38,6 @@ export const WorkItemLevelModals = observer(function WorkItemLevelModals(props: 
   const workItemId = workItemIdentifier ? getIssueIdByIdentifier(workItemIdentifier) : undefined;
   const workItemDetails = workItemId ? getIssueById(workItemId) : undefined;
 
-  const { removeIssue: removeEpic } = useIssuesActions(EIssuesStoreType.EPIC);
   const { removeIssue: removeWorkItem } = useIssuesActions(EIssuesStoreType.PROJECT);
 
   const {
@@ -52,16 +51,11 @@ export const WorkItemLevelModals = observer(function WorkItemLevelModals(props: 
   } = useCommandPalette();
   // derived values
   const { fetchSubIssues: fetchSubWorkItems } = useIssueDetail();
-  const { fetchSubIssues: fetchEpicSubWorkItems } = useIssueDetail(EIssueServiceType.EPICS);
 
-  const handleDeleteIssue = async (workspaceSlug: string, projectId: string, issueId: string) => {
+  const handleDeleteIssue = async (targetWorkspaceSlug: string, projectId: string, issueId: string) => {
     try {
-      const isEpic = workItemDetails?.is_epic;
-      const deleteAction = isEpic ? removeEpic : removeWorkItem;
-      const redirectPath = `/${workspaceSlug}/projects/${projectId}/${isEpic ? "epics" : "issues"}`;
-
-      await deleteAction(projectId, issueId);
-      router.push(redirectPath);
+      await removeWorkItem(projectId, issueId);
+      router.push(`/${targetWorkspaceSlug}/projects/${projectId}/issues`);
     } catch (error) {
       console.error("Failed to delete issue:", error);
     }
@@ -70,8 +64,7 @@ export const WorkItemLevelModals = observer(function WorkItemLevelModals(props: 
   const handleCreateIssueSubmit = async (newIssue: TIssue) => {
     if (!workspaceSlug || !newIssue.project_id || !newIssue.id || newIssue.parent_id !== workItemDetails?.id) return;
 
-    const fetchAction = workItemDetails?.is_epic ? fetchEpicSubWorkItems : fetchSubWorkItems;
-    await fetchAction(workspaceSlug?.toString(), newIssue.project_id, workItemDetails.id);
+    await fetchSubWorkItems(workspaceSlug?.toString(), newIssue.project_id, workItemDetails.id);
   };
 
   const getCreateIssueModalData = () => {

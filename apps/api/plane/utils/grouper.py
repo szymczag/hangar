@@ -5,7 +5,7 @@
 # Django imports
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import Q, UUIDField, Value, QuerySet, OuterRef, Subquery
+from django.db.models import BooleanField, F, Q, UUIDField, Value, QuerySet, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
 # Module imports
@@ -22,7 +22,7 @@ from plane.db.models import (
     ModuleIssue,
     IssueLabel,
 )
-from typing import Optional, Dict, Tuple, Any, Union, List
+from typing import Optional, Dict, Any, Union, List
 
 
 def issue_queryset_grouper(
@@ -74,16 +74,18 @@ def issue_queryset_grouper(
         .values("arr")
     )
 
-    annotations_map: Dict[str, Tuple[str, Q]] = {
+    annotations_map: Dict[str, Any] = {
         "assignee_ids": Coalesce(issue_assignee_subquery, Value([], output_field=ArrayField(UUIDField()))),
         "label_ids": Coalesce(issue_label_subquery, Value([], output_field=ArrayField(UUIDField()))),
         "module_ids": Coalesce(issue_module_subquery, Value([], output_field=ArrayField(UUIDField()))),
+        "is_epic": Coalesce(F("type__is_epic"), Value(False), output_field=BooleanField()),
     }
 
     default_annotations: Dict[str, Any] = {}
 
     for key, expression in annotations_map.items():
-        if FIELD_MAPPER.get(key) in {group_by, sub_group_by}:
+        mapped_field = FIELD_MAPPER.get(key)
+        if mapped_field is not None and mapped_field in {group_by, sub_group_by}:
             continue
         default_annotations[key] = expression
 
@@ -116,6 +118,8 @@ def issue_on_results(
         "sequence_id",
         "project_id",
         "parent_id",
+        "type_id",
+        "is_epic",
         "cycle_id",
         "sub_issues_count",
         "created_at",

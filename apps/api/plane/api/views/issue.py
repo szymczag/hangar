@@ -10,7 +10,7 @@ import re
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import (
     Case,
     CharField,
@@ -206,6 +206,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
             .select_related("workspace")
             .select_related("state")
             .select_related("parent")
+            .select_related("type")
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
@@ -237,7 +238,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         This endpoint provides workspace-level access to work items.
         """
         if issue_identifier and project_identifier:
-            issue = Issue.issue_objects.annotate(
+            issue = Issue.issue_objects.select_related("type").annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
@@ -278,6 +279,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             .select_related("workspace")
             .select_related("state")
             .select_related("parent")
+            .select_related("type")
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
@@ -438,7 +440,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         Create a new work item in the specified project with the provided details.
         Supports external ID tracking for integration purposes.
         """
-        project = Project.objects.get(pk=project_id)
+        project = Project.objects.get(pk=project_id, workspace__slug=slug)
 
         serializer = IssueSerializer(
             data=request.data,
@@ -531,6 +533,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             .select_related("workspace")
             .select_related("state")
             .select_related("parent")
+            .select_related("type")
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
@@ -565,7 +568,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         Supports filtering, ordering, and field selection through query parameters.
         """
 
-        issue = Issue.issue_objects.annotate(
+        issue = Issue.issue_objects.select_related("type").annotate(
             sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
             .order_by()
             .annotate(count=Func(F("id"), function="Count"))
@@ -599,6 +602,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             404: WORK_ITEM_NOT_FOUND_RESPONSE,
         },
     )
+    @transaction.atomic
     def put(self, request, slug, project_id):
         """Update or create work item
 
@@ -607,7 +611,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         """
         # Get the entities required for putting the issue, external_id and
         # external_source are must to identify the issue here
-        project = Project.objects.get(pk=project_id)
+        project = Project.objects.select_for_update().get(pk=project_id, workspace__slug=slug)
         external_id = request.data.get("external_id")
         external_source = request.data.get("external_source")
 
@@ -754,14 +758,15 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             409: EXTERNAL_ID_EXISTS_RESPONSE,
         },
     )
+    @transaction.atomic
     def patch(self, request, slug, project_id, pk):
         """Update work item
 
         Partially update an existing work item with the provided fields.
         Supports external ID validation to prevent conflicts.
         """
-        issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
-        project = Project.objects.get(pk=project_id)
+        project = Project.objects.select_for_update().get(pk=project_id, workspace__slug=slug)
+        issue = Issue.objects.select_for_update().get(workspace__slug=slug, project_id=project_id, pk=pk)
         current_instance = json.dumps(IssueSerializer(issue).data, cls=DjangoJSONEncoder)
         requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
         serializer = IssueSerializer(

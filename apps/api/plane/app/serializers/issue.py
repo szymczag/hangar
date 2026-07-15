@@ -42,7 +42,9 @@ from plane.db.models import (
     IssueDescriptionVersion,
     ProjectMember,
     EstimatePoint,
+    IssueType,
 )
+from plane.db.models.issue_type import ProjectIssueType
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
@@ -86,6 +88,9 @@ class IssueCreateSerializer(BaseSerializer):
     )
     parent_id = serializers.PrimaryKeyRelatedField(
         source="parent", queryset=Issue.objects.all(), required=False, allow_null=True
+    )
+    type_id = serializers.PrimaryKeyRelatedField(
+        source="type", queryset=IssueType.objects.all(), required=False, allow_null=False
     )
     label_ids = serializers.ListField(
         child=serializers.PrimaryKeyRelatedField(queryset=Label.objects.all()),
@@ -185,6 +190,33 @@ class IssueCreateSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("Parent is not valid issue_id please pass a valid issue_id")
 
+        effective_type = attrs.get("type", getattr(self.instance, "type", None))
+        if effective_type and (
+            not effective_type.is_active
+            or not ProjectIssueType.objects.filter(
+                project_id=self.context.get("project_id"),
+                issue_type=effective_type,
+            ).exists()
+        ):
+            raise serializers.ValidationError({"type_id": "Work item type is not active for this project"})
+
+        effective_parent = attrs.get("parent", getattr(self.instance, "parent", None))
+        if effective_type and effective_type.is_epic and effective_parent is not None:
+            raise serializers.ValidationError({"parent_id": "Epic work items cannot have a parent"})
+
+        if self.instance and effective_parent and effective_parent.pk == self.instance.pk:
+            raise serializers.ValidationError({"parent_id": "A work item cannot be its own parent"})
+
+        ancestor = effective_parent
+        visited = set()
+        while self.instance and ancestor is not None:
+            if ancestor.pk == self.instance.pk:
+                raise serializers.ValidationError({"parent_id": "Parent assignment would create a cycle"})
+            if ancestor.pk in visited:
+                raise serializers.ValidationError({"parent_id": "The existing parent hierarchy contains a cycle"})
+            visited.add(ancestor.pk)
+            ancestor = ancestor.parent
+
         if (
             attrs.get("estimate_point")
             and not EstimatePoint.objects.filter(
@@ -205,6 +237,23 @@ class IssueCreateSerializer(BaseSerializer):
         default_assignee_id = self.context["default_assignee_id"]
 
         # Create Issue
+        if "state" not in validated_data:
+            default_state = State.objects.filter(project_id=project_id, default=True).first()
+            if default_state is not None:
+                validated_data["state"] = default_state
+        if "type" not in validated_data:
+            default_type = (
+                ProjectIssueType.objects.filter(
+                    project_id=project_id,
+                    is_default=True,
+                    issue_type__is_active=True,
+                )
+                .select_related("issue_type")
+                .first()
+            )
+            if default_type is not None:
+                validated_data["type"] = default_type.issue_type
+
         issue = Issue.objects.create(**validated_data, project_id=project_id)
 
         # Issue Audit Users
@@ -780,6 +829,10 @@ class IssueSerializer(DynamicBaseSerializer):
     sub_issues_count = serializers.IntegerField(read_only=True)
     attachment_count = serializers.IntegerField(read_only=True)
     link_count = serializers.IntegerField(read_only=True)
+    is_epic = serializers.SerializerMethodField()
+
+    def get_is_epic(self, obj):
+        return bool(obj.type_id and obj.type.is_epic)
 
     class Meta:
         model = Issue
@@ -796,6 +849,8 @@ class IssueSerializer(DynamicBaseSerializer):
             "sequence_id",
             "project_id",
             "parent_id",
+            "type_id",
+            "is_epic",
             "cycle_id",
             "module_ids",
             "label_ids",
@@ -853,6 +908,8 @@ class IssueListDetailSerializer(serializers.Serializer):
             "sequence_id": instance.sequence_id,
             "project_id": instance.project_id,
             "parent_id": instance.parent_id,
+            "type_id": instance.type_id,
+            "is_epic": bool(instance.type_id and instance.type.is_epic),
             "created_at": instance.created_at,
             "updated_at": instance.updated_at,
             "created_by": instance.created_by_id,
@@ -925,9 +982,14 @@ class IssueListDetailSerializer(serializers.Serializer):
 
 
 class IssueLiteSerializer(DynamicBaseSerializer):
+    is_epic = serializers.SerializerMethodField()
+
+    def get_is_epic(self, obj):
+        return bool(obj.type_id and obj.type.is_epic)
+
     class Meta:
         model = Issue
-        fields = ["id", "sequence_id", "project_id"]
+        fields = ["id", "sequence_id", "project_id", "type_id", "is_epic"]
         read_only_fields = fields
 
 

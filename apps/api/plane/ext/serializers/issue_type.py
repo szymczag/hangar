@@ -24,11 +24,21 @@ class IssueTypeSerializer(serializers.ModelSerializer):
             "is_default",
             "is_active",
             "level",
+            "system_key",
             "workspace",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "workspace", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "workspace",
+            "is_epic",
+            "is_default",
+            "level",
+            "system_key",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class EpicUserPropertySerializer(serializers.ModelSerializer):

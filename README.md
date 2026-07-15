@@ -36,9 +36,8 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | SAML 2.0 backend                              | Available on `preview`              | [#5](https://github.com/szymczag/hangar/pull/5)       |
 | SAML 2.0 administration and sign-in UI        | Available on `preview`              | [#6](https://github.com/szymczag/hangar/pull/6)       |
 | Immutable federated SSO identity binding      | Available on `preview`              | [#45](https://github.com/szymczag/hangar/pull/45)     |
-| Epics backend                                 | Available on `preview`              | [#7](https://github.com/szymczag/hangar/pull/7)       |
-| Epics UI and required API surfaces            | Available on `preview`              | [#9](https://github.com/szymczag/hangar/pull/9)       |
-| Epic pagination and terminal load errors      | Available on `preview`              | [#62](https://github.com/szymczag/hangar/pull/62)     |
+| Epics as level-1 work items                   | In review                           | [Feature guide](docs/epics-as-work-items.md)          |
+| Legacy Epic API compatibility                 | Available on `preview`              | [Feature guide](docs/epics-as-work-items.md)          |
 | Custom work-item types and properties backend | Available on `preview`              | [#10](https://github.com/szymczag/hangar/pull/10)     |
 | Custom work-item types and properties UI      | Available on `preview`              | [#11](https://github.com/szymczag/hangar/pull/11)     |
 | Time tracking and worklogs backend            | Available on `preview`              | [#12](https://github.com/szymczag/hangar/pull/12)     |
@@ -62,6 +61,9 @@ the table marks them as available.
 
 ## Feature and security documentation
 
+- [Epics as work items](docs/epics-as-work-items.md) — enable the canonical Task
+  and Epic types, create and filter Epics in Work Items, understand hierarchy
+  invariants, and migrate from the former dedicated Epic surface.
 - [Hangar Runner architecture and implementation plan](docs/hangar-runner-architecture.md)
   — implemented installation controls, security boundaries, and the execution
   work that remains unsupported.

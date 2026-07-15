@@ -5,7 +5,8 @@
 import pytest
 from rest_framework import status
 
-from plane.db.models import Issue, Project, ProjectMember, State
+from plane.db.models import Issue, IssueType, Project, ProjectMember, State
+from plane.ext.services import ensure_project_system_types
 
 
 @pytest.fixture
@@ -94,3 +95,60 @@ class TestIssueListOrderByInjection:
             assert response.status_code == status.HTTP_200_OK, (
                 f"order_by={value!r} got {response.status_code}: {response.data!r}"
             )
+
+
+@pytest.mark.contract
+class TestIssueTypeHierarchyAPI:
+    def get_list_url(self, workspace_slug, project_id):
+        return f"/api/v1/workspaces/{workspace_slug}/projects/{project_id}/issues/"
+
+    def get_detail_url(self, workspace_slug, project_id, issue_id):
+        return f"/api/v1/workspaces/{workspace_slug}/projects/{project_id}/issues/{issue_id}/"
+
+    @pytest.mark.django_db
+    def test_create_epic_through_standard_work_item_api(self, api_key_client, workspace, project, state):
+        _, epic_type = ensure_project_system_types(project)
+
+        response = api_key_client.post(
+            self.get_list_url(workspace.slug, project.id),
+            {"name": "API Epic", "state_id": str(state.id), "type_id": str(epic_type.id)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        assert str(response.data["type_id"]) == str(epic_type.id)
+        assert response.data["is_epic"] is True
+
+    @pytest.mark.django_db
+    def test_rejects_type_not_linked_to_project(self, api_key_client, workspace, project, state):
+        rogue_type = IssueType.objects.create(workspace=workspace, name="Unlinked")
+
+        response = api_key_client.post(
+            self.get_list_url(workspace.slug, project.id),
+            {"name": "Invalid", "state_id": str(state.id), "type_id": str(rogue_type.id)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "type_id" in response.data
+
+    @pytest.mark.django_db
+    def test_rejects_parent_assignment_for_epic(self, api_key_client, workspace, project, state):
+        _, epic_type = ensure_project_system_types(project)
+        epic = Issue.objects.create(
+            name="Epic",
+            workspace=workspace,
+            project=project,
+            state=state,
+            type=epic_type,
+        )
+        parent = Issue.objects.create(name="Parent", workspace=workspace, project=project, state=state)
+
+        response = api_key_client.patch(
+            self.get_detail_url(workspace.slug, project.id, epic.id),
+            {"parent_id": str(parent.id)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "parent_id" in response.data
