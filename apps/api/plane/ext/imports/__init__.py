@@ -3,6 +3,23 @@
 # See the LICENSE file for details.
 
 from .feature import todoist_imports_enabled
-from .services import ImportLeaseLost, ImportTransitionError
+from .services import (
+    ImportAuthorizationRevoked,
+    ImportCancellationRequested,
+    ImportDecisionDrift,
+    ImportLeaseLost,
+    ImportProjectUnavailable,
+    ImportRetryMismatch,
+    ImportTransitionError,
+)
 
-__all__ = ["ImportLeaseLost", "ImportTransitionError", "todoist_imports_enabled"]
+__all__ = [
+    "ImportAuthorizationRevoked",
+    "ImportCancellationRequested",
+    "ImportDecisionDrift",
+    "ImportLeaseLost",
+    "ImportProjectUnavailable",
+    "ImportRetryMismatch",
+    "ImportTransitionError",
+    "todoist_imports_enabled",
+]

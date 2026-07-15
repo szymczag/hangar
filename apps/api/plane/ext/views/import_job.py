@@ -7,6 +7,7 @@ from __future__ import annotations
 from functools import wraps
 import json
 from typing import Any
+from uuid import UUID
 
 # Django imports
 from django.db import IntegrityError
@@ -23,7 +24,7 @@ from plane.app.views.base import BaseAPIView
 from plane.authentication.session import CsrfEnforcedSessionAuthentication
 from plane.db.models import Module, Project, ProjectMember, Workspace
 
-from plane.ext.imports import ImportTransitionError, todoist_imports_enabled
+from plane.ext.imports import ImportRetryMismatch, ImportTransitionError, todoist_imports_enabled
 from plane.ext.imports.dispatcher import publish_import_dispatch
 from plane.ext.imports.services import (
     fail_preparing_job,
@@ -136,7 +137,11 @@ def _module_conflicts(preview: TodoistImportPreview, project: Project) -> list[d
     sections = [record for record in preview.records if record.kind == "section"]
     modules_by_name = {
         module.name: module
-        for module in Module.objects.filter(project=project, name__in=[record.content for record in sections])
+        for module in Module.objects.filter(
+            project=project,
+            name__in=[record.content for record in sections],
+            archived_at__isnull=True,
+        )
     }
     return [
         {
@@ -208,6 +213,7 @@ def _validate_assignee_mapping(
             member_id__in=member_ids,
             role__gte=ROLE.MEMBER.value,
             is_active=True,
+            member__is_active=True,
         ).values_list("member_id", flat=True)
     }
     if member_ids != valid_member_ids:
@@ -239,6 +245,16 @@ def _validate_module_conflicts(
                 return _error("invalid_module_conflict", "The reuse choice contains an unknown option.")
             if not isinstance(decision.get("module_id"), str) or decision["module_id"] != conflict["module_id"]:
                 return _error("invalid_module_conflict", "The selected module does not match the conflict.")
+            module = Module.objects.filter(
+                pk=decision["module_id"],
+                project=project,
+                archived_at__isnull=True,
+            ).first()
+            if module is None:
+                return _error("module_decision_stale", "Preview the import again before continuing.")
+            decision["expected_name"] = module.name
+            decision["expected_status"] = module.status
+            decision["expected_archived_at"] = None
         elif action == "rename":
             if set(decision) != {"action", "name"}:
                 return _error("invalid_module_conflict", "The rename choice contains an unknown option.")
@@ -325,6 +341,13 @@ class TodoistImportEndpoint(BaseAPIView):
             )
 
         workspace = Workspace.objects.get(slug=slug)
+        retry_of_id = None
+        raw_retry_of_id = request.data.get("retry_job_id")
+        if raw_retry_of_id:
+            try:
+                retry_of_id = UUID(str(raw_retry_of_id))
+            except (TypeError, ValueError):
+                return _error("invalid_retry", "The failed import selected for retry is invalid.")
         initial_stats = {
             "source_rows": preview.counts.get("rows", 0),
             "planned_tasks": preview.counts.get("task", 0),
@@ -333,6 +356,11 @@ class TodoistImportEndpoint(BaseAPIView):
             "imported_tasks": 0,
             "imported_sections": 0,
             "imported_notes": 0,
+            "reused_tasks": 0,
+            "reused_sections": 0,
+            "reused_notes": 0,
+            "imported_metadata_comments": 0,
+            "reused_metadata_comments": 0,
             "failed": preview.counts.get("failed", 0),
             "processed_tasks": 0,
         }
@@ -347,6 +375,13 @@ class TodoistImportEndpoint(BaseAPIView):
                 stats=initial_stats,
                 errors=[item.as_dict() for item in preview.diagnostics],
                 request_id=request.headers.get("X-Request-ID"),
+                retry_of_id=retry_of_id,
+            )
+        except ImportRetryMismatch:
+            return _error(
+                "invalid_retry",
+                "The failed import no longer matches this source, destination, actor, or configuration.",
+                status.HTTP_409_CONFLICT,
             )
         except IntegrityError:
             return _error(

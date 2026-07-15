@@ -13,7 +13,15 @@ from django.utils import timezone
 
 from plane.ext.importers import execute_todoist_import
 from plane.ext.importers.todoist import ImportCancelled, ImportRowFailure
-from plane.ext.imports import ImportLeaseLost, ImportTransitionError, todoist_imports_enabled
+from plane.ext.imports import (
+    ImportAuthorizationRevoked,
+    ImportCancellationRequested,
+    ImportDecisionDrift,
+    ImportLeaseLost,
+    ImportProjectUnavailable,
+    ImportTransitionError,
+    todoist_imports_enabled,
+)
 from plane.ext.imports.dispatcher import publish_import_dispatch
 from plane.ext.imports.services import (
     claim_execution,
@@ -81,9 +89,25 @@ def run_todoist_import(self, job_id: str, generation: int = 0) -> None:
         return
 
     try:
-        stats, diagnostics = execute_todoist_import(job)
-    except ImportCancelled:
+        stats, diagnostics = execute_todoist_import(
+            job,
+            generation=claim.generation,
+            lease_token=claim.lease_token,
+        )
+    except (ImportCancelled, ImportCancellationRequested):
         _finish_claim(claim, status=ImportJob.Status.CANCELLED, reason="cancelled_by_user")
+        return
+    except ImportAuthorizationRevoked:
+        _finish_claim(claim, status=ImportJob.Status.FAILED, reason="authorization_revoked")
+        return
+    except ImportProjectUnavailable:
+        _finish_claim(claim, status=ImportJob.Status.FAILED, reason="project_unavailable")
+        return
+    except ImportDecisionDrift:
+        _finish_claim(claim, status=ImportJob.Status.FAILED, reason="decision_drift")
+        return
+    except ImportLeaseLost:
+        logger.warning("Todoist import execution stopped after losing its lease")
         return
     except TodoistImportParseError as exc:
         _finish_claim(
@@ -172,12 +196,14 @@ def cleanup_import_sources() -> None:
     candidate_ids = list(
         ImportJob.objects.filter(source_key__gt="")
         .filter(
-            Q(status__in=[
-                ImportJob.Status.COMPLETED,
-                ImportJob.Status.COMPLETED_WITH_ERRORS,
-                ImportJob.Status.FAILED,
-                ImportJob.Status.CANCELLED,
-            ])
+            Q(
+                status__in=[
+                    ImportJob.Status.COMPLETED,
+                    ImportJob.Status.COMPLETED_WITH_ERRORS,
+                    ImportJob.Status.FAILED,
+                    ImportJob.Status.CANCELLED,
+                ]
+            )
             | Q(retention_expires_at__lte=now)
             | Q(retention_expires_at__isnull=True, created_at__lt=legacy_cutoff)
         )

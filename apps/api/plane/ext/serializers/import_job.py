@@ -28,6 +28,7 @@ class ImportJobSerializer(BaseSerializer):
             "errors",
             "reason",
             "attempt_count",
+            "retry_of",
             "started_at",
             "cancel_requested_at",
             "completed_at",

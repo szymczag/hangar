@@ -105,7 +105,16 @@ class Module(ProjectBaseModel):
                 fields=["name", "project"],
                 condition=Q(deleted_at__isnull=True),
                 name="module_unique_name_project_when_deleted_at_null",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["project", "external_source", "external_id"],
+                condition=Q(
+                    deleted_at__isnull=True,
+                    external_source="todoist_csv",
+                    external_id__isnull=False,
+                ),
+                name="todoist_module_external_uidx",
+            ),
         ]
         verbose_name = "Module"
         verbose_name_plural = "Modules"

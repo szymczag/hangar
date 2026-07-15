@@ -10,11 +10,13 @@ from django.core.exceptions import ValidationError
 from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 
-from plane.db.models import Project, ProjectMember, State
+from plane.db.models import Project, ProjectMember, State, WorkspaceMember
 from plane.ext.importers.todoist import ImportCancelled
 from plane.ext.imports.services import (
     ImportLeaseLost,
+    ImportRetryMismatch,
     claim_execution,
+    fail_preparing_job,
     finish_execution,
     mark_source_stored,
     recover_expired_execution,
@@ -100,11 +102,14 @@ class TestTodoistImportTask:
         assert job.status == ImportJob.Status.QUEUED
         assert job.execution_generation == 1
         assert job.lease_token is None
-        assert claim_execution(
-            job_id=job.id,
-            generation=claim.generation,
-            task_id=str(claim.task_id),
-        ) is None
+        assert (
+            claim_execution(
+                job_id=job.id,
+                generation=claim.generation,
+                task_id=str(claim.task_id),
+            )
+            is None
+        )
         assert ImportAuditEvent.objects.filter(
             job_id=job.id,
             action=ImportAuditEvent.Action.LEASE_RECOVERED,
@@ -171,6 +176,101 @@ class TestTodoistImportTask:
 
         assert first is not None
         assert duplicate is None
+
+    def test_claim_fails_closed_after_admin_revocation(self, queued_job, workspace, create_user):
+        job, dispatch = queued_job(digest="3" * 64)
+        WorkspaceMember.objects.filter(
+            workspace=workspace,
+            member=create_user,
+        ).update(is_active=False)
+
+        claim = claim_execution(
+            job_id=job.id,
+            generation=dispatch.generation,
+            task_id=str(dispatch.task_id),
+        )
+
+        assert claim is None
+        job.refresh_from_db()
+        dispatch.refresh_from_db()
+        assert job.status == ImportJob.Status.FAILED
+        assert job.reason == "authorization_revoked"
+        assert job.config == {}
+        assert dispatch.state == ImportDispatch.State.SUPERSEDED
+        assert ImportAuditEvent.objects.filter(
+            job_id=job.id,
+            action=ImportAuditEvent.Action.AUTHORIZATION_REVOKED,
+        ).exists()
+
+    def test_exact_retry_creates_new_job_with_original_namespace(
+        self,
+        workspace,
+        create_user,
+        import_project,
+    ):
+        config = {"assignee_mapping": {}, "module_conflicts": {}}
+        failed = reserve_job(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest="4" * 64,
+            source_size=128,
+            config=config,
+            stats={},
+            errors=[],
+        )
+        fail_preparing_job(job_id=failed.id, reason="source_store_failed")
+
+        retry = reserve_job(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest="4" * 64,
+            source_size=128,
+            config=config,
+            stats={},
+            errors=[],
+            retry_of_id=failed.id,
+        )
+
+        assert retry.id != failed.id
+        assert retry.retry_of_id == failed.id
+        assert retry.idempotency_namespace == failed.idempotency_namespace
+        failed.refresh_from_db()
+        assert failed.status == ImportJob.Status.FAILED
+
+    def test_changed_retry_manifest_cannot_inherit_namespace(
+        self,
+        workspace,
+        create_user,
+        import_project,
+    ):
+        failed = reserve_job(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest="5" * 64,
+            source_size=128,
+            config={"assignee_mapping": {}, "module_conflicts": {}},
+            stats={},
+            errors=[],
+        )
+        fail_preparing_job(job_id=failed.id, reason="source_store_failed")
+
+        with pytest.raises(ImportRetryMismatch):
+            reserve_job(
+                workspace=workspace,
+                project=import_project,
+                initiated_by=create_user,
+                source_digest="5" * 64,
+                source_size=128,
+                config={"assignee_mapping": {"changed": str(create_user.id)}},
+                stats={},
+                errors=[],
+                retry_of_id=failed.id,
+            )
+
+        assert ImportJob.objects.filter(retry_of=failed).count() == 0
 
     def test_cancellation_wins_over_worker_completion(self, queued_job, create_user):
         job, dispatch = queued_job(digest="e" * 64)
@@ -239,10 +339,7 @@ class TestTodoistImportTask:
 @pytest.mark.todoist_migrations
 @pytest.mark.django_db(transaction=True)
 def test_audit_events_reject_database_mutation(workspace, create_user, import_project, request):
-    if (
-        request.config.getoption("nomigrations")
-        or "django_migrations" not in connection.introspection.table_names()
-    ):
+    if request.config.getoption("nomigrations") or "django_migrations" not in connection.introspection.table_names():
         pytest.skip("database trigger test requires pytest --migrations")
     job = reserve_job(
         workspace=workspace,
@@ -265,3 +362,36 @@ def test_audit_events_reject_database_mutation(workspace, create_user, import_pr
 
     event.refresh_from_db()
     assert event.action == ImportAuditEvent.Action.CREATED
+
+
+@pytest.mark.unit
+@pytest.mark.todoist_migrations
+@pytest.mark.django_db(transaction=True)
+def test_todoist_idempotency_indexes_are_unique_and_partial(request):
+    if request.config.getoption("nomigrations") or "django_migrations" not in connection.introspection.table_names():
+        pytest.skip("database index test requires pytest --migrations")
+
+    expected = {
+        "todoist_issue_external_uidx": "issues",
+        "todoist_comment_external_uidx": "issue_comments",
+        "todoist_module_external_uidx": "modules",
+    }
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT indexname, tablename, indexdef
+            FROM pg_indexes
+            WHERE indexname = ANY(%s)
+            """,
+            [list(expected)],
+        )
+        indexes = {name: (table, definition) for name, table, definition in cursor.fetchall()}
+
+    assert set(indexes) == set(expected)
+    for name, table in expected.items():
+        actual_table, definition = indexes[name]
+        assert actual_table == table
+        assert "CREATE UNIQUE INDEX" in definition
+        assert "deleted_at IS NULL" in definition
+        assert "external_source" in definition and "todoist_csv" in definition
+        assert "external_id IS NOT NULL" in definition

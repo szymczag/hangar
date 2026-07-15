@@ -68,11 +68,22 @@ that description is empty. Existing project descriptions are never overwritten.
 An interrupted job is retried automatically with bounded backoff. Each internal
 attempt has a new durable dispatch identity and execution generation, so a stale
 or duplicate worker cannot claim ownership or overwrite the final result. If an
-import ultimately fails, uploading the file again creates a new history record;
-the failed record is never reset or overwritten. Until the history explicitly
-reports reused entities, treat a new attempt or a confirmed exact-file duplicate
-as capable of creating additional work items. The duplicate warning is scoped to
-the destination project.
+import ultimately fails, a retry creates a new history record; the failed record
+is never reset or overwritten. An explicit retry inherits the prior
+idempotency namespace only when the actor, destination, source digest, and
+canonical mapping decisions are identical. Such a retry reuses already-created
+tasks, sections, and comments, and reports reused and newly imported counts
+separately. A changed mapping, actor, destination, or ordinary duplicate import
+receives a new namespace and can create additional work items. The duplicate
+warning is scoped to the destination project.
+
+Authorization is checked continuously. The initiating account must remain
+active and retain workspace-administrator access, and the destination project
+must remain available, when the worker claims the job and before every imported
+row commits. Revocation stops subsequent writes. A mapped assignee must likewise
+remain an active project member; if not, that complete source row fails instead
+of silently producing an unassigned task. Reused modules are locked and compared
+with the reviewed name, status, and archive state before they are linked.
 
 Starting an import commits the queued job and a durable dispatch record before
 contacting the task broker. If broker confirmation is lost, the request still
@@ -116,6 +127,11 @@ deadline has passed. Failed object deletion remains retryable and the database
 record keeps the source reference until storage confirms deletion.
 Import history and downloaded reports contain counts and safe diagnostics, not
 the original row contents or import configuration.
+
+Database partial unique indexes protect Todoist-created tasks, comments, and
+modules against concurrent worker delivery within an idempotency namespace.
+Only the transaction that creates an entity emits its creation activity; a
+losing or replayed transaction reports reuse instead.
 
 ## Operator controls and recovery
 

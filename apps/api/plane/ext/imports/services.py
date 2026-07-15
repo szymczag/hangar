@@ -4,11 +4,13 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from hashlib import sha256
 import json
 import re
+from collections.abc import Iterator
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -16,6 +18,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from plane.db.models import Project, ProjectMember, User, WorkspaceMember
 from plane.ext.models import ImportAuditEvent, ImportDispatch, ImportJob
 
 
@@ -56,6 +59,30 @@ class ImportDispatchUnavailable(ImportServiceError):
     code = "import_dispatch_unavailable"
 
 
+class ImportCancellationRequested(ImportServiceError):
+    code = "import_cancellation_requested"
+
+
+class ImportAuthorizationRevoked(ImportServiceError):
+    code = "import_authorization_revoked"
+
+
+class ImportProjectUnavailable(ImportServiceError):
+    code = "import_project_unavailable"
+
+
+class ImportDecisionDrift(ImportServiceError):
+    code = "import_decision_drift"
+
+
+class ImportAssigneeIneligible(ImportServiceError):
+    code = "import_assignee_ineligible"
+
+
+class ImportRetryMismatch(ImportServiceError):
+    code = "import_retry_mismatch"
+
+
 @dataclass(frozen=True, slots=True)
 class ExecutionClaim:
     job: ImportJob
@@ -70,6 +97,19 @@ class DispatchAttempt:
     job_id: UUID
     generation: int
     task_id: UUID
+
+
+@dataclass(slots=True)
+class GuardedMutation:
+    job: ImportJob
+    project: Project
+    actor: User
+    _stats: dict[str, Any] | None = None
+    _errors: list[dict[str, Any]] | None = None
+
+    def record_progress(self, *, stats: dict[str, Any], errors: list[dict[str, Any]]) -> None:
+        self._stats = stats
+        self._errors = errors
 
 
 def lease_duration() -> timedelta:
@@ -106,6 +146,19 @@ def build_manifest_digest(
     }
     canonical = json.dumps(manifest, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
     return sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _job_manifest_matches(job: ImportJob) -> bool:
+    if job.initiated_by_id is None or not isinstance(job.config, dict):
+        return False
+    return job.manifest_digest == build_manifest_digest(
+        provider=job.provider,
+        workspace_id=job.workspace_id,
+        project_id=job.project_id,
+        source_digest=job.source_digest,
+        initiated_by_id=job.initiated_by_id,
+        config=job.config,
+    )
 
 
 def _request_id(value: str | None = None) -> str:
@@ -155,6 +208,7 @@ def reserve_job(
     stats: dict[str, Any],
     errors: list[dict[str, Any]],
     request_id: str | None = None,
+    retry_of_id: UUID | None = None,
 ) -> ImportJob:
     manifest_digest = build_manifest_digest(
         provider=ImportJob.Provider.TODOIST_CSV,
@@ -164,6 +218,23 @@ def reserve_job(
         initiated_by_id=initiated_by.id,
         config=config,
     )
+    retry_of = None
+    idempotency_namespace = uuid4()
+    if retry_of_id is not None:
+        retry_of = ImportJob.objects.select_for_update().filter(pk=retry_of_id).first()
+        if (
+            retry_of is None
+            or retry_of.status != ImportJob.Status.FAILED
+            or retry_of.provider != ImportJob.Provider.TODOIST_CSV
+            or retry_of.workspace_id != workspace.id
+            or retry_of.project_id != project.id
+            or retry_of.initiated_by_id != initiated_by.id
+            or retry_of.source_digest != source_digest
+            or retry_of.manifest_digest != manifest_digest
+        ):
+            raise ImportRetryMismatch("The requested retry does not match the failed import decision.")
+        idempotency_namespace = retry_of.idempotency_namespace
+
     job = ImportJob.objects.create(
         workspace=workspace,
         project=project,
@@ -175,6 +246,8 @@ def reserve_job(
         stats=stats,
         errors=errors,
         manifest_digest=manifest_digest,
+        idempotency_namespace=idempotency_namespace,
+        retry_of=retry_of,
     )
     job.source_key = f"imports/{workspace.id}/{job.id}/source.csv"
     job.save(update_fields=["source_key", "updated_at"])
@@ -314,25 +387,49 @@ def claim_execution(*, job_id: UUID, generation: int, task_id: str | None) -> Ex
         parsed_task_id = UUID(task_id)
     except (TypeError, ValueError):
         return None
-    job = (
-        ImportJob.objects.select_for_update(of=("self",))
-        .select_related("project", "workspace", "initiated_by")
-        .filter(pk=job_id)
-        .first()
-    )
+    job = ImportJob.objects.select_for_update().filter(pk=job_id).first()
     if job is None or job.status != ImportJob.Status.QUEUED or job.execution_generation != generation:
         return None
-    dispatch = (
-        ImportDispatch.objects.select_for_update()
-        .filter(
-            job=job,
-            generation=generation,
-            task_id=parsed_task_id,
-            state__in=[ImportDispatch.State.PENDING, ImportDispatch.State.PUBLISHED],
-        )
-        .first()
-    )
+    dispatch_filter = {
+        "job": job,
+        "generation": generation,
+        "task_id": parsed_task_id,
+        "state__in": [ImportDispatch.State.PENDING, ImportDispatch.State.PUBLISHED],
+    }
+    if not ImportDispatch.objects.filter(**dispatch_filter).exists():
+        return None
+
+    failure = _lock_execution_context(job)
+    dispatch = ImportDispatch.objects.select_for_update().filter(**dispatch_filter).first()
     if dispatch is None:
+        return None
+    if failure is not None or not _job_manifest_matches(job):
+        previous_status = job.status
+        reason = failure or "decision_drift"
+        action = (
+            ImportAuditEvent.Action.AUTHORIZATION_REVOKED
+            if reason == "authorization_revoked"
+            else ImportAuditEvent.Action.DECISION_DRIFT
+            if reason == "decision_drift"
+            else ImportAuditEvent.Action.TERMINALIZED
+        )
+        now = timezone.now()
+        job.status = ImportJob.Status.FAILED
+        job.reason = reason
+        job.completed_at = now
+        job.config = {}
+        job.celery_task_id = ""
+        job.quota_released_at = job.quota_released_at or now
+        job.save()
+        dispatch.state = ImportDispatch.State.SUPERSEDED
+        dispatch.save(update_fields=["state", "updated_at"])
+        _audit(
+            job=job,
+            action=action,
+            previous_status=previous_status,
+            actor_id=job.initiated_by_id,
+            metadata={"reason": reason},
+        )
         return None
     previous_status = job.status
     now = timezone.now()
@@ -369,6 +466,98 @@ def claim_execution(*, job_id: UUID, generation: int, task_id: str | None) -> Ex
         actor_id=job.initiated_by_id,
     )
     return ExecutionClaim(job=job, generation=generation, lease_token=token, task_id=parsed_task_id)
+
+
+def _lock_execution_context(job: ImportJob) -> str | None:
+    if job.initiated_by_id is None:
+        return "authorization_revoked"
+    actor = User.objects.select_for_update().filter(pk=job.initiated_by_id, is_active=True).first()
+    if actor is None:
+        return "authorization_revoked"
+    membership = (
+        WorkspaceMember.objects.select_for_update()
+        .filter(
+            workspace_id=job.workspace_id,
+            member_id=actor.id,
+            is_active=True,
+            role__gte=20,
+        )
+        .first()
+    )
+    if membership is None:
+        return "authorization_revoked"
+    project = (
+        Project.objects.select_for_update()
+        .filter(
+            pk=job.project_id,
+            workspace_id=job.workspace_id,
+            archived_at__isnull=True,
+        )
+        .first()
+    )
+    if project is None:
+        return "project_unavailable"
+    job.initiated_by = actor
+    job.project = project
+    return None
+
+
+@contextmanager
+def guard_mutation(
+    *,
+    job_id: UUID,
+    generation: int,
+    lease_token: UUID,
+) -> Iterator[GuardedMutation]:
+    """Fence and authorize exactly one importer mutation transaction."""
+
+    with transaction.atomic():
+        job = ImportJob.objects.select_for_update().get(pk=job_id)
+        _require_owner(job, generation=generation, lease_token=lease_token)
+        if job.status == ImportJob.Status.CANCELLING or job.cancel_requested_at is not None:
+            raise ImportCancellationRequested("The import was cancelled before the next mutation.")
+        if not _job_manifest_matches(job):
+            raise ImportDecisionDrift("The stored import decision no longer matches its manifest.")
+        failure = _lock_execution_context(job)
+        if failure == "authorization_revoked":
+            raise ImportAuthorizationRevoked("The initiating administrator is no longer authorized.")
+        if failure == "project_unavailable":
+            raise ImportProjectUnavailable("The destination project is no longer available.")
+
+        assert job.initiated_by is not None
+        now = timezone.now()
+        job.heartbeat_at = now
+        job.lease_expires_at = now + lease_duration()
+        job.save(update_fields=["heartbeat_at", "lease_expires_at", "updated_at"])
+        guarded = GuardedMutation(job=job, project=job.project, actor=job.initiated_by)
+        yield guarded
+        if guarded._stats is not None and guarded._errors is not None:
+            job.stats = guarded._stats
+            job.errors = guarded._errors
+            job.save(update_fields=["stats", "errors", "updated_at"])
+
+
+def lock_eligible_assignee(*, project_id: UUID, assignee_id: UUID) -> User:
+    """Validate and lock a mapped assignee inside a guarded mutation."""
+
+    if not transaction.get_connection().in_atomic_block:
+        raise RuntimeError("Assignee eligibility must be checked inside a mutation transaction.")
+    assignee = User.objects.select_for_update().filter(pk=assignee_id, is_active=True).first()
+    if assignee is None:
+        raise ImportAssigneeIneligible("The mapped assignee account is inactive.")
+    membership = (
+        ProjectMember.objects.select_for_update()
+        .filter(
+            project_id=project_id,
+            member_id=assignee_id,
+            is_active=True,
+            role__gte=15,
+        )
+        .first()
+    )
+    if membership is None:
+        raise ImportAssigneeIneligible("The mapped assignee is no longer an active project member.")
+    return assignee
 
 
 def _require_owner(job: ImportJob, *, generation: int, lease_token: UUID) -> None:
@@ -416,9 +605,16 @@ def finish_execution(
     if stats is not None:
         job.stats = stats
     job.save()
+    audit_action = (
+        ImportAuditEvent.Action.AUTHORIZATION_REVOKED
+        if reason == "authorization_revoked"
+        else ImportAuditEvent.Action.DECISION_DRIFT
+        if reason == "decision_drift"
+        else ImportAuditEvent.Action.TERMINALIZED
+    )
     _audit(
         job=job,
-        action=ImportAuditEvent.Action.TERMINALIZED,
+        action=audit_action,
         previous_status=previous_status,
         actor_id=job.initiated_by_id,
         metadata={"reason": reason},
