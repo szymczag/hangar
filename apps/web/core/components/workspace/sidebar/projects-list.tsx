@@ -68,13 +68,12 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   const hasMoreProjects =
     projectPreferences.showLimitedProjects && joinedProjects.length > projectPreferences.limitedProjectsCount;
 
-  const handleCopyText = (projectId: string) => {
-    copyUrlToClipboard(`${workspaceSlug}/projects/${projectId}/issues`).then(() => {
-      setToast({
-        type: TOAST_TYPE.SUCCESS,
-        title: t("link_copied"),
-        message: t("project_link_copied_to_clipboard"),
-      });
+  const handleCopyText = async (projectId: string) => {
+    await copyUrlToClipboard(`${workspaceSlug}/projects/${projectId}/issues`);
+    setToast({
+      type: TOAST_TYPE.SUCCESS,
+      title: t("link_copied"),
+      message: t("project_link_copied_to_clipboard"),
     });
   };
 
@@ -219,6 +218,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
               </div>
             </div>
             <Transition
+              as="div"
               show={isAllProjectsListOpen}
               enter="transition duration-100 ease-out"
               enterFrom="transform scale-95 opacity-0"
@@ -229,8 +229,8 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
             >
               {loader === "init-loader" && (
                 <Loader className="w-full space-y-1.5">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <Loader.Item key={index} height="28px" />
+                  {["first", "second", "third", "fourth"].map((loaderKey) => (
+                    <Loader.Item key={loaderKey} height="28px" />
                   ))}
                 </Loader>
               )}

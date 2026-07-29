@@ -178,6 +178,9 @@ jobs:
             pnpm turbo run check:lint
           fi
 
+      - name: Check React runtime contracts
+        run: pnpm test:react-runtime-contracts
+
   # Type check depends on build artifacts
   check-types:
     name: check:types
