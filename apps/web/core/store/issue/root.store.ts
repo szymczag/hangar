@@ -10,20 +10,9 @@ import { autorun, makeObservable, observable } from "mobx";
 import type { ICycle, IIssueLabel, IModule, IProject, IState, IUserLite, TIssueServiceType } from "@plane/types";
 import { EIssueServiceType } from "@plane/types";
 // plane web store
-import type { IIssueDetail } from "@/plane-web/store/issue/issue-details/root.store";
-import { IssueDetail } from "@/plane-web/store/issue/issue-details/root.store";
-import type { ITeamIssuesFilter, ITeamIssues } from "@/plane-web/store/issue/team";
-import { TeamIssues, TeamIssuesFilter } from "@/plane-web/store/issue/team";
-import type { ITeamProjectWorkItemsFilter } from "@/plane-web/store/issue/team-project/filter.store";
-import { TeamProjectWorkItemsFilter } from "@/plane-web/store/issue/team-project/filter.store";
-import type { ITeamProjectWorkItems } from "@/plane-web/store/issue/team-project/issue.store";
-import { TeamProjectWorkItems } from "@/plane-web/store/issue/team-project/issue.store";
-import type { ITeamViewIssues, ITeamViewIssuesFilter } from "@/plane-web/store/issue/team-views";
-import { TeamViewIssues, TeamViewIssuesFilter } from "@/plane-web/store/issue/team-views";
-// root store
-import type { IWorkspaceIssues } from "@/plane-web/store/issue/workspace/issue.store";
-import { WorkspaceIssues } from "@/plane-web/store/issue/workspace/issue.store";
-import type { RootStore } from "@/plane-web/store/root.store";
+import type { IIssueDetail } from "@/store/issue/issue-details/root.store";
+import { IssueDetail } from "@/store/issue/issue-details/root.store";
+import type { RootStore } from "@/store/root.store";
 import type { IWorkspaceMembership } from "@/store/member/workspace/workspace-member.store";
 // issues data store
 import type { IArchivedIssuesFilter, IArchivedIssues } from "./archived";
@@ -46,6 +35,8 @@ import type { IProjectViewIssuesFilter, IProjectViewIssues } from "./project-vie
 import { ProjectViewIssuesFilter, ProjectViewIssues } from "./project-views";
 import type { IWorkspaceIssuesFilter } from "./workspace";
 import { WorkspaceIssuesFilter } from "./workspace";
+import type { IWorkspaceIssues } from "./workspace/issue.store";
+import { WorkspaceIssues } from "./workspace/issue.store";
 import type { IWorkspaceDraftIssues, IWorkspaceDraftIssuesFilter } from "./workspace-draft";
 import { WorkspaceDraftIssues, WorkspaceDraftIssuesFilter } from "./workspace-draft";
 
@@ -86,8 +77,8 @@ export interface IIssueRootStore {
   profileIssuesFilter: IProfileIssuesFilter;
   profileIssues: IProfileIssues;
 
-  teamIssuesFilter: ITeamIssuesFilter;
-  teamIssues: ITeamIssues;
+  teamIssuesFilter: IProjectIssuesFilter;
+  teamIssues: IProjectIssues;
 
   projectIssuesFilter: IProjectIssuesFilter;
   projectIssues: IProjectIssues;
@@ -98,11 +89,11 @@ export interface IIssueRootStore {
   moduleIssuesFilter: IModuleIssuesFilter;
   moduleIssues: IModuleIssues;
 
-  teamViewIssuesFilter: ITeamViewIssuesFilter;
-  teamViewIssues: ITeamViewIssues;
+  teamViewIssuesFilter: IProjectViewIssuesFilter;
+  teamViewIssues: IProjectViewIssues;
 
-  teamProjectWorkItemsFilter: ITeamProjectWorkItemsFilter;
-  teamProjectWorkItems: ITeamProjectWorkItems;
+  teamProjectWorkItemsFilter: IProjectIssuesFilter;
+  teamProjectWorkItems: IProjectIssues;
 
   projectViewIssuesFilter: IProjectViewIssuesFilter;
   projectViewIssues: IProjectViewIssues;
@@ -154,8 +145,8 @@ export class IssueRootStore implements IIssueRootStore {
   profileIssuesFilter: IProfileIssuesFilter;
   profileIssues: IProfileIssues;
 
-  teamIssuesFilter: ITeamIssuesFilter;
-  teamIssues: ITeamIssues;
+  teamIssuesFilter: IProjectIssuesFilter;
+  teamIssues: IProjectIssues;
 
   projectIssuesFilter: IProjectIssuesFilter;
   projectIssues: IProjectIssues;
@@ -166,14 +157,14 @@ export class IssueRootStore implements IIssueRootStore {
   moduleIssuesFilter: IModuleIssuesFilter;
   moduleIssues: IModuleIssues;
 
-  teamViewIssuesFilter: ITeamViewIssuesFilter;
-  teamViewIssues: ITeamViewIssues;
+  teamViewIssuesFilter: IProjectViewIssuesFilter;
+  teamViewIssues: IProjectViewIssues;
 
   projectViewIssuesFilter: IProjectViewIssuesFilter;
   projectViewIssues: IProjectViewIssues;
 
-  teamProjectWorkItemsFilter: ITeamProjectWorkItemsFilter;
-  teamProjectWorkItems: ITeamProjectWorkItems;
+  teamProjectWorkItemsFilter: IProjectIssuesFilter;
+  teamProjectWorkItems: IProjectIssues;
 
   archivedIssuesFilter: IArchivedIssuesFilter;
   archivedIssues: IArchivedIssues;
@@ -248,8 +239,8 @@ export class IssueRootStore implements IIssueRootStore {
     this.projectIssuesFilter = new ProjectIssuesFilter(this);
     this.projectIssues = new ProjectIssues(this, this.projectIssuesFilter);
 
-    this.teamIssuesFilter = new TeamIssuesFilter(this);
-    this.teamIssues = new TeamIssues(this, this.teamIssuesFilter);
+    this.teamIssuesFilter = new ProjectIssuesFilter(this);
+    this.teamIssues = new ProjectIssues(this, this.teamIssuesFilter);
 
     this.cycleIssuesFilter = new CycleIssuesFilter(this);
     this.cycleIssues = new CycleIssues(this, this.cycleIssuesFilter);
@@ -257,14 +248,14 @@ export class IssueRootStore implements IIssueRootStore {
     this.moduleIssuesFilter = new ModuleIssuesFilter(this);
     this.moduleIssues = new ModuleIssues(this, this.moduleIssuesFilter);
 
-    this.teamViewIssuesFilter = new TeamViewIssuesFilter(this);
-    this.teamViewIssues = new TeamViewIssues(this, this.teamViewIssuesFilter);
+    this.teamViewIssuesFilter = new ProjectViewIssuesFilter(this);
+    this.teamViewIssues = new ProjectViewIssues(this, this.teamViewIssuesFilter);
 
     this.projectViewIssuesFilter = new ProjectViewIssuesFilter(this);
     this.projectViewIssues = new ProjectViewIssues(this, this.projectViewIssuesFilter);
 
-    this.teamProjectWorkItemsFilter = new TeamProjectWorkItemsFilter(this);
-    this.teamProjectWorkItems = new TeamProjectWorkItems(this, this.teamProjectWorkItemsFilter);
+    this.teamProjectWorkItemsFilter = new ProjectIssuesFilter(this);
+    this.teamProjectWorkItems = new ProjectIssues(this, this.teamProjectWorkItemsFilter);
 
     this.archivedIssuesFilter = new ArchivedIssuesFilter(this);
     this.archivedIssues = new ArchivedIssues(this, this.archivedIssuesFilter);

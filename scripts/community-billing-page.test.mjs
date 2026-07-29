@@ -6,7 +6,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 
 const repoRoot = new URL("../", import.meta.url);
-const billingComponents = new URL("../apps/web/ce/components/workspace/billing/", import.meta.url);
+const billingComponents = new URL("../apps/web/core/components/workspace/billing/", import.meta.url);
 const billingRoot = readFileSync(new URL("root.tsx", billingComponents), "utf8");
 
 test("keeps the former billing route static and community focused", () => {
