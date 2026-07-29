@@ -7,7 +7,7 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0-rc.13` (`appVersion: v0.1.0-rc.13`). Its
+The latest published chart is `0.1.0-rc.14` (`appVersion: v0.1.0-rc.14`). Its
 evaluation profile is live-qualified on AMD64. It is a prerelease and is not yet
 supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
@@ -27,14 +27,14 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.13
+  --version 0.1.0-rc.14
 ```
 
 Do not use `0.1.0-rc.1` or `0.1.0-rc.2`; those immutable versions were consumed
-by incomplete release attempts. `0.1.0-rc.12` is the immediately previous complete
-publication, but its web application can fail during hydration after the React 19
-and Headless UI 2 upgrade. Use `0.1.0-rc.13`; `0.1.0-rc.11` remains the qualified
-rollback target.
+by incomplete release attempts. `0.1.0-rc.13` is the immediately previous complete
+publication, but shared dropdowns can still fail when Headless UI forwards button
+props through a Fragment. `0.1.0-rc.12` additionally has hydration and transition
+failures. Use `0.1.0-rc.14`; `0.1.0-rc.11` remains the qualified rollback target.
 
 ## Deployment profiles
 
@@ -103,8 +103,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0-rc.13` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.13)
+Release `0.1.0-rc.14` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.14)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
