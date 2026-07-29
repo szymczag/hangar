@@ -5,13 +5,13 @@
 """Contract tests for ``DeployBoardViewSet`` authorization.
 
 Regression coverage for the app-side sibling of GHSA-w2vf-m9x9-mvmc (WEB-8075).
-``DeployBoardViewSet`` uses ``ProjectMemberPermission`` whose SAFE_METHODS branch
-previously checked only workspace membership, so a workspace member who was NOT
-a member of a project could ``GET .../project-deploy-boards/`` and read that
-project's publish configuration.
+``DeployBoardViewSet`` previously used ``ProjectMemberPermission`` whose
+SAFE_METHODS branch checked only workspace membership and whose POST branch
+checked only the workspace role. A workspace member who was NOT a member of a
+project could therefore read or modify that project's publish configuration.
 
-The fix scopes the SAFE_METHODS check to ``project_id=view.project_id`` so a
-non-member is rejected with 403.
+The view now uses ``ProjectEntityPermission``, which scopes both reads and
+writes to active membership in the exact URL project.
 """
 
 from uuid import uuid4
@@ -20,7 +20,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from plane.db.models import Project, ProjectMember, User, WorkspaceMember
+from plane.db.models import Project, ProjectMember, User, Workspace, WorkspaceMember
 
 
 def deploy_board_url(slug, project_id):
@@ -86,6 +86,55 @@ class TestDeployBoardProjectScope:
     def test_project_member_can_read_deploy_board(self, session_client, workspace, project):
         """Positive control: an active project member is not blocked."""
         response = session_client.get(deploy_board_url(workspace.slug, project.id))
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+
+    @pytest.mark.django_db
+    def test_non_project_member_cannot_modify_deploy_board(self, outsider_client, workspace, project):
+        response = outsider_client.post(
+            deploy_board_url(workspace.slug, project.id),
+            {"is_comments_enabled": True},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+
+    @pytest.mark.django_db
+    def test_workspace_member_cannot_modify_cross_workspace_deploy_board(
+        self, outsider_client, workspace, create_user
+    ):
+        unique_id = uuid4().hex[:8]
+        other_workspace = Workspace.objects.create(
+            name="Other Workspace",
+            slug=f"other-{unique_id}",
+            owner=create_user,
+        )
+        other_project = Project.objects.create(
+            name="Other Project",
+            identifier="OTHER",
+            workspace=other_workspace,
+            created_by=create_user,
+        )
+
+        response = outsider_client.post(
+            deploy_board_url(workspace.slug, other_project.id),
+            {"is_comments_enabled": True},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+
+    @pytest.mark.django_db
+    def test_project_member_can_modify_deploy_board(self, session_client, workspace, project):
+        response = session_client.post(
+            deploy_board_url(workspace.slug, project.id),
+            {"is_comments_enabled": True},
+            format="json",
+        )
         assert response.status_code == status.HTTP_200_OK, (
             f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
         )
