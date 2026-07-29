@@ -88,82 +88,83 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
     if (!multiple) handleClose();
   };
 
-  const getDisplayName = (value: string | string[] | null, showUserDetails: boolean, placeholder: string = "") => {
-    if (Array.isArray(value)) {
-      if (value.length > 0) {
-        if (value.length === 1) {
-          return getUserDetails(value[0])?.display_name || placeholder;
+  const getDisplayName = (
+    selectedValue: string | string[] | null,
+    includeUserDetails: boolean,
+    fallback: string = ""
+  ) => {
+    if (Array.isArray(selectedValue)) {
+      if (selectedValue.length > 0) {
+        if (selectedValue.length === 1) {
+          return getUserDetails(selectedValue[0])?.display_name || fallback;
         } else {
-          return showUserDetails ? `${value.length} ${t("members").toLocaleLowerCase()}` : "";
+          return includeUserDetails ? `${selectedValue.length} ${t("members").toLocaleLowerCase()}` : "";
         }
       } else {
-        return placeholder;
+        return fallback;
       }
     } else {
-      if (showUserDetails && value) {
-        return getUserDetails(value)?.display_name || placeholder;
+      if (includeUserDetails && selectedValue) {
+        return getUserDetails(selectedValue)?.display_name || fallback;
       } else {
-        return placeholder;
+        return fallback;
       }
     }
   };
 
-  const comboButton = (
-    <>
-      {button ? (
-        <button
-          ref={setReferenceElement}
-          type="button"
-          className={cn("clickable block h-full w-full outline-none", buttonContainerClassName)}
-          onClick={handleOnClick}
-          disabled={disabled}
-          tabIndex={tabIndex}
-        >
-          {button}
-        </button>
-      ) : (
-        <button
-          ref={setReferenceElement}
-          type="button"
-          className={cn(
-            "clickable block h-full max-w-full outline-none",
-            {
-              "cursor-not-allowed text-secondary": disabled,
-              "cursor-pointer": !disabled,
-            },
-            buttonContainerClassName
-          )}
-          onClick={handleOnClick}
-          disabled={disabled}
-          tabIndex={tabIndex}
-        >
-          <DropdownButton
-            className={cn("text-11", buttonClassName)}
-            isActive={isOpen}
-            tooltipHeading={placeholder}
-            tooltipContent={
-              tooltipContent ?? `${value?.length ?? 0} ${value?.length !== 1 ? t("assignees") : t("assignee")}`
-            }
-            showTooltip={showTooltip}
-            variant={buttonVariant}
-            renderToolTipByDefault={renderByDefault}
-          >
-            {!hideIcon && <ButtonAvatars showTooltip={showTooltip} userIds={value} icon={icon} />}
-            {BUTTON_VARIANTS_WITH_TEXT.includes(buttonVariant) && (
-              <span className="flex-grow truncate text-left text-body-xs-medium leading-5">
-                {getDisplayName(value, showUserDetails, placeholder)}
-              </span>
-            )}
-            {dropdownArrow && (
-              <ChevronDownIcon className={cn("h-2.5 w-2.5 flex-shrink-0", dropdownArrowClassName)} aria-hidden="true" />
-            )}
-          </DropdownButton>
-        </button>
+  const comboButton = button ? (
+    <button
+      ref={setReferenceElement}
+      type="button"
+      className={cn("clickable block h-full w-full outline-none", buttonContainerClassName)}
+      onClick={handleOnClick}
+      disabled={disabled}
+      tabIndex={tabIndex}
+    >
+      {button}
+    </button>
+  ) : (
+    <button
+      ref={setReferenceElement}
+      type="button"
+      className={cn(
+        "clickable block h-full max-w-full outline-none",
+        {
+          "cursor-not-allowed text-secondary": disabled,
+          "cursor-pointer": !disabled,
+        },
+        buttonContainerClassName
       )}
-    </>
+      onClick={handleOnClick}
+      disabled={disabled}
+      tabIndex={tabIndex}
+    >
+      <DropdownButton
+        className={cn("text-11", buttonClassName)}
+        isActive={isOpen}
+        tooltipHeading={placeholder}
+        tooltipContent={
+          tooltipContent ?? `${value?.length ?? 0} ${value?.length !== 1 ? t("assignees") : t("assignee")}`
+        }
+        showTooltip={showTooltip}
+        variant={buttonVariant}
+        renderToolTipByDefault={renderByDefault}
+      >
+        {!hideIcon && <ButtonAvatars showTooltip={showTooltip} userIds={value} icon={icon} />}
+        {BUTTON_VARIANTS_WITH_TEXT.includes(buttonVariant) && (
+          <span className="flex-grow truncate text-left text-body-xs-medium leading-5">
+            {getDisplayName(value, showUserDetails, placeholder)}
+          </span>
+        )}
+        {dropdownArrow && (
+          <ChevronDownIcon className={cn("h-2.5 w-2.5 flex-shrink-0", dropdownArrowClassName)} aria-hidden="true" />
+        )}
+      </DropdownButton>
+    </button>
   );
 
   return (
+    // oxlint-disable-next-line jsx_a11y/no-static-element-interactions
     <ComboDropDown
       as="div"
       ref={dropdownRef}

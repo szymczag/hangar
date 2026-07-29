@@ -5,8 +5,8 @@
  */
 
 import { Combobox } from "@headlessui/react";
-import type { ElementType, KeyboardEventHandler, ReactNode, Ref } from "react";
-import React, { Fragment, forwardRef, useEffect, useRef, useState } from "react";
+import type { ComponentPropsWithRef, ElementType, KeyboardEventHandler, ReactElement, ReactNode, Ref } from "react";
+import React, { forwardRef, useEffect, useRef, useState } from "react";
 
 type Props = {
   as?: ElementType | undefined;
@@ -19,12 +19,18 @@ type Props = {
   onKeyDown?: KeyboardEventHandler<HTMLDivElement> | undefined;
   multiple?: boolean;
   renderByDefault?: boolean;
-  button: ReactNode;
+  button: ReactElement<ComponentPropsWithRef<"button">, "button">;
   children: ReactNode;
 };
 
 const ComboDropDown = forwardRef(function ComboDropDown(props: Props, ref) {
   const { button, renderByDefault = true, children, ...rest } = props;
+
+  if ((button as ReactElement).type !== "button") {
+    throw new Error(
+      "ComboDropDown requires one native button element so Headless UI can attach its accessibility props."
+    );
+  }
 
   const dropDownButtonRef = useRef<HTMLDivElement | null>(null);
 
@@ -58,7 +64,7 @@ const ComboDropDown = forwardRef(function ComboDropDown(props: Props, ref) {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
     <Combobox {...rest} ref={ref}>
-      <Combobox.Button as={Fragment}>{button}</Combobox.Button>
+      <Combobox.Button {...button.props} />
       {children}
     </Combobox>
   );

@@ -398,53 +398,50 @@ export function PriorityDropdown(props: Props) {
       ? BackgroundButton
       : TransparentButton;
 
-  const comboButton = (
-    <>
-      {button ? (
-        <button
-          ref={setReferenceElement}
-          type="button"
-          className={cn("clickable block h-full w-full outline-none", buttonContainerClassName)}
-          onClick={handleOnClick}
-          disabled={disabled}
-          tabIndex={tabIndex}
-        >
-          {button}
-        </button>
-      ) : (
-        <button
-          ref={setReferenceElement}
-          type="button"
-          className={cn(
-            "clickable block h-full max-w-full outline-none",
-            {
-              "cursor-not-allowed text-secondary": disabled,
-              "cursor-pointer": !disabled,
-            },
-            buttonContainerClassName
-          )}
-          onClick={handleOnClick}
-          disabled={disabled}
-          tabIndex={tabIndex}
-        >
-          <ButtonToRender
-            priority={value ?? undefined}
-            className={buttonClassName}
-            highlightUrgent={highlightUrgent}
-            dropdownArrow={dropdownArrow && !disabled}
-            dropdownArrowClassName={dropdownArrowClassName}
-            hideIcon={hideIcon}
-            placeholder={placeholder}
-            showTooltip={showTooltip}
-            hideText={BUTTON_VARIANTS_WITHOUT_TEXT.includes(buttonVariant)}
-            renderToolTipByDefault={renderByDefault}
-          />
-        </button>
+  const comboButton = button ? (
+    <button
+      ref={setReferenceElement}
+      type="button"
+      className={cn("clickable block h-full w-full outline-none", buttonContainerClassName)}
+      onClick={handleOnClick}
+      disabled={disabled}
+      tabIndex={tabIndex}
+    >
+      {button}
+    </button>
+  ) : (
+    <button
+      ref={setReferenceElement}
+      type="button"
+      className={cn(
+        "clickable block h-full max-w-full outline-none",
+        {
+          "cursor-not-allowed text-secondary": disabled,
+          "cursor-pointer": !disabled,
+        },
+        buttonContainerClassName
       )}
-    </>
+      onClick={handleOnClick}
+      disabled={disabled}
+      tabIndex={tabIndex}
+    >
+      <ButtonToRender
+        priority={value ?? undefined}
+        className={buttonClassName}
+        highlightUrgent={highlightUrgent}
+        dropdownArrow={dropdownArrow && !disabled}
+        dropdownArrowClassName={dropdownArrowClassName}
+        hideIcon={hideIcon}
+        placeholder={placeholder}
+        showTooltip={showTooltip}
+        hideText={BUTTON_VARIANTS_WITHOUT_TEXT.includes(buttonVariant)}
+        renderToolTipByDefault={renderByDefault}
+      />
+    </button>
   );
 
   return (
+    // oxlint-disable-next-line jsx_a11y/no-static-element-interactions
     <ComboDropDown
       as="div"
       ref={dropdownRef}
