@@ -57,7 +57,7 @@ export const LiteTextEditor = React.forwardRef(function LiteTextEditor(
   }
   // derived values
   const isEmpty = isCommentEmpty(props.initialValue);
-  const editorRef = isMutableRefObject<EditorRefApi>(ref) ? ref.current : null;
+  const editorRef = isMutableRefObject<EditorRefApi | null>(ref) ? ref.current : null;
   const { liteText: liteTextEditorExtensions } = useEditorFlagging(anchor);
   // parse content
   const { getEditorMetaData } = useParseEditorContent({

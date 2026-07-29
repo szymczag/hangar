@@ -29,7 +29,7 @@ export function Popover(props: TPopover) {
   } = props;
   // states
   const [referenceElement, setReferenceElement] = useState<HTMLDivElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
 
   // react-popper derived values
   const { styles, attributes } = usePopper(referenceElement, popperElement, {

@@ -78,7 +78,7 @@ export const StickyEditor = React.forwardRef(function StickyEditor(
     return !!ref && typeof ref === "object" && "current" in ref;
   }
   // derived values
-  const editorRef = isMutableRefObject<EditorRefApi>(ref) ? ref.current : null;
+  const editorRef = isMutableRefObject<EditorRefApi | null>(ref) ? ref.current : null;
 
   return (
     <div

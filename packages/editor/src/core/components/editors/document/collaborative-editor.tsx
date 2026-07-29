@@ -160,7 +160,11 @@ const CollaborativeDocumentEditorWithRef = React.forwardRef(function Collaborati
   ref: React.ForwardedRef<EditorRefApi>
 ) {
   return (
-    <CollaborativeDocumentEditor key={props.id} {...props} forwardedRef={ref as React.MutableRefObject<EditorRefApi>} />
+    <CollaborativeDocumentEditor
+      key={props.id}
+      {...props}
+      forwardedRef={ref as React.MutableRefObject<EditorRefApi | null>}
+    />
   );
 });
 

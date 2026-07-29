@@ -8,8 +8,6 @@ import React, { useState, useRef, useCallback, useMemo } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { useDropzone } from "react-dropzone";
-import type { Control } from "react-hook-form";
-import { Controller } from "react-hook-form";
 import useSWR from "swr";
 import { Popover } from "@headlessui/react";
 // plane imports
@@ -37,7 +35,6 @@ type TTabOption = {
 type Props = {
   label: string | React.ReactNode;
   value: string | null;
-  control: Control<any>;
   onChange: (data: string) => void;
   disabled?: boolean;
   tabIndex?: number;
@@ -49,7 +46,7 @@ type Props = {
 const fileService = new FileService();
 
 export const ImagePickerPopover = observer(function ImagePickerPopover(props: Props) {
-  const { label, value, control, onChange, disabled = false, tabIndex, isProfileCover = false, projectId } = props;
+  const { label, value, onChange, disabled = false, tabIndex, isProfileCover = false, projectId } = props;
   // states
   const [image, setImage] = useState<File | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
@@ -216,27 +213,20 @@ export const ImagePickerPopover = observer(function ImagePickerPopover(props: Pr
                   {(unsplashImages || !unsplashError) && (
                     <>
                       <div className="flex items-center gap-x-2">
-                        <Controller
-                          control={control}
+                        <Input
+                          id="search"
                           name="search"
-                          render={({ field: { value, ref } }) => (
-                            <Input
-                              id="search"
-                              name="search"
-                              type="text"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  setSearchParams(formData.search);
-                                }
-                              }}
-                              value={value}
-                              onChange={(e) => setFormData({ ...formData, search: e.target.value })}
-                              ref={ref}
-                              placeholder="Search for images"
-                              className="w-full text-13"
-                            />
-                          )}
+                          type="text"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              setSearchParams(formData.search);
+                            }
+                          }}
+                          value={formData.search}
+                          onChange={(e) => setFormData({ ...formData, search: e.target.value })}
+                          placeholder="Search for images"
+                          className="w-full text-13"
                         />
                         <Button variant="primary" size="xl" onClick={() => setSearchParams(formData.search)}>
                           Search

@@ -139,7 +139,8 @@ export function ExistingIssuesListModal(props: Props) {
     <ModalCore isOpen={isOpen} handleClose={handleClose} position={EModalPosition.CENTER} width={EModalWidth.XXL}>
       <Combobox
         as="div"
-        onChange={(val: ISearchIssueResponse) => {
+        onChange={(val: ISearchIssueResponse | null) => {
+          if (val === null) return;
           if (selectedIssues.some((i) => i.id === val.id))
             setSelectedIssues((prevData) => prevData.filter((i) => i.id !== val.id));
           else setSelectedIssues((prevData) => [...prevData, val]);

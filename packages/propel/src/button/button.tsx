@@ -33,9 +33,17 @@ const Button = React.forwardRef(function Button(props: ButtonProps, ref: React.F
       disabled={disabled || loading}
       {...rest}
     >
-      {prependIcon && React.cloneElement(prependIcon, { className: cn("shrink-0", buttonIconStyle), strokeWidth: 2 })}
+      {prependIcon &&
+        React.cloneElement(prependIcon as React.ReactElement<{ className?: string; strokeWidth?: number }>, {
+          className: cn("shrink-0", buttonIconStyle),
+          strokeWidth: 2,
+        })}
       {children}
-      {appendIcon && React.cloneElement(appendIcon, { className: cn("shrink-0", buttonIconStyle), strokeWidth: 2 })}
+      {appendIcon &&
+        React.cloneElement(appendIcon as React.ReactElement<{ className?: string; strokeWidth?: number }>, {
+          className: cn("shrink-0", buttonIconStyle),
+          strokeWidth: 2,
+        })}
     </button>
   );
 });

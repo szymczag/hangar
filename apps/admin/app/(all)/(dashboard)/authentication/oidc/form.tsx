@@ -52,7 +52,7 @@ export function InstanceOIDCConfigForm(props: Props) {
 
   const originURL = !isEmpty(API_BASE_URL) ? API_BASE_URL : typeof window !== "undefined" ? window.location.origin : "";
 
-  const OIDC_FORM_FIELDS: TControllerInputFormField[] = [
+  const OIDC_FORM_FIELDS: TControllerInputFormField<OIDCConfigFormValues>[] = [
     {
       key: "OIDC_ISSUER",
       type: "text",

@@ -15,7 +15,7 @@ type Props = {
   horizontalOffset?: number;
   root?: MutableRefObject<HTMLElement | null>;
   children: ReactNode;
-  as?: keyof JSX.IntrinsicElements;
+  as?: keyof React.JSX.IntrinsicElements;
   classNames?: string;
   placeholderChildren?: ReactNode;
   defaultValue?: boolean;

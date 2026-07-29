@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from "react";
-import type { Control } from "react-hook-form";
+import type { Control, FieldPath, FieldValues } from "react-hook-form";
 import { Controller } from "react-hook-form";
 // icons
 import { Eye, EyeOff } from "lucide-react";
@@ -13,10 +13,10 @@ import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@plane/ui";
 import { cn } from "@plane/utils";
 
-type Props = {
-  control: Control<any>;
+type Props<T extends FieldValues> = {
+  control: Control<T>;
   type: "text" | "password";
-  name: string;
+  name: FieldPath<T>;
   label: string;
   description?: string | React.ReactNode;
   placeholder: string;
@@ -24,8 +24,8 @@ type Props = {
   required: boolean;
 };
 
-export type TControllerInputFormField = {
-  key: string;
+export type TControllerInputFormField<T extends FieldValues = FieldValues> = {
+  key: FieldPath<T>;
   type: "text" | "password";
   label: string;
   description?: string | React.ReactNode;
@@ -34,7 +34,7 @@ export type TControllerInputFormField = {
   required: boolean;
 };
 
-export function ControllerInput(props: Props) {
+export function ControllerInput<T extends FieldValues>(props: Props<T>) {
   const { name, control, type, label, description, placeholder, error, required } = props;
   // states
   const [showPassword, setShowPassword] = useState(false);

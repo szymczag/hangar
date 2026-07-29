@@ -247,7 +247,6 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
                 render={({ field: { value, onChange } }) => (
                   <ImagePickerPopover
                     label={t("change_cover")}
-                    control={control}
                     onChange={(imageUrl) => onChange(imageUrl)}
                     value={value}
                     isProfileCover

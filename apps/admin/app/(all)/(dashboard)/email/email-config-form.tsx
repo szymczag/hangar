@@ -58,7 +58,7 @@ export function InstanceEmailForm(props: IInstanceEmailForm) {
       ENABLE_SMTP: config["ENABLE_SMTP"],
     },
   });
-  const emailFormFields: TControllerInputFormField[] = [
+  const emailFormFields: TControllerInputFormField<EmailFormValues>[] = [
     {
       key: "EMAIL_HOST",
       type: "text",
@@ -87,7 +87,7 @@ export function InstanceEmailForm(props: IInstanceEmailForm) {
     },
   ];
 
-  const OptionalEmailFormFields: TControllerInputFormField[] = [
+  const OptionalEmailFormFields: TControllerInputFormField<EmailFormValues>[] = [
     {
       key: "EMAIL_HOST_USER",
       type: "text",

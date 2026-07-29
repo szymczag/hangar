@@ -16,9 +16,17 @@ const Badge = React.forwardRef(function Badge(props: BadgeProps, ref: React.Forw
 
   return (
     <span ref={ref} className={cn(badgeVariants({ variant, size }))} {...rest}>
-      {prependIcon && React.cloneElement(prependIcon, { className: cn("shrink-0", badgeIconStyle), strokeWidth: 2 })}
+      {prependIcon &&
+        React.cloneElement(prependIcon as React.ReactElement<{ className?: string; strokeWidth?: number }>, {
+          className: cn("shrink-0", badgeIconStyle),
+          strokeWidth: 2,
+        })}
       {children}
-      {appendIcon && React.cloneElement(appendIcon, { className: cn("shrink-0", badgeIconStyle), strokeWidth: 2 })}
+      {appendIcon &&
+        React.cloneElement(appendIcon as React.ReactElement<{ className?: string; strokeWidth?: number }>, {
+          className: cn("shrink-0", badgeIconStyle),
+          strokeWidth: 2,
+        })}
     </span>
   );
 });

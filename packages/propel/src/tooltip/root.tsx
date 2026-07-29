@@ -52,7 +52,7 @@ export function Tooltip(props: ITooltipProps) {
   return (
     <BaseTooltip.Provider>
       <BaseTooltip.Root delay={openDelay} closeDelay={closeDelay} disabled={disabled}>
-        <BaseTooltip.Trigger render={children} />
+        <BaseTooltip.Trigger render={children as React.ReactElement<Record<string, unknown>>} />
         <BaseTooltip.Portal>
           <BaseTooltip.Positioner
             className={cn(
