@@ -228,6 +228,7 @@ export const ProjectDropdownBase = observer(function ProjectDropdownBase(props: 
     <ComboDropDown
       as="div"
       ref={dropdownRef}
+      onClose={handleClose}
       tabIndex={tabIndex}
       className={cn("h-full", className)}
       value={value}
@@ -239,7 +240,7 @@ export const ProjectDropdownBase = observer(function ProjectDropdownBase(props: 
       multiple={multiple}
     >
       {isOpen && (
-        <Combobox.Options className="fixed z-10" static>
+        <Combobox.Options className="fixed z-10" modal={false} static>
           <div
             className="my-1 w-48 rounded-sm border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-11 shadow-raised-200 focus:outline-none"
             ref={setPopperElement}

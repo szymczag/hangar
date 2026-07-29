@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 // plane helpers
 import { useOutsideClickDetector } from "@plane/hooks";
 // hooks
@@ -24,6 +24,8 @@ type TArguments = {
 
 export const useDropdown = (args: TArguments) => {
   const { dropdownRef, inputRef, isOpen, onClose, onOpen, query, setIsOpen, setQuery } = args;
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
 
   const { isMobile } = usePlatformOS();
 
@@ -42,17 +44,21 @@ export const useDropdown = (args: TArguments) => {
    * @description close the dropdown, clear the search input, and call the onClose callback
    */
   const handleClose = () => {
-    if (!isOpen) return;
+    const wasOpen = isOpenRef.current;
+    isOpenRef.current = false;
     setIsOpen(false);
-    onClose?.();
+    if (wasOpen) onClose?.();
     setQuery?.("");
   };
 
   // toggle the dropdown, call the onOpen callback if the dropdown is closed, and call the onClose callback if the dropdown is open
   const toggleDropdown = () => {
-    if (!isOpen) onOpen?.();
-    setIsOpen((prevIsOpen) => !prevIsOpen);
-    if (isOpen) onClose?.();
+    const wasOpen = isOpenRef.current;
+    const nextIsOpen = !wasOpen;
+    isOpenRef.current = nextIsOpen;
+    if (!wasOpen) onOpen?.();
+    setIsOpen(nextIsOpen);
+    if (wasOpen) onClose?.();
   };
 
   const handleKeyDown = useDropdownKeyDown(toggleDropdown, handleClose);

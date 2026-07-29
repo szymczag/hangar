@@ -133,7 +133,7 @@ export const DateRangeDropdown = observer(function DateRangeDropdown(props: Prop
     if (referenceElement) referenceElement.focus();
   };
 
-  const { handleKeyDown, handleOnClick } = useDropdown({
+  const { handleClose, handleKeyDown, handleOnClick } = useDropdown({
     dropdownRef,
     isOpen,
     onOpen,
@@ -261,7 +261,7 @@ export const DateRangeDropdown = observer(function DateRangeDropdown(props: Prop
   );
 
   const comboOptions = (
-    <Combobox.Options data-prevent-outside-click static>
+    <Combobox.Options data-prevent-outside-click modal={false} static>
       <div
         className="z-30 my-1 overflow-hidden rounded-md border-[0.5px] border-subtle-1 bg-surface-1"
         ref={setPopperElement}
@@ -292,6 +292,7 @@ export const DateRangeDropdown = observer(function DateRangeDropdown(props: Prop
     <ComboDropDown
       as="div"
       ref={dropdownRef}
+      onClose={handleClose}
       tabIndex={tabIndex}
       className={cn("h-full", className)}
       onKeyDown={(e) => {

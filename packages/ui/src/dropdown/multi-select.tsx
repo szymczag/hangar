@@ -52,6 +52,8 @@ export function MultiSelectDropdown(props: IMultiSelectDropdown) {
   const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
   // popper-js refs
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
 
@@ -70,9 +72,12 @@ export function MultiSelectDropdown(props: IMultiSelectDropdown) {
 
   // handlers
   const toggleDropdown = () => {
-    if (!isOpen) onOpen?.();
-    setIsOpen((prevIsOpen) => !prevIsOpen);
-    if (isOpen) onClose?.();
+    const wasOpen = isOpenRef.current;
+    const nextIsOpen = !wasOpen;
+    isOpenRef.current = nextIsOpen;
+    if (!wasOpen) onOpen?.();
+    setIsOpen(nextIsOpen);
+    if (wasOpen) onClose?.();
   };
 
   const handleOnClick = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
@@ -82,9 +87,10 @@ export function MultiSelectDropdown(props: IMultiSelectDropdown) {
   };
 
   const handleClose = () => {
-    if (!isOpen) return;
+    const wasOpen = isOpenRef.current;
+    isOpenRef.current = false;
     setIsOpen(false);
-    onClose?.();
+    if (wasOpen) onClose?.();
     setQuery?.("");
   };
 
@@ -117,6 +123,7 @@ export function MultiSelectDropdown(props: IMultiSelectDropdown) {
     <Combobox
       as="div"
       ref={dropdownRef}
+      onClose={handleClose}
       value={value}
       onChange={onChange}
       className={cn(
@@ -140,7 +147,7 @@ export function MultiSelectDropdown(props: IMultiSelectDropdown) {
       />
 
       {isOpen && (
-        <Combobox.Options className="fixed z-10" static>
+        <Combobox.Options className="fixed z-10" modal={false} static>
           <div
             className={cn(
               "my-1 w-48 rounded-sm border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-11 shadow-raised-200 focus:outline-none",

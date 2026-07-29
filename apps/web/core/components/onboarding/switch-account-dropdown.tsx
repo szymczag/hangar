@@ -60,7 +60,10 @@ export const SwitchAccountDropdown = observer(function SwitchAccountDropdown(pro
           leaveFrom="transform scale-100 opacity-100"
           leaveTo="transform scale-95 opacity-0"
         >
-          <Menu.Items className="absolute right-0 z-10 mt-2 min-w-[12rem] rounded-md border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-13 shadow-raised-200">
+          <Menu.Items
+            className="absolute right-0 z-10 mt-2 min-w-[12rem] rounded-md border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-13 shadow-raised-200"
+            modal={false}
+          >
             <Menu.Item
               as="button"
               type="button"

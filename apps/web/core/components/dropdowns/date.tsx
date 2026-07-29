@@ -168,6 +168,7 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
     <ComboDropDown
       as="div"
       ref={dropdownRef}
+      onClose={handleClose}
       tabIndex={tabIndex}
       className={cn("h-full", className)}
       onKeyDown={(e) => {
@@ -181,7 +182,7 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
     >
       {isOpen &&
         createPortal(
-          <Combobox.Options data-prevent-outside-click static>
+          <Combobox.Options data-prevent-outside-click modal={false} static>
             <div
               className={cn(
                 "z-30 my-1 overflow-hidden rounded-md border-[0.5px] border-strong bg-surface-1 shadow-raised-200",

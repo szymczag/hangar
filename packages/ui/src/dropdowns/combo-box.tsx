@@ -15,6 +15,7 @@ type Props = {
   className?: string | undefined;
   value?: string | string[] | null;
   onChange?: (value: any) => void;
+  onClose?: () => void;
   disabled?: boolean | undefined;
   onKeyDown?: KeyboardEventHandler<HTMLDivElement> | undefined;
   multiple?: boolean;

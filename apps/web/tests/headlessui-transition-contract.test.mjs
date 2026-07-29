@@ -17,6 +17,11 @@ const { Combobox, Transition } = webRequire("@headlessui/react");
 
 const sourceRoots = [path.join(repoRoot, "apps"), path.join(repoRoot, "packages")];
 const fragmentButtonComponents = new Set(["Combobox", "Disclosure", "Listbox", "Menu", "Popover"]);
+const nonModalPanelComponents = new Map([
+  ["Combobox", "Options"],
+  ["Listbox", "Options"],
+  ["Menu", "Items"],
+]);
 
 function walkTsxFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -279,6 +284,79 @@ function collectUnsafeComboDropDownButtons(sourceFile) {
   return violations;
 }
 
+function isHeadlessUiPanelTag(tagName, imports) {
+  const name = jsxTagName(tagName);
+  const [rootName, memberName] = name.split(".");
+  const importedRootName = imports.get(rootName);
+
+  if (importedRootName && memberName && nonModalPanelComponents.get(importedRootName) === memberName) return true;
+
+  const importedName = imports.get(name);
+  return [...nonModalPanelComponents].some(
+    ([componentName, panelName]) => importedName === `${componentName}${panelName}`
+  );
+}
+
+function isFalseAttribute(attribute) {
+  if (!attribute?.initializer || !ts.isJsxExpression(attribute.initializer)) return false;
+  return attribute.initializer.expression?.kind === ts.SyntaxKind.FalseKeyword;
+}
+
+function collectModalLegacyPanels(sourceFile) {
+  const violations = [];
+  const imports = headlessUiImports(sourceFile);
+
+  function visit(node) {
+    const openingElement = ts.isJsxElement(node)
+      ? node.openingElement
+      : ts.isJsxSelfClosingElement(node)
+        ? node
+        : undefined;
+
+    if (openingElement && isHeadlessUiPanelTag(openingElement.tagName, imports)) {
+      const modalAttribute = findAttribute(openingElement, "modal");
+
+      if (!isFalseAttribute(modalAttribute)) {
+        violations.push(
+          `${formatLocation(sourceFile, openingElement)} must explicitly use modal={false} to preserve the Headless UI 1 dropdown contract`
+        );
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
+function collectUnsynchronizedComboDropDowns(sourceFile) {
+  const violations = [];
+
+  function visit(node) {
+    const openingElement = ts.isJsxElement(node)
+      ? node.openingElement
+      : ts.isJsxSelfClosingElement(node)
+        ? node
+        : undefined;
+
+    if (
+      openingElement &&
+      jsxTagName(openingElement.tagName) === "ComboDropDown" &&
+      findAttribute(openingElement, "onClose") === undefined
+    ) {
+      violations.push(
+        `${formatLocation(sourceFile, openingElement)} must synchronize Headless UI's internal close with external dropdown state`
+      );
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
 test("documents the Headless UI 2 Fragment failure mode", () => {
   const unsafeTransition = React.createElement(
     Transition,
@@ -366,4 +444,24 @@ test("keeps every ComboDropDown trigger structurally ref-safe", () => {
   });
 
   assert.deepEqual(violations, [], `Unsafe ComboDropDown button contracts:\n${violations.join("\n")}`);
+});
+
+test("keeps legacy Headless UI dropdown panels non-modal", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+    const source = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return collectModalLegacyPanels(sourceFile);
+  });
+
+  assert.deepEqual(violations, [], `Unsafe modal Headless UI dropdown panels:\n${violations.join("\n")}`);
+});
+
+test("keeps ComboDropDown internal and external close state synchronized", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+    const source = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return collectUnsynchronizedComboDropDowns(sourceFile);
+  });
+
+  assert.deepEqual(violations, [], `Unsynchronized ComboDropDown contracts:\n${violations.join("\n")}`);
 });
