@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.11`. It is qualified for evaluation on
+The current release is `0.1.0-rc.12`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -32,12 +32,13 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.11` qualification boundary is:
+The `0.1.0-rc.12` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
 | Kubernetes             | 1.30 through 1.36, including 1.36.2                              |
 | Helm                   | 4.2                                                              |
+| Inherited Plane source | `v1.4.0-rc2` (`package.json` version `1.4.0`)                    |
 | Node architecture      | `linux/amd64`                                                    |
 | Pod Security Admission | Restricted                                                       |
 | Ingress                | TLS-enabled controller with WebSocket support                    |
@@ -97,18 +98,18 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.11`                               |
-| Helm chart version | `0.1.0-rc.11`                                |
-| Git tag            | `hangar-v0.1.0-rc.11`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.11` |
+| Product version    | `v0.1.0-rc.12`                               |
+| Helm chart version | `0.1.0-rc.12`                                |
+| Git tag            | `hangar-v0.1.0-rc.12`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.12` |
 
 `rc.1` and `rc.2` were consumed by incomplete publication attempts. Do not use
-them. `rc.10` is the previous complete release. Published versions are immutable
+them. `rc.11` is the previous complete release. Published versions are immutable
 and are never repaired in place.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.11` notes](../releases/hangar-v0.1.0-rc.11.md) — review
+- [Release `v0.1.0-rc.12` notes](../releases/hangar-v0.1.0-rc.12.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -133,7 +134,7 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The public `rc.11` chart archive, OCI chart, and digest-pinned Hangar images are
+The public `rc.12` chart archive, OCI chart, and digest-pinned Hangar images are
 anonymously downloadable. The release workflow also created provenance
 attestations and keyless Cosign signatures.
 

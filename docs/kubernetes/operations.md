@@ -59,6 +59,57 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.11` to `rc.12`
+
+This upgrade synchronizes the inherited Plane source from `v1.3.1` to
+`v1.4.0-rc2` (`package.json` version `1.4.0`). It includes upstream authorization
+and privacy corrections for project cycles and modules, project-member
+permissions, page-version reads, guest issue listings, and bulk asset association.
+The asset correction allows an uploader to associate a new unassigned asset with
+its target project while rejecting assets uploaded by another user or already
+assigned to a different project. Uploaded filenames also have control characters
+removed before storage.
+
+The release updates `mistune` to 3.3.3, `postcss` to 8.5.23, `sharp` to 0.35.3,
+React Router to 8.3.0, `js-yaml` to 4.3.0, and `valibot` to 1.4.2. There is no new
+Django migration and no Helm values, Secret, permission, or network-policy
+contract change. Because the Plane update includes coordinated client and server
+changes, deploy the API, workers, Live service, and frontends together rather than
+running mixed application versions as a steady state.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target package is `0.1.0-rc.12`, its application version is
+   `v0.1.0-rc.12`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc12);
+3. render the existing values against the target chart and review the immutable
+   image digests, migration Job, Secret references, and NetworkPolicies; and
+4. schedule the API, workers, Live service, and frontends as one coordinated
+   rollout.
+
+After the rollout, verify:
+
+- a workspace member who is not a member of a private project cannot list that
+  project's cycles, modules, member permissions, or page versions;
+- a guest issue listing contains only issues the guest created;
+- a project member can still read the correct project's member roster and page
+  history;
+- an uploader can associate a fresh unassigned asset with its target project,
+  while another user's asset and an asset from a different project are rejected;
+  and
+- uploads with control characters in their filenames are accepted only under a
+  safely sanitized stored name.
+
+Because `rc.12` adds no schema or data migration, a coordinated application
+rollback to `rc.11` does not require a database restore solely for this release.
+Stop or replace all `rc.12` application Pods together, deploy the `rc.11` chart
+and images as one revision, and then re-run the representative access-control and
+asset checks. Restore the pre-upgrade backup if unrelated writes or an incident
+require data recovery. Do not operate mixed `rc.11` and `rc.12` application
+versions as a steady state.
+
 ### Upgrade from `rc.10` to `rc.11`
 
 This upgrade replaces the separate Epic web collection with the canonical Work
