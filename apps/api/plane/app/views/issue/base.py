@@ -662,7 +662,7 @@ class IssueViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], creator=True, model=Issue)
     @transaction.atomic
     def partial_update(self, request, slug, project_id, pk=None):
-        Project.objects.select_for_update().get(pk=project_id, workspace__slug=slug)
+        project = Project.objects.select_for_update().get(pk=project_id, workspace__slug=slug)
         queryset = self.get_queryset()
         queryset = self.apply_annotations(queryset)
 
@@ -714,7 +714,12 @@ class IssueViewSet(BaseViewSet):
         current_instance = json.dumps(IssueDetailSerializer(issue).data, cls=DjangoJSONEncoder)
 
         requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
-        serializer = IssueCreateSerializer(issue, data=request.data, partial=True, context={"project_id": project_id})
+        serializer = IssueCreateSerializer(
+            issue,
+            data=request.data,
+            partial=True,
+            context={"project_id": project_id, "workspace_id": project.workspace_id},
+        )
         if serializer.is_valid():
             serializer.save()
             # Check if the update is a migration description update
