@@ -419,6 +419,32 @@ class TestUnifiedEpicWorkItems:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "sub_issue_ids" in response.data
 
+    @pytest.mark.django_db
+    def test_partial_update_succeeds_for_child_work_item(
+        self, session_client, workspace, project, default_state, completed_state
+    ):
+        """App PATCH must pass workspace_id so existing parents re-validate."""
+        parent = Issue.objects.create(name="Parent", project=project, workspace=workspace, state=default_state)
+        child = Issue.objects.create(
+            name="Child",
+            project=project,
+            workspace=workspace,
+            state=default_state,
+            parent=parent,
+        )
+
+        response = session_client.patch(
+            f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{child.id}/",
+            {"state_id": str(completed_state.id), "name": "Child updated"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT, response.data
+        child.refresh_from_db()
+        assert child.state_id == completed_state.id
+        assert child.name == "Child updated"
+        assert child.parent_id == parent.id
+
 
 @pytest.mark.contract
 class TestEpicScoping:
