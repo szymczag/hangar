@@ -9,7 +9,7 @@ import uniq from "lodash-es/uniq";
 import { observer } from "mobx-react";
 // plane package imports
 import type { TActivityFilters } from "@plane/constants";
-import { E_SORT_ORDER, defaultActivityFilters, EUserPermissions } from "@plane/constants";
+import { E_SORT_ORDER, EUserPermissions, defaultActivityFilters } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
 // i18n
 import { useTranslation } from "@plane/i18n";
@@ -21,9 +21,10 @@ import { CommentCreate } from "@/components/comments/comment-create";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useProject } from "@/hooks/store/use-project";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
-// plane web components
-import { ActivityFilterRoot } from "@/plane-web/components/issues/worklog/activity/filter-root";
+// Hangar extensions
 import { IssueActivityWorklogCreateButton } from "@/plane-web/components/issues/worklog/activity/worklog-create-button";
+// local imports
+import { ActivityFilterRoot } from "./filter-root";
 import { IssueActivityCommentRoot } from "./activity-comment-root";
 import { useWorkItemCommentOperations } from "./helper";
 import { ActivitySortRoot } from "./sort-root";
@@ -53,11 +54,10 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
     defaultActivityFilters
   );
   const { setValue: setSortOrder, storedValue: sortOrder } = useLocalStorage("activity_sort_order", E_SORT_ORDER.ASC);
-  // store hooks
+
   const {
     issue: { getIssueById },
   } = useIssueDetail();
-
   const { getProjectRoleByWorkspaceSlugAndProjectId } = useUserPermissions();
   const { getProjectById } = useProject();
   const { data: currentUser } = useUser();
