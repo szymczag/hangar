@@ -66,7 +66,7 @@ export function InstanceSAMLConfigForm(props: Props) {
 
   const originURL = !isEmpty(API_BASE_URL) ? API_BASE_URL : typeof window !== "undefined" ? window.location.origin : "";
 
-  const SAML_FORM_FIELDS: TControllerInputFormField[] = [
+  const SAML_FORM_FIELDS: TControllerInputFormField<SAMLConfigFormValues>[] = [
     {
       key: "SAML_IDP_ENTITY_ID",
       type: "text",

@@ -148,7 +148,7 @@ export const LiteTextEditor = React.forwardRef(function LiteTextEditor(
             getEditorMetaData={getEditorMetaData}
             handleEditorReady={(ready) => {
               if (ready) {
-                setEditorRef(isMutableRefObject<EditorRefApi>(ref) ? ref.current : null);
+                setEditorRef(isMutableRefObject<EditorRefApi | null>(ref) ? ref.current : null);
               }
             }}
             mentionHandler={{

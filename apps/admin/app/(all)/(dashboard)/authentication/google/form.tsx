@@ -61,7 +61,7 @@ export function InstanceGoogleConfigForm(props: Props) {
 
   const originURL = !isEmpty(API_BASE_URL) ? API_BASE_URL : typeof window !== "undefined" ? window.location.origin : "";
 
-  const GOOGLE_FORM_FIELDS: TControllerInputFormField[] = [
+  const GOOGLE_FORM_FIELDS: TControllerInputFormField<GoogleConfigFormValues>[] = [
     {
       key: "GOOGLE_AUTH_MODE",
       type: "text",

@@ -159,7 +159,8 @@ export const BulkDeleteIssuesModal = observer(function BulkDeleteIssuesModal(pro
     <ModalCore isOpen={isOpen} handleClose={handleClose} position={EModalPosition.CENTER} width={EModalWidth.XXL}>
       <form>
         <Combobox
-          onChange={(val: string) => {
+          onChange={(val: string | null) => {
+            if (val === null) return;
             const selectedIssues = watch("delete_issue_ids");
             if (selectedIssues.includes(val))
               setValue(
