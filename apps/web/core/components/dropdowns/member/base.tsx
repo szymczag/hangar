@@ -168,6 +168,7 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
     <ComboDropDown
       as="div"
       ref={dropdownRef}
+      onClose={handleClose}
       {...comboboxProps}
       className={cn("h-full", className)}
       onChange={dropdownOnChange}

@@ -176,6 +176,7 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
     <ComboDropDown
       as="div"
       ref={dropdownRef}
+      onClose={handleClose}
       className={cn("h-full", className)}
       onKeyDown={handleKeyDown}
       button={comboButton}

@@ -151,7 +151,11 @@ export function SelectDuplicateInboxIssueModal(props: Props) {
           />
         </div>
 
-        <Combobox.Options static className="max-h-80 scroll-py-2 divide-y divide-subtle-1 overflow-y-auto">
+        <Combobox.Options
+          static
+          className="max-h-80 scroll-py-2 divide-y divide-subtle-1 overflow-y-auto"
+          modal={false}
+        >
           {isSearching ? (
             <Loader className="space-y-3 p-3">
               <Loader.Item height="40px" />

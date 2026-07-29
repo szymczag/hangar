@@ -50,6 +50,8 @@ export function CustomSearchSelect(props: ICustomSearchSelectProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
 
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     placement: placement ?? "bottom-start",
@@ -67,14 +69,18 @@ export function CustomSearchSelect(props: ICustomSearchSelectProps) {
   if (multiple) comboboxProps.multiple = true;
 
   const openDropdown = () => {
+    if (isOpenRef.current) return;
+    isOpenRef.current = true;
     setIsOpen(true);
     if (referenceElement) referenceElement.focus();
-    if (onOpen) onOpen();
+    onOpen?.();
   };
 
   const closeDropdown = () => {
+    const wasOpen = isOpenRef.current;
+    isOpenRef.current = false;
     setIsOpen(false);
-    onClose && onClose();
+    if (wasOpen) onClose?.();
   };
 
   const handleKeyDown = useDropdownKeyDown(openDropdown, closeDropdown, isOpen);
@@ -89,14 +95,13 @@ export function CustomSearchSelect(props: ICustomSearchSelectProps) {
     <Combobox
       as="div"
       ref={dropdownRef}
+      onClose={closeDropdown}
       tabIndex={tabIndex}
       className={cn("relative flex-shrink-0 text-left", className)}
       onKeyDown={handleKeyDown}
       {...comboboxProps}
     >
-      {({ open }: { open: boolean }) => {
-        if (open && onOpen) onOpen();
-
+      {() => {
         return (
           <>
             {customButton ? (
@@ -143,7 +148,7 @@ export function CustomSearchSelect(props: ICustomSearchSelectProps) {
             )}
             {isOpen &&
               createPortal(
-                <Combobox.Options data-prevent-outside-click static>
+                <Combobox.Options data-prevent-outside-click modal={false} static>
                   <div
                     className={cn(
                       "z-30 my-1 min-w-48 overflow-y-scroll rounded-md border-[0.5px] border-subtle-1 bg-surface-1 py-2.5 text-11 whitespace-nowrap focus:outline-none",
