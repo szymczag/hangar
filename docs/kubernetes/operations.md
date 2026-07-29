@@ -59,6 +59,61 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.13` to `rc.14`
+
+This release completes the Headless UI 2 migration that was incomplete in
+`rc.13`. Shared `ComboDropDown` triggers now give `Combobox.Button` ownership of
+a native `<button>` instead of asking Headless UI to forward refs, accessibility
+attributes, state, and event handlers through a React Fragment. The migration
+covers member, module, project, intake-state, priority, state, estimate, and
+cycle selectors.
+
+Repository-wide contract tests now execute both the failing Fragment-backed
+`Combobox.Button` case and the supported native-button case. They also scan every
+application and package for Fragment-backed Headless UI components, and verify
+that every shared combo-box trigger resolves to a native button. This extends the
+hydration and transition coverage added in `rc.13`.
+
+There is no Django migration and no Helm values, Secret, permission, Kubernetes
+resource, or network-policy contract change. The inherited Plane source remains
+`v1.4.0-rc2` (`package.json` version `1.4.0`). Existing `rc.13` values are
+compatible with the `rc.14` chart. Upgrade the API, workers, Live service, and
+frontends together as one Helm revision; mixed application versions are not a
+qualified steady state.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target package is `0.1.0-rc.14`, its application version is
+   `v0.1.0-rc.14`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc14);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. schedule all Hangar application components as one coordinated rollout.
+
+After the rollout, use a clean browser profile and verify:
+
+- sign-in, workspace navigation, project navigation, Live updates, and
+  representative API operations;
+- member, module, project, intake-state, priority, state, estimate, and cycle
+  selectors on routes where the operator's test account can access them;
+- keyboard focus and selection behavior for those selectors; and
+- the browser console contains neither React error `#418` nor a Headless UI
+  `Passing props on "Fragment"` error from `Transition.Child` or
+  `Combobox.Button`.
+
+`rc.13` is the immediately previous complete publication, but it contains the
+remaining combo-box failure corrected here. `rc.12` contains the earlier
+hydration and transition failures. Neither is a recommended rollback target.
+Because `rc.12`, `rc.13`, and `rc.14` add no schema or data migration, a
+coordinated application rollback from `rc.14` to `rc.11` does not require a
+database restore solely because one of those releases was deployed. Stop or
+replace all application Pods together, deploy the `rc.11` chart and images as
+one revision, and repeat the representative application and access-control
+checks. Restore the pre-upgrade backup when unrelated writes, data corruption,
+or the incident being handled requires point-in-time recovery.
+
 ### Upgrade from `rc.12` to `rc.13`
 
 This release corrects two frontend runtime incompatibilities introduced by the
