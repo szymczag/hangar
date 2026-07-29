@@ -16,7 +16,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
-from plane.app.permissions import ROLE, ProjectMemberPermission, allow_permission
+from plane.app.permissions import ROLE, ProjectEntityPermission, allow_permission
 from plane.app.serializers import (
     DeployBoardSerializer,
     ProjectListSerializer,
@@ -533,7 +533,7 @@ class ProjectFavoritesViewSet(BaseViewSet):
 
 
 class DeployBoardViewSet(BaseViewSet):
-    permission_classes = [ProjectMemberPermission]
+    permission_classes = [ProjectEntityPermission]
     serializer_class = DeployBoardSerializer
     model = DeployBoard
 

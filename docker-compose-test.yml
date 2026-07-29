@@ -135,6 +135,9 @@ services:
       # (default 10/minute). The whole suite runs from a single IP, so the
       # magic sign-in/up contract tests would trip the limit mid-run.
       AUTHENTICATION_RATE_LIMIT: 10000/minute
+      # Contract tests share an API-key fixture. Keep its aggregate requests
+      # from tripping the production API-key throttle during the full suite.
+      API_KEY_RATE_LIMIT: 10000/minute
     volumes:
       - ./apps/api:/code
     working_dir: /code

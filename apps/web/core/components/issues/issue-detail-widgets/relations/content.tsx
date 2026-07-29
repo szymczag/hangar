@@ -13,9 +13,9 @@ import { EIssueServiceType } from "@plane/types";
 import { Collapsible } from "@plane/ui";
 // components
 import { CreateUpdateIssueModal } from "@/components/issues/issue-modal/modal";
+import { useTimeLineRelationOptions } from "@/components/relations";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
-import { useTimeLineRelationOptions } from "@/plane-web/components/relations";
 // helper
 import { DeleteIssueModal } from "../../delete-issue-modal";
 import { RelationIssueList } from "../../relations/issue-list";
