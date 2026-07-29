@@ -13,9 +13,10 @@ const webRequire = createRequire(new URL("../package.json", import.meta.url));
 const ts = webRequire("typescript");
 const React = webRequire("react");
 const { renderToString } = webRequire("react-dom/server");
-const { Transition } = webRequire("@headlessui/react");
+const { Combobox, Transition } = webRequire("@headlessui/react");
 
-const webSourceRoots = [path.join(repoRoot, "apps/web/app"), path.join(repoRoot, "apps/web/core")];
+const sourceRoots = [path.join(repoRoot, "apps"), path.join(repoRoot, "packages")];
+const fragmentButtonComponents = new Set(["Combobox", "Disclosure", "Listbox", "Menu", "Popover"]);
 
 function walkTsxFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -34,6 +35,39 @@ function isTransitionTag(tagName) {
   return name === "Transition" || name === "Transition.Child" || name === "Transition.Root";
 }
 
+function headlessUiImports(sourceFile) {
+  const imports = new Map();
+
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== "@headlessui/react" ||
+      !statement.importClause?.namedBindings ||
+      !ts.isNamedImports(statement.importClause.namedBindings)
+    ) {
+      continue;
+    }
+
+    for (const element of statement.importClause.namedBindings.elements) {
+      imports.set(element.name.text, element.propertyName?.text ?? element.name.text);
+    }
+  }
+
+  return imports;
+}
+
+function isFragmentButtonTag(tagName, imports) {
+  const name = jsxTagName(tagName);
+  const [rootName, memberName] = name.split(".");
+  const importedRootName = imports.get(rootName);
+
+  if (memberName === "Button" && fragmentButtonComponents.has(importedRootName)) return true;
+
+  const importedName = imports.get(name);
+  return importedName !== undefined && [...fragmentButtonComponents].some((root) => importedName === `${root}Button`);
+}
+
 function findAttribute(openingElement, attributeName) {
   return openingElement.attributes.properties.find(
     (attribute) => ts.isJsxAttribute(attribute) && attribute.name.text === attributeName
@@ -47,6 +81,10 @@ function isFragmentAttribute(attribute) {
   return expression.getText() === "Fragment" || expression.getText() === "React.Fragment";
 }
 
+function isExplicitFragmentBacked(openingElement) {
+  return isFragmentAttribute(findAttribute(openingElement, "as"));
+}
+
 function isFragmentBacked(openingElement) {
   const asAttribute = findAttribute(openingElement, "as");
   return asAttribute === undefined || isFragmentAttribute(asAttribute);
@@ -57,6 +95,102 @@ function meaningfulChildren(element) {
     if (ts.isJsxText(child)) return child.getText().trim().length > 0;
     return !(ts.isJsxExpression(child) && child.expression === undefined);
   });
+}
+
+function isSingleElementExpression(expression) {
+  if (
+    ts.isParenthesizedExpression(expression) ||
+    ts.isAsExpression(expression) ||
+    ts.isNonNullExpression(expression) ||
+    ts.isSatisfiesExpression(expression)
+  ) {
+    return isSingleElementExpression(expression.expression);
+  }
+
+  if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) return true;
+
+  if (ts.isConditionalExpression(expression)) {
+    return isSingleElementExpression(expression.whenTrue) && isSingleElementExpression(expression.whenFalse);
+  }
+
+  return false;
+}
+
+function isStaticallySingleElement(child) {
+  if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) return true;
+  if (!ts.isJsxExpression(child) || !child.expression) return false;
+  return isSingleElementExpression(child.expression);
+}
+
+function findVariableInitializer(sourceFile, variableName) {
+  let initializer;
+
+  function visit(node) {
+    if (
+      initializer === undefined &&
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === variableName
+    ) {
+      initializer = node.initializer;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return initializer;
+}
+
+function returnedExpression(functionExpression) {
+  if (!ts.isBlock(functionExpression.body)) return functionExpression.body;
+
+  const returnStatement = functionExpression.body.statements.find(
+    (statement) => ts.isReturnStatement(statement) && statement.expression
+  );
+  return returnStatement?.expression;
+}
+
+function isNativeButtonExpression(expression, sourceFile, visitedIdentifiers = new Set()) {
+  if (
+    ts.isParenthesizedExpression(expression) ||
+    ts.isAsExpression(expression) ||
+    ts.isNonNullExpression(expression) ||
+    ts.isSatisfiesExpression(expression)
+  ) {
+    return isNativeButtonExpression(expression.expression, sourceFile, visitedIdentifiers);
+  }
+
+  if (ts.isJsxElement(expression)) return jsxTagName(expression.openingElement.tagName) === "button";
+  if (ts.isJsxSelfClosingElement(expression)) return jsxTagName(expression.tagName) === "button";
+
+  if (ts.isConditionalExpression(expression)) {
+    return (
+      isNativeButtonExpression(expression.whenTrue, sourceFile, visitedIdentifiers) &&
+      isNativeButtonExpression(expression.whenFalse, sourceFile, visitedIdentifiers)
+    );
+  }
+
+  if (ts.isIdentifier(expression)) {
+    if (visitedIdentifiers.has(expression.text)) return false;
+    const initializer = findVariableInitializer(sourceFile, expression.text);
+    if (!initializer) return false;
+
+    return isNativeButtonExpression(initializer, sourceFile, new Set([...visitedIdentifiers, expression.text]));
+  }
+
+  if (
+    ts.isCallExpression(expression) &&
+    expression.expression.getText(sourceFile) === "useMemo" &&
+    expression.arguments[0] &&
+    (ts.isArrowFunction(expression.arguments[0]) || ts.isFunctionExpression(expression.arguments[0]))
+  ) {
+    const returned = returnedExpression(expression.arguments[0]);
+    return returned ? isNativeButtonExpression(returned, sourceFile, visitedIdentifiers) : false;
+  }
+
+  return false;
 }
 
 function formatLocation(sourceFile, node) {
@@ -92,6 +226,59 @@ function collectUnsafeFragmentTransitions(sourceFile) {
   return violations;
 }
 
+function collectUnsafeFragmentButtons(sourceFile) {
+  const violations = [];
+  const imports = headlessUiImports(sourceFile);
+
+  function visit(node) {
+    if (
+      ts.isJsxElement(node) &&
+      isFragmentButtonTag(node.openingElement.tagName, imports) &&
+      isExplicitFragmentBacked(node.openingElement)
+    ) {
+      const children = meaningfulChildren(node);
+
+      if (children.length !== 1 || !isStaticallySingleElement(children[0])) {
+        violations.push(
+          `${formatLocation(sourceFile, node.openingElement)} renders ${jsxTagName(
+            node.openingElement.tagName
+          )} as Fragment without one statically verifiable element child`
+        );
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
+function collectUnsafeComboDropDownButtons(sourceFile) {
+  const violations = [];
+
+  function visit(node) {
+    if (ts.isJsxElement(node) && jsxTagName(node.openingElement.tagName) === "ComboDropDown") {
+      const buttonAttribute = findAttribute(node.openingElement, "button");
+      const expression =
+        buttonAttribute?.initializer && ts.isJsxExpression(buttonAttribute.initializer)
+          ? buttonAttribute.initializer.expression
+          : undefined;
+
+      if (!expression || !isNativeButtonExpression(expression, sourceFile)) {
+        violations.push(
+          `${formatLocation(sourceFile, node.openingElement)} passes a trigger that is not statically verified as a native button`
+        );
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
 test("documents the Headless UI 2 Fragment failure mode", () => {
   const unsafeTransition = React.createElement(
     Transition,
@@ -107,6 +294,39 @@ test("documents the Headless UI 2 Fragment failure mode", () => {
   );
 });
 
+test("documents the Headless UI 2 Fragment button failure mode", () => {
+  const unsafeButton = React.createElement(
+    Combobox,
+    null,
+    React.createElement(
+      Combobox.Button,
+      { as: React.Fragment },
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement("button", { type: "button" }, "first"),
+        React.createElement("button", { type: "button" }, "second")
+      )
+    )
+  );
+
+  assert.throws(
+    () => renderToString(unsafeButton),
+    /Passing props on "Fragment"!/,
+    "the regression test no longer reproduces the Headless UI button contract being guarded"
+  );
+});
+
+test("allows Headless UI to own the Combobox button element", () => {
+  const safeButton = React.createElement(
+    Combobox,
+    null,
+    React.createElement(Combobox.Button, { type: "button" }, "open")
+  );
+
+  assert.doesNotThrow(() => renderToString(safeButton));
+});
+
 test("allows multiple children when Transition owns a DOM element", () => {
   const safeTransition = React.createElement(
     Transition,
@@ -118,12 +338,32 @@ test("allows multiple children when Transition owns a DOM element", () => {
   assert.doesNotThrow(() => renderToString(safeTransition));
 });
 
-test("keeps every Fragment-backed web Transition structurally ref-safe", () => {
-  const violations = webSourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+test("keeps every Fragment-backed Transition structurally ref-safe", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
     const source = readFileSync(filePath, "utf8");
     const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     return collectUnsafeFragmentTransitions(sourceFile);
   });
 
   assert.deepEqual(violations, [], `Unsafe Headless UI Transition contracts:\n${violations.join("\n")}`);
+});
+
+test("keeps every Fragment-backed Headless UI button structurally ref-safe", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+    const source = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return collectUnsafeFragmentButtons(sourceFile);
+  });
+
+  assert.deepEqual(violations, [], `Unsafe Headless UI button contracts:\n${violations.join("\n")}`);
+});
+
+test("keeps every ComboDropDown trigger structurally ref-safe", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+    const source = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return collectUnsafeComboDropDownButtons(sourceFile);
+  });
+
+  assert.deepEqual(violations, [], `Unsafe ComboDropDown button contracts:\n${violations.join("\n")}`);
 });

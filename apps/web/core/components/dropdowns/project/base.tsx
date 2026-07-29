@@ -48,6 +48,12 @@ type Props = TDropdownProps & {
       }
   );
 
+const renderProjectIcon = (logoProps: TProject["logo_props"]) => (
+  <span className="grid h-4 w-4 flex-shrink-0 place-items-center">
+    <Logo logo={logoProps} size={14} />
+  </span>
+);
+
 export const ProjectDropdownBase = observer(function ProjectDropdownBase(props: Props) {
   const {
     button,
@@ -139,29 +145,27 @@ export const ProjectDropdownBase = observer(function ProjectDropdownBase(props: 
     if (!multiple) handleClose();
   };
 
-  const getDisplayName = (value: string | string[] | null, placeholder: string = "") => {
-    if (Array.isArray(value)) {
-      const firstProject = getProjectById(value[0]);
-      return value.length ? (value.length === 1 ? firstProject?.name : `${value.length} projects`) : placeholder;
+  const getDisplayName = (selectedValue: string | string[] | null, fallback: string = "") => {
+    if (Array.isArray(selectedValue)) {
+      const firstProject = getProjectById(selectedValue[0]);
+      return selectedValue.length
+        ? selectedValue.length === 1
+          ? firstProject?.name
+          : `${selectedValue.length} projects`
+        : fallback;
     } else {
-      return value ? (getProjectById(value)?.name ?? placeholder) : placeholder;
+      return selectedValue ? (getProjectById(selectedValue)?.name ?? fallback) : fallback;
     }
   };
 
-  const getProjectIcon = (value: string | string[] | null) => {
-    const renderIcon = (logoProps: TProject["logo_props"]) => (
-      <span className="grid h-4 w-4 flex-shrink-0 place-items-center">
-        <Logo logo={logoProps} size={14} />
-      </span>
-    );
-
-    if (Array.isArray(value)) {
+  const getProjectIcon = (selectedValue: string | string[] | null) => {
+    if (Array.isArray(selectedValue)) {
       return (
         <div className="flex items-center gap-0.5">
-          {value.length > 0 ? (
-            value.map((projectId) => {
+          {selectedValue.length > 0 ? (
+            selectedValue.map((projectId) => {
               const projectDetails = getProjectById(projectId);
-              return projectDetails?.logo_props ? renderIcon(projectDetails.logo_props) : null;
+              return projectDetails?.logo_props ? renderProjectIcon(projectDetails.logo_props) : null;
             })
           ) : (
             <ProjectIcon className="size-3 text-tertiary" />
@@ -169,61 +173,58 @@ export const ProjectDropdownBase = observer(function ProjectDropdownBase(props: 
         </div>
       );
     } else {
-      const projectDetails = getProjectById(value);
-      return projectDetails?.logo_props ? renderIcon(projectDetails.logo_props) : null;
+      const projectDetails = getProjectById(selectedValue);
+      return projectDetails?.logo_props ? renderProjectIcon(projectDetails.logo_props) : null;
     }
   };
 
-  const comboButton = (
-    <>
-      {button ? (
-        <button
-          ref={setReferenceElement}
-          type="button"
-          className={cn("clickable block h-full w-full outline-none", buttonContainerClassName)}
-          onClick={handleOnClick}
-          disabled={disabled}
-        >
-          {button}
-        </button>
-      ) : (
-        <button
-          ref={setReferenceElement}
-          type="button"
-          className={cn(
-            "clickable block h-full max-w-full outline-none",
-            {
-              "cursor-not-allowed text-secondary": disabled,
-              "cursor-pointer": !disabled,
-            },
-            buttonContainerClassName
-          )}
-          onClick={handleOnClick}
-          disabled={disabled}
-        >
-          <DropdownButton
-            className={buttonClassName}
-            isActive={isOpen}
-            tooltipHeading="Project"
-            tooltipContent={value?.length ? `${value.length} project${value.length !== 1 ? "s" : ""}` : placeholder}
-            showTooltip={showTooltip}
-            variant={buttonVariant}
-            renderToolTipByDefault={renderByDefault}
-          >
-            {!hideIcon && getProjectIcon(value)}
-            {BUTTON_VARIANTS_WITH_TEXT.includes(buttonVariant) && (
-              <span className="max-w-40 truncate">{getDisplayName(value, placeholder)}</span>
-            )}
-            {dropdownArrow && (
-              <ChevronDownIcon className={cn("h-2.5 w-2.5 flex-shrink-0", dropdownArrowClassName)} aria-hidden="true" />
-            )}
-          </DropdownButton>
-        </button>
+  const comboButton = button ? (
+    <button
+      ref={setReferenceElement}
+      type="button"
+      className={cn("clickable block h-full w-full outline-none", buttonContainerClassName)}
+      onClick={handleOnClick}
+      disabled={disabled}
+    >
+      {button}
+    </button>
+  ) : (
+    <button
+      ref={setReferenceElement}
+      type="button"
+      className={cn(
+        "clickable block h-full max-w-full outline-none",
+        {
+          "cursor-not-allowed text-secondary": disabled,
+          "cursor-pointer": !disabled,
+        },
+        buttonContainerClassName
       )}
-    </>
+      onClick={handleOnClick}
+      disabled={disabled}
+    >
+      <DropdownButton
+        className={buttonClassName}
+        isActive={isOpen}
+        tooltipHeading="Project"
+        tooltipContent={value?.length ? `${value.length} project${value.length !== 1 ? "s" : ""}` : placeholder}
+        showTooltip={showTooltip}
+        variant={buttonVariant}
+        renderToolTipByDefault={renderByDefault}
+      >
+        {!hideIcon && getProjectIcon(value)}
+        {BUTTON_VARIANTS_WITH_TEXT.includes(buttonVariant) && (
+          <span className="max-w-40 truncate">{getDisplayName(value, placeholder)}</span>
+        )}
+        {dropdownArrow && (
+          <ChevronDownIcon className={cn("h-2.5 w-2.5 flex-shrink-0", dropdownArrowClassName)} aria-hidden="true" />
+        )}
+      </DropdownButton>
+    </button>
   );
 
   return (
+    // oxlint-disable-next-line jsx_a11y/no-static-element-interactions
     <ComboDropDown
       as="div"
       ref={dropdownRef}
