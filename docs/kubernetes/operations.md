@@ -59,6 +59,52 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.12` to `rc.13`
+
+This release corrects two frontend runtime incompatibilities introduced by the
+React 19 and Headless UI 2 update in `rc.12`. The SPA hydration fallback now
+produces the same initial tree during prerendering and in the browser, preventing
+React error `#418` and duplicate head resources. The project-sidebar transition
+now owns a DOM element so Headless UI can forward its transition ref instead of
+throwing while rendering multiple children.
+
+There is no Django migration and no Helm values, Secret, permission, Kubernetes
+resource, or network-policy contract change. The inherited Plane source remains
+`v1.4.0-rc2` (`package.json` version `1.4.0`). Existing `rc.12` values are
+compatible with the `rc.13` chart. The release images must still be upgraded as
+one Helm revision; mixed application versions are not a qualified steady state.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target package is `0.1.0-rc.13`, its application version is
+   `v0.1.0-rc.13`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc13);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. schedule the API, workers, Live service, and frontends as one coordinated
+   rollout.
+
+After the rollout, use a clean browser profile and verify:
+
+- the sign-in page renders without React error `#418`;
+- `config.js` and the global stylesheet occur only once in the hydrated document;
+- opening the project list in a workspace does not raise the Headless UI
+  `Passing props on "Fragment"` error; and
+- representative sign-in, workspace navigation, project navigation, Live
+  updates, and API operations still work.
+
+`rc.12` is the immediately previous published release, but it contains the
+frontend defects corrected here and is not a recommended rollback target.
+Because neither release adds a schema or data migration, a coordinated
+application rollback from `rc.13` to `rc.11` does not require a database restore
+solely because `rc.12` or `rc.13` was deployed. Stop or replace all application
+Pods together, deploy the `rc.11` chart and images as one revision, and repeat the
+representative application and access-control checks. Restore the pre-upgrade
+backup when unrelated writes, data corruption, or the incident being handled
+requires point-in-time recovery.
+
 ### Upgrade from `rc.11` to `rc.12`
 
 This upgrade synchronizes the inherited Plane source from `v1.3.1` to
