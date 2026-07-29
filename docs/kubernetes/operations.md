@@ -59,6 +59,66 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.14` to `rc.15`
+
+This release completes the behavioral part of the Headless UI 2 dropdown
+migration. Headless UI 2 makes `Combobox.Options`, `Listbox.Options`, and
+`Menu.Items` modal by default. Hangar's inherited dropdowns use external open
+state and, in several cases, Popper or portals. The new modal default could apply
+`inert` and `aria-hidden` to focused task content, while an independent internal
+close could leave an externally rendered panel visible but unable to select an
+option.
+
+All 30 legacy Headless UI option panels across the web, Space, admin, and shared
+UI packages now explicitly retain the non-modal Headless UI 1 contract. All 11
+shared `ComboDropDown` consumers synchronize Headless UI close events with their
+external state. Open and close callbacks use an immediate state ref so one
+interaction cannot invoke a lifecycle callback twice. Import-aware repository
+contract tests reject a new modal legacy panel or an unsynchronized shared
+combo-box.
+
+There is no Django migration and no Helm values, Secret, permission, Kubernetes
+resource, or network-policy contract change. The inherited Plane source remains
+`v1.4.0-rc2` (`package.json` version `1.4.0`). Existing `rc.14` values are
+compatible with the `rc.15` chart. Upgrade the API, workers, Live service, and
+frontends together as one Helm revision; mixed application versions are not a
+qualified steady state.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target package is `0.1.0-rc.15`, its application version is
+   `v0.1.0-rc.15`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc15);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. schedule all Hangar application components as one coordinated rollout.
+
+After the rollout, use a clean browser profile and verify:
+
+- sign-in, workspace navigation, project navigation, Live updates, and
+  representative API operations;
+- opening and selecting values in priority, state, estimate, member, project,
+  module, cycle, date, date-range, label, intake-state, onboarding role, and
+  account or workspace menus;
+- keyboard focus, Escape, outside-click, and repeated open/close behavior;
+- focused task content does not acquire an `aria-hidden` or inert ancestor when
+  a dropdown opens; and
+- the browser console contains no Headless UI Fragment error and no warning that
+  `aria-hidden` was blocked because a descendant retained focus.
+
+`rc.14` is the immediately previous complete publication, but it contains the
+dropdown interaction failure corrected here. `rc.13` and `rc.12` contain the
+earlier frontend migration failures. None is a recommended rollback target.
+Because `rc.12` through `rc.15` add no schema or data migration, a coordinated
+application rollback from `rc.15` to `rc.11` does not require a database restore
+solely because one of those releases was deployed. Stop or replace all
+application Pods together, deploy the `rc.11` chart and images as one revision,
+and repeat the representative application and access-control checks. Restore
+the pre-upgrade backup when unrelated writes, data corruption, or the incident
+being handled requires point-in-time recovery.
+
 ### Upgrade from `rc.13` to `rc.14`
 
 This release completes the Headless UI 2 migration that was incomplete in
