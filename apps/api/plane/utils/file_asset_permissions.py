@@ -23,6 +23,26 @@ def _active_project_membership(*, user_id, workspace_id, project_id):
     )
 
 
+def can_manage_project_cover(*, user_id, workspace_id, project_id) -> bool:
+    """Authorize project-cover changes using workspace and project roles."""
+
+    return (
+        is_workspace_asset_admin(
+            user_id=user_id,
+            workspace_id=workspace_id,
+        )
+        or _active_project_membership(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
+        .filter(
+            role__in=[ROLE.ADMIN.value, ROLE.MEMBER.value],
+        )
+        .exists()
+    )
+
+
 def can_read_file_asset(*, user_id, asset: FileAsset) -> bool:
     """Authorize private asset reads without treating project_id=NULL as public."""
 
@@ -89,6 +109,12 @@ def can_mutate_file_asset(*, user_id, asset: FileAsset) -> bool:
         FileAsset.EntityTypeContext.USER_COVER,
     }:
         return asset.user_id == user_id
+    if asset.entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
+        return bool(asset.project_id) and can_manage_project_cover(
+            user_id=user_id,
+            workspace_id=asset.workspace_id,
+            project_id=asset.project_id,
+        )
     if asset.project_id:
         project_membership = _active_project_membership(
             user_id=user_id,

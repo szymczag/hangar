@@ -33,6 +33,7 @@ from plane.utils.file_asset_upload import (
     validate_multipart_upload,
 )
 from plane.utils.file_asset_permissions import (
+    can_manage_project_cover,
     can_mutate_file_asset,
     can_read_file_asset,
 )
@@ -53,14 +54,10 @@ def _workspace_entity_fields(*, request, workspace, entity_type, entity_id):
         return None
     if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
         project = Project.objects.filter(id=entity_id, workspace=workspace).first()
-        if (
-            project
-            and ProjectMember.objects.filter(
-                project=project,
-                workspace=workspace,
-                member=request.user,
-                is_active=True,
-            ).exists()
+        if project and can_manage_project_cover(
+            user_id=request.user.id,
+            workspace_id=workspace.id,
+            project_id=project.id,
         ):
             return {"project_id": project.id}
         return None

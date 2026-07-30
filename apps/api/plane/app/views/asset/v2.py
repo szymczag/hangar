@@ -46,6 +46,7 @@ from plane.utils.file_asset_upload import (
     validate_upload_metadata,
 )
 from plane.utils.file_asset_permissions import (
+    can_manage_project_cover,
     can_mutate_file_asset,
     can_read_file_asset,
     is_workspace_asset_admin,
@@ -242,14 +243,10 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
             return {"workspace_id": workspace.id} if str(entity_id) == str(workspace.id) else None
         if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
             project = Project.objects.filter(id=entity_id, workspace=workspace).first()
-            if (
-                project
-                and ProjectMember.objects.filter(
-                    project=project,
-                    workspace=workspace,
-                    member=request.user,
-                    is_active=True,
-                ).exists()
+            if project and can_manage_project_cover(
+                user_id=request.user.id,
+                workspace_id=workspace.id,
+                project_id=project.id,
             ):
                 return {"project_id": project.id}
             return None
@@ -498,13 +495,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
                 {"error": "You don't have access to this asset."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        workspace_admin = WorkspaceMember.objects.filter(
-            workspace__slug=slug,
-            member=request.user,
-            role=ROLE.ADMIN.value,
-            is_active=True,
-        ).exists()
-        if asset.created_by_id != request.user.id and not workspace_admin:
+        if not can_mutate_file_asset(user_id=request.user.id, asset=asset):
             return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
@@ -668,7 +659,13 @@ class ProjectAssetEndpoint(BaseAPIView):
 
     def get_scoped_entity_fields(self, *, request, workspace, project_id, entity_type, entity_id):
         if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
-            return {"project_id": project_id} if str(entity_id) == str(project_id) else None
+            can_manage_cover = can_manage_project_cover(
+                user_id=request.user.id,
+                workspace_id=workspace.id,
+                project_id=project_id,
+            )
+            # Project-scoped callers already persist the route project_id.
+            return {} if can_manage_cover and str(entity_id) == str(project_id) else None
         if entity_type in {
             FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
             FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
@@ -854,6 +851,24 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
         project.cover_image_asset_id = asset.id
         project.save()
 
+    def has_locked_project_cover_access(self, *, request, workspace, project_id):
+        """Recheck the role under a row lock before changing shared project state."""
+
+        workspace_admin = WorkspaceMember.objects.select_for_update().filter(
+            workspace=workspace,
+            member=request.user,
+            role=ROLE.ADMIN.value,
+            is_active=True,
+        )
+        project_manager = ProjectMember.objects.select_for_update().filter(
+            project_id=project_id,
+            workspace=workspace,
+            member=request.user,
+            role__in=[ROLE.ADMIN.value, ROLE.MEMBER.value],
+            is_active=True,
+        )
+        return workspace_admin.exists() or project_manager.exists()
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, entity_id):
         asset_ids = request.data.get("asset_ids", [])
@@ -912,6 +927,17 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
 
         try:
             with transaction.atomic():
+                if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
+                    if not self.has_locked_project_cover_access(
+                        request=request,
+                        workspace=workspace,
+                        project_id=project_id,
+                    ):
+                        return Response(
+                            {"error": "Invalid entity context."},
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+                    Project.objects.select_for_update().get(id=project_id, workspace=workspace)
                 update_fields = {"project_id": project_id, **entity_fields}
                 assets.update(**update_fields)
                 if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
