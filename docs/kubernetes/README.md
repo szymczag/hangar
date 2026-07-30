@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.16`. It is qualified for evaluation on
+The current release is `0.1.0-rc.17`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -32,7 +32,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.16` qualification boundary is:
+The `0.1.0-rc.17` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -98,23 +98,24 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.16`                               |
-| Helm chart version | `0.1.0-rc.16`                                |
-| Git tag            | `hangar-v0.1.0-rc.16`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.16` |
+| Product version    | `v0.1.0-rc.17`                               |
+| Helm chart version | `0.1.0-rc.17`                                |
+| Git tag            | `hangar-v0.1.0-rc.17`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.17` |
 
 `rc.1` and `rc.2` were consumed by incomplete publication attempts. Do not use
-them. `rc.15` is the immediately previous complete publication, but
-Popper-positioned Headless UI panels can appear in the upper-left corner instead
-of beside their trigger. `rc.14` has the earlier dropdown interaction failure,
-`rc.13` has the Fragment-backed combo-box failure, and `rc.12` additionally has
-hydration and transition failures. Do not deploy or roll back to those releases.
-`rc.11` remains the qualified rollback target. Published versions are immutable
-and are never repaired in place.
+them. `rc.16` is the immediately previous complete publication, but
+Popper-positioned Headless UI panels can be clipped by task layout overflow or
+hidden behind surrounding content. `rc.15` has the upper-left positioning
+failure, `rc.14` has the earlier dropdown interaction failure, `rc.13` has the
+Fragment-backed combo-box failure, and `rc.12` additionally has hydration and
+transition failures. Do not deploy or roll back to those releases. `rc.11`
+remains the qualified rollback target. Published versions are immutable and are
+never repaired in place.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.16` notes](../releases/hangar-v0.1.0-rc.16.md) — review
+- [Release `v0.1.0-rc.17` notes](../releases/hangar-v0.1.0-rc.17.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -139,7 +140,7 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The public `rc.16` chart archive, OCI chart, and digest-pinned Hangar images are
+The public `rc.17` chart archive, OCI chart, and digest-pinned Hangar images are
 anonymously downloadable. The release workflow also created provenance
 attestations and keyless Cosign signatures.
 

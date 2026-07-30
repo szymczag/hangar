@@ -59,6 +59,67 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.16` to `rc.17`
+
+This release completes the visibility and interaction portion of the Headless UI
+2 Popper migration. `rc.16` correctly attached Popper refs, styles, and
+attributes to the Headless UI panel root, but most panels remained below
+ancestors using `overflow-hidden` or `overflow-y-auto`. A panel could therefore
+have correct Popper coordinates while being clipped and appear not to open.
+Manually portaled panels could also render below task content because their
+stacking layer remained on an unpositioned child.
+
+Every Popper-backed Headless UI panel now either uses Headless UI's native portal
+or its existing explicit portal. The positioned panel root owns an explicit
+stacking layer and protects portaled pointer events from surrounding
+outside-click handlers. The shared single-select commits a selected value before
+closing, and three Popper-backed popovers missed by the earlier migration now
+follow the same root-ref contract. Repository contract tests reject unportaled,
+unprotected, unlayered, or nested-ref panels.
+
+There is no Django migration and no Helm values, Secret, permission, Kubernetes
+resource, or network-policy contract change. The inherited Plane source remains
+`v1.4.0-rc2` (`package.json` version `1.4.0`). Existing `rc.16` values are
+compatible with the `rc.17` chart. Upgrade the API, workers, Live service, and
+frontends together as one Helm revision; mixed application versions are not a
+qualified steady state.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target package is `0.1.0-rc.17`, its application version is
+   `v0.1.0-rc.17`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc17);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. schedule all Hangar application components as one coordinated rollout.
+
+After the rollout, use a clean browser profile and verify:
+
+- sign-in, workspace navigation, project navigation, Live updates, and
+  representative API operations;
+- opening and selecting values in priority, state, estimate, member, project,
+  module, cycle, date, date-range, label, intake-state, onboarding role, and
+  account or workspace menus;
+- every panel is visible beside its trigger inside task details, including after
+  scrolling and near viewport edges;
+- keyboard focus, pointer selection, Escape, outside-click, and repeated
+  open/close behavior; and
+- the browser console contains no Headless UI Fragment, clipping, or
+  panel-positioning error.
+
+`rc.16` is the immediately previous complete publication, but it contains the
+visibility failure corrected here. `rc.15`, `rc.14`, `rc.13`, and `rc.12`
+contain the earlier frontend migration failures. None is a recommended rollback
+target. Because `rc.12` through `rc.17` add no schema or data migration, a
+coordinated application rollback from `rc.17` to `rc.11` does not require a
+database restore solely because one of those releases was deployed. Stop or
+replace all application Pods together, deploy the `rc.11` chart and images as
+one revision, and repeat the representative application and access-control
+checks. Restore the pre-upgrade backup when unrelated writes, data corruption,
+or the incident being handled requires point-in-time recovery.
+
 ### Upgrade from `rc.15` to `rc.16`
 
 This release completes the positioning part of the Headless UI 2 migration.
