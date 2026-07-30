@@ -8,6 +8,7 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN apk --no-cache add \
     "bash~=5.2" \
     "libpq" \
+    "libmagic" \
     "libxslt" \
     "nodejs-current" \
     "xmlsec" \

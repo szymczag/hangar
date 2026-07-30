@@ -4,12 +4,10 @@
 
 # Python imports
 import json
-import uuid
 
 # Django imports
 from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
-from django.conf import settings
 from django.http import HttpResponseRedirect
 
 # Third Party imports
@@ -20,13 +18,19 @@ from rest_framework.parsers import MultiPartParser, FormParser
 # Module imports
 from .. import BaseAPIView
 from plane.app.serializers import IssueAttachmentSerializer
-from plane.db.models import FileAsset, Workspace
+from plane.db.models import FileAsset, Issue, ProjectMember, Workspace
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.app.permissions import allow_permission, ROLE
 from plane.settings.storage import S3Storage
-from plane.utils.path_validator import sanitize_filename
-from plane.bgtasks.storage_metadata_task import get_asset_object_metadata
 from plane.utils.host import base_host
+from plane.utils.file_asset_upload import (
+    UPLOAD_URL_EXPIRATION_SECONDS,
+    UploadError,
+    build_pending_asset_key,
+    complete_asset_upload,
+    upload_error_payload,
+    validate_upload_metadata,
+)
 
 
 class IssueAttachmentEndpoint(BaseAPIView):
@@ -98,30 +102,40 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, issue_id):
-        name = sanitize_filename(request.data.get("name")) or "unnamed"
-        type = request.data.get("type", False)
-        size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
-
-        if not type or type not in settings.ATTACHMENT_MIME_TYPES:
+        if not Issue.objects.filter(
+            id=issue_id,
+            workspace__slug=slug,
+            project_id=project_id,
+        ).exists():
             return Response(
-                {"error": "Invalid file type.", "status": False},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Issue not found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
+        try:
+            metadata = validate_upload_metadata(
+                raw_name=request.data.get("name"),
+                raw_size=request.data.get("size"),
+                claimed_mime_type=request.data.get("type"),
+                entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
 
         # Get the workspace
         workspace = Workspace.objects.get(slug=slug)
 
-        # asset key
-        asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{name}"
+        asset_key = build_pending_asset_key(namespace=str(workspace.id), name=metadata.name)
 
         # Get the size limit
-        size_limit = min(size, settings.FILE_SIZE_LIMIT)
-
         # Create a File Asset
         asset = FileAsset.objects.create(
-            attributes={"name": name, "type": type, "size": size_limit},
+            attributes={
+                "name": metadata.name,
+                "type": metadata.mime_type,
+                "size": metadata.size,
+            },
             asset=asset_key,
-            size=size_limit,
+            size=metadata.size,
             workspace_id=workspace.id,
             created_by=request.user,
             issue_id=issue_id,
@@ -133,7 +147,22 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
         storage = S3Storage(request=request)
 
         # Generate a presigned URL to share an S3 object
-        presigned_url = storage.generate_presigned_post(object_name=asset_key, file_type=type, file_size=size_limit)
+        presigned_url = storage.generate_presigned_post(
+            object_name=asset_key,
+            file_type=metadata.mime_type,
+            file_size=metadata.size,
+            expiration=UPLOAD_URL_EXPIRATION_SECONDS,
+        )
+        if presigned_url is None:
+            asset.delete()
+            return Response(
+                {
+                    "error": "File storage is temporarily unavailable.",
+                    "code": "upload_storage_unavailable",
+                    "status": False,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         # Return the presigned URL
         return Response(
@@ -148,9 +177,7 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):
-        issue_attachment = FileAsset.objects.get(
-            pk=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id
-        )
+        issue_attachment = FileAsset.objects.get(pk=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id)
         issue_attachment.is_deleted = True
         issue_attachment.deleted_at = timezone.now()
         issue_attachment.save()
@@ -187,6 +214,7 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
                 object_name=asset.asset.name,
                 disposition="attachment",
                 filename=asset.attributes.get("name"),
+                content_type="application/octet-stream",
             )
             return HttpResponseRedirect(presigned_url)
 
@@ -204,13 +232,39 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, issue_id, pk):
-        issue_attachment = FileAsset.objects.get(
+        issue_attachment = FileAsset.objects.filter(
             pk=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id
-        )
-        serializer = IssueAttachmentSerializer(issue_attachment)
+        ).first()
+        if issue_attachment is None:
+            return Response(
+                {"error": "Issue attachment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-        # Send this activity only if the attachment is not uploaded before
-        if not issue_attachment.is_uploaded:
+        is_admin = ProjectMember.objects.filter(
+            project_id=project_id,
+            workspace__slug=slug,
+            member=request.user,
+            role=ROLE.ADMIN.value,
+            is_active=True,
+        ).exists()
+        if issue_attachment.created_by_id != request.user.id and not is_admin:
+            return Response(
+                {"error": "Issue attachment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            storage = S3Storage(request=request)
+            issue_attachment, completed, _ = complete_asset_upload(
+                asset_id=issue_attachment.id,
+                storage=storage,
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+
+        if completed:
+            serializer = IssueAttachmentSerializer(issue_attachment)
             issue_activity.delay(
                 type="attachment.activity.created",
                 requested_data=None,
@@ -223,12 +277,4 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
                 origin=base_host(request=request, is_app=True),
             )
 
-            # Update the attachment — do NOT overwrite created_by; it is set at
-            # creation time and must not be reassigned (GHSA-5mxw-g5mw-3v3w).
-            issue_attachment.is_uploaded = True
-
-        # Get the storage metadata
-        if not issue_attachment.storage_metadata:
-            get_asset_object_metadata.delay(str(issue_attachment.id))
-        issue_attachment.save()
         return Response(status=status.HTTP_204_NO_CONTENT)

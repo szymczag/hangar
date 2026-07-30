@@ -124,20 +124,44 @@ class TestGenericAssetCrossWorkspaceIDOR:
     def test_member_can_patch_own_workspace_asset(self, api_key_client, workspace, create_user):
         """Positive control: an active member of the workspace can still update
         their own asset, so the fix does not over-block legitimate callers."""
-        asset = FileAsset.objects.create(
+        asset = FileAsset(
             attributes={"name": "mine.pdf", "type": "application/pdf", "size": 10},
             asset=f"{workspace.id}/mine.pdf",
             size=10,
             workspace=workspace,
-            created_by=create_user,
             entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
             is_uploaded=False,
             storage_metadata={"size": 10},
         )
+        asset.save(created_by_id=create_user.id)
         url = self.detail_url(workspace.slug, asset.id)
 
-        response = api_key_client.patch(url, {"is_uploaded": True}, format="json")
+        with (
+            mock.patch("plane.api.views.asset.S3Storage") as mock_storage,
+            mock.patch(
+                "plane.utils.file_asset_upload.magic.from_buffer",
+                return_value="application/pdf",
+            ),
+            mock.patch("plane.bgtasks.file_asset_task.delete_staging_asset.apply_async"),
+        ):
+            storage = mock_storage.return_value
+            storage.get_object_metadata.side_effect = [
+                {
+                    "ContentType": "application/pdf",
+                    "ContentLength": 10,
+                    "ETag": '"etag"',
+                },
+                {
+                    "ContentType": "application/pdf",
+                    "ContentLength": 10,
+                    "ETag": '"final-etag"',
+                },
+            ]
+            storage.get_object_prefix.return_value = b"%PDF-1.7\n"
+            storage.copy_object.return_value = {"CopyObjectResult": {"ETag": '"etag"'}}
+            response = api_key_client.patch(url, {"is_uploaded": True}, format="json")
 
         assert response.status_code == status.HTTP_204_NO_CONTENT, f"Got {response.status_code}: {response.data!r}"
         asset.refresh_from_db()
         assert asset.is_uploaded is True
+        assert "/assets/" in asset.asset.name

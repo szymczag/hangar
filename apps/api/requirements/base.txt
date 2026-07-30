@@ -28,6 +28,7 @@ django-filter==24.2
 jsonmodels==2.7.0
 # storage
 django-storages==1.14.2
+python-magic==0.4.27
 # user management
 django-crum==0.7.9
 # web server

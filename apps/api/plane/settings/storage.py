@@ -22,7 +22,7 @@ class S3Storage(S3Boto3Storage):
 
     """S3 storage class to generate presigned URLs for S3 objects"""
 
-    def __init__(self, request=None):
+    def __init__(self, request=None, is_server=False):
         # Get the AWS credentials and bucket name from the environment
         self.aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
         # Use the AWS_SECRET_ACCESS_KEY environment variable for the secret key
@@ -40,9 +40,9 @@ class S3Storage(S3Boto3Storage):
         self.signed_url_expiration = int(os.environ.get("SIGNED_URL_EXPIRATION", "3600"))
 
         endpoint_url = self.aws_s3_endpoint_url
-        if request and self.aws_s3_public_endpoint_url:
+        if request and self.aws_s3_public_endpoint_url and not is_server:
             endpoint_url = self.aws_s3_public_endpoint_url
-        elif request and os.environ.get("USE_MINIO") == "1":
+        elif request and os.environ.get("USE_MINIO") == "1" and not is_server:
             # Backwards compatibility for deployments that proxy the bucket path
             # through the application origin but do not set an explicit public endpoint.
             endpoint_protocol = "https" if os.environ.get("MINIO_ENDPOINT_SSL") == "1" else request.scheme
@@ -119,19 +119,23 @@ class S3Storage(S3Boto3Storage):
         http_method="GET",
         disposition="inline",
         filename=None,
+        content_type=None,
     ):
         """Generate a presigned URL to share an S3 object"""
         if expiration is None:
             expiration = self.signed_url_expiration
         content_disposition = self._get_content_disposition(disposition, filename)
         try:
+            params = {
+                "Bucket": self.aws_storage_bucket_name,
+                "Key": str(object_name),
+                "ResponseContentDisposition": content_disposition,
+            }
+            if content_type:
+                params["ResponseContentType"] = content_type
             response = self.s3_client.generate_presigned_url(
                 "get_object",
-                Params={
-                    "Bucket": self.aws_storage_bucket_name,
-                    "Key": str(object_name),
-                    "ResponseContentDisposition": content_disposition,
-                },
+                Params=params,
                 ExpiresIn=expiration,
                 HttpMethod=http_method,
             )
@@ -158,13 +162,43 @@ class S3Storage(S3Boto3Storage):
             "Metadata": response.get("Metadata", {}),
         }
 
-    def copy_object(self, object_name, new_object_name):
+    def get_object_prefix(self, object_name, byte_count, etag):
+        """Read a bounded object prefix and require the object to keep the same ETag."""
+        try:
+            response = self.s3_client.get_object(
+                Bucket=self.aws_storage_bucket_name,
+                Key=object_name,
+                Range=f"bytes=0-{byte_count - 1}",
+                IfMatch=etag,
+            )
+            body = response["Body"]
+            try:
+                return body.read(byte_count)
+            finally:
+                body.close()
+        except ClientError as e:
+            log_exception(e)
+            return None
+
+    def copy_object(self, object_name, new_object_name, source_etag=None, content_type=None):
         """Copy an S3 object to a new location"""
         try:
+            kwargs = {
+                "Bucket": self.aws_storage_bucket_name,
+                "CopySource": {"Bucket": self.aws_storage_bucket_name, "Key": object_name},
+                "Key": new_object_name,
+            }
+            if source_etag:
+                kwargs["CopySourceIfMatch"] = source_etag
+            if content_type:
+                kwargs.update(
+                    {
+                        "ContentType": content_type,
+                        "MetadataDirective": "REPLACE",
+                    }
+                )
             response = self.s3_client.copy_object(
-                Bucket=self.aws_storage_bucket_name,
-                CopySource={"Bucket": self.aws_storage_bucket_name, "Key": object_name},
-                Key=new_object_name,
+                **kwargs,
             )
         except ClientError as e:
             log_exception(e)

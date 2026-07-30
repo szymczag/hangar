@@ -2,11 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-# Python imports
-import uuid
-
 # Django imports
-from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.utils import timezone
 
@@ -15,10 +11,16 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from plane.bgtasks.storage_metadata_task import get_asset_object_metadata
-from plane.db.models import DeployBoard, FileAsset
+from plane.db.models import DeployBoard, FileAsset, Issue, IssueComment, ProjectMember
 from plane.settings.storage import S3Storage
-from plane.utils.path_validator import sanitize_filename
+from plane.utils.file_asset_upload import (
+    UPLOAD_URL_EXPIRATION_SECONDS,
+    UploadError,
+    build_pending_asset_key,
+    complete_asset_upload,
+    upload_error_payload,
+    validate_upload_metadata,
+)
 
 # Module imports
 from .base import BaseAPIView
@@ -66,12 +68,21 @@ class EntityAssetEndpoint(BaseAPIView):
         storage = S3Storage(request=request)
         asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
         disposition = (
-            "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
+            "inline"
+            if asset_mime_type
+            in {
+                "image/gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+            }
+            else "attachment"
         )
         # Generate a presigned URL to share an S3 object
         signed_url = storage.generate_presigned_url(
             object_name=asset.asset.name,
             disposition=disposition,
+            content_type=(asset_mime_type if disposition == "inline" else "application/octet-stream"),
         )
         # Redirect to the signed URL
         return HttpResponseRedirect(signed_url)
@@ -82,57 +93,96 @@ class EntityAssetEndpoint(BaseAPIView):
         # Check if the project is published
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
+        if not ProjectMember.objects.filter(
+            workspace_id=deploy_board.workspace_id,
+            project_id=deploy_board.project_id,
+            member=request.user,
+            is_active=True,
+        ).exists():
+            return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Get the asset
-        name = sanitize_filename(request.data.get("name")) or "unnamed"
-        type = request.data.get("type", "image/jpeg")
-        size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
         entity_type = request.data.get("entity_type", "")
         entity_identifier = request.data.get("entity_identifier")
 
-        # Check if the entity type is allowed
-        if entity_type not in FileAsset.EntityTypeContext.values:
+        if entity_type not in {
+            FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
+            FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
+        }:
             return Response(
                 {"error": "Invalid entity type.", "status": False},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check if the file type is allowed
-        allowed_types = [
-            "image/jpeg",
-            "image/png",
-            "image/webp",
-            "image/jpg",
-            "image/gif",
-        ]
-        if type not in allowed_types:
+        if entity_type == FileAsset.EntityTypeContext.ISSUE_DESCRIPTION:
+            entity = Issue.objects.filter(
+                id=entity_identifier,
+                workspace_id=deploy_board.workspace_id,
+                project_id=deploy_board.project_id,
+            ).first()
+            entity_fields = {"issue_id": entity.id} if entity else None
+        else:
+            entity = IssueComment.objects.filter(
+                id=entity_identifier,
+                workspace_id=deploy_board.workspace_id,
+                project_id=deploy_board.project_id,
+            ).first()
+            entity_fields = {"comment_id": entity.id} if entity else None
+        if entity_fields is None:
             return Response(
-                {
-                    "error": "Invalid file type. Only JPEG, PNG, WebP, JPG and GIF files are allowed.",
-                    "status": False,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Invalid entity context.", "status": False},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        # asset key
-        asset_key = f"{deploy_board.workspace_id}/{uuid.uuid4().hex}-{name}"
+        try:
+            metadata = validate_upload_metadata(
+                raw_name=request.data.get("name"),
+                raw_size=request.data.get("size"),
+                claimed_mime_type=request.data.get("type"),
+                entity_type=entity_type,
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+
+        asset_key = build_pending_asset_key(
+            namespace=str(deploy_board.workspace_id),
+            name=metadata.name,
+        )
 
         # Create a File Asset
         asset = FileAsset.objects.create(
-            attributes={"name": name, "type": type, "size": size},
+            attributes={
+                "name": metadata.name,
+                "type": metadata.mime_type,
+                "size": metadata.size,
+            },
             asset=asset_key,
-            size=size,
+            size=metadata.size,
             workspace=deploy_board.workspace,
             created_by=request.user,
             entity_type=entity_type,
             project_id=deploy_board.project_id,
-            comment_id=entity_identifier,
+            **entity_fields,
         )
 
         # Get the presigned URL
         storage = S3Storage(request=request)
         # Generate a presigned URL to share an S3 object
-        presigned_url = storage.generate_presigned_post(object_name=asset_key, file_type=type, file_size=size)
+        presigned_url = storage.generate_presigned_post(
+            object_name=asset_key,
+            file_type=metadata.mime_type,
+            file_size=metadata.size,
+            expiration=UPLOAD_URL_EXPIRATION_SECONDS,
+        )
+        if presigned_url is None:
+            asset.delete()
+            return Response(
+                {
+                    "error": "File storage is temporarily unavailable.",
+                    "code": "upload_storage_unavailable",
+                    "status": False,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         # Return the presigned URL
         return Response(
             {
@@ -150,18 +200,21 @@ class EntityAssetEndpoint(BaseAPIView):
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
-        # get the asset id — scope to project to prevent cross-project IDOR
-        asset = FileAsset.objects.get(id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id)
-        # get the storage metadata
-        asset.is_uploaded = True
-        # get the storage metadata
-        if not asset.storage_metadata:
-            get_asset_object_metadata.delay(str(asset.id))
-
-        # update the attributes
-        asset.attributes = request.data.get("attributes", asset.attributes)
-        # save the asset
-        asset.save(update_fields=["attributes", "is_uploaded"])
+        asset = FileAsset.objects.filter(
+            id=pk,
+            workspace=deploy_board.workspace,
+            project_id=deploy_board.project_id,
+            created_by=request.user,
+        ).first()
+        if asset is None:
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            complete_asset_upload(asset_id=asset.id, storage=S3Storage(request=request))
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def delete(self, request, anchor, pk):

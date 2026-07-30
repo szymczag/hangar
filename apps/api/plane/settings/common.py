@@ -641,7 +641,7 @@ ATTACHMENT_MIME_TYPES = [
     # 3D Models
     "model/gltf-binary",
     "model/gltf+json",
-    "application/octet-stream",  # for .obj files, but be cautious
+    "model/obj",
     # Fonts
     "font/ttf",
     "font/otf",
