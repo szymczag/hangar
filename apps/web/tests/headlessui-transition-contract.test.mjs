@@ -16,6 +16,8 @@ const { renderToString } = webRequire("react-dom/server");
 const { Combobox, Transition } = webRequire("@headlessui/react");
 
 const sourceRoots = [path.join(repoRoot, "apps"), path.join(repoRoot, "packages")];
+const tailwindVariablesPath = path.join(repoRoot, "packages/tailwind-config/variables.css");
+const tailwindStylesPath = path.join(repoRoot, "packages/tailwind-config/index.css");
 const fragmentButtonComponents = new Set(["Combobox", "Disclosure", "Listbox", "Menu", "Popover"]);
 const nonModalPanelComponents = new Map([
   ["Combobox", "Options"],
@@ -488,6 +490,44 @@ function collectUnsafePopperPanelLayers(sourceFile) {
   return violations;
 }
 
+function collectPopperTargetsWithoutRuntimePlacement(sourceFile) {
+  const violations = [];
+
+  function visit(node) {
+    const openingElement = ts.isJsxElement(node)
+      ? node.openingElement
+      : ts.isJsxSelfClosingElement(node)
+        ? node
+        : undefined;
+
+    if (openingElement) {
+      const refAttribute = findAttribute(openingElement, "ref");
+      const refExpression =
+        refAttribute?.initializer && ts.isJsxExpression(refAttribute.initializer)
+          ? refAttribute.initializer.expression?.getText(sourceFile)
+          : undefined;
+
+      if (refExpression?.includes("setPopperElement")) {
+        const spreadsPopperAttributes = openingElement.attributes.properties.some(
+          (attribute) =>
+            ts.isJsxSpreadAttribute(attribute) && attribute.expression.getText(sourceFile) === "attributes.popper"
+        );
+
+        if (!spreadsPopperAttributes) {
+          violations.push(
+            `${formatLocation(sourceFile, openingElement)} does not expose Popper's runtime placement attribute required by the global floating-overlay layer`
+          );
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
 test("documents the Headless UI 2 Fragment failure mode", () => {
   const unsafeTransition = React.createElement(
     Transition,
@@ -625,4 +665,27 @@ test("keeps Popper-backed Headless UI panels visible and interactive outside cli
   });
 
   assert.deepEqual(violations, [], `Unsafe Headless UI Popper layers:\n${violations.join("\n")}`);
+});
+
+test("keeps every Popper target above application dialogs", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+    const source = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return collectPopperTargetsWithoutRuntimePlacement(sourceFile);
+  });
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Popper targets without the shared floating-overlay layer:\n${violations.join("\n")}`
+  );
+
+  const variables = readFileSync(tailwindVariablesPath, "utf8");
+  const styles = readFileSync(tailwindStylesPath, "utf8");
+
+  assert.match(variables, /--z-index-floating-overlay:\s*110\s*;/);
+  assert.match(
+    styles,
+    /\[data-popper-placement\]\s*\{[^}]*z-index:\s*var\(--z-index-floating-overlay\)\s*!important\s*;/s
+  );
 });

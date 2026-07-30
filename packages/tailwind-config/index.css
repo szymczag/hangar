@@ -191,6 +191,15 @@ body {
 }
 
 @layer base {
+  /*
+   * Popper-backed menus leave their trigger's stacking context when portaled.
+   * Keep hit-testing on the floating content instead of an enclosing peek view
+   * or modal. `!important` intentionally overrides legacy local z-* utilities.
+   */
+  [data-popper-placement] {
+    z-index: var(--z-index-floating-overlay) !important;
+  }
+
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
