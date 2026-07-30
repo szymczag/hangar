@@ -409,7 +409,7 @@ function collectNestedPopperTargets(sourceFile) {
       node.name.text === "ref" &&
       node.initializer &&
       ts.isJsxExpression(node.initializer) &&
-      node.initializer.expression?.getText(sourceFile) === "setPopperElement"
+      node.initializer.expression?.getText(sourceFile).includes("setPopperElement")
     ) {
       const owner = node.parent.parent;
       if (!isHeadlessUiPositioningPanelTag(owner.tagName, imports)) {
@@ -426,6 +426,57 @@ function collectNestedPopperTargets(sourceFile) {
           }
 
           ancestor = ancestor.parent;
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
+function collectUnsafePopperPanelLayers(sourceFile) {
+  const violations = [];
+  const imports = headlessUiImports(sourceFile);
+  const hasManualPortal =
+    sourceFile.text.includes("createPortal(") || sourceFile.text.includes("ReactDOM.createPortal(");
+
+  function visit(node) {
+    const openingElement = ts.isJsxElement(node)
+      ? node.openingElement
+      : ts.isJsxSelfClosingElement(node)
+        ? node
+        : undefined;
+
+    if (openingElement && isHeadlessUiPositioningPanelTag(openingElement.tagName, imports)) {
+      const refAttribute = findAttribute(openingElement, "ref");
+      const refExpression =
+        refAttribute?.initializer && ts.isJsxExpression(refAttribute.initializer)
+          ? refAttribute.initializer.expression?.getText(sourceFile)
+          : undefined;
+
+      if (refExpression?.includes("setPopperElement")) {
+        const panelName = jsxTagName(openingElement.tagName);
+        const className = findAttribute(openingElement, "className")?.getText(sourceFile) ?? "";
+
+        if (findAttribute(openingElement, "portal") === undefined && !hasManualPortal) {
+          violations.push(
+            `${formatLocation(sourceFile, openingElement)} positions ${panelName} inside a clipping ancestor instead of a portal`
+          );
+        }
+
+        if (findAttribute(openingElement, "data-prevent-outside-click") === undefined) {
+          violations.push(
+            `${formatLocation(sourceFile, openingElement)} does not protect portaled ${panelName} interactions from outside-click handlers`
+          );
+        }
+
+        if (!className.includes("z-")) {
+          violations.push(
+            `${formatLocation(sourceFile, openingElement)} leaves positioned ${panelName} without an explicit stacking layer`
+          );
         }
       }
     }
@@ -564,4 +615,14 @@ test("keeps Popper refs on Headless UI 2 panel roots", () => {
   });
 
   assert.deepEqual(violations, [], `Unsafe nested Headless UI Popper targets:\n${violations.join("\n")}`);
+});
+
+test("keeps Popper-backed Headless UI panels visible and interactive outside clipping ancestors", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+    const source = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return collectUnsafePopperPanelLayers(sourceFile);
+  });
+
+  assert.deepEqual(violations, [], `Unsafe Headless UI Popper layers:\n${violations.join("\n")}`);
 });

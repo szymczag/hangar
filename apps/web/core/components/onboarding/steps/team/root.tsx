@@ -204,7 +204,10 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
 
                 <Listbox.Options
                   as="div"
+                  className="z-10"
+                  data-prevent-outside-click
                   modal={false}
+                  portal
                   ref={setPopperElement}
                   style={styles.popper}
                   {...attributes.popper}

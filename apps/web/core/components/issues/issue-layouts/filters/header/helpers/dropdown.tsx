@@ -100,6 +100,8 @@ export function FiltersDropdown(props: Props) {
             {/** translate-y-0 is a hack to create new stacking context. Required for safari  */}
             <Popover.Panel
               className="fixed z-10 translate-y-0"
+              data-prevent-outside-click
+              portal
               ref={setPopperElement}
               style={styles.popper}
               {...attributes.popper}

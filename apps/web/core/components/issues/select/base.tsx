@@ -194,7 +194,9 @@ export const WorkItemLabelSelectBase = observer(function WorkItemLabelSelectBase
       {isDropdownOpen && (
         <Combobox.Options
           className="fixed z-10"
+          data-prevent-outside-click
           modal={false}
+          portal
           ref={setPopperElement}
           style={styles.popper}
           {...attributes.popper}

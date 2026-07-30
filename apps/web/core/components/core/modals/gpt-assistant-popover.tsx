@@ -4,7 +4,6 @@
  * See the LICENSE file for details.
  */
 
-import type { Ref } from "react";
 import React, { useEffect, useState, useRef, Fragment } from "react";
 import type { Placement } from "@popperjs/core";
 import { Controller, useForm } from "react-hook-form"; // services
@@ -59,7 +58,7 @@ export function GptAssistantPopover(props: Props) {
   const [response, setResponse] = useState("");
   const [invalidResponse, setInvalidResponse] = useState(false);
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
   // refs
   const editorRef = useRef<EditorRefApi>(null);
   const responseRef = useRef<EditorRefApi>(null);
@@ -215,7 +214,9 @@ export function GptAssistantPopover(props: Props) {
         <Popover.Panel
           as="div"
           className={`shadow fixed z-10 flex w-full max-w-full min-w-[50rem] flex-col space-y-4 overflow-hidden rounded-[10px] border border-subtle bg-surface-1 p-4 ${className}`}
-          ref={setPopperElement as Ref<HTMLDivElement>}
+          data-prevent-outside-click
+          portal
+          ref={setPopperElement}
           style={styles.popper}
           {...attributes.popper}
         >
