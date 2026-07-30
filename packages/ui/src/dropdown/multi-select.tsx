@@ -49,7 +49,7 @@ export function MultiSelectDropdown(props: IMultiSelectDropdown) {
   // states
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const isOpenRef = useRef(isOpen);
@@ -147,15 +147,19 @@ export function MultiSelectDropdown(props: IMultiSelectDropdown) {
       />
 
       {isOpen && (
-        <Combobox.Options className="fixed z-10" modal={false} static>
+        <Combobox.Options
+          className="fixed z-10"
+          modal={false}
+          ref={setPopperElement}
+          style={styles.popper}
+          {...attributes.popper}
+          static
+        >
           <div
             className={cn(
               "my-1 w-48 rounded-sm border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-11 shadow-raised-200 focus:outline-none",
               optionsContainerClassName
             )}
-            ref={setPopperElement}
-            style={styles.popper}
-            {...attributes.popper}
           >
             <DropdownOptions
               isOpen={isOpen}

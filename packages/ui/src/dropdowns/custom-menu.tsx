@@ -87,7 +87,7 @@ function CustomMenu(props: ICustomMenuDropdownProps) {
   } = props;
 
   const [referenceElement, setReferenceElement] = React.useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = React.useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = React.useState<HTMLElement | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
   // refs
   const dropdownRef = React.useRef<HTMLDivElement | null>(null);
@@ -202,6 +202,9 @@ function CustomMenu(props: ICustomMenuDropdownProps) {
         "fixed z-30 translate-y-0",
         menuItemsClassName
       )} /** translate-y-0 is a hack to create new stacking context. Required for safari  */
+      ref={setPopperElement}
+      style={styles.popper}
+      {...attributes.popper}
       static
     >
       <div
@@ -215,9 +218,6 @@ function CustomMenu(props: ICustomMenuDropdownProps) {
           },
           optionsClassName
         )}
-        ref={setPopperElement}
-        style={styles.popper}
-        {...attributes.popper}
       >
         <MenuContext.Provider value={menuContextValue}>{children}</MenuContext.Provider>
       </div>

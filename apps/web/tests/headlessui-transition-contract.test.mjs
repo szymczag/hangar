@@ -22,6 +22,7 @@ const nonModalPanelComponents = new Map([
   ["Listbox", "Options"],
   ["Menu", "Items"],
 ]);
+const positionedPanelComponents = new Map([...nonModalPanelComponents, ["Popover", "Panel"]]);
 
 function walkTsxFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -259,6 +260,34 @@ function collectUnsafeFragmentButtons(sourceFile) {
   return violations;
 }
 
+function collectUnsafeFragmentPanels(sourceFile) {
+  const violations = [];
+  const imports = headlessUiImports(sourceFile);
+
+  function visit(node) {
+    if (
+      ts.isJsxElement(node) &&
+      isHeadlessUiPositioningPanelTag(node.openingElement.tagName, imports) &&
+      isExplicitFragmentBacked(node.openingElement)
+    ) {
+      const children = meaningfulChildren(node);
+
+      if (children.length !== 1 || !isStaticallySingleElement(children[0])) {
+        violations.push(
+          `${formatLocation(sourceFile, node.openingElement)} renders ${jsxTagName(
+            node.openingElement.tagName
+          )} as Fragment without one statically verifiable element child`
+        );
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
 function collectUnsafeComboDropDownButtons(sourceFile) {
   const violations = [];
 
@@ -293,6 +322,19 @@ function isHeadlessUiPanelTag(tagName, imports) {
 
   const importedName = imports.get(name);
   return [...nonModalPanelComponents].some(
+    ([componentName, panelName]) => importedName === `${componentName}${panelName}`
+  );
+}
+
+function isHeadlessUiPositioningPanelTag(tagName, imports) {
+  const name = jsxTagName(tagName);
+  const [rootName, memberName] = name.split(".");
+  const importedRootName = imports.get(rootName);
+
+  if (importedRootName && memberName && positionedPanelComponents.get(importedRootName) === memberName) return true;
+
+  const importedName = imports.get(name);
+  return [...positionedPanelComponents].some(
     ([componentName, panelName]) => importedName === `${componentName}${panelName}`
   );
 }
@@ -348,6 +390,44 @@ function collectUnsynchronizedComboDropDowns(sourceFile) {
       violations.push(
         `${formatLocation(sourceFile, openingElement)} must synchronize Headless UI's internal close with external dropdown state`
       );
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
+function collectNestedPopperTargets(sourceFile) {
+  const violations = [];
+  const imports = headlessUiImports(sourceFile);
+
+  function visit(node) {
+    if (
+      ts.isJsxAttribute(node) &&
+      node.name.text === "ref" &&
+      node.initializer &&
+      ts.isJsxExpression(node.initializer) &&
+      node.initializer.expression?.getText(sourceFile) === "setPopperElement"
+    ) {
+      const owner = node.parent.parent;
+      if (!isHeadlessUiPositioningPanelTag(owner.tagName, imports)) {
+        let ancestor = owner.parent;
+
+        while (ancestor) {
+          if (ts.isJsxElement(ancestor) && isHeadlessUiPositioningPanelTag(ancestor.openingElement.tagName, imports)) {
+            violations.push(
+              `${formatLocation(sourceFile, node)} attaches Popper to a descendant of ${jsxTagName(
+                ancestor.openingElement.tagName
+              )}; Headless UI 2 requires the panel root to own the positioning ref`
+            );
+            break;
+          }
+
+          ancestor = ancestor.parent;
+        }
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -436,6 +516,16 @@ test("keeps every Fragment-backed Headless UI button structurally ref-safe", () 
   assert.deepEqual(violations, [], `Unsafe Headless UI button contracts:\n${violations.join("\n")}`);
 });
 
+test("keeps every Fragment-backed Headless UI panel structurally ref-safe", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+    const source = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return collectUnsafeFragmentPanels(sourceFile);
+  });
+
+  assert.deepEqual(violations, [], `Unsafe Headless UI panel contracts:\n${violations.join("\n")}`);
+});
+
 test("keeps every ComboDropDown trigger structurally ref-safe", () => {
   const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
     const source = readFileSync(filePath, "utf8");
@@ -464,4 +554,14 @@ test("keeps ComboDropDown internal and external close state synchronized", () =>
   });
 
   assert.deepEqual(violations, [], `Unsynchronized ComboDropDown contracts:\n${violations.join("\n")}`);
+});
+
+test("keeps Popper refs on Headless UI 2 panel roots", () => {
+  const violations = sourceRoots.flatMap(walkTsxFiles).flatMap((filePath) => {
+    const source = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return collectNestedPopperTargets(sourceFile);
+  });
+
+  assert.deepEqual(violations, [], `Unsafe nested Headless UI Popper targets:\n${violations.join("\n")}`);
 });
