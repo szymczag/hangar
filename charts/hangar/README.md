@@ -7,7 +7,7 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0-rc.15` (`appVersion: v0.1.0-rc.15`). Its
+The latest published chart is `0.1.0-rc.16` (`appVersion: v0.1.0-rc.16`). Its
 evaluation profile is live-qualified on AMD64. It is a prerelease and is not yet
 supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
@@ -27,16 +27,16 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.15
+  --version 0.1.0-rc.16
 ```
 
 Do not use `0.1.0-rc.1` or `0.1.0-rc.2`; those immutable versions were consumed
-by incomplete release attempts. `0.1.0-rc.14` is the immediately previous
-complete publication, but its Headless UI 2 dropdown panels can make surrounding
-task content inert and can become visually open while internally closed.
-`0.1.0-rc.13` has the earlier Fragment-backed combo-box failure, and
-`0.1.0-rc.12` additionally has hydration and transition failures. Use
-`0.1.0-rc.15`; `0.1.0-rc.11` remains the qualified rollback target.
+by incomplete release attempts. `0.1.0-rc.15` is the immediately previous
+complete publication, but Popper-positioned Headless UI panels can appear in the
+upper-left corner instead of beside their trigger. `0.1.0-rc.14` has the earlier
+dropdown interaction failure, `0.1.0-rc.13` has the Fragment-backed combo-box
+failure, and `0.1.0-rc.12` additionally has hydration and transition failures.
+Use `0.1.0-rc.16`; `0.1.0-rc.11` remains the qualified rollback target.
 
 ## Deployment profiles
 
@@ -105,8 +105,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0-rc.15` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.15)
+Release `0.1.0-rc.16` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.16)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
