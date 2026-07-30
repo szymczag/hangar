@@ -16,6 +16,7 @@ from plane.db.models import DeployBoard, FileAsset, Issue, IssueComment, Project
 from plane.settings.storage import S3Storage
 from plane.utils.file_asset_upload import (
     UPLOAD_URL_EXPIRATION_SECONDS,
+    UPLOAD_VALIDATION_VERSION,
     UploadError,
     build_pending_asset_key,
     complete_asset_upload,
@@ -85,17 +86,13 @@ class EntityAssetEndpoint(BaseAPIView):
         # same-origin XSS when Spaces assets are served on the application's origin.
         storage = S3Storage(request=request)
         asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
-        disposition = (
-            "inline"
-            if asset_mime_type
-            in {
-                "image/gif",
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-            }
-            else "attachment"
-        )
+        can_render_inline = asset.upload_validation_version == UPLOAD_VALIDATION_VERSION and asset_mime_type in {
+            "image/gif",
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+        }
+        disposition = "inline" if can_render_inline else "attachment"
         # Generate a presigned URL to share an S3 object
         signed_url = storage.generate_presigned_url(
             object_name=asset.asset.name,

@@ -41,6 +41,7 @@ from plane.utils.openapi import (
 from plane.utils.exception_logger import log_exception
 from plane.utils.file_asset_upload import (
     UPLOAD_URL_EXPIRATION_SECONDS,
+    UPLOAD_VALIDATION_VERSION,
     RASTER_IMAGE_MIME_BY_EXTENSION,
     UploadError,
     build_pending_asset_key,
@@ -48,6 +49,7 @@ from plane.utils.file_asset_upload import (
     upload_error_payload,
     validate_upload_metadata,
 )
+from plane.utils.file_asset_permissions import can_read_file_asset
 
 
 class UserAssetEndpoint(BaseAPIView):
@@ -448,6 +450,8 @@ class GenericAssetEndpoint(BaseAPIView):
 
             # Get the asset
             asset = FileAsset.objects.get(id=asset_id, workspace_id=workspace.id, is_deleted=False)
+            if not can_read_file_asset(user_id=request.user.id, asset=asset):
+                return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
 
             # Check if the asset exists and is uploaded
             if not asset.is_uploaded:
@@ -463,7 +467,10 @@ class GenericAssetEndpoint(BaseAPIView):
             storage = S3Storage(request=request, is_server=True)
             asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
             inline_types = set(RASTER_IMAGE_MIME_BY_EXTENSION.values())
-            disposition = "inline" if asset_mime_type in inline_types else "attachment"
+            can_render_inline = (
+                asset.upload_validation_version == UPLOAD_VALIDATION_VERSION and asset_mime_type in inline_types
+            )
+            disposition = "inline" if can_render_inline else "attachment"
             presigned_url = storage.generate_presigned_url(
                 object_name=asset.asset.name,
                 filename=asset.attributes.get("name"),
@@ -560,14 +567,21 @@ class GenericAssetEndpoint(BaseAPIView):
 
         # Check for existing asset with same external details if provided
         if external_id and external_source:
-            existing_asset = FileAsset.objects.filter(
+            existing_assets = FileAsset.objects.filter(
                 workspace__slug=slug,
+                project_id=project_id,
                 external_source=external_source,
                 external_id=external_id,
                 is_deleted=False,
-            ).first()
+            )
+            if project_id is None:
+                existing_assets = existing_assets.filter(created_by=request.user)
+            existing_asset = existing_assets.first()
 
-            if existing_asset:
+            if existing_asset and can_read_file_asset(
+                user_id=request.user.id,
+                asset=existing_asset,
+            ):
                 return Response(
                     {
                         "message": "Asset with same external id and source already exists",

@@ -93,6 +93,7 @@ from plane.utils.file_asset_upload import (
     upload_error_payload,
     validate_upload_metadata,
 )
+from plane.utils.file_asset_permissions import can_mutate_file_asset
 from plane.utils.issue_relation_mapper import get_actual_relation
 from plane.bgtasks.webhook_task import model_activity
 from plane.app.permissions import ROLE
@@ -167,14 +168,15 @@ from plane.bgtasks.work_item_link_task import crawl_work_item_link_title
 
 
 def user_has_issue_permission(user_id, project_id, issue=None, allowed_roles=None, allow_creator=True):
-    if allow_creator and issue is not None and user_id == issue.created_by_id:
-        return True
-
     qs = ProjectMember.objects.filter(
         project_id=project_id,
         member_id=user_id,
         is_active=True,
     )
+    if not qs.exists():
+        return False
+    if allow_creator and issue is not None and user_id == issue.created_by_id:
+        return True
     if allowed_roles is not None:
         qs = qs.filter(role__in=allowed_roles)
 
@@ -243,15 +245,19 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         This endpoint provides workspace-level access to work items.
         """
         if issue_identifier and project_identifier:
-            issue = Issue.issue_objects.select_related("type").annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
-                .order_by()
-                .annotate(count=Func(F("id"), function="Count"))
-                .values("count")
-            ).get(
-                workspace__slug=slug,
-                project__identifier=project_identifier,
-                sequence_id=issue_identifier,
+            issue = (
+                Issue.issue_objects.select_related("type")
+                .annotate(
+                    sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                    .order_by()
+                    .annotate(count=Func(F("id"), function="Count"))
+                    .values("count")
+                )
+                .get(
+                    workspace__slug=slug,
+                    project__identifier=project_identifier,
+                    sequence_id=issue_identifier,
+                )
             )
             return Response(
                 IssueSerializer(issue, fields=self.fields, expand=self.expand).data,
@@ -587,12 +593,16 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         Supports filtering, ordering, and field selection through query parameters.
         """
 
-        issue = Issue.issue_objects.select_related("type").annotate(
-            sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
-            .order_by()
-            .annotate(count=Func(F("id"), function="Count"))
-            .values("count")
-        ).get(workspace__slug=slug, project_id=project_id, pk=pk)
+        issue = (
+            Issue.issue_objects.select_related("type")
+            .annotate(
+                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                .order_by()
+                .annotate(count=Func(F("id"), function="Count"))
+                .values("count")
+            )
+            .get(workspace__slug=slug, project_id=project_id, pk=pk)
+        )
         return Response(
             IssueSerializer(issue, fields=self.fields, expand=self.expand).data,
             status=status.HTTP_200_OK,
@@ -2023,7 +2033,22 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
 
         List all attachments for an issue.
         """
-        # Get all the attachments
+        issue = Issue.objects.filter(
+            id=issue_id,
+            workspace__slug=slug,
+            project_id=project_id,
+        ).first()
+        if issue is None or not user_has_issue_permission(
+            request.user.id,
+            project_id=project_id,
+            issue=issue,
+            allowed_roles=[ROLE.ADMIN.value, ROLE.MEMBER.value, ROLE.GUEST.value],
+            allow_creator=False,
+        ):
+            return Response(
+                {"error": "You are not allowed to list attachments"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         issue_attachments = FileAsset.objects.filter(
             issue_id=issue_id,
             entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
@@ -2061,26 +2086,22 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
         Records deletion activity and triggers metadata cleanup.
         """
         issue = Issue.objects.get(pk=issue_id, workspace__slug=slug, project_id=project_id)
-        # if the request user is creator or admin then delete the attachment
-        if not user_has_issue_permission(
-            request.user.id,
+        issue_attachment = FileAsset.objects.filter(
+            pk=pk,
+            workspace__slug=slug,
             project_id=project_id,
-            issue=issue,
-            allowed_roles=[ROLE.ADMIN.value, ROLE.MEMBER.value, ROLE.GUEST.value],
-            allow_creator=True,
+            issue_id=issue.id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+        ).first()
+        if issue_attachment is None or not can_mutate_file_asset(
+            user_id=request.user.id,
+            asset=issue_attachment,
         ):
             return Response(
                 {"error": "You are not allowed to delete this attachment"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        issue_attachment = FileAsset.objects.get(
-            pk=pk,
-            workspace__slug=slug,
-            project_id=project_id,
-            issue_id=issue_id,
-            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
-        )
         issue_attachment.is_deleted = True
         issue_attachment.deleted_at = timezone.now()
         issue_attachment.save()
@@ -2231,18 +2252,12 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
             workspace__slug=slug,
             project_id=project_id,
             issue_id=issue_id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
         ).first()
         if issue_attachment is None:
             return Response({"error": "Attachment not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        is_admin = ProjectMember.objects.filter(
-            project_id=project_id,
-            workspace__slug=slug,
-            member=request.user,
-            role=ROLE.ADMIN.value,
-            is_active=True,
-        ).exists()
-        if issue_attachment.created_by_id != request.user.id and not is_admin:
+        if not can_mutate_file_asset(user_id=request.user.id, asset=issue_attachment):
             return Response({"error": "Attachment not found"}, status=status.HTTP_404_NOT_FOUND)
 
         try:

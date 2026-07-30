@@ -219,60 +219,28 @@ class TestWorkspaceFileAssetProjectScope:
     ):
         url = f"/api/assets/v2/static/{unvalidated_workspace_logo_asset.id}/"
 
-        with mock.patch(S3_STORAGE_PATH) as mock_storage:
+        with mock.patch("plane.bgtasks.file_asset_task.enqueue_legacy_static_revalidation") as enqueue:
             response = APIClient().get(url)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
-        mock_storage.return_value.generate_presigned_url.assert_not_called()
+        enqueue.assert_called_once_with(unvalidated_workspace_logo_asset.id)
 
     @pytest.mark.django_db
-    @mock.patch(
-        "plane.utils.file_asset_upload.magic.from_buffer",
-        return_value="image/png",
-    )
-    def test_public_static_endpoint_revalidates_legacy_raster_before_redirect(
+    def test_public_static_endpoint_queues_legacy_raster_without_storage_work(
         self,
-        _magic,
         valid_legacy_workspace_logo_asset,
     ):
         asset = valid_legacy_workspace_logo_asset
         url = f"/api/assets/v2/static/{asset.id}/"
-        source_etag = '"legacy-etag"'
-        final_metadata = {
-            "ContentType": "image/png",
-            "ContentLength": 24,
-            "ETag": '"final-etag"',
-        }
 
-        with mock.patch(S3_STORAGE_PATH) as mock_storage:
-            storage = mock_storage.return_value
-            storage.get_object_metadata.side_effect = [
-                {
-                    "ContentType": "application/octet-stream",
-                    "ContentLength": 24,
-                    "ETag": source_etag,
-                },
-                final_metadata,
-            ]
-            storage.get_object_prefix.return_value = b"\x89PNG\r\n\x1a\nvalidated-raster"
-            storage.copy_object.return_value = {"CopyObjectResult": {}}
-            storage.generate_presigned_url.return_value = "https://signed.example/legacy-logo"
-
+        with mock.patch("plane.bgtasks.file_asset_task.enqueue_legacy_static_revalidation") as enqueue:
             response = APIClient().get(url)
 
-        assert response.status_code == status.HTTP_302_FOUND
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        enqueue.assert_called_once_with(asset.id)
         asset.refresh_from_db()
-        assert asset.asset.name != f"{asset.workspace_id}/legacy-logo.png"
-        assert asset.attributes["type"] == "image/png"
-        assert asset.upload_validation_version == UPLOAD_VALIDATION_VERSION
-        assert asset.storage_metadata["ValidationVersion"] == UPLOAD_VALIDATION_VERSION
-        storage.get_object_prefix.assert_called_once_with(
-            f"{asset.workspace_id}/legacy-logo.png",
-            24,
-            source_etag,
-        )
-        storage.copy_object.assert_called_once()
-        storage.generate_presigned_url.assert_called_once()
+        assert asset.asset.name == f"{asset.workspace_id}/legacy-logo.png"
+        assert asset.upload_validation_version == 0
 
     @pytest.mark.django_db
     def test_get_workspace_level_asset_allowed_for_non_project_member(

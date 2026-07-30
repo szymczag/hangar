@@ -388,7 +388,6 @@ def save_validated_multipart_asset(
     """Publish a validated server-received stream under an immutable key."""
 
     object_name = build_server_asset_key(namespace=str(namespace), name=metadata.name)
-    uploaded = False
     try:
         uploaded_file.seek(0)
         uploaded = storage.upload_file(
@@ -432,8 +431,9 @@ def save_validated_multipart_asset(
         asset.save(created_by_id=created_by_id)
         return asset
     except Exception:
-        if uploaded:
-            storage.delete_files([object_name])
+        # The key is server-generated and unique, so deletion is safe even if
+        # the backend reported failure after partially persisting the object.
+        storage.delete_files([object_name])
         raise
 
 
@@ -447,6 +447,7 @@ def revalidate_legacy_static_asset(*, asset_id, storage) -> FileAsset:
     """
 
     copied_object_name = None
+    source_object_name = None
     try:
         with transaction.atomic():
             asset = FileAsset.objects.select_for_update().get(id=asset_id)
@@ -469,7 +470,8 @@ def revalidate_legacy_static_asset(*, asset_id, storage) -> FileAsset:
                     422,
                 )
 
-            source_metadata = storage.get_object_metadata(asset.asset.name)
+            source_object_name = str(asset.asset.name)
+            source_metadata = storage.get_object_metadata(source_object_name)
             source_size = (source_metadata or {}).get("ContentLength")
             source_etag = (source_metadata or {}).get("ETag")
             metadata = validate_upload_metadata(
@@ -481,7 +483,7 @@ def revalidate_legacy_static_asset(*, asset_id, storage) -> FileAsset:
                 raise UploadStorageError()
 
             content = storage.get_object_prefix(
-                asset.asset.name,
+                source_object_name,
                 min(metadata.size, UPLOAD_SIGNATURE_BYTES),
                 source_etag,
             )
@@ -495,7 +497,7 @@ def revalidate_legacy_static_asset(*, asset_id, storage) -> FileAsset:
             copied_object_name = _build_final_asset_key(asset)
             if (
                 storage.copy_object(
-                    asset.asset.name,
+                    source_object_name,
                     copied_object_name,
                     source_etag=source_etag,
                     content_type=metadata.mime_type,
@@ -540,15 +542,37 @@ def revalidate_legacy_static_asset(*, asset_id, storage) -> FileAsset:
                     "updated_at",
                 ]
             )
+            if not FileAsset.all_objects.exclude(id=asset.id).filter(asset=source_object_name).exists():
+                from plane.bgtasks.file_asset_task import delete_superseded_asset
+
+                transaction.on_commit(
+                    lambda: delete_superseded_asset.apply_async(
+                        args=[source_object_name, str(asset.id)],
+                        countdown=storage.signed_url_expiration + 60,
+                    )
+                )
             return asset
     except UploadError as error:
         if copied_object_name:
             storage.delete_files([copied_object_name])
         if not isinstance(error, UploadStorageError):
-            FileAsset.objects.filter(
+            quarantined = FileAsset.objects.filter(
                 id=asset_id,
                 upload_validation_version=0,
             ).update(upload_validation_version=UPLOAD_VALIDATION_REJECTED)
+            if (
+                quarantined
+                and source_object_name
+                and not FileAsset.all_objects.exclude(id=asset_id).filter(asset=source_object_name).exists()
+            ):
+                from plane.bgtasks.file_asset_task import delete_superseded_asset
+
+                transaction.on_commit(
+                    lambda: delete_superseded_asset.apply_async(
+                        args=[source_object_name, str(asset_id)],
+                        countdown=storage.signed_url_expiration + 60,
+                    )
+                )
         raise
     except Exception:
         if copied_object_name:

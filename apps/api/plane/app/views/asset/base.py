@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 # Third party imports
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -19,6 +20,7 @@ from plane.db.models import (
     Page,
     Project,
     ProjectMember,
+    ProjectPage,
     Workspace,
     WorkspaceMember,
 )
@@ -29,6 +31,10 @@ from plane.utils.file_asset_upload import (
     save_validated_multipart_asset,
     upload_error_payload,
     validate_multipart_upload,
+)
+from plane.utils.file_asset_permissions import (
+    can_mutate_file_asset,
+    can_read_file_asset,
 )
 
 
@@ -93,9 +99,14 @@ def _workspace_entity_fields(*, request, workspace, entity_type, entity_id):
             return None
         if page.owned_by_id == request.user.id:
             return {"page_id": page.id}
+        linked_project_ids = ProjectPage.objects.filter(
+            page=page,
+            workspace=workspace,
+            deleted_at__isnull=True,
+        ).values("project_id")
         accessible_project = (
             ProjectMember.objects.filter(
-                project__pages=page,
+                project_id__in=linked_project_ids,
                 workspace=workspace,
                 member=request.user,
                 is_active=True,
@@ -110,7 +121,11 @@ def _workspace_entity_fields(*, request, workspace, entity_type, entity_id):
         FileAsset.EntityTypeContext.DRAFT_ISSUE_ATTACHMENT,
         FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION,
     }:
-        draft_issue = DraftIssue.objects.filter(id=entity_id, workspace=workspace).first()
+        draft_issue = DraftIssue.objects.filter(
+            id=entity_id,
+            workspace=workspace,
+            created_by=request.user,
+        ).first()
         if (
             draft_issue
             and ProjectMember.objects.filter(
@@ -142,9 +157,14 @@ class FileAssetEndpoint(BaseAPIView):
 
     def get(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
-        files = FileAsset.objects.filter(asset=asset_key)
-        if files.exists():
-            serializer = FileAssetSerializer(files, context={"request": request}, many=True)
+        file_asset = FileAsset.objects.filter(
+            asset=asset_key,
+            workspace_id=workspace_id,
+        ).first()
+        if file_asset and can_read_file_asset(user_id=request.user.id, asset=file_asset):
+            # Preserve the legacy response contract, which wraps the matching
+            # asset in a list even though the identifier resolves one row.
+            serializer = FileAssetSerializer([file_asset], context={"request": request}, many=True)
             return Response({"data": serializer.data, "status": True}, status=status.HTTP_200_OK)
         else:
             return Response(
@@ -226,9 +246,18 @@ class FileAssetEndpoint(BaseAPIView):
 
     def delete(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
-        file_asset = FileAsset.objects.get(asset=asset_key)
+        file_asset = FileAsset.objects.filter(
+            asset=asset_key,
+            workspace_id=workspace_id,
+        ).first()
+        if file_asset is None or not can_mutate_file_asset(
+            user_id=request.user.id,
+            asset=file_asset,
+        ):
+            return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         file_asset.is_deleted = True
-        file_asset.save(update_fields=["is_deleted"])
+        file_asset.deleted_at = timezone.now()
+        file_asset.save(update_fields=["is_deleted", "deleted_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -237,9 +266,18 @@ class FileAssetViewSet(BaseViewSet):
 
     def restore(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
-        file_asset = FileAsset.objects.get(asset=asset_key)
+        file_asset = FileAsset.all_objects.filter(
+            asset=asset_key,
+            workspace_id=workspace_id,
+        ).first()
+        if file_asset is None or not can_mutate_file_asset(
+            user_id=request.user.id,
+            asset=file_asset,
+        ):
+            return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         file_asset.is_deleted = False
-        file_asset.save(update_fields=["is_deleted"])
+        file_asset.deleted_at = None
+        file_asset.save(update_fields=["is_deleted", "deleted_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

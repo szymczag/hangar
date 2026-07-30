@@ -177,12 +177,11 @@ def authenticate_external_identity(adapter) -> FederatedAuthenticationResult:
     # the identity transaction. Their failure must not alter account binding.
     if sync_existing and not is_signup:
         adapter.sync_user_data(user)
+        if external.avatar_url:
+            adapter.queue_avatar_download(external.avatar_url, user)
     elif is_signup and external.avatar_url:
-        avatar_asset = adapter.download_and_upload_avatar(external.avatar_url, user)
-        if avatar_asset:
-            user.avatar_asset = avatar_asset
-        else:
-            user.avatar = external.avatar_url
-        user.save(update_fields=["avatar", "avatar_asset", "updated_at"])
+        user.avatar = external.avatar_url
+        user.save(update_fields=["avatar", "updated_at"])
+        adapter.queue_avatar_download(external.avatar_url, user)
 
     return FederatedAuthenticationResult(user=user, identity=identity, is_signup=is_signup)

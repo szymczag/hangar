@@ -1,12 +1,18 @@
 from unittest import mock
 
 import pytest
+from django.core.cache import cache
 
 from plane.db.models import FileAsset
 from plane.utils.file_asset_upload import (
     UploadError,
     UPLOAD_VALIDATION_REJECTED,
     revalidate_legacy_static_asset,
+)
+from plane.bgtasks.file_asset_task import (
+    delete_superseded_asset,
+    enqueue_legacy_static_revalidation,
+    legacy_revalidation_cache_key,
 )
 
 
@@ -90,3 +96,47 @@ def test_legacy_static_revalidation_deletes_copy_when_final_metadata_mismatches(
     asset.refresh_from_db()
     assert asset.asset.name == f"{workspace.id}/logo.png"
     assert asset.storage_metadata == {}
+
+
+@pytest.mark.django_db
+def test_legacy_revalidation_enqueue_is_deduplicated(workspace, create_user):
+    asset = FileAsset.objects.create(
+        attributes={"name": "logo.png", "type": "image/png", "size": 16},
+        asset=f"{workspace.id}/logo.png",
+        size=16,
+        workspace=workspace,
+        created_by=create_user,
+        entity_type=FileAsset.EntityTypeContext.WORKSPACE_LOGO,
+        is_uploaded=True,
+    )
+    cache.delete(legacy_revalidation_cache_key(asset.id))
+
+    with mock.patch("plane.bgtasks.file_asset_task.revalidate_legacy_static_asset_task.apply_async") as apply_async:
+        assert enqueue_legacy_static_revalidation(asset.id) is True
+        assert enqueue_legacy_static_revalidation(asset.id) is False
+
+    apply_async.assert_called_once_with(args=[str(asset.id)])
+
+
+@pytest.mark.django_db
+def test_superseded_asset_task_deletes_only_after_reference_recheck(
+    workspace,
+    create_user,
+):
+    old_key = f"{workspace.id}/legacy-logo.png"
+    asset = FileAsset.objects.create(
+        attributes={"name": "logo.png", "type": "image/png", "size": 16},
+        asset=old_key,
+        size=16,
+        workspace=workspace,
+        created_by=create_user,
+        entity_type=FileAsset.EntityTypeContext.WORKSPACE_LOGO,
+        is_uploaded=True,
+        upload_validation_version=UPLOAD_VALIDATION_REJECTED,
+    )
+
+    with mock.patch("plane.bgtasks.file_asset_task.S3Storage") as storage_class:
+        storage_class.return_value.delete_files.return_value = True
+        delete_superseded_asset.run(old_key, str(asset.id))
+
+    storage_class.return_value.delete_files.assert_called_once_with([old_key])

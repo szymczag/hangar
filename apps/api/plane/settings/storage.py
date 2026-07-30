@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 # Python imports
+import logging
 import os
 import uuid
 
@@ -14,6 +15,8 @@ from urllib.parse import quote
 # Module imports
 from plane.utils.exception_logger import log_exception
 from storages.backends.s3boto3 import S3Boto3Storage
+
+logger = logging.getLogger("plane.storage")
 
 
 class S3Storage(S3Boto3Storage):
@@ -233,10 +236,19 @@ class S3Storage(S3Boto3Storage):
     def delete_files(self, object_names):
         """Delete an S3 object"""
         try:
-            self.s3_client.delete_objects(
+            response = self.s3_client.delete_objects(
                 Bucket=self.aws_storage_bucket_name,
                 Delete={"Objects": [{"Key": object_name} for object_name in object_names]},
             )
+            if response.get("Errors"):
+                logger.error(
+                    "Object storage reported partial delete failure",
+                    extra={
+                        "error_code": "OBJECT_STORAGE_DELETE_PARTIAL_FAILURE",
+                        "failed_object_count": len(response["Errors"]),
+                    },
+                )
+                return False
             return True
         except ClientError as e:
             log_exception(e)

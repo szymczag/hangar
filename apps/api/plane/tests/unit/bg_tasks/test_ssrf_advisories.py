@@ -245,6 +245,22 @@ class TestOAuthAvatarSSRF:
     def _adapter(self):
         return Adapter(request=MagicMock(), provider="gitea")
 
+    @patch("plane.bgtasks.file_asset_task.download_oauth_avatar.delay")
+    def test_avatar_mirroring_is_queued_outside_auth_request(self, delay):
+        user = MagicMock()
+        user.id = "user-id"
+
+        self._adapter().queue_avatar_download(
+            "https://cdn.example.com/a.png",
+            user,
+        )
+
+        delay.assert_called_once_with(
+            avatar_url="https://cdn.example.com/a.png",
+            user_id="user-id",
+            provider="gitea",
+        )
+
     @patch("plane.utils.url_security.resolve_and_validate")
     def test_avatar_to_internal_ip_is_blocked(self, mock_resolve):
         mock_resolve.side_effect = ValueError(_BLOCKED)

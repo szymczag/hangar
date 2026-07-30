@@ -9,6 +9,7 @@ from plane.bgtasks.copy_s3_object import (
     copy_s3_objects_of_description_and_assets,
     copy_assets,
 )
+from plane.utils.file_asset_upload import UPLOAD_VALIDATION_VERSION
 import base64
 
 
@@ -24,16 +25,17 @@ class TestCopyS3Objects:
         return project
 
     @pytest.fixture
-    def issue(self, workspace, project):
+    def issue(self, workspace, project, create_user):
         return Issue.objects.create(
             name="Test Issue",
             workspace=workspace,
             project_id=project.id,
+            created_by=create_user,
             description_html='<div><image-component src="35e8b958-6ee5-43ce-ae56-fb0e776f421e"></image-component><image-component src="97988198-274f-4dfe-aa7a-4c0ffc684214"></image-component></div>',  # noqa: E501
         )
 
     @pytest.fixture
-    def file_asset(self, workspace, project, issue):
+    def file_asset(self, workspace, project, issue, create_user):
         return FileAsset.objects.create(
             issue=issue,
             workspace=workspace,
@@ -44,9 +46,28 @@ class TestCopyS3Objects:
                 "size": 100,
                 "type": "image/jpeg",
             },
+            size=100,
             id="35e8b958-6ee5-43ce-ae56-fb0e776f421e",
             entity_type="ISSUE_DESCRIPTION",
+            created_by=create_user,
+            is_uploaded=True,
+            upload_validation_version=UPLOAD_VALIDATION_VERSION,
         )
+
+    def configure_storage(self, storage):
+        def metadata(object_name):
+            if str(object_name).endswith(".jpg"):
+                content_type = "image/jpeg"
+            else:
+                content_type = "image/png"
+            return {
+                "ContentType": content_type,
+                "ContentLength": 100,
+                "ETag": '"asset-etag"',
+            }
+
+        storage.get_object_metadata.side_effect = metadata
+        storage.copy_object.return_value = {"CopyObjectResult": {}}
 
     @pytest.mark.django_db
     @patch("plane.bgtasks.copy_s3_object.S3Storage")
@@ -57,14 +78,18 @@ class TestCopyS3Objects:
             issue=issue,
             workspace=workspace,
             project=project,
-            asset="workspace1/test-asset-2.pdf",
+            asset="workspace1/test-asset-2.png",
             attributes={
-                "name": "test-asset-2.pdf",
+                "name": "test-asset-2.png",
                 "size": 100,
-                "type": "application/pdf",
+                "type": "image/png",
             },
+            size=100,
             id="97988198-274f-4dfe-aa7a-4c0ffc684214",
             entity_type="ISSUE_DESCRIPTION",
+            created_by=create_user,
+            is_uploaded=True,
+            upload_validation_version=UPLOAD_VALIDATION_VERSION,
         )
 
         issue.save()
@@ -72,6 +97,7 @@ class TestCopyS3Objects:
         # Set up mock S3 storage
         mock_storage_instance = MagicMock()
         mock_s3_storage.return_value = mock_storage_instance
+        self.configure_storage(mock_storage_instance)
 
         # Mock the external service call to avoid actual HTTP requests
         with patch("plane.bgtasks.copy_s3_object.sync_with_external_service") as mock_sync:
@@ -99,11 +125,20 @@ class TestCopyS3Objects:
 
     @pytest.mark.django_db
     @patch("plane.bgtasks.copy_s3_object.S3Storage")
-    def test_copy_assets_successful(self, mock_s3_storage, workspace, project, issue, file_asset):
+    def test_copy_assets_successful(
+        self,
+        mock_s3_storage,
+        workspace,
+        project,
+        issue,
+        file_asset,
+        create_user,
+    ):
         """Test successful copying of assets"""
         # Arrange
         mock_storage_instance = MagicMock()
         mock_s3_storage.return_value = mock_storage_instance
+        self.configure_storage(mock_storage_instance)
 
         # Act
         result = copy_assets(
@@ -111,7 +146,7 @@ class TestCopyS3Objects:
             entity_identifier=issue.id,
             project_id=project.id,
             asset_ids=[file_asset.id],
-            user_id=issue.created_by_id,
+            user_id=create_user.id,
         )
 
         # Assert
@@ -130,6 +165,7 @@ class TestCopyS3Objects:
         assert new_asset.attributes == file_asset.attributes
         assert new_asset.size == file_asset.size
         assert new_asset.is_uploaded is True
+        assert new_asset.upload_validation_version == UPLOAD_VALIDATION_VERSION
 
     @pytest.mark.django_db
     @patch("plane.bgtasks.copy_s3_object.S3Storage")
@@ -173,3 +209,35 @@ class TestCopyS3Objects:
         # Assert
         assert result == []
         mock_storage_instance.copy_object.assert_not_called()
+
+    @pytest.mark.django_db
+    @patch("plane.bgtasks.copy_s3_object.S3Storage")
+    def test_copy_assets_rejects_unvalidated_pending_source(
+        self,
+        mock_s3_storage,
+        workspace,
+        project,
+        issue,
+        file_asset,
+    ):
+        file_asset.is_uploaded = False
+        file_asset.upload_validation_version = 0
+        file_asset.asset.name = f"{workspace.id}/pending/untrusted.jpg"
+        file_asset.save(
+            update_fields=[
+                "asset",
+                "is_uploaded",
+                "upload_validation_version",
+            ]
+        )
+
+        result = copy_assets(
+            entity=issue,
+            entity_identifier=issue.id,
+            project_id=project.id,
+            asset_ids=[file_asset.id],
+            user_id=issue.created_by_id,
+        )
+
+        assert result == []
+        mock_s3_storage.return_value.copy_object.assert_not_called()

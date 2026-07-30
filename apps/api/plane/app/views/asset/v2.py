@@ -8,7 +8,7 @@ import uuid
 # Django imports
 from django.http import HttpResponseRedirect
 from django.utils import timezone
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 
 # Third party imports
@@ -26,6 +26,7 @@ from plane.db.models import (
     Page,
     Project,
     ProjectMember,
+    ProjectPage,
     User,
     Workspace,
     WorkspaceMember,
@@ -41,9 +42,13 @@ from plane.utils.file_asset_upload import (
     UploadError,
     build_pending_asset_key,
     complete_asset_upload,
-    revalidate_legacy_static_asset,
     upload_error_payload,
     validate_upload_metadata,
+)
+from plane.utils.file_asset_permissions import (
+    can_mutate_file_asset,
+    can_read_file_asset,
+    is_workspace_asset_admin,
 )
 
 
@@ -255,11 +260,36 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
             return {"user_id": request.user.id} if str(entity_id) == str(request.user.id) else None
         if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
             page = Page.objects.filter(
-                Q(owned_by=request.user) | Q(access=Page.PUBLIC_ACCESS),
                 id=entity_id,
                 workspace=workspace,
             ).first()
-            return {"page_id": page.id} if page else None
+            if page is None:
+                return None
+            if page.owned_by_id == request.user.id:
+                return {"page_id": page.id}
+            if page.access != Page.PUBLIC_ACCESS:
+                return None
+            linked_project_ids = ProjectPage.objects.filter(
+                page=page,
+                workspace=workspace,
+                deleted_at__isnull=True,
+            ).values("project_id")
+            accessible_project = (
+                ProjectMember.objects.filter(
+                    project_id__in=linked_project_ids,
+                    workspace=workspace,
+                    member=request.user,
+                    is_active=True,
+                )
+                .values_list("project_id", flat=True)
+                .first()
+            )
+            if accessible_project:
+                return {
+                    "page_id": page.id,
+                    "project_id": accessible_project,
+                }
+            return None
         return None
 
     def asset_delete(self, asset_id):
@@ -498,13 +528,17 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def delete(self, request, slug, asset_id):
-        asset = FileAsset.objects.get(id=asset_id, workspace__slug=slug)
+        asset = FileAsset.objects.filter(id=asset_id, workspace__slug=slug).first()
+        if asset is None:
+            return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         # enforce project-level access for project-bound assets
         if not self.has_project_asset_access(request, asset):
             return Response(
                 {"error": "You don't have access to this asset."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        if not can_mutate_file_asset(user_id=request.user.id, asset=asset):
+            return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
         # get the entity and save the asset id for the request field
@@ -521,6 +555,11 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
             return Response(
                 {"error": "You don't have access to this asset."},
                 status=status.HTTP_403_FORBIDDEN,
+            )
+        if not can_read_file_asset(user_id=request.user.id, asset=asset):
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # Check if the asset is uploaded
@@ -572,18 +611,17 @@ class StaticFileAssetEndpoint(BaseAPIView):
 
         # Static assets are public and inline, so only server-validated raster
         # content carrying the current validation marker is eligible.
-        storage = S3Storage(request=request)
         if asset.upload_validation_version == 0:
             try:
-                asset = revalidate_legacy_static_asset(
-                    asset_id=asset.id,
-                    storage=storage,
-                )
-            except (UploadError, FileAsset.DoesNotExist):
-                return Response(
-                    {"error": "The requested asset could not be found."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+                from plane.bgtasks.file_asset_task import enqueue_legacy_static_revalidation
+
+                enqueue_legacy_static_revalidation(asset.id)
+            except Exception:
+                pass
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         if asset.upload_validation_version != UPLOAD_VALIDATION_VERSION:
             return Response(
                 {"error": "The requested asset could not be found."},
@@ -601,6 +639,7 @@ class StaticFileAssetEndpoint(BaseAPIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         # Generate a presigned URL to share an S3 object
+        storage = S3Storage(request=request)
         signed_url = storage.generate_presigned_url(
             object_name=asset.asset.name,
             disposition="inline",
@@ -615,7 +654,9 @@ class AssetRestoreEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug, asset_id):
-        asset = FileAsset.all_objects.get(id=asset_id, workspace__slug=slug)
+        asset = FileAsset.all_objects.filter(id=asset_id, workspace__slug=slug).first()
+        if asset is None or not can_mutate_file_asset(user_id=request.user.id, asset=asset):
+            return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         asset.is_deleted = False
         asset.deleted_at = None
         asset.save(update_fields=["is_deleted", "deleted_at"])
@@ -650,7 +691,8 @@ class ProjectAssetEndpoint(BaseAPIView):
                 Q(owned_by=request.user) | Q(access=Page.PUBLIC_ACCESS),
                 id=entity_id,
                 workspace=workspace,
-                projects__id=project_id,
+                project_pages__project_id=project_id,
+                project_pages__deleted_at__isnull=True,
             ).first()
             return {"page_id": page.id} if page else None
         if entity_type == FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION:
@@ -658,6 +700,7 @@ class ProjectAssetEndpoint(BaseAPIView):
                 id=entity_id,
                 workspace=workspace,
                 project_id=project_id,
+                created_by=request.user,
             ).first()
             return {"draft_issue_id": draft_issue.id} if draft_issue else None
         return None
@@ -756,14 +799,7 @@ class ProjectAssetEndpoint(BaseAPIView):
         ).first()
         if asset is None:
             return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
-        project_admin = ProjectMember.objects.filter(
-            project_id=project_id,
-            workspace__slug=slug,
-            member=request.user,
-            role=ROLE.ADMIN.value,
-            is_active=True,
-        ).exists()
-        if asset.created_by_id != request.user.id and not project_admin:
+        if not can_mutate_file_asset(user_id=request.user.id, asset=asset):
             return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         try:
             complete_asset_upload(asset_id=asset.id, storage=S3Storage(request=request))
@@ -773,8 +809,9 @@ class ProjectAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def delete(self, request, slug, project_id, pk):
-        # Get the asset
-        asset = FileAsset.objects.get(id=pk, workspace__slug=slug, project_id=project_id)
+        asset = FileAsset.objects.filter(id=pk, workspace__slug=slug, project_id=project_id).first()
+        if asset is None or not can_mutate_file_asset(user_id=request.user.id, asset=asset):
+            return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         # Check deleted assets
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
@@ -786,6 +823,11 @@ class ProjectAssetEndpoint(BaseAPIView):
     def get(self, request, slug, project_id, pk):
         # get the asset id
         asset = FileAsset.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
+        if not can_read_file_asset(user_id=request.user.id, asset=asset):
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         # Check if the asset is uploaded
         if not asset.is_uploaded:
@@ -816,64 +858,69 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
     def post(self, request, slug, project_id, entity_id):
         asset_ids = request.data.get("asset_ids", [])
 
-        # Check if the asset ids are provided
-        if not asset_ids:
+        if not isinstance(asset_ids, list) or not asset_ids:
             return Response({"error": "No asset ids provided."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            normalized_asset_ids = {uuid.UUID(str(asset_id)) for asset_id in asset_ids}
+        except (TypeError, ValueError, AttributeError):
+            return Response({"error": "Invalid asset ids."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(normalized_asset_ids) != len(asset_ids):
+            return Response({"error": "Duplicate asset ids."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Scope to the requester's own uploads in this workspace, limited to assets that are
-        # either unassociated or already in this project. This endpoint *associates*
-        # freshly-uploaded assets, which are not yet project-scoped (e.g. a cover uploaded
-        # during project creation has project_id=NULL until this call sets it) — so the
-        # earlier project_id=project_id filter 404'd that flow. created_by + the
-        # unassociated-or-same-project bound prevent cross-project/user IDOR (a caller can
-        # only touch their own uploads, cannot move an asset in from another project, and
-        # @allow_permission already scopes them to this project).
+        # Resolve every requested object under the caller/workspace/project
+        # boundary. A partial match must fail closed.
         assets = FileAsset.objects.filter(
-            id__in=asset_ids,
+            id__in=normalized_asset_ids,
             workspace__slug=slug,
             created_by=request.user,
+            is_uploaded=True,
         ).filter(Q(project_id=project_id) | Q(project_id__isnull=True))
+        resolved_assets = list(assets)
 
-        # Get the first asset
-        asset = assets.first()
-
-        if not asset:
+        if len(resolved_assets) != len(normalized_asset_ids):
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Check if the asset is uploaded
-        if asset.entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
-            assets.update(project_id=project_id)
-            [self.save_project_cover(asset, project_id) for asset in assets]
+        entity_types = {asset.entity_type for asset in resolved_assets}
+        if len(entity_types) != 1:
+            return Response(
+                {"error": "Assets must have the same entity type."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        entity_type = entity_types.pop()
+        workspace = Workspace.objects.get(slug=slug)
+        entity_fields = ProjectAssetEndpoint.get_scoped_entity_fields(
+            self,
+            request=request,
+            workspace=workspace,
+            project_id=project_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+        )
+        if entity_fields is None:
+            return Response(
+                {"error": "Invalid entity context."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER and len(resolved_assets) != 1:
+            return Response(
+                {"error": "Only one project cover can be associated."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        if asset.entity_type == FileAsset.EntityTypeContext.ISSUE_DESCRIPTION:
-            # For some cases, the bulk api is called after the issue is deleted creating
-            # an integrity error
-            try:
-                assets.update(issue_id=entity_id, project_id=project_id)
-            except IntegrityError:
-                pass
-
-        if asset.entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
-            # For some cases, the bulk api is called after the comment is deleted
-            # creating an integrity error
-            try:
-                assets.update(comment_id=entity_id)
-            except IntegrityError:
-                pass
-
-        if asset.entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
-            assets.update(page_id=entity_id)
-
-        if asset.entity_type == FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION:
-            # For some cases, the bulk api is called after the draft issue is deleted
-            # creating an integrity error
-            try:
-                assets.update(draft_issue_id=entity_id)
-            except IntegrityError:
-                pass
+        try:
+            with transaction.atomic():
+                update_fields = {"project_id": project_id, **entity_fields}
+                assets.update(**update_fields)
+                if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
+                    self.save_project_cover(resolved_assets[0], project_id)
+        except IntegrityError:
+            return Response(
+                {"error": "The target entity is no longer available."},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -883,45 +930,17 @@ class AssetCheckEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
-        asset = FileAsset.all_objects.filter(id=asset_id, workspace__slug=slug, deleted_at__isnull=True).exists()
-        return Response({"exists": asset}, status=status.HTTP_200_OK)
+        asset = FileAsset.objects.filter(
+            id=asset_id,
+            workspace__slug=slug,
+            deleted_at__isnull=True,
+        ).first()
+        exists = bool(asset and can_read_file_asset(user_id=request.user.id, asset=asset))
+        return Response({"exists": exists}, status=status.HTTP_200_OK)
 
 
 class DuplicateAssetEndpoint(BaseAPIView):
     throttle_classes = [AssetRateThrottle]
-
-    def get_entity_id_field(self, entity_type, entity_id):
-        # Workspace Logo
-        if entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO:
-            return {"workspace_id": entity_id}
-
-        # Project Cover
-        if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
-            return {"project_id": entity_id}
-
-        # User Avatar and Cover
-        if entity_type in [
-            FileAsset.EntityTypeContext.USER_AVATAR,
-            FileAsset.EntityTypeContext.USER_COVER,
-        ]:
-            return {"user_id": entity_id}
-
-        # Issue Attachment and Description
-        if entity_type in [
-            FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
-            FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
-        ]:
-            return {"issue_id": entity_id}
-
-        # Page Description
-        if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
-            return {"page_id": entity_id}
-
-        # Comment Description
-        if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
-            return {"comment_id": entity_id}
-
-        return {}
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug, asset_id):
@@ -937,42 +956,118 @@ class DuplicateAssetEndpoint(BaseAPIView):
 
         workspace = Workspace.objects.get(slug=slug)
         if project_id:
-            # check if project exists in the workspace
-            if not Project.objects.filter(id=project_id, workspace=workspace).exists():
+            if not ProjectMember.objects.filter(
+                project_id=project_id,
+                workspace=workspace,
+                member=request.user,
+                is_active=True,
+            ).exists():
                 return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+            entity_fields = ProjectAssetEndpoint.get_scoped_entity_fields(
+                self,
+                request=request,
+                workspace=workspace,
+                project_id=project_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
+        else:
+            if entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO and not is_workspace_asset_admin(
+                user_id=request.user.id,
+                workspace_id=workspace.id,
+            ):
+                return Response({"error": "Invalid entity context."}, status=status.HTTP_404_NOT_FOUND)
+            entity_fields = WorkspaceFileAssetEndpoint.get_scoped_entity_fields(
+                self,
+                request=request,
+                workspace=workspace,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
+        if entity_fields is None:
+            return Response({"error": "Invalid entity context."}, status=status.HTTP_404_NOT_FOUND)
 
         storage = S3Storage(request=request)
-        # Restrict the source asset to the same destination workspace to prevent cross-workspace asset copying
+        # Only copy a server-validated immutable source from this workspace.
         original_asset = FileAsset.objects.filter(
             id=asset_id,
             is_uploaded=True,
             workspace=workspace,
+            upload_validation_version=UPLOAD_VALIDATION_VERSION,
         ).first()
 
         if not original_asset:
             return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not can_read_file_asset(user_id=request.user.id, asset=original_asset):
+            return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        sanitized_name = sanitize_filename(original_asset.attributes.get("name")) or "unnamed"
+        try:
+            metadata = validate_upload_metadata(
+                raw_name=(original_asset.attributes or {}).get("name"),
+                raw_size=original_asset.size,
+                claimed_mime_type=(original_asset.attributes or {}).get("type"),
+                entity_type=entity_type,
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+
+        source_metadata = storage.get_object_metadata(original_asset.asset.name)
+        source_etag = (source_metadata or {}).get("ETag")
+        if not source_etag:
+            return Response(
+                {"error": "File storage is temporarily unavailable."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        sanitized_name = sanitize_filename(metadata.name) or "unnamed"
         destination_key = f"{workspace.id}/{uuid.uuid4().hex}-{sanitized_name}"
-        duplicated_asset = FileAsset.objects.create(
-            attributes={
-                "name": original_asset.attributes.get("name"),
-                "type": original_asset.attributes.get("type"),
-                "size": original_asset.attributes.get("size"),
-            },
-            asset=destination_key,
-            size=original_asset.size,
-            workspace=workspace,
-            created_by_id=request.user.id,
-            entity_type=entity_type,
-            project_id=project_id if project_id else None,
-            storage_metadata=original_asset.storage_metadata,
-            **self.get_entity_id_field(entity_type=entity_type, entity_id=entity_id),
+        copied = storage.copy_object(
+            original_asset.asset.name,
+            destination_key,
+            source_etag=source_etag,
+            content_type=metadata.mime_type,
         )
-        storage.copy_object(original_asset.asset, destination_key)
-        # Update the is_uploaded field for all newly created assets
-        FileAsset.objects.filter(id=duplicated_asset.id).update(is_uploaded=True)
+        final_metadata = storage.get_object_metadata(destination_key) if copied else None
+        final_type = ((final_metadata or {}).get("ContentType") or "").split(";", 1)[0].strip().lower()
+        if (
+            final_metadata is None
+            or final_metadata.get("ContentLength") != metadata.size
+            or final_type != metadata.mime_type
+        ):
+            storage.delete_files([destination_key])
+            return Response(
+                {"error": "File storage is temporarily unavailable."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
+        create_fields = {"workspace_id": workspace.id, "project_id": project_id, **entity_fields}
+        try:
+            duplicated_asset = FileAsset.objects.create(
+                attributes={
+                    "name": metadata.name,
+                    "type": metadata.mime_type,
+                    "size": metadata.size,
+                },
+                asset=destination_key,
+                size=metadata.size,
+                created_by_id=request.user.id,
+                entity_type=entity_type,
+                storage_metadata={
+                    **final_metadata,
+                    "DetectedContentType": (original_asset.storage_metadata or {}).get(
+                        "DetectedContentType",
+                        metadata.mime_type,
+                    ),
+                    "ValidatedAt": timezone.now().isoformat(),
+                    "ValidationVersion": UPLOAD_VALIDATION_VERSION,
+                    "ValidationSource": "validated-asset-copy",
+                },
+                is_uploaded=True,
+                upload_validation_version=UPLOAD_VALIDATION_VERSION,
+                **create_fields,
+            )
+        except Exception:
+            storage.delete_files([destination_key])
+            raise
         return Response({"asset_id": str(duplicated_asset.id)}, status=status.HTTP_200_OK)
 
 
@@ -988,6 +1083,11 @@ class WorkspaceAssetDownloadEndpoint(BaseAPIView):
                 is_uploaded=True,
             )
         except FileAsset.DoesNotExist:
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not can_read_file_asset(user_id=request.user.id, asset=asset):
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -1017,6 +1117,11 @@ class ProjectAssetDownloadEndpoint(BaseAPIView):
                 is_uploaded=True,
             )
         except FileAsset.DoesNotExist:
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not can_read_file_asset(user_id=request.user.id, asset=asset):
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,

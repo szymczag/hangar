@@ -108,8 +108,22 @@ class IssueAttachmentEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):
+        if not ProjectMember.objects.filter(
+            project_id=project_id,
+            workspace__slug=slug,
+            member=request.user,
+            is_active=True,
+        ).exists():
+            return Response(
+                {"error": "Issue attachment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         issue_attachment = FileAsset.objects.filter(
-            pk=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id
+            pk=pk,
+            workspace__slug=slug,
+            project_id=project_id,
+            issue_id=issue_id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
         ).first()
         if not issue_attachment:
             return Response(
@@ -134,7 +148,13 @@ class IssueAttachmentEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, issue_id):
-        issue_attachments = FileAsset.objects.filter(issue_id=issue_id, workspace__slug=slug, project_id=project_id)
+        issue_attachments = FileAsset.objects.filter(
+            issue_id=issue_id,
+            workspace__slug=slug,
+            project_id=project_id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+            is_uploaded=True,
+        )
         serializer = IssueAttachmentSerializer(issue_attachments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -220,7 +240,28 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):
-        issue_attachment = FileAsset.objects.get(pk=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id)
+        if not ProjectMember.objects.filter(
+            project_id=project_id,
+            workspace__slug=slug,
+            member=request.user,
+            is_active=True,
+        ).exists():
+            return Response(
+                {"error": "Issue attachment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        issue_attachment = FileAsset.objects.filter(
+            pk=pk,
+            workspace__slug=slug,
+            project_id=project_id,
+            issue_id=issue_id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+        ).first()
+        if issue_attachment is None:
+            return Response(
+                {"error": "Issue attachment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         issue_attachment.is_deleted = True
         issue_attachment.deleted_at = timezone.now()
         issue_attachment.save()
@@ -243,7 +284,18 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
     def get(self, request, slug, project_id, issue_id, pk=None):
         if pk:
             # Get the asset
-            asset = FileAsset.objects.get(id=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id)
+            asset = FileAsset.objects.filter(
+                id=pk,
+                workspace__slug=slug,
+                project_id=project_id,
+                issue_id=issue_id,
+                entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+            ).first()
+            if asset is None:
+                return Response(
+                    {"error": "The asset could not be found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
             # Check if the asset is uploaded
             if not asset.is_uploaded:

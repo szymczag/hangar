@@ -60,6 +60,16 @@ class TestS3StorageEndpoints:
 
         assert mock_boto3.client.call_args.kwargs["endpoint_url"] == "https://legacy.example.com"
 
+    @patch("plane.settings.storage.boto3")
+    def test_delete_files_fails_on_partial_object_storage_errors(self, mock_boto3):
+        mock_boto3.client.return_value.delete_objects.return_value = {
+            "Deleted": [{"Key": "first"}],
+            "Errors": [{"Key": "second", "Code": "AccessDenied"}],
+        }
+        storage = S3Storage()
+
+        assert storage.delete_files(["first", "second"]) is False
+
 
 @pytest.mark.unit
 class TestS3StorageSignedURLExpiration:

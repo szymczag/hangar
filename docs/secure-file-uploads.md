@@ -37,7 +37,13 @@ checked against their current object size, immutable ETag, filename policy, and
 actual bounded content signature. A valid raster is copied conditionally to a
 new immutable key with canonical metadata and marked with the current validation
 version. Invalid, missing, active-content, or changed objects remain quarantined
-and return `404`; their old object is never made public by the migration.
+and return `404`; their old object is never made public by the migration. When
+no other database row references the old key, it is deleted after the maximum
+signed-URL lifetime.
+First access queues a deduplicated background revalidation and returns `404`
+until that job succeeds, so anonymous requests never perform storage reads,
+content inspection, or object copies synchronously. Operators can proactively
+process the backlog with the management command before switching traffic.
 The trusted validation state lives in a dedicated server-owned database column,
 not in the legacy client-writable JSON metadata.
 Policy-rejected legacy objects are marked as quarantined so repeated anonymous
@@ -84,3 +90,30 @@ Completion is idempotent. It is limited to the uploader or an administrator
 authorized for the same workspace/project/entity. Validation failures are
 logged without filenames or file contents and return stable, non-sensitive
 error codes to the client.
+
+Legacy and current mutation routes share the same ownership boundary:
+workspace logos require an active workspace administrator, project assets
+require their creator or an active project/workspace administrator, and
+restoring an asset applies the same checks as deleting it. Bulk association
+fails closed unless every uploaded asset belongs to the caller, has one common
+entity type, and the target entity has an active link to the URL project.
+Private reads and downloads apply the corresponding active workspace/project
+membership, page visibility, draft ownership, and user-profile ownership
+checks. Server-side duplication accepts only a readable source carrying the
+current trusted validation marker, copies it conditionally against its ETag,
+and verifies the resulting size and canonical MIME type before creating the
+new database row.
+Entity association treats UUIDs as untrusted references: private drafts require
+their creator, and public pages still require an active project link and
+membership in that linked project. This applies consistently to current,
+legacy multipart, bulk, duplicate, and draft-conversion paths.
+Public Spaces and API downloads render raster content inline only when the
+trusted database validation marker is current; historical unvalidated assets
+remain available only as forced `application/octet-stream` attachments.
+
+The pending-object sweep includes soft-deleted database rows, retains references
+when object-storage deletion is partial or fails, and hard-deletes rows only
+after storage confirms the full batch. OAuth avatar mirroring runs outside the
+authentication request in a Celery task with soft and hard time limits; URL and
+content validation remain unchanged, and the worker publishes the result only
+if the user's remote avatar URL is still current.

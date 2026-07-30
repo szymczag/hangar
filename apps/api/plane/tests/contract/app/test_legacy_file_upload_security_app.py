@@ -8,7 +8,17 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 
-from plane.db.models import DeployBoard, DraftIssue, FileAsset, Issue, Project, ProjectMember
+from plane.db.models import (
+    DeployBoard,
+    DraftIssue,
+    FileAsset,
+    Issue,
+    Page,
+    Project,
+    ProjectMember,
+    ProjectPage,
+    User,
+)
 from plane.settings.storage import S3Storage
 from plane.utils.file_asset_upload import UPLOAD_VALIDATION_VERSION
 
@@ -223,6 +233,116 @@ def test_project_asset_upload_rejects_draft_from_another_project(
 
 @pytest.mark.contract
 @pytest.mark.django_db
+@pytest.mark.parametrize("legacy_multipart", [False, True])
+def test_asset_upload_rejects_another_users_private_draft_in_same_project(
+    legacy_multipart,
+    session_client,
+    workspace,
+    project,
+):
+    other_user = User.objects.create(
+        email=f"draft-owner-{uuid4().hex[:8]}@plane.so",
+        username=f"draft_owner_{uuid4().hex[:8]}",
+    )
+    ProjectMember.objects.create(
+        project=project,
+        workspace=workspace,
+        member=other_user,
+        role=15,
+        is_active=True,
+    )
+    other_draft = DraftIssue.objects.create(
+        name="Another user's private draft",
+        workspace=workspace,
+        project=project,
+        created_by=other_user,
+    )
+
+    if legacy_multipart:
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/file-assets/",
+            {
+                "asset": _png_upload("draft.png"),
+                "entity_type": FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION,
+                "entity_identifier": str(other_draft.id),
+            },
+            format="multipart",
+        )
+    else:
+        response = session_client.post(
+            f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/",
+            {
+                "name": "draft.png",
+                "type": "image/png",
+                "size": 32,
+                "entity_type": FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION,
+                "entity_identifier": str(other_draft.id),
+            },
+            format="json",
+        )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert not FileAsset.objects.filter(draft_issue=other_draft).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+@pytest.mark.parametrize("legacy_multipart", [False, True])
+def test_workspace_upload_rejects_public_page_without_project_membership(
+    legacy_multipart,
+    session_client,
+    workspace,
+):
+    foreign_project = Project.objects.create(
+        name="Foreign page project",
+        identifier=f"F{uuid4().hex[:4]}",
+        workspace=workspace,
+    )
+    page_owner = User.objects.create(
+        email=f"page-owner-{uuid4().hex[:8]}@plane.so",
+        username=f"page_owner_{uuid4().hex[:8]}",
+    )
+    foreign_page = Page.objects.create(
+        name="Public but project-scoped",
+        workspace=workspace,
+        owned_by=page_owner,
+        access=Page.PUBLIC_ACCESS,
+    )
+    ProjectPage.objects.create(
+        page=foreign_page,
+        project=foreign_project,
+        workspace=workspace,
+    )
+
+    if legacy_multipart:
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/file-assets/",
+            {
+                "asset": _png_upload("page.png"),
+                "entity_type": FileAsset.EntityTypeContext.PAGE_DESCRIPTION,
+                "entity_identifier": str(foreign_page.id),
+            },
+            format="multipart",
+        )
+    else:
+        response = session_client.post(
+            f"/api/assets/v2/workspaces/{workspace.slug}/",
+            {
+                "name": "page.png",
+                "type": "image/png",
+                "size": 32,
+                "entity_type": FileAsset.EntityTypeContext.PAGE_DESCRIPTION,
+                "entity_identifier": str(foreign_page.id),
+            },
+            format="json",
+        )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert not FileAsset.objects.filter(page=foreign_page).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
 def test_space_asset_completion_rechecks_active_project_membership(
     session_client,
     workspace,
@@ -258,5 +378,43 @@ def test_space_asset_completion_rechecks_active_project_membership(
             format="json",
         )
 
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    complete_upload.assert_not_called()
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        complete_upload.assert_not_called()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_space_legacy_asset_is_never_rendered_inline(
+    session_client,
+    workspace,
+    project,
+    create_user,
+):
+    board = DeployBoard.objects.create(
+        workspace=workspace,
+        project=project,
+        entity_name="project",
+        entity_identifier=project.id,
+    )
+    asset = FileAsset(
+        attributes={"name": "legacy.png", "type": "image/png", "size": 32},
+        asset=f"{workspace.id}/legacy.png",
+        size=32,
+        workspace=workspace,
+        project=project,
+        entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
+        is_uploaded=True,
+    )
+    asset.save(created_by_id=create_user.id)
+
+    with mock.patch("plane.space.views.asset.S3Storage") as storage_class:
+        storage = storage_class.return_value
+        storage.generate_presigned_url.return_value = "https://signed.example/legacy"
+        response = session_client.get(f"/api/public/assets/v2/anchor/{board.anchor}/{asset.id}/")
+
+    assert response.status_code == status.HTTP_302_FOUND
+    storage.generate_presigned_url.assert_called_once_with(
+        object_name=asset.asset.name,
+        disposition="attachment",
+        content_type="application/octet-stream",
+    )
