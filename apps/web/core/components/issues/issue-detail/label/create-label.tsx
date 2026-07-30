@@ -114,6 +114,8 @@ export function LabelCreate(props: ILabelCreate) {
                     </Popover.Button>
                     <Popover.Panel
                       className="fixed z-10"
+                      data-prevent-outside-click
+                      portal
                       ref={setPopperElement}
                       style={styles.popper}
                       {...attributes.popper}

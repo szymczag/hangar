@@ -127,6 +127,7 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
 
   return createPortal(
     <Combobox.Options
+      className="z-30"
       data-prevent-outside-click
       modal={false}
       ref={setPopperElement}

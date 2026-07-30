@@ -129,7 +129,14 @@ export const CalendarOptionsDropdown = observer(function CalendarOptionsDropdown
             leaveFrom="opacity-100 translate-y-0"
             leaveTo="opacity-0 translate-y-1"
           >
-            <Popover.Panel className="fixed z-50" ref={setPopperElement} style={styles.popper} {...attributes.popper}>
+            <Popover.Panel
+              className="fixed z-50"
+              data-prevent-outside-click
+              portal
+              ref={setPopperElement}
+              style={styles.popper}
+              {...attributes.popper}
+            >
               <div className="absolute right-0 z-10 mt-1 min-w-[12rem] overflow-hidden rounded-sm border border-subtle bg-surface-1 p-1 shadow-raised-200">
                 <div>
                   {Object.entries(CALENDAR_LAYOUTS).map(([layout, layoutDetails]) => (

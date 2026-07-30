@@ -72,6 +72,8 @@ export function Popover(props: TPopover) {
         leaveTo="opacity-0 translate-y-1"
       >
         <HeadlessReactPopover.Panel
+          data-prevent-outside-click
+          portal
           ref={setPopperElement}
           style={styles.popper}
           {...attributes.popper}

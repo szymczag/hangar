@@ -126,7 +126,10 @@ export function Dropdown(props: ISingleSelectDropdown) {
       onClose={handleClose}
       value={value}
       onChange={(nextValue) => {
-        if (nextValue !== null) onChange(nextValue);
+        if (nextValue !== null) {
+          onChange(nextValue);
+          handleClose();
+        }
       }}
       className={cn(
         "h-full",
@@ -150,7 +153,9 @@ export function Dropdown(props: ISingleSelectDropdown) {
       {isOpen && (
         <Combobox.Options
           className="fixed z-10"
+          data-prevent-outside-click
           modal={false}
+          portal
           ref={setPopperElement}
           style={styles.popper}
           {...attributes.popper}
@@ -176,7 +181,6 @@ export function Dropdown(props: ISingleSelectDropdown) {
               value={value}
               renderItem={renderItem}
               loader={loader}
-              handleClose={handleClose}
             />
           </div>
         </Combobox.Options>

@@ -50,7 +50,14 @@ export function FiltersDropdown(props: Props) {
               leaveFrom="opacity-100 translate-y-0"
               leaveTo="opacity-0 translate-y-1"
             >
-              <Popover.Panel ref={setPopperElement} style={styles.popper} {...attributes.popper}>
+              <Popover.Panel
+                className="z-10"
+                data-prevent-outside-click
+                portal
+                ref={setPopperElement}
+                style={styles.popper}
+                {...attributes.popper}
+              >
                 <div className="z-10 overflow-hidden rounded-sm border border-subtle bg-surface-1 shadow-raised-200">
                   <div className="flex max-h-[37.5rem] w-[18.75rem] flex-col overflow-hidden">{children}</div>
                 </div>

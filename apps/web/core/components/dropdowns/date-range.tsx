@@ -262,6 +262,7 @@ export const DateRangeDropdown = observer(function DateRangeDropdown(props: Prop
 
   const comboOptions = (
     <Combobox.Options
+      className="z-30"
       data-prevent-outside-click
       modal={false}
       ref={setPopperElement}

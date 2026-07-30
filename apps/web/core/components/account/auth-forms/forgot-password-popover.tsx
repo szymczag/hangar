@@ -41,7 +41,14 @@ export function ForgotPasswordPopover() {
           {t("auth.common.forgot_password")}
         </button>
       </Popover.Button>
-      <Popover.Panel className="fixed z-10" ref={setPopperElement} style={styles.popper} {...attributes.popper}>
+      <Popover.Panel
+        className="fixed z-10"
+        data-prevent-outside-click
+        portal
+        ref={setPopperElement}
+        style={styles.popper}
+        {...attributes.popper}
+      >
         {({ close }) => (
           <div className="z-10 ml-3 flex w-64 items-start gap-3 rounded-sm border border-strong bg-surface-1 px-2 py-1 text-left break-words">
             <span className="flex-shrink-0">🤥</span>
