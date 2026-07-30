@@ -703,17 +703,21 @@ class IssueAttachmentSerializer(BaseSerializer):
     storage information, and access control for document management.
     """
 
+    asset_url = serializers.CharField(read_only=True)
+
     class Meta:
         model = FileAsset
-        fields = "__all__"
-        read_only_fields = [
+        fields = [
             "id",
-            "workspace",
-            "project",
-            "issue",
-            "updated_by",
+            "attributes",
+            "size",
+            "is_uploaded",
+            "created_by",
+            "created_at",
             "updated_at",
+            "asset_url",
         ]
+        read_only_fields = fields
 
 
 class IssueCommentCreateSerializer(BaseSerializer):

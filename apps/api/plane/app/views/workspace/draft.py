@@ -204,7 +204,19 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def create_draft_to_issue(self, request, slug, draft_id):
-        draft_issue = self.get_queryset().filter(pk=draft_id).first()
+        draft_issue = (
+            self.get_queryset()
+            .filter(
+                pk=draft_id,
+                created_by=request.user,
+            )
+            .first()
+        )
+        if draft_issue is None:
+            return Response(
+                {"error": "Draft issue not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         if not draft_issue.project_id:
             return Response(

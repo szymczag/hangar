@@ -18,6 +18,7 @@ WORKDIR /code
 
 RUN apk add --no-cache --upgrade \
     "libpq" \
+    "libmagic" \
     "libxslt" \
     "xmlsec" \
     "gnupg" \

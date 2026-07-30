@@ -2,12 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-# Python Imports
-import uuid
-
 # Django Imports
 from django.utils import timezone
-from django.conf import settings
 
 # Third party imports
 from rest_framework import status
@@ -15,10 +11,8 @@ from rest_framework.response import Response
 from drf_spectacular.utils import OpenApiExample, OpenApiRequest
 
 # Module Imports
-from plane.bgtasks.storage_metadata_task import get_asset_object_metadata
 from plane.settings.storage import S3Storage
-from plane.utils.path_validator import sanitize_filename
-from plane.db.models import FileAsset, User, Workspace
+from plane.db.models import FileAsset, Project, ProjectMember, User, Workspace
 from plane.app.permissions import WorkspaceUserPermission
 from plane.api.views.base import BaseAPIView
 from plane.api.serializers import (
@@ -45,6 +39,17 @@ from plane.utils.openapi import (
     asset_docs,
 )
 from plane.utils.exception_logger import log_exception
+from plane.utils.file_asset_upload import (
+    UPLOAD_URL_EXPIRATION_SECONDS,
+    UPLOAD_VALIDATION_VERSION,
+    RASTER_IMAGE_MIME_BY_EXTENSION,
+    UploadError,
+    build_pending_asset_key,
+    complete_asset_upload,
+    upload_error_payload,
+    validate_upload_metadata,
+)
+from plane.utils.file_asset_permissions import can_read_file_asset
 
 
 class UserAssetEndpoint(BaseAPIView):
@@ -115,14 +120,7 @@ class UserAssetEndpoint(BaseAPIView):
         Create a presigned URL for uploading user profile assets (avatar or cover image).
         This endpoint generates the necessary credentials for direct S3 upload.
         """
-        # get the asset key
-        name = sanitize_filename(request.data.get("name")) or "unnamed"
-        type = request.data.get("type", "image/jpeg")
-        size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
         entity_type = request.data.get("entity_type", False)
-
-        # Check if the file size is within the limit
-        size_limit = min(size, settings.FILE_SIZE_LIMIT)
 
         #  Check if the entity type is allowed
         if not entity_type or entity_type not in ["USER_AVATAR", "USER_COVER"]:
@@ -131,31 +129,30 @@ class UserAssetEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check if the file type is allowed
-        allowed_types = [
-            "image/jpeg",
-            "image/png",
-            "image/webp",
-            "image/jpg",
-            "image/gif",
-        ]
-        if type not in allowed_types:
-            return Response(
-                {
-                    "error": "Invalid file type. Only JPEG and PNG files are allowed.",
-                    "status": False,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            metadata = validate_upload_metadata(
+                raw_name=request.data.get("name"),
+                raw_size=request.data.get("size"),
+                claimed_mime_type=request.data.get("type"),
+                entity_type=entity_type,
             )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
 
-        # asset key
-        asset_key = f"{uuid.uuid4().hex}-{name}"
+        asset_key = build_pending_asset_key(
+            namespace=f"user-{request.user.id}",
+            name=metadata.name,
+        )
 
         # Create a File Asset
         asset = FileAsset.objects.create(
-            attributes={"name": name, "type": type, "size": size_limit},
+            attributes={
+                "name": metadata.name,
+                "type": metadata.mime_type,
+                "size": metadata.size,
+            },
             asset=asset_key,
-            size=size_limit,
+            size=metadata.size,
             user=request.user,
             created_by=request.user,
             entity_type=entity_type,
@@ -164,7 +161,22 @@ class UserAssetEndpoint(BaseAPIView):
         # Get the presigned URL
         storage = S3Storage(request=request)
         # Generate a presigned URL to share an S3 object
-        presigned_url = storage.generate_presigned_post(object_name=asset_key, file_type=type, file_size=size_limit)
+        presigned_url = storage.generate_presigned_post(
+            object_name=asset_key,
+            file_type=metadata.mime_type,
+            file_size=metadata.size,
+            expiration=UPLOAD_URL_EXPIRATION_SECONDS,
+        )
+        if presigned_url is None:
+            asset.delete()
+            return Response(
+                {
+                    "error": "File storage is temporarily unavailable.",
+                    "code": "upload_storage_unavailable",
+                    "status": False,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         # Return the presigned URL
         return Response(
             {
@@ -208,17 +220,13 @@ class UserAssetEndpoint(BaseAPIView):
         Update the asset status and attributes after the file has been uploaded to S3.
         This endpoint should be called after completing the S3 upload to mark the asset as uploaded.
         """
-        # get the asset id
-        asset = FileAsset.objects.get(id=asset_id, user_id=request.user.id)
-        # get the storage metadata
-        asset.is_uploaded = True
-        # get the storage metadata
-        if not asset.storage_metadata:
-            get_asset_object_metadata.delay(asset_id=str(asset_id))
-        # update the attributes
-        asset.attributes = request.data.get("attributes", asset.attributes)
-        # save the asset
-        asset.save(update_fields=["is_uploaded", "attributes"])
+        asset = FileAsset.objects.filter(id=asset_id, user_id=request.user.id).first()
+        if asset is None:
+            return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            complete_asset_upload(asset_id=asset.id, storage=S3Storage(request=request))
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @asset_docs(
@@ -288,14 +296,7 @@ class UserServerAssetEndpoint(BaseAPIView):
         (avatar or cover image) using server credentials. This endpoint generates the
         necessary credentials for direct S3 upload with server-side authentication.
         """
-        # get the asset key
-        name = sanitize_filename(request.data.get("name")) or "unnamed"
-        type = request.data.get("type", "image/jpeg")
-        size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
         entity_type = request.data.get("entity_type", False)
-
-        # Check if the file size is within the limit
-        size_limit = min(size, settings.FILE_SIZE_LIMIT)
 
         #  Check if the entity type is allowed
         if not entity_type or entity_type not in ["USER_AVATAR", "USER_COVER"]:
@@ -304,31 +305,30 @@ class UserServerAssetEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check if the file type is allowed
-        allowed_types = [
-            "image/jpeg",
-            "image/png",
-            "image/webp",
-            "image/jpg",
-            "image/gif",
-        ]
-        if type not in allowed_types:
-            return Response(
-                {
-                    "error": "Invalid file type. Only JPEG and PNG files are allowed.",
-                    "status": False,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            metadata = validate_upload_metadata(
+                raw_name=request.data.get("name"),
+                raw_size=request.data.get("size"),
+                claimed_mime_type=request.data.get("type"),
+                entity_type=entity_type,
             )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
 
-        # asset key
-        asset_key = f"{uuid.uuid4().hex}-{name}"
+        asset_key = build_pending_asset_key(
+            namespace=f"user-{request.user.id}",
+            name=metadata.name,
+        )
 
         # Create a File Asset
         asset = FileAsset.objects.create(
-            attributes={"name": name, "type": type, "size": size_limit},
+            attributes={
+                "name": metadata.name,
+                "type": metadata.mime_type,
+                "size": metadata.size,
+            },
             asset=asset_key,
-            size=size_limit,
+            size=metadata.size,
             user=request.user,
             created_by=request.user,
             entity_type=entity_type,
@@ -337,7 +337,22 @@ class UserServerAssetEndpoint(BaseAPIView):
         # Get the presigned URL
         storage = S3Storage(request=request, is_server=True)
         # Generate a presigned URL to share an S3 object
-        presigned_url = storage.generate_presigned_post(object_name=asset_key, file_type=type, file_size=size_limit)
+        presigned_url = storage.generate_presigned_post(
+            object_name=asset_key,
+            file_type=metadata.mime_type,
+            file_size=metadata.size,
+            expiration=UPLOAD_URL_EXPIRATION_SECONDS,
+        )
+        if presigned_url is None:
+            asset.delete()
+            return Response(
+                {
+                    "error": "File storage is temporarily unavailable.",
+                    "code": "upload_storage_unavailable",
+                    "status": False,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         # Return the presigned URL
         return Response(
             {
@@ -364,17 +379,16 @@ class UserServerAssetEndpoint(BaseAPIView):
         Update the asset status and attributes after the file has been uploaded to S3 using server credentials.
         This endpoint should be called after completing the S3 upload to mark the asset as uploaded.
         """
-        # get the asset id
-        asset = FileAsset.objects.get(id=asset_id, user_id=request.user.id)
-        # get the storage metadata
-        asset.is_uploaded = True
-        # get the storage metadata
-        if not asset.storage_metadata:
-            get_asset_object_metadata.delay(asset_id=str(asset_id))
-        # update the attributes
-        asset.attributes = request.data.get("attributes", asset.attributes)
-        # save the asset
-        asset.save(update_fields=["is_uploaded", "attributes"])
+        asset = FileAsset.objects.filter(id=asset_id, user_id=request.user.id).first()
+        if asset is None:
+            return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            complete_asset_upload(
+                asset_id=asset.id,
+                storage=S3Storage(request=request, is_server=True),
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @asset_docs(
@@ -436,6 +450,8 @@ class GenericAssetEndpoint(BaseAPIView):
 
             # Get the asset
             asset = FileAsset.objects.get(id=asset_id, workspace_id=workspace.id, is_deleted=False)
+            if not can_read_file_asset(user_id=request.user.id, asset=asset):
+                return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
 
             # Check if the asset exists and is uploaded
             if not asset.is_uploaded:
@@ -450,13 +466,16 @@ class GenericAssetEndpoint(BaseAPIView):
             # (default MinIO self-hosted setup).
             storage = S3Storage(request=request, is_server=True)
             asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
-            disposition = (
-                "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
+            inline_types = set(RASTER_IMAGE_MIME_BY_EXTENSION.values())
+            can_render_inline = (
+                asset.upload_validation_version == UPLOAD_VALIDATION_VERSION and asset_mime_type in inline_types
             )
+            disposition = "inline" if can_render_inline else "attachment"
             presigned_url = storage.generate_presigned_url(
                 object_name=asset.asset.name,
                 filename=asset.attributes.get("name"),
                 disposition=disposition,
+                content_type=(asset_mime_type if disposition == "inline" else "application/octet-stream"),
             )
 
             return Response(
@@ -515,46 +534,54 @@ class GenericAssetEndpoint(BaseAPIView):
         Create a presigned URL for uploading generic assets that can be bound to entities like work items.
         Supports various file types and includes external source tracking for integrations.
         """
-        name = sanitize_filename(request.data.get("name"))
-        type = request.data.get("type")
-        size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
         project_id = request.data.get("project_id")
         external_id = request.data.get("external_id")
         external_source = request.data.get("external_source")
 
-        # Check if the request is valid
-        if not name or not size:
-            return Response(
-                {"error": "Name and size are required fields.", "status": False},
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            metadata = validate_upload_metadata(
+                raw_name=request.data.get("name"),
+                raw_size=request.data.get("size"),
+                claimed_mime_type=request.data.get("type"),
+                entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
             )
-
-        # Check if the file size is within the limit
-        size_limit = min(size, settings.FILE_SIZE_LIMIT)
-
-        # Check if the file type is allowed
-        if not type or type not in settings.ATTACHMENT_MIME_TYPES:
-            return Response(
-                {"error": "Invalid file type.", "status": False},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
 
         # Get the workspace
         workspace = Workspace.objects.get(slug=slug)
+        if project_id:
+            project = Project.objects.filter(id=project_id, workspace=workspace).first()
+            if (
+                not project
+                or not ProjectMember.objects.filter(
+                    project=project,
+                    workspace=workspace,
+                    member=request.user,
+                    is_active=True,
+                ).exists()
+            ):
+                return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # asset key
-        asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{name}"
+        asset_key = build_pending_asset_key(namespace=str(workspace.id), name=metadata.name)
 
         # Check for existing asset with same external details if provided
         if external_id and external_source:
-            existing_asset = FileAsset.objects.filter(
+            existing_assets = FileAsset.objects.filter(
                 workspace__slug=slug,
+                project_id=project_id,
                 external_source=external_source,
                 external_id=external_id,
                 is_deleted=False,
-            ).first()
+            )
+            if project_id is None:
+                existing_assets = existing_assets.filter(created_by=request.user)
+            existing_asset = existing_assets.first()
 
-            if existing_asset:
+            if existing_asset and can_read_file_asset(
+                user_id=request.user.id,
+                asset=existing_asset,
+            ):
                 return Response(
                     {
                         "message": "Asset with same external id and source already exists",
@@ -566,9 +593,13 @@ class GenericAssetEndpoint(BaseAPIView):
 
         # Create a File Asset
         asset = FileAsset.objects.create(
-            attributes={"name": name, "type": type, "size": size_limit},
+            attributes={
+                "name": metadata.name,
+                "type": metadata.mime_type,
+                "size": metadata.size,
+            },
             asset=asset_key,
-            size=size_limit,
+            size=metadata.size,
             workspace_id=workspace.id,
             project_id=project_id,
             created_by=request.user,
@@ -579,7 +610,22 @@ class GenericAssetEndpoint(BaseAPIView):
 
         # Get the presigned URL
         storage = S3Storage(request=request, is_server=True)
-        presigned_url = storage.generate_presigned_post(object_name=asset_key, file_type=type, file_size=size_limit)
+        presigned_url = storage.generate_presigned_post(
+            object_name=asset_key,
+            file_type=metadata.mime_type,
+            file_size=metadata.size,
+            expiration=UPLOAD_URL_EXPIRATION_SECONDS,
+        )
+        if presigned_url is None:
+            asset.delete()
+            return Response(
+                {
+                    "error": "File storage is temporarily unavailable.",
+                    "code": "upload_storage_unavailable",
+                    "status": False,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return Response(
             {
@@ -618,17 +664,19 @@ class GenericAssetEndpoint(BaseAPIView):
         and trigger metadata extraction.
         """
         try:
-            asset = FileAsset.objects.get(id=asset_id, workspace__slug=slug, is_deleted=False)
-
-            # Update is_uploaded status
-            asset.is_uploaded = request.data.get("is_uploaded", asset.is_uploaded)
-
-            # Update storage metadata if not present
-            if not asset.storage_metadata:
-                get_asset_object_metadata.delay(asset_id=str(asset_id))
-
-            asset.save(update_fields=["is_uploaded"])
+            asset = FileAsset.objects.get(
+                id=asset_id,
+                workspace__slug=slug,
+                created_by=request.user,
+                is_deleted=False,
+            )
+            complete_asset_upload(
+                asset_id=asset.id,
+                storage=S3Storage(request=request, is_server=True),
+            )
 
             return Response(status=status.HTTP_204_NO_CONTENT)
         except FileAsset.DoesNotExist:
             return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)

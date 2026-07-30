@@ -119,5 +119,6 @@ class FileAssetSerializer(BaseSerializer):
             "is_deleted",
             "deleted_at",
             "storage_metadata",
+            "upload_validation_version",
             "asset_url",
         ]

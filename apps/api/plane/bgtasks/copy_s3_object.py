@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 # Django imports
 from django.conf import settings
+from django.utils import timezone
 
 # Module imports
 from plane.db.models import FileAsset, Page, Issue
@@ -17,6 +18,12 @@ from plane.utils.exception_logger import log_exception
 from plane.settings.storage import S3Storage
 from celery import shared_task
 from plane.utils.url import normalize_url_path
+from plane.utils.file_asset_permissions import can_read_file_asset
+from plane.utils.file_asset_upload import (
+    UPLOAD_VALIDATION_VERSION,
+    UploadError,
+    validate_upload_metadata,
+)
 
 
 def get_entity_id_field(entity_type, entity_id):
@@ -89,35 +96,89 @@ def copy_assets(entity, entity_identifier, project_id, asset_ids, user_id):
     duplicated_assets = []
     workspace = entity.workspace
     storage = S3Storage()
-    original_assets = FileAsset.objects.filter(workspace=workspace, project_id=project_id, id__in=asset_ids)
+    expected_entity_type = (
+        FileAsset.EntityTypeContext.PAGE_DESCRIPTION
+        if isinstance(entity, Page)
+        else FileAsset.EntityTypeContext.ISSUE_DESCRIPTION
+    )
+    original_assets = FileAsset.objects.filter(
+        workspace=workspace,
+        project_id=project_id,
+        id__in=asset_ids,
+        entity_type=expected_entity_type,
+        is_uploaded=True,
+        upload_validation_version=UPLOAD_VALIDATION_VERSION,
+    )
 
     for original_asset in original_assets:
-        destination_key = f"{workspace.id}/{uuid.uuid4().hex}-{original_asset.attributes.get('name')}"
-        duplicated_asset = FileAsset.objects.create(
-            attributes={
-                "name": original_asset.attributes.get("name"),
-                "type": original_asset.attributes.get("type"),
-                "size": original_asset.attributes.get("size"),
-            },
-            asset=destination_key,
-            size=original_asset.size,
-            workspace=workspace,
-            created_by_id=user_id,
-            entity_type=original_asset.entity_type,
-            project_id=project_id,
-            storage_metadata=original_asset.storage_metadata,
-            **get_entity_id_field(original_asset.entity_type, entity_identifier),
+        if not can_read_file_asset(user_id=user_id, asset=original_asset):
+            continue
+        try:
+            metadata = validate_upload_metadata(
+                raw_name=(original_asset.attributes or {}).get("name"),
+                raw_size=original_asset.size,
+                claimed_mime_type=(original_asset.attributes or {}).get("type"),
+                entity_type=expected_entity_type,
+            )
+        except UploadError:
+            continue
+        source_metadata = storage.get_object_metadata(original_asset.asset.name)
+        source_etag = (source_metadata or {}).get("ETag")
+        if not source_etag:
+            continue
+
+        destination_key = f"{workspace.id}/{uuid.uuid4().hex}-{metadata.name}"
+        copied = storage.copy_object(
+            original_asset.asset.name,
+            destination_key,
+            source_etag=source_etag,
+            content_type=metadata.mime_type,
         )
-        storage.copy_object(original_asset.asset, destination_key)
+        final_metadata = storage.get_object_metadata(destination_key) if copied else None
+        final_type = ((final_metadata or {}).get("ContentType") or "").split(";", 1)[0].strip().lower()
+        if (
+            final_metadata is None
+            or final_metadata.get("ContentLength") != metadata.size
+            or final_type != metadata.mime_type
+        ):
+            storage.delete_files([destination_key])
+            continue
+        try:
+            duplicated_asset = FileAsset.objects.create(
+                attributes={
+                    "name": metadata.name,
+                    "type": metadata.mime_type,
+                    "size": metadata.size,
+                },
+                asset=destination_key,
+                size=metadata.size,
+                workspace=workspace,
+                created_by_id=user_id,
+                entity_type=expected_entity_type,
+                project_id=project_id,
+                storage_metadata={
+                    **final_metadata,
+                    "DetectedContentType": (original_asset.storage_metadata or {}).get(
+                        "DetectedContentType",
+                        metadata.mime_type,
+                    ),
+                    "ValidatedAt": timezone.now().isoformat(),
+                    "ValidationVersion": UPLOAD_VALIDATION_VERSION,
+                    "ValidationSource": "validated-description-copy",
+                },
+                is_uploaded=True,
+                upload_validation_version=UPLOAD_VALIDATION_VERSION,
+                **get_entity_id_field(expected_entity_type, entity_identifier),
+            )
+        except Exception:
+            storage.delete_files([destination_key])
+            raise
         duplicated_assets.append(
             {
                 "new_asset_id": str(duplicated_asset.id),
                 "old_asset_id": str(original_asset.id),
             }
         )
-    if duplicated_assets:
-        FileAsset.objects.filter(pk__in=[item["new_asset_id"] for item in duplicated_assets]).update(is_uploaded=True)
-
     return duplicated_assets
 
 

@@ -590,9 +590,6 @@ class PageDuplicateEndpoint(BaseAPIView):
         if page.access == Page.PRIVATE_ACCESS and page.owned_by_id != request.user.id:
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-        # get all the project ids where page is present
-        project_ids = ProjectPage.objects.filter(page_id=page_id).values_list("project_id", flat=True)
-
         page.pk = None
         page.name = f"{page.name} (Copy)"
         page.description_binary = None
@@ -601,14 +598,16 @@ class PageDuplicateEndpoint(BaseAPIView):
         page.updated_by = request.user
         page.save()
 
-        for project_id in project_ids:
-            ProjectPage.objects.create(
-                workspace_id=page.workspace_id,
-                project_id=project_id,
-                page_id=page.id,
-                created_by_id=page.created_by_id,
-                updated_by_id=page.updated_by_id,
-            )
+        # The route authorizes only this project. Replicating every link from a
+        # shared source page would inject the copy into projects the caller
+        # cannot access.
+        ProjectPage.objects.create(
+            workspace_id=page.workspace_id,
+            project_id=project_id,
+            page_id=page.id,
+            created_by_id=page.created_by_id,
+            updated_by_id=page.updated_by_id,
+        )
 
         page_transaction.delay(
             new_description_html=page.description_html,

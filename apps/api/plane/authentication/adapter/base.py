@@ -8,6 +8,7 @@ import os
 import uuid
 from io import BytesIO
 
+from billiard.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -27,6 +28,12 @@ from plane.settings.storage import S3Storage
 from plane.utils.exception_logger import log_exception
 from plane.utils.host import base_host
 from plane.utils.ip_address import get_client_ip
+from plane.utils.file_asset_upload import (
+    UPLOAD_SIGNATURE_BYTES,
+    UPLOAD_VALIDATION_VERSION,
+    validate_file_content,
+    validate_upload_metadata,
+)
 
 from .error import AUTHENTICATION_ERROR_CODES, AuthenticationException
 
@@ -137,6 +144,23 @@ class Adapter:
     def get_avatar_download_headers(self):
         return {}
 
+    def queue_avatar_download(self, avatar_url, user):
+        """Mirror an OAuth avatar outside the authentication request."""
+
+        if not avatar_url:
+            return
+        try:
+            from plane.bgtasks.file_asset_task import download_oauth_avatar
+
+            download_oauth_avatar.delay(
+                avatar_url=str(avatar_url),
+                user_id=str(user.id),
+                provider=str(self.provider),
+            )
+        except Exception as error:
+            # Avatar mirroring is optional and must never fail authentication.
+            log_exception(error)
+
     def check_sync_enabled(self):
         """Check if sync is enabled for the provider"""
         provider_config_map = {
@@ -159,6 +183,8 @@ class Adapter:
         if not avatar_url:
             return None
 
+        storage = None
+        filename = None
         try:
             headers = self.get_avatar_download_headers()
             # Download the avatar image over an SSRF-safe client: the avatar URL
@@ -184,10 +210,11 @@ class Adapter:
                     return None
 
                 # Get content type and determine file extension
-                content_type = response.headers.get("Content-Type", "image/jpeg")
+                content_type = response.headers.get("Content-Type", "image/jpeg").split(";", 1)[0].strip().lower()
+                if content_type == "image/jpg":
+                    content_type = "image/jpeg"
                 extension_map = {
                     "image/jpeg": "jpg",
-                    "image/jpg": "jpg",
                     "image/png": "png",
                     "image/gif": "gif",
                     "image/webp": "webp",
@@ -212,6 +239,16 @@ class Adapter:
 
             # Generate unique filename
             filename = f"{uuid.uuid4().hex}-user-avatar.{extension}"
+            metadata = validate_upload_metadata(
+                raw_name=filename,
+                raw_size=file_size,
+                claimed_mime_type=content_type,
+                entity_type=FileAsset.EntityTypeContext.USER_AVATAR,
+            )
+            detected_mime = validate_file_content(
+                expected_mime=metadata.mime_type,
+                content=content[:UPLOAD_SIGNATURE_BYTES],
+            )
 
             storage = S3Storage(request=self.request)
 
@@ -220,28 +257,58 @@ class Adapter:
             file_obj.seek(0)
 
             # Upload using boto3 directly
-            upload_success = storage.upload_file(file_obj=file_obj, object_name=filename, content_type=content_type)
+            upload_success = storage.upload_file(
+                file_obj=file_obj,
+                object_name=filename,
+                content_type=metadata.mime_type,
+            )
             if not upload_success:
                 return None
 
             # Get storage metadata
             storage_metadata = storage.get_object_metadata(object_name=filename)
+            stored_content_type = ((storage_metadata or {}).get("ContentType") or "").split(";", 1)[0].strip().lower()
+            if (
+                storage_metadata is None
+                or storage_metadata.get("ContentLength") != metadata.size
+                or stored_content_type != metadata.mime_type
+            ):
+                storage.delete_files([filename])
+                return None
+            storage_metadata.update(
+                {
+                    "DetectedContentType": detected_mime,
+                    "ValidatedAt": timezone.now().isoformat(),
+                    "ValidationVersion": UPLOAD_VALIDATION_VERSION,
+                }
+            )
 
             # Create FileAsset record
             file_asset = FileAsset.objects.create(
-                attributes={"name": f"{self.provider}-avatar.{extension}", "type": content_type, "size": file_size},
+                attributes={
+                    "name": f"{self.provider}-avatar.{extension}",
+                    "type": metadata.mime_type,
+                    "size": metadata.size,
+                },
                 asset=filename,
-                size=file_size,
+                size=metadata.size,
                 user=user,
                 created_by=user,
                 entity_type=FileAsset.EntityTypeContext.USER_AVATAR,
                 is_uploaded=True,
+                upload_validation_version=UPLOAD_VALIDATION_VERSION,
                 storage_metadata=storage_metadata,
             )
 
             return file_asset
 
+        except SoftTimeLimitExceeded:
+            if storage is not None and filename is not None:
+                storage.delete_files([filename])
+            raise
         except Exception as e:
+            if storage is not None and filename is not None:
+                storage.delete_files([filename])
             log_exception(e)
             # Return None if upload fails, so original URL can be used as fallback
             return None
@@ -279,19 +346,20 @@ class Adapter:
             if user.avatar_asset:
                 asset = FileAsset.objects.get(pk=user.avatar_asset_id)
                 storage = S3Storage(request=self.request)
-                storage.delete_files(object_names=[asset.asset.name])
+                if not storage.delete_files(object_names=[asset.asset.name]):
+                    return False
 
                 # Delete the user avatar
                 asset.delete()
                 user.avatar_asset = None
                 user.avatar = ""
                 user.save()
-            return
+            return True
         except FileAsset.DoesNotExist:
-            pass
+            return True
         except Exception as e:
             log_exception(e)
-            return
+            return False
 
     def sync_user_data(self, user):
         # Update user details
@@ -312,17 +380,12 @@ class Adapter:
         # Set display name
         user.display_name = display_name
 
-        # Download and upload avatar only if the avatar is different from the one in the storage
+        # Persist the remote fallback immediately; mirroring is queued after the
+        # authentication flow has saved its final user state.
         avatar = self.user_data.get("user", {}).get("avatar", "")
         # Delete the old avatar if it exists
         self.delete_old_avatar(user=user)
-        avatar_asset = self.download_and_upload_avatar(avatar_url=avatar, user=user)
-        if avatar_asset:
-            user.avatar_asset = avatar_asset
-        # If avatar upload fails, set the avatar to the original URL
-        else:
-            user.avatar = avatar
-
+        user.avatar = avatar
         user.save()
         return user
 
@@ -400,16 +463,11 @@ class Adapter:
 
             user.save()
 
-            # Download and upload avatar
+            # Use the provider URL as an immediate fallback. Mirroring happens
+            # asynchronously after the authentication flow finishes.
             avatar = self.user_data.get("user", {}).get("avatar", "")
             if avatar:
-                avatar_asset = self.download_and_upload_avatar(avatar_url=avatar, user=user)
-                if avatar_asset:
-                    user.avatar_asset = avatar_asset
-                    user.avatar = avatar
-                # If avatar upload fails, set the avatar to the original URL
-                else:
-                    user.avatar = avatar
+                user.avatar = avatar
 
             # Create profile
             Profile.objects.create(user=user)
@@ -420,6 +478,9 @@ class Adapter:
 
         # Save user data
         user = self.save_user_data(user=user)
+        avatar = self.user_data.get("user", {}).get("avatar", "")
+        if avatar and (is_signup or self.check_sync_enabled()):
+            self.queue_avatar_download(avatar_url=avatar, user=user)
 
         # Call callback if present
         if self.callback:

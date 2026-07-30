@@ -10,6 +10,85 @@ import { fileTypeFromBuffer } from "file-type";
 import type { TFileMetaDataLite, TFileSignedURLResponse } from "@plane/types";
 import { DANGEROUS_EXTENSIONS } from "@plane/constants";
 
+const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+  "7z": "application/x-7z-compressed",
+  aac: "audio/aac",
+  avi: "video/x-msvideo",
+  bmp: "image/bmp",
+  csv: "text/csv",
+  css: "text/css",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  flac: "audio/flac",
+  gif: "image/gif",
+  glb: "model/gltf-binary",
+  gltf: "model/gltf+json",
+  gz: "application/gzip",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  json: "application/json",
+  js: "text/javascript",
+  m4a: "audio/x-m4a",
+  markdown: "text/markdown",
+  md: "text/markdown",
+  mid: "audio/midi",
+  midi: "audio/midi",
+  mov: "video/quicktime",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  mpeg: "video/mpeg",
+  mpg: "video/mpeg",
+  obj: "model/obj",
+  odb: "application/vnd.oasis.opendocument.database",
+  odg: "application/vnd.oasis.opendocument.graphics",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odt: "application/vnd.oasis.opendocument.text",
+  ogg: "audio/ogg",
+  ogv: "video/ogg",
+  otf: "font/otf",
+  pbm: "image/x-portable-bitmap",
+  pdf: "application/pdf",
+  pgm: "image/x-portable-graymap",
+  png: "image/png",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ppm: "image/x-portable-pixmap",
+  rar: "application/x-rar-compressed",
+  rtf: "application/rtf",
+  sql: "application/x-sql",
+  svg: "image/svg+xml",
+  tar: "application/x-tar",
+  tgz: "application/gzip",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  ttf: "font/ttf",
+  txt: "text/plain",
+  vsd: "application/vnd.visio",
+  vsdx: "application/vnd.visio",
+  wav: "audio/wav",
+  webm: "video/webm",
+  webp: "image/webp",
+  wmv: "video/x-ms-wmv",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xml: "application/xml",
+  zip: "application/zip",
+};
+
+class FileValidationError extends Error {
+  readonly code = "invalid_file";
+  readonly error: string;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "FileValidationError";
+    this.error = message;
+  }
+}
+
 /**
  * @description Filename validation - checks for double extensions and dangerous patterns
  * @param {string} filename
@@ -91,7 +170,7 @@ const validateAndDetectFileType = async (file: File): Promise<string> => {
   // Basic filename validation
   const filenameError = validateFilename(file.name);
   if (filenameError) {
-    console.warn(`File validation warning: ${filenameError}`);
+    throw new FileValidationError(filenameError);
   }
 
   try {
@@ -103,8 +182,15 @@ const validateAndDetectFileType = async (file: File): Promise<string> => {
     console.warn("Error detecting file type from signature:", _error);
   }
 
-  // fallback for unknown files
-  return "";
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const extensionType = MIME_BY_EXTENSION[extension];
+  if (!extensionType) {
+    throw new FileValidationError("This file extension is not supported");
+  }
+
+  // This is only a compatibility hint. The API independently derives the
+  // canonical MIME type and validates the uploaded bytes before publishing.
+  return extensionType;
 };
 
 /**
