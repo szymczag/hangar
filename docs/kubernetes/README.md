@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.18`. It is qualified for evaluation on
+The current release is `0.1.0-rc.19`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -32,7 +32,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.18` qualification boundary is:
+The `0.1.0-rc.19` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -98,24 +98,22 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.18`                               |
-| Helm chart version | `0.1.0-rc.18`                                |
-| Git tag            | `hangar-v0.1.0-rc.18`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.18` |
+| Product version    | `v0.1.0-rc.19`                               |
+| Helm chart version | `0.1.0-rc.19`                                |
+| Git tag            | `hangar-v0.1.0-rc.19`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.19` |
 
 `rc.1` and `rc.2` were consumed by incomplete publication attempts. Do not use
-them. `rc.17` is the immediately previous complete publication, but portaled
-Popper panels can render below dialogs and issue peeks, making visible options
-impossible to select. `rc.16` can clip panels in task layout overflow, `rc.15`
-has the upper-left positioning failure, `rc.14` has the earlier dropdown
-interaction failure, `rc.13` has the Fragment-backed combo-box failure, and
-`rc.12` additionally has hydration and transition failures. Do not deploy or
-roll back to those releases. `rc.11` remains the qualified rollback target.
+them. `rc.18` is the immediately previous complete publication, but it predates
+the server-enforced upload validation, legacy-asset authorization, and trusted
+object-storage endpoint boundary in `rc.19`. Earlier `rc.12` through `rc.17`
+additionally contain frontend migration failures. There is no
+security-equivalent rollback target among the earlier release candidates.
 Published versions are immutable and are never repaired in place.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.18` notes](../releases/hangar-v0.1.0-rc.18.md) — review
+- [Release `v0.1.0-rc.19` notes](../releases/hangar-v0.1.0-rc.19.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -140,7 +138,7 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The public `rc.18` chart archive, OCI chart, and digest-pinned Hangar images are
+The public `rc.19` chart archive, OCI chart, and digest-pinned Hangar images are
 anonymously downloadable. The release workflow also created provenance
 attestations and keyless Cosign signatures.
 

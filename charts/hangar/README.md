@@ -7,7 +7,7 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0-rc.18` (`appVersion: v0.1.0-rc.18`). Its
+The latest published chart is `0.1.0-rc.19` (`appVersion: v0.1.0-rc.19`). Its
 evaluation profile is live-qualified on AMD64. It is a prerelease and is not yet
 supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
@@ -27,18 +27,16 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.18
+  --version 0.1.0-rc.19
 ```
 
 Do not use `0.1.0-rc.1` or `0.1.0-rc.2`; those immutable versions were consumed
-by incomplete release attempts. `0.1.0-rc.17` is the immediately previous
-complete publication, but portaled Popper panels can render below dialogs and
-issue peeks, making visible options impossible to select. `0.1.0-rc.16` can
-clip panels in task layout overflow, `0.1.0-rc.15` has the upper-left
-positioning failure, `0.1.0-rc.14` has the earlier dropdown interaction
-failure, `0.1.0-rc.13` has the Fragment-backed combo-box failure, and
-`0.1.0-rc.12` additionally has hydration and transition failures. Use
-`0.1.0-rc.18`; `0.1.0-rc.11` remains the qualified rollback target.
+by incomplete release attempts. `0.1.0-rc.18` is the immediately previous
+complete publication, but it predates the server-enforced upload validation,
+legacy-asset authorization, and trusted object-storage endpoint boundary in
+`rc.19`. Earlier `rc.12` through `rc.17` additionally contain frontend
+migration failures. Use `0.1.0-rc.19`; there is no security-equivalent rollback
+target among the earlier release candidates.
 
 ## Deployment profiles
 
@@ -107,8 +105,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0-rc.18` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.18)
+Release `0.1.0-rc.19` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.19)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 

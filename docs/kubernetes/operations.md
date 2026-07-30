@@ -59,6 +59,82 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.18` to `rc.19`
+
+This release introduces the server-enforced file-upload boundary described in
+[secure file uploads](../secure-file-uploads.md). Direct uploads are staged
+under server-generated keys and are published only after bounded content,
+canonical MIME, size, and ETag validation. Legacy multipart routes apply the
+same content and entity-authorization policy. Only objects carrying the current
+server-owned validation marker can render inline; other formats are forced to
+download.
+
+Asset mutation authorization is now consistent across current, legacy,
+duplicate, bulk, completion, delete, and restore paths. Project guests cannot
+change a project cover. Server-side object-storage operations always use the
+configured internal endpoint, while browser presigning uses the explicit public
+endpoint or trusted `WEB_URL`; request `Host` headers never select an outbound
+storage destination.
+
+`rc.19` adds Django migration
+`0128_fileasset_upload_validation_version`. The migration adds an integer marker
+with default `0` and does not rewrite existing objects. Existing `rc.18` Helm
+values remain structurally compatible, and there is no Helm values, Secret,
+Kubernetes resource, RBAC, or network-policy contract change. The inherited
+Plane source remains `v1.4.0-rc2` (`package.json` version `1.4.0`).
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target package is `0.1.0-rc.19`, its application version is
+   `v0.1.0-rc.19`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc19);
+3. verify that the internal object-storage endpoint is reachable only from the
+   intended workloads, the public endpoint is the browser-facing origin,
+   anonymous bucket access is disabled, and neither value is derived from an
+   inbound request;
+4. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+5. schedule the API, task workers, Beat, Live service, and all frontends as one
+   coordinated Helm revision.
+
+Wait for the revision-scoped migration Job before admitting traffic. Then run
+the legacy public-raster validator from an API container:
+
+```sh
+python manage.py revalidate_legacy_static_assets
+```
+
+Use `--limit N` for bounded batches and monitor the validated, quarantined, and
+retryable counts. A historical avatar, cover, or logo returns `404` until it is
+successfully revalidated; do not bypass this behavior by restoring anonymous
+bucket reads.
+
+After the rollout, verify:
+
+- a valid JPEG or PNG upload completes, renders inline only in an allowed public
+  raster context, and downloads normally as an attachment elsewhere;
+- MIME-spoofed, active-content, oversized, replaced, and cross-project uploads
+  fail without publishing or associating an object;
+- project members and administrators can manage project covers, while project
+  guests receive a not-found response on every mutation route;
+- the API can perform HEAD, COPY, and DELETE through the internal storage
+  endpoint while generated browser URLs use only the configured public origin;
+- legacy raster revalidation succeeds for a known-valid object and quarantines
+  a deliberately invalid test object; and
+- sign-in, workspace/project navigation, Live updates, import jobs, and a
+  representative issue workflow remain healthy.
+
+`rc.18` is the immediately previous complete publication, but it predates the
+security boundary introduced here. There is no security-equivalent rollback
+target among earlier release candidates. If availability recovery requires an
+emergency application rollback, disable uploads and isolate object storage
+first. The additive validation column may remain in the database; return every
+component to `rc.19` as soon as possible. Restore the pre-upgrade backup only
+when unrelated writes, corruption, or the incident requires point-in-time
+recovery.
+
 ### Upgrade from `rc.17` to `rc.18`
 
 This release fixes the stacking contract for every Popper-positioned Headless

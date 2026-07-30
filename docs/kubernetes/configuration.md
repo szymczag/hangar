@@ -189,6 +189,12 @@ browser-facing presigned URLs; leave it empty only when it is identical to
 provider. The production profile requires HTTPS for both endpoints. Credentials
 come from the object-storage Secret, not this block.
 
+Server-side HEAD, GET, COPY, upload, and delete operations always use
+`endpoint`; only local presigning uses `publicEndpoint`. Hangar never derives
+either destination from an inbound request `Host` header. Treat both values as
+trusted operator configuration, keep the internal endpoint off public ingress,
+and verify the rendered API environment before rollout.
+
 `importBucket` is a separate private bucket for short-lived CSV import sources.
 Grant the API and worker read, write, and delete access to it, deny anonymous
 access, and do not expose it through an Ingress, Gateway, CDN, or public bucket
@@ -353,7 +359,7 @@ global:
 Use a component's `image.pullSecrets` for a narrower credential. Worker, beat,
 and migrator Pods use `api.image.pullSecrets` because they run the API image.
 Public release images currently pull anonymously, so a GHCR credential is not
-required for `0.1.0-rc.18`.
+required for `0.1.0-rc.19`.
 
 ## Replicas and disruption budgets
 
@@ -380,7 +386,7 @@ spread, and a termination grace period. Component templates combine these values
 with their security constraints.
 
 Evaluation dependencies are fixed to `kubernetes.io/arch: amd64`. All application
-images in `0.1.0-rc.18` are also AMD64-only.
+images in `0.1.0-rc.19` are also AMD64-only.
 
 ## Evaluation storage
 
