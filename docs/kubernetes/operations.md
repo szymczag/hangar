@@ -59,6 +59,63 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.15` to `rc.16`
+
+This release completes the positioning part of the Headless UI 2 migration.
+Plane's inherited Headless UI 1 structure attached each Popper ref, style, and
+attributes object to an inner `<div>` beneath `Combobox.Options`,
+`Listbox.Options`, `Menu.Items`, or `Popover.Panel`. Under Headless UI 2 and
+React 19, the descendant did not become the active positioned panel, so Popper
+could retain its initial absolute position at the upper-left corner.
+
+All 28 affected panels now own the Popper integration directly on their Headless
+UI root: 17 combo boxes, 2 list boxes, 1 menu, and 8 popovers across the web,
+Space, and shared UI packages. Repository contract tests reject nested Popper
+targets and unsafe Fragment-backed panels. A browser geometry exercise confirmed
+that the corrected panel follows its trigger instead of remaining at `(0, 0)`.
+
+There is no Django migration and no Helm values, Secret, permission, Kubernetes
+resource, or network-policy contract change. The inherited Plane source remains
+`v1.4.0-rc2` (`package.json` version `1.4.0`). Existing `rc.15` values are
+compatible with the `rc.16` chart. Upgrade the API, workers, Live service, and
+frontends together as one Helm revision; mixed application versions are not a
+qualified steady state.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target package is `0.1.0-rc.16`, its application version is
+   `v0.1.0-rc.16`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc16);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. schedule all Hangar application components as one coordinated rollout.
+
+After the rollout, use a clean browser profile and verify:
+
+- sign-in, workspace navigation, project navigation, Live updates, and
+  representative API operations;
+- opening and selecting values in priority, state, estimate, member, project,
+  module, cycle, date, date-range, label, intake-state, onboarding role, and
+  account or workspace menus;
+- every panel is placed beside its trigger, including after scrolling and near
+  viewport edges;
+- keyboard focus, Escape, outside-click, and repeated open/close behavior; and
+- the browser console contains no Headless UI Fragment or panel-positioning
+  error.
+
+`rc.15` is the immediately previous complete publication, but it contains the
+positioning failure corrected here. `rc.14`, `rc.13`, and `rc.12` contain the
+earlier frontend migration failures. None is a recommended rollback target.
+Because `rc.12` through `rc.16` add no schema or data migration, a coordinated
+application rollback from `rc.16` to `rc.11` does not require a database restore
+solely because one of those releases was deployed. Stop or replace all
+application Pods together, deploy the `rc.11` chart and images as one revision,
+and repeat the representative application and access-control checks. Restore
+the pre-upgrade backup when unrelated writes, data corruption, or the incident
+being handled requires point-in-time recovery.
+
 ### Upgrade from `rc.14` to `rc.15`
 
 This release completes the behavioral part of the Headless UI 2 dropdown
