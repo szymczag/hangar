@@ -5,9 +5,11 @@ from unittest import mock
 from uuid import uuid4
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from plane.app.permissions import ROLE
 from plane.db.models import (
     DraftIssue,
     FileAsset,
@@ -69,6 +71,35 @@ def member_client(member):
     return client
 
 
+@pytest.fixture
+def guest(db, workspace, project):
+    user = User.objects.create(
+        email=f"guest-{uuid4().hex[:8]}@plane.so",
+        username=f"guest_{uuid4().hex[:8]}",
+    )
+    WorkspaceMember.objects.create(
+        workspace=workspace,
+        member=user,
+        role=ROLE.GUEST.value,
+        is_active=True,
+    )
+    ProjectMember.objects.create(
+        project=project,
+        workspace=workspace,
+        member=user,
+        role=ROLE.GUEST.value,
+        is_active=True,
+    )
+    return user
+
+
+@pytest.fixture
+def guest_client(guest):
+    client = APIClient()
+    client.force_authenticate(user=guest)
+    return client
+
+
 def create_asset(*, workspace, creator, entity_type, project=None, issue=None, page=None):
     asset = FileAsset(
         attributes={"name": "asset.png", "type": "image/png", "size": 24},
@@ -89,6 +120,356 @@ def create_asset(*, workspace, creator, entity_type, project=None, issue=None, p
 
 @pytest.mark.contract
 class TestFileAssetMutationScope:
+    @pytest.mark.django_db
+    def test_project_member_can_create_project_cover(
+        self,
+        member_client,
+        member,
+        workspace,
+        project,
+    ):
+        with mock.patch("plane.app.views.asset.v2.S3Storage") as storage_class:
+            storage_class.return_value.generate_presigned_post.return_value = {
+                "url": "https://uploads.example.test",
+                "fields": {},
+            }
+            response = member_client.post(
+                f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/",
+                {
+                    "name": "cover.png",
+                    "type": "image/png",
+                    "size": 32,
+                    "entity_type": FileAsset.EntityTypeContext.PROJECT_COVER,
+                    "entity_identifier": str(project.id),
+                },
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert FileAsset.objects.filter(
+            id=response.data["asset_id"],
+            created_by=member,
+            project=project,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        ).exists()
+
+    @pytest.mark.django_db
+    def test_project_member_can_manage_another_members_project_cover(
+        self,
+        member,
+        workspace,
+        project,
+    ):
+        other_member = User.objects.create(
+            email=f"other-member-{uuid4().hex[:8]}@plane.so",
+            username=f"other_member_{uuid4().hex[:8]}",
+        )
+        WorkspaceMember.objects.create(
+            workspace=workspace,
+            member=other_member,
+            role=ROLE.MEMBER.value,
+            is_active=True,
+        )
+        ProjectMember.objects.create(
+            project=project,
+            workspace=workspace,
+            member=other_member,
+            role=ROLE.MEMBER.value,
+            is_active=True,
+        )
+        client = APIClient()
+        client.force_authenticate(user=other_member)
+        asset = create_asset(
+            workspace=workspace,
+            project=project,
+            creator=member,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        )
+        project_url = f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/{asset.id}/"
+
+        with mock.patch("plane.app.views.asset.v2.complete_asset_upload") as complete_upload:
+            patch_response = client.patch(project_url)
+        delete_response = client.delete(project_url)
+        restore_response = client.post(f"/api/assets/v2/workspaces/{workspace.slug}/restore/{asset.id}/")
+
+        assert patch_response.status_code == status.HTTP_204_NO_CONTENT
+        assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+        assert restore_response.status_code == status.HTTP_204_NO_CONTENT
+        complete_upload.assert_called_once()
+        asset.refresh_from_db()
+        assert asset.is_deleted is False
+
+    @pytest.mark.django_db
+    def test_workspace_admin_with_project_guest_role_can_create_project_cover(
+        self,
+        session_client,
+        create_user,
+        workspace,
+        project,
+    ):
+        ProjectMember.objects.filter(project=project, member=create_user).update(role=ROLE.GUEST.value)
+
+        with mock.patch("plane.app.views.asset.v2.S3Storage") as storage_class:
+            storage_class.return_value.generate_presigned_post.return_value = {
+                "url": "https://uploads.example.test",
+                "fields": {},
+            }
+            response = session_client.post(
+                f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/",
+                {
+                    "name": "cover.png",
+                    "type": "image/png",
+                    "size": 32,
+                    "entity_type": FileAsset.EntityTypeContext.PROJECT_COVER,
+                    "entity_identifier": str(project.id),
+                },
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert FileAsset.objects.filter(
+            id=response.data["asset_id"],
+            created_by=create_user,
+            project=project,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        ).exists()
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("workspace_scoped", [True, False])
+    def test_guest_cannot_create_project_cover(
+        self,
+        workspace_scoped,
+        guest_client,
+        guest,
+        workspace,
+        project,
+    ):
+        url = (
+            f"/api/assets/v2/workspaces/{workspace.slug}/"
+            if workspace_scoped
+            else f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/"
+        )
+
+        with mock.patch("plane.app.views.asset.v2.S3Storage") as storage_class:
+            response = guest_client.post(
+                url,
+                {
+                    "name": "cover.png",
+                    "type": "image/png",
+                    "size": 32,
+                    "entity_type": FileAsset.EntityTypeContext.PROJECT_COVER,
+                    "entity_identifier": str(project.id),
+                },
+                format="json",
+            )
+
+        assert guest.id != project.created_by_id
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert not FileAsset.objects.filter(
+            created_by=guest,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        ).exists()
+        storage_class.return_value.generate_presigned_post.assert_not_called()
+
+    @pytest.mark.django_db
+    def test_guest_cannot_create_legacy_project_cover(
+        self,
+        guest_client,
+        guest,
+        workspace,
+        project,
+    ):
+        response = guest_client.post(
+            f"/api/workspaces/{workspace.slug}/file-assets/",
+            {
+                "asset": SimpleUploadedFile(
+                    "cover.png",
+                    b"\x89PNG\r\n\x1a\nproject-cover",
+                    content_type="image/png",
+                ),
+                "entity_type": FileAsset.EntityTypeContext.PROJECT_COVER,
+                "entity_identifier": str(project.id),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert not FileAsset.objects.filter(
+            created_by=guest,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        ).exists()
+
+    @pytest.mark.django_db
+    def test_guest_cannot_associate_project_cover(
+        self,
+        guest_client,
+        guest,
+        workspace,
+        project,
+    ):
+        asset = create_asset(
+            workspace=workspace,
+            project=project,
+            creator=guest,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        )
+
+        response = guest_client.post(
+            f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/{project.id}/bulk/",
+            {"asset_ids": [str(asset.id)]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        project.refresh_from_db()
+        assert project.cover_image_asset_id is None
+
+    @pytest.mark.django_db
+    def test_bulk_project_cover_rechecks_role_inside_transaction(
+        self,
+        guest_client,
+        guest,
+        workspace,
+        project,
+    ):
+        asset = create_asset(
+            workspace=workspace,
+            project=project,
+            creator=guest,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        )
+
+        with mock.patch(
+            "plane.app.views.asset.v2.ProjectAssetEndpoint.get_scoped_entity_fields",
+            return_value={},
+        ):
+            response = guest_client.post(
+                f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/{project.id}/bulk/",
+                {"asset_ids": [str(asset.id)]},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        project.refresh_from_db()
+        assert project.cover_image_asset_id is None
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("project_scoped", [True, False])
+    def test_guest_cannot_complete_or_delete_project_cover(
+        self,
+        project_scoped,
+        guest_client,
+        guest,
+        workspace,
+        project,
+    ):
+        asset = create_asset(
+            workspace=workspace,
+            project=project,
+            creator=guest,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        )
+        project.cover_image_asset_id = asset.id
+        project.save(update_fields=["cover_image_asset_id"])
+        detail_url = (
+            f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/{asset.id}/"
+            if project_scoped
+            else f"/api/assets/v2/workspaces/{workspace.slug}/{asset.id}/"
+        )
+
+        with mock.patch("plane.app.views.asset.v2.complete_asset_upload") as complete_upload:
+            patch_response = guest_client.patch(detail_url)
+        delete_response = guest_client.delete(detail_url)
+
+        assert patch_response.status_code == status.HTTP_404_NOT_FOUND
+        assert delete_response.status_code == status.HTTP_404_NOT_FOUND
+        complete_upload.assert_not_called()
+        asset.refresh_from_db()
+        project.refresh_from_db()
+        assert asset.is_deleted is False
+        assert project.cover_image_asset_id == asset.id
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("legacy", [True, False])
+    def test_guest_cannot_delete_or_restore_project_cover(
+        self,
+        legacy,
+        guest_client,
+        guest,
+        workspace,
+        project,
+    ):
+        asset = create_asset(
+            workspace=workspace,
+            project=project,
+            creator=guest,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        )
+        asset.is_deleted = True
+        asset.save(update_fields=["is_deleted"])
+        asset_key = asset.asset.name.split("/", 1)[1]
+        restore_url = (
+            f"/api/workspaces/file-assets/{workspace.id}/{asset_key}/restore/"
+            if legacy
+            else f"/api/assets/v2/workspaces/{workspace.slug}/restore/{asset.id}/"
+        )
+
+        restore_response = guest_client.post(restore_url)
+
+        assert restore_response.status_code == status.HTTP_404_NOT_FOUND
+        asset.refresh_from_db()
+        assert asset.is_deleted is True
+
+        asset.is_deleted = False
+        asset.save(update_fields=["is_deleted"])
+        delete_url = (
+            f"/api/workspaces/file-assets/{workspace.id}/{asset_key}/"
+            if legacy
+            else f"/api/assets/v2/workspaces/{workspace.slug}/{asset.id}/"
+        )
+        delete_response = guest_client.delete(delete_url)
+
+        assert delete_response.status_code == status.HTTP_404_NOT_FOUND
+        asset.refresh_from_db()
+        assert asset.is_deleted is False
+
+    @pytest.mark.django_db
+    def test_guest_cannot_duplicate_asset_as_project_cover(
+        self,
+        guest_client,
+        guest,
+        workspace,
+        project,
+    ):
+        source = create_asset(
+            workspace=workspace,
+            project=project,
+            creator=guest,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
+        )
+
+        with mock.patch("plane.app.views.asset.v2.S3Storage") as storage_class:
+            response = guest_client.post(
+                f"/api/assets/v2/workspaces/{workspace.slug}/duplicate-assets/{source.id}/",
+                {
+                    "project_id": str(project.id),
+                    "entity_id": str(project.id),
+                    "entity_type": FileAsset.EntityTypeContext.PROJECT_COVER,
+                },
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert (
+            not FileAsset.objects.filter(
+                created_by=guest,
+                entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+            )
+            .exclude(id=source.id)
+            .exists()
+        )
+        storage_class.return_value.copy_object.assert_not_called()
+
     @pytest.mark.django_db
     def test_project_member_cannot_delete_another_users_asset(
         self,

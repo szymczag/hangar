@@ -20,45 +20,64 @@ class TestS3StorageEndpoints:
         clear=True,
     )
     @patch("plane.settings.storage.boto3")
-    def test_request_scoped_client_uses_explicit_public_endpoint(self, mock_boto3):
-        request = Mock(scheme="https")
+    def test_presigning_uses_explicit_public_endpoint_but_storage_uses_internal(self, mock_boto3):
+        internal_client = Mock()
+        public_client = Mock()
+        mock_boto3.client.side_effect = [internal_client, public_client]
+        request = Mock()
 
-        S3Storage(request=request)
+        storage = S3Storage(request=request)
+        storage.get_object_metadata("workspace/asset.png")
+        storage.generate_presigned_url("workspace/asset.png")
 
-        assert mock_boto3.client.call_args.kwargs["endpoint_url"] == "https://hangar.example.com"
+        assert mock_boto3.client.call_args_list[0].kwargs["endpoint_url"] == "http://object-storage:8333"
+        assert mock_boto3.client.call_args_list[1].kwargs["endpoint_url"] == "https://hangar.example.com"
+        internal_client.head_object.assert_called_once()
+        public_client.generate_presigned_url.assert_called_once()
         request.get_host.assert_not_called()
 
     @patch.dict(
         os.environ,
         {
             "AWS_S3_ENDPOINT_URL": "http://object-storage:8333",
-            "AWS_S3_PUBLIC_ENDPOINT_URL": "https://hangar.example.com",
             "USE_MINIO": "1",
         },
         clear=True,
     )
     @patch("plane.settings.storage.boto3")
-    def test_server_scoped_client_uses_internal_endpoint(self, mock_boto3):
-        S3Storage()
+    def test_single_internal_client_is_used_without_a_distinct_public_endpoint(self, mock_boto3):
+        storage = S3Storage()
 
+        assert mock_boto3.client.call_count == 1
         assert mock_boto3.client.call_args.kwargs["endpoint_url"] == "http://object-storage:8333"
+        assert storage.s3_presign_client is storage.s3_client
 
     @patch.dict(
         os.environ,
         {
             "AWS_S3_ENDPOINT_URL": "http://object-storage:8333",
             "USE_MINIO": "1",
+            "WEB_URL": "https://trusted.example.com",
         },
         clear=True,
     )
     @patch("plane.settings.storage.boto3")
-    def test_request_host_fallback_is_preserved_without_public_endpoint(self, mock_boto3):
-        request = Mock(scheme="https")
-        request.get_host.return_value = "legacy.example.com"
+    def test_minio_fallback_uses_trusted_web_url_and_ignores_request_host(self, mock_boto3):
+        internal_client = Mock()
+        public_client = Mock()
+        mock_boto3.client.side_effect = [internal_client, public_client]
+        request = Mock()
+        request.get_host.return_value = "169.254.169.254"
 
-        S3Storage(request=request)
+        storage = S3Storage(request=request)
+        storage.get_object_metadata("workspace/asset.png")
+        storage.generate_presigned_post("workspace/asset.png", "image/png", 32)
 
-        assert mock_boto3.client.call_args.kwargs["endpoint_url"] == "https://legacy.example.com"
+        assert mock_boto3.client.call_args_list[0].kwargs["endpoint_url"] == "http://object-storage:8333"
+        assert mock_boto3.client.call_args_list[1].kwargs["endpoint_url"] == "https://trusted.example.com"
+        internal_client.head_object.assert_called_once()
+        public_client.generate_presigned_post.assert_called_once()
+        request.get_host.assert_not_called()
 
     @patch("plane.settings.storage.boto3")
     def test_delete_files_fails_on_partial_object_storage_errors(self, mock_boto3):

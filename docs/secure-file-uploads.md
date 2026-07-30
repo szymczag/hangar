@@ -20,6 +20,11 @@ requests are untrusted hints; they do not publish an object.
 
 The staging key is deleted after its presigned credentials expire. A recurring
 task removes abandoned pending assets and their objects after one hour.
+Server-side HEAD, GET, COPY, upload, and delete operations always use the
+configured internal object-storage endpoint. Presigned browser URLs use a
+separate configured public endpoint, or the trusted `WEB_URL` compatibility
+fallback for MinIO. Request `Host` headers never select an outbound storage
+destination.
 
 ## Rendering policy
 
@@ -107,6 +112,9 @@ Entity association treats UUIDs as untrusted references: private drafts require
 their creator, and public pages still require an active project link and
 membership in that linked project. This applies consistently to current,
 legacy multipart, bulk, duplicate, and draft-conversion paths.
+Project-cover creation, duplication, association, completion, deletion, and
+restoration additionally require an active project member or administrator;
+project guests cannot change the project cover through an asset side channel.
 Public Spaces and API downloads render raster content inline only when the
 trusted database validation marker is current; historical unvalidated assets
 remain available only as forced `application/octet-stream` attachments.
