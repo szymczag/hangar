@@ -59,6 +59,69 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.17` to `rc.18`
+
+This release fixes the stacking contract for every Popper-positioned Headless
+UI panel. `rc.17` moved panels into portals to escape clipping ancestors, but
+those portals retained local `z-10` or `z-30` layers. Issue peeks and dialogs
+use layers through `z-100`, so a panel could be visible while browser hit
+testing delivered pointer events to the dialog above it. Priority, label,
+module, date, and other field selectors could therefore open without accepting
+a selection.
+
+The shared Tailwind layer now assigns every Popper root marked with
+`data-popper-placement` to the floating-overlay layer `110`: above all current
+dialog and issue-peek layers, but below the notification layer `1000`. This
+central contract covers all 33 Popper targets and overrides stale component-local
+stacking classes. A repository test verifies that every JSX Popper ref owns its
+attributes and that the shared overlay rule and variable cannot be removed
+independently.
+
+There is no Django migration and no Helm values, Secret, permission, Kubernetes
+resource, or network-policy contract change. The inherited Plane source remains
+`v1.4.0-rc2` (`package.json` version `1.4.0`). Existing `rc.17` values are
+compatible with the `rc.18` chart. Upgrade the API, workers, Live service, and
+frontends together as one Helm revision; mixed application versions are not a
+qualified steady state.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target package is `0.1.0-rc.18`, its application version is
+   `v0.1.0-rc.18`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc18);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. schedule all Hangar application components as one coordinated rollout.
+
+After the rollout, use a clean browser profile and verify:
+
+- opening and selecting priority, labels, modules, dates, state, estimate,
+  member, project, cycle, intake state, onboarding role, and account or
+  workspace menu values;
+- pointer selection inside an issue peek and every supported dialog size;
+- panel placement beside its trigger after scrolling and near viewport edges;
+- keyboard focus, Escape, outside-click, and repeated open/close behavior; and
+- sign-in, workspace and project navigation, Live updates, and representative
+  API operations.
+
+A local real-pointer browser exercise confirmed that Priority changed from none
+to high, Modules from none to alpha, and Labels from none to security inside a
+dialog using the shared layer. The production build, lint, types, format, and
+repository contract tests also passed.
+
+`rc.17` is the immediately previous complete publication, but it contains the
+pointer-interaction failure corrected here. `rc.16`, `rc.15`, `rc.14`,
+`rc.13`, and `rc.12` contain earlier frontend migration failures. None is a
+recommended rollback target. Because `rc.12` through `rc.18` add no schema or
+data migration, a coordinated application rollback from `rc.18` to `rc.11`
+does not require a database restore solely because one of those releases was
+deployed. Stop or replace all application Pods together, deploy the `rc.11`
+chart and images as one revision, and repeat the representative application and
+access-control checks. Restore the pre-upgrade backup when unrelated writes,
+data corruption, or the incident being handled requires point-in-time recovery.
+
 ### Upgrade from `rc.16` to `rc.17`
 
 This release completes the visibility and interaction portion of the Headless UI

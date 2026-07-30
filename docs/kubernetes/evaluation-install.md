@@ -1,6 +1,6 @@
 # Install Hangar for evaluation
 
-This tutorial installs Hangar `0.1.0-rc.17` in a dedicated namespace with bundled,
+This tutorial installs Hangar `0.1.0-rc.18` in a dedicated namespace with bundled,
 persistent PostgreSQL, Valkey, RabbitMQ, and object storage. When complete, you
 will have a TLS-enabled Hangar instance suitable for evaluation and compatibility
 testing.
@@ -26,7 +26,7 @@ You need:
 Set the release parameters used throughout this tutorial:
 
 ```bash
-export CHART_VERSION=0.1.0-rc.17
+export CHART_VERSION=0.1.0-rc.18
 export RELEASE_NAME=hangar
 export NAMESPACE=hangar-evaluation
 export HANGAR_HOST=hangar-evaluation.example.com
@@ -43,8 +43,8 @@ helm show chart oci://ghcr.io/szymczag/charts/hangar \
   --version "$CHART_VERSION"
 ```
 
-Confirm the output reports chart version `0.1.0-rc.17`, application version
-`v0.1.0-rc.17`, and the expected Kubernetes version constraint.
+Confirm the output reports chart version `0.1.0-rc.18`, application version
+`v0.1.0-rc.18`, and the expected Kubernetes version constraint.
 
 For higher-assurance environments, complete [artifact verification](security.md#verify-release-010-rc17)
 before installation.
@@ -82,7 +82,7 @@ Download the release-matched Secret structure into a private local file:
 umask 077
 curl --fail --location --silent --show-error \
   --output evaluation-secrets.yaml \
-  https://raw.githubusercontent.com/szymczag/hangar/hangar-v0.1.0-rc.17/charts/hangar/examples/evaluation-secrets.example.yaml
+  https://raw.githubusercontent.com/szymczag/hangar/hangar-v0.1.0-rc.18/charts/hangar/examples/evaluation-secrets.example.yaml
 ```
 
 Replace every `CHANGE_ME` value with a unique, randomly generated credential.
