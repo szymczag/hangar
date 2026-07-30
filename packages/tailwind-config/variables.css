@@ -5,6 +5,13 @@
 @layer base {
   :root,
   :host {
+    /*
+     * Floating Popper content is portaled to the document root, so it must sit
+     * above every application dialog (currently capped at z-index 100) while
+     * remaining below global notifications (z-index 1000).
+     */
+    --z-index-floating-overlay: 110;
+
     /* ---------- Alpha colors ---------- */
     /* White alpha */
     --alpha-white-0: oklch(1 0 0 / 0%);
