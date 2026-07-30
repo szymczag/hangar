@@ -46,7 +46,7 @@ export function CustomSearchSelect(props: ICustomSearchSelectProps) {
   const [query, setQuery] = useState("");
 
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
   const [isOpen, setIsOpen] = useState(defaultOpen);
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -148,15 +148,19 @@ export function CustomSearchSelect(props: ICustomSearchSelectProps) {
             )}
             {isOpen &&
               createPortal(
-                <Combobox.Options data-prevent-outside-click modal={false} static>
+                <Combobox.Options
+                  data-prevent-outside-click
+                  modal={false}
+                  ref={setPopperElement}
+                  style={styles.popper}
+                  {...attributes.popper}
+                  static
+                >
                   <div
                     className={cn(
                       "z-30 my-1 min-w-48 overflow-y-scroll rounded-md border-[0.5px] border-subtle-1 bg-surface-1 py-2.5 text-11 whitespace-nowrap focus:outline-none",
                       optionsClassName
                     )}
-                    ref={setPopperElement}
-                    style={styles.popper}
-                    {...attributes.popper}
                   >
                     <div className="mx-2 flex items-center gap-1.5 rounded-sm border border-subtle px-2">
                       <SearchIcon className="h-3.5 w-3.5 text-placeholder" strokeWidth={1.5} />

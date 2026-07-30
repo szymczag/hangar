@@ -93,7 +93,7 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
   } = props;
 
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
 
   const { t } = useTranslation();
 
@@ -202,13 +202,14 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
                   />
                 </Listbox.Button>
 
-                <Listbox.Options as="div" modal={false}>
-                  <div
-                    className="shadow-sm absolute z-10 mt-1 h-fit w-48 space-y-1 rounded-md border border-strong bg-surface-1 p-2 focus:outline-none sm:w-60"
-                    ref={setPopperElement}
-                    style={styles.popper}
-                    {...attributes.popper}
-                  >
+                <Listbox.Options
+                  as="div"
+                  modal={false}
+                  ref={setPopperElement}
+                  style={styles.popper}
+                  {...attributes.popper}
+                >
+                  <div className="shadow-sm absolute z-10 mt-1 h-fit w-48 space-y-1 rounded-md border border-strong bg-surface-1 p-2 focus:outline-none sm:w-60">
                     {Object.entries(ROLE_DETAILS).map(([key, value]) => (
                       <Listbox.Option
                         as="div"

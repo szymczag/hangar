@@ -41,7 +41,7 @@ export const IssueLabelSelect = observer(function IssueLabelSelect(props: IIssue
   const { allowPermissions } = useUserPermissions();
   // states
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [query, setQuery] = useState("");
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -139,12 +139,15 @@ export const IssueLabelSelect = observer(function IssueLabelSelect(props: IIssue
           </Button>
         </Combobox.Button>
 
-        <Combobox.Options className="fixed z-10" modal={false}>
+        <Combobox.Options
+          className="fixed z-10"
+          modal={false}
+          ref={setPopperElement}
+          style={styles.popper}
+          {...attributes.popper}
+        >
           <div
             className={`z-10 my-1 w-48 rounded-sm border border-strong bg-surface-1 py-2.5 text-11 whitespace-nowrap shadow-raised-200 focus:outline-none`}
-            ref={setPopperElement}
-            style={styles.popper}
-            {...attributes.popper}
           >
             <div className="px-2">
               <div className="flex w-full items-center justify-start rounded-sm border border-subtle bg-surface-2 px-2">

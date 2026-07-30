@@ -83,7 +83,7 @@ export function LabelDropdown(props: ILabelDropdownProps) {
 
   // popper-js refs
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
 
   //hooks
   const { fetchProjectLabels, getProjectLabels, createLabel } = useLabel();
@@ -253,12 +253,16 @@ export function LabelDropdown(props: ILabelDropdownProps) {
         multiple
       >
         {isOpen && (
-          <Combobox.Options className="fixed z-10" modal={false} static>
+          <Combobox.Options
+            className="fixed z-10"
+            modal={false}
+            ref={setPopperElement}
+            style={styles.popper}
+            {...attributes.popper}
+            static
+          >
             <div
               className={`z-10 my-1 h-auto w-48 rounded-sm border border-strong bg-surface-1 px-2 py-2.5 text-caption-sm-regular whitespace-nowrap shadow-raised-200 focus:outline-none ${optionsClassName}`}
-              ref={setPopperElement}
-              style={styles.popper}
-              {...attributes.popper}
             >
               <div className="flex w-full items-center justify-start rounded-sm border border-subtle bg-surface-2 px-2">
                 <SearchIcon className="h-3.5 w-3.5 text-tertiary" />
