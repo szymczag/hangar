@@ -6,7 +6,6 @@
 import uuid
 
 # Django imports
-from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.utils import timezone
 from django.db import IntegrityError
@@ -38,9 +37,11 @@ from plane.throttles.asset import AssetRateThrottle
 from plane.utils.path_validator import sanitize_filename
 from plane.utils.file_asset_upload import (
     UPLOAD_URL_EXPIRATION_SECONDS,
+    UPLOAD_VALIDATION_VERSION,
     UploadError,
     build_pending_asset_key,
     complete_asset_upload,
+    revalidate_legacy_static_asset,
     upload_error_payload,
     validate_upload_metadata,
 )
@@ -253,7 +254,11 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         }:
             return {"user_id": request.user.id} if str(entity_id) == str(request.user.id) else None
         if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
-            page = Page.objects.filter(id=entity_id, workspace=workspace).first()
+            page = Page.objects.filter(
+                Q(owned_by=request.user) | Q(access=Page.PUBLIC_ACCESS),
+                id=entity_id,
+                workspace=workspace,
+            ).first()
             return {"page_id": page.id} if page else None
         return None
 
@@ -553,7 +558,6 @@ class StaticFileAssetEndpoint(BaseAPIView):
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-
         # Check if the entity type is allowed
         if asset.entity_type not in [
             FileAsset.EntityTypeContext.USER_AVATAR,
@@ -566,17 +570,41 @@ class StaticFileAssetEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get the presigned URL.
-        # Force attachment disposition for script-capable MIME types to prevent
-        # same-origin XSS when assets are served on the application's origin.
+        # Static assets are public and inline, so only server-validated raster
+        # content carrying the current validation marker is eligible.
         storage = S3Storage(request=request)
+        if asset.upload_validation_version == 0:
+            try:
+                asset = revalidate_legacy_static_asset(
+                    asset_id=asset.id,
+                    storage=storage,
+                )
+            except (UploadError, FileAsset.DoesNotExist):
+                return Response(
+                    {"error": "The requested asset could not be found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        if asset.upload_validation_version != UPLOAD_VALIDATION_VERSION:
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
-        disposition = "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
+        if asset_mime_type not in {
+            "image/gif",
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+        }:
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         # Generate a presigned URL to share an S3 object
         signed_url = storage.generate_presigned_url(
             object_name=asset.asset.name,
-            disposition=disposition,
-            content_type=(asset_mime_type if disposition == "inline" else "application/octet-stream"),
+            disposition="inline",
+            content_type=asset_mime_type,
         )
         # Redirect to the signed URL
         return HttpResponseRedirect(signed_url)
@@ -597,7 +625,7 @@ class AssetRestoreEndpoint(BaseAPIView):
 class ProjectAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload cover images/logos etc for workspace, projects and users."""
 
-    def get_scoped_entity_fields(self, *, workspace, project_id, entity_type, entity_id):
+    def get_scoped_entity_fields(self, *, request, workspace, project_id, entity_type, entity_id):
         if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
             return {"project_id": project_id} if str(entity_id) == str(project_id) else None
         if entity_type in {
@@ -619,13 +647,18 @@ class ProjectAssetEndpoint(BaseAPIView):
             return {"comment_id": comment.id} if comment else None
         if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
             page = Page.objects.filter(
+                Q(owned_by=request.user) | Q(access=Page.PUBLIC_ACCESS),
                 id=entity_id,
                 workspace=workspace,
                 projects__id=project_id,
             ).first()
             return {"page_id": page.id} if page else None
         if entity_type == FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION:
-            draft_issue = DraftIssue.objects.filter(id=entity_id, workspace=workspace).first()
+            draft_issue = DraftIssue.objects.filter(
+                id=entity_id,
+                workspace=workspace,
+                project_id=project_id,
+            ).first()
             return {"draft_issue_id": draft_issue.id} if draft_issue else None
         return None
 
@@ -654,6 +687,7 @@ class ProjectAssetEndpoint(BaseAPIView):
         # Get the workspace
         workspace = Workspace.objects.get(slug=slug)
         entity_fields = self.get_scoped_entity_fields(
+            request=request,
             workspace=workspace,
             project_id=project_id,
             entity_type=entity_type,

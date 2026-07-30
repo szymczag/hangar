@@ -29,6 +29,49 @@ are rendered inline. Attachments and all other formats are returned with
 type. SVG, XML, JavaScript, and similar active formats therefore cannot execute
 in Hangar's origin.
 
+Public inline assets must carry the current server-generated validation-version
+marker. Assets uploaded before this validation boundary was introduced are not
+implicitly trusted from their old filename or client-supplied MIME metadata.
+On first access, eligible legacy avatars, covers, logos, and project covers are
+checked against their current object size, immutable ETag, filename policy, and
+actual bounded content signature. A valid raster is copied conditionally to a
+new immutable key with canonical metadata and marked with the current validation
+version. Invalid, missing, active-content, or changed objects remain quarantined
+and return `404`; their old object is never made public by the migration.
+The trusted validation state lives in a dedicated server-owned database column,
+not in the legacy client-writable JSON metadata.
+Policy-rejected legacy objects are marked as quarantined so repeated anonymous
+requests cannot trigger repeated storage inspection. Transient storage failures
+remain retryable.
+
+Operators can pre-validate legacy public assets after deployment instead of
+waiting for first access:
+
+```sh
+python manage.py revalidate_legacy_static_assets
+```
+
+Use `--limit N` to process a bounded batch. The command reports validated,
+quarantined, and retryable objects separately and never promotes an object on a
+storage or policy failure.
+
+## Legacy multipart compatibility
+
+The legacy workspace, user, and issue-attachment multipart URLs remain
+available for older API clients. They now accept only the uploaded `asset` and
+the minimum explicit entity context required by that URL. Client-supplied
+publication flags, relationships, sizes, MIME attributes, storage metadata,
+and object keys are rejected. Django validates the actual multipart filename,
+size, canonical type, and bounded content before writing the object once to
+the final private storage namespace.
+
+The user legacy route accepts only avatar and cover images. Workspace entity
+identifiers are resolved inside the authenticated workspace and, where
+applicable, an actively accessible project. The issue legacy route resolves
+the issue under the exact URL workspace and project before accepting bytes.
+Operators should migrate integrations to the v2 direct-upload flow; the legacy
+routes exist only as a constrained compatibility layer.
+
 ## Security boundary
 
 This validation protects Hangar from MIME spoofing, active-content rendering,

@@ -62,6 +62,10 @@ class FileAsset(BaseModel):
     external_source = models.CharField(max_length=255, null=True, blank=True)
     size = models.FloatField(default=0)
     is_uploaded = models.BooleanField(default=False)
+    upload_validation_version = models.SmallIntegerField(
+        default=0,
+        editable=False,
+    )
     storage_metadata = models.JSONField(default=dict, null=True, blank=True)
 
     class Meta:

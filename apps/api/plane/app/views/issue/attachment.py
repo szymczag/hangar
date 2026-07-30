@@ -28,7 +28,9 @@ from plane.utils.file_asset_upload import (
     UploadError,
     build_pending_asset_key,
     complete_asset_upload,
+    save_validated_multipart_asset,
     upload_error_payload,
+    validate_multipart_upload,
     validate_upload_metadata,
 )
 
@@ -40,28 +42,69 @@ class IssueAttachmentEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, issue_id):
-        serializer = IssueAttachmentSerializer(data=request.data)
-        workspace = Workspace.objects.get(slug=slug)
-        if serializer.is_valid():
-            serializer.save(
-                project_id=project_id,
-                issue_id=issue_id,
-                workspace_id=workspace.id,
+        issue = Issue.objects.filter(
+            id=issue_id,
+            workspace__slug=slug,
+            project_id=project_id,
+        ).first()
+        if issue is None:
+            return Response(
+                {"error": "Issue not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        unexpected_fields = set(request.data) - {"asset"}
+        if unexpected_fields:
+            return Response(
+                {
+                    "error": "Legacy upload metadata is not accepted.",
+                    "code": "unsupported_legacy_field",
+                    "status": False,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        uploaded_file = request.FILES.get("asset")
+        if uploaded_file is None:
+            return Response(
+                {"error": "A file is required.", "code": "missing_file", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            metadata = validate_multipart_upload(
+                uploaded_file=uploaded_file,
                 entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
             )
-            issue_activity.delay(
-                type="attachment.activity.created",
-                requested_data=None,
-                actor_id=str(self.request.user.id),
-                issue_id=str(self.kwargs.get("issue_id", None)),
-                project_id=str(self.kwargs.get("project_id", None)),
-                current_instance=json.dumps(serializer.data, cls=DjangoJSONEncoder),
-                epoch=int(timezone.now().timestamp()),
-                notification=True,
-                origin=base_host(request=request, is_app=True),
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+
+        workspace = Workspace.objects.get(slug=slug)
+        try:
+            asset = save_validated_multipart_asset(
+                uploaded_file=uploaded_file,
+                metadata=metadata,
+                storage=S3Storage(request=request, is_server=True),
+                namespace=workspace.id,
+                created_by_id=request.user.id,
+                entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+                entity_identifier=issue.id,
+                workspace_id=workspace.id,
+                project_id=project_id,
+                issue_id=issue.id,
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+        serializer = IssueAttachmentSerializer(asset)
+        issue_activity.delay(
+            type="attachment.activity.created",
+            requested_data=None,
+            actor_id=str(self.request.user.id),
+            issue_id=str(self.kwargs.get("issue_id", None)),
+            project_id=str(self.kwargs.get("project_id", None)),
+            current_instance=json.dumps(serializer.data, cls=DjangoJSONEncoder),
+            epoch=int(timezone.now().timestamp()),
+            notification=True,
+            origin=base_host(request=request, is_app=True),
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):

@@ -10,9 +10,126 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 # Module imports
 from ..base import BaseAPIView, BaseViewSet
-from plane.app.permissions import WorkspaceMemberPermission
-from plane.db.models import FileAsset, Workspace
+from plane.app.permissions import ROLE, WorkspaceMemberPermission
+from plane.db.models import (
+    DraftIssue,
+    FileAsset,
+    Issue,
+    IssueComment,
+    Page,
+    Project,
+    ProjectMember,
+    Workspace,
+    WorkspaceMember,
+)
 from plane.app.serializers import FileAssetSerializer
+from plane.settings.storage import S3Storage
+from plane.utils.file_asset_upload import (
+    UploadError,
+    save_validated_multipart_asset,
+    upload_error_payload,
+    validate_multipart_upload,
+)
+
+
+def _workspace_entity_fields(*, request, workspace, entity_type, entity_id):
+    """Resolve legacy multipart entity identifiers inside the URL workspace."""
+
+    if entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO:
+        is_admin = WorkspaceMember.objects.filter(
+            workspace=workspace,
+            member=request.user,
+            role=ROLE.ADMIN.value,
+            is_active=True,
+        ).exists()
+        if is_admin and str(entity_id) == str(workspace.id):
+            return {}
+        return None
+    if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
+        project = Project.objects.filter(id=entity_id, workspace=workspace).first()
+        if (
+            project
+            and ProjectMember.objects.filter(
+                project=project,
+                workspace=workspace,
+                member=request.user,
+                is_active=True,
+            ).exists()
+        ):
+            return {"project_id": project.id}
+        return None
+    if entity_type in {
+        FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+        FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
+    }:
+        issue = Issue.objects.filter(id=entity_id, workspace=workspace).first()
+        if (
+            issue
+            and ProjectMember.objects.filter(
+                project_id=issue.project_id,
+                workspace=workspace,
+                member=request.user,
+                is_active=True,
+            ).exists()
+        ):
+            return {"project_id": issue.project_id, "issue_id": issue.id}
+        return None
+    if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
+        comment = IssueComment.objects.filter(id=entity_id, workspace=workspace).first()
+        if (
+            comment
+            and ProjectMember.objects.filter(
+                project_id=comment.project_id,
+                workspace=workspace,
+                member=request.user,
+                is_active=True,
+            ).exists()
+        ):
+            return {"project_id": comment.project_id, "comment_id": comment.id}
+        return None
+    if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
+        page = Page.objects.filter(id=entity_id, workspace=workspace).first()
+        if page is None:
+            return None
+        if page.owned_by_id == request.user.id:
+            return {"page_id": page.id}
+        accessible_project = (
+            ProjectMember.objects.filter(
+                project__pages=page,
+                workspace=workspace,
+                member=request.user,
+                is_active=True,
+            )
+            .values_list("project_id", flat=True)
+            .first()
+        )
+        if page.access == Page.PUBLIC_ACCESS and accessible_project:
+            return {"page_id": page.id, "project_id": accessible_project}
+        return None
+    if entity_type in {
+        FileAsset.EntityTypeContext.DRAFT_ISSUE_ATTACHMENT,
+        FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION,
+    }:
+        draft_issue = DraftIssue.objects.filter(id=entity_id, workspace=workspace).first()
+        if (
+            draft_issue
+            and ProjectMember.objects.filter(
+                project_id=draft_issue.project_id,
+                workspace=workspace,
+                member=request.user,
+                is_active=True,
+            ).exists()
+        ):
+            return {
+                "project_id": draft_issue.project_id,
+                "draft_issue_id": draft_issue.id,
+            }
+        return None
+    return None
+
+
+def _unexpected_legacy_fields(request, allowed_fields):
+    return set(request.data) - set(allowed_fields)
 
 
 class FileAssetEndpoint(BaseAPIView):
@@ -39,11 +156,73 @@ class FileAssetEndpoint(BaseAPIView):
         # WorkspaceMemberPermission already rejects unknown slugs before this runs.
         # Use .get() so any TOCTOU race still surfaces as a 404 via ObjectDoesNotExist.
         workspace = Workspace.objects.get(slug=slug)
-        serializer = FileAssetSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(workspace_id=workspace.id)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        uploaded_file = request.FILES.get("asset")
+        entity_type = request.data.get("entity_type")
+        entity_identifier = request.data.get("entity_identifier")
+        if _unexpected_legacy_fields(
+            request,
+            {"asset", "entity_type", "entity_identifier"},
+        ):
+            return Response(
+                {
+                    "error": "Legacy upload metadata is not accepted.",
+                    "code": "unsupported_legacy_field",
+                    "status": False,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if uploaded_file is None:
+            return Response(
+                {"error": "A file is required.", "code": "missing_file", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if entity_type not in FileAsset.EntityTypeContext.values or not entity_identifier:
+            return Response(
+                {
+                    "error": "A valid entity context is required.",
+                    "code": "invalid_entity_context",
+                    "status": False,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        entity_fields = _workspace_entity_fields(
+            request=request,
+            workspace=workspace,
+            entity_type=entity_type,
+            entity_id=entity_identifier,
+        )
+        if entity_fields is None:
+            return Response(
+                {
+                    "error": "The entity context could not be found.",
+                    "code": "invalid_entity_context",
+                    "status": False,
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            metadata = validate_multipart_upload(
+                uploaded_file=uploaded_file,
+                entity_type=entity_type,
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+
+        try:
+            asset = save_validated_multipart_asset(
+                uploaded_file=uploaded_file,
+                metadata=metadata,
+                storage=S3Storage(request=request, is_server=True),
+                namespace=workspace.id,
+                created_by_id=request.user.id,
+                entity_type=entity_type,
+                entity_identifier=entity_identifier,
+                workspace_id=workspace.id,
+                **entity_fields,
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+        return Response(FileAssetSerializer(asset).data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
@@ -79,11 +258,56 @@ class UserAssetsEndpoint(BaseAPIView):
             )
 
     def post(self, request):
-        serializer = FileAssetSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        uploaded_file = request.FILES.get("asset")
+        entity_type = request.data.get("entity_type")
+        if _unexpected_legacy_fields(request, {"asset", "entity_type"}):
+            return Response(
+                {
+                    "error": "Legacy upload metadata is not accepted.",
+                    "code": "unsupported_legacy_field",
+                    "status": False,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if uploaded_file is None:
+            return Response(
+                {"error": "A file is required.", "code": "missing_file", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if entity_type not in {
+            FileAsset.EntityTypeContext.USER_AVATAR,
+            FileAsset.EntityTypeContext.USER_COVER,
+        }:
+            return Response(
+                {
+                    "error": "A valid user asset context is required.",
+                    "code": "invalid_entity_context",
+                    "status": False,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            metadata = validate_multipart_upload(
+                uploaded_file=uploaded_file,
+                entity_type=entity_type,
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+
+        try:
+            asset = save_validated_multipart_asset(
+                uploaded_file=uploaded_file,
+                metadata=metadata,
+                storage=S3Storage(request=request, is_server=True),
+                namespace=f"user-{request.user.id}",
+                created_by_id=request.user.id,
+                entity_type=entity_type,
+                entity_identifier=request.user.id,
+                user_id=request.user.id,
+            )
+        except UploadError as error:
+            return Response(upload_error_payload(error), status=error.http_status)
+        return Response(FileAssetSerializer(asset).data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, asset_key):
         file_asset = FileAsset.objects.get(asset=asset_key, created_by=request.user)

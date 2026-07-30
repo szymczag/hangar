@@ -27,6 +27,12 @@ from plane.settings.storage import S3Storage
 from plane.utils.exception_logger import log_exception
 from plane.utils.host import base_host
 from plane.utils.ip_address import get_client_ip
+from plane.utils.file_asset_upload import (
+    UPLOAD_SIGNATURE_BYTES,
+    UPLOAD_VALIDATION_VERSION,
+    validate_file_content,
+    validate_upload_metadata,
+)
 
 from .error import AUTHENTICATION_ERROR_CODES, AuthenticationException
 
@@ -159,6 +165,8 @@ class Adapter:
         if not avatar_url:
             return None
 
+        storage = None
+        filename = None
         try:
             headers = self.get_avatar_download_headers()
             # Download the avatar image over an SSRF-safe client: the avatar URL
@@ -184,7 +192,7 @@ class Adapter:
                     return None
 
                 # Get content type and determine file extension
-                content_type = response.headers.get("Content-Type", "image/jpeg")
+                content_type = response.headers.get("Content-Type", "image/jpeg").split(";", 1)[0].strip().lower()
                 extension_map = {
                     "image/jpeg": "jpg",
                     "image/jpg": "jpg",
@@ -212,6 +220,16 @@ class Adapter:
 
             # Generate unique filename
             filename = f"{uuid.uuid4().hex}-user-avatar.{extension}"
+            metadata = validate_upload_metadata(
+                raw_name=filename,
+                raw_size=file_size,
+                claimed_mime_type=content_type,
+                entity_type=FileAsset.EntityTypeContext.USER_AVATAR,
+            )
+            detected_mime = validate_file_content(
+                expected_mime=metadata.mime_type,
+                content=content[:UPLOAD_SIGNATURE_BYTES],
+            )
 
             storage = S3Storage(request=self.request)
 
@@ -220,28 +238,49 @@ class Adapter:
             file_obj.seek(0)
 
             # Upload using boto3 directly
-            upload_success = storage.upload_file(file_obj=file_obj, object_name=filename, content_type=content_type)
+            upload_success = storage.upload_file(
+                file_obj=file_obj,
+                object_name=filename,
+                content_type=metadata.mime_type,
+            )
             if not upload_success:
                 return None
 
             # Get storage metadata
             storage_metadata = storage.get_object_metadata(object_name=filename)
+            if storage_metadata is None or storage_metadata.get("ContentLength") != metadata.size:
+                storage.delete_files([filename])
+                return None
+            storage_metadata.update(
+                {
+                    "DetectedContentType": detected_mime,
+                    "ValidatedAt": timezone.now().isoformat(),
+                    "ValidationVersion": UPLOAD_VALIDATION_VERSION,
+                }
+            )
 
             # Create FileAsset record
             file_asset = FileAsset.objects.create(
-                attributes={"name": f"{self.provider}-avatar.{extension}", "type": content_type, "size": file_size},
+                attributes={
+                    "name": f"{self.provider}-avatar.{extension}",
+                    "type": metadata.mime_type,
+                    "size": metadata.size,
+                },
                 asset=filename,
-                size=file_size,
+                size=metadata.size,
                 user=user,
                 created_by=user,
                 entity_type=FileAsset.EntityTypeContext.USER_AVATAR,
                 is_uploaded=True,
+                upload_validation_version=UPLOAD_VALIDATION_VERSION,
                 storage_metadata=storage_metadata,
             )
 
             return file_asset
 
         except Exception as e:
+            if storage is not None and filename is not None:
+                storage.delete_files([filename])
             log_exception(e)
             # Return None if upload fails, so original URL can be used as fallback
             return None

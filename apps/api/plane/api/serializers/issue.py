@@ -711,6 +711,7 @@ class IssueAttachmentSerializer(BaseSerializer):
             "workspace",
             "project",
             "issue",
+            "upload_validation_version",
             "updated_by",
             "updated_at",
         ]

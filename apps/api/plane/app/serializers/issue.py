@@ -641,15 +641,7 @@ class IssueAttachmentSerializer(BaseSerializer):
     class Meta:
         model = FileAsset
         fields = "__all__"
-        read_only_fields = [
-            "created_by",
-            "updated_by",
-            "created_at",
-            "updated_at",
-            "workspace",
-            "project",
-            "issue",
-        ]
+        read_only_fields = [field.name for field in FileAsset._meta.fields]
 
 
 class IssueAttachmentLiteSerializer(DynamicBaseSerializer):

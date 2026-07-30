@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from plane.app.permissions import ROLE
 from plane.db.models import DeployBoard, FileAsset, Issue, IssueComment, ProjectMember
 from plane.settings.storage import S3Storage
 from plane.utils.file_asset_upload import (
@@ -26,6 +27,23 @@ from plane.utils.file_asset_upload import (
 from .base import BaseAPIView
 
 
+def _active_project_board(anchor):
+    return DeployBoard.objects.filter(
+        anchor=anchor,
+        entity_name="project",
+        is_disabled=False,
+    ).first()
+
+
+def _active_project_member(*, deploy_board, user):
+    return ProjectMember.objects.filter(
+        workspace_id=deploy_board.workspace_id,
+        project_id=deploy_board.project_id,
+        member=user,
+        is_active=True,
+    ).first()
+
+
 class EntityAssetEndpoint(BaseAPIView):
     def get_permissions(self):
         if self.request.method == "GET":
@@ -36,7 +54,7 @@ class EntityAssetEndpoint(BaseAPIView):
 
     def get(self, request, anchor, pk):
         # Get the deploy board
-        deploy_board = DeployBoard.objects.filter(anchor=anchor).first()
+        deploy_board = _active_project_board(anchor)
         # Check if the project is published
         if not deploy_board:
             return Response(
@@ -89,16 +107,11 @@ class EntityAssetEndpoint(BaseAPIView):
 
     def post(self, request, anchor):
         # Get the deploy board
-        deploy_board = DeployBoard.objects.filter(anchor=anchor).first()
+        deploy_board = _active_project_board(anchor)
         # Check if the project is published
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
-        if not ProjectMember.objects.filter(
-            workspace_id=deploy_board.workspace_id,
-            project_id=deploy_board.project_id,
-            member=request.user,
-            is_active=True,
-        ).exists():
+        if _active_project_member(deploy_board=deploy_board, user=request.user) is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
         entity_type = request.data.get("entity_type", "")
@@ -195,9 +208,11 @@ class EntityAssetEndpoint(BaseAPIView):
 
     def patch(self, request, anchor, pk):
         # Get the deploy board
-        deploy_board = DeployBoard.objects.filter(anchor=anchor).first()
+        deploy_board = _active_project_board(anchor)
         # Check if the project is published
         if not deploy_board:
+            return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
+        if _active_project_member(deploy_board=deploy_board, user=request.user) is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
         asset = FileAsset.objects.filter(
@@ -219,12 +234,24 @@ class EntityAssetEndpoint(BaseAPIView):
 
     def delete(self, request, anchor, pk):
         # Get the deploy board
-        deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").first()
+        deploy_board = _active_project_board(anchor)
         # Check if the project is published
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
+        membership = _active_project_member(deploy_board=deploy_board, user=request.user)
+        if membership is None:
+            return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
         # Get the asset
-        asset = FileAsset.objects.get(id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id)
+        asset = FileAsset.objects.get(
+            id=pk,
+            workspace=deploy_board.workspace,
+            project_id=deploy_board.project_id,
+        )
+        if asset.created_by_id != request.user.id and membership.role != ROLE.ADMIN.value:
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         # Check deleted assets
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
@@ -238,13 +265,21 @@ class AssetRestoreEndpoint(BaseAPIView):
 
     def post(self, request, anchor, pk):
         # Get the deploy board
-        deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").first()
+        deploy_board = _active_project_board(anchor)
         # Check if the project is published
         if not deploy_board:
+            return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
+        membership = _active_project_member(deploy_board=deploy_board, user=request.user)
+        if membership is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
         # Get the asset — scope to project to prevent cross-project IDOR
         asset = FileAsset.all_objects.get(id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id)
+        if asset.created_by_id != request.user.id and membership.role != ROLE.ADMIN.value:
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         asset.is_deleted = False
         asset.deleted_at = None
         asset.save(update_fields=["is_deleted", "deleted_at"])
@@ -256,35 +291,46 @@ class EntityBulkAssetEndpoint(BaseAPIView):
 
     def post(self, request, anchor, entity_id):
         # Get the deploy board
-        deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").first()
+        deploy_board = _active_project_board(anchor)
         # Check if the project is published
         if not deploy_board:
+            return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
+        membership = _active_project_member(deploy_board=deploy_board, user=request.user)
+        if membership is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
         asset_ids = request.data.get("asset_ids", [])
 
         # Check if the asset ids are provided
-        if not asset_ids:
+        if not isinstance(asset_ids, list) or not asset_ids:
             return Response({"error": "No asset ids provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # get the asset id
+        comment = IssueComment.objects.filter(
+            id=entity_id,
+            workspace=deploy_board.workspace,
+            project_id=deploy_board.project_id,
+        ).first()
+        if comment is None:
+            return Response(
+                {"error": "The requested entity could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         assets = FileAsset.objects.filter(
             id__in=asset_ids,
             workspace=deploy_board.workspace,
             project_id=deploy_board.project_id,
+            entity_type=FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
         )
-
-        asset = assets.first()
-
-        # Check if the asset is uploaded
-        if not asset:
+        if assets.count() != len(set(asset_ids)):
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-
-        # Check if the entity type is allowed
-        if asset.entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
-            # update the attributes
-            assets.update(comment_id=entity_id)
+        if membership.role != ROLE.ADMIN.value and assets.exclude(created_by=request.user).exists():
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        assets.update(comment=comment)
         return Response(status=status.HTTP_204_NO_CONTENT)
