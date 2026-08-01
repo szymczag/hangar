@@ -1,5 +1,9 @@
 ## Security and privacy
 
+`rc.20` did not complete GitHub Release publication. Its immutable tag, image,
+and chart namespaces were consumed before the release-note preflight stopped the
+workflow. Do not deploy `rc.20`; use the complete `rc.21` publication instead.
+
 `rc.20` closes several server-side authorization gaps found while reviewing the
 final Plane v1.4.0 sync. Saved and advanced analytics now remain within the
 requesting user's active workspace and project memberships. Workspace search,
@@ -97,6 +101,6 @@ candidates. Rolling back to `rc.19` restores the authorization, OAuth
 transaction, outbound-destination, and PDF-fetching weaknesses corrected here.
 If emergency availability recovery requires that rollback, disable affected
 OAuth, SMTP, analytics, and export surfaces first and return every component to
-`rc.20` as soon as possible. Migration `0129` may remain applied because it does
+`rc.21` as soon as possible. Migration `0129` may remain applied because it does
 not rewrite application rows. Restore the pre-upgrade database backup only when
 unrelated writes, corruption, or the incident requires point-in-time recovery.

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "reviews": [
+    {
+      "release_tag": "hangar-v0.1.0-rc.21",
+      "previous_release_tag": "hangar-v0.1.0-rc.19",
+      "repository": "https://github.com/makeplane/plane",
+      "previous_revision": "ff4bf5d64c017cce90ca602431d0a418369b388e",
+      "current_revision": "917b23a6c16d93fc00cef67900eff2755e8b13f7",
+      "rationale": "Plane v1.4.0 final was published from a history that is not descended from v1.4.0-rc2; Hangar merged, reviewed, and tested both exact baselines before release."
+    }
+  ]
+}

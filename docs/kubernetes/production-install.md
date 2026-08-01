@@ -5,7 +5,7 @@ stateful services. It is intended for platform engineers participating in
 production qualification and design review.
 
 > [!CAUTION]
-> Hangar `0.1.0-rc.20` is not supported for production. The production profile
+> Hangar `0.1.0-rc.21` is not supported for production. The production profile
 > renders with secure defaults, but it has not completed the installation,
 > upgrade, backup/restore, failure-recovery, security-review, or compatibility
 > gates required for production support. Do not place critical data or users on
@@ -81,7 +81,7 @@ Confirm that:
 ## 4. Create the namespace and TLS Secret
 
 ```bash
-export CHART_VERSION=0.1.0-rc.20
+export CHART_VERSION=0.1.0-rc.21
 export RELEASE_NAME=hangar
 export NAMESPACE=hangar
 export HANGAR_HOST=hangar.example.com
@@ -128,7 +128,7 @@ Download the release-matched example:
 ```bash
 curl --fail --location --silent --show-error \
   --output production-values.yaml \
-  https://raw.githubusercontent.com/szymczag/hangar/hangar-v0.1.0-rc.20/charts/hangar/examples/production-values.yaml
+  https://raw.githubusercontent.com/szymczag/hangar/hangar-v0.1.0-rc.21/charts/hangar/examples/production-values.yaml
 ```
 
 At minimum, set:

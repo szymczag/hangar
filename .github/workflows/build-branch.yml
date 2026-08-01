@@ -87,10 +87,17 @@ jobs:
       - name: Validate curated release notes
         if: steps.metadata.outputs.is_release == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           GIT_TAG: ${{ steps.metadata.outputs.git_tag }}
         run: |
           set -euo pipefail
-          python3 .github/scripts/release_notes.py validate --git-tag "$GIT_TAG"
+          gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/releases?per_page=100" > release-pages.json
+          python3 .github/scripts/release_notes.py validate \
+            --git-tag "$GIT_TAG" \
+            --commit-sha "$GITHUB_SHA" \
+            --release-pages release-pages.json \
+            --transition-reviews docs/releases/upstream-transition-reviews.json
 
       - name: Validate Kubernetes release documentation
         if: steps.metadata.outputs.is_release == 'true'
@@ -673,7 +680,9 @@ jobs:
             --git-tag "$GIT_TAG" \
             --commit-sha "$GITHUB_SHA" \
             --release-pages release-pages.json \
-            --digests release-digests.json > release-notes.md
+            --digests release-digests.json \
+            --transition-reviews docs/releases/upstream-transition-reviews.json \
+            > release-notes.md
 
       - name: Create GitHub Release
         env:

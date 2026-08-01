@@ -45,6 +45,12 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("Validate curated release notes", self.workflow)
         self.assertIn("release_notes.py validate", self.workflow)
         self.assertIn("release_notes.py generate", self.workflow)
+        self.assertIn('--commit-sha "$GITHUB_SHA"', self.workflow)
+        self.assertIn("--release-pages release-pages.json", self.workflow)
+        self.assertGreaterEqual(
+            self.workflow.count("--transition-reviews docs/releases/upstream-transition-reviews.json"),
+            2,
+        )
         self.assertIn("gh api --paginate --slurp", self.workflow)
         self.assertIn("docker buildx imagetools inspect", self.workflow)
 

@@ -59,7 +59,7 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.19` to `rc.20`
+### Upgrade from `rc.19` to `rc.21`
 
 This release moves the inherited application baseline from Plane `v1.4.0-rc2`
 to the exact final `v1.4.0` commit `917b23a6`. It includes Django 5.2.15 and the
@@ -73,7 +73,7 @@ OIDC, and SMTP outbound traffic validates and pins resolved destinations; the
 Live PDF exporter accepts only bounded raster assets from credential-free
 presigned HTTP(S) URLs and refuses redirects.
 
-`rc.20` adds Django migration
+`rc.21` adds Django migration
 `0129_alter_draftissue_assignees_alter_issue_assignees_and_more`. It records the
 final upstream relationship metadata for draft issue assignees, issue assignees,
 and module members; it does not rewrite existing issue or membership rows.
@@ -85,9 +85,9 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.20`, its application version is
-   `v0.1.0-rc.20`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc20);
+2. confirm the target chart is `0.1.0-rc.21`, its application version is
+   `v0.1.0-rc.21`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc21);
 3. if Gitea OAuth or SMTP is enabled, review the destination policy in the
    [federated SSO guide](../federated-sso-security.md) or
    [email security model](../email-delivery-and-openpgp.md); private destinations
@@ -96,7 +96,7 @@ Before upgrading:
 4. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 5. schedule the API, workers, Live service, and all frontends as one coordinated
-   Helm revision. Do not mix `rc.19` and `rc.20` application images.
+   Helm revision. Do not mix `rc.19` and `rc.21` application images.
 
 The chart does not currently expose `GITEA_ALLOWED_HOSTS`,
 `GITEA_ALLOWED_IPS`, `SMTP_ALLOWED_HOSTS`, `SMTP_ALLOWED_IPS`, or
@@ -122,12 +122,13 @@ the sign-in flow. After the rollout, verify:
 - upload, download, issue editing, Live updates, and a representative workspace
   workflow remain healthy.
 
+`rc.20` was consumed by an incomplete publication attempt and must not be used.
 `rc.19` is the immediately previous complete publication, but it predates the
 security boundaries introduced here. There is no security-equivalent rollback
 target. If an emergency availability rollback is unavoidable, disable affected
 OAuth, SMTP, analytics, and export surfaces first. Migration `0129` may remain
 applied because it does not rewrite application rows; return every component to
-`rc.20` as soon as possible.
+`rc.21` as soon as possible.
 
 ### Upgrade from `rc.18` to `rc.19`
 
