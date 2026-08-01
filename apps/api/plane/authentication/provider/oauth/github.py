@@ -30,7 +30,7 @@ class GitHubOAuthProvider(OauthAdapter):
 
     organization_scope = "read:org"
 
-    def __init__(self, request, code=None, state=None, callback=None):
+    def __init__(self, request, code=None, state=None, callback=None, is_space=False):
         GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_ORGANIZATION_ID = get_configuration_value([
             {
                 "key": "GITHUB_CLIENT_ID",
@@ -59,7 +59,8 @@ class GitHubOAuthProvider(OauthAdapter):
         if self.organization_id:
             self.scope += f" {self.organization_scope}"
 
-        redirect_uri = f"""{"https" if request.is_secure() else "http"}://{request.get_host()}/auth/github/callback/"""
+        callback_path = "/auth/spaces/github/callback/" if is_space else "/auth/github/callback/"
+        redirect_uri = f"""{"https" if request.is_secure() else "http"}://{request.get_host()}{callback_path}"""
         url_params = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
@@ -156,12 +157,9 @@ class GitHubOAuthProvider(OauthAdapter):
 
         if self.organization_id:
             if not self.is_user_in_organization(user_info_response.get("login")):
-                self.logger.warning(
-                    "User is not in organization",
-                    extra={
-                        "organization_id": self.organization_id,
-                    },
-                )
+                # Do not log the organization id or user login here:
+                # the configuration values must not end up in logs
+                self.logger.warning("User is not in organization")
                 raise AuthenticationException(
                     error_code=AUTHENTICATION_ERROR_CODES["GITHUB_USER_NOT_IN_ORG"],
                     error_message="GITHUB_USER_NOT_IN_ORG",

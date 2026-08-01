@@ -16,7 +16,11 @@ class ProjectModulesEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):
-        deploy_board = DeployBoard.objects.filter(anchor=anchor).first()
+        deploy_board = DeployBoard.objects.filter(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        ).first()
         if not deploy_board:
             return Response({"error": "Invalid anchor"}, status=status.HTTP_404_NOT_FOUND)
 

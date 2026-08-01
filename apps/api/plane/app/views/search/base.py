@@ -19,7 +19,7 @@ from django.db.models import (
 )
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
-from django.db.models.functions import Coalesce, Concat
+from django.db.models.functions import Cast, Coalesce, Concat
 from django.utils import timezone
 
 # Third party imports
@@ -55,7 +55,11 @@ class GlobalSearchEndpoint(BaseAPIView):
             for field in fields:
                 q |= Q(**{f"{field}__icontains": query})
         return (
-            Workspace.objects.filter(q, workspace_member__member=self.request.user)
+            Workspace.objects.filter(
+                q,
+                workspace_member__member=self.request.user,
+                workspace_member__is_active=True,
+            )
             .order_by("-created_at")
             .distinct()
             .values("name", "id", "slug")
@@ -342,7 +346,7 @@ class SearchEndpoint(BaseAPIView):
                                     member__avatar_asset__isnull=False,
                                     then=Concat(
                                         Value("/api/assets/v2/static/"),
-                                        "member__avatar_asset",
+                                        Cast("member__avatar_asset", CharField()),
                                         Value("/"),
                                     ),
                                 ),
@@ -553,7 +557,7 @@ class SearchEndpoint(BaseAPIView):
                                     member__avatar_asset__isnull=False,
                                     then=Concat(
                                         Value("/api/assets/v2/static/"),
-                                        "member__avatar_asset",
+                                        Cast("member__avatar_asset", models.CharField()),
                                         Value("/"),
                                     ),
                                 ),

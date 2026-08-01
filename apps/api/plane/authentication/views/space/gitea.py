@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-# Python imports
-import uuid
 from urllib.parse import urlencode
 
 # Django import
@@ -13,6 +11,10 @@ from django.views import View
 # Module imports
 from plane.authentication.provider.oauth.gitea import GiteaOAuthProvider
 from plane.authentication.utils.login import user_login
+from plane.authentication.utils.oauth_transaction import (
+    consume_oauth_transaction,
+    start_oauth_transaction,
+)
 from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
 from plane.authentication.adapter.error import (
@@ -21,14 +23,15 @@ from plane.authentication.adapter.error import (
 )
 from plane.utils.path_validator import validate_next_path
 
+GITEA_TRANSACTION_SPACE = "gitea_oauth_transaction_space"
+
 
 class GiteaOauthInitiateSpaceEndpoint(View):
     def get(self, request):
         # Get host and next path
-        request.session["host"] = base_host(request=request, is_space=True)
+        host = base_host(request=request, is_space=True)
         next_path = request.GET.get("next_path")
-        if next_path:
-            request.session["next_path"] = str(validate_next_path(next_path))
+        next_path = str(validate_next_path(next_path)) if next_path else None
 
         # Check instance configuration
         instance = Instance.objects.first()
@@ -44,9 +47,13 @@ class GiteaOauthInitiateSpaceEndpoint(View):
             return HttpResponseRedirect(url)
 
         try:
-            state = uuid.uuid4().hex
-            provider = GiteaOAuthProvider(request=request, state=state)
-            request.session["state"] = state
+            state = start_oauth_transaction(
+                request,
+                GITEA_TRANSACTION_SPACE,
+                host=host,
+                next_path=next_path,
+            )
+            provider = GiteaOAuthProvider(request=request, state=state, is_space=True)
             auth_url = provider.get_auth_url()
             return HttpResponseRedirect(auth_url)
         except AuthenticationException as e:
@@ -61,9 +68,11 @@ class GiteaCallbackSpaceEndpoint(View):
     def get(self, request):
         code = request.GET.get("code")
         state = request.GET.get("state")
-        next_path = request.session.get("next_path")
+        transaction, valid_transaction = consume_oauth_transaction(request, GITEA_TRANSACTION_SPACE, state)
+        host = transaction.get("host") or base_host(request=request, is_space=True)
+        next_path = transaction.get("next_path")
 
-        if state != request.session.get("state", ""):
+        if not valid_transaction:
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["GITEA_OAUTH_PROVIDER_ERROR"],
                 error_message="GITEA_OAUTH_PROVIDER_ERROR",
@@ -71,7 +80,7 @@ class GiteaCallbackSpaceEndpoint(View):
             params = exc.get_error_dict()
             if next_path:
                 params["next_path"] = str(validate_next_path(next_path))
-            url = f"{base_host(request=request, is_space=True)}?{urlencode(params)}"
+            url = f"{host}?{urlencode(params)}"
             return HttpResponseRedirect(url)
 
         if not code:
@@ -82,23 +91,23 @@ class GiteaCallbackSpaceEndpoint(View):
             params = exc.get_error_dict()
             if next_path:
                 params["next_path"] = str(validate_next_path(next_path))
-            url = f"{base_host(request=request, is_space=True)}?{urlencode(params)}"
+            url = f"{host}?{urlencode(params)}"
             return HttpResponseRedirect(url)
 
         try:
-            provider = GiteaOAuthProvider(request=request, code=code)
+            provider = GiteaOAuthProvider(request=request, code=code, is_space=True)
             user = provider.authenticate()
             # Login the user and record his device info
             user_login(request=request, user=user, is_space=True)
             # Process workspace and project invitations
             # redirect to referer path
             url = (
-                f"{base_host(request=request, is_space=True)}{str(validate_next_path(next_path)) if next_path else ''}"
+                f"{host}{str(validate_next_path(next_path)) if next_path else ''}"
             )
             return HttpResponseRedirect(url)
         except AuthenticationException as e:
             params = e.get_error_dict()
             if next_path:
                 params["next_path"] = str(validate_next_path(next_path))
-            url = f"{base_host(request=request, is_space=True)}?{urlencode(params)}"
+            url = f"{host}?{urlencode(params)}"
             return HttpResponseRedirect(url)

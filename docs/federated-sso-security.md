@@ -1,6 +1,6 @@
 # Federated SSO security and migration
 
-Status: operator security and migration guide for Google, OpenID Connect, and SAML 2.0.
+Status: operator security and migration guide for OAuth, OpenID Connect, and SAML 2.0.
 
 Last reviewed: 2026-07-14.
 
@@ -77,6 +77,20 @@ changing deployment secrets.
 Workspace mode validates the signed Google `hd` claim. A matching email suffix is
 not sufficient. Configure every intended tenant explicitly before switching from
 `generic` to `workspace`.
+
+### Gitea OAuth egress policy
+
+`GITEA_HOST` must be an HTTPS origin in production. Token and profile requests pin
+the resolved address, reject redirects, cap response bodies, and deny private,
+loopback, link-local, and other non-public destinations by default. The OAuth client
+secret and bearer token therefore cannot be redirected to an administrator-selected
+internal service.
+
+For an intentionally private Gitea deployment, the operator must add the exact
+normalized DNS name to `GITEA_ALLOWED_HOSTS` or an address/CIDR to
+`GITEA_ALLOWED_IPS` in the deployment environment. These allowlists are not mutable
+instance settings: changing `GITEA_HOST` in the administration UI cannot expand the
+network boundary. Keep exceptions narrow and restart the API after changing them.
 
 ### OpenID Connect
 

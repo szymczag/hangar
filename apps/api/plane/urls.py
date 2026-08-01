@@ -4,6 +4,7 @@
 
 """plane URL Configuration"""
 
+from django.apps import apps
 from django.conf import settings
 from django.urls import include, path, re_path
 from drf_spectacular.views import (
@@ -41,7 +42,7 @@ if settings.ENABLE_DRF_SPECTACULAR:
         ),
     ]
 
-if settings.DEBUG:
+if settings.DEBUG and apps.is_installed("debug_toolbar"):
     try:
         import debug_toolbar
 

@@ -40,6 +40,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         project_deploy_board = DeployBoard.objects.get(
             workspace__slug=self.kwargs.get("slug"),
             project_id=self.kwargs.get("project_id"),
+            is_disabled=False,
         )
         if project_deploy_board is not None:
             return self.filter_queryset(
@@ -56,7 +57,11 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return IntakeIssue.objects.none()
 
     def list(self, request, anchor, intake_id):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        )
         if project_deploy_board.intake is None:
             return Response(
                 {"error": "Intake is not enabled for this Project Board"},
@@ -107,7 +112,11 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return Response(issues_data, status=status.HTTP_200_OK)
 
     def create(self, request, anchor, intake_id):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        )
         if project_deploy_board.intake is None:
             return Response(
                 {"error": "Intake is not enabled for this Project Board"},
@@ -181,7 +190,11 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def partial_update(self, request, anchor, intake_id, pk):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        )
         if project_deploy_board.intake is None:
             return Response(
                 {"error": "Intake is not enabled for this Project Board"},
@@ -242,7 +255,11 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return Response(issue_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, anchor, intake_id, pk):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        )
         if project_deploy_board.intake is None:
             return Response(
                 {"error": "Intake is not enabled for this Project Board"},
@@ -264,7 +281,11 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, anchor, intake_id, pk):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        )
         if project_deploy_board.intake is None:
             return Response(
                 {"error": "Intake is not enabled for this Project Board"},

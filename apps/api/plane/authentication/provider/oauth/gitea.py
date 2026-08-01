@@ -2,11 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import json
 import os
 from datetime import datetime, timedelta
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urlsplit, urlunsplit
 import pytz
 import requests
+
+from django.conf import settings
 
 # Module imports
 from plane.authentication.adapter.oauth import OauthAdapter
@@ -15,13 +18,18 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
     AuthenticationException,
 )
+from plane.utils.url_security import pinned_fetch
+
+
+GITEA_RESPONSE_MAX_BYTES = 256 * 1024
+GITEA_REQUEST_TIMEOUT = 10
 
 
 class GiteaOAuthProvider(OauthAdapter):
     provider = "gitea"
     scope = "openid email profile read:user"
 
-    def __init__(self, request, code=None, state=None, callback=None):
+    def __init__(self, request, code=None, state=None, callback=None, is_space=False):
         (GITEA_CLIENT_ID, GITEA_CLIENT_SECRET, GITEA_HOST) = get_configuration_value(
             [
                 {
@@ -45,14 +53,41 @@ class GiteaOAuthProvider(OauthAdapter):
                 error_message="GITEA_NOT_CONFIGURED",
             )
 
-        # Enforce scheme and normalize trailing slash(es)
-        parsed = urlparse(GITEA_HOST)
-        if not parsed.scheme or parsed.scheme not in ("https", "http"):
+        # Treat the configured value as a base URL, not as an arbitrary request
+        # target. Credentials and endpoint-specific URL components must never
+        # be smuggled through instance configuration.
+        try:
+            parsed = urlsplit(GITEA_HOST)
+            allowed_schemes = {"https", "http"} if settings.DEBUG else {"https"}
+            if (
+                parsed.scheme not in allowed_schemes
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+                or "\\" in GITEA_HOST
+                or any(ord(character) < 0x20 for character in GITEA_HOST)
+            ):
+                raise ValueError("Unsafe Gitea URL")
+            port = parsed.port
+            hostname = parsed.hostname.rstrip(".").encode("idna").decode("ascii").lower()
+            host_label = f"[{hostname}]" if ":" in hostname else hostname
+            netloc = host_label if port is None else f"{host_label}:{port}"
+            GITEA_HOST = urlunsplit(
+                (
+                    parsed.scheme,
+                    netloc,
+                    parsed.path.rstrip("/"),
+                    "",
+                    "",
+                )
+            )
+        except (TypeError, UnicodeError, ValueError):
             raise AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["GITEA_NOT_CONFIGURED"],
                 error_message="GITEA_NOT_CONFIGURED",  # avoid leaking details to query params
             )
-        GITEA_HOST = GITEA_HOST.rstrip("/")
 
         # Set URLs based on the host
         self.token_url = f"{GITEA_HOST}/login/oauth/access_token"
@@ -61,7 +96,8 @@ class GiteaOAuthProvider(OauthAdapter):
         client_id = GITEA_CLIENT_ID
         client_secret = GITEA_CLIENT_SECRET
 
-        redirect_uri = f"{'https' if request.is_secure() else 'http'}://{request.get_host()}/auth/gitea/callback/"
+        callback_path = "/auth/spaces/gitea/callback/" if is_space else "/auth/gitea/callback/"
+        redirect_uri = f"{'https' if request.is_secure() else 'http'}://{request.get_host()}{callback_path}"
         url_params = {
             "client_id": client_id,
             "scope": self.scope,
@@ -84,6 +120,60 @@ class GiteaOAuthProvider(OauthAdapter):
             code,
             callback=callback,
         )
+
+    @staticmethod
+    def _request_json(method, url, *, headers=None, data=None):
+        response = None
+        try:
+            response = pinned_fetch(
+                method,
+                url,
+                allowed_ips=settings.GITEA_ALLOWED_IPS,
+                allowed_hosts=settings.GITEA_ALLOWED_HOSTS,
+                headers=headers or {},
+                data=data,
+                timeout=GITEA_REQUEST_TIMEOUT,
+                stream=True,
+            )
+            if 300 <= response.status_code < 400:
+                raise requests.RequestException("Gitea OAuth redirects are not allowed")
+            response.raise_for_status()
+
+            body = bytearray()
+            for chunk in response.iter_content(chunk_size=8192):
+                body.extend(chunk)
+                if len(body) > GITEA_RESPONSE_MAX_BYTES:
+                    raise requests.RequestException("Gitea OAuth response is too large")
+            return json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+            raise requests.RequestException("Invalid Gitea OAuth response") from exc
+        finally:
+            if response is not None:
+                response.close()
+
+    def get_user_token(self, data, headers=None):
+        try:
+            return self._request_json("POST", self.get_token_url(), data=data, headers=headers)
+        except requests.RequestException:
+            self.logger.warning("Error getting user token")
+            raise AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["GITEA_OAUTH_PROVIDER_ERROR"],
+                error_message="GITEA_OAUTH_PROVIDER_ERROR",
+            )
+
+    def get_user_response(self):
+        try:
+            return self._request_json(
+                "GET",
+                self.get_user_info_url(),
+                headers={"Authorization": f"Bearer {self.token_data.get('access_token')}"},
+            )
+        except requests.RequestException:
+            self.logger.warning("Error getting user response")
+            raise AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["GITEA_OAUTH_PROVIDER_ERROR"],
+                error_message="GITEA_OAUTH_PROVIDER_ERROR",
+            )
 
     def set_token_data(self):
         data = {
@@ -117,13 +207,7 @@ class GiteaOAuthProvider(OauthAdapter):
         try:
             # Gitea may not provide email in user response, so fetch it separately
             emails_url = f"{self.userinfo_url}/emails"
-            response = requests.get(emails_url, headers=headers)
-            if not response.ok:
-                raise AuthenticationException(
-                    error_code=AUTHENTICATION_ERROR_CODES["GITEA_OAUTH_PROVIDER_ERROR"],
-                    error_message="GITEA_OAUTH_PROVIDER_ERROR: Failed to fetch emails",
-                )
-            emails_response = response.json()
+            emails_response = self._request_json("GET", emails_url, headers=headers)
 
             if not emails_response:
                 raise AuthenticationException(

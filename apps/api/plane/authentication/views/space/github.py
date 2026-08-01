@@ -2,9 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-# Python imports
-import uuid
-
 # Django import
 from django.http import HttpResponseRedirect
 from django.views import View
@@ -13,6 +10,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 # Module imports
 from plane.authentication.provider.oauth.github import GitHubOAuthProvider
 from plane.authentication.utils.login import user_login
+from plane.authentication.utils.oauth_transaction import (
+    consume_oauth_transaction,
+    start_oauth_transaction,
+)
 from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
 from plane.authentication.adapter.error import (
@@ -21,12 +22,15 @@ from plane.authentication.adapter.error import (
 )
 from plane.utils.path_validator import get_safe_redirect_url, validate_next_path, get_allowed_hosts
 
+GITHUB_TRANSACTION_SPACE = "github_oauth_transaction_space"
+
 
 class GitHubOauthInitiateSpaceEndpoint(View):
     def get(self, request):
         # Get host and next path
-        request.session["host"] = base_host(request=request, is_space=True)
+        host = base_host(request=request, is_space=True)
         next_path = request.GET.get("next_path")
+        next_path = str(validate_next_path(next_path)) if next_path else None
         # Check instance configuration
         instance = Instance.objects.first()
         if instance is None or not instance.is_setup_done:
@@ -41,9 +45,13 @@ class GitHubOauthInitiateSpaceEndpoint(View):
             return HttpResponseRedirect(url)
 
         try:
-            state = uuid.uuid4().hex
-            provider = GitHubOAuthProvider(request=request, state=state)
-            request.session["state"] = state
+            state = start_oauth_transaction(
+                request,
+                GITHUB_TRANSACTION_SPACE,
+                host=host,
+                next_path=next_path,
+            )
+            provider = GitHubOAuthProvider(request=request, state=state, is_space=True)
             auth_url = provider.get_auth_url()
             return HttpResponseRedirect(auth_url)
         except AuthenticationException as e:
@@ -58,17 +66,18 @@ class GitHubCallbackSpaceEndpoint(View):
     def get(self, request):
         code = request.GET.get("code")
         state = request.GET.get("state")
-        base_host = request.session.get("host")
-        next_path = request.session.get("next_path")
+        transaction, valid_transaction = consume_oauth_transaction(request, GITHUB_TRANSACTION_SPACE, state)
+        host = transaction.get("host") or base_host(request=request, is_space=True)
+        next_path = transaction.get("next_path")
 
-        if state != request.session.get("state", ""):
+        if not valid_transaction:
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["GITHUB_OAUTH_PROVIDER_ERROR"],
                 error_message="GITHUB_OAUTH_PROVIDER_ERROR",
             )
             params = exc.get_error_dict()
             url = get_safe_redirect_url(
-                base_url=base_host(request=request, is_space=True), next_path=next_path, params=params
+                base_url=host, next_path=next_path, params=params
             )
             return HttpResponseRedirect(url)
 
@@ -79,12 +88,12 @@ class GitHubCallbackSpaceEndpoint(View):
             )
             params = exc.get_error_dict()
             url = get_safe_redirect_url(
-                base_url=base_host(request=request, is_space=True), next_path=next_path, params=params
+                base_url=host, next_path=next_path, params=params
             )
             return HttpResponseRedirect(url)
 
         try:
-            provider = GitHubOAuthProvider(request=request, code=code)
+            provider = GitHubOAuthProvider(request=request, code=code, is_space=True)
             user = provider.authenticate()
             # Login the user and record his device info
             user_login(request=request, user=user, is_space=True)
@@ -92,14 +101,14 @@ class GitHubCallbackSpaceEndpoint(View):
             # redirect to referer path
             next_path = validate_next_path(next_path=next_path)
 
-            url = f"{base_host(request=request, is_space=True).rstrip('/')}{next_path}"
+            url = f"{host.rstrip('/')}{next_path}"
             if url_has_allowed_host_and_scheme(url, allowed_hosts=get_allowed_hosts()):
                 return HttpResponseRedirect(url)
             else:
-                return HttpResponseRedirect(base_host(request=request, is_space=True))
+                return HttpResponseRedirect(host)
         except AuthenticationException as e:
             params = e.get_error_dict()
             url = get_safe_redirect_url(
-                base_url=base_host(request=request, is_space=True), next_path=next_path, params=params
+                base_url=host, next_path=next_path, params=params
             )
             return HttpResponseRedirect(url)

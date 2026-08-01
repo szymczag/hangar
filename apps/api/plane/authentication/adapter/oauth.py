@@ -87,6 +87,7 @@ class OauthAdapter(Adapter):
             response.raise_for_status()
             return response.json()
         except requests.RequestException:
+            # Do not log headers here: they carry the access token
             self.logger.warning("Error getting user response")
             code = self.authentication_error_code()
             raise AuthenticationException(error_code=AUTHENTICATION_ERROR_CODES[code], error_message=str(code))

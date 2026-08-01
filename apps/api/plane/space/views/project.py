@@ -20,7 +20,11 @@ class ProjectDeployBoardPublicSettingsEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        )
         serializer = DeployBoardSerializer(project_deploy_board)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -29,12 +33,21 @@ class WorkspaceProjectDeployBoardEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):
-        deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").values_list
+        deploy_board = DeployBoard.objects.get(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        )
         projects = (
             Project.objects.filter(workspace=deploy_board.workspace)
             .annotate(
                 is_public=Exists(
-                    DeployBoard.objects.filter(anchor=anchor, project_id=OuterRef("pk"), entity_name="project")
+                    DeployBoard.objects.filter(
+                        anchor=anchor,
+                        project_id=OuterRef("pk"),
+                        entity_name="project",
+                        is_disabled=False,
+                    )
                 )
             )
             .filter(is_public=True)
@@ -56,7 +69,10 @@ class WorkspaceProjectAnchorEndpoint(BaseAPIView):
 
     def get(self, request, slug, project_id):
         project_deploy_board = DeployBoard.objects.get(
-            workspace__slug=slug, project_id=project_id, entity_name="project"
+            workspace__slug=slug,
+            project_id=project_id,
+            entity_name="project",
+            is_disabled=False,
         )
         serializer = DeployBoardSerializer(project_deploy_board)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -66,7 +82,11 @@ class ProjectMembersEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):
-        deploy_board = DeployBoard.objects.filter(anchor=anchor).first()
+        deploy_board = DeployBoard.objects.filter(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        ).first()
         if not deploy_board:
             return Response(
                 {"error": "Invalid anchor"},

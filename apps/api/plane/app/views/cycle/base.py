@@ -333,7 +333,14 @@ class CycleViewSet(BaseViewSet):
             )
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def update(self, request, slug, project_id, pk):
+        return self._perform_update(request, slug, project_id, pk, partial=False)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def partial_update(self, request, slug, project_id, pk):
+        return self._perform_update(request, slug, project_id, pk, partial=True)
+
+    def _perform_update(self, request, slug, project_id, pk, *, partial):
         queryset = self.get_queryset().filter(workspace__slug=slug, project_id=project_id, pk=pk)
         cycle = queryset.first()
         if cycle.archived_at:
@@ -356,7 +363,12 @@ class CycleViewSet(BaseViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        serializer = CycleWriteSerializer(cycle, data=request.data, partial=True, context={"project_id": project_id})
+        serializer = CycleWriteSerializer(
+            cycle,
+            data=request.data,
+            partial=partial,
+            context={"project_id": project_id},
+        )
         if serializer.is_valid():
             serializer.save()
             cycle = queryset.values(
@@ -857,7 +869,7 @@ class CycleAnalyticsEndpoint(BaseAPIView):
                             assignees__avatar_asset__isnull=False,
                             then=Concat(
                                 Value("/api/assets/v2/static/"),
-                                "assignees__avatar_asset",  # Assuming avatar_asset has an id or relevant field
+                                Cast("assignees__avatar_asset", models.CharField()),
                                 Value("/"),
                             ),
                         ),
@@ -954,7 +966,7 @@ class CycleAnalyticsEndpoint(BaseAPIView):
                             assignees__avatar_asset__isnull=False,
                             then=Concat(
                                 Value("/api/assets/v2/static/"),
-                                "assignees__avatar_asset",  # Assuming avatar_asset has an id or relevant field
+                                Cast("assignees__avatar_asset", models.CharField()),
                                 Value("/"),
                             ),
                         ),

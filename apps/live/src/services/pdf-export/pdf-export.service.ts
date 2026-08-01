@@ -9,6 +9,7 @@ import sharp from "sharp";
 import { getAllDocumentFormatsFromDocumentEditorBinaryData } from "@plane/editor/lib";
 import type { PDFExportMetadata, TipTapDocument } from "@/lib/pdf";
 import { renderPlaneDocToPdfBuffer } from "@/lib/pdf";
+import { isAssetId, MAX_PDF_IMAGE_COUNT, readBoundedImageResponse } from "@/lib/asset-fetch-security";
 import { getPageService } from "@/services/page/handler";
 import type { TDocumentTypes } from "@/types";
 import {
@@ -53,7 +54,7 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
       const traverse = (node: TipTapNode) => {
         if ((node.type === "imageComponent" || node.type === "image") && node.attrs?.src) {
           const src = node.attrs.src as string;
-          if (src && !src.startsWith("http") && !src.startsWith("data:")) {
+          if (isAssetId(src) && assetIds.length < MAX_PDF_IMAGE_COUNT) {
             assetIds.push(src);
           }
         }
@@ -164,9 +165,14 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
         // Resolve URLs first
         const resolvedUrlMap = yield* tryAsync(
           async () => {
+            const resolvedUrls = await Promise.all(
+              assetIds.map(async (assetId) => ({
+                assetId,
+                url: await pageService.resolveImageAssetUrl?.(workspaceSlug, assetId, projectId),
+              }))
+            );
             const urlMap = new Map<string, string>();
-            for (const assetId of assetIds) {
-              const url = await pageService.resolveImageAssetUrl?.(workspaceSlug, assetId, projectId);
+            for (const { assetId, url } of resolvedUrls) {
               if (url) urlMap.set(assetId, url);
             }
             return urlMap;
@@ -182,7 +188,11 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
         const processSingleImage = ([assetId, url]: [string, string]) =>
           Effect.gen(function* () {
             const response = yield* tryAsync(
-              () => fetch(url),
+              () =>
+                fetch(url, {
+                  redirect: "error",
+                  signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+                }),
               (cause) =>
                 new PdfImageProcessingError({
                   message: "Failed to fetch image",
@@ -200,8 +210,8 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
               );
             }
 
-            const arrayBuffer = yield* tryAsync(
-              () => response.arrayBuffer(),
+            const imageBuffer = yield* tryAsync(
+              () => readBoundedImageResponse(response),
               (cause) =>
                 new PdfImageProcessingError({
                   message: "Failed to read image body",
@@ -212,7 +222,7 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
 
             const processedBuffer = yield* tryAsync(
               () =>
-                sharp(Buffer.from(arrayBuffer))
+                sharp(imageBuffer)
                   .rotate()
                   .flatten({ background: { r: 255, g: 255, b: 255 } })
                   .resize(IMAGE_MAX_DIMENSION, IMAGE_MAX_DIMENSION, { fit: "inside", withoutEnlargement: true })

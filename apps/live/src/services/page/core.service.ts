@@ -7,6 +7,7 @@
 import { logger } from "@plane/logger";
 import type { TDocumentPayload, TPage } from "@plane/types";
 // services
+import { isSafeAssetUrl, isValidAssetReference } from "@/lib/asset-fetch-security";
 import { AppError } from "@/lib/errors";
 import { APIService } from "../api.service";
 
@@ -18,10 +19,6 @@ export type TUserMention = {
 
 export abstract class PageCoreService extends APIService {
   protected abstract basePath: string;
-
-  constructor() {
-    super();
-  }
 
   async fetchDetails(pageId: string): Promise<TPage> {
     try {
@@ -165,9 +162,16 @@ export abstract class PageCoreService extends APIService {
     assetId: string,
     projectId?: string | null
   ): Promise<string | null> {
+    if (!isValidAssetReference(workspaceSlug, assetId, projectId)) {
+      return null;
+    }
+
+    const encodedWorkspaceSlug = encodeURIComponent(workspaceSlug);
+    const encodedAssetId = encodeURIComponent(assetId);
+    const encodedProjectId = projectId ? encodeURIComponent(projectId) : null;
     const path = projectId
-      ? `/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}/${assetId}/?disposition=inline`
-      : `/api/assets/v2/workspaces/${workspaceSlug}/${assetId}/?disposition=inline`;
+      ? `/api/assets/v2/workspaces/${encodedWorkspaceSlug}/projects/${encodedProjectId}/${encodedAssetId}/?disposition=inline`
+      : `/api/assets/v2/workspaces/${encodedWorkspaceSlug}/${encodedAssetId}/?disposition=inline`;
 
     try {
       const response = await this.get(path, {
@@ -177,13 +181,15 @@ export abstract class PageCoreService extends APIService {
       });
       // If we get a 302, the Location header contains the presigned URL
       if (response.status === 302 || response.status === 301) {
-        return response.headers?.location || null;
+        const location = response.headers?.location;
+        return location && isSafeAssetUrl(location) ? location : null;
       }
       return null;
     } catch (error) {
       // Axios throws on 3xx when maxRedirects is 0, so we need to handle the redirect from the error
       if ((error as any).response?.status === 302 || (error as any).response?.status === 301) {
-        return (error as any).response.headers?.location || null;
+        const location = (error as any).response.headers?.location;
+        return location && isSafeAssetUrl(location) ? location : null;
       }
       logger.error("Failed to resolve image asset URL", {
         assetId,

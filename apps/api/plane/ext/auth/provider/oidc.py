@@ -29,11 +29,13 @@ from plane.authentication.adapter.oauth import OauthAdapter
 from plane.authentication.adapter.error import AuthenticationException
 from plane.authentication.services import ExternalIdentity
 from plane.license.utils.instance_value import get_configuration_value
+from plane.utils.ip_address import is_blocked_ip
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
 
 DISCOVERY_CACHE_TTL = 60 * 15
 DISCOVERY_TIMEOUT = 10
+MAX_OIDC_RESPONSE_BYTES = 1024 * 1024
 MAX_RESOLVED_ADDRESSES = 8
 
 # Asymmetric algorithms only. Symmetric (HS*) algorithms are rejected because
@@ -137,7 +139,7 @@ def validate_outbound_url(url, *, required_origin=None):
             if sockaddr[1] != port:
                 raise ValueError("OIDC resolver returned an unexpected port")
             address = _normalize_ip(sockaddr[0])
-            if not address.is_global:
+            if not address.is_global or is_blocked_ip(address):
                 raise ValueError("OIDC hostname resolves to a non-public address")
             key = (family, sockaddr)
             if key not in seen:
@@ -203,7 +205,10 @@ def _request_oidc(method, target, *, data=None, headers=None, timeout=DISCOVERY_
             connection.sock = _connect_pinned(target, address, remaining)
             connection.request(method, path, body=body, headers=request_headers)
             response = connection.getresponse()
-            result = OIDCResponse(response.status, response.read())
+            body = response.read(MAX_OIDC_RESPONSE_BYTES + 1)
+            if len(body) > MAX_OIDC_RESPONSE_BYTES:
+                raise requests.RequestException("OIDC response is too large")
+            result = OIDCResponse(response.status, body)
             return _checked_response(result)
         except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
             last_error = exc

@@ -80,7 +80,7 @@ def test_generic_smtp_does_not_leak_ses_headers():
             "plane.mailer.transports.smtp.get_email_configuration",
             return_value=("smtp.example.com", "user", "password", 587, "1", "0", "sender@example.com"),
         ),
-        patch("plane.mailer.transports.smtp.smtplib.SMTP", return_value=client),
+        patch("plane.mailer.transports.smtp._smtp_client", return_value=client),
     ):
         message = _message()
         SMTPTransport().send(

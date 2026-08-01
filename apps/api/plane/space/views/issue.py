@@ -26,7 +26,7 @@ from django.db.models import (
     CharField,
     Subquery,
 )
-from django.db.models.functions import Concat
+from django.db.models.functions import Cast, Concat
 
 # Third Party imports
 from rest_framework.response import Response
@@ -77,7 +77,11 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
         filters = issue_filters(request.query_params, "GET")
         order_by_param = request.GET.get("order_by", "-created_at")
 
-        deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").first()
+        deploy_board = DeployBoard.objects.filter(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        ).first()
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -227,7 +231,11 @@ class IssueCommentPublicViewSet(BaseViewSet):
 
     def get_queryset(self):
         try:
-            project_deploy_board = DeployBoard.objects.get(anchor=self.kwargs.get("anchor"), entity_name="project")
+            project_deploy_board = DeployBoard.objects.get(
+                anchor=self.kwargs.get("anchor"),
+                entity_name="project",
+                is_disabled=False,
+            )
             if project_deploy_board.is_comments_enabled:
                 return self.filter_queryset(
                     super()
@@ -255,7 +263,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
             return IssueComment.objects.none()
 
     def create(self, request, anchor, issue_id):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
 
         if not project_deploy_board.is_comments_enabled:
             return Response(
@@ -294,7 +302,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, anchor, issue_id, pk):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
 
         if not project_deploy_board.is_comments_enabled:
             return Response(
@@ -318,7 +326,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, anchor, issue_id, pk):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
 
         if not project_deploy_board.is_comments_enabled:
             return Response(
@@ -348,6 +356,7 @@ class IssueReactionPublicViewSet(BaseViewSet):
             project_deploy_board = DeployBoard.objects.get(
                 workspace__slug=self.kwargs.get("slug"),
                 project_id=self.kwargs.get("project_id"),
+                is_disabled=False,
             )
             if project_deploy_board.is_reactions_enabled:
                 return (
@@ -364,7 +373,7 @@ class IssueReactionPublicViewSet(BaseViewSet):
             return IssueReaction.objects.none()
 
     def create(self, request, anchor, issue_id):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
 
         if not project_deploy_board.is_reactions_enabled:
             return Response(
@@ -401,7 +410,7 @@ class IssueReactionPublicViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, anchor, issue_id, reaction_code):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
 
         if not project_deploy_board.is_reactions_enabled:
             return Response(
@@ -433,7 +442,11 @@ class CommentReactionPublicViewSet(BaseViewSet):
 
     def get_queryset(self):
         try:
-            project_deploy_board = DeployBoard.objects.get(anchor=self.kwargs.get("anchor"), entity_name="project")
+            project_deploy_board = DeployBoard.objects.get(
+                anchor=self.kwargs.get("anchor"),
+                entity_name="project",
+                is_disabled=False,
+            )
             if project_deploy_board.is_reactions_enabled:
                 return (
                     super()
@@ -449,7 +462,7 @@ class CommentReactionPublicViewSet(BaseViewSet):
             return CommentReaction.objects.none()
 
     def create(self, request, anchor, comment_id):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
 
         if not project_deploy_board.is_reactions_enabled:
             return Response(
@@ -486,7 +499,7 @@ class CommentReactionPublicViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, anchor, comment_id, reaction_code):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
         if not project_deploy_board.is_reactions_enabled:
             return Response(
                 {"error": "Reactions are not enabled for this board"},
@@ -526,7 +539,9 @@ class IssueVotePublicViewSet(BaseViewSet):
     def get_queryset(self):
         try:
             project_deploy_board = DeployBoard.objects.get(
-                workspace__slug=self.kwargs.get("anchor"), entity_name="project"
+                workspace__slug=self.kwargs.get("anchor"),
+                entity_name="project",
+                is_disabled=False,
             )
             if project_deploy_board.is_votes_enabled:
                 return (
@@ -541,7 +556,7 @@ class IssueVotePublicViewSet(BaseViewSet):
             return IssueVote.objects.none()
 
     def create(self, request, anchor, issue_id):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
         issue_vote, _ = IssueVote.objects.get_or_create(
             actor_id=request.user.id,
             project_id=project_deploy_board.project_id,
@@ -571,7 +586,7 @@ class IssueVotePublicViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, anchor, issue_id):
-        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+        project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
         issue_vote = IssueVote.objects.get(
             issue_id=issue_id,
             actor_id=request.user.id,
@@ -595,7 +610,11 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
     def get(self, request, anchor, issue_id):
-        deploy_board = DeployBoard.objects.get(anchor=anchor)
+        deploy_board = DeployBoard.objects.get(
+            anchor=anchor,
+            entity_name="project",
+            is_disabled=False,
+        )
 
         issue_queryset = (
             Issue.issue_objects.filter(
@@ -667,7 +686,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                                             votes__actor__avatar_asset__isnull=False,
                                             then=Concat(
                                                 Value("/api/assets/v2/static/"),
-                                                F("votes__actor__avatar_asset"),
+                                                Cast("votes__actor__avatar_asset", CharField()),
                                                 Value("/"),
                                             ),
                                         ),
@@ -713,7 +732,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                                             votes__actor__avatar_asset__isnull=False,
                                             then=Concat(
                                                 Value("/api/assets/v2/static/"),
-                                                F("votes__actor__avatar_asset"),
+                                                Cast("votes__actor__avatar_asset", CharField()),
                                                 Value("/"),
                                             ),
                                         ),

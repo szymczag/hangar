@@ -187,3 +187,16 @@ configuration-set names, and SNS/SQS feedback endpoints. It never displays an AW
 This view is read-only. Configure SES API delivery only through the deployment `.env` file, Helm values, and deployment
 secret store. SMTP remains the in-application configurable delivery mode. The same page reports whether OpenPGP is
 available; users add and verify their own public certificate in Profile → Security.
+
+### SMTP destination policy
+
+SMTP resolves and pins the configured hostname before connecting, rejects private,
+loopback, link-local, and other non-public addresses by default, and permits only
+ports listed in `SMTP_ALLOWED_PORTS` (default: `25,465,587,2525`). SMTP credentials
+require STARTTLS or implicit TLS.
+
+An operator who intentionally uses an internal relay must place its exact normalized
+DNS name in `SMTP_ALLOWED_HOSTS` or its address/CIDR in `SMTP_ALLOWED_IPS`. These are
+deployment-owned environment settings; they cannot be expanded from the mutable
+administrator email configuration. Keep exceptions as narrow as possible and restart
+the API and mail worker after changing them.

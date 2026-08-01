@@ -48,7 +48,7 @@ class TestAuthenticationLogHygiene:
         adapter.logger.warning.assert_called_once_with("Error getting user response")
         assert access_token not in str(adapter.logger.mock_calls)
 
-    def test_github_membership_failure_does_not_log_username(self):
+    def test_github_membership_failure_does_not_log_identity_or_configuration(self):
         provider = object.__new__(GitHubOAuthProvider)
         provider.organization_id = "example-org"
         provider.token_data = {"access_token": "secret-oauth-access-token"}
@@ -59,8 +59,8 @@ class TestAuthenticationLogHygiene:
         with pytest.raises(AuthenticationException):
             provider.set_user_data()
 
-        provider.logger.warning.assert_called_once_with(
-            "User is not in organization",
-            extra={"organization_id": "example-org"},
-        )
-        assert "private-user" not in str(provider.logger.mock_calls)
+        provider.logger.warning.assert_called_once_with("User is not in organization")
+        logged_calls = str(provider.logger.mock_calls)
+        assert "private-user" not in logged_calls
+        assert "example-org" not in logged_calls
+        assert "secret-oauth-access-token" not in logged_calls
