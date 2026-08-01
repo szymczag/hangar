@@ -179,6 +179,11 @@ class TestOIDCOutboundURLPolicy:
             ("https://link-local.test/oidc", "169.254.169.254"),
             ("https://reserved.test/oidc", "192.0.2.1"),
             ("https://ipv6-private.test/oidc", "fd00::1"),
+            ("https://nat64-loopback.test/oidc", "64:ff9b::7f00:1"),
+            ("https://nat64-metadata.test/oidc", "64:ff9b::a9fe:a9fe"),
+            ("https://nat64-local-use.test/oidc", "64:ff9b:1::7f00:1"),
+            ("https://six-to-four.test/oidc", "2002:7f00:1::"),
+            ("https://teredo.test/oidc", "2001:0000:4136:e378:8000:63bf:3fff:fdd2"),
         ],
     )
     def test_rejects_non_public_destinations(self, public_oidc_dns, url, address):

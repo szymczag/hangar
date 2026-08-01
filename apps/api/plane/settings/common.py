@@ -124,6 +124,52 @@ WEBHOOK_ALLOWED_HOSTS = [
     _host.strip().rstrip(".").lower() for _host in _webhook_allowed_hosts_raw.split(",") if _host.strip()
 ]
 
+# Gitea OAuth carries a client secret and bearer token. Private destinations
+# are denied by default and may only be enabled by the deployment operator,
+# never through the mutable instance configuration alone.
+_gitea_allowed_ips_raw = os.environ.get("GITEA_ALLOWED_IPS", "")
+GITEA_ALLOWED_IPS = []
+for _cidr in _gitea_allowed_ips_raw.split(","):
+    _cidr = _cidr.strip()
+    if not _cidr:
+        continue
+    try:
+        GITEA_ALLOWED_IPS.append(ipaddress.ip_network(_cidr, strict=False))
+    except ValueError:
+        _logger.warning("GITEA_ALLOWED_IPS: skipping invalid entry %r", _cidr)
+
+_gitea_allowed_hosts_raw = os.environ.get("GITEA_ALLOWED_HOSTS", "")
+GITEA_ALLOWED_HOSTS = [
+    _host.strip().rstrip(".").lower() for _host in _gitea_allowed_hosts_raw.split(",") if _host.strip()
+]
+
+_smtp_allowed_ips_raw = os.environ.get("SMTP_ALLOWED_IPS", "")
+SMTP_ALLOWED_IPS = []
+for _cidr in _smtp_allowed_ips_raw.split(","):
+    _cidr = _cidr.strip()
+    if not _cidr:
+        continue
+    try:
+        SMTP_ALLOWED_IPS.append(ipaddress.ip_network(_cidr, strict=False))
+    except ValueError:
+        _logger.warning("SMTP_ALLOWED_IPS: skipping invalid entry %r", _cidr)
+
+_smtp_allowed_hosts_raw = os.environ.get("SMTP_ALLOWED_HOSTS", "")
+SMTP_ALLOWED_HOSTS = [
+    _host.strip().rstrip(".").lower() for _host in _smtp_allowed_hosts_raw.split(",") if _host.strip()
+]
+
+_smtp_allowed_ports_raw = os.environ.get("SMTP_ALLOWED_PORTS", "25,465,587,2525")
+SMTP_ALLOWED_PORTS = set()
+for _port in _smtp_allowed_ports_raw.split(","):
+    try:
+        _port_number = int(_port.strip())
+        if not 1 <= _port_number <= 65535:
+            raise ValueError
+        SMTP_ALLOWED_PORTS.add(_port_number)
+    except ValueError:
+        _logger.warning("SMTP_ALLOWED_PORTS: skipping invalid entry %r", _port)
+
 # Webhook disallowed domains — comma-separated hostnames. Webhooks targeting
 # these domains or any of their subdomains are rejected (the request host is
 # always appended at validation time as a loop-back guard). Empty by default

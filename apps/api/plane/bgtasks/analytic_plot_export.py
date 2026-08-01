@@ -15,7 +15,7 @@ from celery import shared_task
 from django.template.loader import render_to_string
 from django.db.models import Q, Case, Value, When
 from django.db import models
-from django.db.models.functions import Concat
+from django.db.models.functions import Cast, Concat
 
 # Module imports
 from plane.db.models import Issue, User
@@ -89,7 +89,7 @@ def get_assignee_details(slug, filters):
                     assignees__avatar_asset__isnull=False,
                     then=Concat(
                         Value("/api/assets/v2/static/"),
-                        "assignees__avatar_asset",  # Assuming avatar_asset has an id or relevant field
+                        Cast("assignees__avatar_asset", models.CharField()),
                         Value("/"),
                     ),
                 ),

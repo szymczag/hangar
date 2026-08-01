@@ -213,6 +213,10 @@ class ModuleViewSet(BaseViewSet):
             .get_queryset()
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(workspace__slug=self.kwargs.get("slug"))
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
             .annotate(is_favorite=Exists(favorite_subquery))
             .prefetch_related("members")
             .prefetch_related(
@@ -445,7 +449,7 @@ class ModuleViewSet(BaseViewSet):
                             assignees__avatar_asset__isnull=False,
                             then=Concat(
                                 Value("/api/assets/v2/static/"),
-                                "assignees__avatar_asset",  # Assuming avatar_asset has an id or relevant field
+                                Cast("assignees__avatar_asset", models.CharField()),
                                 Value("/"),
                             ),
                         ),
@@ -553,7 +557,7 @@ class ModuleViewSet(BaseViewSet):
                         assignees__avatar_asset__isnull=False,
                         then=Concat(
                             Value("/api/assets/v2/static/"),
-                            "assignees__avatar_asset",  # Assuming avatar_asset has an id or relevant field
+                            Cast("assignees__avatar_asset", models.CharField()),
                             Value("/"),
                         ),
                     ),
@@ -649,7 +653,14 @@ class ModuleViewSet(BaseViewSet):
         return Response(data, status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def update(self, request, slug, project_id, pk):
+        return self._perform_update(request, slug, project_id, pk, partial=False)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def partial_update(self, request, slug, project_id, pk):
+        return self._perform_update(request, slug, project_id, pk, partial=True)
+
+    def _perform_update(self, request, slug, project_id, pk, *, partial):
         module_queryset = self.get_queryset().filter(pk=pk)
 
         current_module = module_queryset.first()
@@ -666,7 +677,7 @@ class ModuleViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         current_instance = json.dumps(ModuleSerializer(current_module).data, cls=DjangoJSONEncoder)
-        serializer = ModuleWriteSerializer(current_module, data=request.data, partial=True)
+        serializer = ModuleWriteSerializer(current_module, data=request.data, partial=partial)
 
         if serializer.is_valid():
             serializer.save()

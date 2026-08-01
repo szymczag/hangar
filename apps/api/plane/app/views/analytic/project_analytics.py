@@ -22,7 +22,7 @@ from plane.db.models import (
 )
 from django.db import models
 from django.db.models import F, Case, When, Value
-from django.db.models.functions import Concat
+from django.db.models.functions import Cast, Concat
 from plane.utils.build_chart import build_analytics_chart
 from plane.utils.date_utils import (
     get_analytics_filters,
@@ -61,14 +61,20 @@ class ProjectAdvanceAnalyticsEndpoint(ProjectAdvanceAnalyticsBaseView):
         """
         base_queryset = None
         if cycle_id is not None:
-            cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
-                "issue_id", flat=True
-            )
+            cycle_issues = CycleIssue.objects.filter(
+                **self.filters["base_filters"],
+                project_id=project_id,
+                cycle_id=cycle_id,
+                cycle__project_id=project_id,
+            ).values_list("issue_id", flat=True)
             base_queryset = Issue.issue_objects.filter(id__in=cycle_issues)
         elif module_id is not None:
-            module_issues = ModuleIssue.objects.filter(**self.filters["base_filters"], module_id=module_id).values_list(
-                "issue_id", flat=True
-            )
+            module_issues = ModuleIssue.objects.filter(
+                **self.filters["base_filters"],
+                project_id=project_id,
+                module_id=module_id,
+                module__project_id=project_id,
+            ).values_list("issue_id", flat=True)
             base_queryset = Issue.issue_objects.filter(id__in=module_issues)
         else:
             base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"], project_id=project_id)
@@ -119,14 +125,20 @@ class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
     def get_work_items_stats(self, project_id, cycle_id=None, module_id=None) -> Dict[str, Dict[str, int]]:
         base_queryset = None
         if cycle_id is not None:
-            cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
-                "issue_id", flat=True
-            )
+            cycle_issues = CycleIssue.objects.filter(
+                **self.filters["base_filters"],
+                project_id=project_id,
+                cycle_id=cycle_id,
+                cycle__project_id=project_id,
+            ).values_list("issue_id", flat=True)
             base_queryset = Issue.issue_objects.filter(id__in=cycle_issues)
         elif module_id is not None:
-            module_issues = ModuleIssue.objects.filter(**self.filters["base_filters"], module_id=module_id).values_list(
-                "issue_id", flat=True
-            )
+            module_issues = ModuleIssue.objects.filter(
+                **self.filters["base_filters"],
+                project_id=project_id,
+                module_id=module_id,
+                module__project_id=project_id,
+            ).values_list("issue_id", flat=True)
             base_queryset = Issue.issue_objects.filter(id__in=module_issues)
         else:
             base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"], project_id=project_id)
@@ -141,7 +153,7 @@ class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
                         assignees__avatar_asset__isnull=False,
                         then=Concat(
                             Value("/api/assets/v2/static/"),
-                            "assignees__avatar_asset",  # Assuming avatar_asset has an id or relevant field
+                            Cast("assignees__avatar_asset", models.CharField()),
                             Value("/"),
                         ),
                     ),
@@ -190,10 +202,17 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
         )
 
         if cycle_id is not None:
-            cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
-                "issue_id", flat=True
+            cycle_issues = CycleIssue.objects.filter(
+                **self.filters["base_filters"],
+                project_id=project_id,
+                cycle_id=cycle_id,
+                cycle__project_id=project_id,
             )
-            cycle = Cycle.objects.filter(id=cycle_id).first()
+            cycle = Cycle.objects.filter(
+                id=cycle_id,
+                workspace__slug=self._workspace_slug,
+                project_id=project_id,
+            ).first()
             if cycle and cycle.start_date:
                 start_date = cycle.start_date.date()
                 end_date = cycle.end_date.date()
@@ -202,10 +221,17 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
             queryset = cycle_issues
 
         elif module_id is not None:
-            module_issues = ModuleIssue.objects.filter(**self.filters["base_filters"], module_id=module_id).values_list(
-                "issue_id", flat=True
+            module_issues = ModuleIssue.objects.filter(
+                **self.filters["base_filters"],
+                project_id=project_id,
+                module_id=module_id,
+                module__project_id=project_id,
             )
-            module = Module.objects.filter(id=module_id).first()
+            module = Module.objects.filter(
+                id=module_id,
+                workspace__slug=self._workspace_slug,
+                project_id=project_id,
+            ).first()
             if module and module.start_date:
                 start_date = module.start_date
                 end_date = module.target_date
@@ -214,8 +240,8 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
             queryset = module_issues
 
         else:
-            project = Project.objects.filter(id=project_id).first()
-            if project.created_at:
+            project = Project.objects.filter(id=project_id, workspace__slug=self._workspace_slug).first()
+            if project and project.created_at:
                 start_date = project.created_at.date().replace(day=1)
             else:
                 return {"data": [], "schema": {}}
@@ -333,14 +359,20 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
 
             # Apply cycle/module filters if present
             if cycle_id is not None:
-                cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
-                    "issue_id", flat=True
-                )
+                cycle_issues = CycleIssue.objects.filter(
+                    **self.filters["base_filters"],
+                    project_id=project_id,
+                    cycle_id=cycle_id,
+                    cycle__project_id=project_id,
+                ).values_list("issue_id", flat=True)
                 queryset = queryset.filter(id__in=cycle_issues)
 
             elif module_id is not None:
                 module_issues = ModuleIssue.objects.filter(
-                    **self.filters["base_filters"], module_id=module_id
+                    **self.filters["base_filters"],
+                    project_id=project_id,
+                    module_id=module_id,
+                    module__project_id=project_id,
                 ).values_list("issue_id", flat=True)
                 queryset = queryset.filter(id__in=module_issues)
 

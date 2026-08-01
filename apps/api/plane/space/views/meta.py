@@ -18,7 +18,11 @@ class ProjectMetaDataEndpoint(BaseAPIView):
 
     def get(self, request, anchor):
         try:
-            deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
+            deploy_board = DeployBoard.objects.get(
+                anchor=anchor,
+                entity_name="project",
+                is_disabled=False,
+            )
         except DeployBoard.DoesNotExist:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 

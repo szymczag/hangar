@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-import uuid
 from urllib.parse import urlencode, urljoin
 
 # Django import
@@ -14,6 +13,10 @@ from plane.authentication.provider.oauth.gitea import GiteaOAuthProvider
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.redirection_path import get_redirection_path
 from plane.authentication.utils.user_auth_workflow import post_user_auth_workflow
+from plane.authentication.utils.oauth_transaction import (
+    consume_oauth_transaction,
+    start_oauth_transaction,
+)
 from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
 from plane.authentication.adapter.error import (
@@ -22,14 +25,15 @@ from plane.authentication.adapter.error import (
 )
 from plane.utils.path_validator import validate_next_path
 
+GITEA_TRANSACTION_APP = "gitea_oauth_transaction_app"
+
 
 class GiteaOauthInitiateEndpoint(View):
     def get(self, request):
         # Get host and next path
-        request.session["host"] = base_host(request=request, is_app=True)
+        host = base_host(request=request, is_app=True)
         next_path = request.GET.get("next_path")
-        if next_path:
-            request.session["next_path"] = str(validate_next_path(next_path))
+        next_path = str(validate_next_path(next_path)) if next_path else None
 
         # Check instance configuration
         instance = Instance.objects.first()
@@ -44,9 +48,13 @@ class GiteaOauthInitiateEndpoint(View):
             url = urljoin(base_host(request=request, is_app=True), "?" + urlencode(params))
             return HttpResponseRedirect(url)
         try:
-            state = uuid.uuid4().hex
+            state = start_oauth_transaction(
+                request,
+                GITEA_TRANSACTION_APP,
+                host=host,
+                next_path=next_path,
+            )
             provider = GiteaOAuthProvider(request=request, state=state)
-            request.session["state"] = state
             auth_url = provider.get_auth_url()
             return HttpResponseRedirect(auth_url)
         except AuthenticationException as e:
@@ -61,10 +69,11 @@ class GiteaCallbackEndpoint(View):
     def get(self, request):
         code = request.GET.get("code")
         state = request.GET.get("state")
-        base_host = request.session.get("host")
-        next_path = request.session.get("next_path")
+        transaction, valid_transaction = consume_oauth_transaction(request, GITEA_TRANSACTION_APP, state)
+        host = transaction.get("host") or base_host(request=request, is_app=True)
+        next_path = transaction.get("next_path")
 
-        if state != request.session.get("state", ""):
+        if not valid_transaction:
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["GITEA_OAUTH_PROVIDER_ERROR"],
                 error_message="GITEA_OAUTH_PROVIDER_ERROR",
@@ -72,7 +81,7 @@ class GiteaCallbackEndpoint(View):
             params = exc.get_error_dict()
             if next_path:
                 params["next_path"] = str(next_path)
-            url = urljoin(base_host, "?" + urlencode(params))
+            url = urljoin(host, "?" + urlencode(params))
             return HttpResponseRedirect(url)
 
         if not code:
@@ -83,7 +92,7 @@ class GiteaCallbackEndpoint(View):
             params = exc.get_error_dict()
             if next_path:
                 params["next_path"] = str(validate_next_path(next_path))
-            url = urljoin(base_host, "?" + urlencode(params))
+            url = urljoin(host, "?" + urlencode(params))
             return HttpResponseRedirect(url)
 
         try:
@@ -97,11 +106,11 @@ class GiteaCallbackEndpoint(View):
             else:
                 path = get_redirection_path(user=user)
             # redirect to referer path
-            url = urljoin(base_host, path)
+            url = urljoin(host, path)
             return HttpResponseRedirect(url)
         except AuthenticationException as e:
             params = e.get_error_dict()
             if next_path:
                 params["next_path"] = str(validate_next_path(next_path))
-            url = urljoin(base_host, "?" + urlencode(params))
+            url = urljoin(host, "?" + urlencode(params))
             return HttpResponseRedirect(url)

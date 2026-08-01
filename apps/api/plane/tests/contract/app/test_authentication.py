@@ -20,6 +20,58 @@ from plane.settings.redis import redis_instance
 from plane.license.models import Instance
 
 
+@pytest.mark.contract
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "callback_name,provider_path",
+    [
+        ("github-callback", "plane.authentication.views.app.github.GitHubOAuthProvider"),
+        ("space-github-callback", "plane.authentication.views.space.github.GitHubOAuthProvider"),
+        ("gitlab-callback", "plane.authentication.views.app.gitlab.GitLabOAuthProvider"),
+        ("space-gitlab-callback", "plane.authentication.views.space.gitlab.GitLabOAuthProvider"),
+        ("gitea-callback", "plane.authentication.views.app.gitea.GiteaOAuthProvider"),
+        ("space-gitea-callback", "plane.authentication.views.space.gitea.GiteaOAuthProvider"),
+    ],
+)
+def test_oauth_callbacks_reject_blank_state_without_pending_transaction(
+    django_client,
+    callback_name,
+    provider_path,
+):
+    with patch(provider_path) as provider:
+        response = django_client.get(reverse(callback_name), {"code": "attacker-code", "state": ""})
+
+    assert response.status_code == status.HTTP_302_FOUND
+    provider.assert_not_called()
+
+
+def _clear_auth_throttle_keys():
+    """Delete only the AuthenticationThrottle history keys from the shared cache.
+
+    DRF's SimpleRateThrottle stores request history under
+    ``throttle_<scope>_<ident>`` keys, so scoping the pattern to
+    ``throttle_authentication_`` removes just this throttle's entries instead
+    of wiping unrelated cache state.
+    """
+    cache.delete_pattern("throttle_authentication_*")
+
+
+@pytest.fixture(autouse=True)
+def _reset_auth_throttle_cache():
+    """Clear the auth throttle state around every test in this module.
+
+    The auth endpoints apply a per-IP throttle (AuthenticationThrottle) whose
+    request history lives in the Django cache. Because the test session reuses a
+    single cache, that count leaks across tests and trips RATE_LIMIT_EXCEEDED in
+    classes that don't reset it. This mirrors the per-class ``_clear_state``
+    fixtures already used by the throttle / verify-attempt classes, applied
+    module-wide so every auth test starts from a clean throttle state.
+    """
+    _clear_auth_throttle_keys()
+    yield
+    _clear_auth_throttle_keys()
+
+
 @pytest.fixture
 def setup_instance(db):
     """Create and configure an instance for authentication tests"""
