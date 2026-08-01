@@ -59,6 +59,76 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.19` to `rc.20`
+
+This release moves the inherited application baseline from Plane `v1.4.0-rc2`
+to the exact final `v1.4.0` commit `917b23a6`. It includes Django 5.2.15 and the
+final upstream dependency, filtering, avatar, and application fixes. Hangar's
+upload-validation migration remains the migration-history anchor.
+
+The release also tightens server-side authorization for analytics, workspace
+search, cycle and module mutation, and project deploy-board routes. OAuth login
+now uses a provider- and surface-bound, single-use transaction state. Gitea,
+OIDC, and SMTP outbound traffic validates and pins resolved destinations; the
+Live PDF exporter accepts only bounded raster assets from credential-free
+presigned HTTP(S) URLs and refuses redirects.
+
+`rc.20` adds Django migration
+`0129_alter_draftissue_assignees_alter_issue_assignees_and_more`. It records the
+final upstream relationship metadata for draft issue assignees, issue assignees,
+and module members; it does not rewrite existing issue or membership rows.
+Existing `rc.19` Helm values and Secret names remain structurally compatible.
+There is no Helm resource, RBAC, NetworkPolicy, or persisted-data contract
+change.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target chart is `0.1.0-rc.20`, its application version is
+   `v0.1.0-rc.20`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc20);
+3. if Gitea OAuth or SMTP is enabled, review the destination policy in the
+   [federated SSO guide](../federated-sso-security.md) or
+   [email security model](../email-delivery-and-openpgp.md); private destinations
+   require both an application allowlist and the matching narrow
+   `networkPolicy.privateEgress` rule;
+4. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+5. schedule the API, workers, Live service, and all frontends as one coordinated
+   Helm revision. Do not mix `rc.19` and `rc.20` application images.
+
+The chart does not currently expose `GITEA_ALLOWED_HOSTS`,
+`GITEA_ALLOWED_IPS`, `SMTP_ALLOWED_HOSTS`, `SMTP_ALLOWED_IPS`, or
+`SMTP_ALLOWED_PORTS` as Helm values. Public destinations remain usable when
+they resolve exclusively to permitted public addresses. A private Gitea or SMTP
+destination is outside the supported chart contract for this release; do not
+patch generated Deployments by hand to bypass that boundary.
+
+Wait for the revision-scoped migration Job before admitting traffic. OAuth
+transactions started before the rollout cannot be resumed; users should restart
+the sign-in flow. After the rollout, verify:
+
+- users outside a workspace or project cannot read analytics, search results,
+  deploy-board content, or mutate cycles and modules by supplying identifiers;
+- GitHub, GitLab, and Gitea callbacks reject missing, stale, replayed,
+  cross-provider, and cross-surface transaction state;
+- enabled Gitea, OIDC, and SMTP integrations reach only their intended hosts,
+  refuse redirects where applicable, and fail closed on blocked address changes;
+- SMTP credentials are never sent over a plaintext connection;
+- PDF export embeds a valid bounded PNG or JPEG while rejecting redirects,
+  unsupported media types, oversized bodies, malformed asset IDs, and excess
+  image counts; and
+- upload, download, issue editing, Live updates, and a representative workspace
+  workflow remain healthy.
+
+`rc.19` is the immediately previous complete publication, but it predates the
+security boundaries introduced here. There is no security-equivalent rollback
+target. If an emergency availability rollback is unavoidable, disable affected
+OAuth, SMTP, analytics, and export surfaces first. Migration `0129` may remain
+applied because it does not rewrite application rows; return every component to
+`rc.20` as soon as possible.
+
 ### Upgrade from `rc.18` to `rc.19`
 
 This release introduces the server-enforced file-upload boundary described in
