@@ -348,9 +348,6 @@ catalogs:
     ioredis:
       specifier: 5.7.0
       version: 5.7.0
-    is-emoji-supported:
-      specifier: ^0.0.5
-      version: 0.0.5
     isbot:
       specifier: ^5.1.31
       version: 5.1.31
@@ -587,6 +584,9 @@ overrides:
   '@opentelemetry/resources': 2.8.0
   '@opentelemetry/sdk-trace-base': 2.8.0
   morgan: 1.11.0
+
+patchedDependencies:
+  is-emoji-supported@0.0.5: a442ca8829b4b812bd85b0d3e752fbf1040dcc0ef1eb8db5bdd4f7183eddea6f
 
 importers:
 
@@ -1404,9 +1404,6 @@ importers:
       highlight.js:
         specifier: 'catalog:'
         version: 11.11.1
-      is-emoji-supported:
-        specifier: 'catalog:'
-        version: 0.0.5
       jsx-dom-cjs:
         specifier: 'catalog:'
         version: 8.1.6
@@ -12678,7 +12675,7 @@ snapshots:
       '@tiptap/suggestion': 2.26.1(@tiptap/core@2.26.3(@tiptap/pm@2.26.1))(@tiptap/pm@2.26.1)
       emoji-regex: 10.5.0
       emojibase-data: 15.3.2(emojibase@16.0.0)
-      is-emoji-supported: 0.0.5
+      is-emoji-supported: 0.0.5(patch_hash=a442ca8829b4b812bd85b0d3e752fbf1040dcc0ef1eb8db5bdd4f7183eddea6f)
     transitivePeerDependencies:
       - emojibase
 
@@ -15154,7 +15151,7 @@ snapshots:
 
   is-docker@3.0.0: {}
 
-  is-emoji-supported@0.0.5: {}
+  is-emoji-supported@0.0.5(patch_hash=a442ca8829b4b812bd85b0d3e752fbf1040dcc0ef1eb8db5bdd4f7183eddea6f): {}
 
   is-extglob@2.1.1: {}
 

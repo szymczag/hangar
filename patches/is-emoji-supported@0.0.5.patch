@@ -1,0 +1,39 @@
+diff --git a/dist/cjs/is-emoji-supported.js b/dist/cjs/is-emoji-supported.js
+index 0f17fe201d0f9935f1af3f85e69ab52439ac87b2..9acb1d441493d9f20a599dd42f532666ae2ba189 100644
+--- a/dist/cjs/is-emoji-supported.js
++++ b/dist/cjs/is-emoji-supported.js
+@@ -35,7 +35,7 @@ function setCacheHandler(store) {
+ var isSupported = (function () {
+     var ctx = null;
+     try {
+-        ctx = document.createElement('canvas').getContext('2d');
++        ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+     }
+     catch (_a) { }
+     // Not in browser env
+diff --git a/dist/esm/is-emoji-supported.js b/dist/esm/is-emoji-supported.js
+index a1d25182d630954b6f4460ba44b7a9598d45ae6a..eeaf61d0b04fb5c68186b72dc84ff1ad28dd7330 100644
+--- a/dist/esm/is-emoji-supported.js
++++ b/dist/esm/is-emoji-supported.js
+@@ -33,7 +33,7 @@ function setCacheHandler(store) {
+ var isSupported = (function () {
+     var ctx = null;
+     try {
+-        ctx = document.createElement('canvas').getContext('2d');
++        ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+     }
+     catch (_a) { }
+     // Not in browser env
+diff --git a/dist/umd/is-emoji-supported.js b/dist/umd/is-emoji-supported.js
+index 60bfe1d4ca9992ed1edd001d27051058523c3143..e6c82a8590f4075efe52c0b5f6196de131df33b3 100644
+--- a/dist/umd/is-emoji-supported.js
++++ b/dist/umd/is-emoji-supported.js
+@@ -39,7 +39,7 @@
+     var isSupported = (function () {
+         var ctx = null;
+         try {
+-            ctx = document.createElement('canvas').getContext('2d');
++            ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+         }
+         catch (_a) { }
+         // Not in browser env

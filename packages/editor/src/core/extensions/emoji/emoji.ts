@@ -14,7 +14,6 @@ import {
   Node,
   nodeInputRule,
   PasteRule,
-  removeDuplicates,
 } from "@tiptap/core";
 import type { EmojiStorage } from "@tiptap/extension-emoji";
 import { emojis, emojiToShortcode, shortcodeToEmoji } from "@tiptap/extension-emoji";
@@ -22,11 +21,11 @@ import { Fragment } from "@tiptap/pm/model";
 import type { Transaction } from "@tiptap/pm/state";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import type { SuggestionOptions } from "@tiptap/suggestion";
-import Suggestion from "@tiptap/suggestion";
+import TiptapSuggestion from "@tiptap/suggestion";
 import emojiRegex from "emoji-regex";
-import { isEmojiSupported } from "is-emoji-supported";
 // helpers
 import { customFindSuggestionMatch } from "@/helpers/find-suggestion-match";
+import { hasRenderableEmoji } from "./emoji-support";
 
 // Extended storage type to include our custom forceOpen flag
 export interface ExtendedEmojiStorage extends EmojiStorage {
@@ -150,21 +149,9 @@ export const Emoji = Node.create<EmojiOptions, EmojiStorage>({
   },
 
   addStorage() {
-    const { emojis } = this.options;
-    const supportMap: Record<number, boolean> = removeDuplicates(emojis.map((item) => item.version))
-      .filter((version) => typeof version === "number")
-      .reduce((versions, version) => {
-        const emoji = emojis.find((item) => item.version === version && item.emoji);
-
-        return {
-          ...versions,
-          [version]: emoji ? isEmojiSupported(emoji.emoji as string) : false,
-        };
-      }, {});
-
     return {
       emojis: this.options.emojis,
-      isSupported: (emojiItem) => (emojiItem.version ? supportMap[emojiItem.version] : false),
+      isSupported: hasRenderableEmoji,
       forceOpen: false,
     };
   },
@@ -282,10 +269,7 @@ export const Emoji = Node.create<EmojiOptions, EmojiStorage>({
 
     if (this.options.enableEmoticons) {
       // get the list of supported emoticons
-      const emoticons = this.options.emojis
-        .map((item) => item.emoticons)
-        .flat()
-        .filter((item) => item) as string[];
+      const emoticons = this.options.emojis.flatMap((item) => item.emoticons ?? []);
 
       const emoticonRegex = new RegExp(`(?:^|\\s)(${emoticons.map((item) => escapeForRegEx(item)).join("|")}) $`);
 
@@ -351,7 +335,7 @@ export const Emoji = Node.create<EmojiOptions, EmojiStorage>({
       return [];
     }
     return [
-      Suggestion({
+      TiptapSuggestion({
         editor: this.editor,
         findSuggestionMatch: customFindSuggestionMatch,
         ...this.options.suggestion,

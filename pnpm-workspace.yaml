@@ -123,7 +123,6 @@ catalog:
   "i18next-icu": "2.4.3"
   "i18next-resources-to-backend": "1.2.1"
   "ioredis": "5.7.0"
-  "is-emoji-supported": "^0.0.5"
   "isbot": "^5.1.31"
   "jscodeshift": "^17.3.0"
   "jsx-dom-cjs": "^8.0.3"
@@ -259,3 +258,6 @@ minimumReleaseAgeExclude:
   - "@storybook/react@10.4.6"
   - storybook@10.4.6
   - "@blueprintjs/core@6.18.0"
+
+patchedDependencies:
+  is-emoji-supported@0.0.5: patches/is-emoji-supported@0.0.5.patch
