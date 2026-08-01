@@ -156,6 +156,65 @@ class DigestTests(unittest.TestCase):
                 release_notes.load_digests(path)
 
 
+class UpstreamTransitionReviewTests(unittest.TestCase):
+    def valid_payload(self):
+        return {
+            "schema_version": 1,
+            "reviews": [
+                {
+                    "release_tag": "hangar-v0.1.0-rc.21",
+                    "previous_release_tag": "hangar-v0.1.0-rc.19",
+                    "repository": "https://github.com/makeplane/plane",
+                    "previous_revision": "1" * 40,
+                    "current_revision": "2" * 40,
+                    "rationale": "The exact non-linear upstream transition received maintainer review.",
+                }
+            ],
+        }
+
+    def test_loads_exact_review_schema(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "reviews.json"
+            path.write_text(json.dumps(self.valid_payload()), encoding="utf-8")
+
+            reviews = release_notes.load_upstream_transition_reviews(path)
+
+        review = reviews["hangar-v0.1.0-rc.21"]
+        self.assertEqual(review.previous_release_tag, "hangar-v0.1.0-rc.19")
+        self.assertEqual(review.previous_revision, "1" * 40)
+        self.assertEqual(review.current_revision, "2" * 40)
+
+    def test_rejects_malformed_mismatched_and_duplicate_reviews(self):
+        invalid_payloads = []
+
+        extra_key = self.valid_payload()
+        extra_key["unexpected"] = True
+        invalid_payloads.append(extra_key)
+
+        wrong_repository = self.valid_payload()
+        wrong_repository["reviews"][0]["repository"] = "https://example.invalid/plane"
+        invalid_payloads.append(wrong_repository)
+
+        unsafe_rationale = self.valid_payload()
+        unsafe_rationale["reviews"][0]["rationale"] = "reviewed\u2028with a hidden line"
+        invalid_payloads.append(unsafe_rationale)
+
+        identical_tags = self.valid_payload()
+        identical_tags["reviews"][0]["previous_release_tag"] = "hangar-v0.1.0-rc.21"
+        invalid_payloads.append(identical_tags)
+
+        duplicate = self.valid_payload()
+        duplicate["reviews"].append(dict(duplicate["reviews"][0]))
+        invalid_payloads.append(duplicate)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "reviews.json"
+            for index, payload in enumerate(invalid_payloads):
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                with self.subTest(index=index), self.assertRaises(MetadataError):
+                    release_notes.load_upstream_transition_reviews(path)
+
+
 class ReleaseNoteGenerationTests(unittest.TestCase):
     def git(self, repository: Path, *arguments: str) -> str:
         result = subprocess.run(
@@ -225,6 +284,7 @@ class ReleaseNoteGenerationTests(unittest.TestCase):
                 release_pages=release_pages,
                 curated_notes=CURATED_NOTES.strip(),
                 digests=digests,
+                transition_reviews={},
             )
 
         self.assertIn("# Hangar v0.2.0-rc.1", output)
@@ -235,6 +295,90 @@ class ReleaseNoteGenerationTests(unittest.TestCase):
         self.assertIn("refs/tags/hangar-v0.2.0-rc.1", output)
         self.assertIn("does not update the `stable` image tag", output)
         self.assertNotIn("Changes since `v1.3.1`", output)
+
+    def test_requires_exact_review_for_non_linear_upstream_transition(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repository = Path(temporary_directory)
+            self.git(repository, "init", "--initial-branch=main")
+            self.git(repository, "config", "user.name", "Release Note Tests")
+            self.git(repository, "config", "user.email", "tests@example.invalid")
+            self.git(repository, "config", "commit.gpgsign", "false")
+            self.git(repository, "commit", "--allow-empty", "-m", "shared upstream root")
+            shared_root = self.git(repository, "rev-parse", "HEAD")
+
+            self.git(repository, "checkout", "-b", "rewritten-upstream", shared_root)
+            self.git(repository, "commit", "--allow-empty", "-m", "final upstream baseline")
+            current_upstream = self.git(repository, "rev-parse", "HEAD")
+
+            self.git(repository, "checkout", "main")
+            self.git(repository, "commit", "--allow-empty", "-m", "release candidate baseline")
+            previous_upstream = self.git(repository, "rev-parse", "HEAD")
+            self.write_baseline(repository, previous_upstream, "2026-07-29")
+            previous_release = self.commit(repository, "previous Hangar release")
+            previous_tag = "hangar-v0.1.0-rc.19"
+            self.git(repository, "tag", previous_tag, previous_release)
+
+            self.git(repository, "merge", "--no-ff", "rewritten-upstream", "-m", "merge final upstream")
+            self.write_baseline(repository, current_upstream, "2026-08-01")
+            current_commit = self.commit(repository, "prepare recovered release")
+            current_tag = "hangar-v0.1.0-rc.21"
+            release_pages = [
+                {
+                    "tag_name": previous_tag,
+                    "draft": False,
+                    "published_at": "2026-07-30T10:00:00Z",
+                }
+            ]
+            digests = {
+                image: f"sha256:{index:064x}"
+                for index, image in enumerate(release_notes.IMAGE_NAMES, 1)
+            }
+
+            generation_arguments = {
+                "repository_root": repository,
+                "current_tag": current_tag,
+                "current_commit": current_commit,
+                "release_pages": release_pages,
+                "curated_notes": CURATED_NOTES.strip(),
+                "digests": digests,
+            }
+            with self.assertRaisesRegex(MetadataError, "lack an exact maintainer review"):
+                release_notes.generate_release_notes(
+                    **generation_arguments,
+                    transition_reviews={},
+                )
+
+            mismatched_review = release_notes.UpstreamTransitionReview(
+                release_tag=current_tag,
+                previous_release_tag=previous_tag,
+                repository="https://github.com/makeplane/plane",
+                previous_revision=current_upstream,
+                current_revision=previous_upstream,
+                rationale="This intentionally mismatched review must not authorize the transition.",
+            )
+            with self.assertRaisesRegex(MetadataError, "lack an exact maintainer review"):
+                release_notes.generate_release_notes(
+                    **generation_arguments,
+                    transition_reviews={current_tag: mismatched_review},
+                )
+
+            exact_review = release_notes.UpstreamTransitionReview(
+                release_tag=current_tag,
+                previous_release_tag=previous_tag,
+                repository="https://github.com/makeplane/plane",
+                previous_revision=previous_upstream,
+                current_revision=current_upstream,
+                rationale="The exact rewritten upstream transition received maintainer review.",
+            )
+            output = release_notes.generate_release_notes(
+                **generation_arguments,
+                transition_reviews={current_tag: exact_review},
+            )
+
+        self.assertIn("maintainer-reviewed because the histories are not linear", output)
+        self.assertIn(f"/commit/{previous_upstream}", output)
+        self.assertIn(f"/commit/{current_upstream}", output)
+        self.assertNotIn(f"/compare/{previous_upstream}...{current_upstream}", output)
 
 
 if __name__ == "__main__":
