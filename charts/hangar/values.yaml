@@ -241,6 +241,9 @@ space:
 
 live:
   replicas: 2
+  # Exact internal hostnames that PDF image fetching may reach. Leave empty for
+  # public object-storage URLs; add only operator-trusted storage endpoints.
+  pdfAssetAllowedHosts: []
   image:
     repository: ghcr.io/szymczag/hangar-live
     tag: v0.1.0-rc.4

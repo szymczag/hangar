@@ -56,6 +56,10 @@ The chart receives only resource and key names in ordinary values. Workloads use
 `secretKeyRef` or mounted Secret volumes. The chart does not request permission
 to read Secrets through the Kubernetes API.
 
+`LIVE_SERVER_SECRET_KEY` is shared only with Live and the general worker. It
+authenticates the worker's document-conversion call; API, Beat, mail, import,
+frontend, and migration workloads do not receive it.
+
 Kubernetes Secrets are not encrypted by default in every cluster. Enable and
 govern control-plane encryption at rest, restrict API access, audit reads, and
 control etcd backups according to the cluster's security baseline.
@@ -70,6 +74,13 @@ private CIDR/port pairs, and public HTTPS destinations that are not in private o
 reserved ranges. This blocks common metadata-service and loopback SSRF targets at
 the network layer. Application webhook destination validation remains a separate
 control.
+
+Live PDF image egress adds an application-layer boundary: all DNS answers are
+classified, the socket is pinned to the checked address, redirect hops are
+revalidated, and the renderer receives only bounded, re-encoded data URIs.
+`live.pdfAssetAllowedHosts` is an explicit exception for exact, trusted private
+storage hostnames and must remain empty when the storage URL is publicly
+routable.
 
 Verify the rendered selectors against real cluster labels. A policy object that
 selects the wrong ingress or DNS Pods can fail closed and cause an outage; a CNI

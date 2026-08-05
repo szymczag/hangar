@@ -89,6 +89,13 @@ and the import worker. Follow the
 - pre-existing application and TLS Secrets; and
 - a default `StorageClass` or explicit storage classes for evaluation.
 
+Live PDF export validates and pins outbound image connections before rendering.
+Keep `live.pdfAssetAllowedHosts` empty for public storage origins; add only an
+exact operator-trusted hostname when presigned URLs intentionally use a private
+storage service. The `hangar-live` shared secret is mounted into Live and the
+general worker because `/convert-document/` is an authenticated server-to-server
+route.
+
 The chart does not install cluster infrastructure such as an ingress/Gateway controller,
 cert-manager, CNI, CSI driver, external secret operator, or telemetry collector.
 

@@ -48,11 +48,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecrets.cache.name }}
                   key: {{ .Values.existingSecrets.cache.urlKey }}
-            - name: LIVE_SERVER_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecrets.live.name }}
-                  key: {{ .Values.existingSecrets.live.secretKeyKey }}
+            {{- include "hangar.liveSecretEnv" . | nindent 12 }}
           ports:
             - name: http
               containerPort: 3000

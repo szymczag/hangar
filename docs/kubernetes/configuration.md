@@ -97,6 +97,20 @@ with the canonical HTTPS origin.
 Coordinate the ingress controller's request-body limit with
 `application.fileSizeLimit`. The lower limit wins.
 
+## Live PDF asset egress
+
+| Value                       | Default | Constraint or effect                                                         |
+| --------------------------- | ------- | ---------------------------------------------------------------------------- |
+| `live.pdfAssetAllowedHosts` | `[]`    | Exact operator-trusted hostnames allowed to resolve to private address space |
+
+PDF export validates all DNS answers and pins the socket to the address that was
+checked. It repeats that process for every redirect, rejects non-HTTP(S)
+destinations, caps image count/time/body size, and re-encodes accepted images
+before rendering. An allowlisted hostname still uses DNS pinning, but its
+resolved address is intentionally permitted to be private. Use this only when a
+trusted S3-compatible service returns an internal hostname in presigned URLs.
+Public storage origins and the chart's default public endpoint require no entry.
+
 ## Secret interface
 
 The chart stores only Secret names and key names in the Helm release.
@@ -104,7 +118,7 @@ The chart stores only Secret names and key names in the Helm release.
 | Value                           | Default resource        | Default key                                           |
 | ------------------------------- | ----------------------- | ----------------------------------------------------- |
 | `existingSecrets.application`   | `hangar-application`    | `SECRET_KEY`                                          |
-| `existingSecrets.live`          | `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                              |
+| `existingSecrets.live`          | `hangar-live`           | `LIVE_SERVER_SECRET_KEY` (Live and general worker)    |
 | `existingSecrets.database`      | `hangar-database`       | `DATABASE_URL`                                        |
 | `existingSecrets.cache`         | `hangar-cache`          | `REDIS_URL`                                           |
 | `existingSecrets.queue`         | `hangar-queue`          | `AMQP_URL`                                            |

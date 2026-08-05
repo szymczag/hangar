@@ -61,6 +61,9 @@ spec:
           env:
             {{- include "hangar.coreSecretEnv" $root | nindent 12 }}
             {{- include "hangar.celerySecretEnv" $root | nindent 12 }}
+            {{- if eq $worker.name "worker" }}
+            {{- include "hangar.liveSecretEnv" $root | nindent 12 }}
+            {{- end }}
             {{- if or (eq $worker.name "worker") (eq $worker.name "import-worker") }}
             {{- include "hangar.objectStorageSecretEnv" $root | nindent 12 }}
             {{- end }}

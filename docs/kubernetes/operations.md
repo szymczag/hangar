@@ -926,7 +926,7 @@ Updating a Secret does not automatically restart its consumers.
 | Credential                 | Workloads to restart or replace                                       |
 | -------------------------- | --------------------------------------------------------------------- |
 | `SECRET_KEY`               | API, worker, beat worker; invalidate sessions and retest signed links |
-| `LIVE_SERVER_SECRET_KEY`   | Live                                                                  |
+| `LIVE_SERVER_SECRET_KEY`   | Live and general worker                                               |
 | `DATABASE_URL`             | API, worker, beat worker, and the next migrator Job                   |
 | `REDIS_URL`                | API, Live, worker, beat worker, and the next migrator Job             |
 | `AMQP_URL`                 | API, worker, beat worker                                              |

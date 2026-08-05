@@ -96,3 +96,4 @@ data:
   LIVE_BASE_URL: {{ include "hangar.publicOrigin" . | quote }}
   LIVE_BASE_PATH: "/live"
   CORS_ALLOWED_ORIGINS: {{ include "hangar.publicOrigin" . | quote }}
+  PDF_ASSET_ALLOWED_HOSTS: {{ join "," .Values.live.pdfAssetAllowedHosts | quote }}

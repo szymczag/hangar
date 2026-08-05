@@ -84,7 +84,22 @@ def sync_with_external_service(entity_name, description_html):
 
         url = normalize_url_path(f"{live_url}/convert-document/")
 
-        response = requests.post(url, json=data, headers=None)
+        secret_key = settings.LIVE_SERVER_SECRET_KEY
+        if not secret_key:
+            log_exception(
+                Exception(
+                    "LIVE_SERVER_SECRET_KEY is not configured; skipping document conversion"
+                )
+            )
+            return {}
+
+        response = requests.post(
+            url,
+            json=data,
+            headers={"live-server-secret-key": secret_key},
+            timeout=10,
+            allow_redirects=False,
+        )
         if response.status_code == 200:
             return response.json()
     except requests.RequestException as e:
