@@ -59,6 +59,70 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.21` to `rc.22`
+
+This release hardens the outbound paths used by Live PDF export and the Unsplash
+proxy. Live validates every resolved address, pins each socket, revalidates
+bounded redirects, and gives the renderer only bounded raster images re-encoded
+as local JPEG data URIs. The worker-to-Live conversion route requires the shared
+Live secret. Unsplash requests use bounded structured parameters, a pinned
+destination, no redirects or ambient proxy, and a request timeout.
+
+The PostHog destination is now deployment-owned: instance configuration cannot
+set or disclose it, and the runtime reads only the environment. The release also
+updates `cryptography` to major version 50 and avoids unnecessary emoji canvas
+reads in the editor. The inherited Plane source remains final `v1.4.0` at exact
+commit `917b23a6`.
+
+`rc.22` adds Django migration `license.0009_remove_mutable_posthog_host`,
+which deletes any legacy `POSTHOG_HOST` instance-configuration row. It does not
+change other instance settings or application data. Existing `rc.21` Helm values
+remain structurally compatible. The chart adds the empty-by-default
+`live.pdfAssetAllowedHosts` list and mounts the existing Live Secret into the
+general worker; there is no public-route, RBAC, storage, or NetworkPolicy contract
+change.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target chart is `0.1.0-rc.22`, its application version is
+   `v0.1.0-rc.22`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc22);
+3. if the deployment intentionally uses a custom PostHog collector, set
+   `POSTHOG_HOST` in the API and worker deployment environment before running
+   migrations; the chart does not expose this as a supported value;
+4. if Live receives presigned asset URLs for an intentionally private storage
+   hostname, add only that exact hostname to `live.pdfAssetAllowedHosts` and
+   retain a matching narrow egress rule; public origins require no exception;
+5. render the existing values against the target chart and verify the new worker
+   Live-secret reference, expected versions, and immutable image digests; and
+6. schedule API, workers, and Live as one coordinated Helm revision. Do not mix
+   `rc.21` and `rc.22` application images.
+
+Wait for the revision-scoped migration Job before admitting traffic. Then verify:
+
+- PDF export accepts a bounded public PNG or JPEG, follows only revalidated
+  redirects, and rejects private or reserved destinations, unsupported media,
+  oversized or malformed bodies, invalid asset IDs, and unauthenticated direct
+  conversion calls;
+- an explicitly allowed private asset host works only when both the exact
+  application hostname and the narrow network path are configured;
+- Unsplash search accepts normal bounded queries while rejecting invalid page
+  and page-size values and never follows a redirected service response;
+- the instance configuration API cannot set or reveal `POSTHOG_HOST`, and any
+  intentional collector is selected only from deployment configuration; and
+- issue editing, emoji rendering, Live updates, worker jobs, and a representative
+  workspace workflow remain healthy.
+
+`rc.21` is the immediately previous complete publication, but it predates these
+security boundaries. There is no security-equivalent rollback target. An
+emergency rollback restores the affected outbound weaknesses, and migration
+`license.0009` does not recreate the deleted PostHog row. Disable PDF export,
+Unsplash, and PostHog traffic before such a rollback, preserve any intended
+PostHog host in deployment configuration, and return every component to `rc.22`
+as soon as possible.
+
 ### Upgrade from `rc.19` to `rc.21`
 
 This release moves the inherited application baseline from Plane `v1.4.0-rc2`
