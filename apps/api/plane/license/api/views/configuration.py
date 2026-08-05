@@ -22,19 +22,28 @@ from plane.license.utils.encryption import encrypt_data
 from plane.mailer.service import enqueue_rendered_email
 from plane.utils.cache import cache_response, invalidate_cache
 
+DEPLOYMENT_MANAGED_CONFIGURATION_KEYS = {"POSTHOG_HOST"}
+
 
 class InstanceConfigurationEndpoint(BaseAPIView):
     permission_classes = [InstanceAdminPermission]
 
     @cache_response(60 * 60 * 2, user=False)
     def get(self, request):
-        instance_configurations = InstanceConfiguration.objects.all()
+        instance_configurations = InstanceConfiguration.objects.exclude(
+            key__in=DEPLOYMENT_MANAGED_CONFIGURATION_KEYS
+        )
         serializer = InstanceConfigurationSerializer(instance_configurations, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @invalidate_cache(path="/api/instances/configurations/", user=False)
     @invalidate_cache(path="/api/instances/", user=False)
     def patch(self, request):
+        if DEPLOYMENT_MANAGED_CONFIGURATION_KEYS.intersection(request.data):
+            return Response(
+                {"error": "PostHog destination is managed by the deployment."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         smtp_configuration_keys = {
             "EMAIL_HOST",
             "EMAIL_HOST_USER",
