@@ -24,6 +24,10 @@ const envSchema = z.object({
   COMPRESSION_THRESHOLD: z.string().default("5000").transform(Number),
   // secret
   LIVE_SERVER_SECRET_KEY: z.string(),
+  // Exact hostnames that the PDF asset fetcher may intentionally reach even
+  // when they resolve to private infrastructure (for example an internal S3
+  // service). Connections are still pinned to the resolved address.
+  PDF_ASSET_ALLOWED_HOSTS: z.string().default(""),
   // Redis configuration
   REDIS_HOST: z.string().optional(),
   REDIS_PORT: z.string().default("6379").transform(Number),

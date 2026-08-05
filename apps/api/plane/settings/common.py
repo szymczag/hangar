@@ -518,6 +518,7 @@ if LIVE_BASE_URL and not is_valid_url(LIVE_BASE_URL):
 LIVE_BASE_PATH = os.environ.get("LIVE_BASE_PATH", "/live/")
 
 LIVE_URL = urljoin(LIVE_BASE_URL, LIVE_BASE_PATH) if LIVE_BASE_URL else None
+LIVE_SERVER_SECRET_KEY = os.environ.get("LIVE_SERVER_SECRET_KEY")
 
 # WEB URL
 WEB_URL = os.environ.get("WEB_URL")

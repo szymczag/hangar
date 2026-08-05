@@ -8,6 +8,7 @@ import { Image, Link, Text, View } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { ReactElement } from "react";
 import { CORE_EXTENSIONS } from "@plane/editor";
+import { isAssetId, isSafePdfImageDataUri } from "@/lib/asset-fetch-security";
 import { BACKGROUND_COLORS, EDITOR_BACKGROUND_COLORS, resolveColorForPdf, TEXT_COLORS } from "./colors";
 import { CheckIcon, ClipboardIcon, DocumentIcon, GlobeIcon, LightbulbIcon, LinkIcon } from "./icons";
 import { applyMarks } from "./mark-renderers";
@@ -265,6 +266,8 @@ export const nodeRenderers: NodeRendererRegistry = {
       return <View key={ctx.getKey()} />;
     }
 
+    const resolvedSrc = ctx.metadata?.resolvedImageUrls?.[src];
+
     const alignmentStyle =
       alignment === "center"
         ? { alignItems: "center" as const }
@@ -272,10 +275,18 @@ export const nodeRenderers: NodeRendererRegistry = {
           ? { alignItems: "flex-end" as const }
           : { alignItems: "flex-start" as const };
 
+    if (!resolvedSrc || !isSafePdfImageDataUri(resolvedSrc)) {
+      return (
+        <View key={ctx.getKey()} style={[pdfStyles.imagePlaceholder, alignmentStyle]}>
+          <Text style={pdfStyles.imagePlaceholderText}>[Image unavailable]</Text>
+        </View>
+      );
+    }
+
     return (
       <View key={ctx.getKey()} style={[{ width: "100%" }, alignmentStyle]}>
         <Image
-          src={src}
+          src={resolvedSrc}
           style={[pdfStyles.image, width ? { width, maxHeight: 500 } : { maxWidth: 400, maxHeight: 500 }]}
         />
       </View>
@@ -292,15 +303,6 @@ export const nodeRenderers: NodeRendererRegistry = {
     const width = typeof rawWidth === "string" ? parseInt(rawWidth, 10) : (rawWidth as number | undefined);
     const alignment = (node.attrs?.alignment as string) || "left";
 
-    if (!assetId) {
-      return <View key={ctx.getKey()} />;
-    }
-
-    let resolvedSrc = assetId;
-    if (ctx.metadata?.resolvedImageUrls && ctx.metadata.resolvedImageUrls[assetId]) {
-      resolvedSrc = ctx.metadata.resolvedImageUrls[assetId];
-    }
-
     const alignmentStyle =
       alignment === "center"
         ? { alignItems: "center" as const }
@@ -308,7 +310,17 @@ export const nodeRenderers: NodeRendererRegistry = {
           ? { alignItems: "flex-end" as const }
           : { alignItems: "flex-start" as const };
 
-    if (!resolvedSrc.startsWith("http") && !resolvedSrc.startsWith("data:")) {
+    if (!assetId || !isAssetId(assetId)) {
+      return (
+        <View key={ctx.getKey()} style={[pdfStyles.imagePlaceholder, alignmentStyle]}>
+          <Text style={pdfStyles.imagePlaceholderText}>[Image unavailable]</Text>
+        </View>
+      );
+    }
+
+    const resolvedSrc = ctx.metadata?.resolvedImageUrls?.[assetId];
+
+    if (!resolvedSrc || !isSafePdfImageDataUri(resolvedSrc)) {
       return (
         <View key={ctx.getKey()} style={[pdfStyles.imagePlaceholder, alignmentStyle]}>
           <Text style={pdfStyles.imagePlaceholderText}>[Image: {assetId.slice(0, 8)}...]</Text>

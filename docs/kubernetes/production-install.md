@@ -107,7 +107,7 @@ secret-delivery workflow:
 | Default Secret          | Required key                                 | Consumer                     |
 | ----------------------- | -------------------------------------------- | ---------------------------- |
 | `hangar-application`    | `SECRET_KEY`                                 | API, workers, migrator       |
-| `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                     | Live service                 |
+| `hangar-live`           | `LIVE_SERVER_SECRET_KEY`                     | Live and general worker      |
 | `hangar-database`       | `DATABASE_URL`                               | API, workers, migrator       |
 | `hangar-cache`          | `REDIS_URL`                                  | API, Live, workers, migrator |
 | `hangar-queue`          | `AMQP_URL`                                   | API and workers              |
@@ -116,6 +116,11 @@ secret-delivery workflow:
 The chart references existing Secrets. It does not generate credentials, read
 Secrets through Kubernetes RBAC, or copy secret values into the Helm release.
 Avoid `--set` for credentials and do not commit populated Secret manifests.
+
+If the object-storage `publicEndpoint` resolves to private address space from
+the Live pod, add only its exact hostname to `live.pdfAssetAllowedHosts`.
+Normally `publicEndpoint` is the public Hangar/object-storage origin and this
+allowlist remains empty.
 
 Encode reserved characters in connection URLs. Require transport security at
 each external-service boundary; the chart cannot add TLS to a plaintext

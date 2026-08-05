@@ -26,6 +26,18 @@ sources. The chart passes that bucket only to the API and import-capable workers
 the bucket to public Ingress or Gateway routes. Operators must keep anonymous
 access disabled. See [configuration](configuration.md#external-object-storage).
 
+Live PDF export never hands document-provided URLs or paths to the renderer.
+It resolves and validates image destinations, pins each connection to the
+validated address, revalidates every redirect, bounds and re-encodes the image,
+and renders only the resulting local data URI. Public object-storage URLs work
+without extra configuration. If a deployment intentionally returns a private
+storage hostname in presigned URLs, list that exact hostname under
+`live.pdfAssetAllowedHosts`; do not use broad domain or network exceptions.
+
+The Live shared secret is also consumed by the general worker for the
+authenticated `/convert-document/` server-to-server call. Rotating it therefore
+requires a coordinated restart of Live and the general worker deployment.
+
 Start with the [evaluation installation tutorial](evaluation-install.md) to
 exercise the released chart. Use the [production installation guide](production-install.md)
 only to review and help qualify the production profile.

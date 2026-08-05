@@ -70,7 +70,8 @@ helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_versi
 helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
     --set application.fileSizeLimit=1073741824 \
     --set application.signedUrlExpiration=86400 \
-    --set application.hardDeleteAfterDays=3650 >"$boundary_render"
+    --set application.hardDeleteAfterDays=3650 \
+    --set-string 'live.pdfAssetAllowedHosts[0]=storage.internal' >"$boundary_render"
 helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
     --set gateway.enabled=true \
     --set gateway.create=true \
@@ -140,6 +141,9 @@ assert_present '^  FILE_SIZE_LIMIT: "1073741824"$' "$boundary_render" "maximum f
 assert_present '^  SIGNED_URL_EXPIRATION: "86400"$' "$boundary_render" "maximum signed-URL expiration must render as an exact decimal integer"
 assert_present '^  HARD_DELETE_AFTER_DAYS: "3650"$' "$boundary_render" "maximum hard-delete retention must render as an exact decimal integer"
 assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$boundary_render" "maximum integer application settings must not use exponent notation"
+assert_present '^  PDF_ASSET_ALLOWED_HOSTS: "storage.internal"$' "$boundary_render" "Live PDF asset hostname allowlist must render exactly"
+live_secret_consumers="$(grep -Ec '^[[:space:]]+- name: LIVE_SERVER_SECRET_KEY$' "$production_render")"
+[[ "$live_secret_consumers" -eq 2 ]] || fail "only Live and the general worker must receive LIVE_SERVER_SECRET_KEY"
 
 assert_absent '^kind: Ingress$' "$gateway_render" "Gateway API mode must not render an NGINX Ingress"
 assert_present '^kind: Gateway$' "$gateway_render" "Gateway API mode must render a Gateway when create is enabled"
@@ -209,6 +213,7 @@ assert_invalid "HTTP production origin" --set-string publicUrl.scheme=http
 assert_invalid "HTTP production object storage" --set-string externalServices.objectStorage.endpoint=http://s3.example.com
 assert_invalid "HTTP production public object storage" --set-string externalServices.objectStorage.publicEndpoint=http://s3.example.com
 assert_invalid "HTTP telemetry collector" --set-string observability.otlpEndpoint=http://otel.example.com
+assert_invalid "PDF asset allowlist containing a URL" --set-string 'live.pdfAssetAllowedHosts[0]=http://storage.internal'
 assert_invalid "disabled network policy" --set networkPolicy.enabled=false
 assert_invalid "unknown ingress-controller preset" --set-string networkPolicy.ingressController.preset=unknown
 assert_invalid "Gateway API with NGINX network-policy preset" --set gateway.enabled=true

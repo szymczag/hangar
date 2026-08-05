@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { timingSafeEqual } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "@plane/logger";
 import { env } from "@/env";
@@ -34,8 +35,14 @@ import { env } from "@/env";
 // TODO - Move to hmac
 export const requireSecretKey = (req: Request, res: Response, next: NextFunction): void => {
   const secretKey = req.headers["live-server-secret-key"];
+  const providedSecret = typeof secretKey === "string" ? Buffer.from(secretKey) : null;
+  const configuredSecret = Buffer.from(env.LIVE_SERVER_SECRET_KEY);
+  const isValidSecret =
+    providedSecret !== null &&
+    providedSecret.length === configuredSecret.length &&
+    timingSafeEqual(providedSecret, configuredSecret);
 
-  if (!secretKey || secretKey !== env.LIVE_SERVER_SECRET_KEY) {
+  if (!isValidSecret) {
     logger.warn(`
   ⚠️  [AUTH] Unauthorized access attempt
      Endpoint: ${req.path}

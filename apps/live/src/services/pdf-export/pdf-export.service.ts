@@ -9,7 +9,15 @@ import sharp from "sharp";
 import { getAllDocumentFormatsFromDocumentEditorBinaryData } from "@plane/editor/lib";
 import type { PDFExportMetadata, TipTapDocument } from "@/lib/pdf";
 import { renderPlaneDocToPdfBuffer } from "@/lib/pdf";
-import { isAssetId, MAX_PDF_IMAGE_COUNT, readBoundedImageResponse } from "@/lib/asset-fetch-security";
+import {
+  isAssetId,
+  isSafeAssetUrl,
+  MAX_PDF_IMAGE_COUNT,
+  pinnedAssetFetch,
+  readBoundedImageDataUri,
+  readBoundedImageResponse,
+} from "@/lib/asset-fetch-security";
+import { env } from "@/env";
 import { getPageService } from "@/services/page/handler";
 import type { TDocumentTypes } from "@/types";
 import {
@@ -26,6 +34,11 @@ const IMAGE_TIMEOUT_MS = 8000;
 const CONTENT_FETCH_TIMEOUT_MS = 7000;
 const PDF_RENDER_TIMEOUT_MS = 15000;
 const IMAGE_MAX_DIMENSION = 1200;
+const PDF_ASSET_ALLOWED_HOSTS = new Set(
+  env.PDF_ASSET_ALLOWED_HOSTS.split(",")
+    .map((host) => host.trim().replace(/\.$/, "").toLowerCase())
+    .filter(Boolean)
+);
 
 type TipTapNode = {
   type: string;
@@ -46,16 +59,19 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
     },
 
     /**
-     * Extracts image asset IDs from document content
+     * Extracts every image reference from document content. The renderer never
+     * receives these raw values; they must be resolved and re-encoded first.
      */
-    extractImageAssetIds: (doc: TipTapNode): string[] => {
-      const assetIds: string[] = [];
+    extractImageReferences: (doc: TipTapNode): string[] => {
+      const imageReferences: string[] = [];
 
       const traverse = (node: TipTapNode) => {
         if ((node.type === "imageComponent" || node.type === "image") && node.attrs?.src) {
           const src = node.attrs.src as string;
-          if (isAssetId(src) && assetIds.length < MAX_PDF_IMAGE_COUNT) {
-            assetIds.push(src);
+          const isValidReference =
+            isAssetId(src) || (node.type === "image" && (isSafeAssetUrl(src) || src.startsWith("data:image/")));
+          if (isValidReference && imageReferences.length < MAX_PDF_IMAGE_COUNT) {
+            imageReferences.push(src);
           }
         }
         if (node.content) {
@@ -66,7 +82,7 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
       };
 
       traverse(doc);
-      return [...new Set(assetIds)];
+      return [...new Set(imageReferences)];
     },
 
     /**
@@ -149,76 +165,99 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
       pageService: ReturnType<typeof getPageService>,
       workspaceSlug: string,
       projectId: string | undefined,
-      assetIds: string[],
+      imageReferences: string[],
       requestId: string
     ): Effect.Effect<Record<string, string>> =>
       Effect.gen(function* () {
-        if (assetIds.length === 0) {
+        if (imageReferences.length === 0) {
           return {};
         }
 
         yield* Effect.logDebug("PDF_EXPORT: Processing images", {
           requestId,
-          count: assetIds.length,
+          count: imageReferences.length,
         });
 
-        // Resolve URLs first
-        const resolvedUrlMap = yield* tryAsync(
+        // Resolve application asset IDs through Django. Generic image URLs and
+        // data URIs remain keyed by their original src so the renderer can only
+        // use a successfully processed replacement.
+        const resolvedSourceMap = yield* tryAsync(
           async () => {
-            const resolvedUrls = await Promise.all(
-              assetIds.map(async (assetId) => ({
-                assetId,
-                url: await pageService.resolveImageAssetUrl?.(workspaceSlug, assetId, projectId),
-              }))
+            const sourceMap = new Map<string, { data?: Buffer; url?: string }>();
+            const resolvedSources = await Promise.all(
+              imageReferences.map(async (reference) => {
+                if (isAssetId(reference)) {
+                  const url = await pageService.resolveImageAssetUrl?.(workspaceSlug, reference, projectId);
+                  return { reference, url: url ?? undefined };
+                }
+                if (isSafeAssetUrl(reference)) return { reference, url: reference };
+                try {
+                  return { reference, data: readBoundedImageDataUri(reference) };
+                } catch {
+                  return { reference };
+                }
+              })
             );
-            const urlMap = new Map<string, string>();
-            for (const { assetId, url } of resolvedUrls) {
-              if (url) urlMap.set(assetId, url);
+            for (const { reference, data, url } of resolvedSources) {
+              if (data || url) sourceMap.set(reference, { data, url });
             }
-            return urlMap;
+            return sourceMap;
           },
-          () => new Map<string, string>()
-        ).pipe(recoverWithDefault(new Map<string, string>()));
+          () => new Map<string, { data?: Buffer; url?: string }>()
+        ).pipe(recoverWithDefault(new Map<string, { data?: Buffer; url?: string }>()));
 
-        if (resolvedUrlMap.size === 0) {
+        if (resolvedSourceMap.size === 0) {
           return {};
         }
 
         // Process each image
-        const processSingleImage = ([assetId, url]: [string, string]) =>
+        const processSingleImage = ([reference, source]: [string, { data?: Buffer; url?: string }]) =>
           Effect.gen(function* () {
-            const response = yield* tryAsync(
-              () =>
-                fetch(url, {
-                  redirect: "error",
-                  signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
-                }),
-              (cause) =>
-                new PdfImageProcessingError({
-                  message: "Failed to fetch image",
-                  assetId,
-                  cause,
-                })
-            );
+            let imageBuffer = source.data;
+            if (source.url) {
+              const response = yield* tryAsync(
+                () =>
+                  pinnedAssetFetch(source.url as string, {
+                    allowedHosts: PDF_ASSET_ALLOWED_HOSTS,
+                    signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+                  }),
+                (cause) =>
+                  new PdfImageProcessingError({
+                    message: "Failed to fetch image",
+                    assetId: isAssetId(reference) ? reference : "remote-image",
+                    cause,
+                  })
+              );
 
-            if (!response.ok) {
-              return yield* Effect.fail(
-                new PdfImageProcessingError({
-                  message: `Image fetch returned ${response.status}`,
-                  assetId,
-                })
+              if (!response.ok) {
+                yield* Effect.promise(() => response.body?.cancel() ?? Promise.resolve());
+                return yield* Effect.fail(
+                  new PdfImageProcessingError({
+                    message: `Image fetch returned ${response.status}`,
+                    assetId: isAssetId(reference) ? reference : "remote-image",
+                  })
+                );
+              }
+
+              imageBuffer = yield* tryAsync(
+                () => readBoundedImageResponse(response),
+                (cause) =>
+                  new PdfImageProcessingError({
+                    message: "Failed to read image body",
+                    assetId: isAssetId(reference) ? reference : "remote-image",
+                    cause,
+                  })
               );
             }
 
-            const imageBuffer = yield* tryAsync(
-              () => readBoundedImageResponse(response),
-              (cause) =>
+            if (!imageBuffer) {
+              return yield* Effect.fail(
                 new PdfImageProcessingError({
-                  message: "Failed to read image body",
-                  assetId,
-                  cause,
+                  message: "Image source was not resolved",
+                  assetId: isAssetId(reference) ? reference : "remote-image",
                 })
-            );
+              );
+            }
 
             const processedBuffer = yield* tryAsync(
               () =>
@@ -231,29 +270,29 @@ export class PdfExportService extends Effect.Service<PdfExportService>()("PdfExp
               (cause) =>
                 new PdfImageProcessingError({
                   message: "Failed to process image",
-                  assetId,
+                  assetId: isAssetId(reference) ? reference : "remote-image",
                   cause,
                 })
             );
 
             const base64 = processedBuffer.toString("base64");
-            return [assetId, `data:image/jpeg;base64,${base64}`] as const;
+            return [reference, `data:image/jpeg;base64,${base64}`] as const;
           }).pipe(
-            withTimeoutAndRetry(`process image ${assetId}`, {
+            withTimeoutAndRetry(`process image ${isAssetId(reference) ? reference : "remote"}`, {
               timeoutMs: IMAGE_TIMEOUT_MS,
               maxRetries: 1,
             }),
             Effect.tapError((error) =>
               Effect.logWarning("PDF_EXPORT: Image processing failed", {
                 requestId,
-                assetId,
+                assetId: isAssetId(reference) ? reference : "remote-image",
                 error,
               })
             ),
             Effect.catchAll(() => Effect.succeed(null as readonly [string, string] | null))
           );
 
-        const entries = Array.from(resolvedUrlMap.entries());
+        const entries = Array.from(resolvedSourceMap.entries());
         const pairs = yield* Effect.forEach(entries, processSingleImage, {
           concurrency: IMAGE_CONCURRENCY,
         });
@@ -336,18 +375,18 @@ export const exportToPdf = (
     const content = yield* service.fetchPageContent(pageService, pageId, requestId);
 
     // Extract image asset IDs
-    const imageAssetIds = service.extractImageAssetIds(content.contentJSON as TipTapNode);
+    const imageReferences = service.extractImageReferences(content.contentJSON as TipTapNode);
 
     // Fetch user mentions
     let metadata = yield* service.fetchUserMentions(pageService, pageId, requestId);
 
     // Process images if needed
-    if (!noAssets && imageAssetIds.length > 0) {
+    if (!noAssets && imageReferences.length > 0) {
       const resolvedImages = yield* service.processImages(
         pageService,
         workspaceSlug,
         projectId,
-        imageAssetIds,
+        imageReferences,
         requestId
       );
       metadata = { ...metadata, resolvedImageUrls: resolvedImages };

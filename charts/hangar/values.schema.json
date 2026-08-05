@@ -417,7 +417,16 @@
     "web": { "$ref": "#/definitions/component" },
     "admin": { "$ref": "#/definitions/component" },
     "space": { "$ref": "#/definitions/component" },
-    "live": { "$ref": "#/definitions/component" },
+    "live": {
+      "allOf": [
+        { "$ref": "#/definitions/component" },
+        {
+          "type": "object",
+          "required": ["pdfAssetAllowedHosts"],
+          "properties": { "pdfAssetAllowedHosts": { "$ref": "#/definitions/hostnameList" } }
+        }
+      ]
+    },
     "worker": { "$ref": "#/definitions/workerComponent" },
     "beatWorker": {
       "allOf": [
@@ -589,6 +598,16 @@
       "type": "array",
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 }
+    },
+    "hostnameList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 253,
+        "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"
+      }
     },
     "pullSecrets": {
       "type": "array",

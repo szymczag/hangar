@@ -147,6 +147,14 @@ app.kubernetes.io/part-of: hangar
 {{ include "hangar.objectStorageSecretEnv" . }}
 {{- end -}}
 
+{{- define "hangar.liveSecretEnv" -}}
+- name: LIVE_SERVER_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecrets.live.name }}
+      key: {{ .Values.existingSecrets.live.secretKeyKey }}
+{{- end -}}
+
 {{- define "hangar.podSecurityContext" -}}
 runAsNonRoot: true
 runAsUser: {{ .uid }}

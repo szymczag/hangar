@@ -729,4 +729,30 @@ describe("PDF Rendering Integration", () => {
       expect(text).toContain("Text after image");
     });
   });
+
+  describe("image source isolation", () => {
+    it("renders a placeholder instead of passing a remote URL to React PDF", async () => {
+      const doc: TipTapDocument = {
+        type: "doc",
+        content: [{ type: "image", attrs: { src: "http://169.254.169.254/latest/meta-data" } }],
+      };
+
+      const buffer = await renderPlaneDocToPdfBuffer(doc);
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("Image unavailable");
+    });
+
+    it("renders a placeholder for a non-UUID image component source", async () => {
+      const doc: TipTapDocument = {
+        type: "doc",
+        content: [{ type: "imageComponent", attrs: { src: "../../etc/passwd" } }],
+      };
+
+      const buffer = await renderPlaneDocToPdfBuffer(doc);
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("Image unavailable");
+    });
+  });
 });
