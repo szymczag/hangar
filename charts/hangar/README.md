@@ -7,7 +7,7 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0-rc.21` (`appVersion: v0.1.0-rc.21`). Its
+The latest published chart is `0.1.0-rc.22` (`appVersion: v0.1.0-rc.22`). Its
 evaluation profile is live-qualified on AMD64. It is a prerelease and is not yet
 supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
@@ -27,15 +27,15 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.21
+  --version 0.1.0-rc.22
 ```
 
 Do not use `0.1.0-rc.1`, `0.1.0-rc.2`, or `0.1.0-rc.20`; those immutable
-versions were consumed by incomplete release attempts. `0.1.0-rc.19` is the immediately previous
-complete publication, but it predates the final Plane v1.4.0 baseline and the
-authorization, OAuth transaction, outbound-service, and PDF asset-fetching
-hardening in `rc.21`. Earlier `rc.12` through `rc.17` additionally contain
-frontend migration failures. Use `0.1.0-rc.21`; there is no security-equivalent
+versions were consumed by incomplete release attempts. `0.1.0-rc.21` is the
+immediately previous complete publication, but it predates the stricter Live and
+Unsplash request boundaries and deployment-owned PostHog destination in `rc.22`.
+Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
+Use `0.1.0-rc.22`; there is no security-equivalent
 rollback target among the earlier release candidates.
 
 ## Deployment profiles
@@ -112,8 +112,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0-rc.21` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.21)
+Release `0.1.0-rc.22` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.22)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
