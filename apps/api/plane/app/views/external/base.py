@@ -19,6 +19,7 @@ from plane.app.serializers import ProjectLiteSerializer, WorkspaceLiteSerializer
 from plane.db.models import Project, Workspace
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.exception_logger import log_exception
+from plane.utils.url_security import pinned_fetch
 
 from ..base import BaseAPIView
 
@@ -213,6 +214,20 @@ class WorkspaceGPTIntegrationEndpoint(BaseAPIView):
 
 
 class UnsplashEndpoint(BaseAPIView):
+    API_ORIGIN = "https://api.unsplash.com"
+    REQUEST_TIMEOUT_SECONDS = 10
+
+    @staticmethod
+    def _pagination_value(raw_value, *, default, maximum):
+        try:
+            value = int(raw_value)
+        except (TypeError, ValueError):
+            return default, False
+
+        if value < 1 or value > maximum:
+            return default, False
+        return value, True
+
     def get(self, request):
         (UNSPLASH_ACCESS_KEY,) = get_configuration_value(
             [
@@ -227,17 +242,45 @@ class UnsplashEndpoint(BaseAPIView):
             return Response([], status=status.HTTP_200_OK)
 
         # Query parameters
-        query = request.GET.get("query", False)
-        page = request.GET.get("page", 1)
-        per_page = request.GET.get("per_page", 20)
-
-        url = (
-            f"https://api.unsplash.com/search/photos/?client_id={UNSPLASH_ACCESS_KEY}&query={query}&page=${page}&per_page={per_page}"
-            if query
-            else f"https://api.unsplash.com/photos/?client_id={UNSPLASH_ACCESS_KEY}&page={page}&per_page={per_page}"
+        query = request.GET.get("query", "").strip()
+        page, valid_page = self._pagination_value(
+            request.GET.get("page", 1), default=1, maximum=10_000
         )
+        per_page, valid_per_page = self._pagination_value(
+            request.GET.get("per_page", 20), default=20, maximum=30
+        )
+        if not valid_page or not valid_per_page:
+            return Response(
+                {"error": "page must be between 1 and 10000 and per_page between 1 and 30"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        headers = {"Content-Type": "application/json"}
+        path = "/search/photos" if query else "/photos"
+        params = {"page": page, "per_page": per_page}
+        if query:
+            params["query"] = query
 
-        resp = requests.get(url=url, headers=headers)
-        return Response(resp.json(), status=resp.status_code)
+        try:
+            resp = pinned_fetch(
+                "GET",
+                f"{self.API_ORIGIN}{path}",
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}",
+                },
+                params=params,
+                timeout=self.REQUEST_TIMEOUT_SECONDS,
+            )
+            if status.is_redirect(resp.status_code):
+                resp.close()
+                return Response(
+                    {"error": "Unexpected response from Unsplash"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            return Response(resp.json(), status=resp.status_code)
+        except (requests.RequestException, ValueError) as exc:
+            log_exception(exc)
+            return Response(
+                {"error": "Unable to retrieve images from Unsplash"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
