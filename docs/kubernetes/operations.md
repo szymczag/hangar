@@ -59,6 +59,43 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.22` to `rc.23`
+
+This release updates Django from 5.2.15 to security release 5.2.16. It fixes
+CVE-2026-48588 in shared response caching, CVE-2026-53877 in byte-backed
+`GDALRaster` handling, and CVE-2026-53878 in `DomainNameValidator`. Django rates
+all three issues low severity. Hangar does not enable the site-wide cache
+middleware; its direct `cache_page` use is limited to the public timezone-list
+endpoint, and no direct `GDALRaster` or `DomainNameValidator` use was found.
+
+There is no new database migration, Helm value, Secret, Kubernetes resource,
+public route, storage, RBAC, or NetworkPolicy change. Existing `rc.22` values and
+deployment configuration remain structurally compatible. The inherited Plane
+source remains final `v1.4.0` at exact commit `917b23a6`.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target chart is `0.1.0-rc.23`, its application version is
+   `v0.1.0-rc.23`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc23);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. schedule API, migrator, and workers as one coordinated Helm revision. Do not
+   mix `rc.22` and `rc.23` Python application images.
+
+Wait for the revision-scoped migration Job before admitting traffic even though
+there is no new schema operation. Then verify authentication, one cached timezone
+request, API and worker health, Live updates, uploads, and a representative
+workspace workflow.
+
+`rc.22` is the immediately previous complete publication, but it contains the
+superseded Django 5.2.15 runtime. There is no security-equivalent rollback target.
+No schema or configuration conversion blocks a technical rollback; if emergency
+availability recovery requires one, contain any affected shared-cache or raster
+path and return every Python component to `rc.23` as soon as possible.
+
 ### Upgrade from `rc.21` to `rc.22`
 
 This release hardens the outbound paths used by Live PDF export and the Unsplash
