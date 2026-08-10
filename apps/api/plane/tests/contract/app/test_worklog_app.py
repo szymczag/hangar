@@ -168,6 +168,7 @@ class TestGuestWorklogActivityConfidentiality:
         self, workspace, project, issue, query
     ):
         guest_client, guest = make_role_client(workspace, project, role=5)
+        Issue.objects.filter(pk=issue.pk).update(created_by=guest)
         worklog_activity = IssueActivity.objects.create(
             issue=issue,
             project=project,

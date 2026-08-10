@@ -362,7 +362,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
 
         # Reject any field not in the allowlist before it reaches .order_by().
         # An unrecognised value is replaced with the safe default, preventing
-        # ORM order_by injection via relational traversal (GHSA-p885-6jpg-cr2p).
+        # ORM order_by injection via relational traversal.
         order_by_param = sanitize_order_by(
             request.GET.get("order_by", "-created_at"),
             ISSUE_ORDER_BY_ALLOWLIST,
@@ -1611,6 +1611,7 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
                 examples=[ISSUE_COMMENT_EXAMPLE],
             ),
             400: INVALID_REQUEST_RESPONSE,
+            403: FORBIDDEN_RESPONSE,
             404: COMMENT_NOT_FOUND_RESPONSE,
             409: EXTERNAL_ID_EXISTS_RESPONSE,
         },
@@ -1622,6 +1623,19 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
         Validates external ID uniqueness if provided.
         """
         issue_comment = IssueComment.objects.get(workspace__slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
+        # Only the comment author or a project admin may modify a comment.
+        # ProjectLitePermission alone lets any active member (incl. Guest) reach
+        # here, so enforce the same author/admin rule the app applies.
+        if (
+            issue_comment.created_by_id != request.user.id
+            and not ProjectMember.objects.filter(
+                project_id=project_id, member_id=request.user.id, role=ROLE.ADMIN.value, is_active=True
+            ).exists()
+        ):
+            return Response(
+                {"error": "Only the comment author or a project admin can modify this comment."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
         current_instance = json.dumps(IssueCommentSerializer(issue_comment).data, cls=DjangoJSONEncoder)
 
@@ -1681,6 +1695,7 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
         ],
         responses={
             204: OpenApiResponse(description="Work item comment deleted successfully"),
+            403: FORBIDDEN_RESPONSE,
             404: COMMENT_NOT_FOUND_RESPONSE,
         },
     )
@@ -1691,6 +1706,17 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
         Records deletion activity for audit purposes.
         """
         issue_comment = IssueComment.objects.get(workspace__slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
+        # Only the comment author or a project admin may delete a comment.
+        if (
+            issue_comment.created_by_id != request.user.id
+            and not ProjectMember.objects.filter(
+                project_id=project_id, member_id=request.user.id, role=ROLE.ADMIN.value, is_active=True
+            ).exists()
+        ):
+            return Response(
+                {"error": "Only the comment author or a project admin can delete this comment."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         current_instance = json.dumps(IssueCommentSerializer(issue_comment).data, cls=DjangoJSONEncoder)
         issue_comment.delete()
         issue_activity.delay(
@@ -2025,6 +2051,7 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
                 examples=[ISSUE_ATTACHMENT_EXAMPLE],
             ),
             400: INVALID_REQUEST_RESPONSE,
+            403: FORBIDDEN_RESPONSE,
             404: ATTACHMENT_NOT_FOUND_RESPONSE,
         },
     )

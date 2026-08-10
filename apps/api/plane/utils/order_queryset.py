@@ -76,6 +76,14 @@ NOTIFICATION_ORDER_BY_ALLOWLIST = frozenset({
     "updated_at",
 })
 
+# Page list queryset.
+PAGE_ORDER_BY_ALLOWLIST = frozenset({
+    "created_at",
+    "updated_at",
+    "name",
+    "sort_order",
+})
+
 # ---------------------------------------------------------------------------
 # group_by / sub_group_by allowlist for Issue querysets — used by
 # GroupedOffsetPaginator / SubGroupedOffsetPaginator (plane/utils/paginator.py),

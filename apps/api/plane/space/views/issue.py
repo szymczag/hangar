@@ -70,6 +70,33 @@ from plane.bgtasks.issue_activities_task import issue_activity
 from plane.utils.issue_filters import issue_filters
 
 
+# Public Spaces board writes must bind caller-supplied object ids to the board's
+# project + workspace. Shared by every create() so the check can't drift between
+# endpoints or be forgotten on a new one.
+def _issue_in_board_scope(issue_id, project_deploy_board):
+    """A board-visible issue in the board's project + workspace.
+
+    Uses ``issue_objects`` (excludes draft/archived/triage) to match exactly
+    what the public board displays via ProjectIssuesPublicEndpoint /
+    IssueRetrievePublicEndpoint — you can only write on what the board shows.
+    """
+    return Issue.issue_objects.filter(
+        id=issue_id,
+        project_id=project_deploy_board.project_id,
+        workspace_id=project_deploy_board.workspace_id,
+    ).exists()
+
+
+def _comment_in_board_scope(comment_id, project_deploy_board):
+    """A public (EXTERNAL) comment in the board's project + workspace."""
+    return IssueComment.objects.filter(
+        id=comment_id,
+        project_id=project_deploy_board.project_id,
+        workspace_id=project_deploy_board.workspace_id,
+        access="EXTERNAL",
+    ).exists()
+
+
 class ProjectIssuesPublicEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
@@ -241,6 +268,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
                     super()
                     .get_queryset()
                     .filter(workspace_id=project_deploy_board.workspace_id)
+                    .filter(project_id=project_deploy_board.project_id)
                     .filter(issue_id=self.kwargs.get("issue_id"))
                     .filter(access="EXTERNAL")
                     .select_related("project")
@@ -270,6 +298,10 @@ class IssueCommentPublicViewSet(BaseViewSet):
                 {"error": "Comments are not enabled for this project"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Bind the caller-supplied issue_id to this board.
+        if not _issue_in_board_scope(issue_id, project_deploy_board):
+            return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = IssueCommentSerializer(data=request.data)
         if serializer.is_valid():
@@ -381,6 +413,10 @@ class IssueReactionPublicViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Bind the caller-supplied issue_id to this board.
+        if not _issue_in_board_scope(issue_id, project_deploy_board):
+            return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = IssueReactionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(
@@ -470,6 +506,10 @@ class CommentReactionPublicViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Bind the caller-supplied comment_id to this board.
+        if not _comment_in_board_scope(comment_id, project_deploy_board):
+            return Response({"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = CommentReactionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(
@@ -557,6 +597,17 @@ class IssueVotePublicViewSet(BaseViewSet):
 
     def create(self, request, anchor, issue_id):
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
+
+        if not project_deploy_board.is_votes_enabled:
+            return Response(
+                {"error": "Votes are not enabled for this project board"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Bind the caller-supplied issue_id to this board.
+        if not _issue_in_board_scope(issue_id, project_deploy_board):
+            return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
+
         issue_vote, _ = IssueVote.objects.get_or_create(
             actor_id=request.user.id,
             project_id=project_deploy_board.project_id,
