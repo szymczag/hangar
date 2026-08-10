@@ -34,12 +34,30 @@ from plane.utils.issue_relation_mapper import get_actual_relation
 from plane.utils.host import base_host
 
 
+def issue_in_project(issue_id, slug, project_id):
+    """Whether ``issue_id`` belongs to the URL workspace + project.
+
+    ``ProjectEntityPermission`` only checks that the caller is a member of the URL's
+    ``project_id`` — it never binds the sibling ``issue_id`` path parameter to that
+    project. Every handler taking both must therefore check this itself, or it is
+    reachable cross-project/cross-tenant.
+    """
+    return Issue.issue_objects.filter(pk=issue_id, workspace__slug=slug, project_id=project_id).exists()
+
+
 class IssueRelationViewSet(BaseViewSet):
     serializer_class = IssueRelationSerializer
     model = IssueRelation
     permission_classes = [ProjectEntityPermission]
 
     def list(self, request, slug, project_id, issue_id):
+        # SECURITY: the read path needs the same binding as the writes below. Without
+        # it a member of project A could list the relations of an issue in project B of
+        # the same workspace and receive that issue's name, priority, assignees and
+        # labels in the response.
+        if not issue_in_project(issue_id, slug, project_id):
+            return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
+
         issue_relations = (
             IssueRelation.objects.filter(Q(issue_id=issue_id) | Q(related_issue=issue_id))
             .filter(workspace__slug=self.kwargs.get("slug"))
@@ -217,6 +235,13 @@ class IssueRelationViewSet(BaseViewSet):
         issues = request.data.get("issues", [])
         project = Project.objects.get(pk=project_id)
 
+        # SECURITY: bind the URL issue to the workspace + project before using it as one
+        # side of the relation. The body `issues` are scoped below, but `issue_id` came
+        # straight from the URL — so the earlier scoping fix covered one side of the
+        # relationship and missed the other.
+        if not issue_in_project(issue_id, slug, project_id):
+            return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
+
         # Scope to workspace to prevent cross-tenant IDOR
         # Relations can cross projects so only workspace scope is enforced
         issues = list(
@@ -271,12 +296,24 @@ class IssueRelationViewSet(BaseViewSet):
     def remove_relation(self, request, slug, project_id, issue_id):
         related_issue = request.data.get("related_issue", None)
 
+        # SECURITY: same binding as create() — the URL issue must belong to the URL
+        # project before it can be used to select a relation for deletion. Otherwise a
+        # member of one project could delete relations between issues of a sibling
+        # project in the same workspace. The IssueRelation row itself stays
+        # workspace-scoped only: relations legitimately span projects, and either
+        # participant's project may remove them.
+        if not issue_in_project(issue_id, slug, project_id):
+            return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
+
         issue_relations = IssueRelation.objects.filter(
             workspace__slug=slug,
         ).filter(
             Q(issue_id=related_issue, related_issue_id=issue_id) | Q(issue_id=issue_id, related_issue_id=related_issue)
         )
         issue_relations = issue_relations.first()
+        if issue_relations is None:
+            # Previously fell through to `None.delete()` -> AttributeError -> 500.
+            return Response({"error": "Issue relation not found"}, status=status.HTTP_404_NOT_FOUND)
         current_instance = json.dumps(IssueRelationSerializer(issue_relations).data, cls=DjangoJSONEncoder)
         issue_relations.delete()
         issue_activity.delay(
