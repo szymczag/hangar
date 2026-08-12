@@ -59,7 +59,11 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.23` to `rc.24`
+### Upgrade from `rc.23` to `rc.25`
+
+`rc.24` was consumed by an incomplete publication attempt and is not an upgrade
+target. Upgrade directly from the immediately previous complete release,
+`rc.23`, to `rc.25`.
 
 This release hardens authorization and object scoping across the app, Spaces,
 deploy-board, and external API surfaces. It closes cases where a valid identifier
@@ -77,13 +81,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.24`, its application version is
-   `v0.1.0-rc.24`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc24);
+2. confirm the target chart is `0.1.0-rc.25`, its application version is
+   `v0.1.0-rc.25`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc25);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule API, migrator, workers, Spaces, and web applications as one
-   coordinated Helm revision. Do not mix `rc.23` and `rc.24` application images.
+   coordinated Helm revision. Do not mix `rc.23` and `rc.25` application images.
 
 Wait for the revision-scoped migration Job before admitting traffic even though
 there is no new schema operation. Then verify authentication and exercise both
@@ -96,7 +100,7 @@ objects, webhooks, and external API issue subresources.
 authorization fixes. There is no security-equivalent rollback target. No schema
 or configuration conversion blocks a technical rollback; if emergency
 availability recovery requires one, restrict access to affected API surfaces and
-return every application component to `rc.24` as soon as possible.
+return every application component to `rc.25` as soon as possible.
 
 ### Upgrade from `rc.22` to `rc.23`
 

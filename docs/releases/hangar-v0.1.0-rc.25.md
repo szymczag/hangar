@@ -1,13 +1,6 @@
-> [!WARNING]
-> Publication of `rc.24` did not complete. Only the `web`, `admin`, `space`,
-> `api`, and `proxy` container tags were published; `live`, `aio`, the Helm
-> chart, and the GitHub Release were not published. The immutable version is
-> consumed and must not be installed, completed, or repaired in place. Use
-> `rc.25` instead.
-
 ## Security and privacy
 
-`rc.24` ports the applicable upstream authorization and IDOR hardening reviewed
+`rc.25` ports the applicable upstream authorization and IDOR hardening reviewed
 after `rc.23`. It closes cross-scope access paths where an authenticated caller
 with a valid identifier could reach data outside the workspace, project, issue,
 membership, ownership, or nested-object boundary carried by the request.
@@ -48,15 +41,17 @@ qualification boundary remains Kubernetes 1.30 through 1.36 (including 1.36.2),
 Helm 4.2, `linux/amd64`, Restricted Pod Security Admission, TLS ingress with
 WebSocket support, a `NetworkPolicy`-enforcing CNI, and persistent storage.
 
-The product version is `v0.1.0-rc.24`, the chart version is
-`0.1.0-rc.24`, the signed Git tag is `hangar-v0.1.0-rc.24`, and the OCI
-chart reference is `ghcr.io/szymczag/charts/hangar:0.1.0-rc.24`.
-`rc.23` is the immediately previous complete publication. `rc.20` was consumed
-by an incomplete publication attempt and is not an upgrade or rollback target.
+The product version is `v0.1.0-rc.25`, the chart version is
+`0.1.0-rc.25`, the signed Git tag is `hangar-v0.1.0-rc.25`, and the OCI
+chart reference is `ghcr.io/szymczag/charts/hangar:0.1.0-rc.25`.
+`rc.23` is the immediately previous complete publication. `rc.1`, `rc.2`,
+`rc.20`, and `rc.24` were consumed by incomplete publication attempts and are
+not upgrade or rollback targets. `rc.24` published only a subset of its
+containers and no chart or GitHub Release.
 
 ## Known limitations and rollback
 
-Hangar `rc.24` remains a prerelease qualified for evaluation rather than
+Hangar `rc.25` remains a prerelease qualified for evaluation rather than
 production. Published images are AMD64-only. The production-profile install,
 backup and restore, migration-failure recovery, vulnerability and license
 approval, and full support matrix remain open qualification gates.
@@ -70,6 +65,6 @@ There is no security-equivalent rollback target. Rolling back to `rc.23`
 restores the corrected Django 5.2.16 runtime but removes the authorization and
 object-scope fixes shipped here. No database or configuration conversion blocks a
 technical rollback, but an emergency rollback should restrict the affected API
-surfaces and return every application component to `rc.24` as soon as possible.
+surfaces and return every application component to `rc.25` as soon as possible.
 Restore a database backup only when unrelated writes, corruption, or the incident
 requires point-in-time recovery.
