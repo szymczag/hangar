@@ -222,10 +222,32 @@ jobs:
 
           reject_existing_image_tag "ghcr.io/szymczag/charts/hangar:${VERSION#v}"
 
+  signing_tools:
+    name: Prepare release signing tool
+    if: needs.setup.outputs.is_release == 'true'
+    needs: setup
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Install and verify Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Verify Cosign is executable
+        run: cosign version
+
+      - name: Preserve verified Cosign for publication jobs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cosign-${{ github.run_id }}
+          path: ~/.cosign/cosign
+          if-no-files-found: error
+          retention-days: 1
+
   release_approval:
     name: Approve release publication
     if: needs.setup.outputs.is_release == 'true'
-    needs: setup
+    needs: [setup, signing_tools]
     runs-on: ubuntu-22.04
     environment: release
     steps:
@@ -237,11 +259,13 @@ jobs:
     if: >-
       always() &&
       needs.setup.result == 'success' &&
+      (needs.signing_tools.result == 'success' || needs.signing_tools.result == 'skipped') &&
       !(github.event_name == 'workflow_dispatch' && inputs.reuse_preview_images == true) &&
       (needs.release_approval.result == 'success' || needs.release_approval.result == 'skipped')
-    needs: [setup, release_approval]
+    needs: [setup, signing_tools, release_approval]
     runs-on: ubuntu-22.04
     permissions:
+      actions: read
       contents: read
       packages: write
       id-token: write
@@ -281,6 +305,19 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore verified Cosign
+        if: needs.setup.outputs.is_release == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: cosign-${{ github.run_id }}
+          path: ${{ runner.temp }}/cosign
+
+      - name: Add verified Cosign to PATH
+        if: needs.setup.outputs.is_release == 'true'
+        run: |
+          chmod 0755 "$RUNNER_TEMP/cosign/cosign"
+          echo "$RUNNER_TEMP/cosign" >> "$GITHUB_PATH"
 
       - name: Build and publish image
         id: build
@@ -323,10 +360,6 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
-      - name: Install Cosign
-        if: needs.setup.outputs.is_release == 'true'
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
       - name: Sign release image
         if: needs.setup.outputs.is_release == 'true'
         env:
@@ -352,11 +385,13 @@ jobs:
     if: >-
       always() &&
       needs.setup.result == 'success' &&
+      (needs.signing_tools.result == 'success' || needs.signing_tools.result == 'skipped') &&
       !(github.event_name == 'workflow_dispatch' && inputs.reuse_preview_images == true) &&
       needs.components.result == 'success'
-    needs: [setup, components]
+    needs: [setup, signing_tools, components]
     runs-on: ubuntu-22.04
     permissions:
+      actions: read
       contents: read
       packages: write
       id-token: write
@@ -379,6 +414,19 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore verified Cosign
+        if: needs.setup.outputs.is_release == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: cosign-${{ github.run_id }}
+          path: ${{ runner.temp }}/cosign
+
+      - name: Add verified Cosign to PATH
+        if: needs.setup.outputs.is_release == 'true'
+        run: |
+          chmod 0755 "$RUNNER_TEMP/cosign/cosign"
+          echo "$RUNNER_TEMP/cosign" >> "$GITHUB_PATH"
 
       - name: Build and publish image
         id: build
@@ -414,10 +462,6 @@ jobs:
           subject-name: ${{ env.IMAGE_PREFIX }}aio
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
-
-      - name: Install Cosign
-        if: needs.setup.outputs.is_release == 'true'
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign release image
         if: needs.setup.outputs.is_release == 'true'
@@ -460,12 +504,13 @@ jobs:
   chart:
     name: Publish Helm chart
     if: needs.setup.outputs.is_release == 'true'
-    needs: [setup, components]
+    needs: [setup, signing_tools, components, aio]
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     outputs:
       digest: ${{ steps.publish_chart.outputs.digest }}
     permissions:
+      actions: read
       contents: read
       packages: write
       id-token: write
@@ -488,6 +533,17 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore verified Cosign
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: cosign-${{ github.run_id }}
+          path: ${{ runner.temp }}/cosign
+
+      - name: Add verified Cosign to PATH
+        run: |
+          chmod 0755 "$RUNNER_TEMP/cosign/cosign"
+          echo "$RUNNER_TEMP/cosign" >> "$GITHUB_PATH"
 
       - name: Resolve images and prepare release chart
         env:
@@ -539,9 +595,6 @@ jobs:
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: ${{ steps.package_chart.outputs.chart_package }}
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Publish and verify chart
         id: publish_chart
