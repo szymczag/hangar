@@ -7,7 +7,7 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0-rc.23` (`appVersion: v0.1.0-rc.23`). Its
+The latest published chart is `0.1.0-rc.24` (`appVersion: v0.1.0-rc.24`). Its
 evaluation profile is live-qualified on AMD64. It is a prerelease and is not yet
 supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
@@ -27,15 +27,15 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.23
+  --version 0.1.0-rc.24
 ```
 
 Do not use `0.1.0-rc.1`, `0.1.0-rc.2`, or `0.1.0-rc.20`; those immutable
-versions were consumed by incomplete release attempts. `0.1.0-rc.22` is the
-immediately previous complete publication, but it predates the Django 5.2.16
-security fixes in `rc.23`.
+versions were consumed by incomplete release attempts. `0.1.0-rc.23` is the
+immediately previous complete publication, but it predates the authorization,
+object-scope, and request-input hardening in `rc.24`.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-Use `0.1.0-rc.23`; there is no security-equivalent
+Use `0.1.0-rc.24`; there is no security-equivalent
 rollback target among the earlier release candidates.
 
 ## Deployment profiles
@@ -112,8 +112,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0-rc.23` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.23)
+Release `0.1.0-rc.24` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.24)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
