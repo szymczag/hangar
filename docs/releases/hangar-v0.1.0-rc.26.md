@@ -1,13 +1,6 @@
-> [!WARNING]
-> Publication of `rc.25` did not complete. The `web`, `admin`, `live`, `api`,
-> and `proxy` container tags were published; `space`, `aio`, the Helm chart,
-> and the GitHub Release were not published. The immutable version is consumed
-> and must not be installed, completed, or repaired in place. Use `rc.26`
-> instead.
-
 ## Security and privacy
 
-`rc.25` ports the applicable upstream authorization and IDOR hardening reviewed
+`rc.26` ports the applicable upstream authorization and IDOR hardening reviewed
 after `rc.23`. It closes cross-scope access paths where an authenticated caller
 with a valid identifier could reach data outside the workspace, project, issue,
 membership, ownership, or nested-object boundary carried by the request.
@@ -29,7 +22,10 @@ sub-issue transaction and cycle, workspace-administrator, and full-PUT behavior.
 
 Publication is gated on the full API suite, authorization contract tests,
 security migrations, lint, release metadata, Helm rendering and schema policies,
-copyright checks, and CodeQL.
+copyright checks, and CodeQL. The release workflow now installs and verifies
+Cosign before approval or publication, distributes that verified binary to every
+publication job, and waits for AIO before publishing the chart. A signing-tool
+download failure therefore stops before immutable artifact tags are created.
 
 ## Migrations and compatibility
 
@@ -48,17 +44,17 @@ qualification boundary remains Kubernetes 1.30 through 1.36 (including 1.36.2),
 Helm 4.2, `linux/amd64`, Restricted Pod Security Admission, TLS ingress with
 WebSocket support, a `NetworkPolicy`-enforcing CNI, and persistent storage.
 
-The product version is `v0.1.0-rc.25`, the chart version is
-`0.1.0-rc.25`, the signed Git tag is `hangar-v0.1.0-rc.25`, and the OCI
-chart reference is `ghcr.io/szymczag/charts/hangar:0.1.0-rc.25`.
+The product version is `v0.1.0-rc.26`, the chart version is
+`0.1.0-rc.26`, the signed Git tag is `hangar-v0.1.0-rc.26`, and the OCI
+chart reference is `ghcr.io/szymczag/charts/hangar:0.1.0-rc.26`.
 `rc.23` is the immediately previous complete publication. `rc.1`, `rc.2`,
-`rc.20`, and `rc.24` were consumed by incomplete publication attempts and are
-not upgrade or rollback targets. `rc.24` published only a subset of its
-containers and no chart or GitHub Release.
+`rc.20`, `rc.24`, and `rc.25` were consumed by incomplete publication attempts
+and are not upgrade or rollback targets. `rc.24` and `rc.25` each published only
+a subset of their containers and no chart or GitHub Release.
 
 ## Known limitations and rollback
 
-Hangar `rc.25` remains a prerelease qualified for evaluation rather than
+Hangar `rc.26` remains a prerelease qualified for evaluation rather than
 production. Published images are AMD64-only. The production-profile install,
 backup and restore, migration-failure recovery, vulnerability and license
 approval, and full support matrix remain open qualification gates.
@@ -72,6 +68,6 @@ There is no security-equivalent rollback target. Rolling back to `rc.23`
 restores the corrected Django 5.2.16 runtime but removes the authorization and
 object-scope fixes shipped here. No database or configuration conversion blocks a
 technical rollback, but an emergency rollback should restrict the affected API
-surfaces and return every application component to `rc.25` as soon as possible.
+surfaces and return every application component to `rc.26` as soon as possible.
 Restore a database backup only when unrelated writes, corruption, or the incident
 requires point-in-time recovery.
