@@ -35,6 +35,38 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("Could not prove that immutable image tag is unused", self.workflow)
         self.assertIn("GitHub Release immutability check failed", self.workflow)
 
+    def test_cosign_is_verified_before_release_publication(self):
+        self.assertEqual(self.workflow.count("sigstore/cosign-installer@"), 1)
+        self.assertIn("name: Prepare release signing tool", self.workflow)
+        self.assertIn("needs: [setup, signing_tools]", self.workflow)
+        self.assertIn("name: cosign-${{ github.run_id }}", self.workflow)
+        self.assertEqual(self.workflow.count("actions/download-artifact@"), 3)
+        self.assertIn("needs: [setup, signing_tools, components, aio]", self.workflow)
+
+        preflight_position = self.workflow.index("name: Prepare release signing tool")
+        approval_position = self.workflow.index("name: Approve release publication")
+        first_build_position = self.workflow.index("name: Build and publish image")
+        self.assertLess(preflight_position, approval_position)
+        self.assertLess(preflight_position, first_build_position)
+
+        components = self.workflow.split("  components:", maxsplit=1)[1].split(
+            "  aio:", maxsplit=1
+        )[0]
+        aio = self.workflow.split("  aio:", maxsplit=1)[1].split(
+            "  preview_helm_e2e:", maxsplit=1
+        )[0]
+        chart = self.workflow.split("  chart:", maxsplit=1)[1].split(
+            "  verify_publication:", maxsplit=1
+        )[0]
+        for publication_job in (components, aio, chart):
+            restore_position = publication_job.index("name: Restore verified Cosign")
+            publish_position = publication_job.index(
+                "name: Build and publish image"
+                if "name: Build and publish image" in publication_job
+                else "name: Publish and verify chart"
+            )
+            self.assertLess(restore_position, publish_position)
+
     def test_github_release_uses_the_git_tag_not_the_product_version(self):
         self.assertIn('gh release create "$GIT_TAG"', self.workflow)
         self.assertIn("--verify-tag", self.workflow)
