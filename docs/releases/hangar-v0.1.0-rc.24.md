@@ -3,7 +3,7 @@
 > `api`, and `proxy` container tags were published; `live`, `aio`, the Helm
 > chart, and the GitHub Release were not published. The immutable version is
 > consumed and must not be installed, completed, or repaired in place. Use
-> `rc.25` instead.
+> `rc.26` instead.
 
 ## Security and privacy
 
