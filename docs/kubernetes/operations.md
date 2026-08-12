@@ -59,6 +59,45 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.23` to `rc.24`
+
+This release hardens authorization and object scoping across the app, Spaces,
+deploy-board, and external API surfaces. It closes cases where a valid identifier
+could cross a workspace, project, issue, member, ownership, or nested-object
+boundary. It also prevents mass assignment of project audit and workspace-member
+fields, scopes webhook HMAC secrets, limits state mutation to administrators, and
+allowlists page ordering while bounding grouped pagination inputs.
+
+There is no new database migration, Helm value, Secret, Kubernetes resource,
+public route, storage, RBAC, or NetworkPolicy change. Existing `rc.23` values and
+deployment configuration remain structurally compatible. The inherited Plane
+source remains final `v1.4.0` at exact commit `917b23a6`.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target chart is `0.1.0-rc.24`, its application version is
+   `v0.1.0-rc.24`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc24);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. schedule API, migrator, workers, Spaces, and web applications as one
+   coordinated Helm revision. Do not mix `rc.23` and `rc.24` application images.
+
+Wait for the revision-scoped migration Job before admitting traffic even though
+there is no new schema operation. Then verify authentication and exercise both
+allowed and denied access for a restricted guest, a regular member, and a
+workspace administrator. Include issue attachments and history, comments and
+relations, project invitations and members, Spaces board objects, deploy-board
+objects, webhooks, and external API issue subresources.
+
+`rc.23` is the immediately previous complete publication, but it lacks these
+authorization fixes. There is no security-equivalent rollback target. No schema
+or configuration conversion blocks a technical rollback; if emergency
+availability recovery requires one, restrict access to affected API surfaces and
+return every application component to `rc.24` as soon as possible.
+
 ### Upgrade from `rc.22` to `rc.23`
 
 This release updates Django from 5.2.15 to security release 5.2.16. It fixes
