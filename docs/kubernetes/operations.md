@@ -59,6 +59,44 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.26` to `rc.27`
+
+This release updates `nanoid`, `js-yaml`, `undici`, `fast-uri`, `postcss`, and
+`brace-expansion` to patched versions. It also ports selected fixes from Plane
+1.4.1: safer workspace-module member handling, a corrected notification API
+route, resilient layout and dropdown rendering, guarded project and workspace
+state access, and a one-time automatic reload when a deployment leaves a stale
+frontend asset reference in an open browser tab.
+
+There is no new database migration, Helm value, Secret, Kubernetes resource,
+public route, storage, RBAC, or NetworkPolicy change. Existing `rc.26` values and
+deployment configuration remain structurally compatible. The inherited Plane
+baseline remains final `v1.4.0` at exact commit `917b23a6`; the fixes above are
+selectively backported rather than a baseline transition.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target chart is `0.1.0-rc.27`, its application version is
+   `v0.1.0-rc.27`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc27);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. deploy every application image as one coordinated Helm revision. Do not mix
+   `rc.26` and `rc.27` application images.
+
+Wait for the revision-scoped migration Job before admitting traffic even though
+there is no new schema operation. Then verify authentication, workspace module
+membership updates, notification reads, project and workspace navigation, layout
+switching, dropdown interactions, and recovery of a tab that references a stale
+frontend asset.
+
+`rc.26` is the immediately previous complete publication and is structurally
+compatible as an emergency technical rollback target, but it restores the
+superseded dependency versions and removes these operational fixes. Prefer a
+forward correction and return every application component to `rc.27` promptly.
+
 ### Upgrade from `rc.23` to `rc.26`
 
 `rc.24` and `rc.25` were consumed by incomplete publication attempts and are not
