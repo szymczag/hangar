@@ -365,7 +365,18 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}
-        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if cosign sign --yes "${IMAGE}@${DIGEST}"; then
+              exit 0
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "Cosign signing failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
 
       - name: Verify release image signature
         if: needs.setup.outputs.is_release == 'true'
@@ -468,7 +479,18 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE: ${{ env.IMAGE_PREFIX }}aio
-        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if cosign sign --yes "${IMAGE}@${DIGEST}"; then
+              exit 0
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "Cosign signing failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
 
       - name: Verify release image signature
         if: needs.setup.outputs.is_release == 'true'
@@ -614,7 +636,16 @@ jobs:
           fi
 
           chart_ref="ghcr.io/szymczag/charts/hangar@${chart_digest}"
-          cosign sign --yes "$chart_ref"
+          for attempt in 1 2 3; do
+            if cosign sign --yes "$chart_ref"; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "Cosign signing failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
           cosign verify \
             --certificate-identity "$CERTIFICATE_IDENTITY" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
