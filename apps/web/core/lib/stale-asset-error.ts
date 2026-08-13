@@ -28,7 +28,7 @@ export const isStaleAssetError = (error: unknown): boolean => {
 // Reload-once-then-fall-through-to-boundary guard, shared by the window-level
 // listeners (entry.client.tsx) and the route ErrorBoundary (root.tsx) so both
 // paths to the same failure share one reload attempt instead of racing.
-const STALE_ASSET_RELOAD_KEY = "__plane_chunk_reload";
+const STALE_ASSET_RELOAD_KEY = "__hangar_chunk_reload";
 const STALE_ASSET_RELOAD_WINDOW_MS = 30_000;
 
 const hasRecentStaleAssetReload = (): boolean => {
