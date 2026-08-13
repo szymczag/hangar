@@ -20,6 +20,7 @@ export type TTodoistModuleConflict = {
 
 export type TTodoistImportPreview = {
   digest: string;
+  preview_token: string;
   counts: Record<string, number>;
   diagnostics: TImportDiagnostic[];
   assignees: string[];

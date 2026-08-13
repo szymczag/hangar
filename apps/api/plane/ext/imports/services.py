@@ -96,6 +96,18 @@ class ImportRetryMismatch(ImportServiceError):
     code = "import_retry_mismatch"
 
 
+class ImportPreviewConsumed(ImportServiceError):
+    code = "import_preview_consumed"
+
+
+class ImportDuplicate(ImportServiceError):
+    code = "duplicate_import"
+
+
+class ImportAlreadyActive(ImportServiceError):
+    code = "import_in_progress"
+
+
 class ImportQuotaExceeded(ImportServiceError):
     code = "import_quota_exceeded"
 
@@ -357,6 +369,7 @@ def reserve_job(
     config: dict[str, Any],
     stats: dict[str, Any],
     errors: list[dict[str, Any]],
+    preview_nonce: UUID | None = None,
     request_id: str | None = None,
     retry_of_id: UUID | None = None,
 ) -> ImportJob:
@@ -364,8 +377,29 @@ def reserve_job(
     if not isinstance(source_rows, int) or source_rows < 0:
         raise ValueError("Import source row count must be a non-negative integer.")
     now = timezone.now()
+    preview_nonce = preview_nonce or uuid4()
     budgets = _lock_budgets(workspace_id=workspace.id, user_id=initiated_by.id)
     assert budgets.user is not None
+    locked_project = (
+        Project.objects.select_for_update()
+        .filter(pk=project.id, workspace_id=workspace.id, archived_at__isnull=True)
+        .first()
+    )
+    if locked_project is None:
+        raise ImportProjectUnavailable("The destination project is no longer available.")
+    if ImportJob.objects.filter(preview_nonce=preview_nonce).exists():
+        raise ImportPreviewConsumed("The import preview has already been used.")
+    if ImportJob.objects.filter(project=locked_project, status__in=ACTIVE_STATUSES).exists():
+        raise ImportAlreadyActive("An import is already active for this project.")
+    if (
+        config.get("allow_duplicate") is not True
+        and ImportJob.objects.filter(
+            project=locked_project,
+            source_digest=source_digest,
+            status__in={ImportJob.Status.COMPLETED, ImportJob.Status.COMPLETED_WITH_ERRORS},
+        ).exists()
+    ):
+        raise ImportDuplicate("This exact source has already been imported into the project.")
     rolling_cutoff = now - timedelta(hours=24)
     workspace_usage = ImportAdmissionUsage.objects.filter(
         workspace_id=workspace.id,
@@ -455,6 +489,7 @@ def reserve_job(
         initiated_by=initiated_by,
         status=ImportJob.Status.PREPARING,
         source_digest=source_digest,
+        preview_nonce=preview_nonce,
         source_size=source_size,
         config=config,
         stats=stats,

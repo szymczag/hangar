@@ -4,10 +4,13 @@
 
 from .feature import todoist_imports_enabled
 from .services import (
+    ImportAlreadyActive,
     ImportAuthorizationRevoked,
     ImportCancellationRequested,
     ImportDecisionDrift,
+    ImportDuplicate,
     ImportLeaseLost,
+    ImportPreviewConsumed,
     ImportProjectUnavailable,
     ImportQuotaExceeded,
     ImportRetryMismatch,
@@ -16,10 +19,13 @@ from .services import (
 )
 
 __all__ = [
+    "ImportAlreadyActive",
     "ImportAuthorizationRevoked",
     "ImportCancellationRequested",
     "ImportDecisionDrift",
+    "ImportDuplicate",
     "ImportLeaseLost",
+    "ImportPreviewConsumed",
     "ImportProjectUnavailable",
     "ImportQuotaExceeded",
     "ImportRetryMismatch",
