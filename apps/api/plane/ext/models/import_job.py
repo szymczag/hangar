@@ -41,6 +41,7 @@ class ImportJob(BaseModel):
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PREPARING)
     source_key = models.TextField(blank=True)
     source_digest = models.CharField(max_length=64)
+    preview_nonce = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     source_size = models.PositiveBigIntegerField(default=0)
     config = models.JSONField(default=dict, blank=True)
     stats = models.JSONField(default=dict, blank=True)

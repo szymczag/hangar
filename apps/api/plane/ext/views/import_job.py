@@ -25,12 +25,17 @@ from plane.authentication.session import CsrfEnforcedSessionAuthentication
 from plane.db.models import Module, Project, ProjectMember, Workspace
 
 from plane.ext.imports import (
+    ImportAlreadyActive,
+    ImportDuplicate,
+    ImportPreviewConsumed,
+    ImportProjectUnavailable,
     ImportQuotaExceeded,
     ImportRetryMismatch,
     ImportTransitionError,
     audit_quota_rejection,
     todoist_imports_enabled,
 )
+from plane.ext.imports.preview import ImportPreviewTokenError, issue_preview_token, validate_preview_token
 from plane.ext.imports.dispatcher import publish_import_dispatch
 from plane.ext.imports.services import (
     fail_preparing_job,
@@ -296,7 +301,14 @@ class TodoistImportPreviewEndpoint(BaseAPIView):
         if parse_error:
             return parse_error
         assert preview is not None
-        return Response(_preview_payload(preview, project), status=status.HTTP_200_OK)
+        payload = _preview_payload(preview, project)
+        payload["preview_token"] = issue_preview_token(
+            actor_id=request.user.id,
+            workspace_id=project.workspace_id,
+            project_id=project.id,
+            source_digest=preview.digest,
+        )
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class TodoistImportEndpoint(BaseAPIView):
@@ -316,9 +328,16 @@ class TodoistImportEndpoint(BaseAPIView):
         assert preview is not None
         assert content is not None
 
-        expected_digest = request.data.get("preview_digest")
-        if not expected_digest or expected_digest != preview.digest:
-            return _error("preview_mismatch", "The file changed after preview. Preview it again before importing.")
+        try:
+            preview_grant = validate_preview_token(
+                request.data.get("preview_token"),
+                actor_id=request.user.id,
+                workspace_id=project.workspace_id,
+                project_id=project.id,
+                source_digest=preview.digest,
+            )
+        except ImportPreviewTokenError as error:
+            return _error("invalid_preview", str(error), status.HTTP_409_CONFLICT)
 
         config, config_error = _load_config(request)
         if config_error:
@@ -336,24 +355,6 @@ class TodoistImportEndpoint(BaseAPIView):
         conflict_error = _validate_module_conflicts(preview, project, config)
         if conflict_error:
             return conflict_error
-
-        duplicate = ImportJob.objects.filter(
-            project=project,
-            source_digest=preview.digest,
-            status__in=COMPLETED_STATUSES,
-        ).exists()
-        if duplicate and config.get("allow_duplicate") is not True:
-            return _error(
-                "duplicate_import",
-                "This exact file has already been imported into the project.",
-                status.HTTP_409_CONFLICT,
-            )
-        if ImportJob.objects.filter(project=project, status__in=ACTIVE_STATUSES).exists():
-            return _error(
-                "import_in_progress",
-                "Wait for the active project import to finish before starting another.",
-                status.HTTP_409_CONFLICT,
-            )
 
         workspace = Workspace.objects.get(slug=slug)
         retry_of_id = None
@@ -389,8 +390,33 @@ class TodoistImportEndpoint(BaseAPIView):
                 config=config,
                 stats=initial_stats,
                 errors=[item.as_dict() for item in preview.diagnostics],
+                preview_nonce=preview_grant.nonce,
                 request_id=request.headers.get("X-Request-ID"),
                 retry_of_id=retry_of_id,
+            )
+        except ImportPreviewConsumed:
+            return _error(
+                "preview_consumed",
+                "Preview the import again before continuing.",
+                status.HTTP_409_CONFLICT,
+            )
+        except ImportDuplicate:
+            return _error(
+                "duplicate_import",
+                "This exact file has already been imported into the project.",
+                status.HTTP_409_CONFLICT,
+            )
+        except ImportAlreadyActive:
+            return _error(
+                "import_in_progress",
+                "Wait for the active project import to finish before starting another.",
+                status.HTTP_409_CONFLICT,
+            )
+        except ImportProjectUnavailable:
+            return _error(
+                "invalid_project",
+                "The destination project is not available in this workspace.",
+                status.HTTP_409_CONFLICT,
             )
         except ImportRetryMismatch:
             return _error(

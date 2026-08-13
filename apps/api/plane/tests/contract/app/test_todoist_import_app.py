@@ -95,6 +95,16 @@ def import_url(workspace):
     return f"/api/workspaces/{workspace.slug}/imports/todoist/"
 
 
+def preview_token(client, workspace, project, content: bytes) -> str:
+    response = client.post(
+        preview_url(workspace),
+        {"project_id": str(project.id), "file": upload(content)},
+        format="multipart",
+    )
+    assert response.status_code == status.HTTP_200_OK, response.data
+    return response.data["preview_token"]
+
+
 def secure_state_fields(job_status: str) -> dict:
     fields = {"manifest_digest": "0" * 64}
     if job_status in {
@@ -169,7 +179,7 @@ class TestTodoistImportAPI:
         content = csv_content()
         payload = {
             "project_id": str(import_project.id),
-            "preview_digest": parse_todoist_csv(content).digest,
+            "preview_token": preview_token(client, workspace, import_project, content),
             "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
             "file": upload(content),
         }
@@ -185,6 +195,7 @@ class TestTodoistImportAPI:
         csrf_response = client.get("/auth/get-csrf-token/")
         csrf_token = csrf_response.data["csrf_token"]
         content = csv_content()
+        grant = preview_token(client, workspace, import_project, content)
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
         enqueue = mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
 
@@ -192,7 +203,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": parse_todoist_csv(content).digest,
+                "preview_token": grant,
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },
@@ -244,7 +255,69 @@ class TestTodoistImportAPI:
         assert response.data["counts"]["task"] == 1
         assert response.data["assignees"] == ("Owner (100)",)
         assert response.data["duplicate"] is False
+        assert response.data["preview_token"]
         assert ImportJob.objects.count() == 0
+
+    def test_execute_requires_server_issued_preview(self, session_client, workspace, import_project):
+        content = csv_content()
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(content),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.data["error"]["code"] == "invalid_preview"
+        assert ImportJob.objects.count() == 0
+
+    def test_preview_is_bound_to_exact_source(self, session_client, workspace, import_project):
+        content = csv_content()
+        changed = content.replace(b"Synthetic task", b"Different task")
+        grant = preview_token(session_client, workspace, import_project, content)
+
+        response = session_client.post(
+            import_url(workspace),
+            {
+                "project_id": str(import_project.id),
+                "preview_token": grant,
+                "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+                "file": upload(changed),
+            },
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.data["error"]["code"] == "invalid_preview"
+        assert ImportJob.objects.count() == 0
+
+    def test_preview_is_single_use(self, mocker, session_client, workspace, import_project):
+        content = csv_content()
+        grant = preview_token(session_client, workspace, import_project, content)
+        upload_source = mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
+        mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
+        payload = {
+            "project_id": str(import_project.id),
+            "preview_token": grant,
+            "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
+            "file": upload(content),
+        }
+
+        accepted = session_client.post(import_url(workspace), payload, format="multipart")
+        replayed = session_client.post(
+            import_url(workspace),
+            {**payload, "file": upload(content)},
+            format="multipart",
+        )
+
+        assert accepted.status_code == status.HTTP_202_ACCEPTED
+        assert replayed.status_code == status.HTTP_409_CONFLICT
+        assert replayed.data["error"]["code"] == "preview_consumed"
+        assert upload_source.call_count == 1
 
     def test_workspace_member_cannot_preview(self, workspace, import_project):
         email = f"member-{uuid4().hex[:8]}@hangar.test"
@@ -285,7 +358,6 @@ class TestTodoistImportAPI:
 
     def test_start_queues_private_import(self, mocker, session_client, workspace, import_project):
         content = csv_content()
-        digest = parse_todoist_csv(content).digest
         upload_source = mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
         enqueue = mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
 
@@ -293,7 +365,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },
@@ -318,7 +390,6 @@ class TestTodoistImportAPI:
 
     def test_invalid_assignee_mapping_is_rejected(self, session_client, workspace, import_project):
         content = csv_content()
-        digest = parse_todoist_csv(content).digest
         email = f"outsider-{uuid4().hex[:8]}@hangar.test"
         outsider = User.objects.create(email=email, username=email)
 
@@ -326,7 +397,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps(
                     {
                         "assignee_mapping": {"Owner (100)": str(outsider.id)},
@@ -351,7 +422,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": preview.digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },
@@ -364,7 +435,6 @@ class TestTodoistImportAPI:
 
     def test_upload_failure_keeps_source_key_for_cleanup(self, mocker, session_client, workspace, import_project):
         content = csv_content()
-        digest = parse_todoist_csv(content).digest
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=False)
         enqueue = mocker.patch("plane.ext.tasks.run_todoist_import.apply_async")
 
@@ -372,7 +442,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },
@@ -410,7 +480,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": parse_todoist_csv(content).digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },
@@ -457,7 +527,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": parse_todoist_csv(content).digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },
@@ -589,7 +659,6 @@ class TestTodoistImportAPI:
 
     def test_ambiguous_publish_keeps_durable_queued_source(self, mocker, session_client, workspace, import_project):
         content = csv_content()
-        digest = parse_todoist_csv(content).digest
         mocker.patch("plane.ext.views.import_job.upload_import_source", return_value=True)
         mocker.patch("plane.ext.views.import_job.delete_import_source", return_value=False)
         mocker.patch(
@@ -601,7 +670,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },
@@ -630,7 +699,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },
@@ -692,7 +761,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": parse_todoist_csv(content).digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}, "unexpected": True}),
                 "file": upload(content),
             },
@@ -712,7 +781,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": preview.digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps(
                     {
                         "assignee_mapping": {},
@@ -753,7 +822,7 @@ class TestTodoistImportAPI:
             import_url(workspace),
             {
                 "project_id": str(import_project.id),
-                "preview_digest": digest,
+                "preview_token": preview_token(session_client, workspace, import_project, content),
                 "config": json.dumps({"assignee_mapping": {}, "module_conflicts": {}}),
                 "file": upload(content),
             },

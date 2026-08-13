@@ -32,7 +32,11 @@ of the export until you have reviewed the completed import report.
 4. Select **Preview import**.
 
 The preview validates the schema without creating work items or retaining the
-file. It shows separate task, section, note, warning, and error counts. Expand
+file. It issues a signed, 15-minute, single-use preview grant bound to the
+administrator, workspace, destination project, and exact source bytes. Starting
+an import without that grant, after it expires, after it has already been used,
+or with a different actor, destination, or source fails closed and requires a
+new preview. It shows separate task, section, note, warning, and error counts. Expand
 the diagnostics to review every skipped row. If errors are present, you must
 explicitly confirm that valid rows may be imported while those rows are skipped.
 
@@ -75,7 +79,9 @@ canonical mapping decisions are identical. Such a retry reuses already-created
 tasks, sections, and comments, and reports reused and newly imported counts
 separately. A changed mapping, actor, destination, or ordinary duplicate import
 receives a new namespace and can create additional work items. The duplicate
-warning is scoped to the destination project.
+warning is scoped to the destination project. Duplicate admission is rechecked
+while the destination project is locked in the same transaction that reserves
+the job, so a concurrently completing import cannot bypass the confirmation.
 
 Authorization is checked continuously. The initiating account must remain
 active and retain workspace-administrator access, and the destination project
@@ -159,6 +165,7 @@ The execution and admission controls default to:
 | `TODOIST_IMPORT_LEASE_SECONDS`                         |      `120` |         30–900 seconds | Exclusive worker ownership window                                 |
 | `TODOIST_IMPORT_RECOVERY_GRACE_SECONDS`                |       `30` |          0–300 seconds | Delay before an expired owner is fenced and recovered             |
 | `TODOIST_IMPORT_SOURCE_RETENTION_HOURS`                |       `24` |            1–168 hours | Maximum configured source retention before reconciliation         |
+| `TODOIST_IMPORT_PREVIEW_TTL_SECONDS`                   |      `900` |       60–3,600 seconds | Lifetime of a signed, single-use preview grant                    |
 | `TODOIST_IMPORT_MAX_ACTIVE_PER_USER`                   |        `1` |                  1–100 | Concurrent imports reserved by one administrator in one workspace |
 | `TODOIST_IMPORT_MAX_ACTIVE_PER_WORKSPACE`              |        `2` |                1–1,000 | Concurrent imports reserved across a workspace                    |
 | `TODOIST_IMPORT_MAX_ROWS_PER_WORKSPACE_24H`            |    `50000` |           1–10,000,000 | Accepted source rows in the preceding workspace 24 hours          |

@@ -15,6 +15,7 @@ from django.utils import timezone
 from plane.db.models import Project, ProjectMember, State, WorkspaceMember
 from plane.ext.importers.todoist import ImportCancelled
 from plane.ext.imports.services import (
+    ImportDuplicate,
     ImportLeaseLost,
     ImportQuotaExceeded,
     ImportRetryMismatch,
@@ -528,6 +529,45 @@ def test_workspace_active_limit_applies_across_users(settings, workspace, create
 
     assert error.value.limit == "active_workspace_imports"
     assert ImportWorkspaceBudget.objects.get(workspace=workspace).active_jobs == 1
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_reservation_rechecks_completed_duplicate_atomically(workspace, create_user, import_project):
+    digest = "6" * 64
+    ImportJob.objects.create(
+        workspace=workspace,
+        project=import_project,
+        initiated_by=create_user,
+        source_digest=digest,
+        status=ImportJob.Status.COMPLETED,
+        manifest_digest="0" * 64,
+        completed_at=timezone.now(),
+    )
+
+    with pytest.raises(ImportDuplicate):
+        reserve_job(
+            workspace=workspace,
+            project=import_project,
+            initiated_by=create_user,
+            source_digest=digest,
+            source_size=128,
+            config={},
+            stats={"source_rows": 1},
+            errors=[],
+        )
+
+    confirmed = reserve_job(
+        workspace=workspace,
+        project=import_project,
+        initiated_by=create_user,
+        source_digest=digest,
+        source_size=128,
+        config={"allow_duplicate": True},
+        stats={"source_rows": 1},
+        errors=[],
+    )
+    assert confirmed.status == ImportJob.Status.PREPARING
 
 
 @pytest.mark.unit

@@ -120,7 +120,7 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
     };
     setIsSubmitting(true);
     try {
-      await importService.startTodoist(workspaceSlug, projectId, file, preview.digest, config, retryJobId);
+      await importService.startTodoist(workspaceSlug, projectId, file, preview.preview_token, config, retryJobId);
       setHistoryRefreshToken((current) => current + 1);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";

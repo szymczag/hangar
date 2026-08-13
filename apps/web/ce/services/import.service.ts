@@ -40,7 +40,7 @@ export class ImportService extends APIService {
     workspaceSlug: string,
     projectId: string,
     file: File,
-    previewDigest: string,
+    previewToken: string,
     config: TTodoistImportConfig,
     retryJobId?: string | null
   ): Promise<TImportJob> {
@@ -48,7 +48,7 @@ export class ImportService extends APIService {
     const data = new FormData();
     data.append("project_id", projectId);
     data.append("file", file);
-    data.append("preview_digest", previewDigest);
+    data.append("preview_token", previewToken);
     data.append("config", JSON.stringify(config));
     if (retryJobId) data.append("retry_job_id", retryJobId);
     return this.post(`/api/workspaces/${workspaceSlug}/imports/todoist/`, data, {
