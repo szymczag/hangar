@@ -67,6 +67,14 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
             )
             self.assertLess(restore_position, publish_position)
 
+    def test_cosign_signing_retries_transient_service_failures(self):
+        self.assertEqual(self.workflow.count("for attempt in 1 2 3; do"), 3)
+        self.assertEqual(
+            self.workflow.count('echo "Cosign signing failed after $attempt attempts"'),
+            3,
+        )
+        self.assertEqual(self.workflow.count("sleep $((attempt * 15))"), 3)
+
     def test_github_release_uses_the_git_tag_not_the_product_version(self):
         self.assertIn('gh release create "$GIT_TAG"', self.workflow)
         self.assertIn("--verify-tag", self.workflow)
