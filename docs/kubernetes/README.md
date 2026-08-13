@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.27`. It is qualified for evaluation on
+The current release is `0.1.0-rc.28`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -44,7 +44,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.27` qualification boundary is:
+The `0.1.0-rc.28` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -110,14 +110,14 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.27`                               |
-| Helm chart version | `0.1.0-rc.27`                                |
-| Git tag            | `hangar-v0.1.0-rc.27`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.27` |
+| Product version    | `v0.1.0-rc.28`                               |
+| Helm chart version | `0.1.0-rc.28`                                |
+| Git tag            | `hangar-v0.1.0-rc.28`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.28` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, and `rc.25` were consumed by incomplete publication
-attempts. Do not use them. `rc.26` is the immediately previous complete publication, but it
-predates the dependency security updates and operational fixes in `rc.27`.
+attempts. Do not use them. `rc.27` is the immediately previous complete publication, but it
+predates the signed preview grant and transactional duplicate admission controls in `rc.28`.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
 There is no security-equivalent rollback target among the earlier release
 candidates. Published versions are immutable and are never repaired in place. In
@@ -126,7 +126,7 @@ sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.27` notes](../releases/hangar-v0.1.0-rc.27.md) — review
+- [Release `v0.1.0-rc.28` notes](../releases/hangar-v0.1.0-rc.28.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -151,7 +151,7 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The public `rc.27` chart archive, OCI chart, and digest-pinned Hangar images are
+The public `rc.28` chart archive, OCI chart, and digest-pinned Hangar images are
 anonymously downloadable. The release workflow also created provenance
 attestations and keyless Cosign signatures.
 

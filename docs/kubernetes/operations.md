@@ -59,6 +59,47 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.27` to `rc.28`
+
+This release closes two Todoist import admission gaps. Starting an import now
+requires a server-signed, 15-minute, single-use preview grant bound to the
+administrator, workspace, destination project, and exact source bytes. Job
+reservation also locks the destination project and rechecks active jobs and
+completed duplicates in the same transaction, so concurrent completion cannot
+bypass duplicate confirmation.
+
+Migration `ext.0011_import_job_preview_nonce` adds a nullable unique preview
+nonce to import jobs. Existing rows remain valid and require no backfill. There
+is no new Helm value, Secret, Kubernetes resource, public route, storage, RBAC,
+or NetworkPolicy change. Existing `rc.27` values and deployment configuration
+remain structurally compatible; the preview-grant lifetime defaults to 900
+seconds and requires no operator action.
+
+Before upgrading:
+
+1. take a PostgreSQL backup, prove that it can be restored in isolation, and
+   record the current Helm revision and application image digests;
+2. confirm the target chart is `0.1.0-rc.28`, its application version is
+   `v0.1.0-rc.28`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc28);
+3. render the existing values against the target chart and verify that only the
+   expected release versions and immutable image digests change; and
+4. deploy every application image as one coordinated Helm revision. Do not mix
+   `rc.27` and `rc.28` web or API images because their preview-execution request
+   contract intentionally changed together.
+
+Wait for the revision-scoped migration Job to complete before admitting traffic.
+Then enable Todoist imports in a controlled workspace, preview a synthetic CSV,
+start it once, and verify that replaying the same preview grant fails. Confirm
+that an import without a grant and an import whose source changed after preview
+also fail without creating a job or retaining a source object.
+
+`rc.27` remains structurally compatible as an emergency technical rollback
+target; the nullable column may remain in the database. It restores the preview
+bypass and duplicate-confirmation race, however, so it is not a
+security-equivalent rollback. Prefer a forward correction and return every
+application component to `rc.28` promptly.
+
 ### Upgrade from `rc.26` to `rc.27`
 
 This release updates `nanoid`, `js-yaml`, `undici`, `fast-uri`, `postcss`, and
