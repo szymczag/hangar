@@ -10,6 +10,7 @@ import { TriangleAlert } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { EIssueLayoutTypes } from "@plane/types";
 // components
+import { LayoutErrorBoundary } from "@/components/common/layout-error-boundary";
 import { CalendarLayoutLoader } from "@/components/ui/loader/layouts/calendar-layout-loader";
 import { GanttLayoutLoader } from "@/components/ui/loader/layouts/gantt-layout-loader";
 import { KanbanLayoutLoader } from "@/components/ui/loader/layouts/kanban-layout-loader";
@@ -80,5 +81,5 @@ export const IssueLayoutHOC = observer(function IssueLayoutHOC(props: Props) {
     return <IssueLayoutEmptyState storeType={storeType} />;
   }
 
-  return <>{props.children}</>;
+  return <LayoutErrorBoundary key={layout}>{props.children}</LayoutErrorBoundary>;
 });

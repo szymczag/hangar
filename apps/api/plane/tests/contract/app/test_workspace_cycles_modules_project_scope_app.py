@@ -23,6 +23,7 @@ from rest_framework.test import APIClient
 from plane.db.models import (
     Cycle,
     Module,
+    ModuleMember,
     Project,
     ProjectMember,
     User,
@@ -120,3 +121,18 @@ class TestWorkspaceCyclesModulesProjectScope:
         assert response.status_code == status.HTTP_200_OK
         ids = {str(row["id"]) for row in response.data}
         assert str(module.id) in ids, f"Expected module {module.id} in {response.data!r}"
+
+    @pytest.mark.django_db
+    def test_modules_include_member_ids(self, session_client, workspace, module, create_user):
+        ModuleMember.objects.create(
+            module=module,
+            member=create_user,
+            project=module.project,
+            workspace=workspace,
+        )
+
+        response = session_client.get(MODULES_URL.format(slug=workspace.slug))
+
+        assert response.status_code == status.HTTP_200_OK
+        serialized_module = next(row for row in response.data if str(row["id"]) == str(module.id))
+        assert serialized_module["member_ids"] == [str(create_user.id)]
