@@ -205,10 +205,13 @@ def _request_oidc(method, target, *, data=None, headers=None, timeout=DISCOVERY_
             connection.sock = _connect_pinned(target, address, remaining)
             connection.request(method, path, body=body, headers=request_headers)
             response = connection.getresponse()
-            body = response.read(MAX_OIDC_RESPONSE_BYTES + 1)
-            if len(body) > MAX_OIDC_RESPONSE_BYTES:
+            # Never reuse `body` here. Any raise below is caught by the retry
+            # handler, so overwriting it would send this response back out as
+            # the next attempt's request body.
+            response_bytes = response.read(MAX_OIDC_RESPONSE_BYTES + 1)
+            if len(response_bytes) > MAX_OIDC_RESPONSE_BYTES:
                 raise requests.RequestException("OIDC response is too large")
-            result = OIDCResponse(response.status, body)
+            result = OIDCResponse(response.status, response_bytes)
             return _checked_response(result)
         except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
             last_error = exc
@@ -398,7 +401,19 @@ class OIDCOAuthProvider(OauthAdapter):
 
         # Validate cached documents too. Besides being defensive against cache
         # corruption, this keeps validation effective after security rules are
-        # tightened while an older document is still cached.
+        # tightened while an older document is still cached. A cached document
+        # that fails validation is evicted so the next attempt refetches it;
+        # otherwise the bad entry would fail every login until its TTL expires.
+        try:
+            self.__validate_discovery_document(discovery)
+        except AuthenticationException:
+            cache.delete(cache_key)
+            raise
+
+        cache.set(cache_key, discovery, DISCOVERY_CACHE_TTL)
+        return discovery
+
+    def __validate_discovery_document(self, discovery):
         if not isinstance(discovery, dict):
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
@@ -437,9 +452,6 @@ class OIDCOAuthProvider(OauthAdapter):
                     error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
                     error_message="OIDC_PROVIDER_ERROR",
                 )
-
-        cache.set(cache_key, discovery, DISCOVERY_CACHE_TTL)
-        return discovery
 
     def set_token_data(self):
         data = {
