@@ -9,8 +9,12 @@ from urllib.parse import urlencode
 
 import pytz
 
+# Django imports
+from django.conf import settings
+
 # Module imports
 from plane.authentication.adapter.oauth import OauthAdapter
+from plane.authentication.utils.outbound import parse_outbound_base_url
 from plane.license.utils.instance_value import get_configuration_value
 from plane.authentication.adapter.error import (
     AuthenticationException,
@@ -40,15 +44,28 @@ class GitLabOAuthProvider(OauthAdapter):
             ]
         )
 
-        self.host = GITLAB_HOST
-        self.token_url = f"{self.host}/oauth/token"
-        self.userinfo_url = f"{self.host}/api/v4/user"
-
         if not (GITLAB_CLIENT_ID and GITLAB_CLIENT_SECRET and GITLAB_HOST):
             raise AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["GITLAB_NOT_CONFIGURED"],
                 error_message="GITLAB_NOT_CONFIGURED",
             )
+
+        # GITLAB_HOST is operator-supplied and every endpoint below is derived
+        # from it, so validate it before it can address anything. A query
+        # string is refused outright: it is never meaningful in a base URL and
+        # would be carried into each derived endpoint.
+        try:
+            _, host_origin = parse_outbound_base_url(GITLAB_HOST.rstrip("/"), allow_query=False)
+        except ValueError:
+            raise AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["GITLAB_NOT_CONFIGURED"],
+                error_message="GITLAB_NOT_CONFIGURED",
+            )
+
+        self.host = GITLAB_HOST.rstrip("/")
+        self.host_origin = host_origin
+        self.token_url = f"{self.host}/oauth/token"
+        self.userinfo_url = f"{self.host}/api/v4/user"
 
         client_id = GITLAB_CLIENT_ID
         client_secret = GITLAB_CLIENT_SECRET
@@ -76,6 +93,12 @@ class GitLabOAuthProvider(OauthAdapter):
             code,
             callback=callback,
         )
+
+    def outbound_required_origin(self):
+        return self.host_origin
+
+    def outbound_allowlist(self):
+        return settings.GITLAB_ALLOWED_IPS, settings.GITLAB_ALLOWED_HOSTS
 
     def set_token_data(self):
         data = {

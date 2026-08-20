@@ -144,6 +144,25 @@ GITEA_ALLOWED_HOSTS = [
     _host.strip().rstrip(".").lower() for _host in _gitea_allowed_hosts_raw.split(",") if _host.strip()
 ]
 
+# GITLAB_HOST is operator-supplied and self-managed GitLab is commonly internal.
+# Same rule as Gitea: private destinations only when the deployment operator
+# names them, never through the mutable instance configuration alone.
+_gitlab_allowed_ips_raw = os.environ.get("GITLAB_ALLOWED_IPS", "")
+GITLAB_ALLOWED_IPS = []
+for _cidr in _gitlab_allowed_ips_raw.split(","):
+    _cidr = _cidr.strip()
+    if not _cidr:
+        continue
+    try:
+        GITLAB_ALLOWED_IPS.append(ipaddress.ip_network(_cidr, strict=False))
+    except ValueError:
+        _logger.warning("GITLAB_ALLOWED_IPS: skipping invalid entry %r", _cidr)
+
+_gitlab_allowed_hosts_raw = os.environ.get("GITLAB_ALLOWED_HOSTS", "")
+GITLAB_ALLOWED_HOSTS = [
+    _host.strip().rstrip(".").lower() for _host in _gitlab_allowed_hosts_raw.split(",") if _host.strip()
+]
+
 _smtp_allowed_ips_raw = os.environ.get("SMTP_ALLOWED_IPS", "")
 SMTP_ALLOWED_IPS = []
 for _cidr in _smtp_allowed_ips_raw.split(","):

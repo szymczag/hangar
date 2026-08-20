@@ -14,11 +14,35 @@ from plane.authentication.adapter.error import (
 )
 
 # Module imports
+from plane.authentication.utils.outbound import TLSPolicy, fetch_validated
 from plane.db.models import Account
 from .base import Adapter
 
 
 class OauthAdapter(Adapter):
+    # Every OAuth destination goes through the validated transport: resolved
+    # once, pinned to a checked address, redirects refused, body capped, and a
+    # deadline on every request. TLS 1.2 is the floor rather than 1.3 because
+    # self-managed GitLab and Gitea hosts are legitimate destinations here.
+    outbound_tls_policy = TLSPolicy.MIN_TLS12
+    outbound_timeout = 10
+    outbound_max_response_bytes = 1024 * 1024
+
+    def outbound_required_origin(self):
+        """Origin that derived endpoints must belong to, or None.
+
+        Providers whose host is operator-supplied override this so a token or
+        userinfo URL cannot address a different host than the one configured.
+        """
+        return None
+
+    def outbound_allowlist(self):
+        """(allowed_ips, allowed_hosts) for reaching an internal provider.
+
+        Only self-hosted providers override this. Public-only is the default.
+        """
+        return None, None
+
     def __init__(
         self,
         request,
@@ -69,31 +93,44 @@ class OauthAdapter(Adapter):
         self.set_user_data()
         return self.complete_login_or_signup()
 
+    def fetch(self, method, url, *, data=None, headers=None):
+        """Perform one validated request against a provider endpoint."""
+        allowed_ips, allowed_hosts = self.outbound_allowlist()
+        return fetch_validated(
+            method,
+            url,
+            required_origin=self.outbound_required_origin(),
+            allowed_ips=allowed_ips,
+            allowed_hosts=allowed_hosts,
+            data=data,
+            headers=headers,
+            timeout=self.outbound_timeout,
+            max_response_bytes=self.outbound_max_response_bytes,
+            tls_policy=self.outbound_tls_policy,
+        )
+
     def get_user_token(self, data, headers=None):
         try:
-            headers = headers or {}
-            response = requests.post(self.get_token_url(), data=data, headers=headers)
-            response.raise_for_status()
+            response = self.fetch("POST", self.get_token_url(), data=data, headers=headers or {})
             return response.json()
-        except requests.RequestException:
+        except (requests.RequestException, ValueError):
             self.logger.warning("Error getting user token")
             code = self.authentication_error_code()
             raise AuthenticationException(error_code=AUTHENTICATION_ERROR_CODES[code], error_message=str(code))
 
     def get_user_response(self):
         try:
-            headers = {"Authorization": f"Bearer {self.token_data.get('access_token')}"}
-            response = requests.get(self.get_user_info_url(), headers=headers)
-            response.raise_for_status()
+            response = self.fetch(
+                "GET",
+                self.get_user_info_url(),
+                headers={"Authorization": f"Bearer {self.token_data.get('access_token')}"},
+            )
             return response.json()
-        except requests.RequestException:
+        except (requests.RequestException, ValueError):
             # Do not log headers here: they carry the access token
             self.logger.warning("Error getting user response")
             code = self.authentication_error_code()
             raise AuthenticationException(error_code=AUTHENTICATION_ERROR_CODES[code], error_message=str(code))
-
-    def set_user_data(self, data):
-        self.user_data = data
 
     def create_update_account(self, user, identity=None):
         provider_account_id = self.user_data.get("user", {}).get("provider_id")

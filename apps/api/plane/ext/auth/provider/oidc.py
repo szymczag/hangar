@@ -5,14 +5,6 @@
 # Python imports
 import os
 import hashlib
-import http.client
-import ipaddress
-import json
-import socket
-import ssl
-import time
-from socket import getaddrinfo as _getaddrinfo
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -22,14 +14,17 @@ import requests
 
 # Django imports
 from django.core.cache import cache
-from django.conf import settings
 
 # Module imports
 from plane.authentication.adapter.oauth import OauthAdapter
 from plane.authentication.adapter.error import AuthenticationException
 from plane.authentication.services import ExternalIdentity
+from plane.authentication.utils.outbound import (
+    TLSPolicy,
+    request_validated,
+    validate_outbound_url,
+)
 from plane.license.utils.instance_value import get_configuration_value
-from plane.utils.ip_address import is_blocked_ip
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
 
@@ -59,166 +54,22 @@ ALLOWED_ID_TOKEN_ALGS = [
 _jwk_clients = {}
 
 
-@dataclass(frozen=True)
-class ResolvedAddress:
-    family: int
-    socktype: int
-    protocol: int
-    sockaddr: tuple
-    ip: ipaddress.IPv4Address | ipaddress.IPv6Address
-
-
-@dataclass(frozen=True)
-class ResolvedOIDCTarget:
-    url: str
-    parsed: object
-    scheme: str
-    hostname: str
-    port: int
-    origin: tuple[str, str, int]
-    addresses: tuple[ResolvedAddress, ...]
-
-
-class OIDCResponse:
-    def __init__(self, status_code, body):
-        self.status_code = status_code
-        self.body = body
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise requests.HTTPError(f"OIDC provider returned HTTP {self.status_code}")
-
-    def json(self):
-        return json.loads(self.body.decode("utf-8"))
-
-
-def _normalize_hostname(hostname):
-    if "%" in hostname:
-        raise ValueError("Scoped IPv6 addresses are not allowed")
-    return hostname.encode("idna").decode("ascii").lower()
-
-
-def _normalize_ip(address):
-    parsed = ipaddress.ip_address(address.split("%", 1)[0])
-    return parsed.ipv4_mapped if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped else parsed
-
-
-def _url_origin(parsed):
-    default_port = 443 if parsed.scheme == "https" else 80
-    return parsed.scheme, _normalize_hostname(parsed.hostname), parsed.port or default_port
-
-
-def validate_outbound_url(url, *, required_origin=None):
-    """Resolve and validate the exact socket addresses an OIDC request may use."""
-    try:
-        parsed = urlparse(url)
-        if (
-            parsed.scheme not in ({"https", "http"} if settings.DEBUG else {"https"})
-            or not parsed.hostname
-            or parsed.username
-            or parsed.password
-            or parsed.fragment
-        ):
-            raise ValueError("Unsafe OIDC URL")
-        if parsed.scheme == "http" and not settings.DEBUG:
-            raise ValueError("OIDC HTTP is only allowed in development")
-        origin = _url_origin(parsed)
-        if required_origin is not None and origin != required_origin:
-            raise ValueError("OIDC endpoint origin does not match issuer")
-
-        hostname = origin[1]
-        port = origin[2]
-        answers = _getaddrinfo(hostname, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        if not answers:
-            raise ValueError("OIDC hostname did not resolve")
-        resolved = []
-        seen = set()
-        for family, socktype, protocol, _, sockaddr in answers:
-            if family not in (socket.AF_INET, socket.AF_INET6) or socktype != socket.SOCK_STREAM:
-                raise ValueError("OIDC hostname returned an unsupported address")
-            if sockaddr[1] != port:
-                raise ValueError("OIDC resolver returned an unexpected port")
-            address = _normalize_ip(sockaddr[0])
-            if not address.is_global or is_blocked_ip(address):
-                raise ValueError("OIDC hostname resolves to a non-public address")
-            key = (family, sockaddr)
-            if key not in seen:
-                seen.add(key)
-                resolved.append(ResolvedAddress(family, socktype, protocol, sockaddr, address))
-        if len(resolved) > MAX_RESOLVED_ADDRESSES:
-            raise ValueError("OIDC hostname returned too many addresses")
-    except (OSError, ValueError) as exc:
-        raise ValueError("Unsafe OIDC URL") from exc
-    return ResolvedOIDCTarget(url, parsed, parsed.scheme, hostname, port, origin, tuple(resolved))
-
-
-def _checked_response(response):
-    if 300 <= response.status_code < 400:
-        raise requests.RequestException("OIDC redirects are not allowed")
-    response.raise_for_status()
-    return response
-
-
-def _connect_pinned(target, address, timeout):
-    raw_socket = socket.socket(address.family, address.socktype, address.protocol)
-    raw_socket.settimeout(timeout)
-    try:
-        raw_socket.connect(address.sockaddr)
-        peer_ip = _normalize_ip(raw_socket.getpeername()[0])
-        if peer_ip != address.ip:
-            raise OSError("OIDC connection peer does not match the validated address")
-        if target.scheme == "https":
-            # OIDC carries client credentials, bearer tokens, and identity
-            # assertions. Require TLS 1.3 exactly so that neither local OpenSSL
-            # policy nor a provider's protocol negotiation can silently fall
-            # back to TLS 1.2 or legacy TLS versions. Operators must upgrade an
-            # IdP or reverse proxy that cannot negotiate TLS 1.3 before enabling
-            # it in Hangar.
-            tls_context = ssl.create_default_context()
-            tls_context.minimum_version = ssl.TLSVersion.TLSv1_3
-            tls_context.maximum_version = ssl.TLSVersion.TLSv1_3
-            raw_socket = tls_context.wrap_socket(raw_socket, server_hostname=target.hostname)
-        return raw_socket
-    except Exception:
-        raw_socket.close()
-        raise
-
-
 def _request_oidc(method, target, *, data=None, headers=None, timeout=DISCOVERY_TIMEOUT):
-    body = None
-    request_headers = {"Accept": "application/json", "Connection": "close", **(headers or {})}
-    if data is not None:
-        body = urlencode(data).encode("utf-8")
-        request_headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
+    """OIDC's binding of the shared transport.
 
-    path = urlunparse(("", "", target.parsed.path or "/", target.parsed.params, target.parsed.query, ""))
-    last_error = None
-    deadline = time.monotonic() + timeout
-    for address in target.addresses:
-        connection = None
-        try:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            connection_class = http.client.HTTPSConnection if target.scheme == "https" else http.client.HTTPConnection
-            connection = connection_class(target.hostname, target.port, timeout=remaining)
-            connection.sock = _connect_pinned(target, address, remaining)
-            connection.request(method, path, body=body, headers=request_headers)
-            response = connection.getresponse()
-            # Never reuse `body` here. Any raise below is caught by the retry
-            # handler, so overwriting it would send this response back out as
-            # the next attempt's request body.
-            response_bytes = response.read(MAX_OIDC_RESPONSE_BYTES + 1)
-            if len(response_bytes) > MAX_OIDC_RESPONSE_BYTES:
-                raise requests.RequestException("OIDC response is too large")
-            result = OIDCResponse(response.status, response_bytes)
-            return _checked_response(result)
-        except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
-            last_error = exc
-        finally:
-            if connection is not None:
-                connection.close()
-    raise requests.ConnectionError("Unable to connect to the validated OIDC destination") from last_error
+    TLS 1.3 exactly: this integration has no legacy deployments to
+    accommodate, so there is no reason to leave a downgrade path open for
+    traffic carrying client secrets and id_tokens.
+    """
+    return request_validated(
+        method,
+        target,
+        data=data,
+        headers=headers,
+        timeout=timeout,
+        max_response_bytes=MAX_OIDC_RESPONSE_BYTES,
+        tls_policy=TLSPolicy.STRICT_TLS13,
+    )
 
 
 class _ValidatedJWKClient:
