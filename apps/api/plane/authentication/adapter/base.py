@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from plane.bgtasks.user_activation_email_task import user_activation_email
 from plane.authentication.utils.password import is_password_strong
+from plane.authentication.utils.sso_domain_policy import allowed_providers_for_email
 
 # Module imports
 from plane.authentication.services.invitations import active_signup_invitations
@@ -100,6 +101,29 @@ class Adapter:
             )
         # Return email
         return email
+
+    def enforce_sso_domain_policy(self, email):
+        """Refuse providers that are not authoritative for the email's domain.
+
+        Called for every provider on both signup and login. A domain listed in
+        SSO_ENFORCED_DOMAINS may only be asserted by the providers the operator
+        designated, so no other enabled method — password, magic code, or a
+        different IdP claiming the same addresses — can be used to claim or
+        take over an address in that domain.
+        """
+        allowed = allowed_providers_for_email(email)
+        if allowed is None or self.provider in allowed:
+            return
+
+        self.logger.warning(
+            "Provider is not authoritative for this email domain",
+            extra={"provider": self.provider},
+        )
+        raise AuthenticationException(
+            error_code=AUTHENTICATION_ERROR_CODES["SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN"],
+            error_message="SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN",
+            payload={"email": email},
+        )
 
     def validate_password(self, email):
         """Validate password strength"""
@@ -393,6 +417,7 @@ class Adapter:
         if self.external_identity is not None:
             from plane.authentication.services.federated_auth import authenticate_external_identity
 
+            self.enforce_sso_domain_policy(self.sanitize_email(self.external_identity.email))
             return authenticate_external_identity(self).user
 
         # Get email
@@ -400,6 +425,10 @@ class Adapter:
 
         # Sanitize email
         email = self.sanitize_email(email)
+
+        # Refuse providers that are not authoritative for this domain before
+        # any account is looked up or created.
+        self.enforce_sso_domain_policy(email)
 
         # Check if the user is present
         user = User.objects.filter(email=email).first()
