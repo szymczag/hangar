@@ -201,6 +201,79 @@ Changing the IdP entity ID, OIDC issuer, or SAML subject mapping creates a new
 identity namespace. Treat such a change as a migration, not ordinary profile
 configuration.
 
+## Pinning an existing domain to Google
+
+An instance that already has accounts at the domain has two populations, and they
+behave differently on the first Google sign-in after the cutover:
+
+| Existing account                      | First Google sign-in                                     |
+| ------------------------------------- | -------------------------------------------------------- |
+| Has signed in with Google before       | Adopted automatically; same user id, memberships intact  |
+| Only ever used a password or magic link | Refused with `SSO_ACCOUNT_LINK_REQUIRED` until linked    |
+
+The second case is a lockout, not a corner case: the address is already held by an
+unlinked user, and the refusal is deliberate — silently binding a Google subject to
+an existing local account is exactly the takeover the design prevents. Plan for it
+before enabling `SSO_ENFORCED_DOMAINS`, because that setting removes the password
+and magic-link fallback those users still depend on.
+
+### Find out which accounts need work
+
+```python
+# manage.py shell
+from plane.db.models import Account, User
+
+domain = "@corp.com"
+users = User.objects.filter(email__iendswith=domain)
+linked = set(Account.objects.filter(provider="google", user__in=users).values_list("user_id", flat=True))
+
+for user in users:
+    print(user.email, "auto" if user.id in linked else "NEEDS IMPORT")
+```
+
+### Order of operations
+
+Pin the domain **last**. Until that step, everyone keeps their existing sign-in
+method, so a mistake is recoverable.
+
+1. Configure Google and enable it, with `GOOGLE_AUTH_MODE=workspace` and the domain
+   in `GOOGLE_WORKSPACE_DOMAINS`. Leave `SSO_ENFORCED_DOMAINS` empty for now.
+2. Have each account in the `auto` group sign in with Google once. Confirm the user
+   id and workspace memberships are unchanged.
+3. For each account marked `NEEDS IMPORT`, collect its Google subject. In the Google
+   Admin SDK this is the `id` field of `directory.users.get`; it is the same value
+   Google puts in the `sub` claim. Build the CSV with an empty `subject_format`:
+
+   ```csv
+   user_id,email,subject,subject_format
+   5e9158cd-7b35-46fb-a249-a27786bca342,person@corp.com,104729...,
+   ```
+
+4. Import with `--dry-run` first, review the report, then import for real:
+
+   ```bash
+   python manage.py import_federated_identities \
+     --provider google \
+     --issuer https://accounts.google.com \
+     --file /secure/google-mapping.csv \
+     --report /secure/google-mapping-report.json \
+     --dry-run
+   ```
+
+   The issuer must be exactly `https://accounts.google.com`.
+5. Have those accounts sign in with Google and confirm success.
+6. Only now set `SSO_ENFORCED_DOMAINS=corp.com=google`. From this point the domain
+   accepts Google alone; password and magic-link sign-in are refused for it.
+7. Optionally set `SSO_AUTO_JOIN_WORKSPACES` so new colleagues land in a workspace
+   instead of an empty account.
+
+### If someone is locked out afterwards
+
+Their account still exists and nothing has been reassigned. Import the missing
+subject as in step 3, or temporarily clear `SSO_ENFORCED_DOMAINS` to restore the
+previous sign-in methods while sorting it out. Do not resolve it by deleting and
+recreating the account: a new user id loses their memberships and history.
+
 ## Upgrade and migration procedure
 
 ### 1. Prepare recovery and evidence
