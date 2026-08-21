@@ -64,6 +64,61 @@ stored as encrypted instance configuration. Restart behavior depends on how the
 deployment applies environment and instance settings; use a normal rollout after
 changing deployment secrets.
 
+### Where settings are read from
+
+By default (`SKIP_ENV_VAR` unset, or `1`) the **stored configuration is
+authoritative** and an environment variable only supplies the initial value for a
+key that is not stored yet. Editing a setting in the administration UI therefore
+takes effect, and a stale environment variable of the same name does not override
+it after a restart.
+
+If the deployment sets `SKIP_ENV_VAR=0`, that reverses: values are read from the
+environment and stored configuration is ignored. Because every form in the
+administration UI would otherwise still render and still submit, in that mode the
+configuration API refuses writes with `409 Conflict` and the UI shows a banner
+explaining that the deployment owns these settings. The current mode is reported
+to the UI as a read-only `CONFIGURATION_SOURCE` entry (`database` or
+`environment`); it cannot be set through the API.
+
+A small number of settings are deliberately environment-only regardless of this
+mode — see the egress policy below.
+
+### Domain policy
+
+These govern which provider owns an email domain and where its users land. Both
+are editable in the administration UI under **Authentication → Domain policy**.
+
+| Setting                    | Meaning                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| `SSO_ENFORCED_DOMAINS`     | Domains pinned to a provider, as `corp.com=google`, `corp.com=oidc;saml`, or a bare `corp.com` |
+| `SSO_AUTO_JOIN_WORKSPACES` | Workspaces joined on sign-in, as `corp.com=workspace-slug:role`                              |
+
+A listed domain may be asserted **only** by the providers named for it. Every other
+enabled method — password, magic code, and the remaining providers — is refused for
+that domain on both sign-up and sign-in. This is what prevents an attacker from
+claiming a colleague's address through a weaker route before its owner first signs
+in, and what makes a rogue identity provider asserting the same addresses useless.
+A bare domain entry admits any federated provider (`google`, `oidc`, `saml`) and
+refuses credential sign-in. Matching is exact and IDNA-normalized: a parent entry
+does not cover its subdomains, so list those separately.
+
+Auto-join adds a user to the named workspace on **every** sign-in, not only at
+signup, so adding a domain later also covers people who already have an account.
+The role is `admin`, `member`, or `guest`, defaulting to `guest` when omitted so
+that an unstated role cannot grant write access; an unrecognized role is skipped
+rather than guessed. An existing membership is never modified, so a role an
+administrator lowered by hand is not restored at the next sign-in and a deactivated
+member is not silently reactivated.
+
+Auto-join only applies to domains that `SSO_ENFORCED_DOMAINS` pins. Membership is
+granted on the strength of an email domain, so that domain must first belong to a
+designated provider; without the pin, any other enabled sign-in method would become
+a route into the workspace.
+
+Note that Google's `hd` claim is tenant-wide. Workspace mode admits every account in
+an allowed hosted domain; Google issues no organizational-unit or group claim, so
+finer restriction is not available from the token.
+
 ### Google
 
 | Setting                    | Required          | Meaning                                                                                       |
@@ -78,19 +133,39 @@ Workspace mode validates the signed Google `hd` claim. A matching email suffix i
 not sufficient. Configure every intended tenant explicitly before switching from
 `generic` to `workspace`.
 
-### Gitea OAuth egress policy
+### Self-hosted provider egress policy (Gitea, GitLab)
 
-`GITEA_HOST` must be an HTTPS origin in production. Token and profile requests pin
-the resolved address, reject redirects, cap response bodies, and deny private,
-loopback, link-local, and other non-public destinations by default. The OAuth client
-secret and bearer token therefore cannot be redirected to an administrator-selected
-internal service.
+`GITEA_HOST` and `GITLAB_HOST` must be HTTPS origins in production. Every outbound
+authentication request — token exchange, profile lookup, and for OIDC also discovery
+and JWKS — resolves the destination once, rejects any answer that is not a public
+address, pins the connection to a validated address, and re-checks the connected
+peer against it. That last check is what defeats DNS rebinding: a hostname that
+re-resolves to an internal address between validation and connection is refused at
+the socket. Redirects are not followed, response bodies are capped, and every
+request carries a deadline. The OAuth client secret and bearer token therefore
+cannot be redirected to an administrator-selected internal service.
 
-For an intentionally private Gitea deployment, the operator must add the exact
-normalized DNS name to `GITEA_ALLOWED_HOSTS` or an address/CIDR to
-`GITEA_ALLOWED_IPS` in the deployment environment. These allowlists are not mutable
-instance settings: changing `GITEA_HOST` in the administration UI cannot expand the
-network boundary. Keep exceptions narrow and restart the API after changing them.
+For an intentionally private deployment, the operator must name it explicitly in the
+deployment environment:
+
+| Setting                                            | Meaning                              |
+| -------------------------------------------------- | ------------------------------------ |
+| `GITEA_ALLOWED_HOSTS` / `GITLAB_ALLOWED_HOSTS`     | Comma-separated normalized DNS names |
+| `GITEA_ALLOWED_IPS` / `GITLAB_ALLOWED_IPS`         | Comma-separated addresses or CIDRs   |
+
+**These allowlists are environment-only by design and cannot be set from the
+administration UI**, even when the instance otherwise reads its configuration from
+the database. They permit credential-bearing outbound requests to reach private
+addresses, so they belong to whoever controls the deployment rather than to anyone
+holding administrator access to the panel; the configuration API rejects attempts to
+set them with `400`. Changing `GITEA_HOST` or `GITLAB_HOST` in the administration UI
+cannot expand the network boundary on its own. The administration UI shows this
+explanation on the Gitea and GitLab pages so the constraint is discoverable at the
+point of use.
+
+Allowlisting only widens which addresses are acceptable. Address pinning and the
+connected-peer check still apply to an allowlisted destination. Keep exceptions
+narrow and restart the API after changing them.
 
 ### OpenID Connect
 

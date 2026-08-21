@@ -126,7 +126,9 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
               <div className="grow">
                 <div className="pb-1 text-16 font-medium">Allow anyone to sign up even without an invite</div>
                 <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
-                  Toggling this off will only let users sign up when they are invited.
+                  Leaving this on lets anyone who can reach this instance create an account. They join no workspace and
+                  see no content until invited, but they can sign in and create their own workspace unless that is also
+                  disabled. Toggling it off requires an invitation to sign up.
                 </div>
               </div>
             </div>

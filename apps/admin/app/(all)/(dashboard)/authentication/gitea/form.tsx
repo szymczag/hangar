@@ -23,6 +23,8 @@ import { ControllerSwitch } from "@/components/common/controller-switch";
 import type { TCopyField } from "@/components/common/copy-field";
 import { CopyField } from "@/components/common/copy-field";
 // hooks
+import { PrivateNetworkNotice } from "@/components/authentication/private-network-notice";
+// hooks
 import { useInstance } from "@/hooks/store";
 
 type Props = {
@@ -214,6 +216,7 @@ export function InstanceGiteaConfigForm(props: Props) {
               {GITEA_SERVICE_FIELD.map((field) => (
                 <CopyField key={field.key} label={field.label} url={field.url} description={field.description} />
               ))}
+              <PrivateNetworkNotice provider="GITEA" label="Gitea" />
             </div>
           </div>
         </div>

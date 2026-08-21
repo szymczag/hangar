@@ -122,12 +122,18 @@ export interface IInstanceAdmin {
   user_detail: IUserLite;
 }
 
+// Fork (see FORK.md): reported by the API, never written. Tells the panel
+// whether stored configuration is read back at all, or whether the deployment
+// environment decides and every form would be a no-op.
+export type TInstanceConfigurationSourceKey = "CONFIGURATION_SOURCE";
+
 export type TInstanceConfigurationKeys =
   | TInstanceAIConfigurationKeys
   | TInstanceEmailConfigurationKeys
   | TInstanceImageConfigurationKeys
   | TInstanceAuthenticationKeys
-  | TInstanceWorkspaceConfigurationKeys;
+  | TInstanceWorkspaceConfigurationKeys
+  | TInstanceConfigurationSourceKey;
 
 export interface IInstanceConfiguration {
   id: string;
