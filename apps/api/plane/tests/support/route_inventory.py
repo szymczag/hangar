@@ -28,13 +28,14 @@ HANDLER_NAMES = ("get", "post", "put", "patch", "delete", "head", "options")
 # How a route establishes that the caller may act on the target.
 MECHANISM_PERMISSION_CLASS = "permission_class"
 MECHANISM_DECORATOR = "allow_permission"
-MECHANISM_QUERYSET = "queryset_filter"
+MECHANISM_QUERYSET = "membership_filter"
 MECHANISM_SERVICE = "service_layer"
+MECHANISM_SELF = "self_scoped"
 MECHANISM_PUBLIC = "public"
 MECHANISM_NONE = "none"
 
-# Membership-bearing lookups a get_queryset must go through for a view to
-# count as enforcing authorization in its queryset.
+# Membership-bearing lookups a view must go through to count as enforcing
+# authorization itself, whether in get_queryset or inline in the handler.
 MEMBERSHIP_MARKERS = (
     "workspace_member__member",
     "project_projectmember__member",
@@ -44,8 +45,28 @@ MEMBERSHIP_MARKERS = (
     "member=request.user",
 )
 
-# Calls that hand the authorization decision to a service layer.
-SERVICE_MARKERS = ("resolve_for_admin", "actor=request.user", "actor=self.request.user")
+# Calls that hand the authorization decision to a service or helper.
+SERVICE_MARKERS = (
+    "resolve_for_admin",
+    "actor=request.user",
+    "actor=self.request.user",
+    "user_has_issue_permission",
+)
+
+# A view that only ever addresses the caller's own records needs no workspace
+# check: the identity is the scope. These are the "users/me" style endpoints.
+SELF_SCOPE_MARKERS = (
+    "user=request.user",
+    "user=self.request.user",
+    "created_by=request.user",
+    "created_by=self.request.user",
+    "assignees__in=[request.user]",
+    "actor=request.user",
+    "request.user.id",
+    "request.user)",
+    "request.user,",
+    "request.user\n",
+)
 
 
 @dataclass
@@ -76,10 +97,21 @@ def _view_class(callback):
 
 
 def _source_of(view_class):
-    try:
-        return inspect.getsource(view_class)
-    except (OSError, TypeError):
-        return ""
+    """Source of the view and everything it inherits from.
+
+    A view frequently gets its enforcement from a base: the decorator, the
+    filtered ``get_queryset``, or the service call may live one or more levels
+    up. Reading only the leaf class would report those as unprotected.
+    """
+    chunks = []
+    for klass in getattr(view_class, "__mro__", [view_class]):
+        if klass.__module__.startswith(("builtins", "rest_framework", "django")):
+            continue
+        try:
+            chunks.append(inspect.getsource(klass))
+        except (OSError, TypeError):
+            continue
+    return "\n".join(chunks)
 
 
 def _classify(view_class, permission_names, source):
@@ -95,11 +127,16 @@ def _classify(view_class, permission_names, source):
     if "allow_permission" in source:
         mechanisms.add(MECHANISM_DECORATOR)
 
-    if "get_queryset" in source and any(marker in source for marker in MEMBERSHIP_MARKERS):
+    # Not gated on get_queryset: many views filter membership inline in the
+    # handler instead, which is equally valid enforcement.
+    if any(marker in source for marker in MEMBERSHIP_MARKERS):
         mechanisms.add(MECHANISM_QUERYSET)
 
     if any(marker in source for marker in SERVICE_MARKERS):
         mechanisms.add(MECHANISM_SERVICE)
+
+    if any(marker in source for marker in SELF_SCOPE_MARKERS):
+        mechanisms.add(MECHANISM_SELF)
 
     return mechanisms or {MECHANISM_NONE}
 
@@ -156,6 +193,7 @@ __all__ = [
     "MECHANISM_PERMISSION_CLASS",
     "MECHANISM_PUBLIC",
     "MECHANISM_QUERYSET",
+    "MECHANISM_SELF",
     "MECHANISM_SERVICE",
     "RouteRecord",
     "collect_routes",
