@@ -120,7 +120,16 @@ sso_policy_config_variables = [
         "value": os.environ.get("SSO_ENFORCED_DOMAINS", ""),
         "category": "SSO",
         "is_encrypted": False,
-    }
+    },
+    # Workspaces a federated user joins on sign-in, as
+    # "domain=workspace-slug:role" entries. Only applies to domains that
+    # SSO_ENFORCED_DOMAINS pins to a provider.
+    {
+        "key": "SSO_AUTO_JOIN_WORKSPACES",
+        "value": os.environ.get("SSO_AUTO_JOIN_WORKSPACES", ""),
+        "category": "SSO",
+        "is_encrypted": False,
+    },
 ]
 
 extended_config_variables = [*oidc_config_variables, *saml_config_variables, *sso_policy_config_variables]

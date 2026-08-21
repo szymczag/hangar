@@ -84,13 +84,18 @@ export type TInstanceSAMLAuthenticationConfigurationKeys =
   | "SAML_ATTR_LAST_NAME"
   | "SAML_ATTR_SUBJECT";
 
+// Fork (see FORK.md): domain policy keys. Not tied to one provider — they
+// govern which provider may assert a domain and where its users land.
+export type TInstanceSSODomainPolicyConfigurationKeys = "SSO_ENFORCED_DOMAINS" | "SSO_AUTO_JOIN_WORKSPACES";
+
 export type TInstanceAuthenticationConfigurationKeys =
   | TInstanceGoogleAuthenticationConfigurationKeys
   | TInstanceGithubAuthenticationConfigurationKeys
   | TInstanceGitlabAuthenticationConfigurationKeys
   | TInstanceGiteaAuthenticationConfigurationKeys
   | TInstanceOIDCAuthenticationConfigurationKeys
-  | TInstanceSAMLAuthenticationConfigurationKeys;
+  | TInstanceSAMLAuthenticationConfigurationKeys
+  | TInstanceSSODomainPolicyConfigurationKeys;
 
 export type TInstanceAuthenticationKeys = TInstanceAuthenticationMethodKeys | TInstanceAuthenticationConfigurationKeys;
 
