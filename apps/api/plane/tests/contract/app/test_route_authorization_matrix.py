@@ -146,6 +146,11 @@ def _build_kwargs(record, workspace, project, issue):
         "project_identifier": project.identifier,
         "issue_identifier": str(issue.sequence_id),
         "key": "quick_links",
+        # Real ids: a write aimed at a random uuid would 404 for reasons that
+        # have nothing to do with authorization, and prove nothing.
+        "issue_id": str(issue.id),
+        "work_item_id": str(issue.id),
+        "pk": str(issue.id),
     }
     kwargs = {}
     for key in record.kwargs_required:
@@ -218,6 +223,69 @@ def test_non_member_never_receives_another_workspaces_content(victim_workspace, 
         print(f"\n[route-probe] {len(unprobed)} workspace-scoped routes not probed automatically:")
         for entry in sorted(unprobed):
             print(f"  {entry}")
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_non_member_cannot_write_to_another_workspace(victim_workspace, outsider_client):
+    """Writes are held to a stricter rule than reads.
+
+    An empty 200 is a correct answer to a read, but there is no equivalent for
+    a write: a non-member must never get a success status from POST, PUT,
+    PATCH or DELETE against another workspace. The row counts are compared
+    before and after as well, because a 4xx that still mutated something would
+    otherwise pass unnoticed.
+
+    Requests deliberately carry the victim's real object ids, since a write
+    aimed at a random uuid would 404 for reasons unrelated to authorization.
+    """
+    workspace, project, _owner, issue = victim_workspace
+
+    def _counts():
+        return {
+            "workspaces": Workspace.objects.count(),
+            "projects": Project.objects.count(),
+            "issues": Issue.objects.count(),
+            "states": State.objects.count(),
+            "workspace_members": WorkspaceMember.objects.count(),
+            "project_members": ProjectMember.objects.count(),
+        }
+
+    before = _counts()
+    accepted = []
+    attempted = 0
+
+    for record in workspace_scoped(collect_routes()):
+        if not record.name:
+            continue
+
+        kwargs = _build_kwargs(record, workspace, project, issue)
+        if kwargs is None:
+            continue
+
+        try:
+            url = reverse(record.name, kwargs=kwargs)
+        except NoReverseMatch:
+            continue
+
+        for verb in ("post", "put", "patch", "delete"):
+            if verb not in record.handlers:
+                continue
+            attempted += 1
+            payload = {"name": f"{CANARY}-write", "display_name": f"{CANARY}-write"}
+            try:
+                response = getattr(outsider_client, verb)(url, payload, format="json")
+            except Exception:  # noqa: BLE001 - a crash is not an authorization decision
+                continue
+
+            if 200 <= response.status_code < 300:
+                accepted.append(f"{verb.upper()} {url} -> {response.status_code} [{record.view_module}]")
+
+    assert attempted > 50, f"Only {attempted} write attempts made; the probe is not covering the surface"
+    assert not accepted, "Non-member write accepted:\n  " + "\n  ".join(sorted(accepted))
+
+    after = _counts()
+    assert before == after, f"Non-member writes changed the database:\n  before={before}\n  after={after}"
 
 
 @pytest.mark.contract
