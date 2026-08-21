@@ -219,17 +219,36 @@ and magic-link fallback those users still depend on.
 
 ### Find out which accounts need work
 
-```python
-# manage.py shell
-from plane.db.models import Account, User
+The administration panel has no user list, so use the read-only audit command.
+It never writes and is safe against production:
 
-domain = "@corp.com"
-users = User.objects.filter(email__iendswith=domain)
-linked = set(Account.objects.filter(provider="google", user__in=users).values_list("user_id", flat=True))
-
-for user in users:
-    print(user.email, "auto" if user.id in linked else "NEEDS IMPORT")
+```bash
+python manage.py audit_user_identities --domain corp.com --provider google
 ```
+
+```
+EMAIL                  STATUS         PASSWORD  SIGN-IN RECORDS
+adoptable@corp.com     adoptable      no        google
+bound@corp.com         federated      no        google:https://accounts.google.com
+passwordonly@corp.com  needs-import   yes       -
+
+adoptable=1  federated=1  needs-import=1
+
+1 account(s) would be refused after pinning this domain to 'google'. ...
+```
+
+| Status         | Meaning at cutover                                                    |
+| -------------- | --------------------------------------------------------------------- |
+| `federated`    | Already bound to the provider; nothing to do                          |
+| `adoptable`    | Has a prior OAuth account for it; adopted on the next sign-in         |
+| `needs-import` | Nothing links it to the provider; **refused** until its subject is imported |
+
+`--provider` is what makes the distinction meaningful: an account bound to a
+different provider still counts as `needs-import` when the domain is being pinned
+to Google. Add `--csv` to produce a starting point for the import file, and
+`--include-inactive` to see deactivated accounts, which are hidden by default.
+
+Omit `--provider` for a general view of how everyone signs in today.
 
 ### Order of operations
 
@@ -266,6 +285,24 @@ method, so a mistake is recoverable.
    accepts Google alone; password and magic-link sign-in are refused for it.
 7. Optionally set `SSO_AUTO_JOIN_WORKSPACES` so new colleagues land in a workspace
    instead of an empty account.
+
+### Keeping administrative access
+
+Pinning a domain removes password and magic-link sign-in for it, so decide in
+advance how an administrator gets in if the identity provider is unavailable.
+
+Two facts, both covered by tests:
+
+- The policy governs only the domains it lists. An administrator whose address is
+  outside them — a separate operations domain, not a personal mailbox — keeps
+  password sign-in to the application. This is the recommended break-glass account,
+  and it is also the account to use for merging or repairing users.
+- The God Mode console at `/god-mode` authenticates against the password directly
+  rather than through the provider adapters, so an instance administrator cannot
+  lock themselves out of it by pinning their own domain. The corollary is that
+  **pinning a domain does not protect the console**: its password is the only thing
+  in front of it. Give it a strong, unique password and restrict who holds instance
+  administrator rights.
 
 ### If someone is locked out afterwards
 
