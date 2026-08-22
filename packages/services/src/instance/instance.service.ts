@@ -17,6 +17,7 @@ import type {
   TPage,
   IAdminEmailReceiptList,
   IEmailSuppression,
+  TInstanceUserListResponse,
 } from "@plane/types";
 // api service
 import { APIService } from "../api.service";
@@ -105,6 +106,18 @@ export class InstanceService extends APIService {
    * @returns {Promise<IInstanceConfiguration[]>} Promise resolving to an array of instance configurations
    * @throws {Error} If the API request fails
    */
+  /**
+   * Read-only listing of accounts on the instance and how each one signs in.
+   * @param params Optional filters: search, domain, provider, include_inactive, cursor, per_page.
+   */
+  async users(params?: Record<string, string | number | boolean>): Promise<TInstanceUserListResponse> {
+    return this.get("/api/instances/users/", { params })
+      .then((response) => response.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
   async configurations(): Promise<IInstanceConfiguration[]> {
     return this.get("/api/instances/configurations/")
       .then((response) => response.data)

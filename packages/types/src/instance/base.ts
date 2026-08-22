@@ -145,6 +145,39 @@ export interface IInstanceConfiguration {
   updated_by: string | null;
 }
 
+// Fork (see FORK.md): read-only report of who has an account and how they
+// sign in. `status` says what pinning a domain to `provider` would do to the
+// account: already bound, adopted on next sign-in, or refused until imported.
+export type TInstanceUserSignInStatus = "federated" | "adoptable" | "needs-import" | "password-only";
+
+export type TInstanceUserFederatedIdentity = {
+  provider: string;
+  issuer: string;
+  last_authenticated_at: string | null;
+};
+
+export type TInstanceUser = {
+  id: string;
+  email: string;
+  display_name: string;
+  is_active: boolean;
+  has_password: boolean;
+  last_login_at: string | null;
+  federated_identities: TInstanceUserFederatedIdentity[];
+  oauth_accounts: string[];
+  status: TInstanceUserSignInStatus;
+};
+
+export type TInstanceUserListResponse = {
+  results: TInstanceUser[];
+  next_cursor?: string;
+  prev_cursor?: string;
+  next_page_results?: boolean;
+  prev_page_results?: boolean;
+  count?: number;
+  total_count?: number;
+};
+
 export type IFormattedInstanceConfiguration = {
   [key in TInstanceConfigurationKeys]: string;
 };

@@ -12,6 +12,8 @@ export default [
   layout("./(all)/(dashboard)/layout.tsx", [
     route("general", "./(all)/(dashboard)/general/page.tsx"),
     route("workspace", "./(all)/(dashboard)/workspace/page.tsx"),
+    // Fork (see FORK.md)
+    route("users", "./(all)/(dashboard)/users/page.tsx"),
     route("workspace/create", "./(all)/(dashboard)/workspace/create/page.tsx"),
     route("email", "./(all)/(dashboard)/email/page.tsx"),
     route("authentication", "./(all)/(dashboard)/authentication/page.tsx"),
