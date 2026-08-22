@@ -31,6 +31,7 @@ from plane.license.api.serializers import (
 from plane.license.models import Instance, InstanceAdmin
 from plane.db.models import User, Profile
 from plane.utils.cache import cache_response, invalidate_cache
+from plane.authentication.rate_limit import authentication_throttle_allows
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.password import is_password_strong
 from plane.authentication.utils.host import base_host, user_ip
@@ -91,7 +92,31 @@ class InstanceAdminSignUpEndpoint(View):
     permission_classes = [AllowAny]
 
     @invalidate_cache(path="/api/instances/", user=False)
+    def _throttled(self, request):
+        """Refuse when this client is guessing too fast.
+
+        The console carries instance-wide authority and its password is the
+        only control in front of it — a pinned domain does not cover it,
+        because it checks the password directly instead of going through the
+        provider adapters. This endpoint is a plain Django View, so the
+        framework's default throttle does not apply and the limit has to be
+        applied here, as the application sign-in routes already do.
+        """
+        if authentication_throttle_allows(request):
+            return None
+        exc = AuthenticationException(
+            error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+            error_message="RATE_LIMIT_EXCEEDED",
+        )
+        url = urljoin(base_host(request=request, is_admin=True), "?" + urlencode(exc.get_error_dict()))
+        return HttpResponseRedirect(url)
+
+
     def post(self, request):
+        throttled = self._throttled(request)
+        if throttled is not None:
+            return throttled
+
         # Check instance first (outside the transaction — no need to lock yet)
         instance = Instance.objects.first()
         if instance is None:
@@ -270,7 +295,31 @@ class InstanceAdminSignInEndpoint(View):
     permission_classes = [AllowAny]
 
     @invalidate_cache(path="/api/instances/", user=False)
+    def _throttled(self, request):
+        """Refuse when this client is guessing too fast.
+
+        The console carries instance-wide authority and its password is the
+        only control in front of it — a pinned domain does not cover it,
+        because it checks the password directly instead of going through the
+        provider adapters. This endpoint is a plain Django View, so the
+        framework's default throttle does not apply and the limit has to be
+        applied here, as the application sign-in routes already do.
+        """
+        if authentication_throttle_allows(request):
+            return None
+        exc = AuthenticationException(
+            error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+            error_message="RATE_LIMIT_EXCEEDED",
+        )
+        url = urljoin(base_host(request=request, is_admin=True), "?" + urlencode(exc.get_error_dict()))
+        return HttpResponseRedirect(url)
+
+
     def post(self, request):
+        throttled = self._throttled(request)
+        if throttled is not None:
+            return throttled
+
         # Check instance first
         instance = Instance.objects.first()
         if instance is None:
