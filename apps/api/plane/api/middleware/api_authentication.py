@@ -40,7 +40,9 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
         # save api token last used
         api_token.last_used = timezone.now()
         api_token.save(update_fields=["last_used"])
-        return (api_token.user, api_token.token)
+        # The token object, not the string: the view layer needs its workspace
+        # to enforce scope. Nothing reads request.auth as a string.
+        return (api_token.user, api_token)
 
     def authenticate(self, request):
         token = self.get_api_token(request=request)

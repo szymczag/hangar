@@ -53,15 +53,6 @@ def _session_client(user):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "FINDING: APIToken.workspace is never consulted. "
-        "plane/api/middleware/api_authentication.py:29-42 resolves the token to its user "
-        "and stops; scoping then comes only from the caller's memberships. A token issued "
-        "for one workspace reaches every workspace its owner belongs to."
-    ),
-)
 def test_api_token_is_limited_to_the_workspace_it_was_issued_for(scenario):
     """A token bound to workspace X should not act on workspace Y."""
     client, _ = _token_client(scenario.personas["member_a"], workspace=scenario.other_workspace)
@@ -89,14 +80,6 @@ def test_a_token_cannot_reach_a_workspace_its_owner_left(scenario):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "FINDING: renaming a token returns its secret. plane/app/serializers/api.py:11-26 "
-        "APITokenSerializer uses fields='__all__', which includes `token`, and it serialises "
-        "the PATCH response. GET correctly uses APITokenReadSerializer, which excludes it."
-    ),
-)
 def test_renaming_an_api_token_does_not_return_its_secret(scenario):
     """Creation is the one moment the secret may be shown; a rename is not."""
     client = _session_client(scenario.personas["member_a"])
@@ -182,16 +165,6 @@ def test_advance_analytics_ignore_project_ids_from_another_workspace(scenario):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "FINDING: workspace logos are served to anyone holding the asset id. "
-        "plane/app/views/asset/v2.py:576-640 StaticFileAssetEndpoint is AllowAny and looks the "
-        "asset up with FileAsset.objects.get(id=asset_id), with no workspace or membership "
-        "filter. Agreed scope: user avatars and covers stay public, WORKSPACE_LOGO and "
-        "PROJECT_COVER should require membership."
-    ),
-)
 def test_workspace_logo_is_not_served_to_anonymous_callers(scenario):
     """Not content, but it tells a stranger which organisations use this instance."""
     logo = FileAsset.objects.create(
@@ -271,14 +244,6 @@ def test_a_published_board_exposes_its_member_roster(scenario, published_board):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "FINDING: the external member listing includes deactivated memberships. "
-        "plane/api/views/member.py:259-261 filters WorkspaceMember by workspace__slug with no "
-        "is_active clause, so people removed from the workspace keep appearing."
-    ),
-)
 def test_member_listing_excludes_deactivated_memberships(scenario):
     removed = scenario.personas["ws_member_no_project"]
     WorkspaceMember.objects.filter(workspace=scenario.workspace, member=removed).update(is_active=False)
@@ -315,3 +280,107 @@ def test_webhooks_are_not_readable_by_ordinary_members(scenario):
     response = client.get(f"/api/workspaces/{scenario.workspace.slug}/webhooks/")
 
     assert response.status_code == 403
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_user_avatars_remain_public(scenario):
+    """Rendered on sign-in screens and public boards; must not need a session."""
+    avatar = FileAsset.objects.create(
+        user=scenario.owner,
+        entity_type="USER_AVATAR",
+        asset="avatar.png",
+        attributes={"type": "image/png"},
+        size=10,
+        is_uploaded=True,
+        upload_validation_version=UPLOAD_VALIDATION_VERSION,
+    )
+
+    response = APIClient().get(f"/api/assets/v2/static/{avatar.id}/")
+
+    assert response.status_code == 302
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_workspace_member_can_still_read_the_logo(scenario):
+    """The fix must not cost the people it is meant to serve."""
+    logo = FileAsset.objects.create(
+        workspace=scenario.workspace,
+        entity_type="WORKSPACE_LOGO",
+        asset="logo.png",
+        attributes={"type": "image/png"},
+        size=10,
+        is_uploaded=True,
+        upload_validation_version=UPLOAD_VALIDATION_VERSION,
+    )
+
+    response = _session_client(scenario.personas["member_a"]).get(f"/api/assets/v2/static/{logo.id}/")
+
+    assert response.status_code == 302
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_project_cover_follows_publication(scenario):
+    """A cover is public exactly while its project is.
+
+    The public board lists cover_image, so gating covers on membership alone
+    would break published boards.
+    """
+    cover = FileAsset.objects.create(
+        workspace=scenario.workspace,
+        project=scenario.project_a.project,
+        entity_type="PROJECT_COVER",
+        asset="cover.png",
+        attributes={"type": "image/png"},
+        size=10,
+        is_uploaded=True,
+        upload_validation_version=UPLOAD_VALIDATION_VERSION,
+    )
+    anonymous = APIClient()
+    url = f"/api/assets/v2/static/{cover.id}/"
+
+    assert anonymous.get(url).status_code >= 400
+
+    DeployBoard.objects.create(
+        workspace=scenario.workspace,
+        project=scenario.project_a.project,
+        entity_name="project",
+        entity_identifier=scenario.project_a.project.id,
+        is_disabled=False,
+    )
+
+    assert anonymous.get(url).status_code == 302
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_token_naming_its_own_workspace_still_works(scenario):
+    """Scoping must confine a token, not break it."""
+    client, _ = _token_client(scenario.personas["member_a"], workspace=scenario.workspace)
+
+    response = client.get(
+        f"/api/v1/workspaces/{scenario.workspace.slug}/projects/{scenario.project_a.project.id}/issues/"
+    )
+
+    assert response.status_code == 200
+    assert scenario.project_a.canary in response.content.decode()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_an_unscoped_token_keeps_its_previous_reach(scenario):
+    """Tokens minted through the product leave workspace null.
+
+    Their boundary stays the caller's memberships, so existing integrations are
+    unaffected by the scoping rule.
+    """
+    client, _ = _token_client(scenario.personas["member_a"])
+
+    response = client.get(
+        f"/api/v1/workspaces/{scenario.workspace.slug}/projects/{scenario.project_a.project.id}/issues/"
+    )
+
+    assert response.status_code == 200
+

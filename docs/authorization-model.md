@@ -122,6 +122,32 @@ suite stays green, the finding stays visible, and `strict=True` forces whoever
 fixes it to remove the marker — a fixed defect makes the test pass, which fails
 a strict xfail.
 
+## API tokens
+
+A token authenticates as its owner. `APIToken.workspace` is optional: tokens
+minted through the product leave it null, and their reach is the owner's
+memberships. When a token *does* name a workspace, it is confined to it —
+enforced in `BaseAPIView.initial()` rather than a permission class, because
+views override `permission_classes` freely and the rule must not be switchable
+off by omission.
+
+The secret is returned **only** when the token is created. Reads and renames
+answer with `APITokenReadSerializer`, which excludes it.
+
+## Assets served without a session
+
+`StaticFileAssetEndpoint` is deliberately `AllowAny`, but not uniformly:
+
+| Entity type | Who may read it |
+| --- | --- |
+| `USER_AVATAR`, `USER_COVER` | anyone — rendered on sign-in screens and public boards |
+| `WORKSPACE_LOGO` | workspace members |
+| `PROJECT_COVER` | project members, **or** anyone while the project is published |
+
+A project cover follows publication rather than membership because the public
+board lists it. Gating covers on membership alone would break published boards —
+worth re-checking before changing this table.
+
 ## Configuration that participates in authorization
 
 | Setting | Effect |

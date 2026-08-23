@@ -30,7 +30,10 @@ class TestAPIKeyAuthentication:
         user, returned_token = APIKeyAuthentication().validate_api_token(token.token)
 
         assert user == create_user
-        assert returned_token == token.token
+        # request.auth carries the APIToken itself, not the secret string: the
+        # view layer needs its workspace to enforce token scope.
+        assert returned_token == token
+        assert returned_token.workspace_id is None
 
     @pytest.mark.django_db
     def test_validate_api_token_rejects_deactivated_user(self, create_user):

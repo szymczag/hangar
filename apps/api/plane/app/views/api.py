@@ -58,5 +58,10 @@ class ApiTokenEndpoint(BaseAPIView):
         serializer = APITokenSerializer(api_token, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            # Answered with the read serializer, which excludes `token`. Writing
+            # through APITokenSerializer is right — its read_only_fields protect
+            # the secret and the ownership fields from being set — but echoing
+            # its output would hand the secret back on every rename. Creation is
+            # the one moment the token is legitimately shown.
+            return Response(APITokenReadSerializer(api_token).data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
