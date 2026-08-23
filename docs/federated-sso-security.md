@@ -92,6 +92,7 @@ are editable in the administration UI under **Authentication → Domain policy**
 | -------------------------- | ------------------------------------------------------------------------------------------- |
 | `SSO_ENFORCED_DOMAINS`     | Domains pinned to a provider, as `corp.com=google`, `corp.com=oidc;saml`, or a bare `corp.com` |
 | `SSO_AUTO_JOIN_WORKSPACES` | Workspaces joined on sign-in, as `corp.com=workspace-slug:role`                              |
+| `SSO_AUTO_JOIN_PROJECTS`   | Projects joined on sign-in, as `corp.com=workspace-slug/IDENTIFIER:role`                     |
 
 A listed domain may be asserted **only** by the providers named for it. Every other
 enabled method — password, magic code, and the remaining providers — is refused for
@@ -114,6 +115,23 @@ Auto-join only applies to domains that `SSO_ENFORCED_DOMAINS` pins. Membership i
 granted on the strength of an email domain, so that domain must first belong to a
 designated provider; without the pin, any other enabled sign-in method would become
 a route into the workspace.
+
+Project auto-join uses the project **identifier** — the short code shown on its work
+items — rather than a uuid, because that is what an operator has in front of them.
+It requires the matching workspace entry: a project membership without a workspace
+membership is a state the rest of the model does not expect, so an entry whose
+workspace the user has not joined is skipped rather than manufacturing the workspace
+seat. Archived projects are skipped, and as with workspaces an existing membership is
+never modified.
+
+```
+SSO_ENFORCED_DOMAINS=corp.com=google
+SSO_AUTO_JOIN_WORKSPACES=corp.com=engineering:member
+SSO_AUTO_JOIN_PROJECTS=corp.com=engineering/PLAT:member
+```
+
+Both settings are editable in the administration UI under
+**Authentication → Domain policy**.
 
 Note that Google's `hd` claim is tenant-wide. Workspace mode admits every account in
 an allowed hosted domain; Google issues no organizational-unit or group claim, so

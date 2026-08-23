@@ -130,6 +130,15 @@ sso_policy_config_variables = [
         "category": "SSO",
         "is_encrypted": False,
     },
+    # Projects a federated user joins on sign-in, as
+    # "domain=workspace-slug/IDENTIFIER:role" entries. Requires the matching
+    # workspace membership, so it is normally paired with the setting above.
+    {
+        "key": "SSO_AUTO_JOIN_PROJECTS",
+        "value": os.environ.get("SSO_AUTO_JOIN_PROJECTS", ""),
+        "category": "SSO",
+        "is_encrypted": False,
+    },
 ]
 
 extended_config_variables = [*oidc_config_variables, *saml_config_variables, *sso_policy_config_variables]

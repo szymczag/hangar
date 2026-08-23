@@ -86,7 +86,10 @@ export type TInstanceSAMLAuthenticationConfigurationKeys =
 
 // Fork (see FORK.md): domain policy keys. Not tied to one provider — they
 // govern which provider may assert a domain and where its users land.
-export type TInstanceSSODomainPolicyConfigurationKeys = "SSO_ENFORCED_DOMAINS" | "SSO_AUTO_JOIN_WORKSPACES";
+export type TInstanceSSODomainPolicyConfigurationKeys =
+  | "SSO_ENFORCED_DOMAINS"
+  | "SSO_AUTO_JOIN_WORKSPACES"
+  | "SSO_AUTO_JOIN_PROJECTS";
 
 export type TInstanceAuthenticationConfigurationKeys =
   | TInstanceGoogleAuthenticationConfigurationKeys

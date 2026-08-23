@@ -42,6 +42,7 @@ export function InstanceSSODomainPolicyForm(props: Props) {
     defaultValues: {
       SSO_ENFORCED_DOMAINS: config["SSO_ENFORCED_DOMAINS"] ?? "",
       SSO_AUTO_JOIN_WORKSPACES: config["SSO_AUTO_JOIN_WORKSPACES"] ?? "",
+      SSO_AUTO_JOIN_PROJECTS: config["SSO_AUTO_JOIN_PROJECTS"] ?? "",
     },
   });
 
@@ -80,6 +81,23 @@ export function InstanceSSODomainPolicyForm(props: Props) {
       error: Boolean(errors.SSO_AUTO_JOIN_WORKSPACES),
       required: false,
     },
+    {
+      key: "SSO_AUTO_JOIN_PROJECTS",
+      type: "text",
+      label: "Projects to join on sign-in",
+      description: (
+        <>
+          Comma-separated <CodeBlock darkerShade>domain=workspace-slug/IDENTIFIER:role</CodeBlock> entries, using the
+          project&apos;s identifier — the short code shown on its work items. Requires the matching workspace above: a
+          project seat without a workspace seat is a state the rest of the product does not expect, so an entry whose
+          workspace is not joined is skipped. Archived projects are skipped too, and an existing membership is never
+          changed.
+        </>
+      ),
+      placeholder: "corp.com=engineering/PLAT:member",
+      error: Boolean(errors.SSO_AUTO_JOIN_PROJECTS),
+      required: false,
+    },
   ];
 
   const onSubmit = async (formData: DomainPolicyFormValues) => {
@@ -95,6 +113,7 @@ export function InstanceSSODomainPolicyForm(props: Props) {
       reset({
         SSO_ENFORCED_DOMAINS: response.find((item) => item.key === "SSO_ENFORCED_DOMAINS")?.value,
         SSO_AUTO_JOIN_WORKSPACES: response.find((item) => item.key === "SSO_AUTO_JOIN_WORKSPACES")?.value,
+        SSO_AUTO_JOIN_PROJECTS: response.find((item) => item.key === "SSO_AUTO_JOIN_PROJECTS")?.value,
       });
     } catch (error) {
       console.error(error);
