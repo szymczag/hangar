@@ -185,6 +185,21 @@ def workspace_scoped(records):
     return [record for record in records if "slug" in record.kwargs_required and not record.is_public]
 
 
+def project_scoped(records):
+    """Routes addressing a specific project.
+
+    Separate from workspace_scoped because the horizontal boundary lives here:
+    a workspace member who was never added to the project reaches these routes
+    with a legitimate workspace membership, so only a project-level filter
+    stops them.
+    """
+    return [
+        record
+        for record in records
+        if "project_id" in record.kwargs_required and "slug" in record.kwargs_required and not record.is_public
+    ]
+
+
 __all__ = [
     "AllowAny",
     "IsAuthenticated",
@@ -197,5 +212,6 @@ __all__ = [
     "MECHANISM_SERVICE",
     "RouteRecord",
     "collect_routes",
+    "project_scoped",
     "workspace_scoped",
 ]
