@@ -21,6 +21,7 @@ import uuid
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 from plane.authentication.adapter.base import Adapter
 from plane.authentication.adapter.error import AuthenticationException
 from plane.db.models import User
@@ -83,9 +84,7 @@ def test_god_mode_console_is_not_governed_by_the_domain_policy(pinned_domain, se
     InstanceAdmin.objects.create(instance=setup_instance, user=admin, role=20)
 
     response = Client(HTTP_USER_AGENT="Mozilla/5.0 test").post(
-        # Addressed directly: the sign-up route shares the sign-in route's
-        # name, so reverse() would resolve to the wrong one.
-        "/api/instances/admins/sign-in/",
+        reverse("instance-admin-sign-in"),
         {"email": admin.email, "password": PASSWORD},
     )
 
@@ -93,3 +92,20 @@ def test_god_mode_console_is_not_governed_by_the_domain_policy(pinned_domain, se
     # even though corp.com is pinned to Google for every application route.
     assert response.status_code == 302
     assert "error_code" not in response.url
+
+
+@pytest.mark.contract
+def test_admin_sign_in_and_sign_up_have_distinct_route_names():
+    """Guards against the two routes sharing a name again.
+
+    They both answered to "instance-admin-sign-in", so reverse() resolved to
+    whichever was registered last — sign-up. Nothing in production depended on
+    it because the panel posts to literal paths, but every test and any future
+    caller using reverse() silently got the wrong endpoint.
+    """
+    sign_in = reverse("instance-admin-sign-in")
+    sign_up = reverse("instance-admin-sign-up")
+
+    assert sign_in != sign_up
+    assert sign_in.endswith("/admins/sign-in/")
+    assert sign_up.endswith("/admins/sign-up/")
