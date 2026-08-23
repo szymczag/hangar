@@ -128,15 +128,6 @@ def test_listing_api_tokens_never_returns_secrets(scenario):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "FINDING: project statistics ignore project membership. "
-        "plane/app/views/analytic/base.py:391 ProjectStatsEndpoint admits any workspace role "
-        "and filters Project.objects.filter(workspace__slug=slug) with caller-supplied "
-        "project_ids, never checking membership of those projects."
-    ),
-)
 def test_project_stats_require_membership_of_the_project(scenario):
     """A workspace member who is in no project should not get its counts.
 
@@ -169,26 +160,19 @@ def test_project_stats_are_refused_to_a_non_member_of_the_workspace(scenario):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "FINDING: advance analytics accept foreign project ids. "
-        "plane/app/views/analytic/advance.py:72-77 builds ProjectMember.objects.filter("
-        "project_id__in=project_ids) straight from the query string, and "
-        "plane/utils/date_utils.py:172-174 appends them without checking they belong to the "
-        "workspace in the URL. An administrator of one workspace obtains member counts for "
-        "another."
-    ),
-)
 def test_advance_analytics_ignore_project_ids_from_another_workspace(scenario):
     """Cross-tenant: the ids come from a workspace the caller has no part in."""
     client = _session_client(scenario.personas["other_owner"])
     base = f"/api/workspaces/{scenario.other_workspace.slug}/advance-analytics/"
+    victim_members = WorkspaceMember.objects.filter(workspace=scenario.workspace, is_active=True).count()
 
-    own = client.get(base, {"type": "overview"})
     with_foreign = client.get(base, {"type": "overview", "project_ids": str(scenario.project_a.project.id)})
 
-    assert own.json()["total_users"] == with_foreign.json()["total_users"]
+    # Ids from another workspace match nothing here, so the answer is zero —
+    # and above all it is not the victim workspace's roster size.
+    counted = with_foreign.json()["total_users"]["count"]
+    assert counted == 0
+    assert counted != victim_members
 
 
 # --------------------------------------------------------------------------

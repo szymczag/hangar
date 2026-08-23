@@ -1,0 +1,135 @@
+# Authorization model and its boundaries
+
+How Hangar decides who may see and change what, which boundaries exist, and how
+they are kept from eroding. Written for people changing access-controlled code
+or reviewing such a change.
+
+## The boundaries
+
+Four, from outermost to innermost. A defect at any level is only visible if you
+test at that level, which is why the probes described below use distinct
+personas rather than one "unauthorised" caller.
+
+| Boundary | Question | Typical failure |
+| --- | --- | --- |
+| Instance | Does this person have an account at all? | an unauthenticated route |
+| Tenant | May they act on **this workspace**? | a queryset filtered by id but not workspace |
+| Project | May they act on **this project** inside a workspace they belong to? | a check that stops at workspace membership |
+| Role | May they perform **this operation** on it? | a decorator admitting a role that should not write |
+
+The project boundary is the one most often missed. Every caller in that scenario
+legitimately belongs to the workspace, so the request looks ordinary and the
+common workspace-level check passes.
+
+## Six enforcement mechanisms
+
+Authorization is not expressed one way. A change to access control has to
+identify which of these the endpoint uses, because they fail differently:
+
+1. **`permission_classes`** — DRF classes such as `ProjectEntityPermission`.
+2. **`@allow_permission`** — role decorator, `level="PROJECT"` by default.
+3. **Membership filtering in the queryset** — no explicit gate; the filter *is*
+   the gate.
+4. **Service-layer checks** — the view delegates, e.g. `resolve_for_admin(actor=…)`.
+5. **Self-scoping** — the record is keyed to `request.user`, so identity is the
+   scope.
+6. **Helper functions** — e.g. `user_has_issue_permission`, `can_read_file_asset`.
+
+Mechanism 3 is the dangerous one: a missing `.filter()` is indistinguishable
+from correct code by reading.
+
+### Permission classes branch on HTTP method, not on operation
+
+`ProjectBasePermission` answers `POST` from a branch written for *creating* a
+project, which deliberately ignores `project_id` because no project exists yet.
+Any other `POST` endpoint using that class inherits a check that never asks
+about the target object. This produced a real defect: archiving a project asked
+only for a workspace role.
+
+**When adding a `POST` endpoint that acts on an existing object, do not reach
+for `ProjectBasePermission`.** Use `ProjectEntityPermission` (membership to
+read, `ADMIN`/`MEMBER` to write) or the `@allow_permission` decorator.
+
+### The two APIs disagree unless you make them agree
+
+The same operation exists in the session-authenticated app API
+(`plane/app/views/`) and the token-authenticated external API
+(`plane/api/views/`), with **separate** permission wiring. A change to one is
+not a change to the other. Both defects found in the archive endpoint and in
+member listings were divergences of this kind, so when changing an operation's
+authorization, check whether the other API exposes it too.
+
+## Caller-supplied identifiers
+
+Filters built from query parameters must be constrained to the workspace in the
+URL. Two endpoints appended a caller-supplied `project_ids` to a queryset
+without it; one leaked member counts **across tenants**.
+
+```python
+# wrong — the caller chooses the scope
+ProjectMember.objects.filter(project_id__in=project_ids)
+
+# right — the URL chooses the scope, the caller narrows within it
+ProjectMember.objects.filter(workspace__slug=slug, project_id__in=project_ids)
+```
+
+The same applies to ids in a request body: a `state_id` or `assignee_id` from
+another workspace must be rejected, not trusted because the route was.
+
+## How the boundaries are tested
+
+Three suites, each covering what the previous cannot reach.
+
+| Suite | Covers |
+| --- | --- |
+| `test_route_authorization_matrix.py` | every workspace-scoped route, non-member persona; plus the standing check that no route lacks a recognised mechanism |
+| `test_horizontal_authorization.py` | boundaries inside one workspace: member-without-project, guest, project admin, deactivated account, IDOR, self-role escalation |
+| `test_authorization_surfaces.py` | token-authenticated API, published boards, assets by id, analytics |
+
+Shared setup is in `plane/tests/support/`: `personas.py` builds a workspace with
+**two** projects and seven personas, `route_inventory.py` enumerates routes and
+classifies them.
+
+### Conventions worth keeping
+
+- **Assert on content, not status codes.** Several routes legitimately answer
+  `200` with an empty body to a caller who may see nothing. Each project seeds a
+  canary string that exists nowhere else; its presence in a response is the
+  leak. A `5xx` is a failure too — a route that crashes has not denied anything.
+- **Writes are stricter.** There is no benign empty answer to a write, so a
+  `2xx` is always wrong. Row counts are compared before and after, since a `4xx`
+  that still mutated something would otherwise pass.
+- **Keep a positive control.** `test_a_project_member_can_actually_see_their_project`
+  exists so the suite cannot pass against a build that denies everything.
+- **Two projects, not one.** With a single project, "member of the project" and
+  "member of the workspace" give the same answer everywhere, and a missing
+  project filter is invisible.
+- **Do not build personas from `plane/tests/factories.py`.** Its member
+  factories default to `role=20`, so a persona named "guest" would silently be
+  an administrator.
+- **`force_authenticate` bypasses the external API's token authentication.** It
+  reports acceptances that cannot happen. Probe `/api/v1/` with a real
+  `APIToken`.
+- **Filter by generated path, not view module.** Some route names are registered
+  in both url confs, so `reverse()` can return an `/api/v1/` path for a record
+  whose module says `plane.app.views`.
+
+### Recording a finding without going red
+
+A confirmed defect that is not being fixed in the same change is marked
+`@pytest.mark.xfail(strict=True)` with a reason naming the file and line. The
+suite stays green, the finding stays visible, and `strict=True` forces whoever
+fixes it to remove the marker — a fixed defect makes the test pass, which fails
+a strict xfail.
+
+## Configuration that participates in authorization
+
+| Setting | Effect |
+| --- | --- |
+| `ENABLE_SIGNUP=0` | account creation requires an invitation |
+| `DISABLE_WORKSPACE_CREATION=1` | only instance administrators create workspaces |
+| `SSO_ENFORCED_DOMAINS` | pins an email domain to designated identity providers |
+| `SSO_AUTO_JOIN_WORKSPACES` | places federated users into a workspace on sign-in |
+
+An account with no membership sees no content, so those two flags are what make
+"anyone can sign in" safe. See [federated SSO security](federated-sso-security.md).

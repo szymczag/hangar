@@ -406,7 +406,14 @@ class ProjectStatsEndpoint(BaseAPIView):
         if not requested_fields:
             requested_fields = valid_fields
 
-        projects = Project.objects.filter(workspace__slug=slug)
+        # Restricted to projects the caller actually belongs to. The endpoint
+        # admits every workspace role, so without this a member of no project
+        # obtained issue, cycle and member counts for projects they cannot open.
+        projects = Project.objects.filter(
+            workspace__slug=slug,
+            project_projectmember__member=request.user,
+            project_projectmember__is_active=True,
+        ).distinct()
         if project_ids:
             projects = projects.filter(id__in=project_ids.split(","))
 
