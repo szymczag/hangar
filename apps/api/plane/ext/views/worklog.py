@@ -27,9 +27,7 @@ from plane.ext.serializers.worklog import IssueWorkLogSerializer
 
 
 def time_tracking_enabled(slug, project_id):
-    return Project.objects.filter(
-        workspace__slug=slug, pk=project_id, is_time_tracking_enabled=True
-    ).exists()
+    return Project.objects.filter(workspace__slug=slug, pk=project_id, is_time_tracking_enabled=True).exists()
 
 
 def can_modify(worklog, user, slug, project_id):
@@ -103,10 +101,7 @@ class IssueWorkLogsEndpoint(BaseAPIView):
 
 class IssueWorkLogDetailEndpoint(BaseAPIView):
     def get_worklog(self, slug, project_id, issue_id, pk):
-        return get_object_or_404(
-            IssueWorkLog,
-            workspace__slug=slug, project_id=project_id, issue_id=issue_id, pk=pk
-        )
+        return get_object_or_404(IssueWorkLog, workspace__slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def patch(self, request, slug, project_id, issue_id, pk):

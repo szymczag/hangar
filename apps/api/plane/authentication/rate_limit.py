@@ -66,3 +66,38 @@ class EmailVerificationThrottle(UserRateThrottle):
             )
         except AuthenticationException as e:
             return Response(e.get_error_dict(), status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+class _AdminWebAuthnThrottle(AnonRateThrottle):
+    """Base for the console's second-factor endpoints.
+
+    Anonymous rather than user-scoped, because the caller is not logged in
+    during the pending flow. Each subclass takes its own scope so a failing
+    second-factor loop cannot exhaust the shared "authentication" bucket and
+    lock the administrator out of the password step as well.
+    """
+
+    def throttle_failure_view(self, request, *args, **kwargs):
+        try:
+            raise AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+                error_message="RATE_LIMIT_EXCEEDED",
+            )
+        except AuthenticationException as e:
+            return Response(e.get_error_dict(), status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+class AdminWebAuthnOptionsThrottle(_AdminWebAuthnThrottle):
+    rate = os.environ.get("ADMIN_WEBAUTHN_OPTIONS_RATE", "10/minute")
+    scope = "admin_webauthn_options"
+
+
+class AdminWebAuthnVerifyThrottle(_AdminWebAuthnThrottle):
+    rate = os.environ.get("ADMIN_WEBAUTHN_VERIFY_RATE", "10/minute")
+    scope = "admin_webauthn_verify"
+
+
+class AdminWebAuthnRegisterThrottle(_AdminWebAuthnThrottle):
+    rate = os.environ.get("ADMIN_WEBAUTHN_REGISTER_RATE", "10/minute")
+    scope = "admin_webauthn_register"
+

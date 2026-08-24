@@ -13,7 +13,6 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth import logout
 from django.db import transaction
 
 # Third party imports
@@ -31,7 +30,12 @@ from plane.license.api.serializers import (
 from plane.license.models import Instance, InstanceAdmin
 from plane.db.models import User, Profile
 from plane.utils.cache import cache_response, invalidate_cache
+from django.conf import settings
+
 from plane.authentication.rate_limit import authentication_throttle_allows
+from plane.ext.auth.webauthn import pending
+from plane.utils.exception_logger import log_exception
+from plane.ext.models import InstanceAdminWebAuthnCredential
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.password import is_password_strong
 from plane.authentication.utils.host import base_host, user_ip
@@ -284,9 +288,16 @@ class InstanceAdminSignUpEndpoint(View):
                 instance.is_telemetry_enabled = is_telemetry_enabled
                 instance.save()
 
-            # get tokens for user (outside the transaction — session writes must
-            # not be held under the DB lock)
+            # Session writes stay outside the transaction — they must not be
+            # held under the DB lock. Fork (see FORK.md): the very first
+            # administrator enrolls a security key before the console opens.
+            if settings.ADMIN_WEBAUTHN_REQUIRED:
+                pending.start(request, user, pending.STAGE_ENROLL)
+                url = urljoin(base_host(request=request, is_admin=True), "2fa/enroll/")
+                return HttpResponseRedirect(url)
+
             user_login(request=request, user=user, is_admin=True)
+            pending.mark_verified(request)
             url = urljoin(base_host(request=request, is_admin=True), "general/")
             return HttpResponseRedirect(url)
 
@@ -438,6 +449,22 @@ class InstanceAdminSignInEndpoint(View):
                 "?" + urlencode(exc.get_error_dict()),
             )
             return HttpResponseRedirect(url)
+        # The password is proved; the session is not created yet. Fork (see
+        # FORK.md): a second factor is required, so this step records a pending
+        # state and stops. Nothing stamps last_login_* here either — a
+        # half-finished sign-in is not a login; that happens on completion.
+        if settings.ADMIN_WEBAUTHN_REQUIRED:
+            has_credential = InstanceAdminWebAuthnCredential.objects.filter(
+                user=user, disabled_at__isnull=True
+            ).exists()
+            stage = pending.STAGE_ASSERT if has_credential else pending.STAGE_ENROLL
+            pending.start(request, user, stage)
+            url = urljoin(
+                base_host(request=request, is_admin=True),
+                "2fa/" if has_credential else "2fa/enroll/",
+            )
+            return HttpResponseRedirect(url)
+
         # settings last active for the user
         user.is_active = True
         user.last_active = timezone.now()
@@ -449,6 +476,7 @@ class InstanceAdminSignInEndpoint(View):
 
         # get tokens for user
         user_login(request=request, user=user, is_admin=True)
+        pending.mark_verified(request)
         url = urljoin(base_host(request=request, is_admin=True), "general/")
         return HttpResponseRedirect(url)
 
@@ -470,24 +498,44 @@ class InstanceAdminUserSessionEndpoint(BaseAPIView):
             data = {"is_authenticated": True}
             data["user"] = serializer.data
             return Response(data, status=status.HTTP_200_OK)
-        else:
-            return Response({"is_authenticated": False}, status=status.HTTP_200_OK)
+
+        # Fork (see FORK.md): a caller who proved a password but not a second
+        # factor is not authenticated, yet the console still has to know which
+        # step to render. The email is echoed from the caller's own session, so
+        # this discloses nothing they did not just supply.
+        blob = pending.peek(request)
+        if blob:
+            return Response(
+                {
+                    "is_authenticated": False,
+                    "is_2fa_pending": True,
+                    "requires_enrollment": blob.get("stage") == pending.STAGE_ENROLL,
+                    "email": blob.get("email", ""),
+                },
+                status=status.HTTP_200_OK,
+            )
+        return Response({"is_authenticated": False}, status=status.HTTP_200_OK)
 
 
 class InstanceAdminSignOutEndpoint(View):
     permission_classes = [InstanceAdminPermission]
 
     def post(self, request):
-        # Get user
+        # Stamp the logout only when there is a user to stamp it on. A caller
+        # in the pending second-factor state is anonymous, and the lookup used
+        # to raise before logout() ran — leaving the pending blob, and its
+        # accumulated attempt count, in place after "Start over".
         try:
-            user = User.objects.get(pk=request.user.id)
-            user.last_logout_ip = user_ip(request=request)
-            user.last_logout_time = timezone.now()
-            user.save()
-            # Log the user out
-            logout(request)
-            url = get_safe_redirect_url(base_url=base_host(request=request, is_admin=True), next_path="")
-            return HttpResponseRedirect(url)
-        except Exception:
-            url = get_safe_redirect_url(base_url=base_host(request=request, is_admin=True), next_path="")
-            return HttpResponseRedirect(url)
+            if request.user.is_authenticated:
+                user = User.objects.get(pk=request.user.id)
+                user.last_logout_ip = user_ip(request=request)
+                user.last_logout_time = timezone.now()
+                user.save()
+        except Exception as error:
+            log_exception(error)
+
+        # flush() rather than logout(): it clears the session for an anonymous
+        # caller too, which is the whole point here.
+        request.session.flush()
+        url = get_safe_redirect_url(base_url=base_host(request=request, is_admin=True), next_path="")
+        return HttpResponseRedirect(url)

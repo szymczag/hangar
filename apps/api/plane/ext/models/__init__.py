@@ -17,12 +17,15 @@ from .issue_property import (
     IssuePropertyValue,
     PropertyTypeChoices,
 )
+from .webauthn import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCredential
 from plane.ext.runner.models import RunnerAuditEvent, RunnerInstallation
 from .worklog import IssueWorkLog
 
 __all__ = [
     "EpicUserProperty",
     "ImportAdmissionUsage",
+    "InstanceAdminWebAuthnChallenge",
+    "InstanceAdminWebAuthnCredential",
     "ImportJob",
     "ImportUserBudget",
     "ImportWorkspaceBudget",

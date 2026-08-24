@@ -73,6 +73,36 @@ const errorCodeMessages: {
     title: `User account deactivated`,
     message: () => `User account deactivated. Please contact ${SUPPORT_EMAIL ? SUPPORT_EMAIL : "administrator"}.`,
   },
+  // Fork (see FORK.md): WebAuthn second factor for the console.
+  [EAdminAuthErrorCodes.ADMIN_2FA_REQUIRED]: {
+    title: `Security key required`,
+    message: () => `This console requires a security key. Sign in again to register or use one.`,
+  },
+  [EAdminAuthErrorCodes.ADMIN_2FA_SESSION_EXPIRED]: {
+    title: `Sign-in expired`,
+    message: () => `Your sign-in took too long. Enter your password again.`,
+  },
+  [EAdminAuthErrorCodes.ADMIN_2FA_VERIFICATION_FAILED]: {
+    title: `Security key not accepted`,
+    message: () => `That security key could not be verified. Try again, or use a different key.`,
+  },
+  [EAdminAuthErrorCodes.ADMIN_2FA_ENROLLMENT_REQUIRED]: {
+    title: `Register a security key`,
+    message: () => `You need to register a security key before you can open the console.`,
+  },
+  [EAdminAuthErrorCodes.ADMIN_2FA_NOT_CONFIGURED]: {
+    title: `Security keys are not configured`,
+    message: () =>
+      `This deployment cannot use security keys yet. Check WEBAUTHN_RP_ID and that the console is served over HTTPS.`,
+  },
+  [EAdminAuthErrorCodes.ADMIN_2FA_ATTEMPTS_EXHAUSTED]: {
+    title: `Too many attempts`,
+    message: () => `Too many failed attempts. Enter your password again to start over.`,
+  },
+  [EAdminAuthErrorCodes.ADMIN_2FA_LAST_CREDENTIAL]: {
+    title: `Cannot remove your only key`,
+    message: () => `Register a second security key before removing this one.`,
+  },
 };
 
 export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string): TAdminAuthErrorInfo | undefined => {
@@ -86,6 +116,14 @@ export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string
     EAdminAuthErrorCodes.ADMIN_USER_ALREADY_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DOES_NOT_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DEACTIVATED,
+    // Fork (see FORK.md): second-factor codes surface the same way.
+    EAdminAuthErrorCodes.ADMIN_2FA_REQUIRED,
+    EAdminAuthErrorCodes.ADMIN_2FA_SESSION_EXPIRED,
+    EAdminAuthErrorCodes.ADMIN_2FA_VERIFICATION_FAILED,
+    EAdminAuthErrorCodes.ADMIN_2FA_ENROLLMENT_REQUIRED,
+    EAdminAuthErrorCodes.ADMIN_2FA_NOT_CONFIGURED,
+    EAdminAuthErrorCodes.ADMIN_2FA_ATTEMPTS_EXHAUSTED,
+    EAdminAuthErrorCodes.ADMIN_2FA_LAST_CREDENTIAL,
   ];
 
   if (bannerAlertErrorCodes.includes(errorCode))

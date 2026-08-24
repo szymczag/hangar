@@ -25,7 +25,47 @@ from plane.license.api.views import (
     InstanceEmailSuppressionEndpoint,
 )
 
+# Fork (see FORK.md): these must stay under /api/instances/ — the session
+# middleware picks the admin cookie by that substring in the path.
+from plane.ext.views.instance_webauthn import (  # noqa: E402
+    AdminWebAuthnAuthenticationOptionsEndpoint,
+    AdminWebAuthnAuthenticationVerifyEndpoint,
+    AdminWebAuthnCredentialsEndpoint,
+    AdminWebAuthnRegistrationOptionsEndpoint,
+    AdminWebAuthnRegistrationVerifyEndpoint,
+)
+
 urlpatterns = [
+    path(
+        "admins/webauthn/authentication/options/",
+        AdminWebAuthnAuthenticationOptionsEndpoint.as_view(),
+        name="instance-admin-webauthn-authentication-options",
+    ),
+    path(
+        "admins/webauthn/authentication/verify/",
+        AdminWebAuthnAuthenticationVerifyEndpoint.as_view(),
+        name="instance-admin-webauthn-authentication-verify",
+    ),
+    path(
+        "admins/webauthn/registration/options/",
+        AdminWebAuthnRegistrationOptionsEndpoint.as_view(),
+        name="instance-admin-webauthn-registration-options",
+    ),
+    path(
+        "admins/webauthn/registration/verify/",
+        AdminWebAuthnRegistrationVerifyEndpoint.as_view(),
+        name="instance-admin-webauthn-registration-verify",
+    ),
+    path(
+        "admins/webauthn/credentials/",
+        AdminWebAuthnCredentialsEndpoint.as_view(http_method_names=["get"]),
+        name="instance-admin-webauthn-credentials",
+    ),
+    path(
+        "admins/webauthn/credentials/<uuid:pk>/",
+        AdminWebAuthnCredentialsEndpoint.as_view(http_method_names=["delete"]),
+        name="instance-admin-webauthn-credential",
+    ),
     path("", InstanceEndpoint.as_view(), name="instance"),
     path("telemetry/", InstanceTelemetryEndpoint.as_view(), name="instance-telemetry"),
     path("admins/", InstanceAdminEndpoint.as_view(), name="instance-admins"),

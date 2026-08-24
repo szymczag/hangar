@@ -17,6 +17,7 @@ from rest_framework.test import APIClient
 from plane.db.models import Account, FederatedIdentity, User
 from plane.license.models import InstanceAdmin
 from plane.tests.contract.app import test_google_auth as _google_auth
+from plane.tests.support.admin_session import authenticate_admin
 
 setup_instance = _google_auth.setup_instance
 
@@ -60,7 +61,9 @@ def admin_client(db, setup_instance):
     admin = _user("admin@ops.example", password=True)
     InstanceAdmin.objects.create(instance=setup_instance, user=admin, role=20)
     client = APIClient()
-    client.force_authenticate(user=admin)
+    # A real console session with the second-factor marker: force_authenticate
+    # installs a user without a session, which the permission now refuses.
+    authenticate_admin(client, admin)
     return client
 
 

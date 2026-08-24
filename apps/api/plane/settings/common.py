@@ -504,6 +504,38 @@ SESSION_SAVE_EVERY_REQUEST = os.environ.get("SESSION_SAVE_EVERY_REQUEST", "0") =
 ADMIN_SESSION_COOKIE_NAME = "admin-session-id"
 ADMIN_SESSION_COOKIE_AGE = int(os.environ.get("ADMIN_SESSION_COOKIE_AGE", 3600))
 
+# Fork (see FORK.md): WebAuthn second factor for the instance-admin console.
+# The relying-party id is validated by the *browser* against the origin of the
+# page calling navigator.credentials, which is the admin panel — not the API.
+# Left unset it is derived from ADMIN_BASE_URL, falling back to WEB_URL. Set it
+# explicitly when the panel lives on a different subdomain from the app: the
+# correct value is then their shared parent, because an id that is neither equal
+# to nor a registrable-domain suffix of the panel's host makes every sign-in
+# fail in the browser before the request is sent.
+WEBAUTHN_RP_ID = os.environ.get("WEBAUTHN_RP_ID", None)
+WEBAUTHN_RP_NAME = os.environ.get("WEBAUTHN_RP_NAME", "Hangar")
+# Comma-separated exact origins an assertion may come from. Derived from the
+# admin origin when unset. This is the server-side check, and it is what keeps a
+# broad RP ID from being exploitable by a sibling subdomain.
+WEBAUTHN_ALLOWED_ORIGINS = os.environ.get("WEBAUTHN_ALLOWED_ORIGINS", "")
+
+# How long a password-verified sign-in may wait for its second factor, and how
+# long a challenge stays valid. Enrollment gets longer because the person has to
+# find and register a key.
+ADMIN_2FA_PENDING_ASSERT_WINDOW = int(os.environ.get("ADMIN_2FA_PENDING_ASSERT_WINDOW", 300))
+ADMIN_2FA_PENDING_ENROLL_WINDOW = int(os.environ.get("ADMIN_2FA_PENDING_ENROLL_WINDOW", 900))
+ADMIN_2FA_CHALLENGE_TTL = int(os.environ.get("ADMIN_2FA_CHALLENGE_TTL", 300))
+ADMIN_2FA_MAX_ATTEMPTS = int(os.environ.get("ADMIN_2FA_MAX_ATTEMPTS", 5))
+
+# Operator escape hatch, not a way to soften the requirement. It exists so an
+# instance locked out by a misconfigured relying-party id can be recovered
+# without a code change; it is logged loudly at startup when disabled.
+ADMIN_WEBAUTHN_REQUIRED = os.environ.get("ADMIN_WEBAUTHN_REQUIRED", "1") == "1"
+if not ADMIN_WEBAUTHN_REQUIRED:
+    _logger.warning(
+        "ADMIN_WEBAUTHN_REQUIRED=0: the instance-admin console is protected by a password alone."
+    )
+
 # CSRF cookies
 CSRF_COOKIE_SECURE = secure_origins
 CSRF_COOKIE_HTTPONLY = True

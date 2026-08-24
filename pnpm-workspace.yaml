@@ -5,6 +5,7 @@ packages:
   - "!apps/proxy"
 
 catalog:
+  "@simplewebauthn/browser": "13.2.2"
   "@zxcvbn-ts/core": "4.1.2"
   "@zxcvbn-ts/language-common": "4.1.2"
   "@zxcvbn-ts/language-en": "4.1.1"
