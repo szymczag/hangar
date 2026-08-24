@@ -40,6 +40,7 @@ from plane.ext.services.federated_import import (
     FederatedImportGrantError,
     apply_federated_import,
     issue_import_grant,
+    message_for,
     plan_federated_import,
     validate_import_grant,
 )
@@ -83,7 +84,7 @@ class InstanceIdentityImportEndpoint(BaseAPIView):
                 source_name=upload.name or "upload.csv",
             )
         except FederatedImportError as exc:
-            return _error("invalid_file", str(exc))
+            return _error("invalid_file", message_for(exc.code))
 
         if not plan.is_valid:
             # Refusals are the whole point of the preview step, so they are a
@@ -123,7 +124,7 @@ class InstanceIdentityImportEndpoint(BaseAPIView):
                 input_sha256=plan.input_sha256,
             )
         except FederatedImportGrantError as exc:
-            return _error("invalid_grant", str(exc), status.HTTP_409_CONFLICT)
+            return _error("invalid_grant", message_for(exc.code), status.HTTP_409_CONFLICT)
 
         password = request.data.get("password") or ""
         if not password or not request.user.check_password(password):
@@ -138,9 +139,9 @@ class InstanceIdentityImportEndpoint(BaseAPIView):
         except FederatedImportConflict as exc:
             # Something linked an identity between the preview and now; the
             # transaction rolled back, so the operator previews again.
-            return _error("import_conflict", str(exc), status.HTTP_409_CONFLICT)
+            return _error("import_conflict", message_for(exc.code), status.HTTP_409_CONFLICT)
         except FederatedImportError as exc:
-            return _error("invalid_file", str(exc))
+            return _error("invalid_file", message_for(exc.code))
         except Exception as exc:  # noqa: BLE001 - never leak the internals of this one
             log_exception(exc)
             return _error(

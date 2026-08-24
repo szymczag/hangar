@@ -46,16 +46,70 @@ GRANT_SALT = "plane.ext.federated-identity-import.v1"
 GRANT_TTL_SECONDS = 900
 
 
-class FederatedImportGrantError(Exception):
+# Why an import was turned away, as a code rather than a sentence. Callers look
+# the wording up in REFUSAL_MESSAGES instead of rendering the exception, so no
+# exception text — and nothing an exception chained from — can reach a response
+# by someone later interpolating a caught error into a message.
+FILE_NOT_UTF8 = "FILE_NOT_UTF8"
+ISSUER_REQUIRED = "ISSUER_REQUIRED"
+UNKNOWN_PROVIDER = "UNKNOWN_PROVIDER"
+MISSING_SUBJECT_COLUMNS = "MISSING_SUBJECT_COLUMNS"
+MISSING_IDENTIFIER_COLUMN = "MISSING_IDENTIFIER_COLUMN"
+PLAN_HAS_REFUSALS = "PLAN_HAS_REFUSALS"
+
+GRANT_MISSING = "GRANT_MISSING"
+GRANT_EXPIRED = "GRANT_EXPIRED"
+GRANT_INVALID = "GRANT_INVALID"
+GRANT_MISMATCH = "GRANT_MISMATCH"
+
+BINDING_TAKEN_SINCE_PREVIEW = "BINDING_TAKEN_SINCE_PREVIEW"
+ACCOUNT_FEDERATED_SINCE_PREVIEW = "ACCOUNT_FEDERATED_SINCE_PREVIEW"
+
+REFUSAL_MESSAGES = {
+    FILE_NOT_UTF8: "The file must be UTF-8 encoded CSV.",
+    ISSUER_REQUIRED: "An issuer is required.",
+    UNKNOWN_PROVIDER: "Unknown identity provider.",
+    MISSING_SUBJECT_COLUMNS: "The CSV must contain subject and subject_format columns.",
+    MISSING_IDENTIFIER_COLUMN: "The CSV must contain a user_id or email column.",
+    PLAN_HAS_REFUSALS: "A plan with refusals is never applied.",
+    GRANT_MISSING: "Preview the file before confirming the import.",
+    GRANT_EXPIRED: "The import preview expired. Preview the file again.",
+    GRANT_INVALID: "The import preview is invalid.",
+    GRANT_MISMATCH: "This confirmation does not match the file that was previewed.",
+    BINDING_TAKEN_SINCE_PREVIEW: "A subject in this file was linked to another account since the preview.",
+    ACCOUNT_FEDERATED_SINCE_PREVIEW: "An account in this file gained an identity at this issuer since the preview.",
+}
+
+
+class FederatedImportRefusal(Exception):
+    """Carries a code, never a sentence.
+
+    Rendering an exception is how chained causes and library internals end up
+    in an HTTP response; keeping the wording in a table above means the
+    response text is chosen, not inherited.
+    """
+
+    def __init__(self, code: str, *, line: int | None = None):
+        self.code = code
+        self.line = line
+        super().__init__(code)
+
+
+class FederatedImportGrantError(FederatedImportRefusal):
     """The confirmation does not correspond to a preview this admin was shown."""
 
 
-class FederatedImportError(Exception):
+class FederatedImportError(FederatedImportRefusal):
     """The file cannot be read as an import at all."""
 
 
-class FederatedImportConflict(Exception):
+class FederatedImportConflict(FederatedImportRefusal):
     """The database changed between planning and applying."""
+
+
+def message_for(code: object) -> str:
+    """The operator-facing wording for a refusal code."""
+    return REFUSAL_MESSAGES.get(code, "The file could not be imported.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,7 +178,7 @@ def _decode(source_bytes: bytes) -> str:
     try:
         return source_bytes.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
-        raise FederatedImportError("The file must be UTF-8 encoded CSV.") from exc
+        raise FederatedImportError(FILE_NOT_UTF8) from exc
 
 
 def plan_federated_import(*, provider: str, issuer: str, source_bytes: bytes, source_name: str) -> ImportPlan:
@@ -132,16 +186,16 @@ def plan_federated_import(*, provider: str, issuer: str, source_bytes: bytes, so
     provider = provider.strip()
     issuer = issuer.strip()
     if not issuer:
-        raise FederatedImportError("An issuer is required.")
+        raise FederatedImportError(ISSUER_REQUIRED)
     if provider not in dict(FederatedIdentity.Provider.choices):
-        raise FederatedImportError("Unknown identity provider.")
+        raise FederatedImportError(UNKNOWN_PROVIDER)
 
     reader = csv.DictReader(_decode(source_bytes).splitlines())
     columns = set(reader.fieldnames or ())
     if not REQUIRED_COLUMNS.issubset(columns):
-        raise FederatedImportError("The CSV must contain subject and subject_format columns.")
+        raise FederatedImportError(MISSING_SUBJECT_COLUMNS)
     if not IDENTIFIER_COLUMNS & columns:
-        raise FederatedImportError("The CSV must contain a user_id or email column.")
+        raise FederatedImportError(MISSING_IDENTIFIER_COLUMN)
 
     rows = list(reader)
     errors: list[dict] = []
@@ -241,7 +295,7 @@ def _account_already_federated(*, user_id, provider: str, issuer: str, binding_k
 def apply_federated_import(plan: ImportPlan, *, actor=None) -> dict:
     """Create the planned identities and record an immutable audit row."""
     if not plan.is_valid:
-        raise FederatedImportError("A plan with refusals is never applied.")
+        raise FederatedImportError(PLAN_HAS_REFUSALS)
 
     report = plan.as_report(dry_run=False)
     imported = 0
@@ -252,7 +306,7 @@ def apply_federated_import(plan: ImportPlan, *, actor=None) -> dict:
             identity = FederatedIdentity.objects.select_for_update().filter(binding_key=binding.binding_key).first()
             if identity is not None:
                 if str(identity.user_id) != binding.user_id:
-                    raise FederatedImportConflict(f"Binding conflict at line {binding.line}")
+                    raise FederatedImportConflict(BINDING_TAKEN_SINCE_PREVIEW, line=binding.line)
                 existing += 1
                 continue
 
@@ -264,7 +318,7 @@ def apply_federated_import(plan: ImportPlan, *, actor=None) -> dict:
                 issuer=plan.issuer,
                 binding_key=binding.binding_key,
             ):
-                raise FederatedImportConflict(f"Account already federated at line {binding.line}")
+                raise FederatedImportConflict(ACCOUNT_FEDERATED_SINCE_PREVIEW, line=binding.line)
 
             FederatedIdentity.objects.create(
                 user_id=binding.user_id,
@@ -321,13 +375,13 @@ def issue_import_grant(*, actor_id, provider: str, issuer: str, input_sha256: st
 
 def validate_import_grant(token: object, *, actor_id, provider: str, issuer: str, input_sha256: str) -> None:
     if not isinstance(token, str) or not token:
-        raise FederatedImportGrantError("Preview the file before confirming the import.")
+        raise FederatedImportGrantError(GRANT_MISSING)
     try:
         payload = signing.loads(token, salt=GRANT_SALT, max_age=GRANT_TTL_SECONDS)
     except signing.SignatureExpired as error:
-        raise FederatedImportGrantError("The import preview expired. Preview the file again.") from error
+        raise FederatedImportGrantError(GRANT_EXPIRED) from error
     except signing.BadSignature as error:
-        raise FederatedImportGrantError("The import preview is invalid.") from error
+        raise FederatedImportGrantError(GRANT_INVALID) from error
 
     if not isinstance(payload, dict) or set(payload) != {
         "v",
@@ -337,7 +391,7 @@ def validate_import_grant(token: object, *, actor_id, provider: str, issuer: str
         "issuer",
         "input_sha256",
     }:
-        raise FederatedImportGrantError("The import preview is invalid.")
+        raise FederatedImportGrantError(GRANT_INVALID)
 
     expected = {
         "v": 1,
@@ -349,4 +403,4 @@ def validate_import_grant(token: object, *, actor_id, provider: str, issuer: str
     if any(payload.get(key) != value for key, value in expected.items()):
         # Covers the case that matters: a different file, or another admin's
         # preview, presented against this confirmation.
-        raise FederatedImportGrantError("This confirmation does not match the file that was previewed.")
+        raise FederatedImportGrantError(GRANT_MISMATCH)

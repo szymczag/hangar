@@ -476,6 +476,13 @@ Re-importing an identical file remains a no-op: an identity that already matches
 the row exactly is not a conflict with itself, and re-runs are counted as
 `existing_count` rather than refused.
 
+Refusals that reject the file as a whole — an unreadable encoding, a missing
+column, an expired or mismatched console grant, a conflict that appeared between
+preview and confirm — carry a code, and the wording shown to the operator is
+looked up from a fixed table. The refusal is never rendered from the exception
+that raised it, so a chained cause cannot carry library internals into an HTTP
+response or a command's output.
+
 ### 5. Enable and verify
 
 1. Enable only the migrated provider.

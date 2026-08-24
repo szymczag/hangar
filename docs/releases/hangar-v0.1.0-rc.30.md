@@ -71,6 +71,12 @@ confirm, never held server-side in between, and a signed grant carrying the
 file's SHA-256 digest and naming the issuing admin binds the two steps — so the
 file that is applied is provably the file that was reviewed.
 
+Refusals from the identity import carry a code, and the wording returned to the
+caller is looked up from a fixed table rather than rendered from the exception
+that raised it. Several of those refusals chain from a library error, so
+rendering them would carry that error's text — and whatever a later change
+interpolates into it — into an HTTP response.
+
 The `nanoid` override was raised past CVE-2026-67213.
 
 ## Migrations and compatibility

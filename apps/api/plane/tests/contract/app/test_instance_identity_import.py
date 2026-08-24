@@ -18,6 +18,7 @@ from rest_framework.test import APIClient
 from plane.db.models import FederatedIdentity, FederatedIdentityImportAudit, User
 from plane.license.models import InstanceAdmin
 from plane.tests.contract.app import test_google_auth as _google_auth
+from plane.ext.services.federated_import import REFUSAL_MESSAGES
 from plane.tests.support.admin_session import authenticate_admin
 
 setup_instance = _google_auth.setup_instance
@@ -336,3 +337,25 @@ def test_another_admins_grant_cannot_be_used(admin_client, setup_instance):
 
     assert response.status_code == 409
     assert FederatedIdentity.objects.count() == 0
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_refusals_never_render_the_exception_that_caused_them(admin_client):
+    """The response text is chosen from a table, never inherited from an error.
+
+    Decoding failures chain from a library exception, so rendering the refusal
+    would carry that exception's text — and whatever a future `raise ... from`
+    interpolates into it — out to the caller. Every message the endpoint emits
+    must therefore be one of the known constants.
+    """
+    latin1 = io.BytesIO("email,subject,subject_format\nkröger@corp.com,s,\n".encode("latin-1"))
+    latin1.name = "mappings.csv"
+
+    response = _preview(admin_client, latin1)
+
+    assert response.status_code == 400
+    # The chained UnicodeDecodeError names its codec and the offending byte
+    # offset. Neither can appear here, because the message was not built from
+    # the exception at all.
+    assert response.data["error"]["message"] in REFUSAL_MESSAGES.values()
