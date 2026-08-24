@@ -12,6 +12,7 @@ from plane.ext.services.federated_import import (
     FederatedImportConflict,
     FederatedImportError,
     apply_federated_import,
+    message_for,
     plan_federated_import,
 )
 
@@ -52,7 +53,7 @@ class Command(BaseCommand):
                 source_name=source_path.name,
             )
         except FederatedImportError as exc:
-            raise CommandError(str(exc)) from exc
+            raise CommandError(message_for(exc.code)) from exc
 
         if not plan.is_valid:
             report = plan.as_report(dry_run=dry_run)
@@ -68,7 +69,8 @@ class Command(BaseCommand):
         try:
             report = apply_federated_import(plan)
         except (FederatedImportConflict, FederatedImportError) as exc:
-            raise CommandError(f"Import rolled back: {exc}") from exc
+            location = f" at line {exc.line}" if exc.line is not None else ""
+            raise CommandError(f"Import rolled back{location}: {message_for(exc.code)}") from exc
 
         self._write_report(report, options["report"])
         self.stdout.write(self.style.SUCCESS(json.dumps(report, sort_keys=True)))
