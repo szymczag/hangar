@@ -88,11 +88,11 @@ mode — see the egress policy below.
 These govern which provider owns an email domain and where its users land. Both
 are editable in the administration UI under **Authentication → Domain policy**.
 
-| Setting                    | Meaning                                                                                     |
-| -------------------------- | ------------------------------------------------------------------------------------------- |
+| Setting                    | Meaning                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
 | `SSO_ENFORCED_DOMAINS`     | Domains pinned to a provider, as `corp.com=google`, `corp.com=oidc;saml`, or a bare `corp.com` |
-| `SSO_AUTO_JOIN_WORKSPACES` | Workspaces joined on sign-in, as `corp.com=workspace-slug:role`                              |
-| `SSO_AUTO_JOIN_PROJECTS`   | Projects joined on sign-in, as `corp.com=workspace-slug/IDENTIFIER:role`                     |
+| `SSO_AUTO_JOIN_WORKSPACES` | Workspaces joined on sign-in, as `corp.com=workspace-slug:role`                                |
+| `SSO_AUTO_JOIN_PROJECTS`   | Projects joined on sign-in, as `corp.com=workspace-slug/IDENTIFIER:role`                       |
 
 A listed domain may be asserted **only** by the providers named for it. Every other
 enabled method — password, magic code, and the remaining providers — is refused for
@@ -166,10 +166,10 @@ cannot be redirected to an administrator-selected internal service.
 For an intentionally private deployment, the operator must name it explicitly in the
 deployment environment:
 
-| Setting                                            | Meaning                              |
-| -------------------------------------------------- | ------------------------------------ |
-| `GITEA_ALLOWED_HOSTS` / `GITLAB_ALLOWED_HOSTS`     | Comma-separated normalized DNS names |
-| `GITEA_ALLOWED_IPS` / `GITLAB_ALLOWED_IPS`         | Comma-separated addresses or CIDRs   |
+| Setting                                        | Meaning                              |
+| ---------------------------------------------- | ------------------------------------ |
+| `GITEA_ALLOWED_HOSTS` / `GITLAB_ALLOWED_HOSTS` | Comma-separated normalized DNS names |
+| `GITEA_ALLOWED_IPS` / `GITLAB_ALLOWED_IPS`     | Comma-separated addresses or CIDRs   |
 
 **These allowlists are environment-only by design and cannot be set from the
 administration UI**, even when the instance otherwise reads its configuration from
@@ -224,10 +224,10 @@ configuration.
 An instance that already has accounts at the domain has two populations, and they
 behave differently on the first Google sign-in after the cutover:
 
-| Existing account                      | First Google sign-in                                     |
-| ------------------------------------- | -------------------------------------------------------- |
-| Has signed in with Google before       | Adopted automatically; same user id, memberships intact  |
-| Only ever used a password or magic link | Refused with `SSO_ACCOUNT_LINK_REQUIRED` until linked    |
+| Existing account                        | First Google sign-in                                    |
+| --------------------------------------- | ------------------------------------------------------- |
+| Has signed in with Google before        | Adopted automatically; same user id, memberships intact |
+| Only ever used a password or magic link | Refused with `SSO_ACCOUNT_LINK_REQUIRED` until linked   |
 
 The second case is a lockout, not a corner case: the address is already held by an
 unlinked user, and the refusal is deliberate — silently binding a Google subject to
@@ -255,10 +255,10 @@ adoptable=1  federated=1  needs-import=1
 1 account(s) would be refused after pinning this domain to 'google'. ...
 ```
 
-| Status         | Meaning at cutover                                                    |
-| -------------- | --------------------------------------------------------------------- |
-| `federated`    | Already bound to the provider; nothing to do                          |
-| `adoptable`    | Has a prior OAuth account for it; adopted on the next sign-in         |
+| Status         | Meaning at cutover                                                          |
+| -------------- | --------------------------------------------------------------------------- |
+| `federated`    | Already bound to the provider; nothing to do                                |
+| `adoptable`    | Has a prior OAuth account for it; adopted on the next sign-in               |
 | `needs-import` | Nothing links it to the provider; **refused** until its subject is imported |
 
 `--provider` is what makes the distinction meaningful: an account bound to a
@@ -298,6 +298,7 @@ method, so a mistake is recoverable.
    ```
 
    The issuer must be exactly `https://accounts.google.com`.
+
 5. Have those accounts sign in with Google and confirm success.
 6. Only now set `SSO_ENFORCED_DOMAINS=corp.com=google`. From this point the domain
    accepts Google alone; password and magic-link sign-in are refused for it.
@@ -410,6 +411,60 @@ python manage.py import_federated_identities \
 The import is atomic. It writes an append-only audit record containing the input
 SHA-256 digest, source filename, row counts, and bounded report. It does not retain
 the CSV itself.
+
+### Importing from the admin console instead
+
+The same import is available at **Authentication → Identity import** in the God
+Mode console, for operators without shell access to the API image. Both entry
+points call the same validation (`plane/ext/services/federated_import.py`), so
+they refuse identical files — a second set of rules for the console is exactly
+how the weaker path becomes the way in.
+
+The console flow is deliberately more demanding than the CLI, because it is
+reachable over the network:
+
+1. Upload the CSV, choose the provider, and enter the issuer. Nothing is written.
+2. Review the preview: one line per row, saying which account each subject will
+   be linked to, and whether it is already linked.
+3. Confirm by uploading the same file again together with the grant from step 2
+   **and your password**. The console session already proved a security key;
+   the password proves who is at the keyboard for an action nobody else
+   reviews.
+
+The grant is signed, expires after 15 minutes, and carries the file's SHA-256
+digest and the admin it was issued to. A confirmation presenting a different
+file, or another admin's grant, is refused — so the file that is applied is
+provably the file that was reviewed. The server never stores the upload between
+the two steps.
+
+The console applies a 5 MiB limit. A directory export larger than that belongs
+in the CLI, which streams from disk.
+
+### What both paths refuse
+
+Validation is all-or-nothing: one bad row rejects the whole file, so no partial
+import has to be reconciled afterwards.
+
+| Code                            | Meaning                                               |
+| ------------------------------- | ----------------------------------------------------- |
+| `INVALID_SUBJECT`               | Missing subject, or missing `subject_format` for SAML |
+| `DUPLICATE_SUBJECT`             | The same subject appears twice in the file            |
+| `USER_IDENTIFIER_REQUIRED`      | The row names neither `user_id` nor `email`           |
+| `USER_NOT_FOUND`                | No account matches the row                            |
+| `BINDING_OWNED_BY_ANOTHER_USER` | That subject already signs in as a different account  |
+| `ACCOUNT_ALREADY_FEDERATED`     | The account already has an identity at this issuer    |
+
+`ACCOUNT_ALREADY_FEDERATED` is the one worth understanding. Sign-in resolves an
+identity by its binding key and logs in whoever it names, and nothing constrains
+`(user, provider, issuer)` — so a second identity at one issuer does not replace
+how that account signs in, it **adds an independent second way in** while the
+original keeps working. The account owner would observe nothing. The check
+covers both a conflict against the database and two rows in one file pointing at
+the same account.
+
+Re-importing an identical file remains a no-op: an identity that already matches
+the row exactly is not a conflict with itself, and re-runs are counted as
+`existing_count` rather than refused.
 
 ### 5. Enable and verify
 

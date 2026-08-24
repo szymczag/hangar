@@ -27,6 +27,7 @@ from plane.license.api.views import (
 
 # Fork (see FORK.md): these must stay under /api/instances/ — the session
 # middleware picks the admin cookie by that substring in the path.
+from plane.ext.views.instance_identity_import import InstanceIdentityImportEndpoint  # noqa: E402
 from plane.ext.views.instance_webauthn import (  # noqa: E402
     AdminWebAuthnAuthenticationOptionsEndpoint,
     AdminWebAuthnAuthenticationVerifyEndpoint,
@@ -65,6 +66,11 @@ urlpatterns = [
         "admins/webauthn/credentials/<uuid:pk>/",
         AdminWebAuthnCredentialsEndpoint.as_view(http_method_names=["delete"]),
         name="instance-admin-webauthn-credential",
+    ),
+    path(
+        "identity-import/",
+        InstanceIdentityImportEndpoint.as_view(),
+        name="instance-identity-import",
     ),
     path("", InstanceEndpoint.as_view(), name="instance"),
     path("telemetry/", InstanceTelemetryEndpoint.as_view(), name="instance-telemetry"),
