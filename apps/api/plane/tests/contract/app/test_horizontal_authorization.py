@@ -335,22 +335,14 @@ def test_scenario_covers_a_meaningful_number_of_routes(scenario):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "FINDING: the external API archives a project for any workspace ADMIN or MEMBER, "
-        "without requiring membership of that project. plane/api/views/project.py:652 uses "
-        "ProjectBasePermission, whose POST branch checks only the workspace role, while the "
-        "app API equivalent (plane/app/views/project/base.py:428) requires project membership. "
-        "Reported for a decision; remove this marker with the fix."
-    ),
-)
 def test_workspace_member_cannot_archive_a_project_they_do_not_belong_to(scenario):
-    """Archiving is destructive and asymmetric.
+    """Archiving is destructive and was asymmetric.
 
-    The same permission class routes un-archiving through its stricter branch,
-    so a workspace member can archive a project they cannot reach and then
-    cannot restore it.
+    It also deletes every member's UserFavorite rows for the project, which
+    un-archiving does not restore, so the operation is partly irreversible.
+    Un-archiving routed through the permission class's stricter branch, so a
+    workspace member could archive a project they cannot open and then not
+    undo it.
     """
     token = APIToken.objects.create(
         user=scenario.personas["ws_member_no_project"], label="t", token=f"tok-{uuid.uuid4().hex}"
@@ -365,3 +357,30 @@ def test_workspace_member_cannot_archive_a_project_they_do_not_belong_to(scenari
     scenario.project_a.project.refresh_from_db()
     assert response.status_code >= 400
     assert scenario.project_a.project.archived_at is None
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_project_member_can_still_archive_and_unarchive(scenario):
+    """The fix must not cost the people who are supposed to do this.
+
+    Both directions are asserted: the defect was that they disagreed, so
+    checking only one would leave the asymmetry undetected.
+    """
+    token = APIToken.objects.create(
+        user=scenario.personas["member_a"], label="t", token=f"tok-{uuid.uuid4().hex}"
+    )
+    client = APIClient()
+    client.credentials(HTTP_X_API_KEY=token.token)
+    url = f"/api/v1/workspaces/{scenario.workspace.slug}/projects/{scenario.project_a.project.id}/archive/"
+
+    archived = client.post(url)
+    scenario.project_a.project.refresh_from_db()
+    assert archived.status_code == 204
+    assert scenario.project_a.project.archived_at is not None
+
+    restored = client.delete(url)
+    scenario.project_a.project.refresh_from_db()
+    assert restored.status_code == 204
+    assert scenario.project_a.project.archived_at is None
+

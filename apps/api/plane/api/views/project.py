@@ -49,7 +49,7 @@ from plane.api.serializers import (
     ProjectCreateSerializer,
     ProjectUpdateSerializer,
 )
-from plane.app.permissions import ProjectBasePermission, WorkSpaceAdminPermission
+from plane.app.permissions import ProjectBasePermission, ProjectEntityPermission, WorkSpaceAdminPermission
 from plane.utils.openapi import (
     project_docs,
     PROJECT_ID_PARAMETER,
@@ -649,7 +649,14 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
 class ProjectArchiveUnarchiveAPIEndpoint(BaseAPIView):
     """Project Archive and Unarchive Endpoint"""
 
-    permission_classes = [ProjectBasePermission]
+    # ProjectEntityPermission, not ProjectBasePermission: the latter answers POST
+    # from a branch written for *creating* a project, which deliberately ignores
+    # project_id because no project exists yet. Inherited here it meant archiving
+    # asked only for a workspace role, so a member could archive a project they
+    # were never added to — and could not undo it, because DELETE fell through to
+    # the stricter branch. This matches the app API equivalent, which has always
+    # required project membership (plane/app/views/project/base.py).
+    permission_classes = [ProjectEntityPermission]
 
     @project_docs(
         operation_id="archive_project",
