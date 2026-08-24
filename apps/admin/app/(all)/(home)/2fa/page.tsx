@@ -12,6 +12,8 @@ import { Button } from "@plane/propel/button";
 import { AuthService, InstanceWebAuthnService } from "@plane/services";
 // components
 import { Banner } from "@/components/common/banner";
+// helpers
+import { authErrorHandler } from "../auth-helpers";
 // types
 import type { Route } from "./+types/page";
 
@@ -63,7 +65,13 @@ export default function AdminSecondFactorPage(_props: Route.ComponentProps) {
       if (name === "NotAllowedError") setError("The request was cancelled or timed out. Try again.");
       else if (name === "SecurityError")
         setError("This site is not allowed to use your security key. Check WEBAUTHN_RP_ID for this deployment.");
-      else setError((caught as { error_message?: string })?.error_message ?? "That key could not be verified.");
+      else {
+        const code = (caught as { error_code?: string })?.error_code;
+        const known = code ? authErrorHandler(code as never) : undefined;
+        // message is already resolved to a node; the second-factor copy is
+        // plain text, so anything else falls back rather than rendering oddly.
+        setError(typeof known?.message === "string" ? known.message : "That key could not be verified.");
+      }
       setIsBusy(false);
     }
   };

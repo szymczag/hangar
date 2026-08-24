@@ -13,7 +13,6 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth import logout
 from django.db import transaction
 
 # Third party imports
@@ -35,6 +34,7 @@ from django.conf import settings
 
 from plane.authentication.rate_limit import authentication_throttle_allows
 from plane.ext.auth.webauthn import pending
+from plane.utils.exception_logger import log_exception
 from plane.ext.models import InstanceAdminWebAuthnCredential
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.password import is_password_strong
@@ -521,16 +521,21 @@ class InstanceAdminSignOutEndpoint(View):
     permission_classes = [InstanceAdminPermission]
 
     def post(self, request):
-        # Get user
+        # Stamp the logout only when there is a user to stamp it on. A caller
+        # in the pending second-factor state is anonymous, and the lookup used
+        # to raise before logout() ran — leaving the pending blob, and its
+        # accumulated attempt count, in place after "Start over".
         try:
-            user = User.objects.get(pk=request.user.id)
-            user.last_logout_ip = user_ip(request=request)
-            user.last_logout_time = timezone.now()
-            user.save()
-            # Log the user out
-            logout(request)
-            url = get_safe_redirect_url(base_url=base_host(request=request, is_admin=True), next_path="")
-            return HttpResponseRedirect(url)
-        except Exception:
-            url = get_safe_redirect_url(base_url=base_host(request=request, is_admin=True), next_path="")
-            return HttpResponseRedirect(url)
+            if request.user.is_authenticated:
+                user = User.objects.get(pk=request.user.id)
+                user.last_logout_ip = user_ip(request=request)
+                user.last_logout_time = timezone.now()
+                user.save()
+        except Exception as error:
+            log_exception(error)
+
+        # flush() rather than logout(): it clears the session for an anonymous
+        # caller too, which is the whole point here.
+        request.session.flush()
+        url = get_safe_redirect_url(base_url=base_host(request=request, is_admin=True), next_path="")
+        return HttpResponseRedirect(url)

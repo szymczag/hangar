@@ -22,6 +22,7 @@ from datetime import timedelta
 
 # Django imports
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
@@ -35,6 +36,7 @@ from webauthn.helpers import options_to_json
 from webauthn.helpers.exceptions import InvalidAuthenticationResponse, InvalidRegistrationResponse
 from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria,
+    CredentialDeviceType,
     PublicKeyCredentialDescriptor,
     ResidentKeyRequirement,
     UserVerificationRequirement,
@@ -42,6 +44,7 @@ from webauthn.helpers.structs import (
 
 # Module imports
 from plane.app.views.base import BaseAPIView
+from plane.authentication.session import BaseSessionAuthentication
 from plane.authentication.adapter.error import AUTHENTICATION_ERROR_CODES, AuthenticationException
 from plane.authentication.rate_limit import (
     AdminWebAuthnOptionsThrottle,
@@ -73,10 +76,17 @@ def _error(code, http_status=status.HTTP_400_BAD_REQUEST):
 
 
 class _WebAuthnBase(BaseAPIView):
-    """Shared plumbing. Not a permission class — the caller is anonymous."""
+    """Shared plumbing.
+
+    AllowAny because the caller is usually mid-sign-in and therefore anonymous;
+    each endpoint carries its own gate. Session authentication stays enabled so
+    an administrator who *is* signed in can register an additional key — without
+    it request.user is permanently anonymous and that path is unreachable, which
+    with the last-credential rule would leave no way to rotate a key at all.
+    """
 
     permission_classes = [AllowAny]
-    authentication_classes = []
+    authentication_classes = [BaseSessionAuthentication]
 
     def _configured(self, request):
         """Refuse early when the browser would reject what we are about to mint."""
@@ -92,6 +102,11 @@ class _WebAuthnBase(BaseAPIView):
         return Response(exc.get_error_dict(), status=status.HTTP_409_CONFLICT)
 
     def _issue_challenge(self, request, user, purpose):
+        # Housekeeping: without this every options request would leave a row
+        # behind forever. Scoped to this user, so it stays cheap.
+        InstanceAdminWebAuthnChallenge.objects.filter(user=user).filter(
+            Q(expires_at__lte=timezone.now()) | Q(consumed_at__isnull=False)
+        ).delete()
         raw = secrets.token_bytes(32)
         challenge = _b64(raw)
         InstanceAdminWebAuthnChallenge.objects.create(
@@ -210,7 +225,10 @@ class AdminWebAuthnAuthenticationVerifyEndpoint(_WebAuthnBase):
                 credential=payload,
                 expected_challenge=_unb64(challenge.challenge),
                 expected_rp_id=challenge.rp_id,
-                expected_origin=sorted(config.allowed_origins(request)),
+                # The snapshot, like expected_rp_id above: a configuration
+                # change between issuing and verifying must not produce a
+                # mismatched pair.
+                expected_origin=challenge.origin,
                 credential_public_key=_unb64(credential.public_key),
                 credential_current_sign_count=credential.sign_count,
                 require_user_verification=False,
@@ -321,7 +339,7 @@ class AdminWebAuthnRegistrationVerifyEndpoint(_WebAuthnBase):
                 credential=payload,
                 expected_challenge=_unb64(challenge.challenge),
                 expected_rp_id=challenge.rp_id,
-                expected_origin=sorted(config.allowed_origins(request)),
+                expected_origin=challenge.origin,
                 require_user_verification=False,
             )
         except (InvalidRegistrationResponse, ValueError, KeyError):
@@ -338,11 +356,11 @@ class AdminWebAuthnRegistrationVerifyEndpoint(_WebAuthnBase):
             credential_id=credential_id,
             public_key=_b64(verification.credential_public_key),
             sign_count=verification.sign_count,
-            transports=[t.value for t in (getattr(payload, "transports", None) or [])] if payload else [],
+            transports=[t for t in ((payload.get("response") or {}).get("transports") or []) if isinstance(t, str)],
             aaguid=str(getattr(verification, "aaguid", "") or "")[:36],
             user_handle=handle,
             nickname=nickname,
-            backup_eligible=bool(getattr(verification, "credential_backed_up", False)),
+            backup_eligible=getattr(verification, "credential_device_type", None) == CredentialDeviceType.MULTI_DEVICE,
             backup_state=bool(getattr(verification, "credential_backed_up", False)),
         )
 

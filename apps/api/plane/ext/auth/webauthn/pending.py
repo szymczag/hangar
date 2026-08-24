@@ -41,9 +41,11 @@ class PendingError(Exception):
 
 def start(request, user, stage):
     """Record a password-verified sign-in awaiting its second factor."""
-    # Rotate before storing: the pre-authentication session key must not carry
-    # over into the one that will become an administrator session.
-    request.session.cycle_key()
+    # flush(), not cycle_key(): cycle_key keeps the session contents, so a
+    # previously signed-in administrator's _auth_user_id and verification
+    # marker would survive underneath this blob — and reappear the moment the
+    # pending state expired and was cleared. Start genuinely empty.
+    request.session.flush()
     request.session[PENDING_KEY] = {
         "user_id": str(user.id),
         "email": user.email,
@@ -123,11 +125,15 @@ def mark_verified(request, credential_id=None):
 
 
 def is_verified(session):
-    """Whether this session completed a second factor recently enough.
+    """Whether this session completed a second factor.
 
-    Bounded by the admin cookie lifetime rather than by a separate window: the
-    session itself expires at that point, so a longer marker would be
-    meaningless and a shorter one would log administrators out mid-task.
+    The marker's presence is what matters; its age is only checked when the
+    session does not roll. With SESSION_SAVE_EVERY_REQUEST the cookie is
+    refreshed on every request, so an absolute deadline measured from
+    verification would cut an actively working administrator off at exactly
+    ADMIN_SESSION_COOKIE_AGE while their session was still perfectly valid —
+    and with no pending state to drive the second-factor page. In that
+    configuration the session expiry is already the bound.
     """
     if not getattr(settings, "ADMIN_WEBAUTHN_REQUIRED", True):
         return True
@@ -136,4 +142,6 @@ def is_verified(session):
     marked = parse_datetime(session.get(VERIFIED_AT_KEY) or "")
     if marked is None:
         return False
+    if getattr(settings, "SESSION_SAVE_EVERY_REQUEST", False):
+        return True
     return timezone.now() - marked <= timedelta(seconds=settings.ADMIN_SESSION_COOKIE_AGE)

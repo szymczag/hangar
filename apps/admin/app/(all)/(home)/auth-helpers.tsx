@@ -116,6 +116,14 @@ export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string
     EAdminAuthErrorCodes.ADMIN_USER_ALREADY_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DOES_NOT_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DEACTIVATED,
+    // Fork (see FORK.md): second-factor codes surface the same way.
+    EAdminAuthErrorCodes.ADMIN_2FA_REQUIRED,
+    EAdminAuthErrorCodes.ADMIN_2FA_SESSION_EXPIRED,
+    EAdminAuthErrorCodes.ADMIN_2FA_VERIFICATION_FAILED,
+    EAdminAuthErrorCodes.ADMIN_2FA_ENROLLMENT_REQUIRED,
+    EAdminAuthErrorCodes.ADMIN_2FA_NOT_CONFIGURED,
+    EAdminAuthErrorCodes.ADMIN_2FA_ATTEMPTS_EXHAUSTED,
+    EAdminAuthErrorCodes.ADMIN_2FA_LAST_CREDENTIAL,
   ];
 
   if (bannerAlertErrorCodes.includes(errorCode))

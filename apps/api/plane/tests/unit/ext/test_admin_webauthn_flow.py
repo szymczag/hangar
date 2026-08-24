@@ -317,3 +317,107 @@ def test_a_credential_id_cannot_be_registered_to_two_administrators(admin_user, 
 
     with pytest.raises(IntegrityError):
         _credential(other, credential_id="shared-id")
+
+
+# ---------------------------------------------------------------------------
+# Regressions found in review
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_starting_a_pending_state_does_not_inherit_the_previous_session(admin_user, client):
+    """cycle_key kept the old contents, so a verified session survived beneath.
+
+    Once the pending state expired and was cleared, that session reappeared —
+    fully verified, belonging to whoever signed in previously.
+    """
+    authenticate_admin(client, admin_user, verified=True)
+    assert client.get(ME).status_code == 200
+
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+
+    session = admin_session(client)
+    assert "_auth_user_id" not in session
+    assert session.get(pending.VERIFIED_AT_KEY) is None
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_signing_out_of_a_pending_state_clears_it(admin_user, client):
+    """"Start over" left the blob — and its attempt count — in place.
+
+    The sign-out view looked up request.user.id first, which raises for the
+    anonymous pending caller, so logout() never ran.
+    """
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    assert admin_session(client).get(pending.PENDING_KEY) is not None
+
+    client.post("/api/instances/admins/sign-out/")
+
+    assert admin_session(client).get(pending.PENDING_KEY) is None
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_a_verified_administrator_can_request_registration_options(admin_user, client):
+    """Adding a second key must be reachable.
+
+    authentication_classes = [] made request.user permanently anonymous, so
+    this branch could never run — and with the last-credential rule refusing
+    removal, there was no way to rotate a key at all.
+    """
+    _credential(admin_user)
+    authenticate_admin(client, admin_user, verified=True)
+
+    response = client.post(
+        "/api/instances/admins/webauthn/registration/options/", {}, content_type="application/json"
+    )
+
+    assert response.status_code == 200
+    assert "options" in response.json()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_issuing_a_challenge_clears_the_spent_ones(admin_user, client):
+    """Every options request used to leave a row behind permanently."""
+    from plane.ext.views.instance_webauthn import _WebAuthnBase
+
+    InstanceAdminWebAuthnChallenge.objects.create(
+        user=admin_user,
+        purpose=InstanceAdminWebAuthnChallenge.Purpose.AUTHENTICATION,
+        challenge="spent",
+        session_key="sess",
+        rp_id="localhost",
+        origin="http://localhost",
+        expires_at=timezone.now() - timedelta(minutes=1),
+    )
+
+    class _Req:
+        session = type("S", (), {"session_key": "sess"})()
+
+    _WebAuthnBase()._issue_challenge(
+        _Req(), admin_user, InstanceAdminWebAuthnChallenge.Purpose.AUTHENTICATION
+    )
+
+    assert not InstanceAdminWebAuthnChallenge.objects.filter(challenge="spent").exists()
+    assert InstanceAdminWebAuthnChallenge.objects.filter(user=admin_user).count() == 1
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(SESSION_SAVE_EVERY_REQUEST=True)
+def test_a_rolling_session_keeps_its_verification(admin_user, client):
+    """The cookie rolls on every request; an absolute marker deadline did not.
+
+    An administrator working continuously was cut off at exactly
+    ADMIN_SESSION_COOKIE_AGE, with a valid session and no pending state to
+    drive the second-factor page.
+    """
+    session = authenticate_admin(client, admin_user, verified=False)
+    session[pending.VERIFIED_AT_KEY] = (timezone.now() - timedelta(days=2)).isoformat()
+    save_admin_session(client, session)
+
+    assert client.get(ME).status_code == 200
+
