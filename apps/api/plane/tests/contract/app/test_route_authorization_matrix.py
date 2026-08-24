@@ -299,3 +299,29 @@ def test_inventory_sees_a_plausible_number_of_routes():
     records = collect_routes()
     assert len(records) > 100, f"Route inventory collapsed to {len(records)} routes; the walk is broken"
     assert any(MECHANISM_NONE not in record.mechanisms for record in records)
+
+
+@pytest.mark.contract
+def test_a_route_is_never_scoped_by_less_than_its_url_captures():
+    """The failure mode that hid fifteen routes from every probe above.
+
+    ``workspace_scoped`` selects on ``slug`` appearing in ``kwargs_required``.
+    That list used to be read from the leaf pattern only, so a route mounted
+    under ``include()`` — where the parent captures the slug — reported no
+    parameters at all and was quietly skipped. Nothing failed: the report
+    stayed green while naming fewer routes than it claimed to cover.
+
+    Comparing the captures against the URL text catches this for any nesting
+    depth, without naming a route that a later refactor may move.
+    """
+    unaccounted = [
+        record.describe()
+        for record in collect_routes()
+        for parameter in ("slug", "project_id")
+        if f":{parameter}>" in record.pattern and parameter not in record.kwargs_required
+    ]
+
+    assert not unaccounted, (
+        "Routes capture a parameter their inventory entry does not list, so scope "
+        "filters skip them:\n  " + "\n  ".join(sorted(unaccounted))
+    )

@@ -10,12 +10,12 @@ Four, from outermost to innermost. A defect at any level is only visible if you
 test at that level, which is why the probes described below use distinct
 personas rather than one "unauthorised" caller.
 
-| Boundary | Question | Typical failure |
-| --- | --- | --- |
-| Instance | Does this person have an account at all? | an unauthenticated route |
-| Tenant | May they act on **this workspace**? | a queryset filtered by id but not workspace |
-| Project | May they act on **this project** inside a workspace they belong to? | a check that stops at workspace membership |
-| Role | May they perform **this operation** on it? | a decorator admitting a role that should not write |
+| Boundary | Question                                                            | Typical failure                                    |
+| -------- | ------------------------------------------------------------------- | -------------------------------------------------- |
+| Instance | Does this person have an account at all?                            | an unauthenticated route                           |
+| Tenant   | May they act on **this workspace**?                                 | a queryset filtered by id but not workspace        |
+| Project  | May they act on **this project** inside a workspace they belong to? | a check that stops at workspace membership         |
+| Role     | May they perform **this operation** on it?                          | a decorator admitting a role that should not write |
 
 The project boundary is the one most often missed. Every caller in that scenario
 legitimately belongs to the workspace, so the request looks ordinary and the
@@ -28,7 +28,7 @@ identify which of these the endpoint uses, because they fail differently:
 
 1. **`permission_classes`** — DRF classes such as `ProjectEntityPermission`.
 2. **`@allow_permission`** — role decorator, `level="PROJECT"` by default.
-3. **Membership filtering in the queryset** — no explicit gate; the filter *is*
+3. **Membership filtering in the queryset** — no explicit gate; the filter _is_
    the gate.
 4. **Service-layer checks** — the view delegates, e.g. `resolve_for_admin(actor=…)`.
 5. **Self-scoping** — the record is keyed to `request.user`, so identity is the
@@ -40,7 +40,7 @@ from correct code by reading.
 
 ### Permission classes branch on HTTP method, not on operation
 
-`ProjectBasePermission` answers `POST` from a branch written for *creating* a
+`ProjectBasePermission` answers `POST` from a branch written for _creating_ a
 project, which deliberately ignores `project_id` because no project exists yet.
 Any other `POST` endpoint using that class inherits a check that never asks
 about the target object. This produced a real defect: archiving a project asked
@@ -80,11 +80,11 @@ another workspace must be rejected, not trusted because the route was.
 
 Three suites, each covering what the previous cannot reach.
 
-| Suite | Covers |
-| --- | --- |
-| `test_route_authorization_matrix.py` | every workspace-scoped route, non-member persona; plus the standing check that no route lacks a recognised mechanism |
-| `test_horizontal_authorization.py` | boundaries inside one workspace: member-without-project, guest, project admin, deactivated account, IDOR, self-role escalation |
-| `test_authorization_surfaces.py` | token-authenticated API, published boards, assets by id, analytics |
+| Suite                                | Covers                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `test_route_authorization_matrix.py` | every workspace-scoped route, non-member persona; plus the standing check that no route lacks a recognised mechanism           |
+| `test_horizontal_authorization.py`   | boundaries inside one workspace: member-without-project, guest, project admin, deactivated account, IDOR, self-role escalation |
+| `test_authorization_surfaces.py`     | token-authenticated API, published boards, assets by id, analytics                                                             |
 
 Shared setup is in `plane/tests/support/`: `personas.py` builds a workspace with
 **two** projects and seven personas, `route_inventory.py` enumerates routes and
@@ -113,6 +113,15 @@ classifies them.
 - **Filter by generated path, not view module.** Some route names are registered
   in both url confs, so `reverse()` can return an `/api/v1/` path for a record
   whose module says `plane.app.views`.
+- **Read URL parameters from the whole resolver chain, not the leaf.** Under
+  `include()` the workspace `slug` is captured by the parent, so a leaf's own
+  `groupindex` reports no parameters for routes such as
+  `workspaces/<slug>/runner/installation/`. Because `workspace_scoped()` selects
+  on `slug` being present, those routes dropped out of every probe while the
+  report still looked complete — fifteen of them, including the external API's
+  invitation endpoints. `test_a_route_is_never_scoped_by_less_than_its_url_captures`
+  compares each entry's captures against its URL text so this cannot recur at
+  any nesting depth.
 
 ### Recording a finding without going red
 
@@ -126,7 +135,7 @@ a strict xfail.
 
 A token authenticates as its owner. `APIToken.workspace` is optional: tokens
 minted through the product leave it null, and their reach is the owner's
-memberships. When a token *does* name a workspace, it is confined to it —
+memberships. When a token _does_ name a workspace, it is confined to it —
 enforced in `BaseAPIView.initial()` rather than a permission class, because
 views override `permission_classes` freely and the rule must not be switchable
 off by omission.
@@ -138,11 +147,11 @@ answer with `APITokenReadSerializer`, which excludes it.
 
 `StaticFileAssetEndpoint` is deliberately `AllowAny`, but not uniformly:
 
-| Entity type | Who may read it |
-| --- | --- |
-| `USER_AVATAR`, `USER_COVER` | anyone — rendered on sign-in screens and public boards |
-| `WORKSPACE_LOGO` | workspace members |
-| `PROJECT_COVER` | project members, **or** anyone while the project is published |
+| Entity type                 | Who may read it                                               |
+| --------------------------- | ------------------------------------------------------------- |
+| `USER_AVATAR`, `USER_COVER` | anyone — rendered on sign-in screens and public boards        |
+| `WORKSPACE_LOGO`            | workspace members                                             |
+| `PROJECT_COVER`             | project members, **or** anyone while the project is published |
 
 A project cover follows publication rather than membership because the public
 board lists it. Gating covers on membership alone would break published boards —
@@ -167,12 +176,12 @@ Two consequences for anyone adding an endpoint there:
 
 ## Configuration that participates in authorization
 
-| Setting | Effect |
-| --- | --- |
-| `ENABLE_SIGNUP=0` | account creation requires an invitation |
-| `DISABLE_WORKSPACE_CREATION=1` | only instance administrators create workspaces |
-| `SSO_ENFORCED_DOMAINS` | pins an email domain to designated identity providers |
-| `SSO_AUTO_JOIN_WORKSPACES` | places federated users into a workspace on sign-in |
+| Setting                        | Effect                                                |
+| ------------------------------ | ----------------------------------------------------- |
+| `ENABLE_SIGNUP=0`              | account creation requires an invitation               |
+| `DISABLE_WORKSPACE_CREATION=1` | only instance administrators create workspaces        |
+| `SSO_ENFORCED_DOMAINS`         | pins an email domain to designated identity providers |
+| `SSO_AUTO_JOIN_WORKSPACES`     | places federated users into a workspace on sign-in    |
 
 An account with no membership sees no content, so those two flags are what make
 "anyone can sign in" safe. See [federated SSO security](federated-sso-security.md).
