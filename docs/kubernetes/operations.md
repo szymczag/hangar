@@ -59,7 +59,7 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.27` to `rc.29`
+### Upgrade from `rc.27` to `rc.30`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
 Upgrade directly from the immediately previous complete release, `rc.27`.
@@ -82,13 +82,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.29`, its application version is
-   `v0.1.0-rc.29`, and its signatures and digests pass the
+2. confirm the target chart is `0.1.0-rc.30`, its application version is
+   `v0.1.0-rc.30`, and its signatures and digests pass the
    [release verification procedure](security.md#verify-release-010-rc29);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
-   `rc.27` and `rc.29` web or API images because their preview-execution request
+   `rc.27` and `rc.30` web or API images because their preview-execution request
    contract intentionally changed together.
 
 Wait for the revision-scoped migration Job to complete before admitting traffic.
@@ -101,7 +101,7 @@ also fail without creating a job or retaining a source object.
 target; the nullable column may remain in the database. It restores the preview
 bypass and duplicate-confirmation race, however, so it is not a
 security-equivalent rollback. Prefer a forward correction and return every
-application component to `rc.29` promptly.
+application component to `rc.30` promptly.
 
 ### Upgrade from `rc.26` to `rc.27`
 
