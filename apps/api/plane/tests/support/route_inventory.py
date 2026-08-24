@@ -141,19 +141,28 @@ def _classify(view_class, permission_names, source):
     return mechanisms or {MECHANISM_NONE}
 
 
-def _walk(resolver, prefix=""):
+def _walk(resolver, prefix="", captured=()):
+    """Yield each leaf pattern with every parameter captured on the way to it.
+
+    A leaf's own regex only names what its final segment captures. Under
+    ``include()`` the workspace ``slug`` is captured by the parent resolver,
+    so reading ``groupindex`` off the leaf alone reports no slug at all for
+    routes such as ``workspaces/<slug>/runner/installation/`` — and they then
+    fall out of ``workspace_scoped`` while still looking accounted for.
+    """
     for entry in resolver.url_patterns:
         route = prefix + str(entry.pattern)
+        names = (*captured, *entry.pattern.regex.groupindex.keys())
         if isinstance(entry, URLResolver):
-            yield from _walk(entry, route)
+            yield from _walk(entry, route, names)
         elif isinstance(entry, URLPattern):
-            yield route, entry
+            yield route, entry, names
 
 
 def collect_routes(urlconf=None):
     """Return a RouteRecord for every route in the URL conf."""
     records = []
-    for route, entry in _walk(get_resolver(urlconf)):
+    for route, entry, captured in _walk(get_resolver(urlconf)):
         view_class = _view_class(entry.callback)
         if view_class is None:
             continue
@@ -174,7 +183,7 @@ def collect_routes(urlconf=None):
                 handlers=handlers,
                 permission_classes=permission_classes,
                 mechanisms=_classify(view_class, permission_classes, source),
-                kwargs_required=tuple(entry.pattern.regex.groupindex.keys()),
+                kwargs_required=tuple(dict.fromkeys(captured)),
             )
         )
     return records
