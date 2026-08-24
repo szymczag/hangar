@@ -168,6 +168,24 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
             </div>
           </Link>
 
+          <Link
+            href="/authentication/identity-import"
+            className={cn("hover:bg-layout-bg-hover -mx-2 flex w-full items-center gap-14 rounded-sm px-2 py-1")}
+          >
+            <div className="flex grow items-center gap-4">
+              <div className="grow">
+                <div className="pb-1 text-16 font-medium">Import identities for existing accounts</div>
+                <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
+                  Link the accounts you already have to the subjects your provider asserts, so pinning a domain does not
+                  lock them out. Requires your password at the point of use.
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 pr-4 text-tertiary">
+              <ChevronRight className="h-4 w-4" />
+            </div>
+          </Link>
+
           <div className="text-lg pt-6 font-medium">Available authentication modes</div>
           {authenticationModes.map((method) => (
             <AuthenticationMethodCard
