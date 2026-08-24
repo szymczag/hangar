@@ -57,6 +57,13 @@ class WorkspaceViewViewSet(BaseViewSet):
         workspace = Workspace.objects.get(slug=self.kwargs.get("slug"))
         serializer.save(workspace_id=workspace.id, owned_by=self.request.user)
 
+    # Every other action on this viewset is decorated; create was left on the
+    # unguarded ModelViewSet default, so any authenticated user could add a
+    # view to a workspace they do not belong to.
+    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def create(self, request, slug):
+        return super().create(request)
+
     def get_queryset(self):
         return self.filter_queryset(
             super()
@@ -265,6 +272,11 @@ class IssueViewViewSet(BaseViewSet):
 
     def perform_create(self, serializer):
         serializer.save(project_id=self.kwargs.get("project_id"), owned_by=self.request.user)
+
+    # See WorkspaceViewViewSet.create: the same gap existed at project level.
+    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER])
+    def create(self, request, slug, project_id):
+        return super().create(request)
 
     def get_queryset(self):
         subquery = UserFavorite.objects.filter(

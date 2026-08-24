@@ -31,3 +31,4 @@ from .workspace import (
     InstanceWorkSpaceAvailabilityCheckEndpoint,
     InstanceWorkSpaceEndpoint,
 )
+from .user import InstanceUserEndpoint  # noqa: F401

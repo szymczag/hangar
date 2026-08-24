@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-import json
 import os
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, urlsplit, urlunsplit
@@ -18,7 +17,6 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
     AuthenticationException,
 )
-from plane.utils.url_security import pinned_fetch
 
 
 GITEA_RESPONSE_MAX_BYTES = 256 * 1024
@@ -121,59 +119,15 @@ class GiteaOAuthProvider(OauthAdapter):
             callback=callback,
         )
 
-    @staticmethod
-    def _request_json(method, url, *, headers=None, data=None):
-        response = None
-        try:
-            response = pinned_fetch(
-                method,
-                url,
-                allowed_ips=settings.GITEA_ALLOWED_IPS,
-                allowed_hosts=settings.GITEA_ALLOWED_HOSTS,
-                headers=headers or {},
-                data=data,
-                timeout=GITEA_REQUEST_TIMEOUT,
-                stream=True,
-            )
-            if 300 <= response.status_code < 400:
-                raise requests.RequestException("Gitea OAuth redirects are not allowed")
-            response.raise_for_status()
+    # Gitea is commonly self-hosted on an internal network, so private
+    # destinations are reachable when the operator names them. Responses are
+    # capped tighter than the shared default: these endpoints return a small
+    # token or user object.
+    outbound_max_response_bytes = GITEA_RESPONSE_MAX_BYTES
+    outbound_timeout = GITEA_REQUEST_TIMEOUT
 
-            body = bytearray()
-            for chunk in response.iter_content(chunk_size=8192):
-                body.extend(chunk)
-                if len(body) > GITEA_RESPONSE_MAX_BYTES:
-                    raise requests.RequestException("Gitea OAuth response is too large")
-            return json.loads(body.decode("utf-8"))
-        except (UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
-            raise requests.RequestException("Invalid Gitea OAuth response") from exc
-        finally:
-            if response is not None:
-                response.close()
-
-    def get_user_token(self, data, headers=None):
-        try:
-            return self._request_json("POST", self.get_token_url(), data=data, headers=headers)
-        except requests.RequestException:
-            self.logger.warning("Error getting user token")
-            raise AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES["GITEA_OAUTH_PROVIDER_ERROR"],
-                error_message="GITEA_OAUTH_PROVIDER_ERROR",
-            )
-
-    def get_user_response(self):
-        try:
-            return self._request_json(
-                "GET",
-                self.get_user_info_url(),
-                headers={"Authorization": f"Bearer {self.token_data.get('access_token')}"},
-            )
-        except requests.RequestException:
-            self.logger.warning("Error getting user response")
-            raise AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES["GITEA_OAUTH_PROVIDER_ERROR"],
-                error_message="GITEA_OAUTH_PROVIDER_ERROR",
-            )
+    def outbound_allowlist(self):
+        return settings.GITEA_ALLOWED_IPS, settings.GITEA_ALLOWED_HOSTS
 
     def set_token_data(self):
         data = {

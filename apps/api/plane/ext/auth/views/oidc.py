@@ -32,6 +32,8 @@ from plane.ext.auth.provider.oidc import OIDCOAuthProvider
 SESSION_STATE = "oidc_state"
 SESSION_NONCE = "oidc_nonce"
 SESSION_VERIFIER = "oidc_code_verifier"
+SESSION_HOST = "host"
+SESSION_NEXT_PATH = "next_path"
 
 
 def _pkce_pair():
@@ -65,10 +67,13 @@ class OIDCEndpointMixin:
 class OIDCAuthInitiateBase(OIDCEndpointMixin, View):
     def get(self, request):
         host = self._host(request)
-        request.session["host"] = host
+        request.session[self._session_key(SESSION_HOST)] = host
         next_path = request.GET.get("next_path")
-        if next_path:
-            request.session["next_path"] = str(validate_next_path(next_path))
+        # Written unconditionally: a leftover value from an earlier flow must
+        # not be inherited by one that asked for no next_path.
+        request.session[self._session_key(SESSION_NEXT_PATH)] = (
+            str(validate_next_path(next_path)) if next_path else None
+        )
 
         if not authentication_throttle_allows(request):
             exc = AuthenticationException(
@@ -109,11 +114,12 @@ class OIDCCallbackBase(OIDCEndpointMixin, View):
     def get(self, request):
         code = request.GET.get("code")
         state = request.GET.get("state")
-        host = request.session.get("host") or self._host(request)
-        next_path = request.session.get("next_path")
-
         # One-shot session values: pop them so a replayed callback URL cannot
-        # reuse this session's state/nonce/verifier.
+        # reuse this session's state/nonce/verifier. Every value is namespaced
+        # by flow so a concurrent app and space attempt in the same browser
+        # session cannot consume or redirect each other.
+        host = request.session.pop(self._session_key(SESSION_HOST), None) or self._host(request)
+        next_path = request.session.pop(self._session_key(SESSION_NEXT_PATH), None)
         session_state = request.session.pop(self._session_key(SESSION_STATE), "")
         nonce = request.session.pop(self._session_key(SESSION_NONCE), "")
         code_verifier = request.session.pop(self._session_key(SESSION_VERIFIER), "")

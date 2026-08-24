@@ -6,6 +6,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
+import { ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
 // plane internal packages
@@ -124,7 +126,9 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
               <div className="grow">
                 <div className="pb-1 text-16 font-medium">Allow anyone to sign up even without an invite</div>
                 <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
-                  Toggling this off will only let users sign up when they are invited.
+                  Leaving this on lets anyone who can reach this instance create an account. They join no workspace and
+                  see no content until invited, but they can sign in and create their own workspace unless that is also
+                  disabled. Toggling it off requires an invitation to sign up.
                 </div>
               </div>
             </div>
@@ -145,6 +149,25 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
               </div>
             </div>
           </div>
+          <div className="text-lg pt-6 font-medium">Domain policy</div>
+          <Link
+            href="/authentication/domains"
+            className={cn("hover:bg-layout-bg-hover -mx-2 flex w-full items-center gap-14 rounded-sm px-2 py-1")}
+          >
+            <div className="flex grow items-center gap-4">
+              <div className="grow">
+                <div className="pb-1 text-16 font-medium">Pin email domains to a provider</div>
+                <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
+                  Decide which provider owns each domain, so nobody can claim a colleague&apos;s address through a
+                  weaker sign-in method, and choose the workspace its users join automatically.
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 pr-4 text-tertiary">
+              <ChevronRight className="h-4 w-4" />
+            </div>
+          </Link>
+
           <div className="text-lg pt-6 font-medium">Available authentication modes</div>
           {authenticationModes.map((method) => (
             <AuthenticationMethodCard

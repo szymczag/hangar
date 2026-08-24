@@ -12,6 +12,8 @@ export default [
   layout("./(all)/(dashboard)/layout.tsx", [
     route("general", "./(all)/(dashboard)/general/page.tsx"),
     route("workspace", "./(all)/(dashboard)/workspace/page.tsx"),
+    // Fork (see FORK.md)
+    route("users", "./(all)/(dashboard)/users/page.tsx"),
     route("workspace/create", "./(all)/(dashboard)/workspace/create/page.tsx"),
     route("email", "./(all)/(dashboard)/email/page.tsx"),
     route("authentication", "./(all)/(dashboard)/authentication/page.tsx"),
@@ -22,6 +24,7 @@ export default [
     // Fork (see FORK.md)
     route("authentication/oidc", "./(all)/(dashboard)/authentication/oidc/page.tsx"),
     route("authentication/saml", "./(all)/(dashboard)/authentication/saml/page.tsx"),
+    route("authentication/domains", "./(all)/(dashboard)/authentication/domains/page.tsx"),
     route("ai", "./(all)/(dashboard)/ai/page.tsx"),
     route("image", "./(all)/(dashboard)/image/page.tsx"),
   ]),

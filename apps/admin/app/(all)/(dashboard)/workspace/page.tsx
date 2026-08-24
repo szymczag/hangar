@@ -89,6 +89,8 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
                 <div className="pb-1 text-16 font-medium">Prevent anyone else from creating a workspace.</div>
                 <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
                   Toggling this on will let only you create workspaces. You will have to invite users to new workspaces.
+                  Left off, anyone with an account — including someone who signed up through SSO and was never invited
+                  anywhere — can create their own workspace on this instance.
                 </div>
               </div>
             </div>

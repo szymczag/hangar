@@ -23,6 +23,8 @@ import { ControllerInput } from "@/components/common/controller-input";
 import type { TCopyField } from "@/components/common/copy-field";
 import { CopyField } from "@/components/common/copy-field";
 // hooks
+import { PrivateNetworkNotice } from "@/components/authentication/private-network-notice";
+// hooks
 import { useInstance } from "@/hooks/store";
 
 type Props = {
@@ -217,6 +219,7 @@ export function InstanceGitlabConfigForm(props: Props) {
               {GITLAB_SERVICE_FIELD.map((field) => (
                 <CopyField key={field.key} label={field.label} url={field.url} description={field.description} />
               ))}
+              <PrivateNetworkNotice provider="GITLAB" label="GitLab" />
             </div>
           </div>
         </div>

@@ -64,6 +64,61 @@ stored as encrypted instance configuration. Restart behavior depends on how the
 deployment applies environment and instance settings; use a normal rollout after
 changing deployment secrets.
 
+### Where settings are read from
+
+By default (`SKIP_ENV_VAR` unset, or `1`) the **stored configuration is
+authoritative** and an environment variable only supplies the initial value for a
+key that is not stored yet. Editing a setting in the administration UI therefore
+takes effect, and a stale environment variable of the same name does not override
+it after a restart.
+
+If the deployment sets `SKIP_ENV_VAR=0`, that reverses: values are read from the
+environment and stored configuration is ignored. Because every form in the
+administration UI would otherwise still render and still submit, in that mode the
+configuration API refuses writes with `409 Conflict` and the UI shows a banner
+explaining that the deployment owns these settings. The current mode is reported
+to the UI as a read-only `CONFIGURATION_SOURCE` entry (`database` or
+`environment`); it cannot be set through the API.
+
+A small number of settings are deliberately environment-only regardless of this
+mode — see the egress policy below.
+
+### Domain policy
+
+These govern which provider owns an email domain and where its users land. Both
+are editable in the administration UI under **Authentication → Domain policy**.
+
+| Setting                    | Meaning                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| `SSO_ENFORCED_DOMAINS`     | Domains pinned to a provider, as `corp.com=google`, `corp.com=oidc;saml`, or a bare `corp.com` |
+| `SSO_AUTO_JOIN_WORKSPACES` | Workspaces joined on sign-in, as `corp.com=workspace-slug:role`                              |
+
+A listed domain may be asserted **only** by the providers named for it. Every other
+enabled method — password, magic code, and the remaining providers — is refused for
+that domain on both sign-up and sign-in. This is what prevents an attacker from
+claiming a colleague's address through a weaker route before its owner first signs
+in, and what makes a rogue identity provider asserting the same addresses useless.
+A bare domain entry admits any federated provider (`google`, `oidc`, `saml`) and
+refuses credential sign-in. Matching is exact and IDNA-normalized: a parent entry
+does not cover its subdomains, so list those separately.
+
+Auto-join adds a user to the named workspace on **every** sign-in, not only at
+signup, so adding a domain later also covers people who already have an account.
+The role is `admin`, `member`, or `guest`, defaulting to `guest` when omitted so
+that an unstated role cannot grant write access; an unrecognized role is skipped
+rather than guessed. An existing membership is never modified, so a role an
+administrator lowered by hand is not restored at the next sign-in and a deactivated
+member is not silently reactivated.
+
+Auto-join only applies to domains that `SSO_ENFORCED_DOMAINS` pins. Membership is
+granted on the strength of an email domain, so that domain must first belong to a
+designated provider; without the pin, any other enabled sign-in method would become
+a route into the workspace.
+
+Note that Google's `hd` claim is tenant-wide. Workspace mode admits every account in
+an allowed hosted domain; Google issues no organizational-unit or group claim, so
+finer restriction is not available from the token.
+
 ### Google
 
 | Setting                    | Required          | Meaning                                                                                       |
@@ -78,19 +133,39 @@ Workspace mode validates the signed Google `hd` claim. A matching email suffix i
 not sufficient. Configure every intended tenant explicitly before switching from
 `generic` to `workspace`.
 
-### Gitea OAuth egress policy
+### Self-hosted provider egress policy (Gitea, GitLab)
 
-`GITEA_HOST` must be an HTTPS origin in production. Token and profile requests pin
-the resolved address, reject redirects, cap response bodies, and deny private,
-loopback, link-local, and other non-public destinations by default. The OAuth client
-secret and bearer token therefore cannot be redirected to an administrator-selected
-internal service.
+`GITEA_HOST` and `GITLAB_HOST` must be HTTPS origins in production. Every outbound
+authentication request — token exchange, profile lookup, and for OIDC also discovery
+and JWKS — resolves the destination once, rejects any answer that is not a public
+address, pins the connection to a validated address, and re-checks the connected
+peer against it. That last check is what defeats DNS rebinding: a hostname that
+re-resolves to an internal address between validation and connection is refused at
+the socket. Redirects are not followed, response bodies are capped, and every
+request carries a deadline. The OAuth client secret and bearer token therefore
+cannot be redirected to an administrator-selected internal service.
 
-For an intentionally private Gitea deployment, the operator must add the exact
-normalized DNS name to `GITEA_ALLOWED_HOSTS` or an address/CIDR to
-`GITEA_ALLOWED_IPS` in the deployment environment. These allowlists are not mutable
-instance settings: changing `GITEA_HOST` in the administration UI cannot expand the
-network boundary. Keep exceptions narrow and restart the API after changing them.
+For an intentionally private deployment, the operator must name it explicitly in the
+deployment environment:
+
+| Setting                                            | Meaning                              |
+| -------------------------------------------------- | ------------------------------------ |
+| `GITEA_ALLOWED_HOSTS` / `GITLAB_ALLOWED_HOSTS`     | Comma-separated normalized DNS names |
+| `GITEA_ALLOWED_IPS` / `GITLAB_ALLOWED_IPS`         | Comma-separated addresses or CIDRs   |
+
+**These allowlists are environment-only by design and cannot be set from the
+administration UI**, even when the instance otherwise reads its configuration from
+the database. They permit credential-bearing outbound requests to reach private
+addresses, so they belong to whoever controls the deployment rather than to anyone
+holding administrator access to the panel; the configuration API rejects attempts to
+set them with `400`. Changing `GITEA_HOST` or `GITLAB_HOST` in the administration UI
+cannot expand the network boundary on its own. The administration UI shows this
+explanation on the Gitea and GitLab pages so the constraint is discoverable at the
+point of use.
+
+Allowlisting only widens which addresses are acceptable. Address pinning and the
+connected-peer check still apply to an allowlisted destination. Keep exceptions
+narrow and restart the API after changing them.
 
 ### OpenID Connect
 
@@ -125,6 +200,116 @@ The removed `OIDC_ALLOW_UNVERIFIED_EMAIL` setting is not supported.
 Changing the IdP entity ID, OIDC issuer, or SAML subject mapping creates a new
 identity namespace. Treat such a change as a migration, not ordinary profile
 configuration.
+
+## Pinning an existing domain to Google
+
+An instance that already has accounts at the domain has two populations, and they
+behave differently on the first Google sign-in after the cutover:
+
+| Existing account                      | First Google sign-in                                     |
+| ------------------------------------- | -------------------------------------------------------- |
+| Has signed in with Google before       | Adopted automatically; same user id, memberships intact  |
+| Only ever used a password or magic link | Refused with `SSO_ACCOUNT_LINK_REQUIRED` until linked    |
+
+The second case is a lockout, not a corner case: the address is already held by an
+unlinked user, and the refusal is deliberate — silently binding a Google subject to
+an existing local account is exactly the takeover the design prevents. Plan for it
+before enabling `SSO_ENFORCED_DOMAINS`, because that setting removes the password
+and magic-link fallback those users still depend on.
+
+### Find out which accounts need work
+
+The administration panel has no user list, so use the read-only audit command.
+It never writes and is safe against production:
+
+```bash
+python manage.py audit_user_identities --domain corp.com --provider google
+```
+
+```
+EMAIL                  STATUS         PASSWORD  SIGN-IN RECORDS
+adoptable@corp.com     adoptable      no        google
+bound@corp.com         federated      no        google:https://accounts.google.com
+passwordonly@corp.com  needs-import   yes       -
+
+adoptable=1  federated=1  needs-import=1
+
+1 account(s) would be refused after pinning this domain to 'google'. ...
+```
+
+| Status         | Meaning at cutover                                                    |
+| -------------- | --------------------------------------------------------------------- |
+| `federated`    | Already bound to the provider; nothing to do                          |
+| `adoptable`    | Has a prior OAuth account for it; adopted on the next sign-in         |
+| `needs-import` | Nothing links it to the provider; **refused** until its subject is imported |
+
+`--provider` is what makes the distinction meaningful: an account bound to a
+different provider still counts as `needs-import` when the domain is being pinned
+to Google. Add `--csv` to produce a starting point for the import file, and
+`--include-inactive` to see deactivated accounts, which are hidden by default.
+
+Omit `--provider` for a general view of how everyone signs in today.
+
+### Order of operations
+
+Pin the domain **last**. Until that step, everyone keeps their existing sign-in
+method, so a mistake is recoverable.
+
+1. Configure Google and enable it, with `GOOGLE_AUTH_MODE=workspace` and the domain
+   in `GOOGLE_WORKSPACE_DOMAINS`. Leave `SSO_ENFORCED_DOMAINS` empty for now.
+2. Have each account in the `auto` group sign in with Google once. Confirm the user
+   id and workspace memberships are unchanged.
+3. For each account marked `NEEDS IMPORT`, collect its Google subject. In the Google
+   Admin SDK this is the `id` field of `directory.users.get`; it is the same value
+   Google puts in the `sub` claim. Build the CSV with an empty `subject_format`:
+
+   ```csv
+   user_id,email,subject,subject_format
+   5e9158cd-7b35-46fb-a249-a27786bca342,person@corp.com,104729...,
+   ```
+
+4. Import with `--dry-run` first, review the report, then import for real:
+
+   ```bash
+   python manage.py import_federated_identities \
+     --provider google \
+     --issuer https://accounts.google.com \
+     --file /secure/google-mapping.csv \
+     --report /secure/google-mapping-report.json \
+     --dry-run
+   ```
+
+   The issuer must be exactly `https://accounts.google.com`.
+5. Have those accounts sign in with Google and confirm success.
+6. Only now set `SSO_ENFORCED_DOMAINS=corp.com=google`. From this point the domain
+   accepts Google alone; password and magic-link sign-in are refused for it.
+7. Optionally set `SSO_AUTO_JOIN_WORKSPACES` so new colleagues land in a workspace
+   instead of an empty account.
+
+### Keeping administrative access
+
+Pinning a domain removes password and magic-link sign-in for it, so decide in
+advance how an administrator gets in if the identity provider is unavailable.
+
+Two facts, both covered by tests:
+
+- The policy governs only the domains it lists. An administrator whose address is
+  outside them — a separate operations domain, not a personal mailbox — keeps
+  password sign-in to the application. This is the recommended break-glass account,
+  and it is also the account to use for merging or repairing users.
+- The God Mode console at `/god-mode` authenticates against the password directly
+  rather than through the provider adapters, so an instance administrator cannot
+  lock themselves out of it by pinning their own domain. The corollary is that
+  **pinning a domain does not protect the console**: its password is the only thing
+  in front of it. Give it a strong, unique password and restrict who holds instance
+  administrator rights.
+
+### If someone is locked out afterwards
+
+Their account still exists and nothing has been reassigned. Import the missing
+subject as in step 3, or temporarily clear `SSO_ENFORCED_DOMAINS` to restore the
+previous sign-in methods while sorting it out. Do not resolve it by deleting and
+recreating the account: a new user id loses their memberships and history.
 
 ## Upgrade and migration procedure
 

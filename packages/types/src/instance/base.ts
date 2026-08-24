@@ -122,12 +122,18 @@ export interface IInstanceAdmin {
   user_detail: IUserLite;
 }
 
+// Fork (see FORK.md): reported by the API, never written. Tells the panel
+// whether stored configuration is read back at all, or whether the deployment
+// environment decides and every form would be a no-op.
+export type TInstanceConfigurationSourceKey = "CONFIGURATION_SOURCE";
+
 export type TInstanceConfigurationKeys =
   | TInstanceAIConfigurationKeys
   | TInstanceEmailConfigurationKeys
   | TInstanceImageConfigurationKeys
   | TInstanceAuthenticationKeys
-  | TInstanceWorkspaceConfigurationKeys;
+  | TInstanceWorkspaceConfigurationKeys
+  | TInstanceConfigurationSourceKey;
 
 export interface IInstanceConfiguration {
   id: string;
@@ -138,6 +144,39 @@ export interface IInstanceConfiguration {
   created_by: string | null;
   updated_by: string | null;
 }
+
+// Fork (see FORK.md): read-only report of who has an account and how they
+// sign in. `status` says what pinning a domain to `provider` would do to the
+// account: already bound, adopted on next sign-in, or refused until imported.
+export type TInstanceUserSignInStatus = "federated" | "adoptable" | "needs-import" | "password-only";
+
+export type TInstanceUserFederatedIdentity = {
+  provider: string;
+  issuer: string;
+  last_authenticated_at: string | null;
+};
+
+export type TInstanceUser = {
+  id: string;
+  email: string;
+  display_name: string;
+  is_active: boolean;
+  has_password: boolean;
+  last_login_at: string | null;
+  federated_identities: TInstanceUserFederatedIdentity[];
+  oauth_accounts: string[];
+  status: TInstanceUserSignInStatus;
+};
+
+export type TInstanceUserListResponse = {
+  results: TInstanceUser[];
+  next_cursor?: string;
+  prev_cursor?: string;
+  next_page_results?: boolean;
+  prev_page_results?: boolean;
+  count?: number;
+  total_count?: number;
+};
 
 export type IFormattedInstanceConfiguration = {
   [key in TInstanceConfigurationKeys]: string;

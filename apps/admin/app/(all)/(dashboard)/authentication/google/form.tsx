@@ -66,7 +66,13 @@ export function InstanceGoogleConfigForm(props: Props) {
       key: "GOOGLE_AUTH_MODE",
       type: "text",
       label: "Authentication mode",
-      description: <>Use generic for any Google account, or workspace to enforce an allowed Google Workspace tenant.</>,
+      description: (
+        <>
+          Use generic for any Google account, or workspace to enforce an allowed Google Workspace tenant. Workspace mode
+          admits <em>every</em> account in an allowed domain — Google issues no organizational-unit or group claim, so
+          it cannot be narrowed further here. Restrict who gets in with invites, or with Domain policy.
+        </>
+      ),
       placeholder: "generic",
       error: Boolean(errors.GOOGLE_AUTH_MODE),
       required: true,
@@ -76,7 +82,11 @@ export function InstanceGoogleConfigForm(props: Props) {
       type: "text",
       label: "Allowed Workspace domains",
       description: (
-        <>Comma-separated hosted domains. Required in workspace mode and enforced from the signed ID token.</>
+        <>
+          Comma-separated hosted domains. Required in workspace mode and checked against the signed{" "}
+          <CodeBlock darkerShade>hd</CodeBlock> claim, so a matching email suffix alone is not enough. Anyone in a
+          listed domain can sign in.
+        </>
       ),
       placeholder: "example.com,subsidiary.example.com",
       error: Boolean(errors.GOOGLE_WORKSPACE_DOMAINS),

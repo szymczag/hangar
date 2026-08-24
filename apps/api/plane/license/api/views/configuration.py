@@ -24,6 +24,29 @@ from plane.utils.cache import cache_response, invalidate_cache
 
 DEPLOYMENT_MANAGED_CONFIGURATION_KEYS = {"POSTHOG_HOST"}
 
+# Reported to the admin panel so it can say where settings are actually read
+# from. When SKIP_ENV_VAR is off the stored values are ignored at read time and
+# the environment decides, which would otherwise make every form in the panel
+# look editable while changing nothing.
+CONFIGURATION_SOURCE_KEY = "CONFIGURATION_SOURCE"
+CONFIGURATION_SOURCE_DATABASE = "database"
+CONFIGURATION_SOURCE_ENVIRONMENT = "environment"
+
+# Settings a deployment operator must own, because they widen where
+# authentication traffic may be sent. Surfaced read-only so an admin looking
+# for them in the panel finds out they exist and where they live, instead of
+# concluding the instance cannot reach an internal provider.
+ENVIRONMENT_ONLY_SETTINGS = (
+    "GITEA_ALLOWED_IPS",
+    "GITEA_ALLOWED_HOSTS",
+    "GITLAB_ALLOWED_IPS",
+    "GITLAB_ALLOWED_HOSTS",
+)
+
+
+def configuration_source():
+    return CONFIGURATION_SOURCE_DATABASE if settings.SKIP_ENV_VAR else CONFIGURATION_SOURCE_ENVIRONMENT
+
 
 class InstanceConfigurationEndpoint(BaseAPIView):
     permission_classes = [InstanceAdminPermission]
@@ -34,11 +57,54 @@ class InstanceConfigurationEndpoint(BaseAPIView):
             key__in=DEPLOYMENT_MANAGED_CONFIGURATION_KEYS
         )
         serializer = InstanceConfigurationSerializer(instance_configurations, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # Appended rather than returned alongside, so the response stays a flat
+        # list of configuration entries and existing clients keep working.
+        data = [
+            *serializer.data,
+            {
+                "key": CONFIGURATION_SOURCE_KEY,
+                "value": configuration_source(),
+                "category": "META",
+                "is_encrypted": False,
+            },
+        ]
+        return Response(data, status=status.HTTP_200_OK)
 
     @invalidate_cache(path="/api/instances/configurations/", user=False)
     @invalidate_cache(path="/api/instances/", user=False)
     def patch(self, request):
+        # With SKIP_ENV_VAR off, stored values are never read back: the
+        # environment decides. Accepting the write would report success for a
+        # change that has no effect, which is worse than refusing it.
+        if not settings.SKIP_ENV_VAR:
+            return Response(
+                {
+                    "error": (
+                        "This instance reads its configuration from environment variables, so changes made here "
+                        "would have no effect. Update the deployment environment instead, or unset SKIP_ENV_VAR=0 "
+                        "to manage configuration from this panel."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if CONFIGURATION_SOURCE_KEY in request.data:
+            return Response(
+                {"error": "Configuration source is reported by the deployment and cannot be set."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if set(ENVIRONMENT_ONLY_SETTINGS).intersection(request.data):
+            return Response(
+                {
+                    "error": (
+                        "Provider network allowlists are deployment-owned because they permit outbound "
+                        "authentication traffic to private addresses. Set them as environment variables."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if DEPLOYMENT_MANAGED_CONFIGURATION_KEYS.intersection(request.data):
             return Response(
                 {"error": "PostHog destination is managed by the deployment."},

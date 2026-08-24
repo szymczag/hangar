@@ -24,7 +24,13 @@ from plane.db.models import Account, User
 from plane.license.models import Instance, InstanceConfiguration
 
 from plane.ext.auth.error import EXT_AUTHENTICATION_ERROR_CODES
-from plane.ext.auth.provider.oidc import OIDCResponse, _checked_response, _connect_pinned, validate_outbound_url
+from plane.authentication.utils.outbound import (
+    OutboundResponse,
+    TLSPolicy,
+    _connect_pinned,
+    checked_response,
+    validate_outbound_url,
+)
 from plane.ext.auth.views.oidc import SESSION_NONCE, SESSION_STATE, SESSION_VERIFIER
 from plane.authentication.adapter.error import AUTHENTICATION_ERROR_CODES
 
@@ -94,7 +100,7 @@ def django_client():
 def public_oidc_dns(mocker):
     """OIDC contracts are deterministic and never perform real DNS lookups."""
     return mocker.patch(
-        "plane.ext.auth.provider.oidc._getaddrinfo",
+        "plane.authentication.utils.outbound._getaddrinfo",
         return_value=[(2, 1, 6, "", ("8.8.8.8", 443))],
     )
 
@@ -223,11 +229,11 @@ class TestOIDCOutboundURLPolicy:
         public_oidc_dns.return_value = [(2, 1, 6, "", ("127.0.0.1", 443))]
         raw_socket = Mock()
         raw_socket.getpeername.return_value = ("8.8.8.8", 443)
-        mocker.patch("plane.ext.auth.provider.oidc.socket.socket", return_value=raw_socket)
-        tls_context = mocker.patch("plane.ext.auth.provider.oidc.ssl.create_default_context").return_value
+        mocker.patch("plane.authentication.utils.outbound.socket.socket", return_value=raw_socket)
+        tls_context = mocker.patch("plane.authentication.utils.outbound.ssl.create_default_context").return_value
         tls_context.wrap_socket.return_value = raw_socket
 
-        connected = _connect_pinned(target, target.addresses[0], 10)
+        connected = _connect_pinned(target, target.addresses[0], 10, TLSPolicy.STRICT_TLS13)
 
         assert connected is raw_socket
         raw_socket.connect.assert_called_once_with(("8.8.8.8", 443))
@@ -240,10 +246,10 @@ class TestOIDCOutboundURLPolicy:
         target = validate_outbound_url("https://idp.test/oidc")
         raw_socket = Mock()
         raw_socket.getpeername.return_value = ("1.1.1.1", 80)
-        mocker.patch("plane.ext.auth.provider.oidc.socket.socket", return_value=raw_socket)
+        mocker.patch("plane.authentication.utils.outbound.socket.socket", return_value=raw_socket)
 
         with pytest.raises(OSError):
-            _connect_pinned(target, target.addresses[0], 10)
+            _connect_pinned(target, target.addresses[0], 10, TLSPolicy.STRICT_TLS13)
 
         raw_socket.close.assert_called_once()
 
@@ -257,7 +263,7 @@ class TestOIDCOutboundURLPolicy:
         response = Mock(status_code=302, headers={"Location": location})
 
         with pytest.raises(requests.RequestException):
-            _checked_response(response)
+            checked_response(response)
 
 
 @pytest.mark.contract
@@ -399,7 +405,7 @@ class TestOIDCCallback:
     @pytest.mark.django_db
     def test_malformed_token_response_rejected(self, django_client, setup_instance, oidc_config):
         session_state, _, _ = initiate(django_client)
-        token_http_response = OIDCResponse(200, b"[]")
+        token_http_response = OutboundResponse(200, b"[]")
         with patch(
             "plane.ext.auth.provider.oidc._request_oidc",
             return_value=token_http_response,

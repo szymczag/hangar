@@ -9,6 +9,7 @@ import { observer } from "mobx-react";
 import { useRouter } from "next/navigation";
 import { Outlet } from "react-router";
 // components
+import { ConfigurationSourceNotice } from "@/components/common/configuration-source-notice";
 import { AdminHeader } from "@/components/common/header";
 import { LogoSpinner } from "@/components/common/logo-spinner";
 import { NewUserPopup } from "@/components/common/new-user-popup";
@@ -43,6 +44,7 @@ function AdminLayout(_props: Route.ComponentProps) {
         <main className="relative flex h-full w-full flex-col overflow-hidden bg-surface-1">
           <AdminHeader />
           <div className="vertical-scrollbar scrollbar-md h-full w-full overflow-hidden overflow-y-scroll">
+            <ConfigurationSourceNotice />
             <Outlet />
           </div>
         </main>

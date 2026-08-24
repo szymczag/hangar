@@ -52,6 +52,10 @@ class MagicGenerateEndpoint(APIView):
         try:
             validate_email(email)
             adapter = MagicCodeProvider(request=request, key=email)
+            # Refuse before a code is generated or emailed. The sign-in step
+            # enforces this too, but there is no reason to send a code that
+            # can never complete.
+            adapter.enforce_sso_domain_policy(email)
             key, token = adapter.initiate()
             # If the smtp is configured send through here
             magic_link.delay(email, key, token)

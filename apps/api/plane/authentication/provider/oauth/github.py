@@ -110,7 +110,7 @@ class GitHubOAuthProvider(OauthAdapter):
         try:
             # Github does not provide email in user response
             emails_url = "https://api.github.com/user/emails"
-            emails_response = requests.get(emails_url, headers=headers).json()
+            emails_response = self.fetch("GET", emails_url, headers=headers).json()
             # Ensure the response is a list before iterating
             if not isinstance(emails_response, list):
                 self.logger.error("Unexpected response format from GitHub emails API")
@@ -142,11 +142,17 @@ class GitHubOAuthProvider(OauthAdapter):
 
     def is_user_in_organization(self, github_username):
         headers = {"Authorization": f"Bearer {self.token_data.get('access_token')}"}
-        response = requests.get(
-            f"{self.org_membership_url}/{self.organization_id}/memberships/{github_username}",
-            headers=headers,
-        )
-        return response.status_code == 200  # 200 means the user is a member
+        try:
+            self.fetch(
+                "GET",
+                f"{self.org_membership_url}/{self.organization_id}/memberships/{github_username}",
+                headers=headers,
+            )
+        except (requests.RequestException, ValueError):
+            # Any non-2xx (404 for a non-member) or transport failure means we
+            # cannot confirm membership, so treat the user as outside the org.
+            return False
+        return True
 
     def set_user_data(self):
         user_info_response = self.get_user_response()
