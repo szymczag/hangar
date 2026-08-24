@@ -106,6 +106,16 @@ distinguish an unknown credential from a bad signature.
 
 Signature counters are only checked when the authenticator uses them — many
 report zero forever, and treating that as a clone would lock those devices out.
+The check is ours rather than the library's, because py_webauthn only rejects a
+regressed counter; disabling the credential needs the distinction between a bad
+signature and a cloned key.
+
+Registration and assertion are covered end to end by a software authenticator
+(`plane/tests/support/webauthn_device.py`) that produces real ES256 signatures,
+so the verification path is exercised rather than assumed. What that cannot
+cover is the browser itself: whether a given deployment's relying-party ID
+satisfies Chrome is a property of the browser and of DNS, so **test one real
+sign-in with a real key before enabling this on an instance you care about**.
 
 ## Scope
 

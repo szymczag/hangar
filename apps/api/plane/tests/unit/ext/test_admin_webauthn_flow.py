@@ -345,7 +345,7 @@ def test_starting_a_pending_state_does_not_inherit_the_previous_session(admin_us
 @pytest.mark.unit
 @pytest.mark.django_db
 def test_signing_out_of_a_pending_state_clears_it(admin_user, client):
-    """"Start over" left the blob — and its attempt count — in place.
+    """ "Start over" left the blob — and its attempt count — in place.
 
     The sign-out view looked up request.user.id first, which raises for the
     anonymous pending caller, so logout() never ran.
@@ -370,9 +370,7 @@ def test_a_verified_administrator_can_request_registration_options(admin_user, c
     _credential(admin_user)
     authenticate_admin(client, admin_user, verified=True)
 
-    response = client.post(
-        "/api/instances/admins/webauthn/registration/options/", {}, content_type="application/json"
-    )
+    response = client.post("/api/instances/admins/webauthn/registration/options/", {}, content_type="application/json")
 
     assert response.status_code == 200
     assert "options" in response.json()
@@ -397,9 +395,7 @@ def test_issuing_a_challenge_clears_the_spent_ones(admin_user, client):
     class _Req:
         session = type("S", (), {"session_key": "sess"})()
 
-    _WebAuthnBase()._issue_challenge(
-        _Req(), admin_user, InstanceAdminWebAuthnChallenge.Purpose.AUTHENTICATION
-    )
+    _WebAuthnBase()._issue_challenge(_Req(), admin_user, InstanceAdminWebAuthnChallenge.Purpose.AUTHENTICATION)
 
     assert not InstanceAdminWebAuthnChallenge.objects.filter(challenge="spent").exists()
     assert InstanceAdminWebAuthnChallenge.objects.filter(user=admin_user).count() == 1
@@ -420,4 +416,3 @@ def test_a_rolling_session_keeps_its_verification(admin_user, client):
     save_admin_session(client, session)
 
     assert client.get(ME).status_code == 200
-

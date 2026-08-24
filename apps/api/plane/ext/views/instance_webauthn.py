@@ -230,7 +230,11 @@ class AdminWebAuthnAuthenticationVerifyEndpoint(_WebAuthnBase):
                 # mismatched pair.
                 expected_origin=challenge.origin,
                 credential_public_key=_unb64(credential.public_key),
-                credential_current_sign_count=credential.sign_count,
+                # Zero, deliberately: py_webauthn would raise on a regressed
+                # counter, which loses the distinction between "this signature
+                # is wrong" and "this key has been cloned". We want the second
+                # to disable the credential, so the check below is ours.
+                credential_current_sign_count=0,
                 require_user_verification=False,
             )
         except (InvalidAuthenticationResponse, ValueError, KeyError):
