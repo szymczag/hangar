@@ -148,6 +148,23 @@ A project cover follows publication rather than membership because the public
 board lists it. Gating covers on membership alone would break published boards —
 worth re-checking before changing this table.
 
+## The instance-admin console
+
+The console is a separate authentication world: its own session cookie (selected
+by the substring `instances` in the request path), its own permission class, and
+no relation to workspace membership. It is **not** covered by the domain policy —
+it checks the password directly rather than going through the provider adapters —
+so it carries its own second factor instead. See
+[second factor for the God Mode console](god-mode-second-factor.md).
+
+Two consequences for anyone adding an endpoint there:
+
+- It **must** be mounted under a path containing `instances`, or the session
+  middleware will read and write the application session instead.
+- `InstanceAdminPermission` requires a second-factor marker in the session, so
+  `force_authenticate` is not enough in tests. Use
+  `plane/tests/support/admin_session.py`.
+
 ## Configuration that participates in authorization
 
 | Setting | Effect |

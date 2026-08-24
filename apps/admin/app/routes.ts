@@ -8,7 +8,13 @@ import { index, layout, route } from "@react-router/dev/routes";
 import type { RouteConfig } from "@react-router/dev/routes";
 
 export default [
-  layout("./(all)/(home)/layout.tsx", [index("./(all)/(home)/page.tsx")]),
+  layout("./(all)/(home)/layout.tsx", [
+    index("./(all)/(home)/page.tsx"),
+    // Fork (see FORK.md): second factor for the console. Inside the home
+    // layout because the caller is not authenticated yet.
+    route("2fa", "./(all)/(home)/2fa/page.tsx"),
+    route("2fa/enroll", "./(all)/(home)/2fa/enroll/page.tsx"),
+  ]),
   layout("./(all)/(dashboard)/layout.tsx", [
     route("general", "./(all)/(dashboard)/general/page.tsx"),
     route("workspace", "./(all)/(dashboard)/workspace/page.tsx"),
