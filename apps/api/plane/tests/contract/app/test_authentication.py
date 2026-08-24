@@ -6,7 +6,7 @@ import json
 import uuid
 import pytest
 from django.core.cache import cache
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from rest_framework import status
 from django.test import Client
@@ -772,11 +772,10 @@ class TestBotUserAdminSignInBlocked:
     InstanceAdminSignInEndpoint mints its own session via user_login() outside
     Adapter.complete_login_or_signup(), so it carries an independent is_bot
     guard that rejects bots with ADMIN_AUTHENTICATION_FAILED before the admin
-    membership check. (Uses the literal path because license/urls.py reuses the
-    name "instance-admin-sign-in" for both sign-in and sign-up.)
+    membership check.
     """
 
-    ADMIN_SIGN_IN_PATH = "/api/instances/admins/sign-in/"
+    ADMIN_SIGN_IN_PATH = reverse_lazy("instance-admin-sign-in")
     BOT_EMAIL = "admin-bot@plane.so"
     PASSWORD = "Str0ng-Pass!42"
 

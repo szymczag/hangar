@@ -64,7 +64,7 @@ urlpatterns = [
     path(
         "admins/sign-up/",
         InstanceAdminSignUpEndpoint.as_view(),
-        name="instance-admin-sign-in",
+        name="instance-admin-sign-up",
     ),
     path(
         "admins/sign-up-screen-visited/",
