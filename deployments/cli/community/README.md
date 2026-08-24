@@ -54,6 +54,13 @@ Installing plane is a very easy and minimal step process.
 - OS with bash scripting enabled (Ubuntu, Linux AMI, macos). Windows systems need to have [gitbash](https://git-scm.com/download/win)
 - User context used must have access to docker services. In most cases, use sudo su to switch as root user
 - Use the terminal (or gitbash) window to run all the future steps
+- **TLS, unless you are installing on localhost.** The God Mode admin console
+  requires a security key, and browsers only allow that in a secure context, so
+  an instance reachable over `http://` on any other host cannot sign in to the
+  console at all. Set `SITE_ADDRESS` and `CERT_EMAIL` in `variables.env` for
+  automatic certificates. Setting `ADMIN_WEBAUTHN_REQUIRED=0` exists to recover
+  an instance nobody can sign in to; it is not a supported way to run the
+  console permanently.
 
 ### Downloading Latest Release
 
