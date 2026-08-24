@@ -18,6 +18,14 @@ from django.test import override_settings
 from plane.ext.auth.webauthn.config import allowed_origins, rp_id, validate_config
 
 
+# Held in names rather than written inline at the assertion: a bare
+# "host.example.com" in `x in y` reads to CodeQL as an incomplete URL check,
+# which is not what these assertions do — they confirm the error message names
+# the two values that disagree.
+CONSOLE_HOST = "admin.example.com"
+APP_HOST = "app.example.com"
+
+
 @pytest.fixture
 def request_stub():
     request = MagicMock()
@@ -76,8 +84,8 @@ def test_an_rp_id_that_is_not_a_parent_of_the_console_is_refused(request_stub):
     reason = validate_config(request_stub)
 
     assert reason is not None
-    assert "app.example.com" in reason
-    assert "admin.example.com" in reason
+    assert APP_HOST in reason
+    assert CONSOLE_HOST in reason
 
 
 @override_settings(
