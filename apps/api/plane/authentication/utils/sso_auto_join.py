@@ -27,7 +27,7 @@ from plane.authentication.utils.sso_domain_policy import (
     _normalize_domain,
     allowed_providers_for_email,
 )
-from plane.db.models import Workspace, WorkspaceMember
+from plane.db.models import Project, ProjectMember, Workspace, WorkspaceMember
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.exception_logger import log_exception
 
@@ -72,6 +72,80 @@ def parse_auto_join(raw):
     return policy
 
 
+def parse_auto_join_projects(raw):
+    """Parse ``SSO_AUTO_JOIN_PROJECTS`` into {domain: [(slug, identifier, role)]}.
+
+    Entries look like ``corp.com=engineering/PLAT:member``, naming the workspace
+    slug and the project identifier. The identifier rather than a uuid, because
+    an operator typing this into the admin panel has the identifier in front of
+    them and a uuid is unreadable.
+
+    Same failure policy as the workspace form: role defaults to guest, an
+    unrecognised role drops the entry rather than becoming something
+    privileged, and a malformed entry is skipped without taking the rest with
+    it.
+    """
+    policy = {}
+    for entry in str(raw or "").split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        domain, separator, target = entry.partition("=")
+        domain = _normalize_domain(domain)
+        if not domain or not separator:
+            continue
+
+        location, _, role_name = target.partition(":")
+        slug, slash, identifier = location.partition("/")
+        slug = slug.strip().lower()
+        identifier = identifier.strip()
+        if not slug or not slash or not identifier:
+            continue
+
+        role_name = role_name.strip().lower()
+        if role_name and role_name not in ROLE_NAMES:
+            continue
+
+        policy.setdefault(domain, []).append((slug, identifier, ROLE_NAMES.get(role_name, DEFAULT_ROLE)))
+    return policy
+
+
+def _configured_auto_join_projects():
+    (raw,) = get_configuration_value(
+        [
+            {
+                "key": "SSO_AUTO_JOIN_PROJECTS",
+                "default": os.environ.get("SSO_AUTO_JOIN_PROJECTS", ""),
+            }
+        ]
+    )
+    return parse_auto_join_projects(raw)
+
+
+def _targets_for(policy, user, provider):
+    """Entries that apply to this sign-in, or an empty list.
+
+    The pinning check lives here so workspace and project joining cannot drift
+    apart: granting a seat on the strength of an email domain requires that
+    domain to belong to a designated provider, or any other enabled sign-in
+    method becomes a way in.
+    """
+    if not policy:
+        return []
+
+    _, separator, domain = str(user.email or "").rpartition("@")
+    if not separator:
+        return []
+    targets = policy.get(_normalize_domain(domain))
+    if not targets:
+        return []
+
+    allowed = allowed_providers_for_email(user.email)
+    if not allowed or (provider is not None and provider not in allowed):
+        return []
+    return targets
+
+
 def _configured_auto_join():
     (raw,) = get_configuration_value(
         [
@@ -91,26 +165,7 @@ def auto_join_workspaces(user, provider=None):
     lowered by hand is not restored on the next sign-in, and a member who was
     deactivated is not silently reactivated.
     """
-    policy = _configured_auto_join()
-    if not policy:
-        return []
-
-    _, separator, domain = str(user.email or "").rpartition("@")
-    if not separator:
-        return []
-    domain = _normalize_domain(domain)
-    targets = policy.get(domain)
-    if not targets:
-        return []
-
-    # The domain must be pinned to a provider, and the provider that just
-    # authenticated must be one of the permitted ones. Granting a seat on the
-    # basis of an unpinned domain would make any enabled sign-in method a way
-    # to join the workspace.
-    allowed = allowed_providers_for_email(user.email)
-    if not allowed or (provider is not None and provider not in allowed):
-        return []
-
+    targets = _targets_for(_configured_auto_join(), user, provider)
     joined = []
     for slug, role in targets:
         try:
@@ -125,6 +180,52 @@ def auto_join_workspaces(user, provider=None):
                 )
                 if created:
                     joined.append((slug, role))
+        except Exception as exc:  # noqa: BLE001 - never block a valid sign-in
+            log_exception(exc)
+    return joined
+
+
+def auto_join_projects(user, provider=None):
+    """Add ``user`` to every project configured for their email domain.
+
+    Requires an existing workspace membership rather than creating one. A
+    ProjectMember without a WorkspaceMember is a state the rest of the model
+    does not expect, and silently manufacturing the workspace seat would grant
+    more than the operator asked for in this setting.
+
+    Archived projects are skipped: joining someone to a project that has been
+    put away is not what the configuration means.
+    """
+    targets = _targets_for(_configured_auto_join_projects(), user, provider)
+    joined = []
+
+    for slug, identifier, role in targets:
+        try:
+            with transaction.atomic():
+                project = Project.objects.filter(
+                    workspace__slug=slug,
+                    identifier=identifier,
+                    archived_at__isnull=True,
+                ).first()
+                if project is None:
+                    continue
+
+                if not WorkspaceMember.objects.filter(
+                    workspace_id=project.workspace_id, member=user, is_active=True
+                ).exists():
+                    continue
+
+                # objects.create through get_or_create, never bulk_create:
+                # ProjectMember.save() also creates the ProjectUserProperty row
+                # this member needs, and bulk_create would skip it.
+                _, created = ProjectMember.objects.get_or_create(
+                    workspace_id=project.workspace_id,
+                    project=project,
+                    member=user,
+                    defaults={"role": role, "is_active": True},
+                )
+                if created:
+                    joined.append((slug, identifier, role))
         except Exception as exc:  # noqa: BLE001 - never block a valid sign-in
             log_exception(exc)
     return joined

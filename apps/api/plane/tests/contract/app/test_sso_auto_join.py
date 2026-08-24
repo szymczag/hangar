@@ -14,9 +14,15 @@ import uuid
 from unittest.mock import patch
 
 import pytest
+from django.utils import timezone
 
-from plane.authentication.utils.sso_auto_join import auto_join_workspaces, parse_auto_join
-from plane.db.models import User, Workspace, WorkspaceMember
+from plane.authentication.utils.sso_auto_join import (
+    auto_join_projects,
+    auto_join_workspaces,
+    parse_auto_join,
+    parse_auto_join_projects,
+)
+from plane.db.models import Project, ProjectMember, ProjectUserProperty, User, Workspace, WorkspaceMember
 
 
 def _config(auto_join="", enforced=""):
@@ -140,3 +146,144 @@ def test_repeated_sign_in_does_not_duplicate_membership(target_workspace, corp_u
         auto_join_workspaces(corp_user, provider="google")
 
     assert WorkspaceMember.objects.filter(workspace=target_workspace, member=corp_user).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# Projects
+# ---------------------------------------------------------------------------
+
+
+def _project_config(auto_join="", enforced=""):
+    return (
+        patch(
+            "plane.authentication.utils.sso_auto_join._configured_auto_join_projects",
+            return_value=parse_auto_join_projects(auto_join),
+        ),
+        patch(
+            "plane.authentication.utils.sso_domain_policy.get_configuration_value",
+            return_value=(enforced,),
+        ),
+    )
+
+
+@pytest.fixture
+def target_project(db, target_workspace):
+    owner = target_workspace.owner
+    project = Project.objects.create(
+        name="Platform", identifier="PLAT", workspace=target_workspace, created_by=owner
+    )
+    ProjectMember.objects.create(
+        workspace=target_workspace, project=project, member=owner, role=20, is_active=True
+    )
+    return project
+
+
+def _make_workspace_member(workspace, user, role=15):
+    return WorkspaceMember.objects.create(workspace=workspace, member=user, role=role, is_active=True)
+
+
+def test_project_entries_require_a_workspace_and_an_identifier():
+    assert parse_auto_join_projects("corp.com=engineering/PLAT:member") == {
+        "corp.com": [("engineering", "PLAT", 15)]
+    }
+    # Without the workspace/project separator there is nothing to resolve.
+    assert parse_auto_join_projects("corp.com=PLAT:member") == {}
+    assert parse_auto_join_projects("corp.com=engineering/:member") == {}
+
+
+def test_project_role_defaults_to_guest_and_rejects_unknown_roles():
+    assert parse_auto_join_projects("corp.com=engineering/PLAT") == {"corp.com": [("engineering", "PLAT", 5)]}
+    assert parse_auto_join_projects("corp.com=engineering/PLAT:superuser") == {}
+
+
+@pytest.mark.django_db
+def test_user_joins_the_configured_project(target_workspace, target_project, corp_user):
+    _make_workspace_member(target_workspace, corp_user)
+    join_patch, policy_patch = _project_config("corp.com=engineering/PLAT:member", "corp.com=google")
+
+    with join_patch, policy_patch:
+        joined = auto_join_projects(corp_user, provider="google")
+
+    assert joined == [("engineering", "PLAT", 15)]
+    membership = ProjectMember.objects.get(project=target_project, member=corp_user)
+    assert membership.role == 15
+    # ProjectMember.save() creates this; bulk_create would have skipped it.
+    assert ProjectUserProperty.objects.filter(project=target_project, user=corp_user).exists()
+
+
+@pytest.mark.django_db
+def test_no_project_join_without_the_workspace_seat(target_workspace, target_project, corp_user):
+    """A ProjectMember without a WorkspaceMember is a state nothing expects.
+
+    The setting must not manufacture the workspace seat on its own.
+    """
+    join_patch, policy_patch = _project_config("corp.com=engineering/PLAT:member", "corp.com=google")
+
+    with join_patch, policy_patch:
+        joined = auto_join_projects(corp_user, provider="google")
+
+    assert joined == []
+    assert not ProjectMember.objects.filter(project=target_project, member=corp_user).exists()
+
+
+@pytest.mark.django_db
+def test_no_project_join_when_the_domain_is_not_pinned(target_workspace, target_project, corp_user):
+    """The same gate as the workspace form, applied through shared code."""
+    _make_workspace_member(target_workspace, corp_user)
+    join_patch, policy_patch = _project_config("corp.com=engineering/PLAT:member", enforced="")
+
+    with join_patch, policy_patch:
+        joined = auto_join_projects(corp_user, provider="magic-code")
+
+    assert joined == []
+    assert not ProjectMember.objects.filter(project=target_project, member=corp_user).exists()
+
+
+@pytest.mark.django_db
+def test_archived_projects_are_skipped(target_workspace, target_project, corp_user):
+    _make_workspace_member(target_workspace, corp_user)
+    target_project.archived_at = timezone.now()
+    target_project.save()
+    join_patch, policy_patch = _project_config("corp.com=engineering/PLAT:member", "corp.com=google")
+
+    with join_patch, policy_patch:
+        assert auto_join_projects(corp_user, provider="google") == []
+
+
+@pytest.mark.django_db
+def test_existing_project_membership_is_never_modified(target_workspace, target_project, corp_user):
+    _make_workspace_member(target_workspace, corp_user)
+    ProjectMember.objects.create(
+        workspace=target_workspace, project=target_project, member=corp_user, role=5, is_active=False
+    )
+    join_patch, policy_patch = _project_config("corp.com=engineering/PLAT:admin", "corp.com=google")
+
+    with join_patch, policy_patch:
+        joined = auto_join_projects(corp_user, provider="google")
+
+    membership = ProjectMember.objects.get(project=target_project, member=corp_user)
+    assert joined == []
+    assert membership.role == 5
+    assert membership.is_active is False
+
+
+@pytest.mark.django_db
+def test_unknown_identifier_is_skipped_without_failing_sign_in(target_workspace, corp_user):
+    _make_workspace_member(target_workspace, corp_user)
+    join_patch, policy_patch = _project_config("corp.com=engineering/NOPE:member", "corp.com=google")
+
+    with join_patch, policy_patch:
+        assert auto_join_projects(corp_user, provider="google") == []
+
+
+@pytest.mark.django_db
+def test_repeated_sign_in_does_not_duplicate_project_membership(target_workspace, target_project, corp_user):
+    _make_workspace_member(target_workspace, corp_user)
+    join_patch, policy_patch = _project_config("corp.com=engineering/PLAT:member", "corp.com=google")
+
+    with join_patch, policy_patch:
+        auto_join_projects(corp_user, provider="google")
+        auto_join_projects(corp_user, provider="google")
+
+    assert ProjectMember.objects.filter(project=target_project, member=corp_user).count() == 1
+
