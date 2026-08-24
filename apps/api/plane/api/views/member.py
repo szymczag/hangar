@@ -87,7 +87,11 @@ class WorkspaceMemberAPIEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        workspace_members = WorkspaceMember.objects.filter(workspace__slug=slug).select_related("member")
+        # is_active is what removal from a workspace sets; without it, people
+        # who were removed keep appearing in this roster.
+        workspace_members = WorkspaceMember.objects.filter(workspace__slug=slug, is_active=True).select_related(
+            "member"
+        )
 
         # Get all the users with their roles
         users_with_roles = []
@@ -267,8 +271,13 @@ class WorkspaceMemberLiteAPIEndpoint(BaseAPIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # is_active is what removal from a workspace sets; without it, people
+        # who were removed kept appearing in pickers and directories built on
+        # this endpoint. The app-side equivalents have always filtered it.
         workspace_members = (
-            WorkspaceMember.objects.filter(workspace__slug=slug).select_related("member").order_by("-created_at")
+            WorkspaceMember.objects.filter(workspace__slug=slug, is_active=True)
+            .select_related("member")
+            .order_by("-created_at")
         )
         return self.paginate(
             request=request,

@@ -19,6 +19,7 @@ from rest_framework.permissions import AllowAny
 # Module imports
 from ..base import BaseAPIView
 from plane.db.models import (
+    DeployBoard,
     DraftIssue,
     FileAsset,
     Issue,
@@ -578,6 +579,37 @@ class StaticFileAssetEndpoint(BaseAPIView):
 
     permission_classes = [AllowAny]
 
+    @staticmethod
+    def _may_read_organisation_asset(request, asset):
+        """Gate workspace logos and project covers; leave user imagery public.
+
+        A project cover stays public while the project is published, because the
+        public board lists it (plane/space/views/project.py). Workspace logos
+        have no such consumer, so they simply require membership.
+        """
+        if asset.entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO:
+            return (
+                request.user.is_authenticated
+                and WorkspaceMember.objects.filter(
+                    workspace_id=asset.workspace_id, member=request.user, is_active=True
+                ).exists()
+            )
+
+        if asset.entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
+            if asset.project_id and DeployBoard.objects.filter(
+                project_id=asset.project_id, entity_name="project", is_disabled=False
+            ).exists():
+                return True
+            return (
+                request.user.is_authenticated
+                and asset.project_id is not None
+                and ProjectMember.objects.filter(
+                    project_id=asset.project_id, member=request.user, is_active=True
+                ).exists()
+            )
+
+        return True
+
     def get(self, request, asset_id):
         # get the asset id
         asset = FileAsset.objects.get(id=asset_id)
@@ -629,6 +661,19 @@ class StaticFileAssetEndpoint(BaseAPIView):
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        # Checked here, immediately before a URL would be handed out, so the
+        # legacy-revalidation path above keeps running for assets nobody may
+        # read. Avatars and user covers stay reachable without a session — they
+        # are rendered on sign-in screens and public boards alike. Organisation
+        # imagery is different: a workspace logo names a company and a project
+        # cover names a project, and neither should be retrievable by anyone who
+        # merely holds an asset id.
+        if not self._may_read_organisation_asset(request, asset):
+            return Response(
+                {"error": "The requested asset could not be found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         # Generate a presigned URL to share an S3 object
         storage = S3Storage(request=request)
         signed_url = storage.generate_presigned_url(

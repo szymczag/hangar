@@ -15,6 +15,7 @@ from django.utils import timezone
 
 # Third party imports
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -52,6 +53,32 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
     permission_classes = [IsAuthenticated]
 
     use_read_replica = False
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        self._enforce_token_workspace_scope(request)
+
+    def _enforce_token_workspace_scope(self, request):
+        """Hold a token to the workspace it was issued for, when it names one.
+
+        APIToken.workspace existed but was never consulted, so the field
+        promised a restriction that did not exist. Tokens minted through the
+        product leave it null and keep their previous reach — the caller's
+        memberships remain the boundary for those. A token that does name a
+        workspace is now confined to it, so the field means what it says.
+
+        Enforced in initial() rather than a permission class because views
+        override permission_classes freely; this cannot be switched off by a
+        view forgetting to include it.
+        """
+        token = getattr(request, "auth", None)
+        workspace_id = getattr(token, "workspace_id", None)
+        if workspace_id is None:
+            return
+
+        slug = self.kwargs.get("slug")
+        if slug and token.workspace.slug != slug:
+            raise PermissionDenied("This API token is not valid for the requested workspace.")
 
     def filter_queryset(self, queryset):
         for backend in list(self.filter_backends):
