@@ -88,7 +88,6 @@ export type TInstanceSAMLAuthenticationConfigurationKeys =
 // govern which provider may assert a domain and where its users land.
 export type TInstanceSSODomainPolicyConfigurationKeys = "SSO_ENFORCED_DOMAINS" | "SSO_AUTO_JOIN_WORKSPACES";
 
-
 export type TInstanceAuthenticationConfigurationKeys =
   | TInstanceGoogleAuthenticationConfigurationKeys
   | TInstanceGithubAuthenticationConfigurationKeys
