@@ -58,9 +58,7 @@ class IssueProperty(BaseModel):
 class IssuePropertyOption(BaseModel):
     """An option of a select / multi_select property."""
 
-    workspace = models.ForeignKey(
-        "db.Workspace", on_delete=models.CASCADE, related_name="ext_issue_property_options"
-    )
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="ext_issue_property_options")
     property = models.ForeignKey(IssueProperty, on_delete=models.CASCADE, related_name="options")
     name = models.CharField(max_length=255)
     sort_order = models.FloatField(default=65535)
@@ -94,9 +92,7 @@ class IssuePropertyValue(BaseModel):
     keyed on the parent's type is not expressible).
     """
 
-    workspace = models.ForeignKey(
-        "db.Workspace", on_delete=models.CASCADE, related_name="ext_issue_property_values"
-    )
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="ext_issue_property_values")
     project = models.ForeignKey("db.Project", on_delete=models.CASCADE, related_name="ext_issue_property_values")
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="property_values")
     property = models.ForeignKey(IssueProperty, on_delete=models.CASCADE, related_name="values")

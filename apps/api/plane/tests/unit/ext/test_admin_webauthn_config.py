@@ -120,8 +120,6 @@ def test_an_explicit_allowlist_replaces_the_derivation(request_stub):
     assert allowed_origins(request_stub) == {"https://one.example.com", "https://two.example.com"}
 
 
-@override_settings(
-    WEBAUTHN_RP_ID=None, ADMIN_BASE_URL=None, WEB_URL="", APP_BASE_URL="", ADMIN_BASE_PATH="/god-mode"
-)
+@override_settings(WEBAUTHN_RP_ID=None, ADMIN_BASE_URL=None, WEB_URL="", APP_BASE_URL="", ADMIN_BASE_PATH="/god-mode")
 def test_no_derivable_configuration_is_reported_rather_than_guessed(request_stub):
     assert validate_config(request_stub) is not None

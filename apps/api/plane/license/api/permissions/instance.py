@@ -15,4 +15,14 @@ class InstanceAdminPermission(BasePermission):
             return False
 
         instance = Instance.objects.first()
-        return InstanceAdmin.objects.filter(role__gte=15, instance=instance, user=request.user).exists()
+        if not InstanceAdmin.objects.filter(role__gte=15, instance=instance, user=request.user).exists():
+            return False
+
+        # Fork (see FORK.md): the console requires a second factor. Checked here
+        # as well as by leaving the password step anonymous, so that "this
+        # session proved a security key" is an invariant every future code path
+        # creating an admin session must also satisfy — including sessions that
+        # already existed when this shipped, which are now unverified.
+        from plane.ext.auth.webauthn.pending import is_verified
+
+        return is_verified(request.session)

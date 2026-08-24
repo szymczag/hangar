@@ -30,15 +30,9 @@ def get_product_metadata() -> dict[str, str | None]:
         "version": version,
         "repository_url": repository_url,
         "source_url": source_url,
-        "documentation_url": os.environ.get(
-            "HANGAR_DOCUMENTATION_URL", f"{repository_url}#readme"
-        ).strip(),
-        "issues_url": os.environ.get(
-            "HANGAR_ISSUES_URL", f"{repository_url}/issues"
-        ).strip(),
-        "security_url": os.environ.get(
-            "HANGAR_SECURITY_URL", f"{repository_url}/security/advisories/new"
-        ).strip(),
+        "documentation_url": os.environ.get("HANGAR_DOCUMENTATION_URL", f"{repository_url}#readme").strip(),
+        "issues_url": os.environ.get("HANGAR_ISSUES_URL", f"{repository_url}/issues").strip(),
+        "security_url": os.environ.get("HANGAR_SECURITY_URL", f"{repository_url}/security/advisories/new").strip(),
         "terms_url": os.environ.get("HANGAR_TERMS_URL", "").strip() or None,
         "privacy_url": os.environ.get("HANGAR_PRIVACY_URL", "").strip() or None,
     }
