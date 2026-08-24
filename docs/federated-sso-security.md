@@ -423,7 +423,17 @@ how the weaker path becomes the way in.
 The console flow is deliberately more demanding than the CLI, because it is
 reachable over the network:
 
-1. Upload the CSV, choose the provider, and enter the issuer. Nothing is written.
+1. Upload the CSV and choose the provider. The issuer is pre-filled from the
+   configured provider — `https://accounts.google.com` for Google, `OIDC_ISSUER`
+   or `SAML_IDP_ENTITY_ID` for the others — and the console says so when you
+   change it away from that value. It stays editable, because mappings are
+   normally imported _before_ the provider is enabled. Nothing is written at
+   this step.
+
+   An issuer that no sign-in ever asserts is the quiet failure worth guarding
+   against: the identities are created correctly, the import reports success,
+   and no sign-in will ever match them.
+
 2. Review the preview: one line per row, saying which account each subject will
    be linked to, and whether it is already linked.
 3. Confirm by uploading the same file again together with the grant from step 2
