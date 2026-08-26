@@ -344,6 +344,27 @@ forward.
 
 The profile step is deliberately left open: it collects a display name, which
 nobody else can supply.
+### Letting a provider own names and avatars
+
+`ENABLE_GOOGLE_SYNC` and its siblings make the provider authoritative for a
+person's display name and picture: they are rewritten at **every** sign-in, and
+an avatar someone uploaded is deleted from storage in the process.
+
+That is a reasonable choice for a directory-managed organisation and a
+destructive one if it is switched on without knowing. Two consequences worth
+stating before enabling it:
+
+- anything people set in Hangar is replaced at their next login, without notice;
+- uploaded avatars are removed, not merely hidden.
+
+While it is on, the onboarding profile step shows those fields as managed and
+does not offer to change them, because a change there would not survive the next
+sign-in. The avatar control is hidden rather than disabled, since offering it
+would be offering to lose the file. The instance reports which providers are in
+this state, so clients do not have to guess.
+
+Sign-in methods are also no longer offered where they cannot work: on an instance
+with password sign-in disabled, onboarding stops proposing that people set one.
 
 ### Keeping administrative access
 
