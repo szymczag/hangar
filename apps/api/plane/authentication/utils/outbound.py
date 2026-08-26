@@ -42,7 +42,14 @@ from plane.utils.ip_address import is_blocked_ip
 
 DEFAULT_TIMEOUT = 10
 DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024
+# How many validated addresses are kept as connect candidates. One is used; the
+# rest are fallbacks.
 MAX_RESOLVED_ADDRESSES = 8
+# How many answers a resolver may return before the answer itself is treated as
+# pathological. Large services legitimately return many — www.googleapis.com
+# answers with eight A and eight AAAA records — so this bounds work rather than
+# expressing suspicion.
+MAX_DNS_ANSWERS = 64
 
 
 class TLSPolicy:
@@ -195,6 +202,8 @@ def validate_outbound_url(url, *, required_origin=None, allow_query=True, allowe
         answers = _getaddrinfo(hostname, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         if not answers:
             raise ValueError("Hostname did not resolve")
+        if len(answers) > MAX_DNS_ANSWERS:
+            raise ValueError("Hostname returned too many addresses")
         resolved = []
         seen = set()
         for family, socktype, protocol, _, sockaddr in answers:
@@ -208,9 +217,16 @@ def validate_outbound_url(url, *, required_origin=None, allow_query=True, allowe
             key = (family, sockaddr)
             if key not in seen:
                 seen.add(key)
-                resolved.append(ResolvedAddress(family, socktype, protocol, sockaddr, address))
-        if len(resolved) > MAX_RESOLVED_ADDRESSES:
-            raise ValueError("Hostname returned too many addresses")
+                # Every answer is checked above, so a mixed public/private reply
+                # is still refused as a whole. Only the number carried forward
+                # to connect with is capped: refusing a host for answering with
+                # more addresses than we intend to try rejected real providers,
+                # www.googleapis.com among them, and so broke Google sign-in at
+                # the userinfo step.
+                if len(resolved) < MAX_RESOLVED_ADDRESSES:
+                    resolved.append(ResolvedAddress(family, socktype, protocol, sockaddr, address))
+        if not resolved:
+            raise ValueError("Hostname did not resolve to a usable address")
     except (OSError, ValueError) as exc:
         raise ValueError("Unsafe outbound URL") from exc
     return ResolvedTarget(url, parsed, parsed.scheme, hostname, port, origin, tuple(resolved))
