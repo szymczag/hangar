@@ -45,8 +45,14 @@ class TestAuthenticationLogHygiene:
             with pytest.raises(AuthenticationException):
                 adapter.get_user_response()
 
-        adapter.logger.warning.assert_called_once_with("Error getting user response")
+        # The message now carries the failure's type and text so an operator can
+        # tell an egress refusal from an unreachable provider. What must stay out
+        # is the request itself, which is what this asserts.
+        adapter.logger.warning.assert_called_once()
         assert access_token not in str(adapter.logger.mock_calls)
+        assert (
+            "User info request" in adapter.logger.warning.call_args.args[0] % adapter.logger.warning.call_args.args[1:]
+        )
 
     def test_github_membership_failure_does_not_log_identity_or_configuration(self):
         provider = object.__new__(GitHubOAuthProvider)
