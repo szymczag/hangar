@@ -134,6 +134,24 @@ def run_callback(client, *, space=False, token_overrides=None, userinfo_override
 @pytest.mark.contract
 class TestGoogleAuthentication:
     @pytest.mark.django_db
+    @pytest.mark.parametrize("space", [False, True])
+    def test_authorization_request_uses_standard_online_flow(self, django_client, setup_instance, google_config, space):
+        transaction, response = initiate(django_client, space=space)
+        query = parse_qs(urlparse(response["Location"]).query)
+
+        assert query["client_id"] == [CLIENT_ID]
+        assert query["scope"] == ["openid email profile"]
+        assert query["response_type"] == ["code"]
+        assert query["state"] == [transaction["state"]]
+        assert query["nonce"] == [transaction["nonce"]]
+        assert query["code_challenge_method"] == ["S256"]
+        assert query["redirect_uri"] == [
+            "http://testserver/auth/spaces/google/callback/" if space else "http://testserver/auth/google/callback/"
+        ]
+        assert "prompt" not in query
+        assert "access_type" not in query
+
+    @pytest.mark.django_db
     def test_callback_without_pending_state_is_rejected_before_exchange(
         self, django_client, setup_instance, google_config
     ):
@@ -222,6 +240,9 @@ class TestGoogleAuthentication:
     def test_workspace_mode_enforces_signed_hosted_domain(self, django_client, setup_instance, google_config):
         InstanceConfiguration.objects.filter(key="GOOGLE_AUTH_MODE").update(value="workspace")
         InstanceConfiguration.objects.filter(key="GOOGLE_WORKSPACE_DOMAINS").update(value="example.com")
+
+        _, response = initiate(django_client)
+        assert parse_qs(urlparse(response["Location"]).query)["hd"] == ["example.com"]
 
         rejected = run_callback(django_client, token_overrides={"hd": "other.example"})
         assert error_code_of(rejected) == AUTHENTICATION_ERROR_CODES["GOOGLE_WORKSPACE_TENANT_NOT_ALLOWED"]
