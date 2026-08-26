@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { isEmpty } from "lodash-es";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Monitor } from "lucide-react";
 // plane internal packages
 import { API_BASE_URL } from "@plane/constants";
@@ -62,21 +62,6 @@ export function InstanceGoogleConfigForm(props: Props) {
   const originURL = !isEmpty(API_BASE_URL) ? API_BASE_URL : typeof window !== "undefined" ? window.location.origin : "";
 
   const GOOGLE_FORM_FIELDS: TControllerInputFormField<GoogleConfigFormValues>[] = [
-    {
-      key: "GOOGLE_AUTH_MODE",
-      type: "text",
-      label: "Authentication mode",
-      description: (
-        <>
-          Use generic for any Google account, or workspace to enforce an allowed Google Workspace tenant. Workspace mode
-          admits <em>every</em> account in an allowed domain — Google issues no organizational-unit or group claim, so
-          it cannot be narrowed further here. Restrict who gets in with invites, or with Domain policy.
-        </>
-      ),
-      placeholder: "generic",
-      error: Boolean(errors.GOOGLE_AUTH_MODE),
-      required: true,
-    },
     {
       key: "GOOGLE_WORKSPACE_DOMAINS",
       type: "text",
@@ -235,6 +220,41 @@ export function InstanceGoogleConfigForm(props: Props) {
         <div className="grid w-full grid-cols-2 gap-x-12 gap-y-8">
           <div className="col-span-2 flex flex-col gap-y-4 pt-1 md:col-span-1">
             <div className="pt-2.5 text-18 font-medium">Google-provided details for Hangar</div>
+            <Controller
+              control={control}
+              name="GOOGLE_AUTH_MODE"
+              render={({ field: { value, onChange } }) => (
+                <div className="flex flex-col gap-1">
+                  <h4 className="text-13 text-secondary">Who may sign in with Google</h4>
+                  {/* Two accepted values, spelled exactly. Typing them by hand
+                      meant a typo fell back to admitting every Google account,
+                      which is the opposite of what the operator intended. */}
+                  <select
+                    className="rounded-md border border-strong bg-surface-1 px-3 py-2 text-14"
+                    value={value || "generic"}
+                    onChange={(event) => onChange(event.target.value)}
+                  >
+                    <option value="generic">Any Google account</option>
+                    <option value="workspace">Only accounts in the Workspace domains listed below</option>
+                  </select>
+                  <div className="text-11 text-tertiary">
+                    {value === "workspace" ? (
+                      <>
+                        Checked against the signed <CodeBlock darkerShade>hd</CodeBlock> claim, so a matching email
+                        suffix is not enough. It admits <em>every</em> account in a listed domain — Google issues no
+                        organizational-unit or group claim, so it cannot be narrowed further here. Narrow it with
+                        invites, or with Domain policy.
+                      </>
+                    ) : (
+                      <>
+                        Anyone with a Google account can sign in, including personal gmail.com addresses. Choose the
+                        other option to limit sign-in to your own Workspace domains.
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            />
             {GOOGLE_FORM_FIELDS.map((field) => (
               <ControllerInput
                 key={field.key}

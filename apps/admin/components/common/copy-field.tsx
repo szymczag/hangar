@@ -32,7 +32,8 @@ export function CopyField(props: Props) {
       <Button
         variant="secondary"
         size="lg"
-        className="flex items-center justify-between py-2"
+        className="flex w-full items-center justify-between gap-2 py-2"
+        title={url}
         onClick={() => {
           navigator.clipboard.writeText(url);
           setToast({
@@ -42,8 +43,11 @@ export function CopyField(props: Props) {
           });
         }}
       >
-        <p className="text-13 font-medium">{url}</p>
-        <CopyIcon width={18} height={18} color="#B9B9B9" />
+        {/* These are long enough to overflow the button. Scrolling keeps the
+            whole value reachable, and the button copies all of it regardless of
+            what is visible. */}
+        <span className="min-w-0 flex-1 overflow-x-auto text-left text-13 font-medium whitespace-nowrap">{url}</span>
+        <CopyIcon width={18} height={18} color="#B9B9B9" className="shrink-0" />
       </Button>
       <div className="text-11 text-tertiary">{description}</div>
     </div>
