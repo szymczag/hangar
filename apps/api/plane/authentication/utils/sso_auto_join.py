@@ -36,6 +36,21 @@ from plane.utils.exception_logger import log_exception
 # the enum cannot silently redefine what an existing configuration grants.
 ROLE_NAMES = {"admin": 20, "member": 15, "guest": 5}
 DEFAULT_ROLE = ROLE_NAMES["guest"]
+# The same roles written as the numbers the product stores. The admin panel
+# wrote these for one release, and every such entry was discarded here — the
+# auto-join it configured never ran. Accepting them repairs those instances
+# without loosening the rule below: a value that is neither a known name nor a
+# known number still refuses the entry rather than becoming a privileged one.
+ROLE_VALUES = {str(value): value for value in ROLE_NAMES.values()}
+
+
+def _resolve_role(role_name):
+    """Return the role, or None when the entry names one we do not recognise."""
+    if not role_name:
+        return DEFAULT_ROLE
+    if role_name in ROLE_NAMES:
+        return ROLE_NAMES[role_name]
+    return ROLE_VALUES.get(role_name)
 
 
 def parse_auto_join(raw):
@@ -63,12 +78,12 @@ def parse_auto_join(raw):
         if not slug:
             continue
 
-        role_name = role_name.strip().lower()
-        if role_name and role_name not in ROLE_NAMES:
+        role = _resolve_role(role_name.strip().lower())
+        if role is None:
             # An unrecognised role must not silently become a privileged one.
             continue
 
-        policy.setdefault(domain, []).append((slug, ROLE_NAMES.get(role_name, DEFAULT_ROLE)))
+        policy.setdefault(domain, []).append((slug, role))
     return policy
 
 
@@ -102,11 +117,11 @@ def parse_auto_join_projects(raw):
         if not slug or not slash or not identifier:
             continue
 
-        role_name = role_name.strip().lower()
-        if role_name and role_name not in ROLE_NAMES:
+        role = _resolve_role(role_name.strip().lower())
+        if role is None:
             continue
 
-        policy.setdefault(domain, []).append((slug, identifier, ROLE_NAMES.get(role_name, DEFAULT_ROLE)))
+        policy.setdefault(domain, []).append((slug, identifier, role))
     return policy
 
 
