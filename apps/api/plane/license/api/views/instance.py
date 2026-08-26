@@ -185,6 +185,22 @@ class InstanceEndpoint(BaseAPIView):
         data["saml_provider_name"] = str(SAML_PROVIDER_NAME)
         data["is_todoist_imports_enabled"] = settings.TODOIST_IMPORTS_ENABLED
 
+        # Fork (see FORK.md): which providers overwrite a person's name and
+        # avatar on every sign-in. The clients need this to stop offering an
+        # edit that the next sign-in discards — see Adapter.sync_user_data.
+        sync_keys = {
+            "google": "ENABLE_GOOGLE_SYNC",
+            "github": "ENABLE_GITHUB_SYNC",
+            "gitlab": "ENABLE_GITLAB_SYNC",
+            "gitea": "ENABLE_GITEA_SYNC",
+        }
+        sync_values = get_configuration_value(
+            [{"key": key, "default": os.environ.get(key, "0")} for key in sync_keys.values()]
+        )
+        data["provider_managed_profiles"] = [
+            provider for provider, value in zip(sync_keys, sync_values, strict=False) if str(value) == "1"
+        ]
+
         # Fork (see FORK.md): sign-in page branding. Served without a session,
         # because the page it dresses is seen before anyone has one. Empty
         # values mean the built-in wording and wordmark.
