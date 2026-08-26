@@ -561,6 +561,29 @@ response or a command's output.
 
 Keep local recovery access until representative users have completed the flow.
 
+### What a refused person sees
+
+Refusals reach the browser as a numeric code, which the web app turns into a
+message. **A code the web app does not know renders nothing at all** — no banner,
+just a bounce back to the sign-in page with the number in the URL. That is how
+`SSO_ACCOUNT_LINK_REQUIRED` behaved until `rc.33`: the API refused for a reason
+an administrator could resolve, and the person was told nothing.
+
+Each federated refusal now explains itself and names the code to quote, because
+none of them is something the person can fix alone:
+
+| Code                                  | Means                                                        |
+| ------------------------------------- | ------------------------------------------------------------ |
+| `SSO_ACCOUNT_LINK_REQUIRED`           | an account with that address exists but is not linked to SSO |
+| `OAUTH_PROVIDER_UNVERIFIED_EMAIL`     | the provider did not confirm the address                     |
+| `SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN` | the domain is pinned to a different method                   |
+| `GOOGLE_WORKSPACE_TENANT_NOT_ALLOWED` | the Google account is outside the allowed Workspace domains  |
+| `FEDERATED_IDENTITY_CONFLICT`         | that identity already belongs to another account             |
+| `FEDERATED_IDENTITY_INVALID`          | the provider did not send enough to identify the person      |
+
+A test compares the API's codes against the web app's by number, so a new one
+cannot ship silent again.
+
 ### Diagnosing a provider error
 
 Sign-in answers one error code for every transport failure, on purpose — it must
