@@ -87,7 +87,30 @@ class OutboundResponse:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise requests.HTTPError(f"Provider returned HTTP {self.status_code}")
+            raise requests.HTTPError(f"Provider returned HTTP {self.status_code}{self.provider_reason()}")
+
+    def provider_reason(self) -> str:
+        """The provider's own account of the refusal, if it gave one.
+
+        OAuth 2.0 defines `error` and `error_description` for exactly this
+        (RFC 6749 section 5.2), and providers use them to say things an operator
+        has to act on — invalid_client, redirect_uri_mismatch, invalid_grant.
+        Discarding them turns a precise answer into "provider error, try again".
+
+        Only those two fields are taken, and both are truncated: the rest of a
+        body is not ours to copy into a log.
+        """
+        try:
+            payload = self.json()
+        except (ValueError, UnicodeDecodeError):
+            return ""
+        if not isinstance(payload, dict):
+            return ""
+        code = str(payload.get("error") or "")[:64]
+        description = str(payload.get("error_description") or "")[:256]
+        if not code and not description:
+            return ""
+        return f" ({code}{': ' + description if description else ''})"
 
     def json(self):
         return json.loads(self.body.decode("utf-8"))
