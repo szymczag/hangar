@@ -16,7 +16,9 @@ import { Loader, ToggleSwitch } from "@plane/ui";
 import { AuthenticationMethodCard } from "@/components/authentication/authentication-method-card";
 import { PageWrapper } from "@/components/common/page-wrapper";
 // hooks
+import { configurationErrorMessage } from "@/helpers/configuration-error";
 import { useInstance } from "@/hooks/store";
+import { useConfigurationEditable } from "@/hooks/use-configuration-editable";
 // types
 import type { Route } from "./+types/page";
 // local
@@ -25,6 +27,7 @@ import { InstanceOIDCConfigForm } from "./form";
 const InstanceOIDCAuthenticationPage = observer(function InstanceOIDCAuthenticationPage() {
   // store
   const { fetchInstanceConfigurations, formattedConfig, updateInstanceConfigurations } = useInstance();
+  const isConfigurationEditable = useConfigurationEditable();
   // state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   // config
@@ -48,7 +51,7 @@ const InstanceOIDCAuthenticationPage = observer(function InstanceOIDCAuthenticat
       },
       error: {
         title: "Error",
-        message: () => "Failed to save configuration",
+        message: (error) => configurationErrorMessage(error),
       },
     });
 
@@ -77,7 +80,7 @@ const InstanceOIDCAuthenticationPage = observer(function InstanceOIDCAuthenticat
                 updateConfig("IS_OIDC_ENABLED", isOIDCEnabled ? "0" : "1");
               }}
               size="sm"
-              disabled={isSubmitting || !formattedConfig}
+              disabled={isSubmitting || !formattedConfig || !isConfigurationEditable}
             />
           }
           disabled={isSubmitting || !formattedConfig}

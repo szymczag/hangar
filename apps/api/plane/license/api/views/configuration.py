@@ -187,6 +187,26 @@ class InstanceConfigurationEndpoint(BaseAPIView):
 
         configurations = InstanceConfiguration.objects.filter(key__in=request.data.keys())
 
+        # A key with no stored row was previously dropped in silence: the
+        # response was 200 listing everything except the key that did not
+        # apply, so the panel reverted its control with nothing to show the
+        # administrator. Refusing names the key instead, for the same reason
+        # the environment-managed case above refuses rather than reporting a
+        # success nothing will read.
+        unknown_keys = sorted(set(request.data.keys()) - {row.key for row in configurations})
+        if unknown_keys:
+            return Response(
+                {
+                    "error": (
+                        "This instance stores no configuration under "
+                        f"{', '.join(unknown_keys)}, so the change was not saved. "
+                        "The setting may belong to a newer version, or the instance "
+                        "may need its configuration seeded."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         bulk_configurations = []
         for configuration in configurations:
             raw_value = normalized_values.get(

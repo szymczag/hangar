@@ -23,6 +23,7 @@ import { canDisableAuthMethod } from "@/helpers/authentication";
 // hooks
 import { useAuthenticationModes } from "@/hooks/oauth";
 import { useInstance } from "@/hooks/store";
+import { useConfigurationEditable } from "@/hooks/use-configuration-editable";
 // types
 import type { Route } from "./+types/page";
 
@@ -36,6 +37,7 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   // store hooks
   const { fetchInstanceConfigurations, formattedConfig, updateInstanceConfigurations } = useInstance();
+  const isConfigurationEditable = useConfigurationEditable();
   // derived values
   const enableSignUpConfig = formattedConfig?.ENABLE_SIGNUP ?? "";
 
@@ -92,8 +94,7 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
           setIsSubmitting(false);
           return undefined;
         })
-        .catch((err) => {
-          console.error(err);
+        .catch(() => {
           setIsSubmitting(false);
         });
     },
@@ -144,7 +145,7 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
                     }
                   }}
                   size="sm"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !isConfigurationEditable}
                 />
               </div>
             </div>

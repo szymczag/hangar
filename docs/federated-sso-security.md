@@ -75,10 +75,19 @@ it after a restart.
 If the deployment sets `SKIP_ENV_VAR=0`, that reverses: values are read from the
 environment and stored configuration is ignored. Because every form in the
 administration UI would otherwise still render and still submit, in that mode the
-configuration API refuses writes with `409 Conflict` and the UI shows a banner
-explaining that the deployment owns these settings. The current mode is reported
-to the UI as a read-only `CONFIGURATION_SOURCE` entry (`database` or
+configuration API refuses writes with `409 Conflict`, the UI shows a banner
+explaining that the deployment owns these settings, and its controls are
+disabled rather than left inviting a click that can only fail. The current mode
+is reported to the UI as a read-only `CONFIGURATION_SOURCE` entry (`database` or
 `environment`); it cannot be set through the API.
+
+A write naming a setting this instance stores no row for is refused with
+`400 Bad Request` naming the setting, rather than reported as a success that
+changed nothing. That happens when a panel is newer than the API it talks to, or
+when an instance was upgraded without its configuration being seeded. The panel
+shows the server's reason as given — refusals from this endpoint always describe
+something the administrator has to act on, so replacing them with a generic
+failure message loses the only useful part.
 
 A small number of settings are deliberately environment-only regardless of this
 mode — see the egress policy below.

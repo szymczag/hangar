@@ -16,7 +16,9 @@ import { Loader, ToggleSwitch } from "@plane/ui";
 import { AuthenticationMethodCard } from "@/components/authentication/authentication-method-card";
 import { PageWrapper } from "@/components/common/page-wrapper";
 // hooks
+import { configurationErrorMessage } from "@/helpers/configuration-error";
 import { useInstance } from "@/hooks/store";
+import { useConfigurationEditable } from "@/hooks/use-configuration-editable";
 // types
 import type { Route } from "./+types/page";
 // local
@@ -36,6 +38,7 @@ const isValidHttpsUrl = (value: string | undefined) => {
 const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticationPage() {
   // store
   const { fetchInstanceConfigurations, formattedConfig, updateInstanceConfigurations } = useInstance();
+  const isConfigurationEditable = useConfigurationEditable();
   // state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   // config
@@ -59,7 +62,7 @@ const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticat
       },
       error: {
         title: "Error",
-        message: () => "Failed to save configuration",
+        message: (error) => configurationErrorMessage(error),
       },
     });
 
@@ -92,7 +95,9 @@ const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticat
                 updateConfig("IS_SAML_ENABLED", isSAMLEnabled ? "0" : "1");
               }}
               size="sm"
-              disabled={isSubmitting || !formattedConfig || (!isSAMLEnabled && !isSAMLConfigured)}
+              disabled={
+                isSubmitting || !formattedConfig || (!isSAMLEnabled && !isSAMLConfigured) || !isConfigurationEditable
+              }
             />
           }
           disabled={isSubmitting || !formattedConfig}

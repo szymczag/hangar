@@ -15,7 +15,9 @@ import GitlabLogo from "@/app/assets/logos/gitlab-logo.svg?url";
 import { AuthenticationMethodCard } from "@/components/authentication/authentication-method-card";
 import { PageWrapper } from "@/components/common/page-wrapper";
 // hooks
+import { configurationErrorMessage } from "@/helpers/configuration-error";
 import { useInstance } from "@/hooks/store";
+import { useConfigurationEditable } from "@/hooks/use-configuration-editable";
 // types
 import type { Route } from "./+types/page";
 // local
@@ -26,6 +28,7 @@ const InstanceGitlabAuthenticationPage = observer(function InstanceGitlabAuthent
 ) {
   // store
   const { fetchInstanceConfigurations, formattedConfig, updateInstanceConfigurations } = useInstance();
+  const isConfigurationEditable = useConfigurationEditable();
   // state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   // config
@@ -50,18 +53,17 @@ const InstanceGitlabAuthenticationPage = observer(function InstanceGitlabAuthent
       },
       error: {
         title: "Error",
-        message: () => "Failed to save configuration",
+        message: (error) => configurationErrorMessage(error),
       },
     });
 
-    await updateConfigPromise
-      .then(() => {
-        setIsSubmitting(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setIsSubmitting(false);
-      });
+    try {
+      await updateConfigPromise;
+    } catch {
+      // The toast above reports the reason; this only clears the spinner.
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   return (
     <PageWrapper
@@ -81,7 +83,7 @@ const InstanceGitlabAuthenticationPage = observer(function InstanceGitlabAuthent
                 }
               }}
               size="sm"
-              disabled={isSubmitting || !formattedConfig}
+              disabled={isSubmitting || !formattedConfig || !isConfigurationEditable}
             />
           }
           disabled={isSubmitting || !formattedConfig}
