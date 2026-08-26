@@ -4,170 +4,260 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-// plane internal packages
+import { useMemo, useState } from "react";
+import { observer } from "mobx-react";
+import useSWR from "swr";
 import Link from "next/link";
+import { Plus, Trash2 } from "lucide-react";
 // plane internal packages
 import { Button, getButtonStyling } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { IFormattedInstanceConfiguration, TInstanceSSODomainPolicyConfigurationKeys } from "@plane/types";
+import type { IFormattedInstanceConfiguration } from "@plane/types";
 // components
 import { CodeBlock } from "@/components/common/code-block";
-import { ConfirmDiscardModal } from "@/components/common/confirm-discard-modal";
-import type { TControllerInputFormField } from "@/components/common/controller-input";
-import { ControllerInput } from "@/components/common/controller-input";
+// helpers
+import { configurationErrorMessage } from "@/helpers/configuration-error";
 // hooks
-import { useInstance } from "@/hooks/store";
+import { useInstance, useWorkspace } from "@/hooks/store";
+import { useConfigurationEditable } from "@/hooks/use-configuration-editable";
+// local
+import type { TDomainRow, TProvider, TRoleName } from "./policy";
+import { ALL_PROVIDERS, emptyRow, parsePolicy, serializePolicy } from "./policy";
 
 type Props = {
   config: IFormattedInstanceConfiguration;
 };
 
-type DomainPolicyFormValues = Record<TInstanceSSODomainPolicyConfigurationKeys, string>;
+const ROLE_LABELS: Record<TRoleName, string> = {
+  guest: "Guest",
+  member: "Member",
+  admin: "Admin",
+};
 
-export function InstanceSSODomainPolicyForm(props: Props) {
+export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPolicyForm(props: Props) {
   const { config } = props;
-  // states
-  const [isDiscardChangesModalOpen, setIsDiscardChangesModalOpen] = useState(false);
   // store hooks
   const { updateInstanceConfigurations } = useInstance();
-  // form data
-  const {
-    handleSubmit,
-    control,
-    reset,
-    formState: { errors, isDirty, isSubmitting },
-  } = useForm<DomainPolicyFormValues>({
-    defaultValues: {
-      SSO_ENFORCED_DOMAINS: config["SSO_ENFORCED_DOMAINS"] ?? "",
-      SSO_AUTO_JOIN_WORKSPACES: config["SSO_AUTO_JOIN_WORKSPACES"] ?? "",
-      SSO_AUTO_JOIN_PROJECTS: config["SSO_AUTO_JOIN_PROJECTS"] ?? "",
-    },
-  });
+  const { workspaces, fetchWorkspaces } = useWorkspace();
+  const isConfigurationEditable = useConfigurationEditable();
+  // states
+  const [rows, setRows] = useState<TDomainRow[]>(() =>
+    parsePolicy(
+      config.SSO_ENFORCED_DOMAINS ?? "",
+      config.SSO_AUTO_JOIN_WORKSPACES ?? "",
+      config.SSO_AUTO_JOIN_PROJECTS ?? ""
+    )
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
-  const DOMAIN_POLICY_FORM_FIELDS: TControllerInputFormField<DomainPolicyFormValues>[] = [
-    {
-      key: "SSO_ENFORCED_DOMAINS",
-      type: "text",
-      label: "Domains pinned to a provider",
-      description: (
-        <>
-          Comma-separated. <CodeBlock darkerShade>corp.com=google</CodeBlock> lets only Google sign in people at that
-          domain; <CodeBlock darkerShade>corp.com=oidc;saml</CodeBlock> allows either; a bare{" "}
-          <CodeBlock darkerShade>corp.com</CodeBlock> allows any federated provider. Every other method — password,
-          magic code, and the other providers — is refused for a listed domain, on both sign-up and sign-in, so nobody
-          can claim a colleague&apos;s address through a weaker route. Matching is exact: list subdomains separately.
-        </>
-      ),
-      placeholder: "corp.com=google, eu.corp.com=saml",
-      error: Boolean(errors.SSO_ENFORCED_DOMAINS),
-      required: false,
-    },
-    {
-      key: "SSO_AUTO_JOIN_WORKSPACES",
-      type: "text",
-      label: "Workspace to join on sign-in",
-      description: (
-        <>
-          Comma-separated <CodeBlock darkerShade>domain=workspace-slug:role</CodeBlock> entries, where role is{" "}
-          <CodeBlock darkerShade>admin</CodeBlock>, <CodeBlock darkerShade>member</CodeBlock> or{" "}
-          <CodeBlock darkerShade>guest</CodeBlock> (guest if omitted). Leave empty to keep inviting people by hand. Only
-          applies to domains pinned above — membership is granted on an email domain, so that domain has to belong to
-          one provider first. An existing membership is never changed, so a role you lowered by hand stays lowered.
-        </>
-      ),
-      placeholder: "corp.com=engineering:member",
-      error: Boolean(errors.SSO_AUTO_JOIN_WORKSPACES),
-      required: false,
-    },
-    {
-      key: "SSO_AUTO_JOIN_PROJECTS",
-      type: "text",
-      label: "Projects to join on sign-in",
-      description: (
-        <>
-          Comma-separated <CodeBlock darkerShade>domain=workspace-slug/IDENTIFIER:role</CodeBlock> entries, using the
-          project&apos;s identifier — the short code shown on its work items. Requires the matching workspace above: a
-          project seat without a workspace seat is a state the rest of the product does not expect, so an entry whose
-          workspace is not joined is skipped. Archived projects are skipped too, and an existing membership is never
-          changed.
-        </>
-      ),
-      placeholder: "corp.com=engineering/PLAT:member",
-      error: Boolean(errors.SSO_AUTO_JOIN_PROJECTS),
-      required: false,
-    },
-  ];
+  useSWR("INSTANCE_WORKSPACES", () => fetchWorkspaces());
 
-  const onSubmit = async (formData: DomainPolicyFormValues) => {
-    const payload: Partial<DomainPolicyFormValues> = { ...formData };
+  const workspaceOptions = useMemo(() => Object.values(workspaces ?? {}), [workspaces]);
 
+  const update = (index: number, patch: Partial<TDomainRow>) => {
+    setRows((previous) => previous.map((row, position) => (position === index ? { ...row, ...patch } : row)));
+    setIsDirty(true);
+  };
+
+  const toggleProvider = (index: number, provider: TProvider) => {
+    const current = rows[index]?.providers ?? [];
+    update(index, {
+      providers: current.includes(provider) ? current.filter((value) => value !== provider) : [...current, provider],
+    });
+  };
+
+  const onSubmit = async () => {
+    setIsSubmitting(true);
     try {
-      const response = await updateInstanceConfigurations(payload);
+      await updateInstanceConfigurations(serializePolicy(rows));
       setToast({
         type: TOAST_TYPE.SUCCESS,
         title: "Done!",
         message: "Domain policy saved. Test a sign-in from a pinned domain now.",
       });
-      reset({
-        SSO_ENFORCED_DOMAINS: response.find((item) => item.key === "SSO_ENFORCED_DOMAINS")?.value,
-        SSO_AUTO_JOIN_WORKSPACES: response.find((item) => item.key === "SSO_AUTO_JOIN_WORKSPACES")?.value,
-        SSO_AUTO_JOIN_PROJECTS: response.find((item) => item.key === "SSO_AUTO_JOIN_PROJECTS")?.value,
-      });
+      setIsDirty(false);
     } catch (error) {
-      console.error(error);
-      setToast({
-        type: TOAST_TYPE.ERROR,
-        title: "Error!",
-        message: "Something went wrong. Please try again.",
-      });
-    }
-  };
-
-  const handleGoBack = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (isDirty) {
-      event.preventDefault();
-      setIsDiscardChangesModalOpen(true);
+      setToast({ type: TOAST_TYPE.ERROR, title: "Error", message: configurationErrorMessage(error) });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <>
-      <ConfirmDiscardModal
-        isOpen={isDiscardChangesModalOpen}
-        onDiscardHref="/authentication"
-        handleClose={() => setIsDiscardChangesModalOpen(false)}
-      />
-      <div className="space-y-8">
-        <div className="grid grid-cols-1 gap-x-12 gap-y-8 lg:grid-cols-2">
-          <div className="col-span-2 flex flex-col gap-y-4 md:col-span-1">
-            {DOMAIN_POLICY_FORM_FIELDS.map((field) => (
-              <ControllerInput
-                key={field.key}
-                control={control}
-                type={field.type}
-                name={field.key}
-                label={field.label}
-                description={field.description}
-                placeholder={field.placeholder}
-                error={field.error}
-                required={field.required}
-              />
+    <div className="flex flex-col gap-6">
+      <p className="max-w-3xl text-13 text-tertiary">
+        One row per email domain. A pinned domain accepts only the providers you tick — password sign-in and magic codes
+        are refused for it, on both sign-up and sign-in, so nobody can claim a colleague&apos;s address through a weaker
+        route. Matching is exact, so <CodeBlock darkerShade>sub.corp.com</CodeBlock> needs its own row.
+      </p>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-13">
+          <thead className="text-tertiary">
+            <tr className="border-b border-subtle text-left">
+              <th className="py-2 pr-4 font-medium">Email domain</th>
+              <th className="py-2 pr-4 font-medium">May sign in with</th>
+              <th className="py-2 pr-4 font-medium">Joins workspace</th>
+              <th className="py-2 pr-4 font-medium">as</th>
+              <th className="py-2 pr-4 font-medium">Project</th>
+              <th className="py-2 pr-4 font-medium">as</th>
+              <th className="py-2 font-medium" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={row.id} className="border-b border-subtle/60 align-top">
+                <td className="py-2 pr-4">
+                  <input
+                    className="w-44 rounded-md border border-strong bg-surface-1 px-2 py-1"
+                    placeholder="corp.com"
+                    value={row.domain}
+                    onChange={(event) => update(index, { domain: event.target.value })}
+                    disabled={!isConfigurationEditable}
+                  />
+                </td>
+                <td className="py-2 pr-4">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {ALL_PROVIDERS.map((provider) => (
+                      <label key={provider} className="flex items-center gap-1 text-11">
+                        <input
+                          type="checkbox"
+                          checked={row.providers.includes(provider)}
+                          onChange={() => toggleProvider(index, provider)}
+                          disabled={!isConfigurationEditable}
+                        />
+                        {provider}
+                      </label>
+                    ))}
+                  </div>
+                  {row.providers.length === 0 && (
+                    <span className="text-11 text-tertiary">None ticked — any of Google, OIDC or SAML.</span>
+                  )}
+                </td>
+                <td className="py-2 pr-4">
+                  <select
+                    className="w-40 rounded-md border border-strong bg-surface-1 px-2 py-1"
+                    value={row.workspaceSlug}
+                    onChange={(event) => update(index, { workspaceSlug: event.target.value })}
+                    disabled={!isConfigurationEditable}
+                  >
+                    <option value="">Invite by hand</option>
+                    {workspaceOptions.map((workspace) => (
+                      <option key={workspace.id} value={workspace.slug}>
+                        {workspace.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-2 pr-4">
+                  <select
+                    className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1"
+                    value={row.workspaceRole}
+                    onChange={(event) => update(index, { workspaceRole: event.target.value as TRoleName })}
+                    disabled={!isConfigurationEditable || !row.workspaceSlug}
+                  >
+                    {(Object.keys(ROLE_LABELS) as TRoleName[]).map((role) => (
+                      <option key={role} value={role}>
+                        {ROLE_LABELS[role]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-2 pr-4">
+                  <input
+                    className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1 uppercase"
+                    placeholder="PLAT"
+                    value={row.projectIdentifier}
+                    onChange={(event) => update(index, { projectIdentifier: event.target.value })}
+                    disabled={!isConfigurationEditable || !row.workspaceSlug}
+                  />
+                </td>
+                <td className="py-2 pr-4">
+                  <select
+                    className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1"
+                    value={row.projectRole}
+                    onChange={(event) => update(index, { projectRole: event.target.value as TRoleName })}
+                    disabled={!isConfigurationEditable || !row.projectIdentifier}
+                  >
+                    {(Object.keys(ROLE_LABELS) as TRoleName[]).map((role) => (
+                      <option key={role} value={role}>
+                        {ROLE_LABELS[role]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-2">
+                  <button
+                    type="button"
+                    aria-label="Remove domain"
+                    className="text-tertiary hover:text-danger-primary"
+                    onClick={() => {
+                      setRows((previous) => previous.filter((_, position) => position !== index));
+                      setIsDirty(true);
+                    }}
+                    disabled={!isConfigurationEditable}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </td>
+              </tr>
             ))}
-            <div className="flex flex-col gap-1 pt-4">
-              <div className="flex items-center gap-4">
-                <Button variant="primary" onClick={handleSubmit(onSubmit)} loading={isSubmitting} disabled={!isDirty}>
-                  {isSubmitting ? "Saving..." : "Save changes"}
-                </Button>
-                <Link href="/authentication" className={getButtonStyling("secondary", "lg")} onClick={handleGoBack}>
-                  Go back
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-6 text-center text-tertiary">
+                  No domain is pinned. Everyone signs in with whatever methods are enabled.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-    </>
+
+      <div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setRows((previous) => [...previous, emptyRow()]);
+            setIsDirty(true);
+          }}
+          disabled={!isConfigurationEditable}
+        >
+          <Plus className="size-4" /> Add a domain
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-md border border-subtle p-4 text-11 text-tertiary">
+        <span>
+          <strong className="text-secondary">Project identifier</strong> is the short code on a project&apos;s work
+          items, such as <CodeBlock darkerShade>PLAT-42</CodeBlock> → <CodeBlock darkerShade>PLAT</CodeBlock>. A project
+          seat is only granted alongside a workspace seat, and archived projects are skipped.
+        </span>
+        <span>
+          An existing membership is never modified, so a role you lowered by hand stays lowered. Joining happens on
+          sign-in, and only for domains pinned here.
+        </span>
+        <span>
+          Pinning removes password and magic-link sign-in for a domain. Import identities and confirm sign-in for a few
+          accounts <strong className="text-secondary">before</strong> pinning, and read the break-glass guidance first.
+        </span>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={onSubmit}
+          loading={isSubmitting}
+          disabled={!isDirty || isSubmitting || !isConfigurationEditable}
+        >
+          {isSubmitting ? "Saving" : "Save changes"}
+        </Button>
+        <Link href="/authentication" className={getButtonStyling("secondary", "lg")}>
+          Go back
+        </Link>
+      </div>
+    </div>
   );
-}
+});

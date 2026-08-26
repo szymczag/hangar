@@ -94,8 +94,12 @@ mode — see the egress policy below.
 
 ### Domain policy
 
-These govern which provider owns an email domain and where its users land. Both
-are editable in the administration UI under **Authentication → Domain policy**.
+These govern which provider owns an email domain and where its users land. They
+are edited in the administration UI under **Authentication → Domain policy**,
+which presents them as one row per domain — tick the providers, choose the
+workspace and roles — and composes the stored strings below for you. The formats
+are documented because they are also settable through the environment, and
+because a stored value is what an incident response will look at.
 
 | Setting                    | Meaning                                                                                        |
 | -------------------------- | ---------------------------------------------------------------------------------------------- |
