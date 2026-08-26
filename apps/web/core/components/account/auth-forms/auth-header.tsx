@@ -13,6 +13,8 @@ import { LogoSpinner } from "@/components/common/logo-spinner";
 import { WorkspaceLogo } from "@/components/workspace/logo";
 // helpers
 import { EAuthModes, EAuthSteps } from "@/helpers/authentication.helper";
+// hooks
+import { useInstance } from "@/hooks/store/use-instance";
 // services
 import { WorkspaceService } from "@/services/workspace.service";
 
@@ -61,6 +63,10 @@ export const AuthHeader = observer(function AuthHeader(props: TAuthHeader) {
   const { workspaceSlug, invitationId, invitationEmail, authMode, currentAuthStep } = props;
   // plane imports
   const { t } = useTranslation();
+  const { config } = useInstance();
+  const instanceBranding = config
+    ? { sign_in_header: config.sign_in_header, sign_in_subheader: config.sign_in_subheader }
+    : undefined;
 
   const { data: invitation, isLoading } = useSWR(
     workspaceSlug && invitationId ? `WORKSPACE_INVITATION_${workspaceSlug}_${invitationId}` : null,
@@ -94,7 +100,13 @@ export const AuthHeader = observer(function AuthHeader(props: TAuthHeader) {
       };
     }
 
-    return Titles[mode][step];
+    const configured = Titles[mode][step];
+    // An operator who set neither value gets the built-in wording, so an
+    // instance that never touches branding looks exactly as it did.
+    return {
+      header: instanceBranding?.sign_in_header || configured.header,
+      subHeader: instanceBranding?.sign_in_subheader || configured.subHeader,
+    };
   };
 
   const { header, subHeader } = getHeaderSubHeader(currentAuthStep, authMode, invitation || undefined, invitationEmail);
