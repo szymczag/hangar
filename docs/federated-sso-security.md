@@ -561,6 +561,15 @@ used or has expired. Only those two fields are repeated, both truncated.
 Each record carries `refused_by_egress_policy`, which is the field to look at
 first because it decides who has to act:
 
+One refusal is worth naming, because it looked like a provider fault and was
+ours. Until `rc.32`, a host answering with more addresses than the transport
+intended to try was refused outright. `www.googleapis.com` answers with eight A
+and eight AAAA records, so Google's userinfo and JWKS endpoints were rejected
+before any connection — after the token exchange had already succeeded, which
+made it look as though Google had failed. Every resolved address is still
+checked, so a reply mixing public and private addresses is refused as a whole;
+only how many are carried forward to connect with is capped.
+
 - **`true`** — the destination was refused by this instance's own outbound
   policy, before anything left the network. Usual causes are a provider host
   resolving to a private address (split-horizon DNS), a deployment that requires
