@@ -4,17 +4,17 @@
 
 """Administrative access must survive pinning a domain to an identity provider.
 
-Two escape hatches exist, and an operator needs to know which one they are
-relying on before the cutover.
+The God Mode console is the recovery path this deployment relies on. It
+authenticates against the password directly rather than through the provider
+adapters, so an administrator cannot pin themselves out of it — and, since the
+second factor shipped, the credential that recovers an instance is a password
+plus a registered security key rather than a password alone.
 
-The first is ordinary: the domain policy only governs the domains it lists, so
-an administrator whose address is outside them keeps password sign-in.
-
-The second is a property of the God Mode console, which authenticates against
-the password directly rather than through the provider adapters. That keeps an
-instance administrator from locking themselves out, and it also means pinning a
-domain does not protect the console — worth stating plainly, because it is the
-kind of assumption that is only discovered afterwards.
+An application account in an unpinned domain also keeps password sign-in, because
+the policy governs only the domains it lists. That behaviour is asserted here so
+it cannot change silently, but it is a property of the policy rather than a
+recommendation: each such account is a password-authenticated way into a domain
+that pinning was meant to close.
 """
 
 import uuid

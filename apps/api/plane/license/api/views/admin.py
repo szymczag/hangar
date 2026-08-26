@@ -99,10 +99,11 @@ class InstanceAdminSignUpEndpoint(View):
     def _throttled(self, request):
         """Refuse when this client is guessing too fast.
 
-        The console carries instance-wide authority and its password is the
-        only control in front of it — a pinned domain does not cover it,
-        because it checks the password directly instead of going through the
-        provider adapters. This endpoint is a plain Django View, so the
+        The console carries instance-wide authority and a pinned domain does
+        not cover it, because it checks the password directly instead of going
+        through the provider adapters. That is deliberate — it is what keeps an
+        administrator from pinning themselves out of the recovery path — so the
+        password has to be rate limited here. This endpoint is a plain Django View, so the
         framework's default throttle does not apply and the limit has to be
         applied here, as the application sign-in routes already do.
         """
@@ -114,7 +115,6 @@ class InstanceAdminSignUpEndpoint(View):
         )
         url = urljoin(base_host(request=request, is_admin=True), "?" + urlencode(exc.get_error_dict()))
         return HttpResponseRedirect(url)
-
 
     def post(self, request):
         throttled = self._throttled(request)
@@ -309,10 +309,11 @@ class InstanceAdminSignInEndpoint(View):
     def _throttled(self, request):
         """Refuse when this client is guessing too fast.
 
-        The console carries instance-wide authority and its password is the
-        only control in front of it — a pinned domain does not cover it,
-        because it checks the password directly instead of going through the
-        provider adapters. This endpoint is a plain Django View, so the
+        The console carries instance-wide authority and a pinned domain does
+        not cover it, because it checks the password directly instead of going
+        through the provider adapters. That is deliberate — it is what keeps an
+        administrator from pinning themselves out of the recovery path — so the
+        password has to be rate limited here. This endpoint is a plain Django View, so the
         framework's default throttle does not apply and the limit has to be
         applied here, as the application sign-in routes already do.
         """
@@ -324,7 +325,6 @@ class InstanceAdminSignInEndpoint(View):
         )
         url = urljoin(base_host(request=request, is_admin=True), "?" + urlencode(exc.get_error_dict()))
         return HttpResponseRedirect(url)
-
 
     def post(self, request):
         throttled = self._throttled(request)
