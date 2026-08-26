@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 # Python imports
+import re
 import uuid
 
 # Django imports
@@ -28,6 +29,7 @@ DEPLOYMENT_MANAGED_CONFIGURATION_KEYS = {"POSTHOG_HOST"}
 # from. When SKIP_ENV_VAR is off the stored values are ignored at read time and
 # the environment decides, which would otherwise make every form in the panel
 # look editable while changing nothing.
+COLOUR_CONFIGURATION_KEYS = {"INSTANCE_ACCENT_COLOR", "INSTANCE_LOGIN_BACKDROP_COLOR"}
 CONFIGURATION_SOURCE_KEY = "CONFIGURATION_SOURCE"
 CONFIGURATION_SOURCE_DATABASE = "database"
 CONFIGURATION_SOURCE_ENVIRONMENT = "environment"
@@ -53,9 +55,7 @@ class InstanceConfigurationEndpoint(BaseAPIView):
 
     @cache_response(60 * 60 * 2, user=False)
     def get(self, request):
-        instance_configurations = InstanceConfiguration.objects.exclude(
-            key__in=DEPLOYMENT_MANAGED_CONFIGURATION_KEYS
-        )
+        instance_configurations = InstanceConfiguration.objects.exclude(key__in=DEPLOYMENT_MANAGED_CONFIGURATION_KEYS)
         serializer = InstanceConfigurationSerializer(instance_configurations, many=True)
         # Appended rather than returned alongside, so the response stays a flat
         # list of configuration entries and existing clients keep working.
@@ -87,6 +87,18 @@ class InstanceConfigurationEndpoint(BaseAPIView):
                 },
                 status=status.HTTP_409_CONFLICT,
             )
+
+        # Colours reach a style attribute on the sign-in page, which is the one
+        # page that collects passwords. Anything but a plain hex colour is
+        # refused here rather than escaped downstream, so there is one place to
+        # look rather than several.
+        for key in COLOUR_CONFIGURATION_KEYS & set(request.data):
+            value = (request.data.get(key) or "").strip()
+            if value and not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+                return Response(
+                    {"error": f"{key} must be a colour such as #1d4ed8, or empty."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if CONFIGURATION_SOURCE_KEY in request.data:
             return Response(
