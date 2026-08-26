@@ -181,187 +181,30 @@ export const EmailSecuritySettings = () => {
         </div>
       </div>
 
-      {!data.enabled ? (
+      {!data.enabled && (
         <div className="mt-6 flex gap-3 rounded-md border border-warning-subtle bg-warning-subtle p-4 text-13">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-          <p>OpenPGP email security is not enabled by this instance administrator.</p>
+          <p>
+            Encrypted notifications are not switched on for this instance yet. You can add and verify your key now — it
+            starts being used the moment an administrator enables them, with nothing further to do.
+          </p>
         </div>
-      ) : (
-        <div className="mt-7 flex max-w-3xl flex-col gap-7">
-          <Lifecycle status={data} />
+      )}
 
-          {data.active_key && !data.pending_key ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-13 font-medium text-success-primary">
-                <MailCheck className="size-4" /> Notifications are encrypted
-              </div>
-              <KeySummary value={data.active_key} />
-              {showReplacement && (
-                <label htmlFor="replacement-openpgp-certificate" className="flex flex-col gap-2 text-13 text-primary">
-                  Replacement public certificate
-                  <TextArea
-                    id="replacement-openpgp-certificate"
-                    value={certificate}
-                    onChange={(event) => setCertificate(event.target.value)}
-                    placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"
-                    rows={8}
-                    className="font-mono min-h-40 text-11"
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                </label>
-              )}
-              {!currentUser?.is_password_autoset && (
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder={
-                    showReplacement
-                      ? "Current password required to replace this key"
-                      : "Current password required to remove this key"
-                  }
-                  autoComplete="current-password"
-                />
-              )}
-              <div className="flex flex-wrap gap-2">
-                {showReplacement ? (
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    loading={busyAction === "upload"}
-                    disabled={!certificate.trim() || (!currentUser?.is_password_autoset && !password)}
-                    onClick={upload}
-                  >
-                    Upload replacement
-                  </Button>
-                ) : (
-                  <Button variant="secondary" size="lg" onClick={() => setShowReplacement(true)}>
-                    Replace public key
-                  </Button>
-                )}
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  loading={busyAction === "test"}
-                  onClick={() =>
-                    run(
-                      "test",
-                      () => userService.sendOpenPGPTest(data.active_key!.id),
-                      "An encrypted test message was queued."
-                    )
-                  }
-                >
-                  Send encrypted test
-                </Button>
-                <Button
-                  variant="error-outline"
-                  size="lg"
-                  loading={busyAction === "remove"}
-                  disabled={!currentUser?.is_password_autoset && !password}
-                  onClick={() =>
-                    confirmRemoval === data.active_key!.id
-                      ? remove(data.active_key!.id)
-                      : setConfirmRemoval(data.active_key!.id)
-                  }
-                >
-                  <Trash2 className="size-4" />
-                  {confirmRemoval === data.active_key.id ? "Confirm removal" : "Remove key"}
-                </Button>
-              </div>
+      <div className="mt-7 flex max-w-3xl flex-col gap-7">
+        <Lifecycle status={data} />
+
+        {data.active_key && !data.pending_key ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 text-13 font-medium text-success-primary">
+              <MailCheck className="size-4" /> Notifications are encrypted
             </div>
-          ) : data.pending_key ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-13 font-medium text-primary">
-                <KeyRound className="size-4" /> Verification required
-              </div>
-              {data.active_key && (
-                <p className="text-12 leading-5 text-secondary">
-                  Your existing active key remains in use until this replacement is verified.
-                </p>
-              )}
-              <KeySummary value={data.pending_key} />
-              <p className="text-12 leading-5 text-secondary">
-                Send a challenge, decrypt it with your private key, then enter the code below. Hangar never receives or
-                stores your private key.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  loading={busyAction === "challenge"}
-                  onClick={() =>
-                    run(
-                      "challenge",
-                      () => userService.sendOpenPGPChallenge(data.pending_key!.id),
-                      "The encrypted verification message was queued."
-                    )
-                  }
-                >
-                  Send encrypted challenge
-                </Button>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  value={code}
-                  onChange={(event) => setCode(event.target.value.toUpperCase())}
-                  placeholder="Verification code"
-                  autoComplete="one-time-code"
-                  className="font-mono uppercase"
-                />
-                <Button
-                  variant="primary"
-                  size="lg"
-                  disabled={code.trim().length < 8}
-                  loading={busyAction === "verify"}
-                  onClick={() =>
-                    run(
-                      "verify",
-                      async () => {
-                        await userService.verifyOpenPGPChallenge(data.pending_key!.id, code.trim());
-                        setCode("");
-                      },
-                      "The key is verified. Future project notifications will be encrypted."
-                    )
-                  }
-                >
-                  Verify key
-                </Button>
-              </div>
-              {!currentUser?.is_password_autoset && (
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Current password required to discard this key"
-                  autoComplete="current-password"
-                />
-              )}
-              <Button
-                variant="error-outline"
-                size="lg"
-                className="self-start"
-                loading={busyAction === "remove"}
-                disabled={!currentUser?.is_password_autoset && !password}
-                onClick={() =>
-                  confirmRemoval === data.pending_key!.id
-                    ? remove(data.pending_key!.id)
-                    : setConfirmRemoval(data.pending_key!.id)
-                }
-              >
-                {confirmRemoval === data.pending_key.id ? "Confirm discard" : "Discard pending key"}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <div className="rounded-md border border-subtle-1 bg-layer-2 p-4 text-13 leading-5 text-secondary">
-                Project and export emails are currently silenced. Paste one ASCII-armored public certificate below;
-                private keys and private-key blocks are rejected.
-              </div>
-              <label htmlFor="openpgp-certificate" className="flex flex-col gap-2 text-13 text-primary">
-                OpenPGP public certificate
+            <KeySummary value={data.active_key} />
+            {showReplacement && (
+              <label htmlFor="replacement-openpgp-certificate" className="flex flex-col gap-2 text-13 text-primary">
+                Replacement public certificate
                 <TextArea
-                  id="openpgp-certificate"
+                  id="replacement-openpgp-certificate"
                   value={certificate}
                   onChange={(event) => setCertificate(event.target.value)}
                   placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"
@@ -371,29 +214,189 @@ export const EmailSecuritySettings = () => {
                   autoComplete="off"
                 />
               </label>
-              {!currentUser?.is_password_autoset && (
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Current password"
-                  autoComplete="current-password"
-                />
+            )}
+            {!currentUser?.is_password_autoset && (
+              <Input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={
+                  showReplacement
+                    ? "Current password required to replace this key"
+                    : "Current password required to remove this key"
+                }
+                autoComplete="current-password"
+              />
+            )}
+            <div className="flex flex-wrap gap-2">
+              {showReplacement ? (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  loading={busyAction === "upload"}
+                  disabled={!certificate.trim() || (!currentUser?.is_password_autoset && !password)}
+                  onClick={upload}
+                >
+                  Upload replacement
+                </Button>
+              ) : (
+                <Button variant="secondary" size="lg" onClick={() => setShowReplacement(true)}>
+                  Replace public key
+                </Button>
               )}
+              <Button
+                variant="secondary"
+                size="lg"
+                loading={busyAction === "test"}
+                onClick={() =>
+                  run(
+                    "test",
+                    () => userService.sendOpenPGPTest(data.active_key!.id),
+                    "An encrypted test message was queued."
+                  )
+                }
+              >
+                Send encrypted test
+              </Button>
+              <Button
+                variant="error-outline"
+                size="lg"
+                loading={busyAction === "remove"}
+                disabled={!currentUser?.is_password_autoset && !password}
+                onClick={() =>
+                  confirmRemoval === data.active_key!.id
+                    ? remove(data.active_key!.id)
+                    : setConfirmRemoval(data.active_key!.id)
+                }
+              >
+                <Trash2 className="size-4" />
+                {confirmRemoval === data.active_key.id ? "Confirm removal" : "Remove key"}
+              </Button>
+            </div>
+          </div>
+        ) : data.pending_key ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 text-13 font-medium text-primary">
+              <KeyRound className="size-4" /> Verification required
+            </div>
+            {data.active_key && (
+              <p className="text-12 leading-5 text-secondary">
+                Your existing active key remains in use until this replacement is verified.
+              </p>
+            )}
+            <KeySummary value={data.pending_key} />
+            <p className="text-12 leading-5 text-secondary">
+              Send a challenge, decrypt it with your private key, then enter the code below. Hangar never receives or
+              stores your private key.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="lg"
+                loading={busyAction === "challenge"}
+                onClick={() =>
+                  run(
+                    "challenge",
+                    () => userService.sendOpenPGPChallenge(data.pending_key!.id),
+                    "The encrypted verification message was queued."
+                  )
+                }
+              >
+                Send encrypted challenge
+              </Button>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={code}
+                onChange={(event) => setCode(event.target.value.toUpperCase())}
+                placeholder="Verification code"
+                autoComplete="one-time-code"
+                className="font-mono uppercase"
+              />
               <Button
                 variant="primary"
                 size="lg"
-                className="self-start"
-                disabled={!certificate.trim() || (!currentUser?.is_password_autoset && !password)}
-                loading={busyAction === "upload"}
-                onClick={upload}
+                disabled={code.trim().length < 8}
+                loading={busyAction === "verify"}
+                onClick={() =>
+                  run(
+                    "verify",
+                    async () => {
+                      await userService.verifyOpenPGPChallenge(data.pending_key!.id, code.trim());
+                      setCode("");
+                    },
+                    "The key is verified. Future project notifications will be encrypted."
+                  )
+                }
               >
-                Upload public key
+                Verify key
               </Button>
             </div>
-          )}
-        </div>
-      )}
+            {!currentUser?.is_password_autoset && (
+              <Input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Current password required to discard this key"
+                autoComplete="current-password"
+              />
+            )}
+            <Button
+              variant="error-outline"
+              size="lg"
+              className="self-start"
+              loading={busyAction === "remove"}
+              disabled={!currentUser?.is_password_autoset && !password}
+              onClick={() =>
+                confirmRemoval === data.pending_key!.id
+                  ? remove(data.pending_key!.id)
+                  : setConfirmRemoval(data.pending_key!.id)
+              }
+            >
+              {confirmRemoval === data.pending_key.id ? "Confirm discard" : "Discard pending key"}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-md border border-subtle-1 bg-layer-2 p-4 text-13 leading-5 text-secondary">
+              Project and export emails are currently silenced. Paste one ASCII-armored public certificate below;
+              private keys and private-key blocks are rejected.
+            </div>
+            <label htmlFor="openpgp-certificate" className="flex flex-col gap-2 text-13 text-primary">
+              OpenPGP public certificate
+              <TextArea
+                id="openpgp-certificate"
+                value={certificate}
+                onChange={(event) => setCertificate(event.target.value)}
+                placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"
+                rows={8}
+                className="font-mono min-h-40 text-11"
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </label>
+            {!currentUser?.is_password_autoset && (
+              <Input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Current password"
+                autoComplete="current-password"
+              />
+            )}
+            <Button
+              variant="primary"
+              size="lg"
+              className="self-start"
+              disabled={!certificate.trim() || (!currentUser?.is_password_autoset && !password)}
+              loading={busyAction === "upload"}
+              onClick={upload}
+            >
+              Upload public key
+            </Button>
+          </div>
+        )}
+      </div>
       {data.active_suppressions.length > 0 && (
         <div className="mt-6 flex max-w-3xl gap-3 rounded-md border border-danger-subtle bg-danger-subtle p-4 text-13">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" />

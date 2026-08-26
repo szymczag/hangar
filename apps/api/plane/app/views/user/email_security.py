@@ -64,7 +64,37 @@ class OpenPGPTestThrottle(UserRateThrottle):
     scope = "openpgp_test"
 
 
-def _feature_required():
+def _verification_possible():
+    """Verifying a key means receiving a code that only its holder can read.
+
+    The mailer encrypts a challenge whenever one names a key, regardless of
+    whether the instance has switched encryption on — but it refuses outright
+    without durable delivery, because that path cannot encrypt at all. Saying so
+    here beats surfacing the enqueue failure as an opaque 503.
+    """
+    if not settings.EMAIL_DELIVERY_V2_ENABLED:
+        return Response(
+            {
+                "error": (
+                    "Verifying a key needs durable email delivery, which this instance "
+                    "has not enabled. The key stays enrolled until then."
+                )
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+    return None
+
+
+def _delivery_required():
+    """Guards the operations that would actually send an encrypted message.
+
+    Enrolling a key is deliberately not one of them. Gating enrolment on the
+    feature made preparing for it impossible: nobody could hold a verified key
+    until an administrator switched encryption on, and the moment they did,
+    every message went out in the clear until people got organised. Keys can
+    now be enrolled and verified beforehand and start being used the moment
+    the instance enables delivery.
+    """
     if not settings.EMAIL_OPENPGP_ENABLED:
         return Response(
             {"error": "OpenPGP email security is not enabled for this instance."},
@@ -162,9 +192,6 @@ class EmailSecurityKeyUploadEndpoint(BaseAPIView):
     throttle_classes = [OpenPGPUploadThrottle]
 
     def post(self, request):
-        disabled = _feature_required()
-        if disabled:
-            return disabled
         serializer = OpenPGPKeyUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         reauth_error = _require_recent_authentication(request, serializer.validated_data.get("password", ""))
@@ -215,9 +242,10 @@ class EmailSecurityChallengeEndpoint(BaseAPIView):
     throttle_classes = [OpenPGPChallengeThrottle]
 
     def post(self, request, key_id):
-        disabled = _feature_required()
-        if disabled:
-            return disabled
+        unavailable = _verification_possible()
+        if unavailable:
+            return unavailable
+
         key = (
             UserOpenPGPKey.objects.filter(
                 pk=key_id,
@@ -285,9 +313,6 @@ class EmailSecurityChallengeVerifyEndpoint(BaseAPIView):
     throttle_classes = [OpenPGPVerifyThrottle]
 
     def post(self, request, key_id):
-        disabled = _feature_required()
-        if disabled:
-            return disabled
         serializer = OpenPGPChallengeVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
@@ -345,9 +370,6 @@ class EmailSecurityChallengeVerifyEndpoint(BaseAPIView):
 
 class EmailSecurityKeyEndpoint(BaseAPIView):
     def delete(self, request, key_id):
-        disabled = _feature_required()
-        if disabled:
-            return disabled
         serializer = OpenPGPKeyRemovalSerializer(data=request.data or {})
         serializer.is_valid(raise_exception=True)
         reauth_error = _require_recent_authentication(request, serializer.validated_data.get("password", ""))
@@ -378,7 +400,7 @@ class EmailSecurityTestEndpoint(BaseAPIView):
     throttle_classes = [OpenPGPTestThrottle]
 
     def post(self, request, key_id):
-        disabled = _feature_required()
+        disabled = _delivery_required()
         if disabled:
             return disabled
         key = (

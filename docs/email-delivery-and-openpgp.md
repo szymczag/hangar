@@ -114,6 +114,16 @@ The Email security section in Profile → Security supports:
 
 Upload alone is not enough. The encrypted challenge proves control of the corresponding private key. The existing active key remains active until a replacement completes verification.
 
+### Enrolling before the instance switches encryption on
+
+Enrolment does not require `EMAIL_OPENPGP_ENABLED`. Anyone can add and verify a key while encrypted notification delivery is still off, and their key starts being used the moment an administrator enables it, with no further action from them.
+
+Gating enrolment on the flag produced the failure it appeared to prevent: nobody could hold a verified key until encryption was switched on, so the first encrypted send always went to an audience without keys — that is, in the clear. Preparing first, then switching on, is the order that actually protects the first message.
+
+The challenge stays a real proof of possession while the feature is off. The mailer encrypts any message that names a key explicitly, independently of the instance flag, and refuses to send it at all rather than falling back to plaintext. Without durable delivery (`EMAIL_DELIVERY_V2_ENABLED`) there is no path that can encrypt, so verification is refused with a message saying so and the key stays enrolled until delivery is available.
+
+Sending a compatibility test still requires the feature, because that operation exists to send an encrypted message rather than to prepare for one.
+
 Hangar rejects private-key material, malformed or oversized certificates, expired/revoked/disabled keys, signing-only certificates, weak RSA encryption keys, excessive certificate structure, and unsupported algorithms. Certificate processing is isolated and cannot retrieve keys from a network.
 
 The user's private key remains solely in their mail client or key-management environment. It must not be pasted into Hangar, sent to support, or stored in a browser profile field.
