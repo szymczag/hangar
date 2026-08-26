@@ -124,6 +124,20 @@ The challenge stays a real proof of possession while the feature is off. The mai
 
 Sending a compatibility test still requires the feature, because that operation exists to send an encrypted message rather than to prepare for one.
 
+### Administrator-managed keys
+
+An organisation that escrows keys can set the certificate an account's mail is encrypted to, and stop that account changing it, from **God Mode → Users → Manage key**.
+
+**Understand what this is before using it.** A key set this way is activated without the emailed challenge. That challenge is what normally proves the account holder controls the private half; here the administrator vouches for the certificate instead. An administrator who sets a key whose private half they hold can read that person's notifications. With a key escrow that is the intended workflow. Without one it is indistinguishable from arranging to read someone's mail.
+
+Because the two cases look identical from the outside, they are separated by evidence rather than by permission:
+
+- every action writes an `OpenPGPAdminAction` row naming the administrator, the account, the certificate fingerprint and the stated reason. The row cannot be edited or deleted, by anyone, through the application;
+- the account holder is emailed whenever their key is set this way;
+- the endpoint sits behind `InstanceAdminPermission`, so it requires the console's WebAuthn second factor, not just an administrator password.
+
+The lock is recorded against the account rather than a key. A lock attached to a key would be escaped by enrolling a new one, which is precisely what it exists to prevent. While locked, the account's own upload and removal endpoints refuse with an explanation naming the administrator as the owner of the setting; unlocking returns it to self-service and is recorded too.
+
 Hangar rejects private-key material, malformed or oversized certificates, expired/revoked/disabled keys, signing-only certificates, weak RSA encryption keys, excessive certificate structure, and unsupported algorithms. Certificate processing is isolated and cannot retrieve keys from a network.
 
 The user's private key remains solely in their mail client or key-management environment. It must not be pasted into Hangar, sent to support, or stored in a browser profile field.

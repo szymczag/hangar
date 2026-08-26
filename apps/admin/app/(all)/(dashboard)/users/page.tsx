@@ -14,6 +14,8 @@ import { Loader } from "@plane/ui";
 import { cn } from "@plane/utils";
 // components
 import { PageWrapper } from "@/components/common/page-wrapper";
+// local
+import { OpenPGPControl } from "./openpgp-control";
 // types
 import type { Route } from "./+types/page";
 
@@ -137,6 +139,7 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
                 <th className="py-2 pr-4 font-medium">Status</th>
                 <th className="py-2 pr-4 font-medium">Password</th>
                 <th className="py-2 pr-4 font-medium">Sign-in records</th>
+                <th className="py-2 pr-4 font-medium">Encryption key</th>
               </tr>
             </thead>
             <tbody>
@@ -157,12 +160,15 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
                     <td className="py-2 pr-4">
                       <SignInRecords user={user} />
                     </td>
+                    <td className="py-2 pr-4">
+                      <OpenPGPControl userId={user.id} email={user.email} />
+                    </td>
                   </tr>
                 );
               })}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-6 text-center text-tertiary">
+                  <td colSpan={5} className="py-6 text-center text-tertiary">
                     No matching users.
                   </td>
                 </tr>

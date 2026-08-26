@@ -7,3 +7,4 @@
 export * from "./instance.service";
 export * from "./instance-webauthn.service";
 export * from "./instance-identity-import.service";
+export * from "./instance-openpgp.service";
