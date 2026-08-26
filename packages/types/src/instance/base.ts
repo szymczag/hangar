@@ -113,6 +113,8 @@ export interface IInstanceConfig {
   accent_color?: string;
   login_backdrop_color?: string;
   show_license_notice?: boolean;
+  /** Providers that overwrite name and avatar on every sign-in. */
+  provider_managed_profiles?: string[];
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;

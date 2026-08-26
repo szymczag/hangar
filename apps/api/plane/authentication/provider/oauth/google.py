@@ -115,8 +115,6 @@ class GoogleOAuthProvider(OauthAdapter):
             "scope": self.scope,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "access_type": "offline",
-            "prompt": "consent",
             "state": state,
         }
         if nonce:
