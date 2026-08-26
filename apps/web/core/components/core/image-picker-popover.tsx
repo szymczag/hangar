@@ -78,10 +78,13 @@ export const ImagePickerPopover = observer(function ImagePickerPopover(props: Pr
       {
         key: "upload",
         title: "Upload",
-        isEnabled: true,
+        // An uploaded cover is stored against the project it belongs to, so
+        // there is nowhere to put one while the project is still being filled
+        // in. Offering the tab there produced an upload that always failed.
+        isEnabled: isProfileCover || Boolean(projectId),
       },
     ],
-    [hasUnsplashConfigured]
+    [hasUnsplashConfigured, isProfileCover, projectId]
   );
 
   const enabledTabs = useMemo(() => tabOptions.filter((tab) => tab.isEnabled), [tabOptions]);
