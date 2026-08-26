@@ -68,7 +68,7 @@ export function InstanceBrandingForm(props: Props) {
       description: (
         <>Shown in the sign-in page footer and in the browser tab. Left empty, neither mentions an organisation.</>
       ),
-      placeholder: "Example Org",
+      placeholder: "Your organisation",
       error: Boolean(errors.INSTANCE_BRANDING_NAME),
       required: false,
     },
