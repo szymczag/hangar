@@ -154,6 +154,20 @@ export enum EAuthErrorCodes {
   GOOGLE_OAUTH_PROVIDER_ERROR = "5115",
   GITHUB_OAUTH_PROVIDER_ERROR = "5120",
   GITLAB_OAUTH_PROVIDER_ERROR = "5121",
+  // Fork (see FORK.md): federated sign-in outcomes an operator has to act on.
+  // Each needs an entry in the message map below and, to be seen at all, in the
+  // banner list — an unlisted code renders nothing and bounces in silence.
+  OAUTH_PROVIDER_UNVERIFIED_EMAIL = "5124",
+  SSO_ACCOUNT_LINK_REQUIRED = "5126",
+  FEDERATED_IDENTITY_CONFLICT = "5127",
+  FEDERATED_IDENTITY_INVALID = "5128",
+  GOOGLE_WORKSPACE_TENANT_NOT_ALLOWED = "5129",
+  SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN = "5131",
+  EMAIL_PASSWORD_AUTHENTICATION_DISABLED = "5056",
+  GITEA_NOT_CONFIGURED = "5112",
+  GITHUB_USER_NOT_IN_ORG = "5122",
+  GITEA_OAUTH_PROVIDER_ERROR = "5123",
+  AUTHENTICATION_FAILED = "5999",
   // Reset Password
   INVALID_PASSWORD_TOKEN = "5125",
   EXPIRED_PASSWORD_TOKEN = "5130",
