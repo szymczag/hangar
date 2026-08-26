@@ -366,6 +366,40 @@ this state, so clients do not have to guess.
 Sign-in methods are also no longer offered where they cannot work: on an instance
 with password sign-in disabled, onboarding stops proposing that people set one.
 
+### Authorising a link when you only have email addresses
+
+Sign-in matches an account by binding key — a hash over provider, issuer,
+subject format and subject — and the email address is **not** part of it. An
+account that predates SSO therefore cannot be found by a provider assertion, and
+its holder meets `SSO_ACCOUNT_LINK_REQUIRED` at every attempt.
+
+The precise repair is a CSV import of each person's subject, which for Google
+means exporting the `sub` claim from the Admin SDK. Where that is not available,
+**God Mode → Authentication → Import identities** also accepts a pasted list of
+addresses. Nothing is linked at that moment: the entry records that the next
+assertion from a named issuer for that address may bind whatever subject it
+carries, so the subject comes from the assertion rather than being guessed.
+
+This is a deliberate relaxation of the rule that an address never links an
+account, and it is narrow only because of what is required alongside it. All of
+it is checked at sign-in:
+
+1. an administrator authorised **that exact address for that exact issuer**, and
+   the authorisation is neither spent nor expired;
+2. the address's **domain is pinned to that provider** — so the identity provider
+   is the authority for the domain, rather than whoever typed the address. An
+   unpinned domain is refused however it was authorised;
+3. the provider asserted the address as **verified**, which the ordinary sign-in
+   path already requires;
+4. the account has **no identity at that issuer** already.
+
+Authorisations are single-use and expire after fourteen days, so a list nobody
+acted on stops being a way in. Creating them takes the console's second factor
+and the administrator's password at the point of use, and every link that
+actually happens writes an immutable record naming who authorised it, when, and
+which subject was ultimately bound — because from the outside, an authorised
+link and an account takeover look the same, and the record is the difference.
+
 ### Keeping administrative access
 
 Pinning a domain removes password and magic-link sign-in for it, so decide in
