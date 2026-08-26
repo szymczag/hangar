@@ -71,6 +71,11 @@ urlpatterns = [
     ),
     path("branding/logo/", InstanceLogoEndpoint.as_view(), name="instance-branding-logo"),
     path(
+        "branding/images/<str:kind>/",
+        InstanceLogoEndpoint.as_view(),
+        name="instance-branding-image",
+    ),
+    path(
         "users/<uuid:user_id>/openpgp/",
         InstanceUserOpenPGPEndpoint.as_view(),
         name="instance-user-openpgp",

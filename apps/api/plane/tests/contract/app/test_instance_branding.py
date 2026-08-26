@@ -31,6 +31,13 @@ def _user(email):
     return User.objects.create(email=email, username=uuid.uuid4().hex)
 
 
+def _seed(key, value=""):
+    """The suite runs with --nomigrations, so seeded rows are arranged here."""
+    InstanceConfiguration.objects.update_or_create(
+        key=key, defaults={"value": value, "category": "BRANDING", "is_encrypted": False}
+    )
+
+
 def _asset(entity_type, **kwargs):
     return FileAsset.objects.create(
         attributes={"type": "image/png"},
@@ -142,3 +149,82 @@ def test_an_instance_that_set_nothing_reports_empty_branding(db, setup_instance)
     config = response.data["config"]
     assert config["branding_name"] == ""
     assert config["logo_url"] == ""
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "value",
+    ["red", "#fff", "#12345g", "#123456; background-image: url(https://evil.test/x)", "javascript:alert(1)"],
+)
+def test_a_colour_that_is_not_a_hex_colour_is_refused(admin_client, value):
+    """These reach a style attribute on the page that collects passwords."""
+    response = admin_client.patch("/api/instances/configurations/", {"INSTANCE_ACCENT_COLOR": value}, format="json")
+
+    assert response.status_code == 400
+    assert "INSTANCE_ACCENT_COLOR" in response.data["error"]
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_hex_colour_is_accepted_and_reported(admin_client, db, setup_instance):
+    _seed("INSTANCE_ACCENT_COLOR")
+    _seed("INSTANCE_LOGIN_BACKDROP_COLOR")
+
+    saved = admin_client.patch(
+        "/api/instances/configurations/",
+        {"INSTANCE_ACCENT_COLOR": "#1D4ED8", "INSTANCE_LOGIN_BACKDROP_COLOR": "#0b1220"},
+        format="json",
+    )
+    assert saved.status_code == 200, saved.data
+
+    cache.clear()
+    config = APIClient().get("/api/instances/").data["config"]
+    assert config["accent_color"] == "#1D4ED8"
+    assert config["login_backdrop_color"] == "#0b1220"
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_colour_written_around_the_api_is_still_not_served(db, setup_instance):
+    """Read-side check, for a value that never passed the write-side one."""
+    InstanceConfiguration.objects.update_or_create(
+        key="INSTANCE_ACCENT_COLOR",
+        defaults={
+            "value": "#000; background: url(https://evil.test/x)",
+            "category": "BRANDING",
+            "is_encrypted": False,
+        },
+    )
+
+    cache.clear()
+    assert APIClient().get("/api/instances/").data["config"]["accent_color"] == ""
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_the_licence_notice_is_shown_unless_it_is_turned_off(admin_client, db, setup_instance):
+    """On by default: an upgrade must not quietly stop making the source offer."""
+    _seed("INSTANCE_SHOW_LICENSE_NOTICE", "1")
+
+    cache.clear()
+    assert APIClient().get("/api/instances/").data["config"]["show_license_notice"] is True
+
+    admin_client.patch("/api/instances/configurations/", {"INSTANCE_SHOW_LICENSE_NOTICE": "0"}, format="json")
+
+    cache.clear()
+    assert APIClient().get("/api/instances/").data["config"]["show_license_notice"] is False
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_background_is_readable_without_signing_in(db):
+    asset = _asset(FileAsset.EntityTypeContext.INSTANCE_LOGIN_BACKGROUND)
+
+    assert APIClient().get(f"/api/assets/v2/static/{asset.id}/").status_code in (200, 302)
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_an_unknown_branding_image_is_refused(admin_client):
+    assert admin_client.delete("/api/instances/branding/images/favicon/").status_code == 404

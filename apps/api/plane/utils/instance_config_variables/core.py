@@ -73,6 +73,36 @@ branding_config_variables = [
         "category": "BRANDING",
         "is_encrypted": False,
     },
+    {
+        "key": "INSTANCE_LOGIN_BACKGROUND_ASSET_ID",
+        "value": os.environ.get("INSTANCE_LOGIN_BACKGROUND_ASSET_ID", ""),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
+    {
+        # #rrggbb only, validated on write: these reach a style attribute, and
+        # an unchecked string there is an injection point on the one page that
+        # collects passwords.
+        "key": "INSTANCE_ACCENT_COLOR",
+        "value": os.environ.get("INSTANCE_ACCENT_COLOR", ""),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
+    {
+        "key": "INSTANCE_LOGIN_BACKDROP_COLOR",
+        "value": os.environ.get("INSTANCE_LOGIN_BACKDROP_COLOR", ""),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
+    {
+        # Whether the AGPL source offer appears on the sign-in page. The offer
+        # itself is not optional — it stays in the in-app help menu, which is
+        # what keeps a deployment inside the licence when this is off.
+        "key": "INSTANCE_SHOW_LICENSE_NOTICE",
+        "value": os.environ.get("INSTANCE_SHOW_LICENSE_NOTICE", "1"),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
 ]
 
 google_config_variables = [
