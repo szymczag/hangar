@@ -29,6 +29,7 @@ from plane.license.api.views import (
 # middleware picks the admin cookie by that substring in the path.
 from plane.ext.views.instance_branding import InstanceLogoEndpoint  # noqa: E402
 from plane.ext.views.instance_identity_import import InstanceIdentityImportEndpoint  # noqa: E402
+from plane.ext.views.instance_link_authorization import InstanceLinkAuthorizationEndpoint  # noqa: E402
 from plane.ext.views.instance_openpgp import InstanceUserOpenPGPEndpoint  # noqa: E402
 from plane.ext.views.instance_webauthn import (  # noqa: E402
     AdminWebAuthnAuthenticationOptionsEndpoint,
@@ -79,6 +80,11 @@ urlpatterns = [
         "users/<uuid:user_id>/openpgp/",
         InstanceUserOpenPGPEndpoint.as_view(),
         name="instance-user-openpgp",
+    ),
+    path(
+        "identity-import/link-authorizations/",
+        InstanceLinkAuthorizationEndpoint.as_view(),
+        name="instance-link-authorizations",
     ),
     path(
         "identity-import/",
