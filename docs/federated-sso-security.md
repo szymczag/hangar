@@ -534,6 +534,43 @@ response or a command's output.
 
 Keep local recovery access until representative users have completed the flow.
 
+### Diagnosing a provider error
+
+Sign-in answers one error code for every transport failure, on purpose — it must
+not become a way to probe the deployment from outside. The detail goes to the API
+log instead, at `WARNING`, naming the stage, the exception type and its message:
+
+```
+Token exchange failed for google: ConnectionError (connection refused)
+```
+
+When the provider answered and refused, its own words are included. OAuth 2.0
+defines `error` and `error_description` for this, and they name the problem
+exactly:
+
+```
+Token exchange failed for google: HTTPError (Provider returned HTTP 400
+(invalid_client: The OAuth client was not found.))
+```
+
+`invalid_client` means the client id or secret is wrong, `redirect_uri_mismatch`
+means the callback URL registered with the provider does not match the one this
+instance sends, and `invalid_grant` means the authorization code was already
+used or has expired. Only those two fields are repeated, both truncated.
+
+Each record carries `refused_by_egress_policy`, which is the field to look at
+first because it decides who has to act:
+
+- **`true`** — the destination was refused by this instance's own outbound
+  policy, before anything left the network. Usual causes are a provider host
+  resolving to a private address (split-horizon DNS), a deployment that requires
+  an outbound proxy, or a TLS-intercepting middlebox whose certificate the
+  container does not trust. All are deployment configuration.
+- **`false`** — the request left and the provider did not answer usefully.
+
+The request body and headers are never logged: the body carries the client secret
+and the authorization code, and the headers carry the access token.
+
 ## Failure handling and rollback
 
 | Symptom                       | Meaning                                                                                  | Action                                                                                         |
