@@ -27,6 +27,7 @@ from plane.app.serializers.email_security import (
 )
 from plane.app.views.base import BaseAPIView
 from plane.db.models import EmailOutbox, EmailSuppression, OpenPGPKeyChallenge, User, UserOpenPGPKey
+from plane.ext.models import UserOpenPGPPolicy
 from plane.mailer.audit import email_receipt
 from plane.mailer.enums import OpenPGPKeyStatus, OutboxStatus
 from plane.mailer.exceptions import MailerError, OpenPGPError
@@ -62,6 +63,26 @@ class OpenPGPVerifyThrottle(UserRateThrottle):
 class OpenPGPTestThrottle(UserRateThrottle):
     rate = "3/hour"
     scope = "openpgp_test"
+
+
+def _self_service_allowed(user):
+    """Refuse when an administrator manages this account's key.
+
+    The lock lives on the account rather than on a key: attached to a key it
+    would be escaped by enrolling another one, which is the thing it exists to
+    prevent.
+    """
+    policy = UserOpenPGPPolicy.objects.filter(user=user).first()
+    if policy is not None and policy.is_locked:
+        return Response(
+            {
+                "error": (
+                    "An instance administrator manages the encryption key for this account. Ask them to change it."
+                )
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
 
 
 def _verification_possible():
@@ -197,6 +218,10 @@ class EmailSecurityKeyUploadEndpoint(BaseAPIView):
         reauth_error = _require_recent_authentication(request, serializer.validated_data.get("password", ""))
         if reauth_error:
             return reauth_error
+
+        managed = _self_service_allowed(request.user)
+        if managed:
+            return managed
         try:
             info = inspect_certificate(serializer.validated_data["certificate"])
         except OpenPGPError:
@@ -375,6 +400,10 @@ class EmailSecurityKeyEndpoint(BaseAPIView):
         reauth_error = _require_recent_authentication(request, serializer.validated_data.get("password", ""))
         if reauth_error:
             return reauth_error
+
+        managed = _self_service_allowed(request.user)
+        if managed:
+            return managed
         now = timezone.now()
         with transaction.atomic():
             key = (

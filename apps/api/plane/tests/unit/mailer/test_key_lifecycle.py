@@ -22,6 +22,7 @@ from plane.app.views.user.email_security import (
 from plane.db.models import OpenPGPKeyChallenge, UserOpenPGPKey
 from plane.mailer.enums import OpenPGPKeyStatus
 from plane.mailer.exceptions import OpenPGPError
+from plane.ext.models import UserOpenPGPPolicy
 from plane.mailer.openpgp import OpenPGPCertificateInfo
 from plane.tests.factories import UserFactory
 
@@ -138,6 +139,19 @@ def test_key_upload_never_exposes_openpgp_exception_details():
 UPLOAD_PASSWORD = "correct-horse-battery-staple-42"
 
 
+def _certificate_info(fingerprint="A" * 40):
+    return OpenPGPCertificateInfo(
+        normalized_certificate="-----BEGIN PGP PUBLIC KEY BLOCK-----",
+        primary_fingerprint=fingerprint,
+        encryption_subkey_fingerprint="B" * 40,
+        primary_algorithm="RSA",
+        encryption_algorithm="RSA",
+        encryption_key_size=3072,
+        created_at=timezone.now(),
+        expires_at=timezone.now() + timedelta(days=365),
+    )
+
+
 def _upload(user, certificate="-----BEGIN PGP PUBLIC KEY BLOCK-----"):
     # Changing a key demands the current password, as it does for a real client.
     request = APIRequestFactory().post(
@@ -161,17 +175,7 @@ def test_a_key_can_be_enrolled_before_the_instance_switches_encryption_on():
     user = UserFactory(is_password_autoset=False)
     user.set_password(UPLOAD_PASSWORD)
     user.save()
-    inspected = OpenPGPCertificateInfo(
-        normalized_certificate="-----BEGIN PGP PUBLIC KEY BLOCK-----",
-        primary_fingerprint="A" * 40,
-        encryption_subkey_fingerprint="B" * 40,
-        primary_algorithm="RSA",
-        encryption_algorithm="RSA",
-        encryption_key_size=3072,
-        created_at=timezone.now(),
-        expires_at=timezone.now() + timedelta(days=365),
-    )
-    with patch("plane.app.views.user.email_security.inspect_certificate", return_value=inspected):
+    with patch("plane.app.views.user.email_security.inspect_certificate", return_value=_certificate_info()):
         response = _upload(user)
 
     assert response.status_code == 201
@@ -231,3 +235,39 @@ def test_a_test_message_still_requires_the_feature():
     response = EmailSecurityTestEndpoint.as_view()(request, key_id=key.id)
 
     assert response.status_code == 409
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(EMAIL_OPENPGP_ENABLED=False, EMAIL_DELIVERY_V2_ENABLED=True)
+def test_a_locked_account_cannot_replace_its_own_key():
+    """The lock is on the account, so enrolling a new key cannot escape it."""
+    user = UserFactory(is_password_autoset=False)
+    user.set_password(UPLOAD_PASSWORD)
+    user.save()
+    UserOpenPGPPolicy.objects.create(user=user, is_locked=True)
+
+    with patch("plane.app.views.user.email_security.inspect_certificate") as inspect:
+        response = _upload(user)
+
+    assert response.status_code == 403
+    assert "administrator" in response.data["error"]
+    # Refused before the certificate is even parsed.
+    inspect.assert_not_called()
+    assert not UserOpenPGPKey.objects.filter(user=user).exists()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(EMAIL_OPENPGP_ENABLED=False, EMAIL_DELIVERY_V2_ENABLED=True)
+def test_an_unlocked_policy_row_does_not_block_anything():
+    """Having a row is not the same as being locked."""
+    user = UserFactory(is_password_autoset=False)
+    user.set_password(UPLOAD_PASSWORD)
+    user.save()
+    UserOpenPGPPolicy.objects.create(user=user, is_locked=False)
+
+    with patch("plane.app.views.user.email_security.inspect_certificate", return_value=_certificate_info()):
+        response = _upload(user)
+
+    assert response.status_code == 201

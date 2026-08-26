@@ -11,6 +11,7 @@ from .import_job import (
     ImportUserBudget,
     ImportWorkspaceBudget,
 )
+from .openpgp_policy import OpenPGPAdminAction, UserOpenPGPPolicy
 from .issue_property import (
     IssueProperty,
     IssuePropertyOption,
@@ -35,6 +36,8 @@ __all__ = [
     "IssuePropertyOption",
     "IssuePropertyValue",
     "IssueWorkLog",
+    "OpenPGPAdminAction",
+    "UserOpenPGPPolicy",
     "PropertyTypeChoices",
     "RunnerAuditEvent",
     "RunnerInstallation",
