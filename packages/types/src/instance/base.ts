@@ -82,7 +82,9 @@ export interface IInstance {
 export type TInstanceBrandingConfigurationKeys =
   | "INSTANCE_BRANDING_NAME"
   | "INSTANCE_SIGN_IN_HEADER"
-  | "INSTANCE_SIGN_IN_SUBHEADER";
+  | "INSTANCE_SIGN_IN_SUBHEADER"
+  | "INSTANCE_ACCENT_COLOR"
+  | "INSTANCE_LOGIN_BACKDROP_COLOR";
 
 export interface IInstanceConfig {
   product: IProductMetadata;
@@ -105,6 +107,11 @@ export interface IInstanceConfig {
   sign_in_header?: string;
   sign_in_subheader?: string;
   logo_url?: string;
+  login_background_url?: string;
+  /** Empty unless it is a plain hex colour; validated on write and on read. */
+  accent_color?: string;
+  login_backdrop_color?: string;
+  show_license_notice?: boolean;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;
@@ -145,6 +152,8 @@ export type TInstanceConfigurationKeys =
   | TInstanceWorkspaceConfigurationKeys
   | TInstanceBrandingConfigurationKeys
   | "INSTANCE_LOGO_ASSET_ID"
+  | "INSTANCE_LOGIN_BACKGROUND_ASSET_ID"
+  | "INSTANCE_SHOW_LICENSE_NOTICE"
   | TInstanceConfigurationSourceKey;
 
 export interface IInstanceConfiguration {

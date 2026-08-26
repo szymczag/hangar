@@ -33,35 +33,44 @@ export function TermsAndConditions({ authType = EAuthModes.SIGN_IN }: TermsAndCo
   const privacyUrl = config?.product?.privacy_url ?? PRIVACY_URL;
   const sourceUrl = config?.product?.source_url ?? SOURCE_CODE_URL;
 
-  if (!termsUrl && !privacyUrl) {
-    return (
-      <div className="flex items-center justify-center">
+  // Turned off from God Mode for a plain sign-in page. The offer itself is not
+  // optional — AGPL-3.0 section 13 requires it of anyone running a modified
+  // version over a network — so it stays in the in-app help menu, which every
+  // signed-in person reaches and which this setting does not touch.
+  const showLicenseNotice = config?.show_license_notice !== false;
+  const hasLegalLinks = Boolean(termsUrl || privacyUrl);
+
+  if (!hasLegalLinks && !showLicenseNotice) return null;
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-1">
+      {hasLegalLinks && (
+        <p className="text-center text-13 whitespace-pre-line text-tertiary">
+          {MESSAGES[authType]}
+          {termsUrl && (
+            <>
+              {", you agree to the "}
+              <LegalLink href={termsUrl}>Terms of Service</LegalLink>
+            </>
+          )}
+          {privacyUrl && (
+            <>
+              {termsUrl ? " and acknowledge the " : ", you acknowledge the "}
+              <LegalLink href={privacyUrl}>Privacy Policy</LegalLink>
+            </>
+          )}
+          {"."}
+        </p>
+      )}
+      {/* Previously this appeared only when neither legal URL was set, so
+          configuring terms and privacy dropped the source offer without anyone
+          deciding to. The two are separate statements and now render as such. */}
+      {showLicenseNotice && (
         <p className="text-center text-13 text-tertiary">
           Hangar is open-source software under the AGPL-3.0 license.{" "}
           <LegalLink href={sourceUrl}>View source code</LegalLink>.
         </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center justify-center">
-      <p className="text-center text-13 whitespace-pre-line text-tertiary">
-        {MESSAGES[authType]}
-        {termsUrl && (
-          <>
-            {", you agree to the "}
-            <LegalLink href={termsUrl}>Terms of Service</LegalLink>
-          </>
-        )}
-        {privacyUrl && (
-          <>
-            {termsUrl ? " and acknowledge the " : ", you acknowledge the "}
-            <LegalLink href={privacyUrl}>Privacy Policy</LegalLink>
-          </>
-        )}
-        {"."}
-      </p>
+      )}
     </div>
   );
 }
