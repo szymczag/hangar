@@ -26,8 +26,16 @@ export function ControllerSwitch<T extends FieldValues>(props: Props<T>) {
   } = props;
 
   return (
-    <div className="flex items-center justify-between gap-1">
-      <h4 className="text-sm text-custom-text-300">Refresh user attributes from {label} during sign in</h4>
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-1">
+        <h4 className="text-sm text-custom-text-300">Refresh user attributes from {label} during sign in</h4>
+        {/* Said plainly, because the consequence is destructive and the label
+            alone reads like a harmless sync. */}
+        <p className="text-11 text-tertiary">
+          Every sign-in overwrites the person&apos;s display name and avatar with whatever {label} reports. Anything
+          they changed in Hangar is replaced, each time they sign in. Leave this off to let people keep their own.
+        </p>
+      </div>
       <div className="relative">
         <Controller
           control={control}
