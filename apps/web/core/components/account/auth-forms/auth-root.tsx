@@ -4,12 +4,15 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
 import { useSearchParams } from "next/navigation";
 // plane imports
 import { OAuthOptions } from "@plane/ui";
+// components
+import { LogoSpinner } from "@/components/common/logo-spinner";
 // helpers
+import { shouldAutoRedirectToGoogle } from "@/helpers/google-auto-redirect";
 import type { TAuthErrorInfo } from "@/helpers/authentication.helper";
 import {
   EAuthModes,
@@ -39,6 +42,7 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   const invitation_id = searchParams.get("invitation_id");
   const workspaceSlug = searchParams.get("slug");
   const error_code = searchParams.get("error_code");
+  const wasSignedOut = searchParams.get("signed_out") === "1";
   // props
   const { authMode: currentAuthMode } = props;
   // states
@@ -46,6 +50,7 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   const [authStep, setAuthStep] = useState<EAuthSteps>(EAuthSteps.EMAIL);
   const [email, setEmail] = useState(emailParam ? emailParam.toString() : "");
   const [errorInfo, setErrorInfo] = useState<TAuthErrorInfo | undefined>(undefined);
+  const hasStartedGoogleRedirect = useRef(false);
   // store hooks
   const { config } = useInstance();
   // derived values
@@ -53,6 +58,11 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   const { isOAuthEnabled, oAuthOptions } = useOAuthConfig(oAuthActionText);
   const isEmailBasedAuthEnabled = config?.is_email_password_enabled || config?.is_magic_login_enabled;
   const noAuthMethodsAvailable = !isOAuthEnabled && !isEmailBasedAuthEnabled;
+  const googleOAuthOption = oAuthOptions.find((option) => option.id === "google" && option.enabled);
+  const shouldStartGoogleRedirect = shouldAutoRedirectToGoogle(config, {
+    hasAuthenticationError: Boolean(error_code),
+    wasSignedOut,
+  });
 
   useEffect(() => {
     if (!authMode && currentAuthMode) setAuthMode(currentAuthMode);
@@ -100,7 +110,25 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
     }
   }, [error_code, authMode]);
 
+  useEffect(() => {
+    if (!shouldStartGoogleRedirect || !googleOAuthOption || hasStartedGoogleRedirect.current) return;
+
+    hasStartedGoogleRedirect.current = true;
+    googleOAuthOption.onClick();
+  }, [googleOAuthOption, shouldStartGoogleRedirect]);
+
   if (!authMode) return <></>;
+
+  if (shouldStartGoogleRedirect) {
+    return (
+      <AuthContainer>
+        <div className="flex flex-col items-center gap-3 text-center text-13 text-tertiary" aria-live="polite">
+          <LogoSpinner />
+          <span>Redirecting to Google…</span>
+        </div>
+      </AuthContainer>
+    );
+  }
 
   if (noAuthMethodsAvailable) {
     return (
