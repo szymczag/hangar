@@ -108,6 +108,16 @@ export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [
 
   useEffect(() => {
     const handleInitialStep = () => {
+      // Belonging somewhere already answers the question these steps ask. A
+      // person admitted by SSO auto-join has a membership and no invitation to
+      // accept, so without this they land on "create a workspace" — and where
+      // creation is restricted, on a screen with no way forward. Depending on
+      // the loaded list rather than running once on mount matters: this effect
+      // used to fire before the workspaces arrived.
+      if (workspacesList.length > 0) {
+        finishOnboarding();
+        return;
+      }
       if (
         userProfile?.onboarding_step?.profile_complete &&
         !userProfile?.onboarding_step?.workspace_create &&
@@ -126,7 +136,7 @@ export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [
 
     handleInitialStep();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [workspacesList.length, userProfile?.onboarding_step]);
 
   return (
     <div className="flex h-full flex-col">
