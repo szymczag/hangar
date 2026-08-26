@@ -79,6 +79,11 @@ export interface IInstance {
   workspaces_exist: boolean;
 }
 
+export type TInstanceBrandingConfigurationKeys =
+  | "INSTANCE_BRANDING_NAME"
+  | "INSTANCE_SIGN_IN_HEADER"
+  | "INSTANCE_SIGN_IN_SUBHEADER";
+
 export interface IInstanceConfig {
   product: IProductMetadata;
   enable_signup: boolean;
@@ -95,6 +100,11 @@ export interface IInstanceConfig {
   is_saml_enabled: boolean;
   saml_provider_name: string | undefined;
   is_todoist_imports_enabled?: boolean;
+  // Sign-in page branding. Empty means the built-in wording and wordmark.
+  branding_name?: string;
+  sign_in_header?: string;
+  sign_in_subheader?: string;
+  logo_url?: string;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;
@@ -133,6 +143,8 @@ export type TInstanceConfigurationKeys =
   | TInstanceImageConfigurationKeys
   | TInstanceAuthenticationKeys
   | TInstanceWorkspaceConfigurationKeys
+  | TInstanceBrandingConfigurationKeys
+  | "INSTANCE_LOGO_ASSET_ID"
   | TInstanceConfigurationSourceKey;
 
 export interface IInstanceConfiguration {

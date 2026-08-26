@@ -172,6 +172,27 @@ class InstanceEndpoint(BaseAPIView):
         data["saml_provider_name"] = str(SAML_PROVIDER_NAME)
         data["is_todoist_imports_enabled"] = settings.TODOIST_IMPORTS_ENABLED
 
+        # Fork (see FORK.md): sign-in page branding. Served without a session,
+        # because the page it dresses is seen before anyone has one. Empty
+        # values mean the built-in wording and wordmark.
+        (
+            INSTANCE_BRANDING_NAME,
+            INSTANCE_SIGN_IN_HEADER,
+            INSTANCE_SIGN_IN_SUBHEADER,
+            INSTANCE_LOGO_ASSET_ID,
+        ) = get_configuration_value(
+            [
+                {"key": "INSTANCE_BRANDING_NAME", "default": os.environ.get("INSTANCE_BRANDING_NAME", "")},
+                {"key": "INSTANCE_SIGN_IN_HEADER", "default": os.environ.get("INSTANCE_SIGN_IN_HEADER", "")},
+                {"key": "INSTANCE_SIGN_IN_SUBHEADER", "default": os.environ.get("INSTANCE_SIGN_IN_SUBHEADER", "")},
+                {"key": "INSTANCE_LOGO_ASSET_ID", "default": os.environ.get("INSTANCE_LOGO_ASSET_ID", "")},
+            ]
+        )
+        data["branding_name"] = str(INSTANCE_BRANDING_NAME or "")
+        data["sign_in_header"] = str(INSTANCE_SIGN_IN_HEADER or "")
+        data["sign_in_subheader"] = str(INSTANCE_SIGN_IN_SUBHEADER or "")
+        data["logo_url"] = f"/api/assets/v2/static/{INSTANCE_LOGO_ASSET_ID}/" if INSTANCE_LOGO_ASSET_ID else ""
+
         # Github app name
         data["github_app_name"] = str(GITHUB_APP_NAME)
 

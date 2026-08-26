@@ -20,6 +20,10 @@ def get_upload_path(instance, filename):
     filename = sanitize_filename(filename) or uuid4().hex
     if instance.workspace_id is not None:
         return f"{instance.workspace.id}/{uuid4().hex}-{filename}"
+    if instance.entity_type == FileAsset.EntityTypeContext.INSTANCE_LOGO:
+        # Owned by the instance, not by the administrator who happened to
+        # upload it, so it does not sit under a personal prefix.
+        return f"instance/{uuid4().hex}-{filename}"
     return f"user-{uuid4().hex}-{filename}"
 
 
@@ -44,6 +48,9 @@ class FileAsset(BaseModel):
         PROJECT_COVER = "PROJECT_COVER"
         DRAFT_ISSUE_ATTACHMENT = "DRAFT_ISSUE_ATTACHMENT"
         DRAFT_ISSUE_DESCRIPTION = "DRAFT_ISSUE_DESCRIPTION"
+        # Fork (see FORK.md): the sign-in page belongs to the instance rather
+        # than to any workspace, and is shown before anyone has signed in.
+        INSTANCE_LOGO = "INSTANCE_LOGO"
 
     attributes = models.JSONField(default=dict)
     asset = models.FileField(upload_to=get_upload_path, max_length=800)
