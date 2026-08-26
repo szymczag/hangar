@@ -33,6 +33,16 @@ workspace_management_config_variables = [
         "category": "WORKSPACE_MANAGEMENT",
         "is_encrypted": False,
     },
+    {
+        # Fork (see FORK.md): the workspace role a person must hold to mint an
+        # API token for it. "5" is guest, which is what every member could do
+        # before this existed, so an upgrade changes nothing until an
+        # administrator raises it.
+        "key": "API_TOKEN_MINIMUM_ROLE",
+        "value": os.environ.get("API_TOKEN_MINIMUM_ROLE", "5"),
+        "category": "WORKSPACE_MANAGEMENT",
+        "is_encrypted": False,
+    },
 ]
 
 google_config_variables = [

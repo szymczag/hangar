@@ -19,4 +19,6 @@ export interface IApiToken {
   user_type: number;
   token?: string;
   workspace: string;
+  /** Write-only: the workspace a new token may act in. */
+  workspace_slug?: string;
 }

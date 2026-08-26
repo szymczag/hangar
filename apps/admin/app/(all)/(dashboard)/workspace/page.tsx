@@ -40,6 +40,7 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
   } = useWorkspace();
   // derived values
   const disableWorkspaceCreation = formattedConfig?.DISABLE_WORKSPACE_CREATION ?? "";
+  const apiTokenMinimumRole = formattedConfig?.API_TOKEN_MINIMUM_ROLE ?? "5";
   const hasNextPage = paginationInfo?.next_page_results && paginationInfo?.next_cursor !== undefined;
 
   // fetch data
@@ -117,6 +118,33 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
           <Loader>
             <Loader.Item height="50px" width="100%" />
           </Loader>
+        )}
+
+        {formattedConfig && (
+          <div className={cn("flex w-full items-center gap-14 rounded-sm border-t border-subtle pt-4")}>
+            <div className="flex grow items-center gap-4">
+              <div className="grow">
+                <div className="pb-1 text-16 font-medium">Role required to create an API token</div>
+                <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
+                  A token acts in one workspace and carries its owner&apos;s permissions there, so this decides who can
+                  hand a script the same access they have. Raising it does not revoke tokens that already exist.
+                </div>
+              </div>
+            </div>
+            <div className={`shrink-0 pr-4 ${isSubmitting && "opacity-70"}`}>
+              <select
+                aria-label="Role required to create an API token"
+                className="rounded-md border border-strong bg-surface-1 px-3 py-2 text-14"
+                value={apiTokenMinimumRole}
+                onChange={(event) => updateConfig("API_TOKEN_MINIMUM_ROLE", event.target.value)}
+                disabled={isSubmitting || !isConfigurationEditable}
+              >
+                <option value="5">Guest and above</option>
+                <option value="15">Member and above</option>
+                <option value="20">Admin only</option>
+              </select>
+            </div>
+          </div>
         )}
         {workspaceLoader !== "init-loader" ? (
           <>
