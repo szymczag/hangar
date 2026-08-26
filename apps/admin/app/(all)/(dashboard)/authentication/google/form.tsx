@@ -14,6 +14,7 @@ import { API_BASE_URL } from "@plane/constants";
 import { Button, getButtonStyling } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { IFormattedInstanceConfiguration, TInstanceGoogleAuthenticationConfigurationKeys } from "@plane/types";
+import { ToggleSwitch } from "@plane/ui";
 // components
 import { CodeBlock } from "@/components/common/code-block";
 import { ConfirmDiscardModal } from "@/components/common/confirm-discard-modal";
@@ -54,6 +55,7 @@ export function InstanceGoogleConfigForm(props: Props) {
       GOOGLE_CLIENT_ID: config["GOOGLE_CLIENT_ID"],
       GOOGLE_CLIENT_SECRET: config["GOOGLE_CLIENT_SECRET"],
       ENABLE_GOOGLE_SYNC: config["ENABLE_GOOGLE_SYNC"] || "0",
+      GOOGLE_AUTO_REDIRECT: config["GOOGLE_AUTO_REDIRECT"] || "0",
       GOOGLE_AUTH_MODE: config["GOOGLE_AUTH_MODE"] || "generic",
       GOOGLE_WORKSPACE_DOMAINS: config["GOOGLE_WORKSPACE_DOMAINS"] || "",
     },
@@ -194,6 +196,7 @@ export function InstanceGoogleConfigForm(props: Props) {
         GOOGLE_CLIENT_ID: response.find((item) => item.key === "GOOGLE_CLIENT_ID")?.value,
         GOOGLE_CLIENT_SECRET: response.find((item) => item.key === "GOOGLE_CLIENT_SECRET")?.value,
         ENABLE_GOOGLE_SYNC: response.find((item) => item.key === "ENABLE_GOOGLE_SYNC")?.value,
+        GOOGLE_AUTO_REDIRECT: response.find((item) => item.key === "GOOGLE_AUTO_REDIRECT")?.value,
         GOOGLE_AUTH_MODE: response.find((item) => item.key === "GOOGLE_AUTH_MODE")?.value,
         GOOGLE_WORKSPACE_DOMAINS: response.find((item) => item.key === "GOOGLE_WORKSPACE_DOMAINS")?.value,
       });
@@ -269,6 +272,25 @@ export function InstanceGoogleConfigForm(props: Props) {
               />
             ))}
             <ControllerSwitch control={control} field={GOOGLE_FORM_SWITCH_FIELD} />
+            <Controller
+              control={control}
+              name="GOOGLE_AUTO_REDIRECT"
+              render={({ field: { value, onChange } }) => {
+                const isEnabled = value === "1";
+                return (
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                      <h4 className="text-sm text-custom-text-300">Automatically start Google sign-in</h4>
+                      <p className="text-11 text-tertiary">
+                        Skip the sign-in chooser when Google is the only enabled login method. OAuth errors and an
+                        explicit sign-out still show the Google button so people can recover or switch accounts.
+                      </p>
+                    </div>
+                    <ToggleSwitch value={isEnabled} onChange={() => onChange(isEnabled ? "0" : "1")} size="sm" />
+                  </div>
+                );
+              }}
+            />
             <div className="flex flex-col gap-1 pt-4">
               <div className="flex items-center gap-4">
                 <Button

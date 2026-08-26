@@ -13,6 +13,7 @@
     "check:lint": "oxlint --max-warnings=11957 .",
     "check:types": "react-router typegen && tsc --noEmit",
     "check:format": "oxfmt --check .",
+    "test": "vitest run",
     "fix:lint": "oxlint --fix .",
     "fix:format": "oxfmt ."
   },
@@ -86,6 +87,7 @@
     "dotenv": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-tsconfig-paths": "catalog:"
+    "vite-tsconfig-paths": "catalog:",
+    "vitest": "catalog:"
   }
 }
