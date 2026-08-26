@@ -98,6 +98,7 @@ admin pages) are listed for completeness but carry no merge-conflict risk.
 | 43  | `apps/api/plane/authentication/utils/user_auth_workflow.py`, `apps/web/core/components/onboarding/{root.tsx,steps/workspace/create.tsx}` | Auto-join | settle the workspace onboarding steps for someone auto-join admitted, so they are not sent to create one |
 | 44  | `packages/constants/src/auth/index.ts`, `packages/utils/src/auth.ts`, `apps/web/helpers/authentication.helper.tsx` | Auth errors | messages and banner entries for the federated sign-in codes, which rendered nothing at all |
 | 45  | `apps/api/plane/license/api/views/instance.py`, `apps/web/core/components/onboarding/steps/profile/root.tsx` | Onboarding | report which providers own profile attributes, and stop offering edits and passwords that cannot take effect |
+| 46  | `apps/api/plane/authentication/services/federated_auth.py`, `apps/api/plane/license/urls.py` | Account linking | let an administrator authorise an existing account to be linked on its next federated sign-in |
 
 Phase 6 new files implement the import model, parser, API, worker, tests, CE
 frontend, workspace settings route, and [administrator how-to](docs/importing-from-todoist.md).
