@@ -39,18 +39,25 @@ from plane.utils.file_asset_upload import (
     validate_multipart_upload,
 )
 
-LOGO_KEY = "INSTANCE_LOGO_ASSET_ID"
+# Which stored pointer each uploadable image lives behind.
+BRANDING_ASSETS = {
+    "logo": ("INSTANCE_LOGO_ASSET_ID", FileAsset.EntityTypeContext.INSTANCE_LOGO),
+    "login-background": (
+        "INSTANCE_LOGIN_BACKGROUND_ASSET_ID",
+        FileAsset.EntityTypeContext.INSTANCE_LOGIN_BACKGROUND,
+    ),
+}
 
 
-def _store_asset_id(value: str) -> None:
+def _store_asset_id(key: str, value: str) -> None:
     InstanceConfiguration.objects.update_or_create(
-        key=LOGO_KEY,
+        key=key,
         defaults={"value": value, "category": "BRANDING", "is_encrypted": False},
     )
 
 
 class InstanceLogoEndpoint(BaseAPIView):
-    """Upload or clear the sign-in logo."""
+    """Upload or clear an image shown on the sign-in page."""
 
     authentication_classes = [BaseSessionAuthentication]
     permission_classes = [InstanceAdminPermission]
@@ -62,12 +69,16 @@ class InstanceLogoEndpoint(BaseAPIView):
     @invalidate_cache(path="/api/instances/", user=False)
     @invalidate_cache(path="/api/instances/configurations/", user=False)
     @method_decorator(csrf_protect)
-    def post(self, request):
+    def post(self, request, kind="logo"):
+        stored = BRANDING_ASSETS.get(kind)
+        if stored is None:
+            return Response({"error": "Unknown branding image."}, status=status.HTTP_404_NOT_FOUND)
+        config_key, entity_type = stored
+
         uploaded_file = request.FILES.get("file")
         if uploaded_file is None:
             return Response({"error": "Attach an image to use as the logo."}, status=status.HTTP_400_BAD_REQUEST)
 
-        entity_type = FileAsset.EntityTypeContext.INSTANCE_LOGO
         try:
             metadata = validate_multipart_upload(uploaded_file=uploaded_file, entity_type=entity_type)
         except UploadError as error:
@@ -86,18 +97,21 @@ class InstanceLogoEndpoint(BaseAPIView):
         except UploadError as error:
             return Response(upload_error_payload(error), status=error.http_status)
 
-        _store_asset_id(str(asset.id))
+        _store_asset_id(config_key, str(asset.id))
         return Response({"asset_id": str(asset.id), "asset_url": asset.asset_url}, status=status.HTTP_201_CREATED)
 
     @invalidate_cache(path="/api/instances/", user=False)
     @invalidate_cache(path="/api/instances/configurations/", user=False)
     @method_decorator(csrf_protect)
-    def delete(self, request):
-        """Return to the built-in wordmark.
+    def delete(self, request, kind="logo"):
+        """Return to the built-in appearance.
 
         The asset row is left alone: clearing the pointer is enough to stop
         serving it, and deleting stored objects from here would make an
         accidental click unrecoverable.
         """
-        _store_asset_id("")
+        stored = BRANDING_ASSETS.get(kind)
+        if stored is None:
+            return Response({"error": "Unknown branding image."}, status=status.HTTP_404_NOT_FOUND)
+        _store_asset_id(stored[0], "")
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -4,6 +4,7 @@
 
 # Python imports
 import os
+import re
 
 # Django imports
 from django.conf import settings
@@ -26,6 +27,12 @@ from plane.utils.cache import cache_response, invalidate_cache
 from plane.utils.otlp_endpoints import get_otlp_metric_export_configuration
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_control
+
+
+def _safe_colour(value) -> str:
+    """Return the value only if it is a plain hex colour."""
+    candidate = str(value or "").strip()
+    return candidate if re.fullmatch(r"#[0-9a-fA-F]{6}", candidate) else ""
 
 
 class InstanceEndpoint(BaseAPIView):
@@ -192,6 +199,38 @@ class InstanceEndpoint(BaseAPIView):
         data["sign_in_header"] = str(INSTANCE_SIGN_IN_HEADER or "")
         data["sign_in_subheader"] = str(INSTANCE_SIGN_IN_SUBHEADER or "")
         data["logo_url"] = f"/api/assets/v2/static/{INSTANCE_LOGO_ASSET_ID}/" if INSTANCE_LOGO_ASSET_ID else ""
+
+        (
+            INSTANCE_LOGIN_BACKGROUND_ASSET_ID,
+            INSTANCE_ACCENT_COLOR,
+            INSTANCE_LOGIN_BACKDROP_COLOR,
+            INSTANCE_SHOW_LICENSE_NOTICE,
+        ) = get_configuration_value(
+            [
+                {
+                    "key": "INSTANCE_LOGIN_BACKGROUND_ASSET_ID",
+                    "default": os.environ.get("INSTANCE_LOGIN_BACKGROUND_ASSET_ID", ""),
+                },
+                {"key": "INSTANCE_ACCENT_COLOR", "default": os.environ.get("INSTANCE_ACCENT_COLOR", "")},
+                {
+                    "key": "INSTANCE_LOGIN_BACKDROP_COLOR",
+                    "default": os.environ.get("INSTANCE_LOGIN_BACKDROP_COLOR", ""),
+                },
+                {
+                    "key": "INSTANCE_SHOW_LICENSE_NOTICE",
+                    "default": os.environ.get("INSTANCE_SHOW_LICENSE_NOTICE", "1"),
+                },
+            ]
+        )
+        data["login_background_url"] = (
+            f"/api/assets/v2/static/{INSTANCE_LOGIN_BACKGROUND_ASSET_ID}/" if INSTANCE_LOGIN_BACKGROUND_ASSET_ID else ""
+        )
+        # Re-checked on the way out as well as on the way in: a value written
+        # before the validation existed, or straight into the database, must not
+        # reach a style attribute.
+        data["accent_color"] = _safe_colour(INSTANCE_ACCENT_COLOR)
+        data["login_backdrop_color"] = _safe_colour(INSTANCE_LOGIN_BACKDROP_COLOR)
+        data["show_license_notice"] = str(INSTANCE_SHOW_LICENSE_NOTICE) != "0"
 
         # Github app name
         data["github_app_name"] = str(GITHUB_APP_NAME)
