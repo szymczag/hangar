@@ -228,3 +228,30 @@ def test_a_background_is_readable_without_signing_in(db):
 @pytest.mark.django_db
 def test_an_unknown_branding_image_is_refused(admin_client):
     assert admin_client.delete("/api/instances/branding/images/favicon/").status_code == 404
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_providers_that_overwrite_profiles_are_reported(db, setup_instance):
+    """Clients need this to stop offering an edit the next sign-in discards.
+
+    With attribute sync on, a provider rewrites name and avatar at every login
+    and deletes an uploaded avatar outright, so a field left editable is a field
+    that quietly loses what someone typed.
+    """
+    _seed("ENABLE_GOOGLE_SYNC", "1")
+    _seed("ENABLE_GITHUB_SYNC", "0")
+
+    cache.clear()
+    config = APIClient().get("/api/instances/").data["config"]
+
+    assert "google" in config["provider_managed_profiles"]
+    assert "github" not in config["provider_managed_profiles"]
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_no_provider_manages_profiles_by_default(db, setup_instance):
+    cache.clear()
+
+    assert APIClient().get("/api/instances/").data["config"]["provider_managed_profiles"] == []
