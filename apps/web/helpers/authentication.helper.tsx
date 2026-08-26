@@ -79,6 +79,20 @@ export enum EAuthenticationErrorCodes {
   GOOGLE_OAUTH_PROVIDER_ERROR = "5115",
   GITHUB_OAUTH_PROVIDER_ERROR = "5120",
   GITLAB_OAUTH_PROVIDER_ERROR = "5121",
+  // Fork (see FORK.md): federated sign-in outcomes an operator has to act on.
+  // Each needs an entry in the message map below and, to be seen at all, in the
+  // banner list — an unlisted code renders nothing and bounces in silence.
+  OAUTH_PROVIDER_UNVERIFIED_EMAIL = "5124",
+  SSO_ACCOUNT_LINK_REQUIRED = "5126",
+  FEDERATED_IDENTITY_CONFLICT = "5127",
+  FEDERATED_IDENTITY_INVALID = "5128",
+  GOOGLE_WORKSPACE_TENANT_NOT_ALLOWED = "5129",
+  SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN = "5131",
+  EMAIL_PASSWORD_AUTHENTICATION_DISABLED = "5056",
+  GITEA_NOT_CONFIGURED = "5112",
+  GITHUB_USER_NOT_IN_ORG = "5122",
+  GITEA_OAUTH_PROVIDER_ERROR = "5123",
+  AUTHENTICATION_FAILED = "5999",
   // Reset Password
   INVALID_PASSWORD_TOKEN = "5125",
   EXPIRED_PASSWORD_TOKEN = "5130",
@@ -283,6 +297,61 @@ const errorCodeMessages: {
     title: `GitHub OAuth provider error`,
     message: () => `GitHub OAuth provider error. Please try again.`,
   },
+  // Fork (see FORK.md). These say what happened and what to do about it: each
+  // one is a state only an administrator can resolve, so a person who hits it
+  // needs something to quote rather than "try again".
+  [EAuthenticationErrorCodes.EMAIL_PASSWORD_AUTHENTICATION_DISABLED]: {
+    title: `Password sign-in disabled`,
+    message: () =>
+      `This instance does not allow signing in with a password. Use the method your organisation configured.`,
+  },
+  [EAuthenticationErrorCodes.GITEA_NOT_CONFIGURED]: {
+    title: `Gitea not configured`,
+    message: () => `Gitea not configured. Please contact your administrator.`,
+  },
+  [EAuthenticationErrorCodes.GITEA_OAUTH_PROVIDER_ERROR]: {
+    title: `Gitea OAuth provider error`,
+    message: () => `Gitea OAuth provider error. Please try again.`,
+  },
+  [EAuthenticationErrorCodes.GITHUB_USER_NOT_IN_ORG]: {
+    title: `Not a member of the organisation`,
+    message: () =>
+      `This instance only admits members of a specific GitHub organisation, and your account is not one. Contact your administrator and quote GITHUB_USER_NOT_IN_ORG.`,
+  },
+  [EAuthenticationErrorCodes.AUTHENTICATION_FAILED]: {
+    title: `Authentication failed`,
+    message: () => `Authentication failed. Please try again, and contact your administrator if it keeps happening.`,
+  },
+  [EAuthenticationErrorCodes.OAUTH_PROVIDER_UNVERIFIED_EMAIL]: {
+    title: `Email not verified`,
+    message: () =>
+      `Your identity provider did not confirm this email address, so it cannot be used to sign in. Verify it with your provider, or contact your administrator and quote OAUTH_PROVIDER_UNVERIFIED_EMAIL.`,
+  },
+  [EAuthenticationErrorCodes.SSO_ACCOUNT_LINK_REQUIRED]: {
+    title: `Account already exists`,
+    message: () =>
+      `An account with this email address already exists but is not linked to single sign-on yet. Contact your instance administrator and quote SSO_ACCOUNT_LINK_REQUIRED — they can authorise the link.`,
+  },
+  [EAuthenticationErrorCodes.FEDERATED_IDENTITY_CONFLICT]: {
+    title: `Sign-in identity conflict`,
+    message: () =>
+      `This identity is already linked to a different account, so signing in stopped rather than guessing. Contact your instance administrator and quote FEDERATED_IDENTITY_CONFLICT.`,
+  },
+  [EAuthenticationErrorCodes.FEDERATED_IDENTITY_INVALID]: {
+    title: `Sign-in details incomplete`,
+    message: () =>
+      `Your identity provider did not send everything needed to identify you. Contact your instance administrator and quote FEDERATED_IDENTITY_INVALID.`,
+  },
+  [EAuthenticationErrorCodes.GOOGLE_WORKSPACE_TENANT_NOT_ALLOWED]: {
+    title: `Google account not allowed`,
+    message: () =>
+      `This instance only accepts Google accounts from specific Workspace domains, and yours is not one of them. Sign in with your work account, or contact your administrator and quote GOOGLE_WORKSPACE_TENANT_NOT_ALLOWED.`,
+  },
+  [EAuthenticationErrorCodes.SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN]: {
+    title: `Wrong sign-in method`,
+    message: () =>
+      `Your email domain is set up to sign in through a different method than the one you used. Use the method your organisation configured, or contact your administrator and quote SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN.`,
+  },
   [EAuthenticationErrorCodes.GITLAB_OAUTH_PROVIDER_ERROR]: {
     title: `GitLab OAuth provider error`,
     message: () => `GitLab OAuth provider error. Please try again.`,
@@ -379,6 +448,20 @@ const errorCodeMessages: {
 
 export const authErrorHandler = (errorCode: EAuthenticationErrorCodes, email?: string): TAuthErrorInfo | undefined => {
   const bannerAlertErrorCodes = [
+    // Fork (see FORK.md): without listing a code here nothing renders at all —
+    // authErrorHandler returns undefined and the person is bounced back to the
+    // sign-in page with only a number in the URL.
+    EAuthenticationErrorCodes.OAUTH_PROVIDER_UNVERIFIED_EMAIL,
+    EAuthenticationErrorCodes.SSO_ACCOUNT_LINK_REQUIRED,
+    EAuthenticationErrorCodes.FEDERATED_IDENTITY_CONFLICT,
+    EAuthenticationErrorCodes.FEDERATED_IDENTITY_INVALID,
+    EAuthenticationErrorCodes.GOOGLE_WORKSPACE_TENANT_NOT_ALLOWED,
+    EAuthenticationErrorCodes.SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN,
+    EAuthenticationErrorCodes.EMAIL_PASSWORD_AUTHENTICATION_DISABLED,
+    EAuthenticationErrorCodes.GITEA_NOT_CONFIGURED,
+    EAuthenticationErrorCodes.GITEA_OAUTH_PROVIDER_ERROR,
+    EAuthenticationErrorCodes.GITHUB_USER_NOT_IN_ORG,
+    EAuthenticationErrorCodes.AUTHENTICATION_FAILED,
     EAuthenticationErrorCodes.INSTANCE_NOT_CONFIGURED,
     EAuthenticationErrorCodes.INVALID_EMAIL,
     EAuthenticationErrorCodes.EMAIL_REQUIRED,
