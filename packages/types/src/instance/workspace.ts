@@ -4,4 +4,4 @@
  * See the LICENSE file for details.
  */
 
-export type TInstanceWorkspaceConfigurationKeys = "DISABLE_WORKSPACE_CREATION";
+export type TInstanceWorkspaceConfigurationKeys = "DISABLE_WORKSPACE_CREATION" | "API_TOKEN_MINIMUM_ROLE";

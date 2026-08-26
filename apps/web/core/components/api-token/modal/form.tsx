@@ -18,6 +18,8 @@ import { CustomSelect, Input, TextArea, ToggleSwitch } from "@plane/ui";
 import { cn, renderFormattedDate, renderFormattedTime } from "@plane/utils";
 // components
 import { DateDropdown } from "@/components/dropdowns/date";
+// hooks
+import { useWorkspace } from "@/hooks/store/use-workspace";
 // helpers
 type Props = {
   handleClose: () => void;
@@ -53,6 +55,7 @@ const defaultValues: Partial<IApiToken> = {
   label: "",
   description: "",
   expired_at: null,
+  workspace_slug: "",
 };
 
 const getExpiryDate = (val: string): Date | null | undefined => {
@@ -84,6 +87,10 @@ export function CreateApiTokenForm(props: Props) {
   } = useForm<IApiToken>({ defaultValues });
   // hooks
   const { t } = useTranslation();
+  const { workspaces } = useWorkspace();
+  // A token acts only in the workspace it names, so the choice is part of
+  // creating one rather than a detail that can be filled in later.
+  const workspaceOptions = Object.values(workspaces ?? {});
 
   const handleFormSubmit = async (data: IApiToken) => {
     // if never expires is toggled off, and the user has not selected a custom date or a predefined date, show an error
@@ -97,6 +104,7 @@ export function CreateApiTokenForm(props: Props) {
     const payload: Partial<IApiToken> = {
       label: data.label,
       description: data.description,
+      workspace_slug: data.workspace_slug,
     };
 
     // if never expires is toggled on, set expired_at to null
@@ -154,6 +162,47 @@ export function CreateApiTokenForm(props: Props) {
               )}
             />
             {errors.label && <span className="text-11 text-danger-primary">{errors.label.message}</span>}
+          </div>
+          <div className="space-y-1">
+            <Controller
+              control={control}
+              name="workspace_slug"
+              rules={{ required: "Choose the workspace this token may act in." }}
+              render={({ field: { value, onChange } }) => (
+                <CustomSelect
+                  customButton={
+                    <div
+                      className={cn(
+                        "flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-14",
+                        errors.workspace_slug ? "border-danger-strong" : "border-strong"
+                      )}
+                    >
+                      <span className={cn(!value && "text-placeholder")}>
+                        {workspaceOptions.find((workspace) => workspace.slug === value)?.name ?? "Select a workspace"}
+                      </span>
+                    </div>
+                  }
+                  value={value}
+                  onChange={onChange}
+                  className="w-full"
+                  optionsClassName="w-full"
+                  input
+                >
+                  {workspaceOptions.map((workspace) => (
+                    <CustomSelect.Option key={workspace.id} value={workspace.slug}>
+                      {workspace.name}
+                    </CustomSelect.Option>
+                  ))}
+                </CustomSelect>
+              )}
+            />
+            <span className="text-11 text-tertiary">
+              The token reaches this workspace only. Creating one needs a sufficient role in it, which an instance
+              administrator sets.
+            </span>
+            {errors.workspace_slug && (
+              <span className="text-11 text-danger-primary">{errors.workspace_slug.message}</span>
+            )}
           </div>
           <Controller
             control={control}

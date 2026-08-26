@@ -9,7 +9,17 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
-from plane.db.models import APIToken, User
+from plane.app.permissions.base import ROLE
+from plane.db.models import APIToken, User, WorkspaceMember
+from plane.tests.factories import WorkspaceFactory, WorkspaceMemberFactory
+
+
+@pytest.fixture
+def member_workspace(db, create_user):
+    """A workspace the token owner belongs to, since a token now names one."""
+    workspace = WorkspaceFactory(owner=create_user)
+    WorkspaceMemberFactory(workspace=workspace, member=create_user, role=ROLE.ADMIN.value)
+    return workspace
 
 
 @pytest.mark.contract
@@ -18,14 +28,14 @@ class TestApiTokenEndpoint:
 
     # POST /user/api-tokens/ tests
     @pytest.mark.django_db
-    def test_create_api_token_success(self, session_client, create_user, api_token_data):
+    def test_create_api_token_success(self, session_client, create_user, api_token_data, member_workspace):
         """Test successful API token creation"""
         # Arrange
         session_client.force_authenticate(user=create_user)
         url = reverse("api-tokens")
 
         # Act
-        response = session_client.post(url, api_token_data, format="json")
+        response = session_client.post(url, {**api_token_data, "workspace_slug": member_workspace.slug}, format="json")
 
         # Assert
         assert response.status_code == status.HTTP_201_CREATED
@@ -43,25 +53,27 @@ class TestApiTokenEndpoint:
     def test_create_api_token_for_bot_user(self, session_client, create_bot_user, api_token_data):
         """Test API token creation for bot user"""
         # Arrange
+        workspace = WorkspaceFactory(owner=create_bot_user)
+        WorkspaceMemberFactory(workspace=workspace, member=create_bot_user, role=ROLE.ADMIN.value)
         session_client.force_authenticate(user=create_bot_user)
         url = reverse("api-tokens")
 
         # Act
-        response = session_client.post(url, api_token_data, format="json")
+        response = session_client.post(url, {**api_token_data, "workspace_slug": workspace.slug}, format="json")
 
         # Assert
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["user_type"] == 1  # Bot user
 
     @pytest.mark.django_db
-    def test_create_api_token_minimal_data(self, session_client, create_user):
+    def test_create_api_token_minimal_data(self, session_client, create_user, member_workspace):
         """Test API token creation with minimal data"""
         # Arrange
         session_client.force_authenticate(user=create_user)
         url = reverse("api-tokens")
 
         # Act
-        response = session_client.post(url, {}, format="json")
+        response = session_client.post(url, {"workspace_slug": member_workspace.slug}, format="json")
 
         # Assert
         assert response.status_code == status.HTTP_201_CREATED
@@ -70,13 +82,17 @@ class TestApiTokenEndpoint:
         assert response.data["description"] == ""
 
     @pytest.mark.django_db
-    def test_create_api_token_with_expiry(self, session_client, create_user):
+    def test_create_api_token_with_expiry(self, session_client, create_user, member_workspace):
         """Test API token creation with expiry date"""
         # Arrange
         session_client.force_authenticate(user=create_user)
         url = reverse("api-tokens")
         future_date = timezone.now() + timedelta(days=30)
-        data = {"label": "Expiring Token", "expired_at": future_date.isoformat()}
+        data = {
+            "label": "Expiring Token",
+            "expired_at": future_date.isoformat(),
+            "workspace_slug": member_workspace.slug,
+        }
 
         # Act
         response = session_client.post(url, data, format="json")

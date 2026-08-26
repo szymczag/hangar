@@ -80,6 +80,13 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
         if slug and token.workspace.slug != slug:
             raise PermissionDenied("This API token is not valid for the requested workspace.")
 
+        # A route with no slug addresses no workspace. Every one of them today
+        # is the caller's own record — their profile and their own uploads —
+        # where a scoped token acting as its owner is right. That is an
+        # assumption about the route table rather than something enforced here,
+        # so a test asserts the set has not grown into anything workspace-bound.
+        # See test_api_token_workspace_scope.py.
+
     def filter_queryset(self, queryset):
         for backend in list(self.filter_backends):
             queryset = backend().filter_queryset(self.request, queryset, self)

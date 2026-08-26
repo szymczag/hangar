@@ -83,7 +83,11 @@ def test_a_token_cannot_reach_a_workspace_its_owner_left(scenario):
 def test_renaming_an_api_token_does_not_return_its_secret(scenario):
     """Creation is the one moment the secret may be shown; a rename is not."""
     client = _session_client(scenario.personas["member_a"])
-    created = client.post("/api/users/api-tokens/", {"label": "original"}, format="json")
+    created = client.post(
+        "/api/users/api-tokens/",
+        {"label": "original", "workspace_slug": scenario.workspace.slug},
+        format="json",
+    )
     token_id = created.json()["id"]
 
     renamed = client.patch(f"/api/users/api-tokens/{token_id}/", {"label": "renamed"}, format="json")
@@ -96,7 +100,11 @@ def test_renaming_an_api_token_does_not_return_its_secret(scenario):
 def test_listing_api_tokens_never_returns_secrets(scenario):
     """The read path is correct and must stay that way."""
     client = _session_client(scenario.personas["member_a"])
-    client.post("/api/users/api-tokens/", {"label": "original"}, format="json")
+    client.post(
+        "/api/users/api-tokens/",
+        {"label": "original", "workspace_slug": scenario.workspace.slug},
+        format="json",
+    )
 
     listed = client.get("/api/users/api-tokens/")
 
@@ -383,4 +391,3 @@ def test_an_unscoped_token_keeps_its_previous_reach(scenario):
     )
 
     assert response.status_code == 200
-

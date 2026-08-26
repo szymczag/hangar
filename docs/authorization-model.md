@@ -133,12 +133,29 @@ a strict xfail.
 
 ## API tokens
 
-A token authenticates as its owner. `APIToken.workspace` is optional: tokens
-minted through the product leave it null, and their reach is the owner's
-memberships. When a token _does_ name a workspace, it is confined to it —
-enforced in `BaseAPIView.initial()` rather than a permission class, because
-views override `permission_classes` freely and the rule must not be switchable
-off by omission.
+A token authenticates as its owner and names the workspace it may act in. It is
+confined to that workspace in `BaseAPIView.initial()` rather than by a permission
+class, because views override `permission_classes` freely and the rule must not
+be switchable off by omission.
+
+Creating one requires holding a role in that workspace, at or above
+`API_TOKEN_MINIMUM_ROLE` (guest by default, raised in God Mode). The two halves
+depend on each other: without the workspace on the token a role requirement means
+nothing, because someone who is an administrator of their own workspace would
+mint a token that reaches one where they are a guest. That was the behaviour
+before — any signed-in account could mint a token, and it reached everywhere its
+owner did.
+
+Tokens created before this keep `workspace = NULL` and their previous reach: the
+owner's memberships. Nothing revokes them, and raising the threshold does not
+either — it governs minting, not tokens already issued.
+
+A route with no workspace slug in its path is not confined by this, since there
+is nothing to compare against. Every such route under `/api/v1/` today addresses
+the caller's own record — their profile and their own uploads — where a scoped
+token acting as its owner is correct. That is an assumption about the route
+table, so `test_api_token_workspace_scope.py` asserts the set has not grown into
+anything workspace-bound.
 
 The secret is returned **only** when the token is created. Reads and renames
 answer with `APITokenReadSerializer`, which excludes it.
