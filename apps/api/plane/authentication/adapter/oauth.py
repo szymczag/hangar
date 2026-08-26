@@ -109,12 +109,38 @@ class OauthAdapter(Adapter):
             tls_policy=self.outbound_tls_policy,
         )
 
+    def _log_outbound_failure(self, stage: str, error: Exception) -> None:
+        """Record why a provider call failed, without recording what was in it.
+
+        The caller sees one code for every failure, deliberately — it must not
+        become an oracle. An operator, though, has to tell "our egress policy
+        refused this destination" from "the provider did not answer": the first
+        is a deployment they can fix, the second is not, and both arrive here as
+        the same exception types.
+
+        Only the exception's type and message are logged. The request body
+        carries the client secret and the authorization code, and the headers
+        carry the access token, so neither is ever included.
+        """
+        refused_locally = isinstance(error, ValueError) and not isinstance(error, requests.RequestException)
+        self.logger.warning(
+            "%s failed for %s: %s (%s)",
+            stage,
+            self.provider,
+            error.__class__.__name__,
+            str(error) or "no detail",
+            extra={
+                "provider": self.provider,
+                "refused_by_egress_policy": refused_locally,
+            },
+        )
+
     def get_user_token(self, data, headers=None):
         try:
             response = self.fetch("POST", self.get_token_url(), data=data, headers=headers or {})
             return response.json()
-        except (requests.RequestException, ValueError):
-            self.logger.warning("Error getting user token")
+        except (requests.RequestException, ValueError) as error:
+            self._log_outbound_failure("Token exchange", error)
             code = self.authentication_error_code()
             raise AuthenticationException(error_code=AUTHENTICATION_ERROR_CODES[code], error_message=str(code))
 
@@ -126,9 +152,8 @@ class OauthAdapter(Adapter):
                 headers={"Authorization": f"Bearer {self.token_data.get('access_token')}"},
             )
             return response.json()
-        except (requests.RequestException, ValueError):
-            # Do not log headers here: they carry the access token
-            self.logger.warning("Error getting user response")
+        except (requests.RequestException, ValueError) as error:
+            self._log_outbound_failure("User info request", error)
             code = self.authentication_error_code()
             raise AuthenticationException(error_code=AUTHENTICATION_ERROR_CODES[code], error_message=str(code))
 

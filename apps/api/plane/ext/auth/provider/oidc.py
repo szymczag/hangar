@@ -54,6 +54,26 @@ ALLOWED_ID_TOKEN_ALGS = [
 _jwk_clients = {}
 
 
+def _log_outbound_failure(logger, stage: str, error: Exception) -> None:
+    """Say why a provider call failed, without saying what was in it.
+
+    Every failure answers the caller with one code, deliberately. An operator
+    needs more than that: a destination refused by our own egress policy is a
+    deployment they can fix, and a provider that did not answer is not, yet both
+    arrive as the same exception types. Only the type and message are recorded —
+    the request body carries the client secret and the authorization code, and
+    the headers carry the access token.
+    """
+    refused_locally = isinstance(error, ValueError) and not isinstance(error, requests.RequestException)
+    logger.warning(
+        "%s failed: %s (%s)",
+        stage,
+        error.__class__.__name__,
+        str(error) or "no detail",
+        extra={"refused_by_egress_policy": refused_locally},
+    )
+
+
 def _request_oidc(method, target, *, data=None, headers=None, timeout=DISCOVERY_TIMEOUT):
     """OIDC's binding of the shared transport.
 
@@ -207,8 +227,8 @@ class OIDCOAuthProvider(OauthAdapter):
             if not isinstance(token_response, dict):
                 raise ValueError("OIDC token response is not an object")
             return token_response
-        except (requests.RequestException, ValueError):
-            self.logger.warning("OIDC token request failed")
+        except (requests.RequestException, ValueError) as error:
+            _log_outbound_failure(self.logger, "OIDC token request", error)
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
                 error_message="OIDC_PROVIDER_ERROR",
@@ -226,8 +246,8 @@ class OIDCOAuthProvider(OauthAdapter):
             if not isinstance(userinfo, dict):
                 raise ValueError("OIDC userinfo response is not an object")
             return userinfo
-        except (requests.RequestException, ValueError):
-            self.logger.warning("OIDC userinfo request failed")
+        except (requests.RequestException, ValueError) as error:
+            _log_outbound_failure(self.logger, "OIDC userinfo request", error)
             raise AuthenticationException(
                 error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
                 error_message="OIDC_PROVIDER_ERROR",
@@ -244,7 +264,8 @@ class OIDCOAuthProvider(OauthAdapter):
                 discovery = response.json()
                 if not isinstance(discovery, dict):
                     raise ValueError("OIDC discovery response is not an object")
-            except (requests.RequestException, ValueError):
+            except (requests.RequestException, ValueError) as error:
+                _log_outbound_failure(self.logger, "OIDC discovery", error)
                 raise AuthenticationException(
                     error_code=EXT_AUTHENTICATION_ERROR_CODES["OIDC_PROVIDER_ERROR"],
                     error_message="OIDC_PROVIDER_ERROR",
