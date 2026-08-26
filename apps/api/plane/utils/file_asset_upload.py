@@ -161,6 +161,7 @@ INLINE_IMAGE_ENTITY_TYPES = {
     FileAsset.EntityTypeContext.USER_AVATAR,
     FileAsset.EntityTypeContext.USER_COVER,
     FileAsset.EntityTypeContext.WORKSPACE_LOGO,
+    FileAsset.EntityTypeContext.INSTANCE_LOGO,
 }
 
 

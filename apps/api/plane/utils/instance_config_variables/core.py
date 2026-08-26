@@ -45,6 +45,36 @@ workspace_management_config_variables = [
     },
 ]
 
+# Fork (see FORK.md): what the sign-in page says and shows. Empty values keep
+# the built-in wording, so an instance that sets none looks exactly as before.
+branding_config_variables = [
+    {
+        "key": "INSTANCE_BRANDING_NAME",
+        "value": os.environ.get("INSTANCE_BRANDING_NAME", ""),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
+    {
+        "key": "INSTANCE_SIGN_IN_HEADER",
+        "value": os.environ.get("INSTANCE_SIGN_IN_HEADER", ""),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
+    {
+        "key": "INSTANCE_SIGN_IN_SUBHEADER",
+        "value": os.environ.get("INSTANCE_SIGN_IN_SUBHEADER", ""),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
+    {
+        # The id of the uploaded FileAsset, or empty for the Hangar wordmark.
+        "key": "INSTANCE_LOGO_ASSET_ID",
+        "value": os.environ.get("INSTANCE_LOGO_ASSET_ID", ""),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
+]
+
 google_config_variables = [
     {
         "key": "IS_GOOGLE_ENABLED",
@@ -298,6 +328,7 @@ unsplash_config_variables = [
 
 core_config_variables = [
     *authentication_config_variables,
+    *branding_config_variables,
     *workspace_management_config_variables,
     *google_config_variables,
     *github_config_variables,

@@ -66,17 +66,27 @@ type TAuthHeaderBase = {
   additionalAction?: React.ReactNode;
 };
 
-export function AuthHeaderBase(props: TAuthHeaderBase) {
+export const AuthHeaderBase = observer(function AuthHeaderBase(props: TAuthHeaderBase) {
   const { pageTitle, additionalAction } = props;
+  const { config } = useInstance();
+  // An uploaded logo has proportions of its own, so it is rendered as an image
+  // with a bounded height rather than through HangarLogo, whose viewBox is the
+  // wordmark's own aspect ratio and would distort anything else.
+  const brandingName = config?.branding_name || "Hangar";
+  const logoUrl = config?.logo_url;
   return (
     <>
-      <PageHead title={pageTitle + " - Hangar"} />
+      <PageHead title={`${pageTitle} - ${brandingName}`} />
       <div className="sticky top-0 flex w-full flex-shrink-0 items-center justify-between gap-6">
         <Link href="/">
-          <HangarLogo height={20} width={95} />
+          {logoUrl ? (
+            <img src={logoUrl} alt={brandingName} className="h-5 w-auto max-w-[180px] object-contain" />
+          ) : (
+            <HangarLogo height={20} width={95} />
+          )}
         </Link>
         {additionalAction}
       </div>
     </>
   );
-}
+});
