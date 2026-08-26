@@ -65,6 +65,7 @@ class InstanceEndpoint(BaseAPIView):
             ENABLE_SIGNUP,
             DISABLE_WORKSPACE_CREATION,
             IS_GOOGLE_ENABLED,
+            GOOGLE_AUTO_REDIRECT,
             IS_GITHUB_ENABLED,
             GITHUB_APP_NAME,
             IS_GITLAB_ENABLED,
@@ -89,6 +90,10 @@ class InstanceEndpoint(BaseAPIView):
                 {
                     "key": "IS_GOOGLE_ENABLED",
                     "default": os.environ.get("IS_GOOGLE_ENABLED", "0"),
+                },
+                {
+                    "key": "GOOGLE_AUTO_REDIRECT",
+                    "default": os.environ.get("GOOGLE_AUTO_REDIRECT", "0"),
                 },
                 {
                     "key": "IS_GITHUB_ENABLED",
@@ -140,6 +145,7 @@ class InstanceEndpoint(BaseAPIView):
         data["enable_signup"] = ENABLE_SIGNUP == "1"
         data["is_workspace_creation_disabled"] = DISABLE_WORKSPACE_CREATION == "1"
         data["is_google_enabled"] = IS_GOOGLE_ENABLED == "1"
+        data["is_google_auto_redirect_enabled"] = GOOGLE_AUTO_REDIRECT == "1"
         data["is_github_enabled"] = IS_GITHUB_ENABLED == "1"
         data["is_gitlab_enabled"] = IS_GITLAB_ENABLED == "1"
         data["is_gitea_enabled"] = IS_GITEA_ENABLED == "1"

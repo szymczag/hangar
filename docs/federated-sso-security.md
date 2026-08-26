@@ -171,10 +171,21 @@ finer restriction is not available from the token.
 | `GOOGLE_AUTH_MODE`         | Yes               | `generic` permits any validated Google account; `workspace` requires an allowed hosted domain |
 | `GOOGLE_WORKSPACE_DOMAINS` | In workspace mode | Comma-separated, normalized Google Workspace hosted domains                                   |
 | `ENABLE_GOOGLE_SYNC`       | No                | Synchronizes non-binding profile data for existing users                                      |
+| `GOOGLE_AUTO_REDIRECT`     | No                | `1` starts Google OAuth automatically when Google is the only enabled login method            |
 
 Workspace mode validates the signed Google `hd` claim. A matching email suffix is
 not sufficient. Configure every intended tenant explicitly before switching from
 `generic` to `workspace`.
+
+#### Automatically start Google sign-in
+
+`GOOGLE_AUTO_REDIRECT` defaults to `0` and is also editable under
+**Authentication → Google**. Even when set to `1`, Hangar shows the normal method
+chooser if password, magic code, GitHub, GitLab, Gitea, OIDC, or SAML login is
+enabled. OAuth errors and an explicit sign-out also stop the automatic redirect
+and leave the Google button available, so a person can retry or choose another
+Google account. The setting applies to the main application only; public Space
+authentication is unchanged.
 
 ### Self-hosted provider egress policy (Gitea, GitLab)
 

@@ -97,6 +97,7 @@ admin pages) are listed for completeness but carry no merge-conflict risk.
 | 42  | `apps/api/plane/license/api/views/{configuration,instance}.py`, `apps/api/plane/db/models/asset.py`, `apps/api/plane/app/views/asset/v2.py`, `apps/api/plane/utils/file_asset_upload.py`, `apps/web/core/components/{auth-screens/auth-base.tsx,account/terms-and-conditions.tsx}` | Branding | sign-in background and accent colours, validated as hex on write and read, and a switch for the licence notice |
 | 43  | `apps/api/plane/authentication/utils/user_auth_workflow.py`, `apps/web/core/components/onboarding/{root.tsx,steps/workspace/create.tsx}` | Auto-join | settle the workspace onboarding steps for someone auto-join admitted, so they are not sent to create one |
 | 44  | `packages/constants/src/auth/index.ts`, `packages/utils/src/auth.ts`, `apps/web/helpers/authentication.helper.tsx` | Auth errors | messages and banner entries for the federated sign-in codes, which rendered nothing at all |
+| 45  | Authentication configuration and app sign-in surfaces | Google SSO | add an operator-controlled Google-only automatic redirect with error and explicit-sign-out escape paths |
 
 Phase 6 new files implement the import model, parser, API, worker, tests, CE
 frontend, workspace settings route, and [administrator how-to](docs/importing-from-todoist.md).
