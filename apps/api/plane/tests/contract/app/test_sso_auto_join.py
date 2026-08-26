@@ -169,12 +169,8 @@ def _project_config(auto_join="", enforced=""):
 @pytest.fixture
 def target_project(db, target_workspace):
     owner = target_workspace.owner
-    project = Project.objects.create(
-        name="Platform", identifier="PLAT", workspace=target_workspace, created_by=owner
-    )
-    ProjectMember.objects.create(
-        workspace=target_workspace, project=project, member=owner, role=20, is_active=True
-    )
+    project = Project.objects.create(name="Platform", identifier="PLAT", workspace=target_workspace, created_by=owner)
+    ProjectMember.objects.create(workspace=target_workspace, project=project, member=owner, role=20, is_active=True)
     return project
 
 
@@ -183,9 +179,7 @@ def _make_workspace_member(workspace, user, role=15):
 
 
 def test_project_entries_require_a_workspace_and_an_identifier():
-    assert parse_auto_join_projects("corp.com=engineering/PLAT:member") == {
-        "corp.com": [("engineering", "PLAT", 15)]
-    }
+    assert parse_auto_join_projects("corp.com=engineering/PLAT:member") == {"corp.com": [("engineering", "PLAT", 15)]}
     # Without the workspace/project separator there is nothing to resolve.
     assert parse_auto_join_projects("corp.com=PLAT:member") == {}
     assert parse_auto_join_projects("corp.com=engineering/:member") == {}
@@ -287,3 +281,27 @@ def test_repeated_sign_in_does_not_duplicate_project_membership(target_workspace
 
     assert ProjectMember.objects.filter(project=target_project, member=corp_user).count() == 1
 
+
+def test_a_numeric_role_is_accepted_as_well_as_a_name():
+    """The admin panel wrote numbers for one release, and every such entry was
+    dropped here — so auto-join configured from the panel never ran at all.
+    Reading them repairs those instances without anyone editing the database.
+    """
+    assert parse_auto_join("corp.com=engineering:15") == {"corp.com": [("engineering", 15)]}
+    assert parse_auto_join("corp.com=engineering:5") == {"corp.com": [("engineering", 5)]}
+    assert parse_auto_join("corp.com=engineering:20") == {"corp.com": [("engineering", 20)]}
+    assert parse_auto_join_projects("corp.com=engineering/PLAT:15") == {"corp.com": [("engineering", "PLAT", 15)]}
+
+
+def test_a_number_that_is_not_a_role_is_still_refused():
+    """Accepting numbers must not become accepting anything numeric."""
+    assert parse_auto_join("corp.com=engineering:1") == {}
+    assert parse_auto_join("corp.com=engineering:25") == {}
+    assert parse_auto_join("corp.com=engineering:0") == {}
+
+
+def test_one_domain_can_join_several_workspaces():
+    """The panel used to collapse these to one, so saving deleted the others."""
+    assert parse_auto_join("corp.com=engineering:member,corp.com=design:guest") == {
+        "corp.com": [("engineering", 15), ("design", 5)]
+    }

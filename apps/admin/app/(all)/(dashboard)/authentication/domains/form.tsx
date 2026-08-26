@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 import Link from "next/link";
@@ -13,6 +13,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button, getButtonStyling } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { IFormattedInstanceConfiguration } from "@plane/types";
+import { Loader } from "@plane/ui";
 // components
 import { CodeBlock } from "@/components/common/code-block";
 // helpers
@@ -21,24 +22,20 @@ import { configurationErrorMessage } from "@/helpers/configuration-error";
 import { useInstance, useWorkspace } from "@/hooks/store";
 import { useConfigurationEditable } from "@/hooks/use-configuration-editable";
 // local
-import type { TDomainRow, TProvider, TRoleName } from "./policy";
-import { ALL_PROVIDERS, emptyRow, parsePolicy, serializePolicy } from "./policy";
+import type { TDomainRow, TProvider, TRoleName, TWorkspaceGrant } from "./policy";
+import { ALL_PROVIDERS, ROLE_NAMES, emptyGrant, emptyRow, parsePolicy, serializePolicy } from "./policy";
 
 type Props = {
   config: IFormattedInstanceConfiguration;
 };
 
-const ROLE_LABELS: Record<TRoleName, string> = {
-  guest: "Guest",
-  member: "Member",
-  admin: "Admin",
-};
+const ROLE_LABELS: Record<TRoleName, string> = { guest: "Guest", member: "Member", admin: "Admin" };
 
 export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPolicyForm(props: Props) {
   const { config } = props;
   // store hooks
   const { updateInstanceConfigurations } = useInstance();
-  const { workspaces, fetchWorkspaces } = useWorkspace();
+  const { workspaces, paginationInfo, loader, fetchWorkspaces, fetchNextWorkspaces } = useWorkspace();
   const isConfigurationEditable = useConfigurationEditable();
   // states
   const [rows, setRows] = useState<TDomainRow[]>(() =>
@@ -53,19 +50,42 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
 
   useSWR("INSTANCE_WORKSPACES", () => fetchWorkspaces());
 
+  // The endpoint pages ten at a time. A domain pointing at the eleventh
+  // workspace would otherwise have no matching option, and a select whose value
+  // matches nothing displays its first option — so the row would read "Invite by
+  // hand" while holding a slug, and the operator could not correct it because
+  // their workspace was not in the list.
+  useEffect(() => {
+    if (paginationInfo?.next_page_results && loader !== "pagination") void fetchNextWorkspaces();
+  }, [paginationInfo?.next_page_results, loader, fetchNextWorkspaces]);
+
   const workspaceOptions = useMemo(() => Object.values(workspaces ?? {}), [workspaces]);
+  const isLoadingWorkspaces = loader === "init-loader" || Boolean(paginationInfo?.next_page_results);
 
-  const update = (index: number, patch: Partial<TDomainRow>) => {
-    setRows((previous) => previous.map((row, position) => (position === index ? { ...row, ...patch } : row)));
-    setIsDirty(true);
+  const markDirty = () => setIsDirty(true);
+
+  const updateRow = (rowId: string, patch: Partial<TDomainRow>) => {
+    setRows((previous) => previous.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
+    markDirty();
   };
 
-  const toggleProvider = (index: number, provider: TProvider) => {
-    const current = rows[index]?.providers ?? [];
-    update(index, {
-      providers: current.includes(provider) ? current.filter((value) => value !== provider) : [...current, provider],
+  const updateGrant = (rowId: string, grantId: string, patch: Partial<TWorkspaceGrant>) => {
+    setRows((previous) =>
+      previous.map((row) =>
+        row.id === rowId
+          ? { ...row, grants: row.grants.map((grant) => (grant.id === grantId ? { ...grant, ...patch } : grant)) }
+          : row
+      )
+    );
+    markDirty();
+  };
+
+  const toggleProvider = (row: TDomainRow, provider: TProvider) =>
+    updateRow(row.id, {
+      providers: row.providers.includes(provider)
+        ? row.providers.filter((value) => value !== provider)
+        : [...row.providers, provider],
     });
-  };
 
   const onSubmit = async () => {
     setIsSubmitting(true);
@@ -84,6 +104,80 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
     }
   };
 
+  const renderGrant = (row: TDomainRow, grant: TWorkspaceGrant) => {
+    // A slug that is not among the options would silently display as "Invite by
+    // hand". Carrying it as its own option keeps what is stored visible.
+    const isUnknownSlug =
+      Boolean(grant.workspaceSlug) && !workspaceOptions.some((workspace) => workspace.slug === grant.workspaceSlug);
+
+    return (
+      <div key={grant.id} className="flex flex-wrap items-start gap-2">
+        <select
+          aria-label="Workspace to join"
+          className="w-44 rounded-md border border-strong bg-surface-1 px-2 py-1"
+          value={grant.workspaceSlug}
+          onChange={(event) => updateGrant(row.id, grant.id, { workspaceSlug: event.target.value })}
+          disabled={!isConfigurationEditable}
+        >
+          <option value="">Invite by hand</option>
+          {isUnknownSlug && <option value={grant.workspaceSlug}>{grant.workspaceSlug} (not on this instance)</option>}
+          {workspaceOptions.map((workspace) => (
+            <option key={workspace.id} value={workspace.slug}>
+              {workspace.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          aria-label="Workspace role"
+          className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1"
+          value={grant.workspaceRole}
+          onChange={(event) => updateGrant(row.id, grant.id, { workspaceRole: event.target.value as TRoleName })}
+          disabled={!isConfigurationEditable || !grant.workspaceSlug}
+        >
+          {ROLE_NAMES.map((role) => (
+            <option key={role} value={role}>
+              {ROLE_LABELS[role]}
+            </option>
+          ))}
+        </select>
+
+        <input
+          aria-label="Project identifier"
+          className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1 uppercase"
+          placeholder="PLAT"
+          value={grant.projectIdentifier}
+          onChange={(event) => updateGrant(row.id, grant.id, { projectIdentifier: event.target.value })}
+          disabled={!isConfigurationEditable || !grant.workspaceSlug}
+        />
+
+        <select
+          aria-label="Project role"
+          className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1"
+          value={grant.projectRole}
+          onChange={(event) => updateGrant(row.id, grant.id, { projectRole: event.target.value as TRoleName })}
+          disabled={!isConfigurationEditable || !grant.projectIdentifier}
+        >
+          {ROLE_NAMES.map((role) => (
+            <option key={role} value={role}>
+              {ROLE_LABELS[role]}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          aria-label="Remove workspace"
+          className="mt-1 text-tertiary hover:text-danger-primary"
+          onClick={() => updateRow(row.id, { grants: row.grants.filter((candidate) => candidate.id !== grant.id) })}
+          disabled={!isConfigurationEditable}
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-3xl text-13 text-tertiary">
@@ -92,127 +186,83 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
         route. Matching is exact, so <CodeBlock darkerShade>sub.corp.com</CodeBlock> needs its own row.
       </p>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-13">
-          <thead className="text-tertiary">
-            <tr className="border-b border-subtle text-left">
-              <th className="py-2 pr-4 font-medium">Email domain</th>
-              <th className="py-2 pr-4 font-medium">May sign in with</th>
-              <th className="py-2 pr-4 font-medium">Joins workspace</th>
-              <th className="py-2 pr-4 font-medium">as</th>
-              <th className="py-2 pr-4 font-medium">Project</th>
-              <th className="py-2 pr-4 font-medium">as</th>
-              <th className="py-2 font-medium" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={row.id} className="border-b border-subtle/60 align-top">
-                <td className="py-2 pr-4">
-                  <input
-                    className="w-44 rounded-md border border-strong bg-surface-1 px-2 py-1"
-                    placeholder="corp.com"
-                    value={row.domain}
-                    onChange={(event) => update(index, { domain: event.target.value })}
-                    disabled={!isConfigurationEditable}
-                  />
-                </td>
-                <td className="py-2 pr-4">
-                  <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    {ALL_PROVIDERS.map((provider) => (
-                      <label key={provider} className="flex items-center gap-1 text-11">
-                        <input
-                          type="checkbox"
-                          checked={row.providers.includes(provider)}
-                          onChange={() => toggleProvider(index, provider)}
-                          disabled={!isConfigurationEditable}
-                        />
-                        {provider}
-                      </label>
-                    ))}
-                  </div>
-                  {row.providers.length === 0 && (
-                    <span className="text-11 text-tertiary">None ticked — any of Google, OIDC or SAML.</span>
-                  )}
-                </td>
-                <td className="py-2 pr-4">
-                  <select
-                    className="w-40 rounded-md border border-strong bg-surface-1 px-2 py-1"
-                    value={row.workspaceSlug}
-                    onChange={(event) => update(index, { workspaceSlug: event.target.value })}
-                    disabled={!isConfigurationEditable}
-                  >
-                    <option value="">Invite by hand</option>
-                    {workspaceOptions.map((workspace) => (
-                      <option key={workspace.id} value={workspace.slug}>
-                        {workspace.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-2 pr-4">
-                  <select
-                    className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1"
-                    value={row.workspaceRole}
-                    onChange={(event) => update(index, { workspaceRole: event.target.value as TRoleName })}
-                    disabled={!isConfigurationEditable || !row.workspaceSlug}
-                  >
-                    {(Object.keys(ROLE_LABELS) as TRoleName[]).map((role) => (
-                      <option key={role} value={role}>
-                        {ROLE_LABELS[role]}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-2 pr-4">
-                  <input
-                    className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1 uppercase"
-                    placeholder="PLAT"
-                    value={row.projectIdentifier}
-                    onChange={(event) => update(index, { projectIdentifier: event.target.value })}
-                    disabled={!isConfigurationEditable || !row.workspaceSlug}
-                  />
-                </td>
-                <td className="py-2 pr-4">
-                  <select
-                    className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1"
-                    value={row.projectRole}
-                    onChange={(event) => update(index, { projectRole: event.target.value as TRoleName })}
-                    disabled={!isConfigurationEditable || !row.projectIdentifier}
-                  >
-                    {(Object.keys(ROLE_LABELS) as TRoleName[]).map((role) => (
-                      <option key={role} value={role}>
-                        {ROLE_LABELS[role]}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-2">
-                  <button
-                    type="button"
-                    aria-label="Remove domain"
-                    className="text-tertiary hover:text-danger-primary"
-                    onClick={() => {
-                      setRows((previous) => previous.filter((_, position) => position !== index));
-                      setIsDirty(true);
-                    }}
+      {isLoadingWorkspaces ? (
+        <Loader className="space-y-3">
+          <Loader.Item height="40px" />
+          <Loader.Item height="40px" />
+        </Loader>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {rows.map((row) => (
+            <div key={row.id} className="flex flex-col gap-3 rounded-md border border-subtle p-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <input
+                  aria-label="Email domain"
+                  className="w-56 rounded-md border border-strong bg-surface-1 px-2 py-1"
+                  placeholder="corp.com"
+                  value={row.domain}
+                  onChange={(event) => updateRow(row.id, { domain: event.target.value })}
+                  disabled={!isConfigurationEditable}
+                />
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {ALL_PROVIDERS.map((provider) => (
+                    <label key={provider} className="flex items-center gap-1 text-11">
+                      <input
+                        type="checkbox"
+                        checked={row.providers.includes(provider)}
+                        onChange={() => toggleProvider(row, provider)}
+                        disabled={!isConfigurationEditable}
+                      />
+                      {provider}
+                    </label>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Remove domain"
+                  className="ml-auto text-tertiary hover:text-danger-primary"
+                  onClick={() => {
+                    setRows((previous) => previous.filter((candidate) => candidate.id !== row.id));
+                    markDirty();
+                  }}
+                  disabled={!isConfigurationEditable}
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+
+              {row.providers.length === 0 && (
+                <span className="text-11 text-tertiary">None ticked — any of Google, OIDC or SAML.</span>
+              )}
+
+              <div className="flex flex-col gap-2 border-t border-subtle pt-3">
+                {row.grants.length === 0 && (
+                  <span className="text-11 text-tertiary">
+                    Nobody joins anything automatically. Invite people by hand, or add a workspace below.
+                  </span>
+                )}
+                {row.grants.map((grant) => renderGrant(row, grant))}
+                <div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => updateRow(row.id, { grants: [...row.grants, emptyGrant()] })}
                     disabled={!isConfigurationEditable}
                   >
-                    <Trash2 className="size-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="py-6 text-center text-tertiary">
-                  No domain is pinned. Everyone signs in with whatever methods are enabled.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                    <Plus className="size-4" /> Add a workspace
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {rows.length === 0 && (
+            <p className="py-6 text-center text-13 text-tertiary">
+              No domain is pinned. Everyone signs in with whatever methods are enabled.
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <Button
@@ -220,7 +270,7 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
           size="sm"
           onClick={() => {
             setRows((previous) => [...previous, emptyRow()]);
-            setIsDirty(true);
+            markDirty();
           }}
           disabled={!isConfigurationEditable}
         >
@@ -230,6 +280,7 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
 
       <div className="flex flex-col gap-2 rounded-md border border-subtle p-4 text-11 text-tertiary">
         <span>
+          A domain may join more than one workspace — add as many as you need.{" "}
           <strong className="text-secondary">Project identifier</strong> is the short code on a project&apos;s work
           items, such as <CodeBlock darkerShade>PLAT-42</CodeBlock> → <CodeBlock darkerShade>PLAT</CodeBlock>. A project
           seat is only granted alongside a workspace seat, and archived projects are skipped.
