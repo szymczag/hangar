@@ -330,6 +330,21 @@ method, so a mistake is recoverable.
 7. Optionally set `SSO_AUTO_JOIN_WORKSPACES` so new colleagues land in a workspace
    instead of an empty account.
 
+### What happens to someone auto-join admits
+
+Auto-join adds a workspace membership directly. It creates no invitation, which
+matters because the onboarding screens ask "do you have an invitation?" rather
+than "do you belong anywhere?".
+
+So the sign-in that grants a seat also settles the workspace steps of that
+person's onboarding and records the workspace as their last one. Without it they
+would arrive at "create a workspace" holding a membership they could not see —
+and on an instance that restricts workspace creation, at a screen with no way
+forward.
+
+The profile step is deliberately left open: it collects a display name, which
+nobody else can supply.
+
 ### Keeping administrative access
 
 Pinning a domain removes password and magic-link sign-in for it, so decide in

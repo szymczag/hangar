@@ -115,12 +115,18 @@ export const WorkspaceCreateStep = observer(function WorkspaceCreateStep({
   const isButtonDisabled = !isValid || invalidSlug || isSubmitting;
 
   if (isWorkspaceCreationDisabled) {
+    // Reached only by someone who genuinely belongs nowhere: a person already in
+    // a workspace — including one added by SSO auto-join, which creates a
+    // membership and no invitation — finishes onboarding before this renders.
     return (
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-4">
         <span className="text-center text-14 text-tertiary">
-          You don&apos;t seem to have any invites to a workspace and your instance admin has restricted creation of new
-          workspaces. Please ask a workspace owner or admin to invite you to a workspace first and come back to this
-          screen to join.
+          You have no workspace yet, and this instance only lets administrators create them.
+        </span>
+        <span className="text-center text-13 text-tertiary">
+          Ask a workspace admin to invite you, then sign in again — an invitation is picked up automatically. If your
+          organisation signs in through SSO and you expected to be added to a workspace, tell your instance
+          administrator: joining is configured per email domain and yours may not be covered.
         </span>
       </div>
     );
