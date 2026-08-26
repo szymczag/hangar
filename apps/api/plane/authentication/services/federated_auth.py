@@ -135,11 +135,35 @@ def authenticate_external_identity(adapter) -> FederatedAuthenticationResult:
                 else:
                     existing_user = User.objects.select_for_update().filter(email=email).first()
                     if existing_user is not None:
-                        raise _auth_error("SSO_ACCOUNT_LINK_REQUIRED", email)
-                    signup_invite = adapter._check_signup(email)
-                    user = _create_user(adapter, external, email)
-                    identity = _create_identity(external, user, email)
-                    is_signup = True
+                        # Fork (see FORK.md): an address is not proof of
+                        # anything, so linking by one stays refused unless an
+                        # administrator authorised this exact address for this
+                        # issuer and the domain is pinned to this provider.
+                        # claim_authorization checks all of that and records
+                        # what it allowed.
+                        from plane.ext.services.federated_link import claim_authorization
+
+                        authorized = claim_authorization(
+                            email=email,
+                            provider=external.provider,
+                            issuer=external.issuer,
+                            subject=external.subject,
+                            user=existing_user,
+                        )
+                        if authorized is None:
+                            raise _auth_error("SSO_ACCOUNT_LINK_REQUIRED", email)
+                        # Not a signup: the account already existed and keeps
+                        # its id, memberships and history. Everything after
+                        # this block — the deactivated and bot checks, the
+                        # callback, the identity bookkeeping — applies exactly
+                        # as it does to any other sign-in.
+                        user = existing_user
+                        identity = _create_identity(external, user, email)
+                    else:
+                        signup_invite = adapter._check_signup(email)
+                        user = _create_user(adapter, external, email)
+                        identity = _create_identity(external, user, email)
+                        is_signup = True
 
                 # A concurrent transaction can win the unique binding race.
                 # The outer IntegrityError handler fails closed and rolls back
