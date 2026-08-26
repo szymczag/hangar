@@ -4,42 +4,28 @@
  * See the LICENSE file for details.
  */
 
-import React from "react";
-import { AccentureLogo, DolbyLogo, SonyLogo, ZerodhaLogo } from "@plane/propel/icons";
+import { observer } from "mobx-react";
+// hooks
+import { useInstance } from "@/hooks/store/use-instance";
 
-const BRAND_LOGOS: {
-  id: string;
-  icon: React.ReactNode;
-}[] = [
-  {
-    id: "zerodha",
-    icon: <ZerodhaLogo className="h-7 w-24 text-[#387ED1]" />,
-  },
-  {
-    id: "sony",
-    icon: <SonyLogo className="h-7 w-16 dark:text-on-color" />,
-  },
-  {
-    id: "dolby",
-    icon: <DolbyLogo className="h-7 w-16 dark:text-on-color" />,
-  },
-  {
-    id: "accenture",
-    icon: <AccentureLogo className="h-7 w-24 dark:text-on-color" />,
-  },
-];
+/**
+ * Says whose instance this is, and what it runs on.
+ *
+ * What stood here was inherited Plane marketing — "Join 10,000+ teams building
+ * with Hangar" above the logos of four companies that are not customers of this
+ * deployment and never agreed to appear on its sign-in page. On a self-hosted
+ * instance that is not persuasive, it is just wrong.
+ */
+export const AuthFooter = observer(function AuthFooter() {
+  const { config } = useInstance();
+  const brandingName = config?.branding_name?.trim();
 
-export function AuthFooter() {
   return (
-    <div className="flex flex-col items-center gap-6">
-      <span className="text-13 whitespace-nowrap text-tertiary">Join 10,000+ teams building with Hangar</span>
-      <div className="flex w-full flex-wrap items-center justify-center gap-x-10 gap-y-4">
-        {BRAND_LOGOS.map((brand) => (
-          <div className="flex h-7 flex-1 items-center justify-center" key={brand.id}>
-            {brand.icon}
-          </div>
-        ))}
-      </div>
+    <div className="flex flex-col items-center gap-2">
+      <span className="text-13 text-tertiary">
+        Running Hangar, an open-source work management platform
+        {brandingName ? <span className="text-secondary"> · {brandingName}</span> : null}
+      </span>
     </div>
   );
-}
+});
