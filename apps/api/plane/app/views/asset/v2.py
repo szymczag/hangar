@@ -236,6 +236,33 @@ class UserAssetsV2Endpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def _entity_identifier_or_error(raw):
+    """Return the identifier as a UUID, or an answer explaining why it is not one.
+
+    An entity id reaches a queryset filter on a UUID column, where Django raises
+    ValidationError for anything that is not one. The generic handler turns that
+    into "Please provide valid detail", which says nothing about which field is
+    wrong — a client sending an empty identifier because the record it names does
+    not exist yet gets no way to tell that from a server fault.
+    """
+    # Absent means the caller named no target and the existing "unknown entity"
+    # answer applies. Present-but-empty is different: the caller did name the
+    # field, with something that cannot identify anything, and saying so is the
+    # only way they learn the record has to exist first.
+    if raw is None:
+        return None, None
+    try:
+        return uuid.UUID(str(raw)), None
+    except (AttributeError, TypeError, ValueError):
+        return None, Response(
+            {
+                "error": "entity_identifier must be the id of an existing record this asset belongs to.",
+                "status": False,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
 class WorkspaceFileAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload cover images/logos etc for workspace, projects and users."""
 
@@ -395,7 +422,9 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug):
         entity_type = request.data.get("entity_type")
-        entity_identifier = request.data.get("entity_identifier", False)
+        entity_identifier, identifier_error = _entity_identifier_or_error(request.data.get("entity_identifier"))
+        if identifier_error:
+            return identifier_error
         workspace = Workspace.objects.get(slug=slug)
 
         # Check if the entity type is allowed
@@ -596,9 +625,12 @@ class StaticFileAssetEndpoint(BaseAPIView):
             )
 
         if asset.entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
-            if asset.project_id and DeployBoard.objects.filter(
-                project_id=asset.project_id, entity_name="project", is_disabled=False
-            ).exists():
+            if (
+                asset.project_id
+                and DeployBoard.objects.filter(
+                    project_id=asset.project_id, entity_name="project", is_disabled=False
+                ).exists()
+            ):
                 return True
             return (
                 request.user.is_authenticated
@@ -752,7 +784,9 @@ class ProjectAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id):
         entity_type = request.data.get("entity_type", "")
-        entity_identifier = request.data.get("entity_identifier")
+        entity_identifier, identifier_error = _entity_identifier_or_error(request.data.get("entity_identifier"))
+        if identifier_error:
+            return identifier_error
 
         # Check if the entity type is allowed
         if entity_type not in FileAsset.EntityTypeContext.values:
