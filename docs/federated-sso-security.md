@@ -310,18 +310,39 @@ method, so a mistake is recoverable.
 Pinning a domain removes password and magic-link sign-in for it, so decide in
 advance how an administrator gets in if the identity provider is unavailable.
 
-Two facts, both covered by tests:
+**The God Mode console is the recovery path.** It authenticates against the
+password directly rather than through the provider adapters, so pinning a domain
+cannot lock an instance administrator out of it — including an administrator
+whose own address is in the pinned domain. Since `v0.1.0-rc.30` the console also
+requires a WebAuthn second factor, so the credential that recovers the instance
+is a password **and** a registered security key, not a password alone.
 
-- The policy governs only the domains it lists. An administrator whose address is
-  outside them — a separate operations domain, not a personal mailbox — keeps
-  password sign-in to the application. This is the recommended break-glass account,
-  and it is also the account to use for merging or repairing users.
-- The God Mode console at `/god-mode` authenticates against the password directly
-  rather than through the provider adapters, so an instance administrator cannot
-  lock themselves out of it by pinning their own domain. The corollary is that
-  **pinning a domain does not protect the console**: its password is the only thing
-  in front of it. Give it a strong, unique password and restrict who holds instance
-  administrator rights.
+Keeping an application account in an unpinned domain is possible — the policy
+governs only the domains it lists — but it is not what this deployment relies on.
+Each such account is a password-authenticated way into a domain that pinning was
+supposed to close, so the smaller surface is to have none and recover through the
+console.
+
+#### What the console can and cannot do
+
+Know this before you need it, because the boundary is not obvious.
+
+The console **restores the ability to sign in**. From it you can clear
+`SSO_ENFORCED_DOMAINS`, disable a provider, review which accounts exist and how
+they authenticate, and import missing identity bindings.
+
+One consequence deserves stating plainly: accounts created through SSO have no
+usable password (`is_password_autoset`), so clearing the pin does not let them
+sign in with one. Their route back is the magic link, which arrives by email —
+**working email delivery is therefore part of the recovery plan**, not a
+convenience. Verify it before you pin a domain, not during an incident.
+
+The console **does not give access to workspace content**. It administers the
+instance; it is not a way into a project. While the identity provider is
+unavailable and the domain is still pinned, nobody works in the application. That
+is the accepted trade-off of recovering through the console alone: a smaller
+attack surface in exchange for a slower recovery, in which restoring sign-in is
+the first step rather than an alternative to having a standing back door.
 
 ### If someone is locked out afterwards
 
