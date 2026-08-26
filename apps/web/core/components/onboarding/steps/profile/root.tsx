@@ -122,6 +122,14 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
 
   // derived values
   const isPasswordAlreadySetup = !user?.is_password_autoset;
+  // Offering to set a password an instance will not accept is an invitation to
+  // waste time: where password sign-in is off, the only way in is the provider.
+  const canSignInWithPassword = instanceConfig?.is_email_password_enabled !== false;
+  // The provider overwrites these on every sign-in when attribute sync is on,
+  // so editing them here would be undone by the next login without explanation.
+  const providerManagingProfile = (instanceConfig?.provider_managed_profiles ?? []).includes(
+    user?.last_login_medium ?? ""
+  );
   const currentPassword = watch("password") || undefined;
   const currentConfirmPassword = watch("confirm_password") || undefined;
   const passwordStrength = usePasswordStrength(currentPassword ?? "");
@@ -143,7 +151,8 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
 
   // Check for all available fields validation and if password field is available, then checks for password validation (strength + confirmation).
   // Also handles the condition for optional password i.e if password field is optional it only checks for above validation if it's not empty.
-  const isButtonDisabled = isSubmitting || !isValid || (!isPasswordAlreadySetup && !isValidPassword);
+  const showPasswordSetup = !isPasswordAlreadySetup && canSignInWithPassword;
+  const isButtonDisabled = isSubmitting || !isValid || (showPasswordSetup && !isValidPassword);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-10">
@@ -172,6 +181,7 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
           className="flex size-12 items-center justify-center rounded-full bg-accent-primary text-18 font-semibold text-on-color"
           type="button"
           onClick={() => setIsImageUploadModalOpen(true)}
+          disabled={providerManagingProfile}
         >
           {userAvatar ? (
             <img
@@ -184,14 +194,19 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
           )}
         </button>
         <input type="file" className="hidden" id="profile-image-input" />
-        <button
-          className="flex items-center gap-1.5 px-2 py-1 text-13 text-tertiary hover:text-secondary"
-          type="button"
-          onClick={() => setIsImageUploadModalOpen(true)}
-        >
-          <ImageIcon className="size-4" />
-          <span className="text-13">{userAvatar ? "Change image" : "Upload image"}</span>
-        </button>
+        {/* Hidden rather than disabled when the provider owns it: sync deletes
+            an uploaded avatar outright, so offering the control at all would be
+            offering to lose the file. */}
+        {!providerManagingProfile && (
+          <button
+            className="flex items-center gap-1.5 px-2 py-1 text-13 text-tertiary hover:text-secondary"
+            type="button"
+            onClick={() => setIsImageUploadModalOpen(true)}
+          >
+            <ImageIcon className="size-4" />
+            <span className="text-13">{userAvatar ? "Change image" : "Upload image"}</span>
+          </button>
+        )}
       </div>
 
       <div className="flex w-full flex-col gap-6">
@@ -231,14 +246,22 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
                 )}
                 placeholder="Enter your full name"
                 autoComplete="on"
+                readOnly={providerManagingProfile}
+                disabled={providerManagingProfile}
               />
             )}
           />
+          {providerManagingProfile && (
+            <span className="text-11 text-tertiary">
+              Managed by {user?.last_login_medium}. Your name and picture are taken from there on every sign-in, so a
+              change made here would not survive the next one — change them with your provider instead.
+            </span>
+          )}
           {errors.first_name && <span className="text-13 text-danger-primary">{errors.first_name.message}</span>}
         </div>
 
         {/* setting up password for the first time */}
-        {!isPasswordAlreadySetup && (
+        {showPasswordSetup && (
           <SetPasswordRoot
             onPasswordChange={(password) => setValue("password", password)}
             onConfirmPasswordChange={(confirm_password) => setValue("confirm_password", confirm_password)}
