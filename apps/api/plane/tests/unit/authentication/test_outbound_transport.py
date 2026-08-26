@@ -196,3 +196,48 @@ def test_required_origin_pins_a_derived_endpoint_to_its_host(public_dns):
     validate_outbound_url("https://idp.test/token", required_origin=target.origin)
     with pytest.raises(ValueError):
         validate_outbound_url("https://elsewhere.test/token", required_origin=target.origin)
+
+
+@override_settings(DEBUG=False)
+def test_a_host_answering_with_many_addresses_is_reachable(public_dns):
+    """www.googleapis.com answers with eight A and eight AAAA records.
+
+    Refusing a host for returning more addresses than we intend to try rejected
+    real providers. It broke Google sign-in at the userinfo step, where the
+    token exchange had already succeeded — so the account existed, the code was
+    valid, and the failure looked like the provider's.
+    """
+    public_dns.return_value = [(2, 1, 6, "", (f"142.251.127.{octet}", 443)) for octet in range(1, 9)] + [
+        (10, 1, 6, "", (f"2a00:1450:4001:80f::{octet}", 443, 0, 0)) for octet in range(1, 9)
+    ]
+
+    target = validate_outbound_url("https://www.googleapis.com/oauth2/v3/certs")
+
+    assert len(target.addresses) == 8
+    assert str(target.addresses[0].ip) == "142.251.127.1"
+
+
+@override_settings(DEBUG=False)
+def test_a_private_address_anywhere_in_a_long_answer_still_refuses_all_of_it(public_dns):
+    """The cap must not become a way to hide a rebinding attempt behind padding.
+
+    Every answer is examined; only how many are carried forward to connect with
+    is limited.
+    """
+    public_dns.return_value = [(2, 1, 6, "", (f"8.8.8.{octet}", 443)) for octet in range(1, 12)] + [
+        (2, 1, 6, "", ("10.0.0.1", 443))
+    ]
+
+    with pytest.raises(ValueError):
+        validate_outbound_url("https://idp.test/oauth")
+
+
+@override_settings(DEBUG=False)
+def test_an_answer_beyond_all_reason_is_still_refused(public_dns):
+    """A resolver returning hundreds of addresses is not a provider."""
+    public_dns.return_value = [
+        (2, 1, 6, "", (f"8.8.{block}.{octet}", 443)) for block in range(4) for octet in range(20)
+    ]
+
+    with pytest.raises(ValueError):
+        validate_outbound_url("https://idp.test/oauth")
