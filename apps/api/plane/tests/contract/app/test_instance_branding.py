@@ -114,7 +114,7 @@ def test_a_request_without_a_file_is_refused(admin_client):
 def test_branding_is_reported_to_anyone_opening_the_sign_in_page(db, setup_instance):
     """The page renders before authentication, so the values must too."""
     for key, value in (
-        ("INSTANCE_BRANDING_NAME", "SECURITUM SZKOLENIA"),
+        ("INSTANCE_BRANDING_NAME", "Example Org"),
         ("INSTANCE_SIGN_IN_HEADER", "Work securely."),
         ("INSTANCE_SIGN_IN_SUBHEADER", "Sign in to continue."),
     ):
@@ -127,7 +127,7 @@ def test_branding_is_reported_to_anyone_opening_the_sign_in_page(db, setup_insta
 
     assert response.status_code == 200
     config = response.data["config"]
-    assert config["branding_name"] == "SECURITUM SZKOLENIA"
+    assert config["branding_name"] == "Example Org"
     assert config["sign_in_header"] == "Work securely."
     assert config["sign_in_subheader"] == "Sign in to continue."
 
