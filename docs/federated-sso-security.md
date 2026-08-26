@@ -94,8 +94,20 @@ mode — see the egress policy below.
 
 ### Domain policy
 
-These govern which provider owns an email domain and where its users land. They
-are edited in the administration UI under **Authentication → Domain policy**,
+These govern which provider owns an email domain and where its users land.
+
+**Roles are written by name** — `member`, `admin`, `guest`. An entry naming a role
+the parser does not recognise is dropped whole, deliberately, so that an unknown
+role cannot become a privileged one. Numeric roles are also read, because the
+administration panel wrote them for one release and every such entry was
+discarded — auto-join configured from the panel between `rc.30` and `rc.32` never
+ran. If a policy from that period looks correct and does nothing, re-save it from
+the panel or rewrite the role by name.
+
+A domain may name **several workspaces**; list them as separate comma-separated
+entries sharing the same domain.
+
+They are edited in the administration UI under **Authentication → Domain policy**,
 which presents them as one row per domain — tick the providers, choose the
 workspace and roles — and composes the stored strings below for you. The formats
 are documented because they are also settable through the environment, and
