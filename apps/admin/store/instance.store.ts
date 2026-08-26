@@ -216,21 +216,19 @@ export class InstanceStore implements IInstanceStore {
    * @description updating instance configurations
    * @param data
    */
+  // A rejection propagates untouched: it carries the server's reason, which the
+  // caller puts in front of the administrator. Catching it here to log a line
+  // only copied it somewhere nobody administering an instance looks.
   updateInstanceConfigurations = async (data: Partial<IFormattedInstanceConfiguration>) => {
-    try {
-      const response = await this.instanceService.updateConfigurations(data);
-      runInAction(() => {
-        this.instanceConfigurations = this.instanceConfigurations?.map((config) => {
-          const item = response.find((item) => item.key === config.key);
-          if (item) return item;
-          return config;
-        });
+    const response = await this.instanceService.updateConfigurations(data);
+    runInAction(() => {
+      this.instanceConfigurations = this.instanceConfigurations?.map((config) => {
+        const item = response.find((entry) => entry.key === config.key);
+        if (item) return item;
+        return config;
       });
-      return response;
-    } catch (error) {
-      console.error("Error updating the instance configurations");
-      throw error;
-    }
+    });
+    return response;
   };
 
   disableEmail = async () => {
