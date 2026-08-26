@@ -125,6 +125,12 @@ google_config_variables = [
         "is_encrypted": False,
     },
     {
+        "key": "GOOGLE_AUTO_REDIRECT",
+        "value": os.environ.get("GOOGLE_AUTO_REDIRECT", "0"),
+        "category": "GOOGLE",
+        "is_encrypted": False,
+    },
+    {
         "key": "GOOGLE_CLIENT_ID",
         "value": os.environ.get("GOOGLE_CLIENT_ID"),
         "category": "GOOGLE",

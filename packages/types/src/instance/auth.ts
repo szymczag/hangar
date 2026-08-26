@@ -45,6 +45,7 @@ export type TInstanceGoogleAuthenticationConfigurationKeys =
   | "GOOGLE_CLIENT_ID"
   | "GOOGLE_CLIENT_SECRET"
   | "ENABLE_GOOGLE_SYNC"
+  | "GOOGLE_AUTO_REDIRECT"
   | "GOOGLE_AUTH_MODE"
   | "GOOGLE_WORKSPACE_DOMAINS";
 
