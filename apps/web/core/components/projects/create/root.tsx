@@ -60,43 +60,60 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
     });
   };
 
+  /**
+   * Copies a cover that is bundled with the app into the workspace's storage and
+   * attaches it to the project.
+   *
+   * Deliberately called only once the project exists. An asset is stored against
+   * the record it belongs to, and the identifier of a project that has not been
+   * created yet is the empty string, which the API refuses — so uploading first
+   * could never have worked. The bundled covers cannot simply be recorded by URL
+   * instead: they are hashed build assets, and the name changes with every
+   * release.
+   */
+  const attachBundledCover = async (projectId: string, coverImage: string) => {
+    const uploadedAssetUrl = await uploadCoverImage(coverImage, {
+      workspaceSlug: workspaceSlug.toString(),
+      entityIdentifier: projectId,
+      entityType: EFileAssetType.PROJECT_COVER,
+      isUserAsset: false,
+    });
+    await updateCoverImageStatus(projectId, uploadedAssetUrl);
+    await updateProject(workspaceSlug.toString(), projectId, { cover_image_url: uploadedAssetUrl });
+  };
+
   const onSubmit = async (formData: Partial<TProject>) => {
     // Upper case identifier
     formData.identifier = formData.identifier?.toUpperCase();
     const coverImage = formData.cover_image_url;
-    let uploadedAssetUrl: string | null = null;
+    const isBundledCover = Boolean(coverImage) && getCoverImageType(coverImage!) === "local_static";
 
-    if (coverImage) {
-      const imageType = getCoverImageType(coverImage);
-
-      if (imageType === "local_static") {
-        try {
-          uploadedAssetUrl = await uploadCoverImage(coverImage, {
-            workspaceSlug: workspaceSlug.toString(),
-            entityIdentifier: "",
-            entityType: EFileAssetType.PROJECT_COVER,
-            isUserAsset: false,
-          });
-        } catch (error) {
-          console.error("Error uploading cover image:", error);
-          setToast({
-            type: TOAST_TYPE.ERROR,
-            title: t("toast.error"),
-            message: error instanceof Error ? error.message : "Failed to upload cover image",
-          });
-          return Promise.reject(error);
-        }
-      } else {
-        formData.cover_image = coverImage;
-        formData.cover_image_asset = null;
-      }
+    // An address the browser can fetch is recorded as it stands; only a bundled
+    // cover has to be copied into storage, and that waits for the project.
+    if (coverImage && !isBundledCover) {
+      formData.cover_image = coverImage;
+      formData.cover_image_asset = null;
     }
 
     return createProject(workspaceSlug.toString(), formData)
       .then(async (res) => {
-        if (uploadedAssetUrl) {
-          await updateCoverImageStatus(res.id, uploadedAssetUrl);
-          await updateProject(workspaceSlug.toString(), res.id, { cover_image_url: uploadedAssetUrl });
+        if (coverImage && isBundledCover) {
+          // The project exists by now, so a cover that cannot be stored costs
+          // the cover and nothing else. Failing the whole creation here would
+          // discard everything the person filled in over a decorative image.
+          try {
+            await attachBundledCover(res.id, coverImage);
+          } catch (error) {
+            console.error("Error uploading cover image:", error);
+            setToast({
+              type: TOAST_TYPE.WARNING,
+              title: t("warning"),
+              message:
+                error instanceof Error && error.message
+                  ? error.message
+                  : "The project was created, but its cover image could not be stored.",
+            });
+          }
         } else if (coverImage && coverImage.startsWith("http")) {
           await updateCoverImageStatus(res.id, coverImage);
           await updateProject(workspaceSlug.toString(), res.id, { cover_image_url: coverImage });
