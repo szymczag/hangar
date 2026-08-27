@@ -63,6 +63,18 @@ The startup-failure page and the production error boundary keep their links, sin
 they render when no configuration can be read and are seen by whoever is fixing
 the instance.
 
+The startup-failure page and the crash page no longer tell people to open a
+public issue. `INSTANCE_SUPPORT_TEXT`, set on the Branding page, is what they show
+instead — a help desk, an extension number, whatever the operator puts there. Left
+empty they say only that something went wrong and offer no destination at all.
+
+Those pages render precisely when the configuration endpoint could not be reached,
+so they cannot ask what to say. The answer is kept from the last time the instance
+could be asked and read back from there. Anyone who has opened the application
+before has it; a first-time visitor arriving during an outage gets the neutral
+wording and no links. The crash page keeps its source link either way, for the
+same section 13 reason as everywhere else.
+
 New accounts now start on **Monday** rather than Sunday, on a **light theme**
 rather than whatever the operating system is set to, and in whichever timezone the
 operator names. These are starting values and not rules: everyone changes their
