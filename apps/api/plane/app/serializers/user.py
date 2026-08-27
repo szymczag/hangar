@@ -62,9 +62,16 @@ class UserSerializer(BaseSerializer):
 
 
 class UserMeSerializer(BaseSerializer):
+    # Fork (see FORK.md): whether this account signs in through an identity
+    # provider. The application offers to edit a name the provider overwrites on
+    # every sign-in and an address the provider owns; without this it has no way
+    # to know not to.
+    is_federated = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
+            "is_federated",
             "id",
             "avatar",
             "cover_image",
@@ -86,6 +93,9 @@ class UserMeSerializer(BaseSerializer):
             "last_login_time",
         ]
         read_only_fields = fields
+
+    def get_is_federated(self, obj) -> bool:
+        return obj.federated_identities.exists()
 
 
 class UserMeSettingsSerializer(BaseSerializer):

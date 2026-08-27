@@ -49,6 +49,9 @@ export interface IUser extends IUserLite {
   user_timezone: string;
   username: string;
   last_login_medium: TLoginMediums;
+  // Fork: the account signs in through an identity provider, which owns its
+  // address and overwrites its name on every sign-in where sync is enabled.
+  is_federated?: boolean;
   theme: IUserTheme;
 }
 
