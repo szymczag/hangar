@@ -42,7 +42,13 @@ export function InstanceGithubConfigForm(props: Props) {
   // states
   const [isDiscardChangesModalOpen, setIsDiscardChangesModalOpen] = useState(false);
   // store hooks
-  const { updateInstanceConfigurations } = useInstance();
+  const { updateInstanceConfigurations, configuredSecrets } = useInstance();
+  // The API never returns a stored secret, so an empty field means either
+  // "never set" or "set and unreadable". Only the first should block saving:
+  // an empty value is understood server-side as "keep the existing secret",
+  // so demanding it again just to change an unrelated setting asks the
+  // operator to fetch a credential the instance already has.
+  const isSecretConfigured = configuredSecrets.has("GITHUB_CLIENT_SECRET");
   // form data
   const {
     handleSubmit,
@@ -99,9 +105,11 @@ export function InstanceGithubConfigForm(props: Props) {
           </a>
         </>
       ),
-      placeholder: "9b0050f94ec1b744e32ce79ea4ffacd40d4119cb",
+      placeholder: isSecretConfigured
+        ? "Leave blank to keep the current secret"
+        : "9b0050f94ec1b744e32ce79ea4ffacd40d4119cb",
       error: Boolean(errors.GITHUB_CLIENT_SECRET),
-      required: true,
+      required: !isSecretConfigured,
     },
     {
       key: "GITHUB_ORGANIZATION_ID",

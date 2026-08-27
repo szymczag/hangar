@@ -43,7 +43,13 @@ export function InstanceGoogleConfigForm(props: Props) {
   // states
   const [isDiscardChangesModalOpen, setIsDiscardChangesModalOpen] = useState(false);
   // store hooks
-  const { updateInstanceConfigurations } = useInstance();
+  const { updateInstanceConfigurations, configuredSecrets } = useInstance();
+  // The API never returns a stored secret, so an empty field means either
+  // "never set" or "set and unreadable". Only the first should block saving:
+  // an empty value is understood server-side as "keep the existing secret",
+  // so demanding it again just to change an unrelated setting asks the
+  // operator to fetch a credential the instance already has.
+  const isSecretConfigured = configuredSecrets.has("GOOGLE_CLIENT_SECRET");
   // form data
   const {
     handleSubmit,
@@ -119,9 +125,9 @@ export function InstanceGoogleConfigForm(props: Props) {
           </a>
         </>
       ),
-      placeholder: "GOCShX-ADp4cI0kPqav1gGCBg5bE02E",
+      placeholder: isSecretConfigured ? "Leave blank to keep the current secret" : "GOCShX-ADp4cI0kPqav1gGCBg5bE02E",
       error: Boolean(errors.GOOGLE_CLIENT_SECRET),
-      required: true,
+      required: !isSecretConfigured,
     },
   ];
 

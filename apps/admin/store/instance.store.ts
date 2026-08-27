@@ -19,6 +19,7 @@ import type {
   IInstanceInfo,
   IInstanceConfig,
   IInstanceTelemetryConfiguration,
+  TInstanceConfigurationKeys,
 } from "@plane/types";
 // root store
 import type { RootStore } from "@/store/root.store";
@@ -36,6 +37,7 @@ export interface IInstanceStore {
   instanceConfigurations: IInstanceConfiguration[] | undefined;
   // computed
   formattedConfig: IFormattedInstanceConfiguration | undefined;
+  configuredSecrets: Set<TInstanceConfigurationKeys>;
   // action
   hydrate: (data: IInstanceInfo) => void;
   fetchInstanceInfo: () => Promise<IInstanceInfo | undefined>;
@@ -74,6 +76,7 @@ export class InstanceStore implements IInstanceStore {
       instanceConfigurations: observable,
       // computed
       formattedConfig: computed,
+      configuredSecrets: computed,
       // actions
       hydrate: action,
       fetchInstanceInfo: action,
@@ -104,6 +107,21 @@ export class InstanceStore implements IInstanceStore {
       formData[config.key] = config.value;
       return formData;
     }, {} as IFormattedInstanceConfiguration);
+  }
+
+  /**
+   * @description keys whose secret is already stored.
+   *
+   * Encrypted values never come back from the API — they are write-only — so a
+   * form cannot tell "no secret has ever been set" from "a secret exists and you
+   * may not read it" by looking at the value. The API answers that with
+   * `is_configured`, and this is where a form gets at it: `formattedConfig`
+   * flattens configuration to key and value, dropping everything else.
+   */
+  get configuredSecrets() {
+    return new Set(
+      (this.instanceConfigurations ?? []).filter((config) => config.is_configured).map((config) => config.key)
+    );
   }
 
   /**
