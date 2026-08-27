@@ -63,10 +63,11 @@ Hangar is AGPL-3.0-only. Presenting it under your own name and logo is permitted
 
 `INSTANCE_SHOW_LICENSE_NOTICE` controls whether the source offer appears on the
 sign-in page. Turning it off **moves** the offer rather than removing it: the
-link stays in the in-app help menu, which every signed-in person reaches, and
-that one is not configurable. Section 13 of the AGPL requires that people using a
-modified version over a network be offered its source, so a switch that removed
-it everywhere would hand an operator a licence violation in one click.
+source command stays in the in-app command menu, which every signed-in person
+reaches, and that one is not configurable. Section 13 of the AGPL requires that
+people using a modified version over a network be offered its source, so a switch
+that removed it everywhere would hand an operator a licence violation in one
+click.
 
 Note for anyone upgrading: the notice used to appear **only** when neither a
 terms nor a privacy URL was configured, so setting those silently dropped the
@@ -78,8 +79,8 @@ independently.
 `INSTANCE_SHOW_EXTERNAL_LINKS`, off by default and set on the Branding page,
 decides whether the application may point anyone at a host the operator does not
 run. Off, it hides "Star us on GitHub" in the header and on the invitation page,
-the release-notes and documentation buttons in the Hangar Community dialog, and
-the issue-tracker links.
+the top-navigation help icon, the release-notes and documentation buttons in the
+Hangar Community dialog, and the issue-tracker links.
 
 Off by default because of where Hangar is deployed. Inside an organisation, a
 link to a code-hosting site is a link out of the building for somebody who did
@@ -122,4 +123,3 @@ run over a network.
 
 A contract test holds all of this with **no exemptions**, so a link added later
 has to be gated or be the licence offer.
-
