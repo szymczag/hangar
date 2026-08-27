@@ -24,6 +24,7 @@ from plane.license.api.serializers import InstanceSerializer
 from plane.license.models import Instance
 from plane.utils.api_token_policy import api_token_minimum_role
 from plane.utils.provider_profile import providers_managing_profiles
+from plane.utils.visibility_policy import force_private_visibility
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.cache import cache_response, invalidate_cache
 from plane.utils.otlp_endpoints import get_otlp_metric_export_configuration
@@ -267,6 +268,11 @@ class InstanceEndpoint(BaseAPIView):
         # with a refusal it could have predicted. It discloses a policy an
         # operator set, not a credential.
         data["api_token_minimum_role"] = api_token_minimum_role()
+
+        # Fork (see FORK.md): whether this instance forces everything private.
+        # Reported so the clients stop offering a visibility choice that is not
+        # accepted, and stop showing a publish action that is refused.
+        data["force_private_visibility"] = force_private_visibility()
 
         # File size settings
         data["file_size_limit"] = float(os.environ.get("FILE_SIZE_LIMIT", 5242880))

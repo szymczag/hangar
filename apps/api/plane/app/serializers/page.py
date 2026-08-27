@@ -8,6 +8,7 @@ import base64
 
 # Module imports
 from .base import BaseSerializer
+from plane.utils.visibility_policy import PAGE_PRIVATE_ACCESS, force_private_visibility
 from plane.utils.content_validator import (
     validate_binary_data,
     validate_html_content,
@@ -32,6 +33,15 @@ class PageSerializer(BaseSerializer):
     # Many to many
     label_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
     project_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
+
+    def validate(self, data):
+        # Fork (see FORK.md): where the instance forces private visibility the
+        # choice is not offered and not accepted. Overwritten rather than
+        # rejected, so a client that still sends the old value gets a private
+        # object instead of an error it will not act on.
+        if force_private_visibility():
+            data["access"] = PAGE_PRIVATE_ACCESS
+        return data
 
     class Meta:
         model = Page

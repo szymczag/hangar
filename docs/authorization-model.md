@@ -131,6 +131,50 @@ suite stays green, the finding stays visible, and `strict=True` forces whoever
 fixes it to remove the marker — a fixed defect makes the test pass, which fails
 a strict xfail.
 
+## Forced private visibility
+
+`FORCE_PRIVATE_VISIBILITY`, off by default and set in God Mode, keeps pages and
+views to the project they belong to and refuses to publish anything to the
+internet. It is a refusal, not a default: the choice is not offered and not
+accepted.
+
+`Page.access` is `0` for public and `1` for private. `IssueView.access` is **the
+reverse**. Code that takes one "make it private" value and applies it to both
+sets the opposite of what it intended for one of them, so the private value for
+each is named once, in `plane.utils.visibility_policy`, and a test compares each
+against its own model's choices — a renumbering upstream would otherwise turn
+that module into a way of publishing things quietly.
+
+`Project.network` is deliberately **not** governed. It decides whether members of
+a workspace can discover a project they have not been added to, not whether
+outsiders can read it. Forcing it would change how a team navigates without
+closing anything that was open, so the choice stays where it is.
+
+Requested values are **overwritten rather than rejected**, so an older client, a
+script, or the API used directly produces a private object instead of an error it
+will not act on.
+
+Publishing to the internet has no per-object setting to force — a deploy board
+either exists and serves or it does not — so it is refused in two places: the
+endpoint that creates a board, and `TimezoneMixin.initial()` in `plane.space`,
+through which every public request passes. The second is the one that matters:
+nine views under `plane.space` filter on `is_disabled` today, and a tenth that
+did not would serve exactly what the instance said must not be served.
+
+Turning the policy on also brings existing objects into line, because enforcing
+at write time governs only what happens next. Pages and views become private and
+published boards are disabled. Boards are disabled rather than
+deleted: the row carries the anchor that was handed out, and deleting it would
+let the same address be reissued later for unrelated content.
+
+**This part is one-way.** What each object used to be readable by is not
+recorded, because a table describing what to re-expose is the opposite of what an
+operator turning this on is asking for. Turning the policy back off leaves
+everything private until someone opens it again deliberately.
+
+An instance configured through the environment rather than God Mode can bring
+existing content into line with `python manage.py enforce_private_visibility`.
+
 ## API tokens
 
 A token authenticates as its owner and names the workspace it may act in. It is

@@ -40,6 +40,7 @@ from plane.db.models import (
     WorkspaceMember,
 )
 from plane.db.models.intake import IntakeIssueStatus
+from plane.utils.visibility_policy import force_private_visibility
 from plane.utils.host import base_host
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
 
@@ -562,6 +563,15 @@ class DeployBoardViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, slug, project_id):
+        # Fork (see FORK.md): publishing is what makes project content readable
+        # without an account, so where the instance forbids it the board is not
+        # created rather than created and then filtered out of the public views.
+        if force_private_visibility():
+            return Response(
+                {"error": "This instance does not publish anything publicly."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         comments = request.data.get("is_comments_enabled", False)
         reactions = request.data.get("is_reactions_enabled", False)
         intake = request.data.get("intake", None)
