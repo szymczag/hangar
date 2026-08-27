@@ -104,6 +104,7 @@ admin pages) are listed for completeness but carry no merge-conflict risk.
 | 49  | `.github/workflows/pull-request-build-lint-api.yml`, `docs/linting.md` | CI | check formatting of `plane/ext` only, leaving files inherited from Plane in Plane's style so upstream merges do not conflict over formatting |
 | 50  | `.github/workflows/pull-request-build-lint-api.yml`, `docs/linting.md` | CI | move the path filter from the trigger to a changes job and add a gate job that always reports, so API lint can be required without blocking pull requests that touch no Python |
 | 51  | `packages/types/src/instance/base.ts`, `apps/admin/store/instance.store.ts`, God Mode OAuth and OIDC forms, `docs/federated-sso-security.md` | God Mode | stop requiring a stored secret to be retyped before any other setting on the page can be saved, using the `is_configured` flag the API already returns |
+| 52  | `apps/web/core/components/projects/create/root.tsx` | Project creation | store a bundled cover image after the project exists rather than before, so creating a project with the default cover is not refused for naming a record that has no id yet |
 
 Phase 6 new files implement the import model, parser, API, worker, tests, CE
 frontend, workspace settings route, and [administrator how-to](docs/importing-from-todoist.md).
