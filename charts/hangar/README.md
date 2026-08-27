@@ -7,7 +7,7 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0-rc.32` (`appVersion: v0.1.0-rc.32`). Its
+The latest published chart is `0.1.0-rc.34` (`appVersion: v0.1.0-rc.34`). Its
 evaluation profile is live-qualified on AMD64. It is a prerelease and is not yet
 supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
@@ -27,7 +27,7 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.32
+  --version 0.1.0-rc.34
 ```
 
 Do not use `0.1.0-rc.1`, `0.1.0-rc.2`, `0.1.0-rc.20`, `0.1.0-rc.24`,
@@ -36,9 +36,9 @@ incomplete release attempts. `0.1.0-rc.24`, `0.1.0-rc.25`, and `0.1.0-rc.28`
 each published only a subset of their container sets and no chart or GitHub
 Release. `0.1.0-rc.27` is the immediately previous complete
 publication, but it predates the signed preview grant and transactional duplicate
-admission controls in `rc.32`.
+admission controls in `rc.34`.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-Use `0.1.0-rc.32`; there is no security-equivalent
+Use `0.1.0-rc.34`; there is no security-equivalent
 rollback target among the earlier release candidates.
 
 ## Deployment profiles
@@ -115,8 +115,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0-rc.32` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.32)
+Release `0.1.0-rc.34` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.34)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
