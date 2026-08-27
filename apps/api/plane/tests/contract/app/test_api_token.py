@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from plane.app.permissions.base import ROLE
-from plane.db.models import APIToken, User, WorkspaceMember
+from plane.db.models import APIToken, User
 from plane.tests.factories import WorkspaceFactory, WorkspaceMemberFactory
 
 

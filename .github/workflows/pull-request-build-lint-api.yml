@@ -34,9 +34,16 @@ jobs:
           python-version: "3.12.x"
           cache: 'pip'
           cache-dependency-path: 'apps/api/requirements.txt'
-      - name: Install Pylint
-        run: python -m pip install ruff
+      # The pin is read from the requirements file rather than repeated here, so
+      # CI and anyone running ruff locally use the same version and there is one
+      # place to change it. Installed on its own rather than through the file,
+      # which pulls in the whole dependency tree that a static analyser does not
+      # need. Unpinned, a ruff release changes the result overnight.
+      - name: Install ruff
+        run: python -m pip install "$(grep '^ruff==' apps/api/requirements/local.txt)"
       - name: Install API Dependencies
         run: cd apps/api && pip install -r requirements.txt
+      # Without --fix. Ruff fixed what it found and exited zero, so the job was
+      # green whatever it found, and the fix died with the runner.
       - name: Lint apps/api
-        run: ruff check --fix apps/api
+        run: ruff check apps/api
