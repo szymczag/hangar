@@ -115,6 +115,9 @@ export interface IInstanceConfig {
   show_license_notice?: boolean;
   /** Providers that overwrite name and avatar on every sign-in. */
   provider_managed_profiles?: string[];
+  // Fork: workspace role needed before an account may mint an API token, so the
+  // app can offer the feature only where creating one would succeed.
+  api_token_minimum_role?: number;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;
