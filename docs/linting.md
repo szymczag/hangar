@@ -146,6 +146,24 @@ future upstream merge and buy nothing for it.
 If you are editing an inherited file, match the style around you rather than
 running the formatter over the whole file.
 
+### The API checks gate merges
+
+`API lint` and `API tests` are required status checks on `preview`. They are not
+the jobs that do the work — they are small jobs that run whatever the real ones
+did and report the result, in the same shape as `Verify publication` in
+`build-branch.yml`.
+
+The indirection is necessary. A path filter under `on:` stops the **whole
+workflow** from starting, and a required check that never reports leaves a pull
+request blocked forever — so the API workflows can no longer filter by path at
+the trigger. Instead a `changes` job asks the API which files the pull request
+touches, the heavy jobs are gated on its answer, and the gate job runs
+unconditionally and treats a skipped job as success.
+
+So a front-end-only change still does not pay for an eleven-minute API test run,
+and a change that breaks the API can no longer be merged because the check that
+would have caught it was advisory.
+
 ### Test exemptions cover less than they look like they do
 
 `[tool.ruff.lint.per-file-ignores]` exempts `tests/*` from `E402`, `F401` and

@@ -1,24 +1,60 @@
 name: API tests
 
+# Deliberately unfiltered. A path filter here stops the whole workflow from
+# running, so a required check inside it would never report on a pull request
+# that does not touch the API and would block it forever. The filter now lives
+# in the changes job below, which every job here is gated on, so the heavy work
+# is still skipped while the gate job still reports.
 on:
   pull_request:
-    paths:
-      - "apps/api/**"
-      - "docker-compose-test.yml"
-      - ".github/workflows/api-tests.yml"
   push:
     branches:
       - preview
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: api-tests-importer-bounded-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect API changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+    steps:
+      # Asked of the API rather than computed from a checkout: the answer is one
+      # request, and it needs no clone and no reasoning about how deep to fetch.
+      - name: Decide whether the API changed
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Anything that is not a pull request — a push to preview, a manual
+          # run — gets the full suite rather than a guess.
+          if [ -z "${PR:-}" ]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(gh api --paginate "repos/$REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          if printf '%s\n' "$changed" | grep -qE '^(apps/api/|docker-compose-test\.yml$|\.github/workflows/api-tests\.yml$)'; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=false" >> "$GITHUB_OUTPUT"
+          fi
+
   pytest:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -45,6 +81,8 @@ jobs:
         run: docker compose -f docker-compose-test.yml down -v
 
   todoist-import:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     name: todoist-import (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -84,6 +122,8 @@ jobs:
         run: docker compose -f docker-compose-test.yml down -v
 
   security-migrations:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -107,3 +147,42 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose -f docker-compose-test.yml down -v
+
+  # The context to require on the branch ruleset. It runs whatever the jobs above
+  # did, so it reports on every pull request, and it treats skipped as success so
+  # a front-end-only change is not held up by tests that had no reason to run.
+  api-tests:
+    name: API tests
+    needs: [changes, pytest, todoist-import, security-migrations]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every API test job to have succeeded or been skipped
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          PYTEST_RESULT: ${{ needs.pytest.result }}
+          TODOIST_RESULT: ${{ needs.todoist-import.result }}
+          MIGRATIONS_RESULT: ${{ needs.security-migrations.result }}
+        run: |
+          set -euo pipefail
+
+          failed=0
+          for entry in \
+            "changes=$CHANGES_RESULT" \
+            "pytest=$PYTEST_RESULT" \
+            "todoist-import=$TODOIST_RESULT" \
+            "security-migrations=$MIGRATIONS_RESULT"; do
+            name="${entry%%=*}"
+            result="${entry#*=}"
+            case "$result" in
+              success|skipped) ;;
+              *) echo "$name: $result" >&2; failed=1 ;;
+            esac
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "API tests did not complete successfully." >&2
+            exit 1
+          fi
+
