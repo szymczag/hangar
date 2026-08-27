@@ -14,6 +14,8 @@ import { getTabIndex } from "@plane/utils";
 // components
 import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { ProjectNetworkIcon } from "@/components/project/project-network-icon";
+// hooks
+import { useInstance } from "@/hooks/store/use-instance";
 
 type Props = {
   isMobile?: boolean;
@@ -24,53 +26,65 @@ function ProjectAttributes(props: Props) {
   const { t } = useTranslation();
   const { control } = useFormContext<IProject>();
   const { getIndex } = getTabIndex(ETabIndices.PROJECT_CREATE, isMobile);
+  const { config } = useInstance();
+  // Where the instance forces everything private the server overwrites this
+  // whatever is sent, so the chooser would offer a decision that is not the
+  // person's to make and would appear not to have been honoured.
+  const forcesPrivate = Boolean(config?.force_private_visibility);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Controller
-        name="network"
-        control={control}
-        render={({ field: { onChange, value } }) => {
-          const currentNetwork = NETWORK_CHOICES.find((n) => n.key === value);
+      {forcesPrivate ? (
+        <div className="flex h-7 flex-shrink-0 items-center gap-1 px-2 text-13 text-tertiary">
+          <ProjectNetworkIcon iconKey="Lock" className="h-3.5 w-3.5" />
+          <span>Private — this instance keeps every project to its members.</span>
+        </div>
+      ) : (
+        <Controller
+          name="network"
+          control={control}
+          render={({ field: { onChange, value } }) => {
+            const currentNetwork = NETWORK_CHOICES.find((n) => n.key === value);
 
-          return (
-            <div className="h-7 flex-shrink-0" tabIndex={getIndex("network")}>
-              <CustomSelect
-                value={value}
-                onChange={onChange}
-                label={
-                  <div className="flex h-full items-center gap-1">
-                    {currentNetwork ? (
-                      <>
-                        <ProjectNetworkIcon iconKey={currentNetwork.iconKey} />
-                        {t(currentNetwork.i18n_label)}
-                      </>
-                    ) : (
-                      <span className="text-placeholder">{t("select_network")}</span>
-                    )}
-                  </div>
-                }
-                placement="bottom-start"
-                className="h-full"
-                buttonClassName="h-full"
-                noChevron
-                tabIndex={getIndex("network")}
-              >
-                {NETWORK_CHOICES.map((network) => (
-                  <CustomSelect.Option key={network.key} value={network.key}>
-                    <div className="flex items-start gap-2">
-                      <ProjectNetworkIcon iconKey={network.iconKey} className="h-3.5 w-3.5" />
-                      <div className="-mt-1">
-                        <p>{t(network.i18n_label)}</p>
-                        <p className="text-11 text-placeholder">{t(network.description)}</p>
-                      </div>
+            return (
+              <div className="h-7 flex-shrink-0" tabIndex={getIndex("network")}>
+                <CustomSelect
+                  value={value}
+                  onChange={onChange}
+                  label={
+                    <div className="flex h-full items-center gap-1">
+                      {currentNetwork ? (
+                        <>
+                          <ProjectNetworkIcon iconKey={currentNetwork.iconKey} />
+                          {t(currentNetwork.i18n_label)}
+                        </>
+                      ) : (
+                        <span className="text-placeholder">{t("select_network")}</span>
+                      )}
                     </div>
-                  </CustomSelect.Option>
-                ))}
-              </CustomSelect>
-            </div>
-          );
-        }}
-      />
+                  }
+                  placement="bottom-start"
+                  className="h-full"
+                  buttonClassName="h-full"
+                  noChevron
+                  tabIndex={getIndex("network")}
+                >
+                  {NETWORK_CHOICES.map((network) => (
+                    <CustomSelect.Option key={network.key} value={network.key}>
+                      <div className="flex items-start gap-2">
+                        <ProjectNetworkIcon iconKey={network.iconKey} className="h-3.5 w-3.5" />
+                        <div className="-mt-1">
+                          <p>{t(network.i18n_label)}</p>
+                          <p className="text-11 text-placeholder">{t(network.description)}</p>
+                        </div>
+                      </div>
+                    </CustomSelect.Option>
+                  ))}
+                </CustomSelect>
+              </div>
+            );
+          }}
+        />
+      )}
       <Controller
         name="project_lead"
         control={control}

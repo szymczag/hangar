@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 # Module imports
 from .base import DynamicBaseSerializer
+from plane.utils.visibility_policy import VIEW_PRIVATE_ACCESS, force_private_visibility
 from plane.db.models import IssueView
 from plane.utils.issue_filters import issue_filters
 
@@ -55,6 +56,15 @@ class ViewIssueListSerializer(serializers.Serializer):
 
 class IssueViewSerializer(DynamicBaseSerializer):
     is_favorite = serializers.BooleanField(read_only=True)
+
+    def validate(self, data):
+        # Fork (see FORK.md): where the instance forces private visibility the
+        # choice is not offered and not accepted. Overwritten rather than
+        # rejected, so a client that still sends the old value gets a private
+        # object instead of an error it will not act on.
+        if force_private_visibility():
+            data["access"] = VIEW_PRIVATE_ACCESS
+        return data
 
     class Meta:
         model = IssueView

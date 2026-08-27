@@ -131,6 +131,47 @@ suite stays green, the finding stays visible, and `strict=True` forces whoever
 fixes it to remove the marker — a fixed defect makes the test pass, which fails
 a strict xfail.
 
+## Forced private visibility
+
+`FORCE_PRIVATE_VISIBILITY`, off by default and set in God Mode, makes this
+instance keep everything to its members. It is a refusal, not a default: the
+choice is not offered and not accepted.
+
+Three models carry a visibility field and **they do not agree on what the numbers
+mean**. `Page.access` is `0` for public and `1` for private; `IssueView.access`
+is the reverse; `Project.network` uses `0` and `2`, and calls the visible one
+"Public" while meaning everyone in the workspace rather than everyone. Any code
+that takes one "make it private" value and applies it to more than one of them
+sets the opposite of what it intended somewhere. The private value for each is
+therefore named once, in `plane.utils.visibility_policy`, and a test compares
+each against its own model's choices — a renumbering upstream would otherwise
+turn that module into a way of publishing things quietly.
+
+Requested values are **overwritten rather than rejected**, so an older client, a
+script, or the API used directly produces a private object instead of an error it
+will not act on.
+
+Publishing to the internet has no per-object setting to force — a deploy board
+either exists and serves or it does not — so it is refused in two places: the
+endpoint that creates a board, and `TimezoneMixin.initial()` in `plane.space`,
+through which every public request passes. The second is the one that matters:
+nine views under `plane.space` filter on `is_disabled` today, and a tenth that
+did not would serve exactly what the instance said must not be served.
+
+Turning the policy on also brings existing objects into line, because enforcing
+at write time governs only what happens next. Projects, pages and views become
+private and published boards are disabled. Boards are disabled rather than
+deleted: the row carries the anchor that was handed out, and deleting it would
+let the same address be reissued later for unrelated content.
+
+**This part is one-way.** What each object used to be readable by is not
+recorded, because a table describing what to re-expose is the opposite of what an
+operator turning this on is asking for. Turning the policy back off leaves
+everything private until someone opens it again deliberately.
+
+An instance configured through the environment rather than God Mode can bring
+existing content into line with `python manage.py enforce_private_visibility`.
+
 ## API tokens
 
 A token authenticates as its owner and names the workspace it may act in. It is

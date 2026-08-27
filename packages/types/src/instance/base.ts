@@ -118,6 +118,9 @@ export interface IInstanceConfig {
   // Fork: workspace role needed before an account may mint an API token, so the
   // app can offer the feature only where creating one would succeed.
   api_token_minimum_role?: number;
+  // Fork: the instance forces every project, page and view private and refuses
+  // to publish anything publicly, so the clients must not offer the choice.
+  force_private_visibility?: boolean;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;

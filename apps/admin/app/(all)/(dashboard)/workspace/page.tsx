@@ -41,6 +41,7 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
   // derived values
   const disableWorkspaceCreation = formattedConfig?.DISABLE_WORKSPACE_CREATION ?? "";
   const apiTokenMinimumRole = formattedConfig?.API_TOKEN_MINIMUM_ROLE ?? "5";
+  const forcePrivateVisibility = formattedConfig?.FORCE_PRIVATE_VISIBILITY ?? "0";
   const hasNextPage = paginationInfo?.next_page_results && paginationInfo?.next_cursor !== undefined;
 
   // fetch data
@@ -85,6 +86,41 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
       }}
     >
       <div className="space-y-3">
+        {formattedConfig ? (
+          <div className={cn("flex w-full items-center gap-14 rounded-sm")}>
+            <div className="flex grow items-center gap-4">
+              <div className="grow">
+                <div className="pb-1 text-16 font-medium">Keep everything to the people it belongs to.</div>
+                <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
+                  Every project, page and view is private, the choice is not offered, and nothing can be published to
+                  the internet — the public pages are refused outright. Turning this on also makes what already exists
+                  match: projects, pages and views become private and published boards stop serving. That part cannot be
+                  undone by turning it back off, because what each thing used to be readable by is not recorded.
+                </div>
+              </div>
+            </div>
+            <div className={`shrink-0 pr-4 ${isSubmitting && "opacity-70"}`}>
+              <div className="flex items-center gap-4">
+                <ToggleSwitch
+                  value={Boolean(parseInt(forcePrivateVisibility))}
+                  onChange={() => {
+                    if (Boolean(parseInt(forcePrivateVisibility)) === true) {
+                      updateConfig("FORCE_PRIVATE_VISIBILITY", "0");
+                    } else {
+                      updateConfig("FORCE_PRIVATE_VISIBILITY", "1");
+                    }
+                  }}
+                  size="sm"
+                  disabled={isSubmitting || !isConfigurationEditable}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <Loader>
+            <Loader.Item height="50px" width="100%" />
+          </Loader>
+        )}
         {formattedConfig ? (
           <div className={cn("flex w-full items-center gap-14 rounded-sm")}>
             <div className="flex grow items-center gap-4">

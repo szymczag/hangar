@@ -11,6 +11,9 @@ from django.db import IntegrityError
 # Django imports
 from django.urls import resolve
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
+
+from plane.utils.visibility_policy import force_private_visibility
 from django_filters.rest_framework import DjangoFilterBackend
 
 # Third part imports
@@ -35,6 +38,14 @@ class TimezoneMixin:
     """
 
     def initial(self, request, *args, **kwargs):
+        # Fork (see FORK.md): where the instance forbids publishing, this whole
+        # surface is closed. Refused here rather than in each view because every
+        # view under plane.space inherits this and none can forget it — nine of
+        # them filter on is_disabled today, and a tenth that did not would serve
+        # what the instance said must not be served. The published objects keep
+        # their rows; only the way in is shut.
+        if force_private_visibility():
+            raise PermissionDenied("This instance does not publish anything publicly.")
         super().initial(request, *args, **kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))

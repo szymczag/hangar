@@ -11,6 +11,7 @@ import re
 # Module imports
 from .base import BaseSerializer, DynamicBaseSerializer
 from django.db.models import Max
+from plane.utils.visibility_policy import PROJECT_SECRET_NETWORK, force_private_visibility
 from plane.app.serializers.workspace import WorkspaceLiteSerializer
 from plane.app.serializers.user import UserLiteSerializer, UserAdminLiteSerializer
 from plane.db.models import (
@@ -90,6 +91,14 @@ class ProjectSerializer(BaseSerializer):
 
             if not is_valid:
                 raise serializers.ValidationError({"error": "html content is not valid"})
+
+        # Fork (see FORK.md): where the instance forces private visibility the
+        # choice is not offered and not accepted. Overwritten rather than
+        # rejected, so a client that still sends the old value — an older build,
+        # a script, the API used directly — gets a private object instead of an
+        # error it will not act on.
+        if force_private_visibility():
+            data["network"] = PROJECT_SECRET_NETWORK
 
         return data
 
