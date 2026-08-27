@@ -246,6 +246,22 @@ class InstanceEndpoint(BaseAPIView):
         data["login_backdrop_color"] = _safe_colour(INSTANCE_LOGIN_BACKDROP_COLOR)
         data["show_license_notice"] = str(INSTANCE_SHOW_LICENSE_NOTICE) != "0"
 
+        # Fork (see FORK.md): whether the application may point anyone at a host
+        # this instance does not run. Off by default — Hangar is deployed inside
+        # organisations, where a link to a code-hosting site is a link out of the
+        # building for people who did not ask to leave it. The licence offer is
+        # not covered by this and never hidden; point HANGAR_SOURCE_URL at an
+        # internal mirror to keep even that inside.
+        (INSTANCE_SHOW_EXTERNAL_LINKS,) = get_configuration_value(
+            [
+                {
+                    "key": "INSTANCE_SHOW_EXTERNAL_LINKS",
+                    "default": os.environ.get("INSTANCE_SHOW_EXTERNAL_LINKS", "0"),
+                }
+            ]
+        )
+        data["show_external_links"] = str(INSTANCE_SHOW_EXTERNAL_LINKS) == "1"
+
         # Github app name
         data["github_app_name"] = str(GITHUB_APP_NAME)
 

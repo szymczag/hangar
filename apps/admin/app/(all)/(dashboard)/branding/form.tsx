@@ -112,6 +112,7 @@ export function InstanceBrandingForm(props: Props) {
     },
   });
   const [showLicenseNotice, setShowLicenseNotice] = useState(config.INSTANCE_SHOW_LICENSE_NOTICE !== "0");
+  const [showExternalLinks, setShowExternalLinks] = useState(config.INSTANCE_SHOW_EXTERNAL_LINKS === "1");
 
   useEffect(() => {
     authService.requestCSRFToken().then((data) => data?.csrf_token && setCsrfToken(data.csrf_token));
@@ -177,6 +178,7 @@ export function InstanceBrandingForm(props: Props) {
       const response = await updateInstanceConfigurations({
         ...formData,
         INSTANCE_SHOW_LICENSE_NOTICE: showLicenseNotice ? "1" : "0",
+        INSTANCE_SHOW_EXTERNAL_LINKS: showExternalLinks ? "1" : "0",
       });
       setToast({ type: TOAST_TYPE.SUCCESS, title: "Saved", message: "Branding updated." });
       reset({
@@ -290,7 +292,31 @@ export function InstanceBrandingForm(props: Props) {
             <span className="block text-11 text-tertiary">
               Hangar is AGPL-3.0. Section 13 requires that people using it over a network be offered its source, so
               turning this off moves the offer rather than removing it: the link stays in the in-app help menu, where
-              every signed-in person reaches it. That link is not configurable, deliberately.
+              every signed-in person reaches it. That link is not configurable, deliberately — point HANGAR_SOURCE_URL
+              at your own mirror to keep it inside your network.
+            </span>
+          </span>
+        </label>
+
+        <label className="flex items-start gap-3" htmlFor="show-external-links">
+          <input
+            id="show-external-links"
+            type="checkbox"
+            aria-label="Allow links to sites this instance does not run"
+            className="mt-1"
+            checked={showExternalLinks}
+            onChange={(event) => {
+              setShowExternalLinks(event.target.checked);
+              setIsLicenseNoticeDirty(true);
+            }}
+            disabled={!isConfigurationEditable}
+          />
+          <span>
+            <span className="font-medium text-secondary">Allow links to sites this instance does not run</span>
+            <span className="block text-11 text-tertiary">
+              Off by default. Hides &ldquo;Star us on GitHub&rdquo;, the release notes and documentation buttons, and
+              the issue-tracker links — every one of which sends whoever clicks it, and their address, to somebody
+              else&apos;s server. The source offer above is not affected and stays visible either way.
             </span>
           </span>
         </label>
