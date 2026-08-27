@@ -1,5 +1,8 @@
 # Linting in Hangar - How It Works
 
+This page covers the TypeScript and JavaScript side. The Python API is linted
+separately with [ruff](https://docs.astral.sh/ruff/) — see [Linting the API](#linting-the-api).
+
 We use [OxLint](https://oxc.rs/docs/guide/usage/linter) for linting across the entire monorepo. OxLint is a single Rust binary that's 50-100x faster than ESLint, with zero Node.js dependencies at runtime.
 
 ## Key Points
@@ -91,3 +94,47 @@ If the commit fails due to lint errors, fix them before committing.
 
 - [.oxlintrc.json](../.oxlintrc.json) - OxLint configuration
 - [package.json](../package.json) - Available scripts
+
+## Linting the API
+
+`apps/api` is linted with ruff, configured in `apps/api/pyproject.toml`. Only
+pycodestyle (`E`) and Pyflakes (`F`) are enabled, at a line length of 120.
+
+```bash
+# from the repo root
+ruff check apps/api
+```
+
+### The version is pinned in one place
+
+`apps/api/requirements/local.txt` holds the pin, and the CI workflow reads it
+from there rather than repeating it:
+
+```yaml
+run: python -m pip install "$(grep '^ruff==' apps/api/requirements/local.txt)"
+```
+
+Change the version in that file and CI follows. Installing ruff unpinned means a
+ruff release can change the result of a check nobody re-ran, and it means CI and
+your machine can disagree about whether the code is clean.
+
+### The check has to be able to fail
+
+The workflow runs `ruff check apps/api` — deliberately **without** `--fix`. With
+`--fix`, ruff repairs what it finds and exits zero, so the job reports success
+whatever it found, and the repair is thrown away with the runner. A check that
+cannot fail is not a check.
+
+If ruff reports something, fix it in your branch. `ruff check --fix apps/api` is
+fine to run locally, where the result is kept.
+
+### Test exemptions cover less than they look like they do
+
+`[tool.ruff.lint.per-file-ignores]` exempts `tests/*` from `E402`, `F401` and
+`F811`. That glob matches `apps/api/tests/` — three files — and **not**
+`apps/api/plane/tests/`, where nearly every test actually lives. The main test
+tree is therefore held to the same rules as the rest of the code.
+
+This is left as it is on purpose. Widening the glob would weaken the check across
+hundreds of files to accommodate a pattern the codebase does not currently need.
+
