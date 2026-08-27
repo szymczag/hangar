@@ -177,6 +177,23 @@ Workspace mode validates the signed Google `hd` claim. A matching email suffix i
 not sufficient. Configure every intended tenant explicitly before switching from
 `generic` to `workspace`.
 
+### An invitation is retired once the membership it offered exists
+
+Invitations are consumed when accepted through the emailed link. Someone invited
+by address who signs in through the provider instead never accepts one — auto-join
+adds the membership directly — so the invitation stayed outstanding and the person
+appeared under Members and Pending Invites at the same time.
+
+The invitation is now retired on sign-in whenever the account is already an active
+member of the workspace it names, and recorded as consumed rather than deleted so
+what happened to it stays legible.
+
+This is not only tidiness. An unaccepted invitation remains usable until it
+expires, so once the person is removed from the workspace it is a way back in that
+nobody granted. A membership that has been deactivated does **not** retire an
+invitation, because that is exactly the case where someone may need to be let back
+in deliberately.
+
 ### Onboarding is skipped when it would ask nothing
 
 Where attribute sync is enabled, the provider supplies the name, display name and

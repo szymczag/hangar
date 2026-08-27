@@ -8,7 +8,7 @@ from plane.db.models import Profile, WorkspaceMember
 from plane.utils.exception_logger import log_exception
 
 from .sso_auto_join import auto_join_projects, auto_join_workspaces
-from .workspace_project_join import process_workspace_project_invitations
+from .workspace_project_join import process_workspace_project_invitations, spend_invitations_already_honoured
 
 
 def _settle_onboarding(user):
@@ -85,6 +85,11 @@ def post_user_auth_workflow(user, is_signup, request):
     # After the workspace pass: a project seat requires the workspace seat, so
     # ordering these the other way would skip everyone on their first sign-in.
     auto_join_projects(user=user)
+    # Last, because it asks which workspaces this account is now a member of and
+    # both passes above can have added one. An invitation to a workspace someone
+    # already belongs to has nothing left to offer, and left outstanding it is a
+    # way back in after they are removed.
+    spend_invitations_already_honoured(user=user)
     try:
         _settle_onboarding(user=user)
     except Exception as exc:  # noqa: BLE001 - never block a valid sign-in
