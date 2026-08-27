@@ -132,6 +132,26 @@ class UserEndpoint(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Fork (see FORK.md): an account that signs in through a provider does
+        # not own its own address. The federated binding is a digest over
+        # provider, issuer and subject, and the email takes no part in it — so
+        # changing it here would not break sign-in, and that is the problem. The
+        # address is what domain policy reads: SSO_ENFORCED_DOMAINS pins a domain
+        # to a provider and auto-join grants workspaces by domain. Proving
+        # control of some other mailbox would let an account keep its identity
+        # while moving out from under the policy that admitted it, or into one
+        # that would admit it to more.
+        if user.federated_identities.exists():
+            return Response(
+                {
+                    "error": (
+                        "This account signs in through an identity provider, which is where its "
+                        "email address comes from. Change it with your provider instead."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         return None
 
     def generate_email_verification_code(self, request):
