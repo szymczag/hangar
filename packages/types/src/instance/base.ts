@@ -167,6 +167,9 @@ export type TInstanceConfigurationKeys =
   | "INSTANCE_LOGIN_BACKGROUND_ASSET_ID"
   | "INSTANCE_SHOW_LICENSE_NOTICE"
   | "INSTANCE_SHOW_EXTERNAL_LINKS"
+  | "INSTANCE_DEFAULT_START_OF_WEEK"
+  | "INSTANCE_DEFAULT_THEME"
+  | "INSTANCE_DEFAULT_TIMEZONE"
   | TInstanceConfigurationSourceKey;
 
 export interface IInstanceConfiguration {

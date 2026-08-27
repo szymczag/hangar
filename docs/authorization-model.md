@@ -131,6 +131,29 @@ suite stays green, the finding stays visible, and `strict=True` forces whoever
 fixes it to remove the marker — a fixed defect makes the test pass, which fails
 a strict xfail.
 
+## What a new account starts with
+
+Three instance settings decide the starting preferences of accounts created after
+they are set: `INSTANCE_DEFAULT_START_OF_WEEK` (Monday, where upstream uses
+Sunday), `INSTANCE_DEFAULT_THEME` (light, where upstream follows the operating
+system) and `INSTANCE_DEFAULT_TIMEZONE` (UTC unless the operator names one).
+
+They are **starting values, not rules**. Anyone can change their own afterwards,
+and changing the instance setting does not reach back into accounts that already
+exist — a preference is not a security boundary, and forcing a theme would take
+something away from people who need a particular one without protecting anything.
+
+Applied by a `post_save` signal on `Profile` creation rather than at each of the
+five places a profile is made — signup, federated signup, magic link, the admin
+console and the redirection path. A sixth would otherwise quietly start on
+upstream's defaults, and nobody would notice until somebody complained that the
+week begins on Sunday.
+
+Only fields still holding the value the model shipped with are touched, and a
+setting that names a weekday or theme that does not exist falls back rather than
+producing a row the column would refuse — which would take the signup down with
+it.
+
 ## No third-party code in the browser
 
 Nothing this application serves loads executable code from a host the instance
