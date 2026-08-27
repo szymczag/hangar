@@ -22,12 +22,16 @@ import { useAppRouter } from "@/hooks/use-app-router";
 // wrappers
 import { AuthenticationWrapper } from "@/lib/wrappers/authentication-wrapper";
 import { WorkspaceService } from "@/services/workspace.service";
+import { showExternalLinks } from "@/helpers/external-links";
+import { useInstance } from "@/hooks/store/use-instance";
 // services
 
 // service initialization
 const workspaceService = new WorkspaceService();
 
 function WorkspaceInvitationPage() {
+  const { config: instanceConfigForLinks } = useInstance();
+  const linksAllowed = showExternalLinks(instanceConfigForLinks);
   // router
   const router = useAppRouter();
   // query params
@@ -111,12 +115,16 @@ function WorkspaceInvitationPage() {
               ) : (
                 <EmptySpaceItem Icon={Boxes} title="Continue to home" href="/" />
               )}
-              <EmptySpaceItem Icon={Star} title="Star us on GitHub" href="https://github.com/szymczag/hangar" />
-              <EmptySpaceItem
-                Icon={Share2}
-                title="Open a GitHub issue"
-                href="https://github.com/szymczag/hangar/issues"
-              />
+              {linksAllowed && (
+                <>
+                  <EmptySpaceItem Icon={Star} title="Star us on GitHub" href="https://github.com/szymczag/hangar" />
+                  <EmptySpaceItem
+                    Icon={Share2}
+                    title="Open a GitHub issue"
+                    href="https://github.com/szymczag/hangar/issues"
+                  />
+                </>
+              )}
             </EmptySpace>
           )
         ) : (

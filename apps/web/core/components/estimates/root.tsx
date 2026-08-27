@@ -22,6 +22,8 @@ import { DeleteEstimateModal } from "./delete/modal";
 import { EstimateDisableSwitch } from "./estimate-disable-switch";
 import { EstimateList } from "./estimate-list";
 import { EstimateLoaderScreen } from "./loader-screen";
+import { showExternalLinks } from "@/helpers/external-links";
+import { useInstance } from "@/hooks/store/use-instance";
 
 type TEstimateRoot = {
   workspaceSlug: string;
@@ -30,6 +32,8 @@ type TEstimateRoot = {
 };
 
 export const EstimateRoot = observer(function EstimateRoot(props: TEstimateRoot) {
+  const { config: instanceConfigForLinks } = useInstance();
+  const linksAllowed = showExternalLinks(instanceConfigForLinks);
   const { workspaceSlug, projectId, isAdmin } = props;
   // hooks
   const { currentProjectDetails } = useProject();
@@ -108,15 +112,20 @@ export const EstimateRoot = observer(function EstimateRoot(props: TEstimateRoot)
                 description={
                   <>
                     Estimates have gone through a change, these are the estimates you had in your older versions which
-                    were not in use. Read more about them&nbsp;
-                    <a
-                      href="https://github.com/szymczag/hangar#readme"
-                      target="_blank"
-                      className="text-accent-primary/80 hover:text-accent-primary"
-                      rel="noreferrer"
-                    >
-                      here.
-                    </a>
+                    were not in use.
+                    {linksAllowed && (
+                      <>
+                        {" Read more about them\u00a0"}
+                        <a
+                          href="https://github.com/szymczag/hangar#readme"
+                          target="_blank"
+                          className="text-accent-primary/80 hover:text-accent-primary"
+                          rel="noreferrer"
+                        >
+                          here.
+                        </a>
+                      </>
+                    )}
                   </>
                 }
                 variant="h6"

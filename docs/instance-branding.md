@@ -72,3 +72,37 @@ Note for anyone upgrading: the notice used to appear **only** when neither a
 terms nor a privacy URL was configured, so setting those silently dropped the
 source offer. The two are now separate — legal links and the source offer render
 independently.
+
+## Links to places this instance does not run
+
+`INSTANCE_SHOW_EXTERNAL_LINKS`, off by default and set on the Branding page,
+decides whether the application may point anyone at a host the operator does not
+run. Off, it hides "Star us on GitHub" in the header and on the invitation page,
+the release-notes and documentation buttons in the Hangar Community dialog, and
+the issue-tracker links.
+
+Off by default because of where Hangar is deployed. Inside an organisation, a
+link to a code-hosting site is a link out of the building for somebody who did
+not ask to leave it, and following it tells the far end who is looking and from
+where.
+
+### The source offer is not covered
+
+The AGPL-3.0 section 13 offer is never hidden by this setting. Anyone running a
+modified version over a network owes it to the people using that version, and a
+branding switch is not a reason to stop owing it.
+
+An operator who wants that link to stay inside their network points
+`HANGAR_SOURCE_URL` at their own mirror of the source. The link already reads
+from there, so nothing else needs changing — the obligation is met and nobody
+leaves the building.
+
+### Two places are exempt
+
+The startup-failure page and the production error boundary keep their links.
+They render when the instance did not come up and no configuration can be read,
+and they are seen by whoever is fixing it rather than by the people using it.
+
+A contract test holds the rest, so a link added later has to be gated, be the
+licence offer, or be named as an exemption.
+

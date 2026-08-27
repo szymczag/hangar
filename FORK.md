@@ -113,6 +113,7 @@ admin pages) are listed for completeness but carry no merge-conflict risk.
 | 58  | `apps/web/core/components/workspace/settings/members-list.tsx` | Workspace settings | remove a Disclosure.Panel nested inside a Collapsible, which supplies its own and drove the pending-invites section open and empty |
 | 59  | `apps/web/app/root.tsx`, `apps/web/app/layout.tsx`, `docs/authorization-model.md` | Privacy | remove Microsoft Clarity rather than leaving it behind an environment flag, and enforce an empty allow-list for third-party script hosts |
 | 60  | `apps/api/plane/authentication/utils/workspace_project_join.py`, `apps/api/plane/authentication/utils/user_auth_workflow.py`, `docs/federated-sso-security.md` | Invitations | retire an invitation to a workspace the account already belongs to, so it stops showing as pending and stops being a way back in after removal |
+| 61  | `apps/api/plane/license/api/views/instance.py`, `apps/web/helpers/external-links.ts`, star-us link, invitation page, estimates settings, Hangar Community dialog, God Mode branding, `docs/instance-branding.md` | Branding | let an operator switch off every link to a host the instance does not run, keeping the AGPL source offer, which can point at an internal mirror |
 
 Phase 6 new files implement the import model, parser, API, worker, tests, CE
 frontend, workspace settings route, and [administrator how-to](docs/importing-from-todoist.md).

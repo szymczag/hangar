@@ -10,13 +10,23 @@ import { useTranslation } from "@plane/i18n";
 // assets
 import githubBlackImage from "@/app/assets/logos/github-black.png?url";
 import githubWhiteImage from "@/app/assets/logos/github-white.png?url";
+// helpers
+import { showExternalLinks } from "@/helpers/external-links";
+// hooks
+import { useInstance } from "@/hooks/store/use-instance";
 
 export function StarUsOnGitHubLink() {
   // plane hooks
   const { t } = useTranslation();
+  const { config } = useInstance();
   // hooks
   const { resolvedTheme } = useTheme();
   const imageSrc = resolvedTheme === "dark" ? githubWhiteImage : githubBlackImage;
+
+  // Nothing renders where the instance keeps its people inside. Returning null
+  // rather than disabling: an invitation to leave that cannot be taken is worse
+  // than no invitation.
+  if (!showExternalLinks(config)) return null;
 
   return (
     <a
