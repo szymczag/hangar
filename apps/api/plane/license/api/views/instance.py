@@ -5,6 +5,7 @@
 # Python imports
 import os
 import re
+import uuid
 
 # Django imports
 from django.conf import settings
@@ -271,6 +272,27 @@ class InstanceEndpoint(BaseAPIView):
             [{"key": "INSTANCE_SUPPORT_TEXT", "default": os.environ.get("INSTANCE_SUPPORT_TEXT", "")}]
         )
         data["support_text"] = str(INSTANCE_SUPPORT_TEXT or "")
+
+        # The UUID is safe to expose and survives workspace slug changes. A stale
+        # value is treated as disabled so the public endpoint never advertises a
+        # route that cannot be resolved.
+        (INSTANCE_DEFAULT_WORKSPACE_ID,) = get_configuration_value(
+            [
+                {
+                    "key": "INSTANCE_DEFAULT_WORKSPACE_ID",
+                    "default": os.environ.get("INSTANCE_DEFAULT_WORKSPACE_ID", ""),
+                }
+            ]
+        )
+        default_workspace_id = str(INSTANCE_DEFAULT_WORKSPACE_ID or "").strip()
+        try:
+            parsed_workspace_id = uuid.UUID(default_workspace_id) if default_workspace_id else None
+            default_workspace_exists = parsed_workspace_id is not None and Workspace.objects.filter(
+                id=parsed_workspace_id
+            ).exists()
+        except (ValueError, TypeError):
+            default_workspace_exists = False
+        data["default_workspace_id"] = default_workspace_id if default_workspace_exists else ""
 
         # Github app name
         data["github_app_name"] = str(GITHUB_APP_NAME)

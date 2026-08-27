@@ -42,6 +42,7 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
   const disableWorkspaceCreation = formattedConfig?.DISABLE_WORKSPACE_CREATION ?? "";
   const apiTokenMinimumRole = formattedConfig?.API_TOKEN_MINIMUM_ROLE ?? "5";
   const forcePrivateVisibility = formattedConfig?.FORCE_PRIVATE_VISIBILITY ?? "0";
+  const defaultWorkspaceId = formattedConfig?.INSTANCE_DEFAULT_WORKSPACE_ID ?? "";
   const defaultStartOfWeek = formattedConfig?.INSTANCE_DEFAULT_START_OF_WEEK ?? "1";
   const defaultTheme = formattedConfig?.INSTANCE_DEFAULT_THEME ?? "light";
   const defaultTimezone = formattedConfig?.INSTANCE_DEFAULT_TIMEZONE ?? "UTC";
@@ -255,7 +256,8 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
                 </div>
                 <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
                   You can&apos;t yet delete workspaces and you can only go to the workspace if you are an Admin or a
-                  Member.
+                  Member. Choose one workspace to use compact links such as /i/AA-123. Clearing the choice restores
+                  workspace-qualified links everywhere.
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -266,7 +268,16 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
             </div>
             <div className="flex flex-col gap-4 py-2">
               {workspaceIds.map((workspaceId) => (
-                <WorkspaceListItem key={workspaceId} workspaceId={workspaceId} />
+                <WorkspaceListItem
+                  key={workspaceId}
+                  workspaceId={workspaceId}
+                  isDefaultForShortLinks={workspaceId === defaultWorkspaceId}
+                  isUpdatingDefault={isSubmitting}
+                  canUpdateDefault={isConfigurationEditable}
+                  onDefaultChange={(selected) =>
+                    updateConfig("INSTANCE_DEFAULT_WORKSPACE_ID", selected ? workspaceId : "")
+                  }
+                />
               ))}
             </div>
             {hasNextPage && (

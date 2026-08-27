@@ -7,6 +7,7 @@
 import React from "react";
 import { Link as RRLink } from "react-router";
 import { ensureTrailingSlash } from "./helper";
+import { useRoutePolicy } from "./route-policy-context";
 
 type NextLinkProps = React.ComponentProps<"a"> & {
   href: string;
@@ -17,7 +18,8 @@ type NextLinkProps = React.ComponentProps<"a"> & {
 };
 
 function Link({ href, replace, prefetch: _prefetch, scroll: _scroll, shallow: _shallow, ...rest }: NextLinkProps) {
-  return <RRLink to={ensureTrailingSlash(href)} replace={replace} {...rest} />;
+  const { normalizePath } = useRoutePolicy();
+  return <RRLink to={ensureTrailingSlash(normalizePath(href))} replace={replace} {...rest} />;
 }
 
 export default Link;
