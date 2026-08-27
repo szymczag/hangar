@@ -109,6 +109,7 @@ export function InstanceBrandingForm(props: Props) {
       INSTANCE_SIGN_IN_SUBHEADER: config.INSTANCE_SIGN_IN_SUBHEADER ?? "",
       INSTANCE_ACCENT_COLOR: config.INSTANCE_ACCENT_COLOR ?? "",
       INSTANCE_LOGIN_BACKDROP_COLOR: config.INSTANCE_LOGIN_BACKDROP_COLOR ?? "",
+      INSTANCE_SUPPORT_TEXT: config.INSTANCE_SUPPORT_TEXT ?? "",
     },
   });
   const [showLicenseNotice, setShowLicenseNotice] = useState(config.INSTANCE_SHOW_LICENSE_NOTICE !== "0");
@@ -171,6 +172,20 @@ export function InstanceBrandingForm(props: Props) {
       error: Boolean(errors.INSTANCE_SIGN_IN_SUBHEADER),
       required: false,
     },
+    {
+      key: "INSTANCE_SUPPORT_TEXT",
+      type: "text",
+      label: "What the failure pages say",
+      description: (
+        <>
+          Shown when the instance cannot be reached or has crashed. Left empty, those pages say only that something went
+          wrong — they will not tell your staff to open a public issue. Put your own help desk here instead.
+        </>
+      ),
+      placeholder: "Contact the IT service desk on extension 4200.",
+      error: false,
+      required: false,
+    },
   ];
 
   const onSubmit = async (formData: BrandingFormValues) => {
@@ -188,6 +203,7 @@ export function InstanceBrandingForm(props: Props) {
         INSTANCE_ACCENT_COLOR: response.find((item) => item.key === "INSTANCE_ACCENT_COLOR")?.value ?? "",
         INSTANCE_LOGIN_BACKDROP_COLOR:
           response.find((item) => item.key === "INSTANCE_LOGIN_BACKDROP_COLOR")?.value ?? "",
+        INSTANCE_SUPPORT_TEXT: response.find((item) => item.key === "INSTANCE_SUPPORT_TEXT")?.value ?? "",
       });
     } catch (error) {
       setToast({ type: TOAST_TYPE.ERROR, title: "Error", message: configurationErrorMessage(error) });

@@ -11,6 +11,7 @@ import useSWR from "swr";
 import { LogoSpinner } from "@/components/common/logo-spinner";
 import { InstanceNotReady, MaintenanceView } from "@/components/instance";
 // hooks
+import { rememberFailurePageBranding } from "@/helpers/failure-page-branding";
 import { useInstance } from "@/hooks/store/use-instance";
 
 type TInstanceWrapper = {
@@ -20,7 +21,10 @@ type TInstanceWrapper = {
 const InstanceWrapper = observer(function InstanceWrapper(props: TInstanceWrapper) {
   const { children } = props;
   // store
-  const { isLoading, instance, error, fetchInstanceInfo } = useInstance();
+  const { isLoading, instance, error, fetchInstanceInfo, config } = useInstance();
+  // Kept while it can still be asked for: the failure pages below render when
+  // this very endpoint could not be reached.
+  rememberFailurePageBranding(config);
 
   const { isLoading: isInstanceSWRLoading, error: instanceSWRError } = useSWR(
     "INSTANCE_INFORMATION",
