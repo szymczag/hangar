@@ -21,7 +21,7 @@ export function GanttLayoutListItemLoader() {
 export function GanttLayoutLoader() {
   return (
     <div className="flex h-full animate-pulse flex-col overflow-x-auto">
-      <div className="min-h-10 w-full border-b border-subtle">
+      <div className="min-h-12 w-full border-b border-subtle">
         <span className="h-6 w-12 rounded-sm bg-layer-1" />
       </div>
       <div className="flex h-full">
