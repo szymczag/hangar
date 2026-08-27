@@ -4,8 +4,6 @@
  * See the LICENSE file for details.
  */
 
-import Script from "next/script";
-
 // styles
 import "@/styles/globals.css";
 
@@ -55,8 +53,6 @@ export const meta = () => [
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const isSessionRecorderEnabled = parseInt(process.env.VITE_ENABLE_SESSION_RECORDER || "0");
-
   return (
     <html lang="en">
       <head>
@@ -85,15 +81,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </AppProvider>
       </body>
-      {!!isSessionRecorderEnabled && process.env.VITE_SESSION_RECORDER_KEY && (
-        <Script id="clarity-tracking">
-          {`(function(c,l,a,r,i,t,y){
-              c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-              t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-              y=l.getElementsByTagName(r)[0];if(y){y.parentNode.insertBefore(t,y);}
-          })(window, document, "clarity", "script", "${process.env.VITE_SESSION_RECORDER_KEY}");`}
-        </Script>
-      )}
     </html>
   );
 }
