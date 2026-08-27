@@ -115,3 +115,10 @@ test("every outbound link is either gated or the licence offer", () => {
       `operator to turn that off: ${offenders.join(", ")}`
   );
 });
+
+test("the top-navigation help menu is hidden when outbound links are disabled", () => {
+  const helpMenu = readFileSync(path.join(WEB, "core/components/workspace/sidebar/help-section/root.tsx"), "utf8");
+
+  assert.match(helpMenu, /import \{ showExternalLinks \} from "@\/helpers\/external-links"/);
+  assert.match(helpMenu, /if \(!showExternalLinks\(config\)\) return null/);
+});

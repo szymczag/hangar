@@ -14,6 +14,8 @@ import { PageIcon } from "@plane/propel/icons";
 import { CustomMenu } from "@plane/ui";
 // components
 import { AppSidebarItem } from "@/components/sidebar/sidebar-item";
+// helpers
+import { showExternalLinks } from "@/helpers/external-links";
 // hooks
 import { useInstance } from "@/hooks/store/use-instance";
 import { usePowerK } from "@/hooks/store/use-power-k";
@@ -26,6 +28,10 @@ export const HelpMenuRoot = observer(function HelpMenuRoot() {
   const product = config?.product;
   // states
   const [isNeedHelpOpen, setIsNeedHelpOpen] = useState(false);
+
+  // This control opens links to documentation, issue-tracker and security
+  // hosts, so remove the entry point when the operator disables outbound links.
+  if (!showExternalLinks(config)) return null;
 
   return (
     <>

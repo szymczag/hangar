@@ -307,9 +307,9 @@ export function InstanceBrandingForm(props: Props) {
             <span className="font-medium text-secondary">Show the licence notice on the sign-in page</span>
             <span className="block text-11 text-tertiary">
               Hangar is AGPL-3.0. Section 13 requires that people using it over a network be offered its source, so
-              turning this off moves the offer rather than removing it: the link stays in the in-app help menu, where
-              every signed-in person reaches it. That link is not configurable, deliberately — point HANGAR_SOURCE_URL
-              at your own mirror to keep it inside your network.
+              turning this off moves the offer rather than removing it: the source command stays in the in-app command
+              menu, where every signed-in person reaches it. That command is not configurable, deliberately — point
+              HANGAR_SOURCE_URL at your own mirror to keep it inside your network.
             </span>
           </span>
         </label>
@@ -331,8 +331,8 @@ export function InstanceBrandingForm(props: Props) {
             <span className="font-medium text-secondary">Allow links to sites this instance does not run</span>
             <span className="block text-11 text-tertiary">
               Off by default. Hides &ldquo;Star us on GitHub&rdquo;, the release notes and documentation buttons, and
-              the issue-tracker links — every one of which sends whoever clicks it, and their address, to somebody
-              else&apos;s server. The source offer above is not affected and stays visible either way.
+              the help icon and issue-tracker links — every one of which sends whoever clicks it, and their address, to
+              somebody else&apos;s server. The source offer above is not affected and remains in the command menu.
             </span>
           </span>
         </label>
