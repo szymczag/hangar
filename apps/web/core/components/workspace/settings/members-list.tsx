@@ -8,7 +8,6 @@ import { useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
-import { Disclosure } from "@headlessui/react";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { ChevronDownIcon } from "@plane/propel/icons";
@@ -96,13 +95,17 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
             </div>
           }
         >
-          <Disclosure.Panel>
-            <div className="ml-auto items-center gap-1.5 rounded-md bg-surface-1 py-1.5">
-              {searchedInvitationsIds?.map((invitationId) => (
-                <WorkspaceInvitationsListItem key={invitationId} invitationId={invitationId} />
-              ))}
-            </div>
-          </Disclosure.Panel>
+          {/* No Disclosure.Panel here. Collapsible already renders one, `static`,
+              inside its own Disclosure and drives it from `isOpen`. A second,
+              non-static panel nested in that context follows headlessui's own
+              open state instead, which starts closed — so the section animated
+              open and its contents were never shown, which reads as expanding
+              and immediately collapsing again. */}
+          <div className="ml-auto items-center gap-1.5 rounded-md bg-surface-1 py-1.5">
+            {searchedInvitationsIds?.map((invitationId) => (
+              <WorkspaceInvitationsListItem key={invitationId} invitationId={invitationId} />
+            ))}
+          </div>
         </Collapsible>
       )}
     </>
