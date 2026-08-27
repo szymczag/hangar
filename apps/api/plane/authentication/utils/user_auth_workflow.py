@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 # Module imports
+from plane.utils.provider_profile import provider_manages_profile
 from plane.db.models import Profile, WorkspaceMember
 from plane.utils.exception_logger import log_exception
 
@@ -21,7 +22,10 @@ def _settle_onboarding(user):
 
     Fixing it here rather than in the onboarding screens is deliberate: the
     server is what knows a membership was granted, and every client asking
-    "is this person onboarded" gets the same answer.
+    "is this person onboarded" gets the same answer. It is also the only place
+    that can prevent the screens being reached at all — a client can only decide
+    not to show them after it has loaded enough to know, by which point it has
+    already rendered something.
     """
     memberships = (
         WorkspaceMember.objects.filter(member=user, is_active=True).select_related("workspace").order_by("created_at")
@@ -35,19 +39,40 @@ def _settle_onboarding(user):
         return
 
     steps = dict(profile.onboarding_step or {})
-    # The profile step is left alone: it collects a display name, which nobody
-    # else can supply. Only the workspace steps are settled, because belonging
-    # to a workspace is what they were asking about.
-    already_settled = all(steps.get(key) for key in ("workspace_create", "workspace_join"))
-    if already_settled and profile.last_workspace_id:
+    settled = ["workspace_create", "workspace_join", "workspace_invite"]
+
+    # The profile step collects a name, a display name and a picture. Where the
+    # provider supplies all three and overwrites them on every sign-in, it
+    # collects nothing — the fields are shown read-only and the avatar upload is
+    # not offered at all — so it is settled too. Where it is not, the step still
+    # has a job and is left alone: someone admitted by invitation may genuinely
+    # have no name recorded.
+    provider_supplies_profile = provider_manages_profile(user.last_login_medium)
+    if provider_supplies_profile:
+        settled.append("profile_complete")
+
+    # is_onboarded is what the application actually routes on. Settling only the
+    # step flags left it false, so the person was still sent to onboarding, which
+    # rendered its first screen and then navigated away once it had loaded enough
+    # to see there was nothing to ask — a visible flash of a form they were never
+    # meant to fill in.
+    onboarding_finished = provider_supplies_profile
+
+    already_settled = all(steps.get(key) for key in settled)
+    if already_settled and profile.last_workspace_id and (profile.is_onboarded or not onboarding_finished):
         return
 
-    steps["workspace_create"] = True
-    steps["workspace_join"] = True
+    for key in settled:
+        steps[key] = True
     profile.onboarding_step = steps
     if not profile.last_workspace_id:
         profile.last_workspace_id = membership.workspace_id
-    profile.save(update_fields=["onboarding_step", "last_workspace_id", "updated_at"])
+
+    fields = ["onboarding_step", "last_workspace_id", "updated_at"]
+    if onboarding_finished and not profile.is_onboarded:
+        profile.is_onboarded = True
+        fields.append("is_onboarded")
+    profile.save(update_fields=fields)
 
 
 def post_user_auth_workflow(user, is_signup, request):

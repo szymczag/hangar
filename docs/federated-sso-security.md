@@ -177,6 +177,24 @@ Workspace mode validates the signed Google `hd` claim. A matching email suffix i
 not sufficient. Configure every intended tenant explicitly before switching from
 `generic` to `workspace`.
 
+### Onboarding is skipped when it would ask nothing
+
+Where attribute sync is enabled, the provider supplies the name, display name and
+picture, and the onboarding profile step has nothing left to collect — its fields
+render read-only and the avatar upload is not offered. Combined with a workspace
+granted by auto-join, there is no question left to answer.
+
+The sign-in workflow therefore marks such an account onboarded outright, rather
+than settling the individual steps and leaving the application to work it out.
+The distinction matters: the application routes on `is_onboarded`, so settling
+only the step flags still sent the person to the onboarding screens, which
+rendered their first page and navigated away once loaded — a visible flash of a
+form they were never meant to fill in.
+
+Accounts whose provider has sync switched off still see the step, because it
+still has a job: nobody else supplies their name. Being federated is not the
+question; whether the provider writes the profile is.
+
 ### A federated account does not own its address
 
 An account with any federated identity cannot change its email address, and is
