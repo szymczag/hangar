@@ -34,9 +34,19 @@ const WEB = path.dirname(path.dirname(fileURLToPath(new URL("../tests/x", import
 // read what was remembered from the last successful start.
 const EXEMPT = new Set([]);
 
-// Addresses that are not destinations: XML namespaces, and the placeholders used
-// in examples and stories.
-const IGNORED_HOSTS = ["www.w3.org", "example.com", "dummy.com", "localhost"];
+// Hosts that are not destinations: XML namespaces, and the placeholders used in
+// examples and stories. Compared as whole host names — matching a substring
+// would let https://evil.example/www.w3.org through, which is the same mistake
+// this file exists to catch elsewhere.
+const IGNORED_HOSTS = new Set(["www.w3.org", "example.com", "dummy.com", "localhost"]);
+
+const hostOf = (address) => {
+  try {
+    return new URL(address).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+};
 
 function* sources(directory) {
   for (const entry of readdirSync(directory)) {
@@ -79,12 +89,19 @@ test("every outbound link is either gated or the licence offer", () => {
         addresses.push(match[1]);
       }
     }
-    const outbound = addresses.filter((address) => !IGNORED_HOSTS.some((host) => address.includes(host)));
+    const outbound = addresses.filter((address) => {
+      const host = hostOf(address);
+      return host !== "" && !IGNORED_HOSTS.has(host);
+    });
     if (outbound.length === 0) continue;
 
     // The licence offer reads its address from configuration, so an operator can
     // point it at their own mirror. It is allowed to render unconditionally.
-    if (/SOURCE_CODE_URL|sourceUrl/.test(source) && outbound.every((address) => address.includes("github.com"))) {
+    const everyAddressIsTheRepository = outbound.every((address) => {
+      const host = hostOf(address);
+      return host === "github.com" || host.endsWith(".github.com");
+    });
+    if (/SOURCE_CODE_URL|sourceUrl/.test(source) && everyAddressIsTheRepository) {
       if (!/ISSUE_TRACKER_URL|\/issues/.test(source)) continue;
     }
 
