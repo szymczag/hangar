@@ -100,6 +100,7 @@ admin pages) are listed for completeness but carry no merge-conflict risk.
 | 45  | `apps/api/plane/license/api/views/instance.py`, `apps/web/core/components/onboarding/steps/profile/root.tsx` | Onboarding | report which providers own profile attributes, and stop offering edits and passwords that cannot take effect |
 | 46  | `apps/api/plane/authentication/services/federated_auth.py`, `apps/api/plane/license/urls.py` | Account linking | let an administrator authorise an existing account to be linked on its next federated sign-in |
 | 47  | Authentication configuration and app sign-in surfaces | Google SSO | add an operator-controlled Google-only automatic redirect with error and explicit-sign-out escape paths |
+| 48  | `.github/workflows/pull-request-build-lint-api.yml`, `apps/api/requirements/local.txt`, `apps/api/plane/tests/contract/app/test_api_token.py`, `docs/linting.md` | CI | run ruff without `--fix` so the lint job can fail, read its pinned version from the requirements file, and remove the one unused import this had been hiding |
 
 Phase 6 new files implement the import model, parser, API, worker, tests, CE
 frontend, workspace settings route, and [administrator how-to](docs/importing-from-todoist.md).
