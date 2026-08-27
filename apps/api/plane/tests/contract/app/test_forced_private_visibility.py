@@ -5,10 +5,12 @@
 """An instance can refuse to let anything be seen beyond its members.
 
 Hangar is deployed where the interesting question is not who may edit something
-but who may read it. Plane defaults every one of these the visible way: a project
-is created "Public" to the workspace, a page is created public, a view is created
-public, and any of them can be published to the internet by anyone who can
-administer the project.
+but who may read it. Plane creates a page public, creates a view public, and
+lets anyone who can administer a project publish it to the internet.
+
+A project's own network setting is left alone: it decides whether members of a
+workspace can discover a project they have not been added to, not whether
+outsiders can read it.
 
 Where the policy is on, those choices are not offered and not accepted, and the
 public surface is closed outright. The refusal is at the single point every
@@ -28,7 +30,6 @@ from plane.utils.visibility_policy import (
     FORCE_PRIVATE_VISIBILITY_KEY,
     apply_private_visibility,
     PAGE_PRIVATE_ACCESS,
-    PROJECT_SECRET_NETWORK,
     VIEW_PRIVATE_ACCESS,
 )
 
@@ -96,39 +97,6 @@ def test_with_the_policy_off_nothing_changes(member):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_a_project_asked_for_publicly_is_created_private(member):
-    """Overwritten rather than refused: an older client gets a private project."""
-    _policy("1")
-    client, workspace, _, _ = member
-
-    response = client.post(
-        f"/api/workspaces/{workspace.slug}/projects/",
-        {"name": "Second", "identifier": "SEC", "network": 2},
-        format="json",
-    )
-
-    assert response.status_code == 201
-    assert Project.objects.get(id=response.data["id"]).network == PROJECT_SECRET_NETWORK
-
-
-@pytest.mark.contract
-@pytest.mark.django_db
-def test_an_existing_project_cannot_be_made_public_again(member):
-    _policy("1")
-    client, workspace, project, owner = member
-
-    client.patch(
-        f"/api/workspaces/{workspace.slug}/projects/{project.id}/",
-        {"network": 2},
-        format="json",
-    )
-
-    project.refresh_from_db()
-    assert project.network == PROJECT_SECRET_NETWORK
-
-
-@pytest.mark.contract
-@pytest.mark.django_db
 def test_a_page_asked_for_publicly_is_created_private(member):
     _policy("1")
     client, workspace, project, owner = member
@@ -166,22 +134,6 @@ def test_a_view_asked_for_publicly_is_created_private(member):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_with_the_policy_off_a_public_project_stays_public(member):
-    _policy("0")
-    client, workspace, _, _ = member
-
-    response = client.post(
-        f"/api/workspaces/{workspace.slug}/projects/",
-        {"name": "Third", "identifier": "THR", "network": 2},
-        format="json",
-    )
-
-    assert response.status_code == 201
-    assert Project.objects.get(id=response.data["id"]).network == 2
-
-
-@pytest.mark.contract
-@pytest.mark.django_db
 def test_objects_that_already_existed_are_brought_into_line(member):
     """Enforcing at write time governs only what happens next.
 
@@ -202,7 +154,6 @@ def test_objects_that_already_existed_are_brought_into_line(member):
     page.refresh_from_db()
     view.refresh_from_db()
     board.refresh_from_db()
-    assert project.network == PROJECT_SECRET_NETWORK
     assert page.access == PAGE_PRIVATE_ACCESS
     assert view.access == VIEW_PRIVATE_ACCESS
     assert board.is_disabled is True
@@ -238,4 +189,4 @@ def test_running_it_twice_changes_nothing_the_second_time(member):
     apply_private_visibility()
     second = apply_private_visibility()
 
-    assert second == {"projects": 0, "pages": 0, "views": 0, "deploy_boards": 0}
+    assert second == {"pages": 0, "views": 0, "deploy_boards": 0}

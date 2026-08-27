@@ -133,19 +133,22 @@ a strict xfail.
 
 ## Forced private visibility
 
-`FORCE_PRIVATE_VISIBILITY`, off by default and set in God Mode, makes this
-instance keep everything to its members. It is a refusal, not a default: the
-choice is not offered and not accepted.
+`FORCE_PRIVATE_VISIBILITY`, off by default and set in God Mode, keeps pages and
+views to the project they belong to and refuses to publish anything to the
+internet. It is a refusal, not a default: the choice is not offered and not
+accepted.
 
-Three models carry a visibility field and **they do not agree on what the numbers
-mean**. `Page.access` is `0` for public and `1` for private; `IssueView.access`
-is the reverse; `Project.network` uses `0` and `2`, and calls the visible one
-"Public" while meaning everyone in the workspace rather than everyone. Any code
-that takes one "make it private" value and applies it to more than one of them
-sets the opposite of what it intended somewhere. The private value for each is
-therefore named once, in `plane.utils.visibility_policy`, and a test compares
-each against its own model's choices — a renumbering upstream would otherwise
-turn that module into a way of publishing things quietly.
+`Page.access` is `0` for public and `1` for private. `IssueView.access` is **the
+reverse**. Code that takes one "make it private" value and applies it to both
+sets the opposite of what it intended for one of them, so the private value for
+each is named once, in `plane.utils.visibility_policy`, and a test compares each
+against its own model's choices — a renumbering upstream would otherwise turn
+that module into a way of publishing things quietly.
+
+`Project.network` is deliberately **not** governed. It decides whether members of
+a workspace can discover a project they have not been added to, not whether
+outsiders can read it. Forcing it would change how a team navigates without
+closing anything that was open, so the choice stays where it is.
 
 Requested values are **overwritten rather than rejected**, so an older client, a
 script, or the API used directly produces a private object instead of an error it
@@ -159,8 +162,8 @@ nine views under `plane.space` filter on `is_disabled` today, and a tenth that
 did not would serve exactly what the instance said must not be served.
 
 Turning the policy on also brings existing objects into line, because enforcing
-at write time governs only what happens next. Projects, pages and views become
-private and published boards are disabled. Boards are disabled rather than
+at write time governs only what happens next. Pages and views become private and
+published boards are disabled. Boards are disabled rather than
 deleted: the row carries the anchor that was handed out, and deleting it would
 let the same address be reissued later for unrelated content.
 

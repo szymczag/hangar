@@ -4,32 +4,20 @@
 
 """The private value named for each model must be the one that model means.
 
-Three models carry a visibility field and disagree about the numbers. Page uses
-0 for public and 1 for private; IssueView uses the reverse. A constant that
-drifts from its model — through a renumbering upstream, or a copied line — would
-not fail loudly: it would quietly publish what it was asked to hide.
+Page uses 0 for public and 1 for private; IssueView uses the reverse. A constant
+that drifts from its model — through a renumbering upstream, or a copied line —
+would not fail loudly: it would quietly publish what it was asked to hide.
 """
 
 import pytest
 
-from plane.db.models import Page, Project
+from plane.db.models import Page
 from plane.db.models.view import IssueView
-from plane.utils.visibility_policy import (
-    PAGE_PRIVATE_ACCESS,
-    PROJECT_SECRET_NETWORK,
-    VIEW_PRIVATE_ACCESS,
-)
+from plane.utils.visibility_policy import PAGE_PRIVATE_ACCESS, VIEW_PRIVATE_ACCESS
 
 
 def _choice_labels(field):
     return {value: str(label).lower() for value, label in field.choices}
-
-
-@pytest.mark.unit
-def test_the_project_value_is_the_one_the_model_calls_secret():
-    labels = _choice_labels(Project._meta.get_field("network"))
-
-    assert labels[PROJECT_SECRET_NETWORK] == "secret"
 
 
 @pytest.mark.unit

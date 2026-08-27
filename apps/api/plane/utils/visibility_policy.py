@@ -4,16 +4,18 @@
 
 """Whether this instance allows anything to be visible beyond its members.
 
-Three models carry a visibility field and they do not agree on what the numbers
-mean. `Page.access` is 0 for public and 1 for private; `IssueView.access` is the
-other way round; `Project.network` uses 0 and 2 and calls the visible one
-"Public" while meaning "everyone in the workspace", not "everyone". Any code that
-takes a single "make it private" value and applies it to more than one of them
-sets the opposite of what it intended somewhere.
+`Page.access` is 0 for public and 1 for private. `IssueView.access` is the other
+way round. Any code that takes a single "make it private" value and applies it to
+both sets the opposite of what it intended for one of them.
 
 So the private value for each is named here, once, and nowhere else. A test
 compares each against its model's own choices, because a renumbering upstream
 would otherwise turn this file into a way of publishing things quietly.
+
+`Project.network` is deliberately not governed. It decides whether members of a
+workspace can discover a project they have not been added to — not whether
+outsiders can read it — so forcing it would change how a team navigates without
+closing anything that was open.
 
 Publishing to the internet is a separate question with no per-object setting to
 force: a deploy board either exists and serves or it does not. It is refused at
@@ -28,8 +30,6 @@ from plane.license.utils.instance_value import get_configuration_value
 # instance it changes what people can already see.
 FORCE_PRIVATE_VISIBILITY_KEY = "FORCE_PRIVATE_VISIBILITY"
 
-# Project.NETWORK_CHOICES = ((0, "Secret"), (2, "Public"))
-PROJECT_SECRET_NETWORK = 0
 # Page.access choices = ((0, "Public"), (1, "Private"))
 PAGE_PRIVATE_ACCESS = 1
 # IssueView.access choices = ((0, "Private"), (1, "Public")) — the reverse of Page.
@@ -75,13 +75,11 @@ def apply_private_visibility(*, apps=None) -> dict[str, int]:
 
         registry = django_apps
 
-    Project = registry.get_model("db", "Project")
     Page = registry.get_model("db", "Page")
     IssueView = registry.get_model("db", "IssueView")
     DeployBoard = registry.get_model("db", "DeployBoard")
 
     return {
-        "projects": Project.objects.exclude(network=PROJECT_SECRET_NETWORK).update(network=PROJECT_SECRET_NETWORK),
         "pages": Page.objects.exclude(access=PAGE_PRIVATE_ACCESS).update(access=PAGE_PRIVATE_ACCESS),
         "views": IssueView.objects.exclude(access=VIEW_PRIVATE_ACCESS).update(access=VIEW_PRIVATE_ACCESS),
         "deploy_boards": DeployBoard.objects.filter(is_disabled=False).update(is_disabled=True),
