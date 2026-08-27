@@ -181,6 +181,14 @@ jobs:
       - name: Check React runtime contracts
         run: pnpm test:react-runtime-contracts
 
+      # Five packages carry vitest suites and nothing ran them, so they passed
+      # once and would have rotted from there. Not scoped with --affected: a
+      # change to a package's source can break a suite in a package that depends
+      # on it, and these are fast enough that running all of them is cheaper
+      # than reasoning about which ones matter.
+      - name: Run unit tests
+        run: pnpm turbo run test
+
   # Type check depends on build artifacts
   check-types:
     name: check:types
