@@ -302,6 +302,52 @@ class Account(TimeAuditModel):
         ordering = ("-created_at",)
 
 
+@receiver(post_save, sender=Profile)
+def apply_instance_account_defaults(sender, instance, created, **kwargs):
+    """Start a new account on what this instance considers sensible.
+
+    Fork (see FORK.md): applied here rather than at each of the five places a
+    profile is created — signup, federated signup, magic link, the admin console
+    and the redirection path — because a sixth would otherwise start on
+    upstream's defaults and nobody would notice until somebody complained about
+    the week beginning on Sunday.
+
+    Only on creation, and only where the field still holds what the model shipped
+    with. Somebody who has chosen a theme keeps it, and an operator changing the
+    instance default does not reach back and rewrite what people already picked.
+    """
+    if not created:
+        return
+
+    from plane.utils.account_defaults import default_start_of_week, default_theme, default_timezone
+
+    try:
+        fields = []
+        if instance.start_of_the_week == Profile._meta.get_field("start_of_the_week").default:
+            configured = default_start_of_week()
+            if configured != instance.start_of_the_week:
+                instance.start_of_the_week = configured
+                fields.append("start_of_the_week")
+
+        if not instance.theme:
+            instance.theme = {"theme": default_theme()}
+            fields.append("theme")
+
+        if fields:
+            instance.save(update_fields=fields)
+
+        user = instance.user
+        if user and user.user_timezone == User._meta.get_field("user_timezone").default:
+            configured = default_timezone()
+            if configured != user.user_timezone:
+                user.user_timezone = configured
+                user.save(update_fields=["user_timezone"])
+    except Exception as error:  # noqa: BLE001 - a preference must never block a signup
+        from plane.utils.exception_logger import log_exception
+
+        log_exception(error)
+
+
 @receiver(post_save, sender=User)
 def create_user_notification(sender, instance, created, **kwargs):
     # create preferences
