@@ -16,6 +16,10 @@ from rest_framework.response import Response
 
 # Module imports
 from .base import BaseAPIView
+from plane.utils.visibility_policy import (
+    FORCE_PRIVATE_VISIBILITY_KEY,
+    apply_private_visibility,
+)
 from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.models import InstanceConfiguration
 from plane.license.api.serializers import InstanceConfigurationSerializer
@@ -238,6 +242,15 @@ class InstanceConfigurationEndpoint(BaseAPIView):
             bulk_configurations.append(configuration)
 
         InstanceConfiguration.objects.bulk_update(bulk_configurations, ["value"], batch_size=100)
+
+        # Fork (see FORK.md): switching this on has to reach what already
+        # exists. Enforcing at write time governs only what happens next, so
+        # without this an operator would turn the policy on, be told it was
+        # saved, and leave every project, page and published board created
+        # beforehand exactly as visible as it was. A handful of bulk updates,
+        # and it is idempotent, so saving the page again costs nothing.
+        if str(request.data.get(FORCE_PRIVATE_VISIBILITY_KEY, "")) == "1":
+            apply_private_visibility()
 
         serializer = InstanceConfigurationSerializer(configurations, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
