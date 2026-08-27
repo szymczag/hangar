@@ -172,6 +172,7 @@ assert_absent '^[[:space:]]+app\.kubernetes\.io/name: ingress-nginx$' "$traefik_
 for variable in VITE_ADMIN_BASE_URL VITE_SPACE_BASE_URL VITE_LIVE_BASE_URL VITE_WEB_BASE_URL VITE_API_BASE_URL; do
     assert_present "^[[:space:]]+${variable}: \\\"https://hangar.example.com\\\",?$" "$production_render" "frontend runtime config is missing ${variable}"
 done
+assert_present '^[[:space:]]+VITE_LIVE_BASE_PATH: "/live",?$' "$production_render" "frontend runtime config is missing the Live base path"
 
 assert_absent 'Source: hangar/charts/evaluation' "$production_render" "production must not render evaluation dependencies"
 assert_present 'Source: hangar/charts/evaluation-postgresql' "$evaluation_render" "evaluation PostgreSQL did not render"

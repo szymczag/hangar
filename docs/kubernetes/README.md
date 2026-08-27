@@ -38,6 +38,12 @@ The Live shared secret is also consumed by the general worker for the
 authenticated `/convert-document/` server-to-server call. Rotating it therefore
 requires a coordinated restart of Live and the general worker deployment.
 
+The web frontend receives the Live origin and `VITE_LIVE_BASE_PATH=/live`
+through its generated, non-cacheable runtime `config.js`. Collaboration
+WebSockets therefore use `/live/collaboration`, matching the chart proxy route
+and the Live service. Published images also bake `/live` as a fallback, so a
+missing runtime file cannot silently move collaboration traffic to the root.
+
 Start with the [evaluation installation tutorial](evaluation-install.md) to
 exercise the released chart. Use the [production installation guide](production-install.md)
 only to review and help qualify the production profile.

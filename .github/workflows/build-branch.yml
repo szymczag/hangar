@@ -337,6 +337,7 @@ jobs:
             VITE_ADMIN_BASE_URL=${{ needs.setup.outputs.public_origin }}
             VITE_SPACE_BASE_URL=${{ needs.setup.outputs.public_origin }}
             VITE_LIVE_BASE_URL=${{ needs.setup.outputs.public_origin }}
+            VITE_LIVE_BASE_PATH=/live
             VITE_WEB_BASE_URL=${{ needs.setup.outputs.public_origin }}
             VITE_API_BASE_URL=${{ needs.setup.outputs.public_origin }}
           labels: |
