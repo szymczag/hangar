@@ -24,8 +24,8 @@ def _person(email="person@corp.com"):
     return user
 
 
-def _workspace(owner, slug="securitum"):
-    workspace = Workspace.objects.create(name="Securitum", owner=owner, slug=slug)
+def _workspace(owner, slug="acme"):
+    workspace = Workspace.objects.create(name="Acme", owner=owner, slug=slug)
     return workspace
 
 
