@@ -15,6 +15,7 @@ import { Menu, Transition } from "@headlessui/react";
 import { useTranslation } from "@plane/i18n";
 import { ChevronDownIcon } from "@plane/propel/icons";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Tooltip } from "@plane/propel/tooltip";
 import type { IWorkspace } from "@plane/types";
 import { Loader } from "@plane/ui";
 import { orderWorkspacesList, cn } from "@plane/utils";
@@ -77,10 +78,13 @@ export const WorkspaceMenuRoot = observer(function WorkspaceMenuRoot(props: Work
   return (
     <Menu
       as="div"
-      className={cn("relative flex h-full w-fit max-w-48 truncate whitespace-nowrap", {
-        "w-full justify-center text-center": variant === "sidebar",
-        "flex-grow justify-stretch truncate text-left": variant === "top-navigation",
-      })}
+      className={cn(
+        "relative flex h-full w-fit max-w-12 truncate whitespace-nowrap sm:max-w-48 md:max-w-60 xl:max-w-72",
+        {
+          "w-full justify-center text-center": variant === "sidebar",
+          "flex-grow justify-stretch truncate text-left": variant === "top-navigation",
+        }
+      )}
     >
       {({ open, close }: { open: boolean; close: () => void }) => {
         // Update local state directly
@@ -113,23 +117,27 @@ export const WorkspaceMenuRoot = observer(function WorkspaceMenuRoot(props: Work
             {variant === "top-navigation" && (
               <Menu.Button
                 className={cn(
-                  "group/menu-button flex flex-grow items-center justify-between gap-1 truncate rounded-sm p-1 text-13 font-medium text-secondary hover:bg-layer-1 focus:outline-none",
+                  "group/menu-button flex flex-grow items-center justify-between gap-1 truncate rounded-sm p-1.5 text-13 font-medium text-secondary hover:bg-layer-1 focus:outline-none",
                   {
                     "bg-layer-1": open,
                   }
                 )}
                 aria-label={t("aria_labels.projects_sidebar.open_workspace_switcher")}
               >
-                <div className="flex flex-grow items-center gap-2 truncate">
+                <div className="flex min-w-0 flex-grow items-center gap-0 truncate sm:gap-2">
                   <WorkspaceLogo
                     logo={activeWorkspace?.logo_url}
                     name={activeWorkspace?.name}
-                    classNames="border border-subtle rounded-md size-7"
+                    classNames="border border-subtle rounded-md size-9"
                   />
-                  <h4 className="truncate text-14 font-medium text-primary">{activeWorkspace?.name ?? t("loading")}</h4>
+                  <Tooltip tooltipContent={activeWorkspace?.name ?? t("loading")} position="bottom">
+                    <h4 className="hidden min-w-0 truncate text-14 font-medium text-primary sm:block">
+                      {activeWorkspace?.name ?? t("loading")}
+                    </h4>
+                  </Tooltip>
                 </div>
                 <ChevronDownIcon
-                  className={cn("size-4 flex-shrink-0 text-placeholder duration-300", {
+                  className={cn("hidden size-4 flex-shrink-0 text-placeholder duration-300 sm:block", {
                     "rotate-180": open,
                   })}
                 />
@@ -150,7 +158,7 @@ export const WorkspaceMenuRoot = observer(function WorkspaceMenuRoot(props: Work
                     "fixed z-21 mt-1 flex w-[19rem] origin-top-left flex-col divide-y divide-subtle rounded-md border-[0.5px] border-strong bg-surface-1 shadow-raised-200 outline-none",
                     {
                       "top-11 left-14": variant === "sidebar",
-                      "top-10 left-4": variant === "top-navigation",
+                      "top-12 left-4": variant === "top-navigation",
                     }
                   )}
                 >
