@@ -174,3 +174,5 @@ tree is therefore held to the same rules as the rest of the code.
 This is left as it is on purpose. Widening the glob would weaken the check across
 hundreds of files to accommodate a pattern the codebase does not currently need.
 
+
+<!-- temporary: proving the API gate reports on a pull request that touches no Python -->
