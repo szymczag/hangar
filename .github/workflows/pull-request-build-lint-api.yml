@@ -1,5 +1,9 @@
 name: Build and lint API
 
+# Deliberately unfiltered by path. A path filter here stops the whole workflow
+# from running, so a required check inside it would never report on a pull
+# request that does not touch the API and would block it forever. The filter now
+# lives in the changes job, which the lint job is gated on.
 on:
   workflow_dispatch:
   pull_request:
@@ -11,21 +15,58 @@ on:
       - "ready_for_review"
       - "review_requested"
       - "reopened"
-    paths:
-      - "apps/api/**"
+
+permissions:
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect API changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+    steps:
+      # Asked of the API rather than computed from a checkout: the answer is one
+      # request, and it needs no clone and no reasoning about how deep to fetch.
+      - name: Decide whether the API changed
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # A manual run has no pull request to compare against, so it lints
+          # everything rather than guessing.
+          if [ -z "${PR:-}" ]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(gh api --paginate "repos/$REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          if printf '%s\n' "$changed" | grep -qE '^(apps/api/|\.github/workflows/pull-request-build-lint-api\.yml$)'; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=false" >> "$GITHUB_OUTPUT"
+          fi
+
   lint-api:
     name: Lint API
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    if: |
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.requested_reviewers != null
+    needs: changes
+    # The former condition also required requested_reviewers to be non-null,
+    # which a manual run can never satisfy — github.event.pull_request is null
+    # there — so workflow_dispatch never did anything. Drafts are still skipped;
+    # `!= true` rather than `== false` so a null on a manual run does not skip.
+    if: needs.changes.outputs.api == 'true' && github.event.pull_request.draft != true
     steps:
       - uses: actions/checkout@v6
       - name: Set up Python
@@ -55,3 +96,36 @@ jobs:
       # starts green and stays that way.
       - name: Check formatting of fork-owned API code
         run: ruff format --check apps/api/plane/ext
+
+  # The context to require on the branch ruleset. It runs whatever the lint job
+  # did, so it reports on every pull request, and treats skipped as success so a
+  # change that touches no Python is not held up by it.
+  api-lint:
+    name: API lint
+    needs: [changes, lint-api]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the lint job to have succeeded or been skipped
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          LINT_RESULT: ${{ needs.lint-api.result }}
+        run: |
+          set -euo pipefail
+
+          failed=0
+          for entry in "changes=$CHANGES_RESULT" "lint-api=$LINT_RESULT"; do
+            name="${entry%%=*}"
+            result="${entry#*=}"
+            case "$result" in
+              success|skipped) ;;
+              *) echo "$name: $result" >&2; failed=1 ;;
+            esac
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "API lint did not complete successfully." >&2
+            exit 1
+          fi
+
