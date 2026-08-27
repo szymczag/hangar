@@ -7,5 +7,11 @@
 export default {
   test: {
     environment: "node",
+    // Restricted to TypeScript suites. apps/web/tests/*.test.mjs are node:test
+    // contracts with no vitest suite in them, run separately by the
+    // test:react-runtime-contracts script; without this vitest collects them
+    // and fails on files that are not its own.
+    include: ["**/*.test.ts", "**/*.test.tsx"],
+    exclude: ["**/node_modules/**", "**/build/**", "**/dist/**"],
   },
 };
