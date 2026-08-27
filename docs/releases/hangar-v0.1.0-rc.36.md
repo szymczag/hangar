@@ -56,6 +56,13 @@ already issued. This is presentation and not a boundary — the endpoint still
 decides, and decides the same way whatever the interface showed. The threshold is
 read from one place precisely so the offer and the refusal cannot drift apart.
 
+
+
+
+
+
+
+
 The inherited Plane baseline remains final `v1.4.0` at commit `917b23a6`. The
 qualification boundary remains Kubernetes 1.30 through 1.36 (including 1.36.2),
 Helm 4.2, `linux/amd64`, Restricted Pod Security Admission, TLS ingress with
