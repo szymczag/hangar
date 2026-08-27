@@ -19,6 +19,8 @@ import { cn, renderFormattedDate, renderFormattedTime } from "@plane/utils";
 // components
 import { DateDropdown } from "@/components/dropdowns/date";
 // hooks
+import { workspacesAllowingApiTokens } from "@/helpers/api-token-eligibility";
+import { useInstance } from "@/hooks/store/use-instance";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 // helpers
 type Props = {
@@ -88,9 +90,12 @@ export function CreateApiTokenForm(props: Props) {
   // hooks
   const { t } = useTranslation();
   const { workspaces } = useWorkspace();
+  const { config } = useInstance();
   // A token acts only in the workspace it names, so the choice is part of
-  // creating one rather than a detail that can be filled in later.
-  const workspaceOptions = Object.values(workspaces ?? {});
+  // creating one rather than a detail that can be filled in later — and it is
+  // narrowed to the workspaces where a role high enough to mint one is held,
+  // because offering the others produces a form that is filled in and refused.
+  const workspaceOptions = workspacesAllowingApiTokens(workspaces, config?.api_token_minimum_role);
 
   const handleFormSubmit = async (data: IApiToken) => {
     // if never expires is toggled off, and the user has not selected a custom date or a predefined date, show an error

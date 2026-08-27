@@ -150,6 +150,19 @@ Tokens created before this keep `workspace = NULL` and their previous reach: the
 owner's memberships. Nothing revokes them, and raising the threshold does not
 either — it governs minting, not tokens already issued.
 
+The threshold is reported to the application on `/api/instances/`, so it offers
+the feature only where creating a token would succeed: the workspace chooser
+lists the memberships that qualify, and where none do the offer is withdrawn with
+the reason rather than accepting a form and refusing it on save. Existing tokens
+stay listed and revocable regardless — someone below the threshold can still see
+and revoke what they already hold.
+
+This is presentation, not enforcement. `ApiTokenEndpoint` decides, and it decides
+the same way whatever the interface showed. The threshold is read from one place,
+`plane.utils.api_token_policy`, precisely so the offer and the refusal cannot
+drift apart; a drifting copy would either hide a feature that works or offer one
+that does not.
+
 A route with no workspace slug in its path is not confined by this, since there
 is nothing to compare against. Every such route under `/api/v1/` today addresses
 the caller's own record — their profile and their own uploads — where a scoped
