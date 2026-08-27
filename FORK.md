@@ -117,6 +117,7 @@ admin pages) are listed for completeness but carry no merge-conflict risk.
 | 62  | `apps/api/plane/utils/account_defaults.py`, `apps/api/plane/db/models/user.py`, God Mode workspace settings, `docs/authorization-model.md` | Preferences | let an instance decide the starting week, theme and timezone for new accounts, without reaching into choices already made |
 | 63  | `apps/web/helpers/failure-page-branding.ts`, startup-failure and crash pages, `apps/web/core/lib/wrappers/instance-wrapper.tsx`, God Mode branding, `docs/instance-branding.md` | Branding | let an operator say what the failure pages tell people to do, remembered from the last successful start because those pages render when the instance cannot be asked |
 | 64  | instance configuration API and migration, God Mode workspace list, web route compatibility layer, `docs/workspace-short-links.md` | Routing | let one UUID-backed default workspace use stable `/i/AA-123` work-item links while every other route retains its workspace slug |
+| 65  | `packages/constants/src/endpoints.ts`, release image workflow, Kubernetes frontend runtime configuration and docs | Live | keep collaboration WebSockets below `/live` in runtime configuration and published-image fallbacks |
 
 Phase 6 new files implement the import model, parser, API, worker, tests, CE
 frontend, workspace settings route, and [administrator how-to](docs/importing-from-todoist.md).
