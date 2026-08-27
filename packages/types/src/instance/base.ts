@@ -128,6 +128,8 @@ export interface IInstanceConfig {
   // Fork: what the failure pages tell people to do. Shown instead of a public
   // issue tracker on a deployment inside a company.
   support_text?: string;
+  /** Workspace UUID used to resolve stable `/i/PROJECT-123` links. */
+  default_workspace_id?: string;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;

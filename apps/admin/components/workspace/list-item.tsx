@@ -9,6 +9,7 @@ import { observer } from "mobx-react";
 // plane internal packages
 import { WEB_BASE_URL } from "@plane/constants";
 import { NewTabIcon } from "@plane/propel/icons";
+import { Button } from "@plane/propel/button";
 import { Tooltip } from "@plane/propel/tooltip";
 import { getFileURL } from "@plane/utils";
 // hooks
@@ -16,9 +17,19 @@ import { useWorkspace } from "@/hooks/store";
 
 type TWorkspaceListItemProps = {
   workspaceId: string;
+  isDefaultForShortLinks: boolean;
+  isUpdatingDefault: boolean;
+  canUpdateDefault: boolean;
+  onDefaultChange: (selected: boolean) => void;
 };
 
-export const WorkspaceListItem = observer(function WorkspaceListItem({ workspaceId }: TWorkspaceListItemProps) {
+export const WorkspaceListItem = observer(function WorkspaceListItem({
+  workspaceId,
+  isDefaultForShortLinks,
+  isUpdatingDefault,
+  canUpdateDefault,
+  onDefaultChange,
+}: TWorkspaceListItemProps) {
   // store hooks
   const { getWorkspaceById } = useWorkspace();
   // derived values
@@ -26,14 +37,16 @@ export const WorkspaceListItem = observer(function WorkspaceListItem({ workspace
 
   if (!workspace) return null;
   return (
-    <a
+    <div
       key={workspaceId}
-      href={`${WEB_BASE_URL}/${encodeURIComponent(workspace.slug)}`}
-      target="_blank"
       className="group flex items-center justify-between gap-2.5 truncate rounded-lg border border-subtle bg-layer-1 p-3 hover:border-subtle-1 hover:bg-layer-1-hover hover:shadow-raised-100"
-      rel="noreferrer"
     >
-      <div className="flex items-start gap-4">
+      <a
+        href={`${WEB_BASE_URL}/${encodeURIComponent(workspace.slug)}`}
+        target="_blank"
+        className="flex min-w-0 flex-1 items-start gap-4"
+        rel="noreferrer"
+      >
         <span
           className={`relative mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center p-2 text-11 uppercase ${
             !workspace?.logo_url && "rounded-lg bg-accent-primary text-on-color"
@@ -80,10 +93,22 @@ export const WorkspaceListItem = observer(function WorkspaceListItem({ workspace
             )}
           </div>
         </div>
-      </div>
+        <NewTabIcon
+          width={14}
+          height={16}
+          className="ml-auto flex-shrink-0 text-placeholder group-hover:text-secondary"
+        />
+      </a>
       <div className="flex-shrink-0">
-        <NewTabIcon width={14} height={16} className="text-placeholder group-hover:text-secondary" />
+        <Button
+          variant={isDefaultForShortLinks ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => onDefaultChange(!isDefaultForShortLinks)}
+          disabled={isUpdatingDefault || !canUpdateDefault}
+        >
+          {isDefaultForShortLinks ? "Short links enabled" : "Use for short links"}
+        </Button>
       </div>
-    </a>
+    </div>
   );
 });

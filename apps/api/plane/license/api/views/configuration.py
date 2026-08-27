@@ -22,6 +22,7 @@ from plane.utils.visibility_policy import (
 )
 from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.models import InstanceConfiguration
+from plane.db.models import Workspace
 from plane.license.api.serializers import InstanceConfigurationSerializer
 from plane.license.utils.encryption import encrypt_data
 from plane.mailer.service import enqueue_rendered_email
@@ -153,6 +154,23 @@ class InstanceConfigurationEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         normalized_values = {}
+        if "INSTANCE_DEFAULT_WORKSPACE_ID" in request.data:
+            default_workspace_id = str(request.data.get("INSTANCE_DEFAULT_WORKSPACE_ID") or "").strip()
+            if default_workspace_id:
+                try:
+                    parsed_workspace_id = uuid.UUID(default_workspace_id)
+                except ValueError:
+                    return Response(
+                        {"error": "The workspace selected for short links is not valid."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if not Workspace.objects.filter(id=parsed_workspace_id).exists():
+                    return Response(
+                        {"error": "The workspace selected for short links does not exist."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            normalized_values["INSTANCE_DEFAULT_WORKSPACE_ID"] = default_workspace_id
+
         if "OIDC_ALLOW_UNVERIFIED_EMAIL" in request.data:
             return Response(
                 {"error": "Unverified OIDC email is not supported."},
