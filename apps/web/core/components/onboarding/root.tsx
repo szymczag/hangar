@@ -23,11 +23,15 @@ type Props = {
 };
 
 export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [] }: Props) {
-  const [currentStep, setCurrentStep] = useState<TOnboardingStep>(EOnboardingSteps.PROFILE_SETUP);
+  // Undefined until the first step has been chosen. Starting at PROFILE_SETUP
+  // rendered that screen on mount, before the workspaces had loaded and before
+  // anything had decided which step applied — so somebody with nothing to
+  // onboard saw a name field and an avatar picker flash past on the way out.
+  const [currentStep, setCurrentStep] = useState<TOnboardingStep | undefined>(undefined);
   // store hooks
   const { data: user } = useUser();
   const { data: userProfile, updateUserProfile, finishUserOnboarding } = useUserProfile();
-  const { workspaces } = useWorkspace();
+  const { workspaces, loader: workspacesLoader } = useWorkspace();
   const { config: instanceConfig } = useInstance();
 
   const workspacesList = Object.values(workspaces ?? {});
@@ -131,12 +135,25 @@ export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [
         !userProfile?.onboarding_step?.workspace_invite
       ) {
         setCurrentStep(EOnboardingSteps.INVITE_MEMBERS);
+        return;
       }
+      // Nothing above applied, so the profile step is the one that does.
+      setCurrentStep(EOnboardingSteps.PROFILE_SETUP);
     };
 
+    // Deciding on a half-loaded picture is what produced the flash. The profile
+    // carries the recorded steps and the workspace list answers whether the
+    // person already belongs somewhere; without both, no step is chosen and
+    // nothing is rendered yet.
+    if (workspacesLoader || !userProfile) return;
     handleInitialStep();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspacesList.length, userProfile?.onboarding_step]);
+  }, [workspacesLoader, workspacesList.length, userProfile]);
+
+  // Renders nothing at all rather than a placeholder: this component is on the
+  // way past for anyone who has nothing to onboard, and a spinner would be one
+  // more thing flashing at them.
+  if (!currentStep) return null;
 
   return (
     <div className="flex h-full flex-col">

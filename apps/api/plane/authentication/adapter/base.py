@@ -27,6 +27,7 @@ from plane.db.models import FileAsset, Profile, User
 from plane.license.utils.instance_value import get_configuration_value
 from plane.settings.storage import S3Storage
 from plane.utils.exception_logger import log_exception
+from plane.utils.provider_profile import provider_manages_profile
 from plane.utils.host import base_host
 from plane.utils.ip_address import get_client_ip
 from plane.utils.file_asset_upload import (
@@ -187,17 +188,7 @@ class Adapter:
 
     def check_sync_enabled(self):
         """Check if sync is enabled for the provider"""
-        provider_config_map = {
-            "google": "ENABLE_GOOGLE_SYNC",
-            "github": "ENABLE_GITHUB_SYNC",
-            "gitlab": "ENABLE_GITLAB_SYNC",
-            "gitea": "ENABLE_GITEA_SYNC",
-        }
-        config_key = provider_config_map.get(self.provider)
-        if config_key:
-            (enabled,) = get_configuration_value([{"key": config_key, "default": os.environ.get(config_key, "0")}])
-            return enabled == "1"
-        return False
+        return provider_manages_profile(self.provider)
 
     def download_and_upload_avatar(self, avatar_url, user):
         """

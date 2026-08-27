@@ -23,6 +23,7 @@ from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.api.serializers import InstanceSerializer
 from plane.license.models import Instance
 from plane.utils.api_token_policy import api_token_minimum_role
+from plane.utils.provider_profile import providers_managing_profiles
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.cache import cache_response, invalidate_cache
 from plane.utils.otlp_endpoints import get_otlp_metric_export_configuration
@@ -189,18 +190,7 @@ class InstanceEndpoint(BaseAPIView):
         # Fork (see FORK.md): which providers overwrite a person's name and
         # avatar on every sign-in. The clients need this to stop offering an
         # edit that the next sign-in discards — see Adapter.sync_user_data.
-        sync_keys = {
-            "google": "ENABLE_GOOGLE_SYNC",
-            "github": "ENABLE_GITHUB_SYNC",
-            "gitlab": "ENABLE_GITLAB_SYNC",
-            "gitea": "ENABLE_GITEA_SYNC",
-        }
-        sync_values = get_configuration_value(
-            [{"key": key, "default": os.environ.get(key, "0")} for key in sync_keys.values()]
-        )
-        data["provider_managed_profiles"] = [
-            provider for provider, value in zip(sync_keys, sync_values, strict=False) if str(value) == "1"
-        ]
+        data["provider_managed_profiles"] = providers_managing_profiles()
 
         # Fork (see FORK.md): sign-in page branding. Served without a session,
         # because the page it dresses is seen before anyone has one. Empty
