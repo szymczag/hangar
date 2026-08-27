@@ -262,6 +262,16 @@ class InstanceEndpoint(BaseAPIView):
         )
         data["show_external_links"] = str(INSTANCE_SHOW_EXTERNAL_LINKS) == "1"
 
+        # Fork (see FORK.md): what the failure pages say. They render when this
+        # very endpoint could not be reached, so the clients keep the last answer
+        # and read it from there — an operator inside a company needs their own
+        # help desk on that screen, not an invitation to file a public bug
+        # report from the moment the thing is broken.
+        (INSTANCE_SUPPORT_TEXT,) = get_configuration_value(
+            [{"key": "INSTANCE_SUPPORT_TEXT", "default": os.environ.get("INSTANCE_SUPPORT_TEXT", "")}]
+        )
+        data["support_text"] = str(INSTANCE_SUPPORT_TEXT or "")
+
         # Github app name
         data["github_app_name"] = str(GITHUB_APP_NAME)
 

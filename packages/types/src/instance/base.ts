@@ -84,6 +84,7 @@ export type TInstanceBrandingConfigurationKeys =
   | "INSTANCE_SIGN_IN_HEADER"
   | "INSTANCE_SIGN_IN_SUBHEADER"
   | "INSTANCE_ACCENT_COLOR"
+  | "INSTANCE_SUPPORT_TEXT"
   | "INSTANCE_LOGIN_BACKDROP_COLOR";
 
 export interface IInstanceConfig {
@@ -124,6 +125,9 @@ export interface IInstanceConfig {
   // Fork: whether the application may link to hosts this instance does not run.
   // The AGPL source offer is exempt and always shown.
   show_external_links?: boolean;
+  // Fork: what the failure pages tell people to do. Shown instead of a public
+  // issue tracker on a deployment inside a company.
+  support_text?: string;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;

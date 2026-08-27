@@ -97,12 +97,29 @@ An operator who wants that link to stay inside their network points
 from there, so nothing else needs changing — the obligation is met and nobody
 leaves the building.
 
-### Two places are exempt
+### The failure pages say what you tell them to
 
-The startup-failure page and the production error boundary keep their links.
-They render when the instance did not come up and no configuration can be read,
-and they are seen by whoever is fixing it rather than by the people using it.
+`INSTANCE_SUPPORT_TEXT` is what the startup-failure page and the crash page show.
+Set it to your own help desk. Left empty, those pages say only that something went
+wrong and offer no destination at all.
 
-A contract test holds the rest, so a link added later has to be gated, be the
-licence offer, or be named as an exemption.
+These pages render precisely when `/api/instances/` could not be reached, so they
+cannot ask what to say. The answer is therefore **remembered** from the last time
+the instance could be asked, and read from there. Anyone who has opened the
+application before has it. A first-time visitor arriving while the instance is
+down gets the neutral wording and no links, which is the right thing to show
+somebody the instance knows nothing about.
+
+They were originally exempt from the setting above, on the reasoning that they are
+seen by whoever is fixing the instance. That was wrong: on a deployment inside a
+company they are what every member of staff sees the moment their tools stop
+working, which is the worst possible time to be inviting them to file a public bug
+report.
+
+The crash page keeps the source link either way, for the same section 13 reason as
+everywhere else — a page rendering after a crash is still a modified version being
+run over a network.
+
+A contract test holds all of this with **no exemptions**, so a link added later
+has to be gated or be the licence offer.
 
