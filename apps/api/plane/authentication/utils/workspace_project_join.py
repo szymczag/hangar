@@ -11,6 +11,7 @@ from plane.db.models import (
     ProjectMember,
     ProjectMemberInvite,
     WorkspaceMember,
+    WorkspaceMemberInvite,
 )
 from plane.utils.cache import invalidate_cache_directly
 from plane.bgtasks.event_tracking_task import track_event
@@ -99,3 +100,33 @@ def process_workspace_project_invitations(user):
     """Consume accepted workspace/project invitations in one transaction."""
     with transaction.atomic():
         _process_workspace_project_invitations(user)
+
+
+def spend_invitations_already_honoured(user):
+    """Retire invitations to workspaces this account is already a member of.
+
+    Fork (see FORK.md): an invitation is consumed when it is accepted through
+    the link. Somebody invited by email who then signs in through the identity
+    provider instead — admitted by auto-join, or already a member — never
+    accepts it, so it stays outstanding. Their name appears under Members and
+    under Pending Invites at the same time, which is the reported symptom.
+
+    It is not only untidy. An unaccepted invitation stays usable until it
+    expires, so if the person is later removed from the workspace, that
+    invitation is a way back in that nobody granted. Retiring it when the
+    membership it was offering already exists closes that.
+
+    Recorded as consumed in the same way an accepted one is, rather than
+    deleted, so what happened to it remains legible.
+    """
+    memberships = WorkspaceMember.objects.filter(member=user, is_active=True).values_list("workspace_id", flat=True)
+    if not memberships:
+        return 0
+
+    now = timezone.now()
+    return WorkspaceMemberInvite.objects.filter(
+        email__iexact=user.email,
+        workspace_id__in=list(memberships),
+        consumed_at__isnull=True,
+        deleted_at__isnull=True,
+    ).update(consumed_at=now, deleted_at=now)
