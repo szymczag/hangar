@@ -177,6 +177,22 @@ Workspace mode validates the signed Google `hd` claim. A matching email suffix i
 not sufficient. Configure every intended tenant explicitly before switching from
 `generic` to `workspace`.
 
+### A federated account does not own its address
+
+An account with any federated identity cannot change its email address, and is
+refused both when requesting a verification code and when submitting one.
+
+The refusal is not about sign-in. The binding is a digest over provider, issuer,
+subject format and subject; email takes no part in it, so a changed address would
+not stop the account signing in — which is the reason it has to be refused rather
+than left to fail on its own. The address is what policy reads:
+`SSO_ENFORCED_DOMAINS` pins a domain to a provider, and auto-join grants
+workspaces by domain. Proving control of an unrelated mailbox would otherwise let
+an account keep the identity that admitted it while moving out from under the
+policy that governs it, or into one that would grant it more.
+
+Accounts that sign in with a password are unaffected.
+
 #### Secrets are write-only
 
 `GOOGLE_CLIENT_SECRET` and every other encrypted setting is stored but never read
