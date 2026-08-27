@@ -56,6 +56,13 @@ already issued. This is presentation and not a boundary — the endpoint still
 decides, and decides the same way whatever the interface showed. The threshold is
 read from one place precisely so the offer and the refusal cannot drift apart.
 
+A deploying organisation's name was removed from a test fixture, where it had
+been copied from a production report. Published source should not say who runs a
+given instance. A check now scans every tracked file for such names on each pull
+request, because the previous occurrence was removed by hand with nothing left
+behind to stop it recurring, and it recurred. Earlier releases still carry the
+name in their sources and in this repository's history.
+
 The inherited Plane baseline remains final `v1.4.0` at commit `917b23a6`. The
 qualification boundary remains Kubernetes 1.30 through 1.36 (including 1.36.2),
 Helm 4.2, `linux/amd64`, Restricted Pod Security Admission, TLS ingress with
