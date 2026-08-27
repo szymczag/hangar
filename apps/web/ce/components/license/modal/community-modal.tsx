@@ -8,6 +8,8 @@ import { Dialog } from "@headlessui/react";
 import { BookOpen, Check, ExternalLink, FileCode2, X } from "lucide-react";
 import { observer } from "mobx-react";
 import { DOCUMENTATION_URL, SOURCE_CODE_URL } from "@plane/constants";
+// helpers
+import { showExternalLinks } from "@/helpers/external-links";
 import { getButtonStyling } from "@plane/propel/button";
 import { HangarLogo } from "@plane/propel/icons";
 import { IconButton } from "@plane/propel/icon-button";
@@ -30,6 +32,7 @@ export const HangarCommunityModal = observer(function HangarCommunityModal(props
 
   const documentationUrl = config?.product?.documentation_url ?? DOCUMENTATION_URL;
   const sourceUrl = config?.product?.source_url ?? SOURCE_CODE_URL;
+  const linksAllowed = showExternalLinks(config);
   const version = config?.product?.version ?? packageJson.version;
   const releaseNotesUrl = `${sourceUrl.replace(/\/$/, "")}/releases`;
 
@@ -97,16 +100,22 @@ export const HangarCommunityModal = observer(function HangarCommunityModal(props
         </section>
 
         <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-          <a
-            href={releaseNotesUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(getButtonStyling("primary", "base"), "justify-center gap-2")}
-          >
-            <BookOpen className="size-4" aria-hidden="true" />
-            View release notes
-            <ExternalLink className="size-3.5" aria-hidden="true" />
-          </a>
+          {/* Release notes and documentation live on hosts this instance does not
+              run, so they appear only where an operator allows that. The source
+              offer below is not covered: AGPL-3.0 section 13 requires it of
+              anyone running a modified version over a network. */}
+          {linksAllowed && (
+            <a
+              href={releaseNotesUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(getButtonStyling("primary", "base"), "justify-center gap-2")}
+            >
+              <BookOpen className="size-4" aria-hidden="true" />
+              View release notes
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+            </a>
+          )}
           <a
             href={sourceUrl}
             target="_blank"
@@ -117,15 +126,17 @@ export const HangarCommunityModal = observer(function HangarCommunityModal(props
             View source and license
             <ExternalLink className="size-3.5" aria-hidden="true" />
           </a>
-          <a
-            href={documentationUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(getButtonStyling("tertiary", "base"), "justify-center gap-2")}
-          >
-            Documentation
-            <ExternalLink className="size-3.5" aria-hidden="true" />
-          </a>
+          {linksAllowed && (
+            <a
+              href={documentationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(getButtonStyling("tertiary", "base"), "justify-center gap-2")}
+            >
+              Documentation
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+            </a>
+          )}
         </div>
 
         <div className="mt-7 border-t border-subtle pt-5">

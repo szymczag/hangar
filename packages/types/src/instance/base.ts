@@ -121,6 +121,9 @@ export interface IInstanceConfig {
   // Fork: the instance forces every project, page and view private and refuses
   // to publish anything publicly, so the clients must not offer the choice.
   force_private_visibility?: boolean;
+  // Fork: whether the application may link to hosts this instance does not run.
+  // The AGPL source offer is exempt and always shown.
+  show_external_links?: boolean;
   github_app_name: string | undefined;
   slack_client_id: string | undefined;
   posthog_api_key: string | undefined;
@@ -163,6 +166,7 @@ export type TInstanceConfigurationKeys =
   | "INSTANCE_LOGO_ASSET_ID"
   | "INSTANCE_LOGIN_BACKGROUND_ASSET_ID"
   | "INSTANCE_SHOW_LICENSE_NOTICE"
+  | "INSTANCE_SHOW_EXTERNAL_LINKS"
   | TInstanceConfigurationSourceKey;
 
 export interface IInstanceConfiguration {
