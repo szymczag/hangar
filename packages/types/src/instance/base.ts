@@ -167,6 +167,10 @@ export interface IInstanceConfiguration {
   value: string;
   created_by: string | null;
   updated_by: string | null;
+  // Sent only for encrypted keys, whose `value` is always returned empty
+  // because secrets are write-only. It is the only way a form can tell a secret
+  // that has never been set from one it simply cannot read back.
+  is_configured?: boolean;
 }
 
 // Fork (see FORK.md): read-only report of who has an account and how they

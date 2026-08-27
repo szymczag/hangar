@@ -177,6 +177,22 @@ Workspace mode validates the signed Google `hd` claim. A matching email suffix i
 not sufficient. Configure every intended tenant explicitly before switching from
 `generic` to `workspace`.
 
+#### Secrets are write-only
+
+`GOOGLE_CLIENT_SECRET` and every other encrypted setting is stored but never read
+back: the configuration API returns an empty value for it and reports only
+whether one is set. God Mode shows the field empty for that reason, not because
+the secret is missing.
+
+Leaving it empty when saving **keeps the stored secret**. That is how any other
+setting on the page — the sign-in mode, the allowed domains, the automatic
+redirect — can be changed without fetching the credential again. To replace a
+secret, type the new one; to remove a provider, disable it rather than blanking
+its secret.
+
+The field is still required the first time, while nothing is stored, so a
+provider cannot be enabled without one.
+
 #### Automatically start Google sign-in
 
 `GOOGLE_AUTO_REDIRECT` defaults to `0` and is also editable under

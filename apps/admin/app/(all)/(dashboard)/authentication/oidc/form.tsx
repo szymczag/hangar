@@ -34,7 +34,13 @@ export function InstanceOIDCConfigForm(props: Props) {
   // states
   const [isDiscardChangesModalOpen, setIsDiscardChangesModalOpen] = useState(false);
   // store hooks
-  const { updateInstanceConfigurations } = useInstance();
+  const { updateInstanceConfigurations, configuredSecrets } = useInstance();
+  // The API never returns a stored secret, so an empty field means either
+  // "never set" or "set and unreadable". Only the first should block saving:
+  // an empty value is understood server-side as "keep the existing secret",
+  // so demanding it again just to change an unrelated setting asks the
+  // operator to fetch a credential the instance already has.
+  const isSecretConfigured = configuredSecrets.has("OIDC_CLIENT_SECRET");
   // form data
   const {
     handleSubmit,
@@ -83,9 +89,11 @@ export function InstanceOIDCConfigForm(props: Props) {
       type: "password",
       label: "Client secret",
       description: <>The client secret issued by your identity provider for this client.</>,
-      placeholder: "9b0050f94ec1b744e32ce79ea4ffacd40d4119cb",
+      placeholder: isSecretConfigured
+        ? "Leave blank to keep the current secret"
+        : "9b0050f94ec1b744e32ce79ea4ffacd40d4119cb",
       error: Boolean(errors.OIDC_CLIENT_SECRET),
-      required: true,
+      required: !isSecretConfigured,
     },
     {
       key: "OIDC_PROVIDER_NAME",

@@ -181,6 +181,11 @@ jobs:
       - name: Check React runtime contracts
         run: pnpm test:react-runtime-contracts
 
+      # Source-level invariants for the God Mode forms, which have no test
+      # runner of their own.
+      - name: Check God Mode form contracts
+        run: pnpm test:admin-form-contracts
+
       # Five packages carry vitest suites and nothing ran them, so they passed
       # once and would have rotted from there. Not scoped with --affected: a
       # change to a package's source can break a suite in a package that depends
