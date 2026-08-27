@@ -18,6 +18,8 @@ import { usePasswordStrength } from "@plane/ui";
 import { cn, getFileURL, validatePersonName } from "@plane/utils";
 // components
 import { UserImageUploadModal } from "@/components/core/modals/user-image-upload-modal";
+// helpers
+import { isProfileManagedByProvider } from "@/helpers/provider-managed-profile";
 // hooks
 import { useInstance } from "@/hooks/store/use-instance";
 import { useUser, useUserProfile } from "@/hooks/store/user";
@@ -127,9 +129,9 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
   const canSignInWithPassword = instanceConfig?.is_email_password_enabled !== false;
   // The provider overwrites these on every sign-in when attribute sync is on,
   // so editing them here would be undone by the next login without explanation.
-  const providerManagingProfile = (instanceConfig?.provider_managed_profiles ?? []).includes(
-    user?.last_login_medium ?? ""
-  );
+  // Shared with profile settings, which asks the same question of the same two
+  // values and must not drift from this one.
+  const providerManagingProfile = isProfileManagedByProvider(instanceConfig, user);
   const currentPassword = watch("password") || undefined;
   const currentConfirmPassword = watch("confirm_password") || undefined;
   const passwordStrength = usePasswordStrength(currentPassword ?? "");

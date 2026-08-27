@@ -106,6 +106,7 @@ admin pages) are listed for completeness but carry no merge-conflict risk.
 | 51  | `packages/types/src/instance/base.ts`, `apps/admin/store/instance.store.ts`, God Mode OAuth and OIDC forms, `docs/federated-sso-security.md` | God Mode | stop requiring a stored secret to be retyped before any other setting on the page can be saved, using the `is_configured` flag the API already returns |
 | 52  | `apps/web/core/components/projects/create/root.tsx` | Project creation | store a bundled cover image after the project exists rather than before, so creating a project with the default cover is not refused for naming a record that has no id yet |
 | 53  | `apps/api/plane/app/views/user/base.py`, `apps/api/plane/app/serializers/user.py`, `packages/types/src/users.ts`, `docs/federated-sso-security.md` | Federated accounts | refuse an email change on an account that signs in through a provider, since the address drives domain policy while the sign-in binding ignores it, and report federation to the app |
+| 54  | `apps/web/core/components/settings/profile/content/pages/general/form.tsx`, onboarding profile step, `apps/web/helpers/provider-managed-profile.ts` | Federated accounts | stop profile settings offering a name the provider rewrites on every sign-in, an avatar sync deletes, and an address the API refuses to change |
 
 Phase 6 new files implement the import model, parser, API, worker, tests, CE
 frontend, workspace settings route, and [administrator how-to](docs/importing-from-todoist.md).

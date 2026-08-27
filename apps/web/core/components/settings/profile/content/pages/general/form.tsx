@@ -26,6 +26,7 @@ import { SettingsBoxedControlItem } from "@/components/settings/boxed-control-it
 // helpers
 import { handleCoverImageChange } from "@/helpers/cover-image.helper";
 // hooks
+import { isProfileManagedByProvider } from "@/helpers/provider-managed-profile";
 import { useInstance } from "@/hooks/store/use-instance";
 import { useUser, useUserProfile } from "@/hooks/store/user";
 // utils
@@ -89,6 +90,18 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
   const { config } = useInstance();
 
   const isSMTPConfigured = config?.is_smtp_configured || false;
+  // The provider rewrites these on every sign-in, so an edit made here lasts
+  // until the next login and no further. Offering it invites someone to set a
+  // name, see it take effect, and find it reverted with no explanation.
+  const providerManagesProfile = isProfileManagedByProvider(config, currentUser);
+  // Separate from the above: the address is refused by the API for any federated
+  // account, whether or not attribute sync is on, because domain policy reads it.
+  const isFederated = Boolean(currentUser?.is_federated);
+  const managedByNotice = providerManagesProfile ? (
+    <span className="text-11 text-tertiary">
+      Managed by {currentUser?.last_login_medium}. Change it with your provider.
+    </span>
+  ) : null;
 
   const handleProfilePictureDelete = async (url: string | null | undefined) => {
     if (!url) return;
@@ -220,7 +233,14 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
             <div className="absolute -bottom-6 left-6 flex items-end justify-between">
               <div className="flex gap-3">
                 <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2">
-                  <button type="button" onClick={() => setIsImageUploadModalOpen(true)}>
+                  {/* Not merely reverted by sync but deleted: sync_user_data removes an
+                      uploaded avatar from storage before writing the provider's, so
+                      offering the upload here would be offering to lose the file. */}
+                  <button
+                    type="button"
+                    onClick={() => !providerManagesProfile && setIsImageUploadModalOpen(true)}
+                    disabled={providerManagesProfile}
+                  >
                     {!userAvatar || userAvatar === "" ? (
                       <div className="h-16 w-16 rounded-md bg-layer-1 p-2">
                         <CircleUserRound className="h-full w-full text-secondary" />
@@ -230,9 +250,9 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
                         <img
                           src={getFileURL(userAvatar)}
                           className="absolute top-0 left-0 h-full w-full rounded-lg object-cover"
-                          onClick={() => setIsImageUploadModalOpen(true)}
+                          onClick={() => !providerManagesProfile && setIsImageUploadModalOpen(true)}
                           alt={currentUser?.display_name}
-                          role="button"
+                          role={providerManagesProfile ? undefined : "button"}
                         />
                       </div>
                     )}
@@ -287,12 +307,14 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
                       ref={ref}
                       hasError={Boolean(errors.first_name)}
                       placeholder="Enter your first name"
+                      disabled={providerManagesProfile}
                       className={`w-full rounded-md ${errors.first_name ? "border-danger-strong" : ""}`}
                       maxLength={50}
                       autoComplete="on"
                     />
                   )}
                 />
+                {managedByNotice}
                 {errors.first_name && <span className="text-11 text-danger-primary">{errors.first_name.message}</span>}
               </div>
               <div className="flex flex-col gap-1">
@@ -313,12 +335,14 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
                       ref={ref}
                       hasError={Boolean(errors.last_name)}
                       placeholder="Enter your last name"
+                      disabled={providerManagesProfile}
                       className="w-full rounded-md"
                       maxLength={50}
                       autoComplete="on"
                     />
                   )}
                 />
+                {managedByNotice}
                 {errors.last_name && <span className="text-11 text-danger-primary">{errors.last_name.message}</span>}
               </div>
               <div className="flex flex-col gap-1">
@@ -343,11 +367,13 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
                       ref={ref}
                       hasError={Boolean(errors?.display_name)}
                       placeholder="Enter your display name"
+                      disabled={providerManagesProfile}
                       className={`w-full ${errors?.display_name ? "border-danger-strong" : ""}`}
                       maxLength={50}
                     />
                   )}
                 />
+                {managedByNotice}
                 {errors?.display_name && (
                   <span className="text-11 text-danger-primary">{errors?.display_name?.message}</span>
                 )}
@@ -380,14 +406,21 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
                     />
                   )}
                 />
-                {isSMTPConfigured && (
-                  <button
-                    type="button"
-                    className="btn w-fit text-11 text-secondary underline"
-                    onClick={() => setIsChangeEmailModalOpen(true)}
-                  >
-                    {t("account_settings.profile.change_email_modal.title")}
-                  </button>
+                {isFederated ? (
+                  <span className="text-11 text-tertiary">
+                    Your identity provider owns this address, and the workspaces you are admitted to are decided by its
+                    domain. Change it with your provider.
+                  </span>
+                ) : (
+                  isSMTPConfigured && (
+                    <button
+                      type="button"
+                      className="btn w-fit text-11 text-secondary underline"
+                      onClick={() => setIsChangeEmailModalOpen(true)}
+                    >
+                      {t("account_settings.profile.change_email_modal.title")}
+                    </button>
+                  )
                 )}
               </div>
             </div>
