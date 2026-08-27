@@ -5,20 +5,22 @@
  */
 
 import { useMemo } from "react";
-import { useLocation, useNavigate, useParams as useParamsRR, useSearchParams as useSearchParamsRR } from "react-router";
+import { useLocation, useNavigate, useSearchParams as useSearchParamsRR } from "react-router";
 import { ensureTrailingSlash } from "./helper";
+import { useRoutePolicy } from "./route-policy-context";
 
 export function useRouter() {
   const navigate = useNavigate();
+  const { normalizePath } = useRoutePolicy();
   return useMemo(
     () => ({
       push: (to: string) => {
         // Defer navigation to avoid state updates during render
-        setTimeout(() => navigate(ensureTrailingSlash(to)), 0);
+        setTimeout(() => navigate(ensureTrailingSlash(normalizePath(to))), 0);
       },
       replace: (to: string) => {
         // Defer navigation to avoid state updates during render
-        setTimeout(() => navigate(ensureTrailingSlash(to), { replace: true }), 0);
+        setTimeout(() => navigate(ensureTrailingSlash(normalizePath(to)), { replace: true }), 0);
       },
       back: () => {
         setTimeout(() => navigate(-1), 0);
@@ -33,7 +35,7 @@ export function useRouter() {
         // no-op in this shim
       },
     }),
-    [navigate]
+    [navigate, normalizePath]
   );
 }
 
@@ -47,6 +49,6 @@ export function useSearchParams(): URLSearchParams {
   return searchParams;
 }
 
-export function useParams() {
-  return useParamsRR();
+export function useParams(): Readonly<Record<string, string>> {
+  return useRoutePolicy().params as Readonly<Record<string, string>>;
 }

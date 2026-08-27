@@ -6,6 +6,7 @@
 
 import { useEffect } from "react";
 import { observer } from "mobx-react";
+import { useParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
 // plane imports
@@ -30,12 +31,10 @@ import { ProjectAuthWrapper } from "@/layouts/auth-layout/project-wrapper";
 import { useWorkItemProperties } from "@/hooks/use-issue-properties";
 import { WorkItemDetailRoot } from "@/components/browse/workItem-detail";
 
-import type { Route } from "./+types/page";
-
-export const IssueDetailsPage = observer(function IssueDetailsPage({ params }: Route.ComponentProps) {
+export const IssueDetailsPage = observer(function IssueDetailsPage() {
   // router
   const router = useAppRouter();
-  const { workspaceSlug, workItem } = params;
+  const { workspaceSlug = "", workItem = "" } = useParams();
   // hooks
   const { resolvedTheme } = useTheme();
   // store hooks
@@ -51,7 +50,7 @@ export const IssueDetailsPage = observer(function IssueDetailsPage({ params }: R
 
   // fetching issue details
   const { data, isLoading, error } = useSWR<TIssue, Error>(
-    `ISSUE_DETAIL_${workspaceSlug}_${projectIdentifier}_${sequence_id}`,
+    workspaceSlug && workItem ? `ISSUE_DETAIL_${workspaceSlug}_${projectIdentifier}_${sequence_id}` : null,
     () => fetchIssueWithIdentifier(workspaceSlug.toString(), projectIdentifier, sequence_id)
   );
 

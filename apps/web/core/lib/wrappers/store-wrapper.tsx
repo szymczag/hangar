@@ -5,15 +5,18 @@
  */
 
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { observer } from "mobx-react";
-import { useParams } from "next/navigation";
 import { useTheme } from "next-themes";
+import { useLocation, useNavigate, useParams } from "react-router";
 // helpers
 import { applyCustomTheme, clearCustomTheme } from "@plane/utils";
+import { RoutePolicyProvider, normalizeDefaultWorkspacePath } from "@/app/compat/next/route-policy-context";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
+import { useInstance } from "@/hooks/store/use-instance";
 import { useRouterParams } from "@/hooks/store/use-router-params";
+import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUserProfile } from "@/hooks/store/user";
 
 type TStoreWrapper = {
@@ -26,8 +29,12 @@ function StoreWrapper(props: TStoreWrapper) {
   const { setTheme } = useTheme();
   // router
   const params = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   // store hooks
   const { setQuery } = useRouterParams();
+  const { config } = useInstance();
+  const { getWorkspaceById } = useWorkspace();
   const { sidebarCollapsed, toggleSidebar } = useAppTheme();
   const { data: userProfile } = useUserProfile();
   // Track if we've initialized theme from server (one-time only)
@@ -36,13 +43,23 @@ function StoreWrapper(props: TStoreWrapper) {
   const currentUserIdRef = useRef<string | undefined>(undefined);
   // Track previous theme to detect transitions from custom theme
   const previousThemeRef = useRef<string | undefined>(undefined);
+  const defaultWorkspaceSlug = config?.default_workspace_id
+    ? getWorkspaceById(config.default_workspace_id)?.slug
+    : undefined;
+  const effectiveParams = useMemo(
+    () =>
+      params.workItem && !params.workspaceSlug && defaultWorkspaceSlug
+        ? { ...params, workspaceSlug: defaultWorkspaceSlug }
+        : params,
+    [defaultWorkspaceSlug, params]
+  );
 
   /**
    * Sidebar collapsed fetching from local storage
    */
   useEffect(() => {
     const localValue = localStorage && localStorage.getItem("app_sidebar_collapsed");
-    const localBoolValue = localValue ? (localValue === "true" ? true : false) : false;
+    const localBoolValue = localValue === "true";
     if (localValue && sidebarCollapsed === undefined) toggleSidebar(localBoolValue);
   }, [sidebarCollapsed, setTheme, toggleSidebar]);
 
@@ -74,7 +91,7 @@ function StoreWrapper(props: TStoreWrapper) {
 
     // Mark as initialized - prevents future syncs from server
     hasInitializedThemeRef.current = true;
-  }, [userProfile?.theme?.theme, setTheme]);
+  }, [userProfile?.id, userProfile?.theme?.theme, setTheme]);
 
   /**
    * Effect 2: Custom theme CSS application (runs on every change)
@@ -104,11 +121,20 @@ function StoreWrapper(props: TStoreWrapper) {
   }, [userProfile?.theme]);
 
   useEffect(() => {
-    if (!params) return;
-    setQuery(params);
-  }, [params, setQuery]);
+    setQuery(effectiveParams);
+  }, [effectiveParams, setQuery]);
 
-  return <>{children}</>;
+  useEffect(() => {
+    const currentPath = `${location.pathname}${location.search}${location.hash}`;
+    const normalizedPath = normalizeDefaultWorkspacePath(currentPath, defaultWorkspaceSlug);
+    if (normalizedPath !== currentPath) navigate(normalizedPath, { replace: true });
+  }, [defaultWorkspaceSlug, location.hash, location.pathname, location.search, navigate]);
+
+  return (
+    <RoutePolicyProvider params={params} defaultWorkspaceSlug={defaultWorkspaceSlug}>
+      {children}
+    </RoutePolicyProvider>
+  );
 }
 
 export default observer(StoreWrapper);
