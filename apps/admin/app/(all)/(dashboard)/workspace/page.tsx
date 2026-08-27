@@ -42,6 +42,9 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
   const disableWorkspaceCreation = formattedConfig?.DISABLE_WORKSPACE_CREATION ?? "";
   const apiTokenMinimumRole = formattedConfig?.API_TOKEN_MINIMUM_ROLE ?? "5";
   const forcePrivateVisibility = formattedConfig?.FORCE_PRIVATE_VISIBILITY ?? "0";
+  const defaultStartOfWeek = formattedConfig?.INSTANCE_DEFAULT_START_OF_WEEK ?? "1";
+  const defaultTheme = formattedConfig?.INSTANCE_DEFAULT_THEME ?? "light";
+  const defaultTimezone = formattedConfig?.INSTANCE_DEFAULT_TIMEZONE ?? "UTC";
   const hasNextPage = paginationInfo?.next_page_results && paginationInfo?.next_cursor !== undefined;
 
   // fetch data
@@ -111,6 +114,64 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
                     }
                   }}
                   size="sm"
+                  disabled={isSubmitting || !isConfigurationEditable}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <Loader>
+            <Loader.Item height="50px" width="100%" />
+          </Loader>
+        )}
+        {formattedConfig ? (
+          <div className="flex w-full flex-col gap-4 rounded-sm">
+            <div className="grow">
+              <div className="pb-1 text-16 font-medium">What a new account starts with.</div>
+              <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
+                Starting values, not rules. Everyone can change these afterwards, and changing them here does not reach
+                back into accounts that already exist. Upstream starts the week on Sunday and follows the operating
+                system for the theme, which means every new person changes the same settings by hand.
+              </div>
+            </div>
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-11 text-tertiary">First day of the week</span>
+                <select
+                  className="w-44 rounded-md border border-strong bg-surface-1 px-3 py-2 text-13"
+                  value={defaultStartOfWeek}
+                  onChange={(event) => updateConfig("INSTANCE_DEFAULT_START_OF_WEEK", event.target.value)}
+                  disabled={isSubmitting || !isConfigurationEditable}
+                >
+                  {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, index) => (
+                    <option key={day} value={String(index)}>
+                      {day}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-11 text-tertiary">Theme</span>
+                <select
+                  className="w-44 rounded-md border border-strong bg-surface-1 px-3 py-2 text-13"
+                  value={defaultTheme}
+                  onChange={(event) => updateConfig("INSTANCE_DEFAULT_THEME", event.target.value)}
+                  disabled={isSubmitting || !isConfigurationEditable}
+                >
+                  {["light", "dark", "light-contrast", "dark-contrast", "system"].map((theme) => (
+                    <option key={theme} value={theme}>
+                      {theme}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-11 text-tertiary">Timezone</span>
+                <input
+                  className="w-56 rounded-md border border-strong bg-surface-1 px-3 py-2 text-13"
+                  value={defaultTimezone}
+                  placeholder="Europe/Warsaw"
+                  onChange={(event) => updateConfig("INSTANCE_DEFAULT_TIMEZONE", event.target.value)}
                   disabled={isSubmitting || !isConfigurationEditable}
                 />
               </div>
