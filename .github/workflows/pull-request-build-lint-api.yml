@@ -47,3 +47,11 @@ jobs:
       # green whatever it found, and the fix died with the runner.
       - name: Lint apps/api
         run: ruff check apps/api
+      # Scoped to the fork's own code on purpose. Across apps/api/plane, ruff
+      # would reformat 48 files, and 41 of them are inherited from Plane and
+      # mostly carry Plane's own style rather than any drift of ours. Rewriting
+      # those means a formatting conflict in every future upstream merge, bought
+      # with nothing. plane/ext is entirely ours and already formatted, so this
+      # starts green and stays that way.
+      - name: Check formatting of fork-owned API code
+        run: ruff format --check apps/api/plane/ext

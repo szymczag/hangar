@@ -128,6 +128,24 @@ cannot fail is not a check.
 If ruff reports something, fix it in your branch. `ruff check --fix apps/api` is
 fine to run locally, where the result is kept.
 
+### Formatting is checked for fork-owned code only
+
+```bash
+ruff format --check apps/api/plane/ext
+```
+
+`apps/api/plane/ext` holds Hangar's own API code, it is already formatted, and CI
+keeps it that way.
+
+The rest of `apps/api/plane` is deliberately **not** checked. Ruff would reformat
+48 files there, and 41 of them are inherited from Plane at the upstream baseline
+recorded in `UPSTREAM_BASE.json` — carrying Plane's own formatting rather than any
+drift introduced here. Rewriting those would put a formatting conflict in every
+future upstream merge and buy nothing for it.
+
+If you are editing an inherited file, match the style around you rather than
+running the formatter over the whole file.
+
 ### Test exemptions cover less than they look like they do
 
 `[tool.ruff.lint.per-file-ignores]` exempts `tests/*` from `E402`, `F401` and
