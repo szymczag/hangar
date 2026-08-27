@@ -131,6 +131,20 @@ suite stays green, the finding stays visible, and `strict=True` forces whoever
 fixes it to remove the marker — a fixed defect makes the test pass, which fails
 a strict xfail.
 
+## No third-party code in the browser
+
+Nothing this application serves loads executable code from a host the instance
+does not control. A contract test enforces it across the web sources with an
+empty allow-list, so adding an exception is a deliberate edit to that list rather
+than an import nobody notices.
+
+Upstream shipped Microsoft Clarity — a session recorder — behind
+`VITE_ENABLE_SESSION_RECORDER`. It is removed rather than left switched off. Off
+by default is not the same as absent: the code sat one configuration change away
+from sending every signed-in person's address, and whatever it chose to record,
+to a third party, inside an application whose point is that its contents stay in
+the building.
+
 ## Forced private visibility
 
 `FORCE_PRIVATE_VISIBILITY`, off by default and set in God Mode, keeps pages and
