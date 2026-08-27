@@ -59,6 +59,25 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.37` to `rc.38`
+
+Upgrade directly from the immediately previous complete release, `rc.37`.
+Migration `license.0021_default_workspace_short_urls` seeds an empty configuration
+row and requires no data backfill. Existing values, Secrets, storage, RBAC, and
+NetworkPolicies remain compatible.
+
+Deploy all application images together. The new web image corrects the Live
+collaboration path and must not be substituted with the `rc.37` web image. After
+the migration Job succeeds, optionally choose a default workspace in God Mode,
+open a compact `/i/PROJECT-123` link, and verify page collaboration connects below
+`/live/collaboration` through the configured proxy.
+
+Before upgrading, back up PostgreSQL, record the current Helm revision, render
+the existing values against `0.1.0-rc.38`, and verify the signed tag, chart, image
+digests, and attestations. A technical rollback to `rc.37` may leave the seeded
+configuration row in place; that release ignores it. It also removes compact
+links and restores the Live path defect, so prefer a forward correction.
+
 ### Upgrade from `rc.27` to `rc.37`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
