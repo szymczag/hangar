@@ -140,7 +140,9 @@ before admitting the package to a controlled environment.
 backend host/CORS settings, Live, all five frontend URL variables, TLS host
 matching, and a generated runtime `config.js`. Published frontend images also
 bake the default origin as a fallback, while the runtime file lets an operator
-change the hostname without rebuilding static assets.
+change the hostname without rebuilding static assets. The runtime file supplies
+the Live origin and `/live` base path together, keeping collaboration
+WebSockets on the route exposed by both the proxy and Live service.
 
 Set `gateway.enabled: true` to use Gateway API. This suppresses the NGINX
 `Ingress` and renders explicit routes for `/god-mode/`, `/spaces/`, `/live/`,
