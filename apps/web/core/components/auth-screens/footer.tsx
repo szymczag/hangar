@@ -11,7 +11,7 @@ import { useInstance } from "@/hooks/store/use-instance";
 /**
  * Says whose instance this is, and what it runs on.
  *
- * What stood here was inherited Plane marketing — "Join 10,000+ teams building
+ * What stood here was inherited upstream marketing — "Join 10,000+ teams building
  * with Hangar" above the logos of four companies that are not customers of this
  * deployment and never agreed to appear on its sign-in page. On a self-hosted
  * instance that is not persuasive, it is just wrong.
