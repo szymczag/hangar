@@ -146,36 +146,34 @@ export const SidebarMenuItems = observer(function SidebarMenuItems() {
           leaveFrom="transform scale-100 opacity-100"
           leaveTo="transform scale-95 opacity-0"
         >
-          {isWorkspaceMenuOpen && (
-            <Disclosure.Panel as="div" className="flex flex-col gap-0.5" static>
-              <>
-                {WORKSPACE_SIDEBAR_STATIC_PINNED_NAVIGATION_ITEMS_LINKS.map((item, _index) => (
-                  // oxlint-disable-next-line react/no-array-index-key
-                  <SidebarItemBase key={`static_${_index}`} item={item} />
-                ))}
-                {sortedNavigationItems.map((item, _index) => (
-                  // oxlint-disable-next-line react/no-array-index-key
-                  <SidebarItemBase key={`dynamic_${_index}`} item={item} />
-                ))}
-                <SidebarNavItem>
-                  <button
-                    type="button"
-                    onClick={() => toggleExtendedSidebar()}
-                    className="flex flex-grow items-center gap-1.5 text-13 font-medium text-tertiary"
-                    id="extended-sidebar-toggle"
-                    aria-label={t(
-                      isExtendedSidebarOpened
-                        ? "aria_labels.app_sidebar.close_extended_sidebar"
-                        : "aria_labels.app_sidebar.open_extended_sidebar"
-                    )}
-                  >
-                    <Ellipsis className="size-4 flex-shrink-0" />
-                    <span>{isExtendedSidebarOpened ? "Hide" : "More"}</span>
-                  </button>
-                </SidebarNavItem>
-              </>
-            </Disclosure.Panel>
-          )}
+          <Disclosure.Panel as="div" className="flex flex-col gap-0.5" static>
+            <>
+              {WORKSPACE_SIDEBAR_STATIC_PINNED_NAVIGATION_ITEMS_LINKS.map((item, _index) => (
+                // oxlint-disable-next-line react/no-array-index-key
+                <SidebarItemBase key={`static_${_index}`} item={item} />
+              ))}
+              {sortedNavigationItems.map((item, _index) => (
+                // oxlint-disable-next-line react/no-array-index-key
+                <SidebarItemBase key={`dynamic_${_index}`} item={item} />
+              ))}
+              <SidebarNavItem>
+                <button
+                  type="button"
+                  onClick={() => toggleExtendedSidebar()}
+                  className="flex flex-grow items-center gap-1.5 text-13 font-medium text-tertiary"
+                  id="extended-sidebar-toggle"
+                  aria-label={t(
+                    isExtendedSidebarOpened
+                      ? "aria_labels.app_sidebar.close_extended_sidebar"
+                      : "aria_labels.app_sidebar.open_extended_sidebar"
+                  )}
+                >
+                  <Ellipsis className="size-4 flex-shrink-0" />
+                  <span>{isExtendedSidebarOpened ? "Hide" : "More"}</span>
+                </button>
+              </SidebarNavItem>
+            </>
+          </Disclosure.Panel>
         </Transition>
       </Disclosure>
     </>
