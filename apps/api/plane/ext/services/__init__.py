@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from .issue_types import ensure_project_system_types
+from .project_copy import ProjectCopyError, duplicate_project
 from .work_items import (
     MAX_HIERARCHY_DEPTH,
     WorkItemInvariantError,
@@ -12,7 +13,9 @@ from .work_items import (
 
 __all__ = [
     "MAX_HIERARCHY_DEPTH",
+    "ProjectCopyError",
     "WorkItemInvariantError",
+    "duplicate_project",
     "parent_ancestry_ids",
     "ensure_project_system_types",
     "project_default_issue_type",

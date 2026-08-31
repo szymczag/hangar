@@ -14,7 +14,7 @@ import { observer } from "mobx-react";
 import { useParams, useRouter } from "next/navigation";
 import { createRoot } from "react-dom/client";
 import scrollIntoView from "smooth-scroll-into-view-if-needed";
-import { Settings, Share2, LogOut, MoreHorizontal } from "lucide-react";
+import { Settings, Share2, LogOut, MoreHorizontal, CopyPlus } from "lucide-react";
 import { Disclosure, Transition } from "@headlessui/react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel, MEMBER_TRACKER_ELEMENTS } from "@plane/constants";
@@ -29,6 +29,7 @@ import { cn } from "@plane/utils";
 // components
 import { DEFAULT_TAB_KEY, getTabUrl } from "@/components/navigation/tab-navigation-utils";
 import { useTabPreferences } from "@/components/navigation/use-tab-preferences";
+import { DuplicateProjectModal } from "@/components/project/duplicate-project-modal";
 import { LeaveProjectModal } from "@/components/project/leave-project-modal";
 import { PublishProjectModal } from "@/components/project/publish-project/modal";
 // hooks
@@ -80,6 +81,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
 
   // states
   const [leaveProjectModalOpen, setLeaveProjectModal] = useState(false);
+  const [duplicateProjectModalOpen, setDuplicateProjectModal] = useState(false);
   const [publishModalOpen, setPublishModal] = useState(false);
   const [isMenuActive, setIsMenuActive] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -281,6 +283,11 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
     <>
       <PublishProjectModal isOpen={publishModalOpen} projectId={projectId} onClose={() => setPublishModal(false)} />
       <LeaveProjectModal project={project} isOpen={leaveProjectModalOpen} onClose={() => setLeaveProjectModal(false)} />
+      <DuplicateProjectModal
+        project={project}
+        isOpen={duplicateProjectModalOpen}
+        onClose={() => setDuplicateProjectModal(false)}
+      />
       <Disclosure key={`${project.id}_${URLProjectId}`} defaultOpen={isProjectListOpen} as="div">
         <div
           id={`sidebar-${projectId}-${projectListType}`}
@@ -402,6 +409,14 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                         </div>
                         <div>{t("publish_project")}</div>
                       </div>
+                    </CustomMenu.MenuItem>
+                  )}
+                  {isAdmin && (
+                    <CustomMenu.MenuItem onClick={() => setDuplicateProjectModal(true)}>
+                      <span className="flex items-center justify-start gap-2">
+                        <CopyPlus className="h-3.5 w-3.5 stroke-[1.5]" />
+                        <span>{t("duplicate_project")}</span>
+                      </span>
                     </CustomMenu.MenuItem>
                   )}
                   <CustomMenu.MenuItem onClick={handleCopyText}>

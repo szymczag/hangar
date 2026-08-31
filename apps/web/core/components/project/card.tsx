@@ -8,7 +8,7 @@ import React, { useRef, useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArchiveRestoreIcon, Settings, UserPlus } from "lucide-react";
+import { ArchiveRestoreIcon, Settings, UserPlus, CopyPlus } from "lucide-react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel, IS_FAVORITE_MENU_OPEN } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
@@ -31,6 +31,7 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // local imports
 import { CoverImage } from "@/components/common/cover-image";
 import { DeleteProjectModal } from "./delete-project-modal";
+import { DuplicateProjectModal } from "./duplicate-project-modal";
 import { JoinProjectModal } from "./join-project-modal";
 import { ArchiveRestoreProjectModal } from "./archive-restore-modal";
 
@@ -44,6 +45,7 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
   const [deleteProjectModalOpen, setDeleteProjectModal] = useState(false);
   const [joinProjectModalOpen, setJoinProjectModal] = useState(false);
   const [restoreProject, setRestoreProject] = useState(false);
+  const [duplicateProjectModalOpen, setDuplicateProjectModal] = useState(false);
   // refs
   const projectCardRef = useRef(null);
   // router
@@ -131,6 +133,14 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
       shouldRender: !isArchived && (hasAdminRole || hasMemberRole),
     },
     {
+      key: "duplicate",
+      action: () => setDuplicateProjectModal(true),
+      title: "Duplicate",
+      icon: CopyPlus,
+      // Admin only, matching the API: duplication re-links shared work item types.
+      shouldRender: !isArchived && hasAdminRole,
+    },
+    {
       key: "join",
       action: () => setJoinProjectModal(true),
       title: "Join",
@@ -174,6 +184,12 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
         project={project}
         isOpen={deleteProjectModalOpen}
         onClose={() => setDeleteProjectModal(false)}
+      />
+      {/* Duplicate Project Modal */}
+      <DuplicateProjectModal
+        project={project}
+        isOpen={duplicateProjectModalOpen}
+        onClose={() => setDuplicateProjectModal(false)}
       />
       {/* Join Project Modal */}
       {workspaceSlug && (
@@ -307,7 +323,8 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
             {isArchived ? (
               hasAdminRole && (
                 <div className="flex items-center justify-center gap-2">
-                  <div
+                  <button
+                    type="button"
                     className="flex items-center justify-center text-11 font-medium text-placeholder hover:text-secondary"
                     onClick={(e) => {
                       e.preventDefault();
@@ -319,8 +336,9 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
                       <ArchiveRestoreIcon className="h-3.5 w-3.5" />
                       Restore
                     </div>
-                  </div>
-                  <div
+                  </button>
+                  <button
+                    type="button"
                     className="flex items-center justify-center text-11 font-medium text-placeholder hover:text-secondary"
                     onClick={(e) => {
                       e.preventDefault();
@@ -329,7 +347,7 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
                     }}
                   >
                     <TrashIcon className="h-3.5 w-3.5" />
-                  </div>
+                  </button>
                 </div>
               )
             ) : (

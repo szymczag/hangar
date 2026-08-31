@@ -41,6 +41,7 @@ from plane.ext.views.import_job import (
     TodoistImportEndpoint,
     TodoistImportPreviewEndpoint,
 )
+from plane.ext.views.project_copy import ProjectDuplicateEndpoint
 from plane.ext.views.worklog import (
     IssueWorkLogDetailEndpoint,
     IssueWorkLogsEndpoint,
@@ -89,6 +90,13 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/epic-settings/",
         EpicSettingsEndpoint.as_view(),
         name="epic-settings",
+    ),
+    path(
+        f"{PROJECT_BASE}/duplicate/",
+        ProjectDuplicateEndpoint.as_view(),
+        # A distinct name on purpose: `name="project"` is declared three times in
+        # plane.app.urls.project, which is why its tests build URLs by hand.
+        name="project-duplicate",
     ),
     path(
         f"{PROJECT_BASE}/issue-types/",

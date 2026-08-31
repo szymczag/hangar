@@ -96,6 +96,13 @@ TODOIST_IMPORT_PREVIEW_USER_RATE = _rate_setting("TODOIST_IMPORT_PREVIEW_USER_RA
 TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE = _rate_setting("TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE", "30/minute")
 TODOIST_IMPORT_EXECUTE_USER_RATE = _rate_setting("TODOIST_IMPORT_EXECUTE_USER_RATE", "3/hour")
 TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE = _rate_setting("TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE", "10/hour")
+
+# Duplicating a project writes up to MAX_TOTAL_ROWS rows while holding a lock on
+# the workspace row, so an unthrottled caller can stall project creation for
+# everyone in that workspace. The DRF default is AnonRateThrottle, which by
+# construction does not throttle an authenticated caller.
+PROJECT_DUPLICATE_USER_RATE = _rate_setting("PROJECT_DUPLICATE_USER_RATE", "10/hour")
+PROJECT_DUPLICATE_WORKSPACE_RATE = _rate_setting("PROJECT_DUPLICATE_WORKSPACE_RATE", "30/hour")
 TODOIST_IMPORT_WORKER_CONCURRENCY = _bounded_integer_setting("TODOIST_IMPORT_WORKER_CONCURRENCY", 2, 1, 32)
 TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER = _bounded_integer_setting(
     "TODOIST_IMPORT_WORKER_PREFETCH_MULTIPLIER", 1, 1, 4
@@ -260,6 +267,8 @@ REST_FRAMEWORK = {
         "todoist_preview_workspace": TODOIST_IMPORT_PREVIEW_WORKSPACE_RATE,
         "todoist_execute_user": TODOIST_IMPORT_EXECUTE_USER_RATE,
         "todoist_execute_workspace": TODOIST_IMPORT_EXECUTE_WORKSPACE_RATE,
+        "project_duplicate_user": PROJECT_DUPLICATE_USER_RATE,
+        "project_duplicate_workspace": PROJECT_DUPLICATE_WORKSPACE_RATE,
     },
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
@@ -532,9 +541,7 @@ ADMIN_2FA_MAX_ATTEMPTS = int(os.environ.get("ADMIN_2FA_MAX_ATTEMPTS", 5))
 # without a code change; it is logged loudly at startup when disabled.
 ADMIN_WEBAUTHN_REQUIRED = os.environ.get("ADMIN_WEBAUTHN_REQUIRED", "1") == "1"
 if not ADMIN_WEBAUTHN_REQUIRED:
-    _logger.warning(
-        "ADMIN_WEBAUTHN_REQUIRED=0: the instance-admin console is protected by a password alone."
-    )
+    _logger.warning("ADMIN_WEBAUTHN_REQUIRED=0: the instance-admin console is protected by a password alone.")
 
 # CSRF cookies
 CSRF_COOKIE_SECURE = secure_origins

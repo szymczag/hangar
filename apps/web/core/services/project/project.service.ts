@@ -19,6 +19,27 @@ import type { TProject, TPartialProject } from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
 
+/**
+ * What a project duplication should carry across. Every field is optional; the
+ * API derives a free name and identifier and inherits the source's visibility
+ * when they are omitted. `states` and work item types are always copied and so
+ * are not offered here.
+ */
+export type TDuplicateProjectPayload = {
+  name?: string;
+  identifier?: string;
+  network?: number;
+  include?: {
+    labels?: boolean;
+    estimates?: boolean;
+    intake?: boolean;
+    members?: boolean;
+    cycles?: boolean;
+    modules?: boolean;
+    views?: boolean;
+  };
+};
+
 export class ProjectService extends APIService {
   constructor() {
     super(API_BASE_URL);
@@ -26,6 +47,24 @@ export class ProjectService extends APIService {
 
   async createProject(workspaceSlug: string, data: Partial<TProject>): Promise<TProject> {
     return this.post(`/api/workspaces/${workspaceSlug}/projects/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response;
+      });
+  }
+
+  /**
+   * Copy a project's configuration into a new project.
+   *
+   * The source project id belongs in the path, not the body: the API resolves
+   * its project-level permission check from the URL, so a body-supplied source
+   * would not be scoped to a project the caller can actually read.
+   *
+   * Rejects with `error.response` (not `.response.data`) to match
+   * `createProject`, whose callers decode `err.data` for the API's error codes.
+   */
+  async duplicateProject(workspaceSlug: string, projectId: string, data: TDuplicateProjectPayload): Promise<TProject> {
+    return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/duplicate/`, data)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response;
