@@ -105,29 +105,58 @@ function meaningfulChildren(element) {
   });
 }
 
-function isSingleElementExpression(expression) {
+function isSingleElementExpression(expression, sourceFile, visitedIdentifiers = new Set()) {
   if (
     ts.isParenthesizedExpression(expression) ||
     ts.isAsExpression(expression) ||
     ts.isNonNullExpression(expression) ||
     ts.isSatisfiesExpression(expression)
   ) {
-    return isSingleElementExpression(expression.expression);
+    return isSingleElementExpression(expression.expression, sourceFile, visitedIdentifiers);
   }
 
   if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) return true;
 
   if (ts.isConditionalExpression(expression)) {
-    return isSingleElementExpression(expression.whenTrue) && isSingleElementExpression(expression.whenFalse);
+    return (
+      isSingleElementExpression(expression.whenTrue, sourceFile, visitedIdentifiers) &&
+      isSingleElementExpression(expression.whenFalse, sourceFile, visitedIdentifiers)
+    );
+  }
+
+  // `{element}` where `const element = <div />` is declared in the same file.
+  if (ts.isIdentifier(expression) && sourceFile) {
+    if (visitedIdentifiers.has(expression.text)) return false;
+    const initializer = findVariableInitializer(sourceFile, expression.text);
+    if (!initializer || ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) return false;
+
+    return isSingleElementExpression(initializer, sourceFile, new Set([...visitedIdentifiers, expression.text]));
+  }
+
+  // `{renderPanel()}` where `const renderPanel = () => <div />` is declared in the same file.
+  if (
+    ts.isCallExpression(expression) &&
+    ts.isIdentifier(expression.expression) &&
+    expression.arguments.length === 0 &&
+    sourceFile
+  ) {
+    const name = expression.expression.text;
+    if (visitedIdentifiers.has(name)) return false;
+
+    const initializer = findVariableInitializer(sourceFile, name);
+    if (!initializer || !(ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))) return false;
+
+    const returned = returnedExpression(initializer);
+    return returned ? isSingleElementExpression(returned, sourceFile, new Set([...visitedIdentifiers, name])) : false;
   }
 
   return false;
 }
 
-function isStaticallySingleElement(child) {
+function isStaticallySingleElement(child, sourceFile) {
   if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) return true;
   if (!ts.isJsxExpression(child) || !child.expression) return false;
-  return isSingleElementExpression(child.expression);
+  return isSingleElementExpression(child.expression, sourceFile);
 }
 
 function findVariableInitializer(sourceFile, variableName) {
@@ -218,11 +247,20 @@ function collectUnsafeFragmentTransitions(sourceFile) {
       const children = meaningfulChildren(node);
       const directFragment = children.some((child) => ts.isJsxFragment(child));
 
-      if (children.length > 1 || directFragment) {
+      // A Fragment-backed Transition always forwards a ref, so its child must be exactly one
+      // statically verifiable element. `{flag && <Panel />}` satisfies "one child" but renders
+      // `false` during the leave transition, which throws `Passing props on "Fragment"!`.
+      if (children.length !== 1 || !isStaticallySingleElement(children[0], sourceFile)) {
+        const reason = directFragment
+          ? "a direct Fragment child"
+          : children.length !== 1
+            ? `${children.length} direct children`
+            : "a child that is not statically verifiable as a single element";
+
         violations.push(
           `${formatLocation(sourceFile, node.openingElement)} renders a Fragment-backed ${jsxTagName(
             node.openingElement.tagName
-          )} with ${directFragment ? "a direct Fragment child" : `${children.length} direct children`}`
+          )} with ${reason}`
         );
       }
     }
@@ -246,7 +284,7 @@ function collectUnsafeFragmentButtons(sourceFile) {
     ) {
       const children = meaningfulChildren(node);
 
-      if (children.length !== 1 || !isStaticallySingleElement(children[0])) {
+      if (children.length !== 1 || !isStaticallySingleElement(children[0], sourceFile)) {
         violations.push(
           `${formatLocation(sourceFile, node.openingElement)} renders ${jsxTagName(
             node.openingElement.tagName
@@ -274,7 +312,7 @@ function collectUnsafeFragmentPanels(sourceFile) {
     ) {
       const children = meaningfulChildren(node);
 
-      if (children.length !== 1 || !isStaticallySingleElement(children[0])) {
+      if (children.length !== 1 || !isStaticallySingleElement(children[0], sourceFile)) {
         violations.push(
           `${formatLocation(sourceFile, node.openingElement)} renders ${jsxTagName(
             node.openingElement.tagName
@@ -543,6 +581,31 @@ test("documents the Headless UI 2 Fragment failure mode", () => {
   );
 });
 
+test("documents the collapsing-disclosure Fragment failure mode", () => {
+  // The shape that crashed the sidebar: `<Transition show={flag}>{flag && <Panel />}</Transition>`.
+  // While the leave transition plays, `show` is already false, so the only child evaluates to
+  // `false` and Headless UI has nothing to forward its ref to.
+  const collapsing = React.createElement(Transition, { show: true, enter: "transition" }, false);
+
+  assert.throws(
+    () => renderToString(collapsing),
+    /Passing props on "Fragment"!/,
+    "the regression test no longer reproduces the collapsing-disclosure crash being guarded"
+  );
+});
+
+test("allows a Transition to own a single always-rendered panel", () => {
+  // The fix: no conditional guard, so the Transition always has exactly one element child and
+  // owns mounting itself through `show`.
+  const safe = React.createElement(
+    Transition,
+    { show: true, enter: "transition" },
+    React.createElement("div", null, "panel")
+  );
+
+  assert.doesNotThrow(() => renderToString(safe));
+});
+
 test("documents the Headless UI 2 Fragment button failure mode", () => {
   const unsafeButton = React.createElement(
     Combobox,
@@ -585,6 +648,21 @@ test("allows multiple children when Transition owns a DOM element", () => {
   );
 
   assert.doesNotThrow(() => renderToString(safeTransition));
+});
+
+test("keeps shared loading primitives able to receive a Headless UI ref", () => {
+  // A Fragment-backed Transition forwards a ref and asserts it landed on a DOM node in an effect
+  // ("Did you forget to passthrough the `ref` to the actual DOM node?"). That throw cannot be
+  // reproduced through renderToString because effects do not run during SSR, so guard the source
+  // shape instead: Loader is rendered directly inside a Transition by the rich-filters row.
+  const loaderSource = readFileSync(path.join(repoRoot, "packages/ui/src/loader.tsx"), "utf8");
+
+  assert.match(
+    loaderSource,
+    /React\.forwardRef</,
+    "Loader must forward refs so Headless UI can attach to its DOM node"
+  );
+  assert.match(loaderSource, /<div\s+ref=\{ref\}/, "Loader must attach the forwarded ref to its root element");
 });
 
 test("keeps every Fragment-backed Transition structurally ref-safe", () => {

@@ -477,12 +477,10 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
               leaveFrom="transform scale-100 opacity-100"
               leaveTo="transform scale-95 opacity-0"
             >
-              {isProjectListOpen && (
-                <Disclosure.Panel as="div" className="relative mt-1 mb-1.5 flex flex-col gap-0.5 pl-6">
-                  <div className="absolute top-0 bottom-1 left-[15px] w-[1px] bg-layer-3" />
-                  <ProjectNavigation workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
-                </Disclosure.Panel>
-              )}
+              <Disclosure.Panel static as="div" className="relative mt-1 mb-1.5 flex flex-col gap-0.5 pl-6">
+                <div className="absolute top-0 bottom-1 left-[15px] w-[1px] bg-layer-3" />
+                <ProjectNavigation workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
+              </Disclosure.Panel>
             </Transition>
           )}
           {isLastChild && <DropIndicator isVisible={instruction === "DRAG_BELOW"} />}

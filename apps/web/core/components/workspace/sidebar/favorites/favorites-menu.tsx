@@ -246,41 +246,39 @@ export const SidebarFavoritesMenu = observer(function SidebarFavoritesMenu() {
           leaveFrom="transform scale-100 opacity-100"
           leaveTo="transform scale-95 opacity-0"
         >
-          {isFavoriteMenuOpen && (
-            <Disclosure.Panel as="div" className="mt-0.5 flex flex-col gap-0.5" static>
-              {createNewFolder && <NewFavoriteFolder setCreateNewFolder={setCreateNewFolder} actionType="create" />}
-              {Object.keys(groupedFavorites).length === 0 ? (
-                <>
-                  <span className="px-8 py-1.5 text-11 font-medium text-placeholder">{t("no_favorites_yet")}</span>
-                </>
-              ) : (
-                orderBy(Object.values(groupedFavorites), "sequence", "desc")
-                  .filter((fav) => !fav.parent)
-                  .map((fav, index, { length }) => (
-                    <>
-                      {fav?.is_folder ? (
-                        <FavoriteFolder
-                          favorite={fav}
-                          isLastChild={index === length - 1}
-                          handleRemoveFromFavorites={handleRemoveFromFavorites}
-                          handleRemoveFromFavoritesFolder={handleRemoveFromFavoritesFolder}
-                          handleDrop={handleDrop}
-                        />
-                      ) : (
-                        <FavoriteRoot
-                          workspaceSlug={workspaceSlug.toString()}
-                          favorite={fav}
-                          isLastChild={index === length - 1}
-                          parentId={undefined}
-                          handleRemoveFromFavorites={handleRemoveFromFavorites}
-                          handleDrop={handleDrop}
-                        />
-                      )}
-                    </>
-                  ))
-              )}
-            </Disclosure.Panel>
-          )}
+          <Disclosure.Panel as="div" className="mt-0.5 flex flex-col gap-0.5" static>
+            {createNewFolder && <NewFavoriteFolder setCreateNewFolder={setCreateNewFolder} actionType="create" />}
+            {Object.keys(groupedFavorites).length === 0 ? (
+              <>
+                <span className="px-8 py-1.5 text-11 font-medium text-placeholder">{t("no_favorites_yet")}</span>
+              </>
+            ) : (
+              orderBy(Object.values(groupedFavorites), "sequence", "desc")
+                .filter((fav) => !fav.parent)
+                .map((fav, index, { length }) => (
+                  <>
+                    {fav?.is_folder ? (
+                      <FavoriteFolder
+                        favorite={fav}
+                        isLastChild={index === length - 1}
+                        handleRemoveFromFavorites={handleRemoveFromFavorites}
+                        handleRemoveFromFavoritesFolder={handleRemoveFromFavoritesFolder}
+                        handleDrop={handleDrop}
+                      />
+                    ) : (
+                      <FavoriteRoot
+                        workspaceSlug={workspaceSlug.toString()}
+                        favorite={fav}
+                        isLastChild={index === length - 1}
+                        parentId={undefined}
+                        handleRemoveFromFavorites={handleRemoveFromFavorites}
+                        handleDrop={handleDrop}
+                      />
+                    )}
+                  </>
+                ))
+            )}
+          </Disclosure.Panel>
         </Transition>
       </Disclosure>
     </>

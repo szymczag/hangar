@@ -13,13 +13,15 @@ type Props = {
   className?: string;
 };
 
-function Loader({ children, className = "" }: Props) {
+// forwardRef so the loader can be the single child of a Fragment-backed Headless UI Transition,
+// which throws "Did you forget to passthrough the `ref` to the actual DOM node?" otherwise.
+const Loader = React.forwardRef<HTMLDivElement, Props>(function Loader({ children, className = "" }, ref) {
   return (
-    <div className={cn("animate-pulse", className)} role="status">
+    <div ref={ref} className={cn("animate-pulse", className)} role="status">
       {children}
     </div>
   );
-}
+}) as React.ForwardRefExoticComponent<Props & React.RefAttributes<HTMLDivElement>> & { Item: typeof Item };
 
 type ItemProps = {
   height?: string;

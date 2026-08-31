@@ -68,13 +68,11 @@ export const SidebarWorkspaceMenu = observer(function SidebarWorkspaceMenu() {
         leaveFrom="transform scale-100 opacity-100"
         leaveTo="transform scale-95 opacity-0"
       >
-        {isWorkspaceMenuOpen && (
-          <Disclosure.Panel as="div" className="mt-0.5 flex flex-col gap-0.5" static>
-            {SIDEBAR_WORKSPACE_MENU_ITEMS.map((item) => (
-              <SidebarWorkspaceMenuItem key={item.key} item={item} />
-            ))}
-          </Disclosure.Panel>
-        )}
+        <Disclosure.Panel as="div" className="mt-0.5 flex flex-col gap-0.5" static>
+          {SIDEBAR_WORKSPACE_MENU_ITEMS.map((item) => (
+            <SidebarWorkspaceMenuItem key={item.key} item={item} />
+          ))}
+        </Disclosure.Panel>
       </Transition>
     </Disclosure>
   );
