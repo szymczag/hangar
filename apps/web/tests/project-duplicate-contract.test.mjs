@@ -75,6 +75,35 @@ test("access-granting copy options stay off until they are asked for", () => {
   }
 });
 
+test("the create modal starts from a source instead of creating an empty project", () => {
+  // `templateId` was declared and threaded through this path upstream but never
+  // read, so the picker silently did nothing. Guard against it going dead again.
+  const form = read("apps/web/core/components/projects/create/root.tsx");
+  const createModal = read("apps/web/core/components/project/create-project-modal.tsx");
+  const header = read("apps/web/core/components/project/create/header.tsx");
+
+  assert.match(form, /templateId[,\s}]/, "the create form must destructure templateId, not just declare it");
+  assert.match(
+    form,
+    /templateId\s*\n?\s*\?\s*duplicateProject\(/,
+    "with a source chosen the form must duplicate, not create an empty project"
+  );
+  assert.match(
+    form,
+    /isBundledCover && !templateId/,
+    "the server owns the cover on the duplicate path; the client must not also attach one"
+  );
+  assert.match(header, /handleTemplateSelect &&/, "the header must render the picker entry point");
+  assert.match(createModal, /SOURCE_SELECTION/, "the modal needs a step for choosing the source");
+});
+
+test("only projects the user administers can be copied from", () => {
+  // The API requires ADMIN on the source, because duplication re-links shared
+  // work item types. The picker must not offer projects it would refuse.
+  const picker = read("apps/web/core/components/project/create/source-picker.tsx");
+  assert.match(picker, /member_role === EUserPermissions\.ADMIN/);
+});
+
 test("every entry point opens the one shared modal", () => {
   const entryPoints = [
     "apps/web/core/components/workspace/sidebar/projects-list-item.tsx",

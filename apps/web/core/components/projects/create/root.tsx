@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import { FormProvider, useForm } from "react-hook-form";
 // plane imports
@@ -31,14 +31,24 @@ export type TCreateProjectFormProps = {
   handleNextStep: (projectId: string) => void;
   data?: Partial<TProject>;
   templateId?: string;
+  handleTemplateSelect?: () => void;
   updateCoverImageStatus: (projectId: string, coverImage: string) => Promise<void>;
 };
 
 export const CreateProjectForm = observer(function CreateProjectForm(props: TCreateProjectFormProps) {
-  const { setToFavorite, workspaceSlug, data, onClose, handleNextStep, updateCoverImageStatus } = props;
+  const {
+    setToFavorite,
+    workspaceSlug,
+    data,
+    onClose,
+    handleNextStep,
+    updateCoverImageStatus,
+    templateId,
+    handleTemplateSelect,
+  } = props;
   // store
   const { t } = useTranslation();
-  const { addProjectToFavorites, createProject, updateProject } = useProject();
+  const { addProjectToFavorites, createProject, duplicateProject, updateProject, getProjectById } = useProject();
   // states
   const [shouldAutoSyncIdentifier, setShouldAutoSyncIdentifier] = useState(true);
   // form info
@@ -47,6 +57,20 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
     reValidateMode: "onChange",
   });
   const { handleSubmit, reset, setValue } = methods;
+  const sourceProject = templateId ? getProjectById(templateId) : undefined;
+
+  // Seeding from a source is a one-way door within a single open: the person
+  // picked a project to start from, so its settings become the starting point.
+  useEffect(() => {
+    if (!sourceProject) return;
+    reset({
+      ...getProjectFormValues(),
+      ...sourceProject,
+      id: undefined,
+      name: `${sourceProject.name} (Copy)`,
+      identifier: "",
+    });
+  }, [sourceProject, reset]);
   const { isMobile } = usePlatformOS();
   const handleAddToFavorites = (projectId: string) => {
     if (!workspaceSlug) return;
@@ -95,9 +119,20 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
       formData.cover_image_asset = null;
     }
 
-    return createProject(workspaceSlug.toString(), formData)
+    // With a source chosen, the server copies its configuration rather than
+    // creating an empty project; it also owns the cover, so the bundled-cover
+    // path below stays out of the way unless the person changed it here.
+    const creation = templateId
+      ? duplicateProject(workspaceSlug.toString(), templateId, {
+          name: formData.name ?? undefined,
+          identifier: formData.identifier ?? undefined,
+          network: formData.network ?? undefined,
+        })
+      : createProject(workspaceSlug.toString(), formData);
+
+    return creation
       .then(async (res) => {
-        if (coverImage && isBundledCover) {
+        if (coverImage && isBundledCover && !templateId) {
           // The project exists by now, so a cover that cannot be stored costs
           // the cover and nothing else. Failing the whole creation here would
           // discard everything the person filled in over a decorative image.
@@ -121,7 +156,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
         setToast({
           type: TOAST_TYPE.SUCCESS,
           title: t("success"),
-          message: t("project_created_successfully"),
+          message: templateId ? t("project_duplicated_successfully") : t("project_created_successfully"),
         });
 
         if (setToFavorite) {
@@ -191,7 +226,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
 
   return (
     <FormProvider {...methods}>
-      <ProjectCreateHeader handleClose={handleClose} isMobile={isMobile} />
+      <ProjectCreateHeader handleClose={handleClose} isMobile={isMobile} handleTemplateSelect={handleTemplateSelect} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="px-3">
         <div className="mt-9 space-y-6 pb-5">

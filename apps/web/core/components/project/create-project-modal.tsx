@@ -18,6 +18,7 @@ import type { TProject } from "@plane/types";
 // services
 import { FileService } from "@/services/file.service";
 const fileService = new FileService();
+import { ProjectSourcePicker } from "@/components/project/create/source-picker";
 import { ProjectFeatureUpdate } from "./project-feature-update";
 
 type Props = {
@@ -30,6 +31,7 @@ type Props = {
 };
 
 enum EProjectCreationSteps {
+  SOURCE_SELECTION = "SOURCE_SELECTION",
   CREATE_PROJECT = "CREATE_PROJECT",
   FEATURE_SELECTION = "FEATURE_SELECTION",
 }
@@ -39,13 +41,17 @@ export function CreateProjectModal(props: Props) {
   // states
   const [currentStep, setCurrentStep] = useState<EProjectCreationSteps>(EProjectCreationSteps.CREATE_PROJECT);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  // The project this one is being started from, if any. `templateId` from props
+  // wins, so a caller can open the modal already pointed at a source.
+  const [sourceProjectId, setSourceProjectId] = useState<string | undefined>(templateId);
 
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(EProjectCreationSteps.CREATE_PROJECT);
       setCreatedProjectId(null);
+      setSourceProjectId(templateId);
     }
-  }, [isOpen]);
+  }, [isOpen, templateId]);
 
   const handleNextStep = (projectId: string) => {
     if (!projectId) return;
@@ -67,6 +73,15 @@ export function CreateProjectModal(props: Props) {
 
   return (
     <ModalCore isOpen={isOpen} position={EModalPosition.TOP} width={EModalWidth.XXXXL}>
+      {currentStep === EProjectCreationSteps.SOURCE_SELECTION && (
+        <ProjectSourcePicker
+          onSelect={(projectId) => {
+            setSourceProjectId(projectId);
+            setCurrentStep(EProjectCreationSteps.CREATE_PROJECT);
+          }}
+          onCancel={() => setCurrentStep(EProjectCreationSteps.CREATE_PROJECT)}
+        />
+      )}
       {currentStep === EProjectCreationSteps.CREATE_PROJECT && (
         <CreateProjectForm
           setToFavorite={setToFavorite}
@@ -75,7 +90,8 @@ export function CreateProjectModal(props: Props) {
           updateCoverImageStatus={handleCoverImageStatusUpdate}
           handleNextStep={handleNextStep}
           data={data}
-          templateId={templateId}
+          templateId={sourceProjectId}
+          handleTemplateSelect={() => setCurrentStep(EProjectCreationSteps.SOURCE_SELECTION)}
         />
       )}
       {currentStep === EProjectCreationSteps.FEATURE_SELECTION && (

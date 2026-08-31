@@ -14,12 +14,12 @@ configure.
 
 ## What a copy contains
 
-| Always copied                                                                                         | Copied unless you opt out         | Copied only if you opt in                  | Never copied                                                                     |
-| ----------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------- |
-| Project settings and feature toggles (cycles, modules, pages, intake, time tracking, work item types) | Labels, including their hierarchy | Members and their roles                    | Work items and everything on them — comments, attachments, activity, subscribers |
-| States, including the triage state                                                                    | Estimates and their points        | Cycles, as empty shells                    | Pages                                                                            |
-| Work item types                                                                                       | Intake configuration              | Modules, as empty shells, with their links | Webhooks                                                                         |
-|                                                                                                       |                                   | Views, subject to the privacy rules below  | Published boards, favourites, drafts, notifications, import history              |
+| Always copied                                                                                                          | Copied unless you opt out         | Copied only if you opt in                  | Never copied                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------- |
+| Project settings, feature toggles (cycles, modules, pages, intake, time tracking, work item types) and the cover image | Labels, including their hierarchy | Members and their roles                    | Work items and everything on them — comments, attachments, activity, subscribers |
+| States, including the triage state                                                                                     | Estimates and their points        | Cycles, as empty shells                    | Pages                                                                            |
+| Work item types                                                                                                        | Intake configuration              | Modules, as empty shells, with their links | Webhooks                                                                         |
+|                                                                                                                        |                                   | Views, subject to the privacy rules below  | Published boards, favourites, drafts, notifications, import history              |
 
 The copy always gets a **new name and identifier**, and the person who made it
 becomes its project lead and an admin.
@@ -144,6 +144,18 @@ enough to delay other people creating projects in the same workspace. If you are
 hitting them, that is the signal to move this work to a background job rather
 than to raise the numbers.
 
+## The cover image
+
+The copy gets its own copy of the source's cover, not a reference to it —
+`cover_image_asset` is a single foreign key, so sharing the row would make
+deleting either project take the other's cover with it.
+
+The file is duplicated after the database transaction commits, because an object
+copy in storage cannot be rolled back with it. A cover that cannot be copied is
+not worth failing a project over, so the copy is created without one and the
+response says `cover_image:failed` (or `cover_image:unreadable` if the source
+asset is gone or unreadable).
+
 ## Rate limits
 
 The copy holds a lock on the workspace while it runs, so duplication is rate
@@ -160,9 +172,6 @@ in the workspace. Exceeding either returns `429`.
 
 ## Known limitations
 
-- **The cover image is not copied yet.** The copy starts without one. Copying it
-  means duplicating the stored file, which cannot be rolled back with the
-  database transaction, so it is handled separately.
 - **Pages are not copied.** Copy them individually with the duplicate action on
   a page, which already handles their attachments.
 - **Cycles and modules arrive empty**, since there are no work items to put in

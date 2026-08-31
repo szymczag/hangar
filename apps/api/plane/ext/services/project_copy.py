@@ -136,6 +136,10 @@ class CopyResult:
     # ProjectMember rows the caller's copy created for *other* people; the view
     # mails them after commit.
     notify_member_ids: list = field(default_factory=list)
+    # The source's cover, for the view to copy once the transaction has
+    # committed. An S3 copy cannot be rolled back with the database, so it must
+    # not happen inside it.
+    cover_source_asset_id: uuid.UUID | None = None
 
 
 class _Remap:
@@ -849,7 +853,7 @@ def duplicate_project(*, source: Project, actor, name=None, identifier=None, net
         actor=actor,
         plan=plan,
         remap=_Remap(),
-        result=CopyResult(project=target),
+        result=CopyResult(project=target, cover_source_asset_id=source.cover_image_asset_id),
     )
 
     _copy_states(context)

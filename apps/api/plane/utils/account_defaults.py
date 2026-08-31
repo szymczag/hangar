@@ -4,7 +4,7 @@
 
 """What a new account starts with, decided by the instance rather than upstream.
 
-Plane ships one set of starting preferences for everyone: the week begins on
+Upstream ships one set of starting preferences for everyone: the week begins on
 Sunday, the clock is UTC, and the theme follows the system. Those are reasonable
 defaults for a hosted product with users everywhere and wrong for a company in
 one place, where every new person changes the same three settings by hand.
