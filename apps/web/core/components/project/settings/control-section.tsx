@@ -18,6 +18,7 @@ import { useProject } from "@/hooks/store/use-project";
 // local imports
 import { ArchiveRestoreProjectModal } from "../archive-restore-modal";
 import { DeleteProjectModal } from "../delete-project-modal";
+import { DuplicateProjectModal } from "../duplicate-project-modal";
 
 type Props = {
   projectId: string;
@@ -30,6 +31,7 @@ export const GeneralProjectSettingsControlSection = observer(function GeneralPro
   // states
   const [selectProject, setSelectedProject] = useState<string | null>(null);
   const [archiveProject, setArchiveProject] = useState<boolean>(false);
+  const [duplicateProject, setDuplicateProject] = useState<boolean>(false);
   // params
   const { workspaceSlug } = useParams();
   // store hooks
@@ -55,10 +57,25 @@ export const GeneralProjectSettingsControlSection = observer(function GeneralPro
         isOpen={Boolean(selectProject)}
         onClose={() => setSelectedProject(null)}
       />
+      <DuplicateProjectModal
+        project={currentProjectDetails}
+        isOpen={duplicateProject}
+        onClose={() => setDuplicateProject(false)}
+      />
       <div className="rounded-lg border border-subtle bg-layer-2">
-        {/* Project Selector */}
         <SettingsBoxedControlItem
           className="rounded-b-none border-0 border-b"
+          title={t("duplicate_project")}
+          description={t("duplicate_project_settings_description")}
+          control={
+            <Button variant="secondary" onClick={() => setDuplicateProject(true)}>
+              {t("duplicate")}
+            </Button>
+          }
+        />
+        {/* Project Selector */}
+        <SettingsBoxedControlItem
+          className="rounded-none border-0 border-b"
           title={t("archive")}
           description="Archiving a project will unlist your project from your side navigation although you will still be able to access it from your projects page. You can restore the project or delete it whenever you want."
           control={

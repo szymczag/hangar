@@ -14,6 +14,7 @@ import { orderProjects, shouldFilterProject } from "@plane/utils";
 // services
 import type { TProject, TPartialProject } from "@plane/types";
 import { IssueLabelService, IssueService } from "@/services/issue";
+import type { TDuplicateProjectPayload } from "@/services/project";
 import { ProjectService, ProjectStateService, ProjectArchiveService } from "@/services/project";
 // store
 import type { CoreRootStore } from "../root.store";
@@ -69,6 +70,7 @@ export interface IProjectStore {
   updateProjectView: (workspaceSlug: string, projectId: string, viewProps: any) => Promise<any>;
   // CRUD actions
   createProject: (workspaceSlug: string, data: Partial<TProject>) => Promise<TProject>;
+  duplicateProject: (workspaceSlug: string, projectId: string, data: TDuplicateProjectPayload) => Promise<TProject>;
   updateProject: (workspaceSlug: string, projectId: string, data: Partial<TProject>) => Promise<TProject>;
   deleteProject: (workspaceSlug: string, projectId: string) => Promise<void>;
   // archive actions
@@ -129,6 +131,7 @@ export class ProjectStore implements IProjectStore {
       updateProjectView: action,
       // CRUD actions
       createProject: action,
+      duplicateProject: action,
       updateProject: action,
       // collapsible actions
       setOpenCollapsibleSection: action,
@@ -539,6 +542,26 @@ export class ProjectStore implements IProjectStore {
       return response;
     } catch (error) {
       console.log("Failed to create project from project store");
+      throw error;
+    }
+  };
+
+  /**
+   * Copies an existing project's configuration into a new project and adds it
+   * to the store. The API returns the same shape as creation, so the new
+   * project lands in the map without a refetch.
+   * @param workspaceSlug
+   * @param projectId the project being copied
+   * @param data
+   * @returns Promise<TProject>
+   */
+  duplicateProject = async (workspaceSlug: string, projectId: string, data: TDuplicateProjectPayload) => {
+    try {
+      const response = await this.projectService.duplicateProject(workspaceSlug, projectId, data);
+      this.processProjectAfterCreation(workspaceSlug, response);
+      return response;
+    } catch (error) {
+      console.log("Failed to duplicate project from project store");
       throw error;
     }
   };

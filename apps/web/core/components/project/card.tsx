@@ -8,7 +8,7 @@ import React, { useRef, useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArchiveRestoreIcon, Settings, UserPlus } from "lucide-react";
+import { ArchiveRestoreIcon, Settings, UserPlus, CopyPlus } from "lucide-react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel, IS_FAVORITE_MENU_OPEN } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
@@ -31,6 +31,7 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // local imports
 import { CoverImage } from "@/components/common/cover-image";
 import { DeleteProjectModal } from "./delete-project-modal";
+import { DuplicateProjectModal } from "./duplicate-project-modal";
 import { JoinProjectModal } from "./join-project-modal";
 import { ArchiveRestoreProjectModal } from "./archive-restore-modal";
 
@@ -44,6 +45,7 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
   const [deleteProjectModalOpen, setDeleteProjectModal] = useState(false);
   const [joinProjectModalOpen, setJoinProjectModal] = useState(false);
   const [restoreProject, setRestoreProject] = useState(false);
+  const [duplicateProjectModalOpen, setDuplicateProjectModal] = useState(false);
   // refs
   const projectCardRef = useRef(null);
   // router
@@ -131,6 +133,13 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
       shouldRender: !isArchived && (hasAdminRole || hasMemberRole),
     },
     {
+      key: "duplicate",
+      action: () => setDuplicateProjectModal(true),
+      title: "Duplicate",
+      icon: CopyPlus,
+      shouldRender: !isArchived && (hasAdminRole || hasMemberRole),
+    },
+    {
       key: "join",
       action: () => setJoinProjectModal(true),
       title: "Join",
@@ -174,6 +183,12 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
         project={project}
         isOpen={deleteProjectModalOpen}
         onClose={() => setDeleteProjectModal(false)}
+      />
+      {/* Duplicate Project Modal */}
+      <DuplicateProjectModal
+        project={project}
+        isOpen={duplicateProjectModalOpen}
+        onClose={() => setDuplicateProjectModal(false)}
       />
       {/* Join Project Modal */}
       {workspaceSlug && (
