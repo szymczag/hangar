@@ -186,12 +186,6 @@ jobs:
       - name: Check God Mode form contracts
         run: pnpm test:admin-form-contracts
 
-
-
-
-
-
-
       # Five packages carry vitest suites and nothing ran them, so they passed
       # once and would have rotted from there. Not scoped with --affected: a
       # change to a package's source can break a suite in a package that depends

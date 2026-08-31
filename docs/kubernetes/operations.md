@@ -59,29 +59,33 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.37` to `rc.38`
+### Upgrade from `rc.30` to `rc.39`
 
-Upgrade directly from the immediately previous complete release, `rc.37`.
-Migration `license.0021_default_workspace_short_urls` seeds an empty configuration
-row and requires no data backfill. Existing values, Secrets, storage, RBAC, and
-NetworkPolicies remain compatible.
+Upgrade directly from the immediately previous retained GitHub release, `rc.30`.
+Releases `rc.31` through `rc.38` are retired and are not intermediate upgrade or
+rollback targets. The intervening migrations are additive: they create the
+OpenPGP policy and federated-link authorization records, spend invitations whose
+membership already exists, and seed the instance branding, login appearance,
+Google redirect, private visibility, external-link, account-default, support-text,
+API-token-role, and default-workspace settings. Existing values, Secrets,
+storage, RBAC, and NetworkPolicies remain compatible.
 
-Deploy all application images together. The new web image corrects the Live
-collaboration path and must not be substituted with the `rc.37` web image. After
+Deploy all application images together. The web image corrects the Live
+collaboration path and must not be substituted with an earlier image. After
 the migration Job succeeds, optionally choose a default workspace in God Mode,
 open a compact `/i/PROJECT-123` link, and verify page collaboration connects below
 `/live/collaboration` through the configured proxy.
 
 Before upgrading, back up PostgreSQL, record the current Helm revision, render
-the existing values against `0.1.0-rc.38`, and verify the signed tag, chart, image
-digests, and attestations. A technical rollback to `rc.37` may leave the seeded
-configuration row in place; that release ignores it. It also removes compact
-links and restores the Live path defect, so prefer a forward correction.
+the existing values against `0.1.0-rc.39`, and verify the signed tag, chart, image
+digests, and attestations. The additive database objects can remain in place if
+an unrelated incident requires a technical rollback to `rc.30`, but that release
+lacks all features and fixes introduced since it, so prefer a forward correction.
 
-### Upgrade from `rc.27` to `rc.37`
+### Upgrade from `rc.27` to `rc.39`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
-Upgrade directly from the immediately previous complete release, `rc.27`.
+Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.39`.
 
 This release closes two Todoist import admission gaps. Starting an import now
 requires a server-signed, 15-minute, single-use preview grant bound to the
@@ -101,13 +105,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.37`, its application version is
-   `v0.1.0-rc.37`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc29);
+2. confirm the target chart is `0.1.0-rc.39`, its application version is
+   `v0.1.0-rc.39`, and its signatures and digests pass the
+   [release verification procedure](security.md#verify-release-010-rc39);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
-   `rc.27` and `rc.37` web or API images because their preview-execution request
+   `rc.27` and `rc.39` web or API images because their preview-execution request
    contract intentionally changed together.
 
 Wait for the revision-scoped migration Job to complete before admitting traffic.
@@ -120,7 +124,7 @@ also fail without creating a job or retaining a source object.
 target; the nullable column may remain in the database. It restores the preview
 bypass and duplicate-confirmation race, however, so it is not a
 security-equivalent rollback. Prefer a forward correction and return every
-application component to `rc.37` promptly.
+application component to `rc.39` promptly.
 
 ### Upgrade from `rc.26` to `rc.27`
 
