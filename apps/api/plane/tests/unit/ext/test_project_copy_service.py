@@ -121,7 +121,9 @@ class TestAdmission:
             duplicate_project(source=project, actor=create_user, options={"members": True})
 
         assert error.value.code == "PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY"
-        assert error.value.detail["members"] >= 1
+        # Only the limit that was exceeded -- the per-model tally would report
+        # how many rows the source holds, including ones this caller cannot see.
+        assert error.value.detail == {"limit": "members"}
 
     def test_the_cap_is_a_real_number(self):
         assert MAX_MEMBERS > 0

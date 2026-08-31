@@ -23,6 +23,7 @@ independent authorizations therefore have to hold, and these tests pin both:
 from uuid import uuid4
 
 import pytest
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -98,6 +99,13 @@ def outsider(db, workspace):
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestProjectDuplicateScope:
+    @pytest.fixture(autouse=True)
+    def clear_throttles(self):
+        """The duplicate endpoint is throttled per user and per workspace, and
+        every test here shares one workspace slug. Without this the suite
+        throttles itself."""
+        cache.clear()
+
     def test_non_member_cannot_duplicate_a_secret_project(self, outsider, workspace, secret_project):
         """The headline case: no copy, and nothing created."""
         before = Project.objects.count()
@@ -116,6 +124,25 @@ class TestProjectDuplicateScope:
         before = Project.objects.count()
 
         response = client_for(outsider).post(duplicate_url(workspace.slug, public_project.id), {}, format="json")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert Project.objects.count() == before
+
+    def test_project_member_cannot_duplicate(self, workspace, public_project):
+        """ADMIN of the source is required, not MEMBER.
+
+        The copy re-links the source's custom work item types, and
+        `IssueTypeDetailEndpoint` authorizes a mutation by ADMIN of *any* project
+        linking the type. Since the caller becomes ADMIN of the copy, letting a
+        MEMBER duplicate would hand them admin control over type and property
+        definitions shared with projects they do not administer.
+        """
+        member = make_user("member")
+        WorkspaceMember.objects.create(workspace=workspace, member=member, role=MEMBER)
+        ProjectMember.objects.create(project=public_project, member=member, workspace=workspace, role=MEMBER)
+        before = Project.objects.count()
+
+        response = client_for(member).post(duplicate_url(workspace.slug, public_project.id), {}, format="json")
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert Project.objects.count() == before

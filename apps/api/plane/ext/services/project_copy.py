@@ -82,6 +82,17 @@ REMAPPABLE_FILTER_KEYS = {
 # Filter keys that name users; kept only where the user is a member of the copy.
 MEMBER_FILTER_KEYS = ("assignees", "created_by", "subscriber", "mentions")
 
+# `rich_filters` is the representation the work item list actually queries with.
+# Its keys are "<field>__<operator>"; these are the fields naming project-scoped
+# rows, mapped to the remap namespace that holds their new ids.
+RICH_FILTER_REMAPPABLE_FIELDS = {
+    "state_id": "state",
+    "label_id": "label",
+    "cycle_id": "cycle",
+    "module_id": "module",
+}
+RICH_FILTER_MEMBER_FIELDS = ("assignee_id", "mention_id", "created_by_id")
+
 
 class ProjectCopyError(Exception):
     """A copy that cannot proceed, carrying the code the API should report."""
@@ -231,7 +242,14 @@ def derive_identifier(workspace_id, base_identifier: str, limit: int = 100) -> s
 # --------------------------------------------------------------------------
 
 
-def _planned_counts(source: Project, plan: CopyPlan) -> dict:
+def _planned_counts(source: Project, actor, plan: CopyPlan) -> dict:
+    """Count what this caller's copy would actually create.
+
+    The view count applies the same predicate ``_copy_views`` does. Counting
+    every view instead would both over-count -- refusing a copy that would in
+    fact be small -- and report, through the admission error, how many private
+    views other members hold. No other endpoint discloses that.
+    """
     counts = {
         "states": State.all_state_objects.filter(project=source, deleted_at__isnull=True).count(),
         "labels": Label.objects.filter(project=source).count() if plan.labels else 0,
@@ -239,20 +257,22 @@ def _planned_counts(source: Project, plan: CopyPlan) -> dict:
         "members": ProjectMember.objects.filter(project=source, is_active=True).count() if plan.members else 0,
         "cycles": Cycle.objects.filter(project=source).count() if plan.cycles else 0,
         "modules": Module.objects.filter(project=source).count() if plan.modules else 0,
-        "views": IssueView.objects.filter(project=source).count() if plan.views else 0,
+        "views": _copyable_views(source, actor).count() if plan.views else 0,
     }
     return counts
 
 
-def _admit(source: Project, plan: CopyPlan) -> None:
-    counts = _planned_counts(source, plan)
+def _admit(source: Project, actor, plan: CopyPlan) -> None:
+    counts = _planned_counts(source, actor, plan)
 
+    # The limit that was exceeded is what the caller needs; the per-model tally
+    # is not, so it stays out of the error body.
     if counts["members"] > MAX_MEMBERS:
-        raise ProjectCopyError("PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY", detail=counts)
+        raise ProjectCopyError("PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY", detail={"limit": "members"})
     if counts["cycles"] + counts["modules"] > MAX_CYCLES_AND_MODULES:
-        raise ProjectCopyError("PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY", detail=counts)
+        raise ProjectCopyError("PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY", detail={"limit": "cycles_and_modules"})
     if sum(counts.values()) > MAX_TOTAL_ROWS:
-        raise ProjectCopyError("PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY", detail=counts)
+        raise ProjectCopyError("PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY", detail={"limit": "total_rows"})
 
 
 # --------------------------------------------------------------------------
@@ -584,6 +604,64 @@ def _copy_modules(context: _Context) -> None:
     context.record("module_members", len(membership_rows))
 
 
+def _copyable_views(source: Project, actor):
+    """The views of ``source`` this actor may carry into a copy.
+
+    `IssueView.access` numbers PRIVATE as 0 and PUBLIC as 1 -- the inverse of
+    `Page.access`. Shared by the copy step and by admission counting, so the two
+    can never disagree about which views exist.
+    """
+    return IssueView.objects.filter(project=source, archived_at__isnull=True).filter(
+        Q(access=VIEW_ACCESS_PUBLIC) | Q(owned_by_id=actor.id)
+    )
+
+
+def _remap_rich_filters(rich_filters: dict, context: _Context, member_ids: set) -> tuple[dict, bool]:
+    """Translate project-scoped ids inside a rich filter into the copy's ids.
+
+    ``rich_filters`` is the representation the work item list actually queries
+    with -- the legacy ``filters`` blob below is no longer what the UI reads --
+    so a copy that remaps only ``filters`` produces views that quietly match
+    nothing. Keys are ``"<field>__<operator>"`` (``state_id__in``) and values are
+    a list or a single value.
+    """
+    if not isinstance(rich_filters, dict):
+        return {}, False
+
+    remapped = {}
+    dropped = False
+
+    for key, value in rich_filters.items():
+        field = key.split("__", 1)[0]
+        values = value if isinstance(value, list) else [value]
+
+        if field in RICH_FILTER_REMAPPABLE_FIELDS:
+            translated = context.remap.translate(RICH_FILTER_REMAPPABLE_FIELDS[field], values)
+            if len(translated) != len(values):
+                dropped = True
+            if translated:
+                remapped[key] = translated if isinstance(value, list) else translated[0]
+            continue
+
+        if field in RICH_FILTER_MEMBER_FIELDS:
+            kept = [str(item) for item in values if str(item) in member_ids]
+            if len(kept) != len(values):
+                dropped = True
+            if kept:
+                remapped[key] = kept if isinstance(value, list) else kept[0]
+            continue
+
+        if field == "project_id":
+            # The copy is its own project; pointing at the source would filter
+            # every work item away.
+            remapped[key] = [str(context.target.id)] if isinstance(value, list) else str(context.target.id)
+            continue
+
+        remapped[key] = value
+
+    return remapped, dropped
+
+
 def _remap_view_filters(filters: dict, context: _Context, member_ids: set) -> tuple[dict, bool]:
     """Translate project-scoped ids inside a saved filter into the copy's ids.
 
@@ -619,13 +697,9 @@ def _remap_view_filters(filters: dict, context: _Context, member_ids: set) -> tu
 
 
 def _copy_views(context: _Context) -> None:
-    # `IssueView.access` numbers PRIVATE as 0 and PUBLIC as 1 -- the inverse of
-    # `Page.access`. Copying someone else's private view would disclose it.
-    sources = list(
-        IssueView.objects.filter(project=context.source, archived_at__isnull=True).filter(
-            Q(access=VIEW_ACCESS_PUBLIC) | Q(owned_by_id=context.actor.id)
-        )
-    )
+    # Copying someone else's private view would disclose it; `_copyable_views`
+    # owns that predicate so admission counting cannot drift from it.
+    sources = list(_copyable_views(context.source, context.actor))
     if IssueView.objects.filter(project=context.source, archived_at__isnull=True).count() > len(sources):
         context.skip("views:private")
 
@@ -635,7 +709,8 @@ def _copy_views(context: _Context) -> None:
 
     for source in sources:
         filters, dropped = _remap_view_filters(source.filters, context, member_ids)
-        dropped_any = dropped_any or dropped
+        rich_filters, rich_dropped = _remap_rich_filters(source.rich_filters, context, member_ids)
+        dropped_any = dropped_any or dropped or rich_dropped
 
         # `save()`, not `bulk_create`: `IssueView.save()` recomputes `query` from
         # `filters`, and a `query` blob copied verbatim still points at the source.
@@ -647,7 +722,7 @@ def _copy_views(context: _Context) -> None:
             filters=filters,
             display_filters=source.display_filters,
             display_properties=source.display_properties,
-            rich_filters=source.rich_filters,
+            rich_filters=rich_filters,
             access=source.access,
             logo_props=source.logo_props,
             owned_by=context.actor,
@@ -707,7 +782,7 @@ def duplicate_project(*, source: Project, actor, name=None, identifier=None, net
     # than deadlock.
     Workspace.objects.select_for_update().get(pk=source.workspace_id)
 
-    _admit(source, plan)
+    _admit(source, actor, plan)
 
     resolved_name = name or derive_name(source.workspace_id, source.name)
     resolved_identifier = identifier or derive_identifier(source.workspace_id, source.identifier)

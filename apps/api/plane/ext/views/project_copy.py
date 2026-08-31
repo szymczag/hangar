@@ -11,6 +11,7 @@ from django.db.models import Exists, OuterRef, Prefetch, Subquery
 # Third party imports
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.throttling import SimpleRateThrottle
 
 # Module imports
 from plane.app.permissions import ROLE, allow_permission
@@ -79,6 +80,31 @@ def _project_list_queryset(user, slug):
     )
 
 
+class ProjectDuplicateUserThrottle(SimpleRateThrottle):
+    scope = "project_duplicate_user"
+
+    def get_cache_key(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": request.user.pk}
+
+
+class ProjectDuplicateWorkspaceThrottle(SimpleRateThrottle):
+    """Per-workspace, because the cost lands on the workspace row's lock.
+
+    One user staying under their own limit can still stall project creation for
+    everyone else in the workspace, so the two throttles are not redundant.
+    """
+
+    scope = "project_duplicate_workspace"
+
+    def get_cache_key(self, request, view):
+        slug = view.kwargs.get("slug")
+        if not slug:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": slug}
+
+
 class ProjectDuplicateEndpoint(BaseAPIView):
     """Copy a project's configuration into a new project.
 
@@ -88,7 +114,15 @@ class ProjectDuplicateEndpoint(BaseAPIView):
     at all while it reads the source's entire object graph.
     """
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="PROJECT")
+    throttle_classes = [ProjectDuplicateUserThrottle, ProjectDuplicateWorkspaceThrottle]
+
+    # ADMIN of the source, not MEMBER. The copy re-links the source's custom
+    # work item types (`_copy_work_item_types`), and `IssueTypeDetailEndpoint`
+    # authorizes a mutation by ADMIN of *any* project linking the type. Since
+    # the caller becomes ADMIN of the copy, allowing a mere MEMBER to duplicate
+    # would hand them admin control over type and property definitions shared
+    # with projects they do not administer -- and may not even belong to.
+    @allow_permission([ROLE.ADMIN], level="PROJECT")
     def post(self, request, slug, project_id):
         # `allow_permission` at PROJECT level proves the caller is an active
         # member of the *source*, which is what stops a workspace member reading

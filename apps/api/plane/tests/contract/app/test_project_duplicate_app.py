@@ -11,7 +11,10 @@ was never set because ``bulk_create`` skipped ``save()``, or a foreign key on
 the copy still pointing into the source.
 """
 
+import uuid
+
 import pytest
+from django.core.cache import cache
 from rest_framework import status
 
 from plane.db.models import (
@@ -108,6 +111,13 @@ def source_project(db, workspace, create_user):
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestProjectDuplicate:
+    @pytest.fixture(autouse=True)
+    def clear_throttles(self):
+        """The duplicate endpoint is throttled per user and per workspace, and
+        every test here shares one workspace slug. Without this the suite
+        throttles itself."""
+        cache.clear()
+
     def test_copies_configuration_and_leaves_the_source_alone(self, session_client, workspace, source_project):
         source_state_count = State.all_state_objects.filter(project=source_project, deleted_at__isnull=True).count()
 
@@ -269,6 +279,74 @@ class TestProjectDuplicate:
         assert copied.filter(name="Shared view").exists()
         assert not copied.filter(name="Their private view").exists()
         assert "views:private" in response.data["copy_summary"]["skipped"]
+
+    def test_view_rich_filters_are_remapped_into_the_copy(self, session_client, workspace, source_project, create_user):
+        """`rich_filters` is what the work item list actually queries with.
+
+        Remapping only the legacy `filters` blob would leave copied views
+        pointing at the source's states and matching nothing.
+        """
+        source_state = State.objects.filter(project=source_project, name="Backlog").first()
+        source_label = Label.objects.filter(project=source_project, name="Area").first()
+
+        IssueView.objects.create(
+            name="Backlog view",
+            access=VIEW_PUBLIC,
+            owned_by=create_user,
+            project=source_project,
+            workspace=workspace,
+            query={},
+            rich_filters={
+                "state_id__in": [str(source_state.id)],
+                "label_id__in": [str(source_label.id)],
+                "priority__in": ["urgent"],
+            },
+        )
+
+        response = session_client.post(
+            duplicate_url(workspace.slug, source_project.id), {"include": {"views": True}}, format="json"
+        )
+        copy_id = response.data["id"]
+        copied = IssueView.objects.get(project_id=copy_id, name="Backlog view")
+
+        copied_state_ids = set(State.all_state_objects.filter(project_id=copy_id).values_list("id", flat=True))
+        copied_label_ids = set(Label.objects.filter(project_id=copy_id).values_list("id", flat=True))
+
+        assert copied.rich_filters["state_id__in"][0] != str(source_state.id)
+        assert uuid.UUID(copied.rich_filters["state_id__in"][0]) in copied_state_ids
+        assert uuid.UUID(copied.rich_filters["label_id__in"][0]) in copied_label_ids
+        # Values that name nothing project-scoped pass through untouched.
+        assert copied.rich_filters["priority__in"] == ["urgent"]
+
+    def test_admission_counts_ignore_other_members_private_views(
+        self, session_client, workspace, source_project, create_user
+    ):
+        """Admission must count what this caller would copy, not every row.
+
+        Counting others' private views both over-counts -- refusing a copy that
+        would in fact be small -- and would report their number back through the
+        admission error.
+        """
+        from plane.db.models import User, WorkspaceMember
+        from plane.ext.services.project_copy import CopyPlan, _planned_counts
+
+        other = User.objects.create(email="privateowner@example.test", username="privateowner")
+        other.set_password("test-password")
+        other.save()
+        WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
+        ProjectMember.objects.create(project=source_project, member=other, workspace=workspace, role=15)
+        IssueView.objects.create(
+            name="Theirs",
+            access=VIEW_PRIVATE,
+            owned_by=other,
+            project=source_project,
+            workspace=workspace,
+            query={},
+        )
+
+        counts = _planned_counts(source_project, create_user, CopyPlan.from_options({"views": True}))
+
+        assert counts["views"] == 0, "another member's private view must not be counted"
 
     def test_repeated_duplication_derives_free_names_and_identifiers(self, session_client, workspace, source_project):
         first = session_client.post(duplicate_url(workspace.slug, source_project.id), {}, format="json")

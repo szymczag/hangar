@@ -411,7 +411,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                       </div>
                     </CustomMenu.MenuItem>
                   )}
-                  {isAuthorized && (
+                  {isAdmin && (
                     <CustomMenu.MenuItem onClick={() => setDuplicateProjectModal(true)}>
                       <span className="flex items-center justify-start gap-2">
                         <CopyPlus className="h-3.5 w-3.5 stroke-[1.5]" />

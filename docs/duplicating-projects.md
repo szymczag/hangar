@@ -58,13 +58,17 @@ Anything skipped is listed in the response's `copy_summary.skipped`.
 
 Two separate permissions, both required:
 
-1. **On the source project** — an active member with the role Admin or Member.
-   Workspace admins are not exempt: an admin who is not a member of the project
-   cannot copy it. This is what stops a project whose visibility is _Secret_
-   being copied out by someone who cannot otherwise open it.
+1. **On the source project** — an active **Admin**. Workspace admins are not
+   exempt: an admin who is not a member of the project cannot copy it. This is
+   what stops a project whose visibility is _Secret_ being copied out by someone
+   who cannot otherwise open it.
 2. **In the workspace** — Admin or Member, the same bar as creating any project.
 
-Guests cannot duplicate a project.
+Members and guests cannot duplicate a project. Admin is required rather than
+Member because the copy re-links the source's custom work item types, and a
+type's definition can be edited by an admin of _any_ project that links it — so
+letting a member duplicate would hand them admin control over definitions shared
+with projects they do not administer.
 
 ## The API
 
@@ -114,6 +118,7 @@ creation returns, plus:
 | 400    | `PROJECT_IDENTIFIER_ALREADY_EXIST`        | The identifier you supplied is taken                               |
 | 400    | `PROJECT_ARCHIVED`                        | The source project is archived; restore it first                   |
 | 400    | `PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY` | See below                                                          |
+| 429    | —                                         | Rate limited; see below                                            |
 | 403    | —                                         | You are not a member of the source, or cannot create projects here |
 | 404    | —                                         | No such project in this workspace                                  |
 
@@ -133,6 +138,20 @@ These are deliberately conservative: past them the transaction holds a lock long
 enough to delay other people creating projects in the same workspace. If you are
 hitting them, that is the signal to move this work to a background job rather
 than to raise the numbers.
+
+## Rate limits
+
+The copy holds a lock on the workspace while it runs, so duplication is rate
+limited per user and per workspace. Both are configurable:
+
+| Setting                            | Default   |
+| ---------------------------------- | --------- |
+| `PROJECT_DUPLICATE_USER_RATE`      | `10/hour` |
+| `PROJECT_DUPLICATE_WORKSPACE_RATE` | `30/hour` |
+
+The workspace limit is not redundant with the user limit: several people each
+staying under their own limit can still stall project creation for everyone else
+in the workspace. Exceeding either returns `429`.
 
 ## Known limitations
 

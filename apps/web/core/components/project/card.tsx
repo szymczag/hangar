@@ -137,7 +137,8 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
       action: () => setDuplicateProjectModal(true),
       title: "Duplicate",
       icon: CopyPlus,
-      shouldRender: !isArchived && (hasAdminRole || hasMemberRole),
+      // Admin only, matching the API: duplication re-links shared work item types.
+      shouldRender: !isArchived && hasAdminRole,
     },
     {
       key: "join",
