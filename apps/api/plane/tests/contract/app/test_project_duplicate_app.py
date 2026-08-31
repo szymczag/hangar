@@ -245,6 +245,55 @@ class TestProjectDuplicate:
         )
         assert ProjectMember.objects.filter(project_id=opted_in.data["id"], member=other).exists()
 
+    def test_copied_members_are_notified(self, session_client, workspace, source_project, mocker):
+        """Nobody should find themselves in a project without being told.
+
+        `ProjectMemberViewSet.create` mails everyone it adds; the copy must too.
+        """
+        from plane.db.models import User, WorkspaceMember
+
+        other = User.objects.create(email="notified@example.test", username="notified")
+        other.set_password("test-password")
+        other.save()
+        WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
+        ProjectMember.objects.create(project=source_project, member=other, workspace=workspace, role=15)
+
+        send = mocker.patch("plane.ext.views.project_copy.project_add_user_email.delay")
+
+        response = session_client.post(
+            duplicate_url(workspace.slug, source_project.id), {"include": {"members": True}}, format="json"
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+
+        notified = ProjectMember.objects.get(project_id=response.data["id"], member=other)
+        assert send.call_count == 1, "the copied member was not notified"
+        assert send.call_args.args[1] == notified.id
+        # Exactly one call: the caller added themselves and needs no email.
+        assert ProjectMember.objects.filter(project_id=response.data["id"]).count() == 2
+
+    def test_copied_role_is_capped_to_the_workspace_role(self, session_client, workspace, source_project):
+        """A workspace guest must not land in the copy holding a member role.
+
+        `ProjectMemberViewSet.create` refuses that combination outright; a copy
+        cannot refuse, so it clamps and says so.
+        """
+        from plane.db.models import User, WorkspaceMember
+
+        guest = User.objects.create(email="wsguest@example.test", username="wsguest")
+        guest.set_password("test-password")
+        guest.save()
+        WorkspaceMember.objects.create(workspace=workspace, member=guest, role=5)
+        # A stale row: project MEMBER while only a workspace GUEST.
+        ProjectMember.objects.create(project=source_project, member=guest, workspace=workspace, role=15)
+
+        response = session_client.post(
+            duplicate_url(workspace.slug, source_project.id), {"include": {"members": True}}, format="json"
+        )
+        copied = ProjectMember.objects.get(project_id=response.data["id"], member=guest)
+
+        assert copied.role == 5
+        assert "members:role-adjusted" in response.data["copy_summary"]["skipped"]
+
     def test_private_views_of_other_members_are_not_copied(self, session_client, workspace, source_project):
         from plane.db.models import User, WorkspaceMember
 

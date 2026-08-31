@@ -48,6 +48,7 @@ from plane.db.models import (
     ProjectMember,
     State,
     Workspace,
+    WorkspaceMember,
 )
 from plane.db.models.issue_type import ProjectIssueType
 from plane.ext.services.issue_types import ensure_project_system_types
@@ -132,7 +133,9 @@ class CopyResult:
     project: Project
     counts: dict = field(default_factory=dict)
     skipped: list = field(default_factory=list)
-    cover_source_asset_id: uuid.UUID | None = None
+    # ProjectMember rows the caller's copy created for *other* people; the view
+    # mails them after commit.
+    notify_member_ids: list = field(default_factory=list)
 
 
 class _Remap:
@@ -472,6 +475,23 @@ def _copy_intake(context: _Context) -> None:
     context.record("intake", len(created))
 
 
+def _capped_role(source_role: int, workspace_role: int) -> int:
+    """Keep a copied project role consistent with the member's workspace role.
+
+    `ProjectMemberViewSet.create` refuses the combinations outright: a workspace
+    ADMIN may not hold a lower project role, and a workspace GUEST may not hold a
+    higher one. A copy cannot refuse -- the source row already exists -- so it
+    clamps instead, and reports `members:role-adjusted`.
+    """
+    from plane.app.permissions import ROLE
+
+    if workspace_role == ROLE.ADMIN.value:
+        return ROLE.ADMIN.value
+    if workspace_role == ROLE.GUEST.value:
+        return ROLE.GUEST.value
+    return source_role
+
+
 def _copy_members(context: _Context) -> None:
     """Add the caller as ADMIN, and optionally mirror the source's membership.
 
@@ -494,20 +514,43 @@ def _copy_members(context: _Context) -> None:
         sources = ProjectMember.objects.filter(project=context.source, is_active=True, member__isnull=False).exclude(
             member_id=context.actor.id
         )
+        workspace_roles = dict(
+            WorkspaceMember.objects.filter(
+                workspace_id=context.target.workspace_id,
+                member_id__in=[source.member_id for source in sources],
+                is_active=True,
+            ).values_list("member_id", "role")
+        )
+        adjusted = False
 
         for source in sources:
-            ProjectMember.objects.create(
+            workspace_role = workspace_roles.get(source.member_id)
+            if workspace_role is None:
+                # No longer in the workspace; the source row is stale.
+                context.skip("members:not-in-workspace")
+                continue
+
+            role = _capped_role(source.role, workspace_role)
+            adjusted = adjusted or role != source.role
+
+            member = ProjectMember.objects.create(
                 project=context.target,
                 workspace_id=context.target.workspace_id,
                 member_id=source.member_id,
-                role=source.role,
+                role=role,
                 view_props=source.view_props,
                 default_props=source.default_props,
                 preferences=source.preferences,
                 created_by=context.actor,
-                updated_by=context.actor,
             )
+            # The view mails these once the transaction commits, matching what
+            # `ProjectMemberViewSet.create` does. Nobody should find themselves
+            # in a project without being told.
+            context.result.notify_member_ids.append(member.id)
             created += 1
+
+        if adjusted:
+            context.skip("members:role-adjusted")
 
     context.record("members", created)
 
@@ -806,7 +849,7 @@ def duplicate_project(*, source: Project, actor, name=None, identifier=None, net
         actor=actor,
         plan=plan,
         remap=_Remap(),
-        result=CopyResult(project=target, cover_source_asset_id=source.cover_image_asset_id),
+        result=CopyResult(project=target),
     )
 
     _copy_states(context)

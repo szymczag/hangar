@@ -17,6 +17,7 @@ from rest_framework.throttling import SimpleRateThrottle
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import ProjectListSerializer
 from plane.app.views.base import BaseAPIView
+from plane.bgtasks.project_add_user_email_task import project_add_user_email
 from plane.bgtasks.webhook_task import model_activity
 from plane.db.models import (
     DeployBoard,
@@ -164,6 +165,16 @@ class ProjectDuplicateEndpoint(BaseAPIView):
             if error.detail is not None:
                 body["detail"] = error.detail
             return Response(body, status=error.status_code)
+
+        # Tell the people the copy enrolled, the same way `ProjectMemberViewSet`
+        # does. `duplicate_project` has committed by now, so nobody is mailed
+        # about a project that rolled back.
+        for member_id in result.notify_member_ids:
+            project_add_user_email.delay(
+                base_host(request=request, is_app=True),
+                member_id,
+                request.user.id,
+            )
 
         model_activity.delay(
             model_name="project",

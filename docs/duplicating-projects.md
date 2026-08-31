@@ -34,7 +34,12 @@ separate, larger piece of work.
 endpoint whose owner never asked for them. Re-attach webhooks deliberately.
 
 **Members, by default.** Copying membership grants people access to something
-they have not been told about. Ask for it explicitly when you want it.
+they have not asked for. Ask for it explicitly when you want it. When you do,
+everyone the copy adds is emailed, exactly as if you had added them by hand, and
+each person's role is capped to their workspace role — a workspace guest cannot
+land in the copy holding a member role even if the source says otherwise. That
+adjustment is reported as `members:role-adjusted`, and anyone who has since left
+the workspace is skipped as `members:not-in-workspace`.
 
 **Someone else's private views.** A view whose access is private and which you
 do not own is skipped. The response reports this as `views:private`.
