@@ -607,6 +607,7 @@ export class ProjectStore implements IProjectStore {
           set(this.projectMap, [projectId, "archived_at"], response.archived_at);
           this.rootStore.favorite.removeFavoriteFromStore(projectId);
         });
+        return;
       })
       .catch((error) => {
         console.log("Failed to archive project from project store");
@@ -627,6 +628,7 @@ export class ProjectStore implements IProjectStore {
         runInAction(() => {
           set(this.projectMap, [projectId, "archived_at"], null);
         });
+        return;
       })
       .catch((error) => {
         console.log("Failed to restore project from project store");
