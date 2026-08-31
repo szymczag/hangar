@@ -467,6 +467,42 @@ class TestProjectDuplicate:
         assert response.data["cover_image_asset"] is None
         assert "cover_image:failed" in response.data["copy_summary"]["skipped"]
 
+    def test_a_broker_failure_does_not_turn_a_successful_copy_into_an_error(
+        self, session_client, workspace, source_project, mocker
+    ):
+        """Found by running this against a real instance.
+
+        Everything after `duplicate_project` runs post-commit, so the project
+        already exists. When the celery broker was unreachable the request
+        raised and returned 500 -- telling the caller the copy had failed while
+        leaving the project behind for them to discover by accident.
+        """
+        from plane.db.models import User, WorkspaceMember
+
+        other = User.objects.create(email="broker@example.test", username="broker")
+        other.set_password("test-password")
+        other.save()
+        WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
+        ProjectMember.objects.create(project=source_project, member=other, workspace=workspace, role=15)
+
+        mocker.patch(
+            "plane.ext.views.project_copy.project_add_user_email.delay",
+            side_effect=OSError("broker unreachable"),
+        )
+        mocker.patch(
+            "plane.ext.views.project_copy.model_activity.delay",
+            side_effect=OSError("broker unreachable"),
+        )
+
+        before = Project.objects.count()
+        response = session_client.post(
+            duplicate_url(workspace.slug, source_project.id), {"include": {"members": True}}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, "a broker outage must not fail a committed copy"
+        assert Project.objects.count() == before + 1
+        assert "members:not-notified" in response.data["copy_summary"]["skipped"]
+
     def test_repeated_duplication_derives_free_names_and_identifiers(self, session_client, workspace, source_project):
         first = session_client.post(duplicate_url(workspace.slug, source_project.id), {}, format="json")
         second = session_client.post(duplicate_url(workspace.slug, source_project.id), {}, format="json")

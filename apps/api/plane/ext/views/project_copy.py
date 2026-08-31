@@ -201,29 +201,42 @@ class ProjectDuplicateEndpoint(BaseAPIView):
                 body["detail"] = error.detail
             return Response(body, status=error.status_code)
 
+        # Everything from here runs after `duplicate_project` has committed, so
+        # the project exists whatever happens next. Reporting a failure now
+        # would tell the caller the copy did not happen when it did, and leave
+        # them to discover the project by accident -- so each side effect is
+        # allowed to fail on its own and is reported in `copy_summary.skipped`.
         cover_note = _copy_cover_image(request, result.cover_source_asset_id, result.project)
         if cover_note:
             result.skipped.append(cover_note)
 
         # Tell the people the copy enrolled, the same way `ProjectMemberViewSet`
-        # does. `duplicate_project` has committed by now, so nobody is mailed
-        # about a project that rolled back.
+        # does. Nobody is mailed about a project that rolled back, because there
+        # is no longer any way for it to.
         for member_id in result.notify_member_ids:
-            project_add_user_email.delay(
-                base_host(request=request, is_app=True),
-                member_id,
-                request.user.id,
-            )
+            try:
+                project_add_user_email.delay(
+                    base_host(request=request, is_app=True),
+                    member_id,
+                    request.user.id,
+                )
+            except Exception:
+                log.warning("Could not queue the project-added email for %s", member_id, exc_info=True)
+                result.skipped.append("members:not-notified")
+                break
 
-        model_activity.delay(
-            model_name="project",
-            model_id=str(result.project.id),
-            requested_data=request.data,
-            current_instance=None,
-            actor_id=request.user.id,
-            slug=slug,
-            origin=base_host(request=request, is_app=True),
-        )
+        try:
+            model_activity.delay(
+                model_name="project",
+                model_id=str(result.project.id),
+                requested_data=request.data,
+                current_instance=None,
+                actor_id=request.user.id,
+                slug=slug,
+                origin=base_host(request=request, is_app=True),
+            )
+        except Exception:
+            log.warning("Could not queue the creation activity for project %s", result.project.id, exc_info=True)
 
         created = _project_list_queryset(request.user, slug).filter(pk=result.project.id).first()
         data = ProjectListSerializer(created).data
