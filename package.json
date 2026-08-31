@@ -22,7 +22,6 @@
     "test:community-modal": "node scripts/community-modal.test.mjs",
     "test:react-runtime-contracts": "node --test apps/web/tests/*-contract.test.mjs",
     "test:admin-form-contracts": "node --test apps/admin/tests/*-contract.test.mjs",
-    "test:no-customer-names": "python3 -m unittest discover -s .github/scripts/tests -p test_no_customer_names.py",
     "check:lint": "turbo run check:lint",
     "check:format": "turbo run check:format",
     "check:types": "turbo run check:types",

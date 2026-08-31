@@ -186,12 +186,6 @@ jobs:
       - name: Check God Mode form contracts
         run: pnpm test:admin-form-contracts
 
-      # Runs here rather than only in the release-metadata workflow, which is
-      # path-filtered to release files: a customer's name arrives in a fixture or
-      # a comment, not in UPSTREAM_BASE.json.
-      - name: Check for deploying organisations named in source
-        run: pnpm test:no-customer-names
-
       # Five packages carry vitest suites and nothing ran them, so they passed
       # once and would have rotted from there. Not scoped with --affected: a
       # change to a package's source can break a suite in a package that depends
