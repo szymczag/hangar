@@ -397,6 +397,76 @@ class TestProjectDuplicate:
 
         assert counts["views"] == 0, "another member's private view must not be counted"
 
+    def test_cover_image_is_copied_after_the_transaction(self, session_client, workspace, source_project, mocker):
+        """The stored file is duplicated, not shared.
+
+        `cover_image_asset` is a single FK, so pointing the copy at the source's
+        row would make deleting either project take the other's cover with it.
+        The S3 copy runs after commit because it cannot be rolled back.
+        """
+        from plane.db.models import FileAsset
+
+        cover = FileAsset.objects.create(
+            workspace=workspace,
+            project=source_project,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+            asset=f"{workspace.id}/original-cover.png",
+            attributes={"name": "cover.png", "type": "image/png", "size": 12},
+            size=12,
+            is_uploaded=True,
+        )
+        source_project.cover_image_asset = cover
+        source_project.save()
+
+        copied_asset = FileAsset.objects.create(
+            workspace=workspace,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+            asset=f"{workspace.id}/copied-cover.png",
+            attributes={"name": "cover.png", "type": "image/png", "size": 12},
+            size=12,
+            is_uploaded=True,
+        )
+        mocker.patch("plane.ext.views.project_copy.copyable_asset", return_value=cover)
+        duplicate = mocker.patch("plane.ext.views.project_copy.duplicate_file_asset", return_value=copied_asset)
+
+        response = session_client.post(duplicate_url(workspace.slug, source_project.id), {}, format="json")
+        copy = Project.objects.get(pk=response.data["id"])
+
+        assert duplicate.call_count == 1
+        assert copy.cover_image_asset_id == copied_asset.id
+        assert copy.cover_image_asset_id != cover.id, "the copy must not share the source's asset row"
+
+    def test_a_cover_that_cannot_be_copied_does_not_fail_the_duplicate(
+        self, session_client, workspace, source_project, mocker
+    ):
+        """The cover is not worth failing a project over."""
+        from plane.db.models import FileAsset
+        from plane.utils.file_asset_copy import AssetCopyError
+
+        cover = FileAsset.objects.create(
+            workspace=workspace,
+            project=source_project,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+            asset=f"{workspace.id}/original-cover.png",
+            attributes={"name": "cover.png", "type": "image/png", "size": 12},
+            size=12,
+            is_uploaded=True,
+        )
+        source_project.cover_image_asset = cover
+        source_project.save()
+
+        mocker.patch("plane.ext.views.project_copy.copyable_asset", return_value=cover)
+        mocker.patch(
+            "plane.ext.views.project_copy.duplicate_file_asset",
+            side_effect=AssetCopyError("storage_unavailable", 503),
+        )
+
+        response = session_client.post(duplicate_url(workspace.slug, source_project.id), {}, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["cover_image_asset"] is None
+        assert "cover_image:failed" in response.data["copy_summary"]["skipped"]
+
     def test_repeated_duplication_derives_free_names_and_identifiers(self, session_client, workspace, source_project):
         first = session_client.post(duplicate_url(workspace.slug, source_project.id), {}, format="json")
         second = session_client.post(duplicate_url(workspace.slug, source_project.id), {}, format="json")

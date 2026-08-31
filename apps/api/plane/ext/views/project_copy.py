@@ -21,6 +21,7 @@ from plane.bgtasks.project_add_user_email_task import project_add_user_email
 from plane.bgtasks.webhook_task import model_activity
 from plane.db.models import (
     DeployBoard,
+    FileAsset,
     Project,
     ProjectMember,
     ProjectUserProperty,
@@ -29,6 +30,8 @@ from plane.db.models import (
 )
 from plane.ext.serializers.project_copy import ProjectDuplicateSerializer
 from plane.ext.services.project_copy import ProjectCopyError, duplicate_project
+from plane.settings.storage import S3Storage
+from plane.utils.file_asset_copy import AssetCopyError, copyable_asset, duplicate_file_asset
 from plane.utils.host import base_host
 
 log = logging.getLogger(__name__)
@@ -79,6 +82,38 @@ def _project_list_queryset(user, slug):
             )
         )
     )
+
+
+def _copy_cover_image(request, source_asset_id, target):
+    """Copy the source project's cover into the new project.
+
+    Runs after the copy transaction has committed, because an S3 object copy
+    cannot be rolled back with it. A cover that cannot be copied is not worth
+    failing a project over, so this degrades to no cover and says so.
+    """
+    if source_asset_id is None:
+        return None
+
+    original = copyable_asset(asset_id=source_asset_id, workspace=target.workspace, actor_id=request.user.id)
+    if original is None:
+        return "cover_image:unreadable"
+
+    try:
+        duplicated = duplicate_file_asset(
+            storage=S3Storage(request=request),
+            original_asset=original,
+            workspace=target.workspace,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+            entity_fields={},
+            project_id=target.id,
+            actor_id=request.user.id,
+        )
+    except AssetCopyError:
+        log.warning("Could not copy the cover image for project %s", target.id, exc_info=True)
+        return "cover_image:failed"
+
+    Project.objects.filter(pk=target.pk).update(cover_image_asset=duplicated)
+    return None
 
 
 class ProjectDuplicateUserThrottle(SimpleRateThrottle):
@@ -165,6 +200,10 @@ class ProjectDuplicateEndpoint(BaseAPIView):
             if error.detail is not None:
                 body["detail"] = error.detail
             return Response(body, status=error.status_code)
+
+        cover_note = _copy_cover_image(request, result.cover_source_asset_id, result.project)
+        if cover_note:
+            result.skipped.append(cover_note)
 
         # Tell the people the copy enrolled, the same way `ProjectMemberViewSet`
         # does. `duplicate_project` has committed by now, so nobody is mailed

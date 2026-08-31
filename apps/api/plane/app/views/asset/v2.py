@@ -36,7 +36,7 @@ from plane.settings.storage import S3Storage
 from plane.app.permissions import allow_permission, ROLE
 from plane.utils.cache import invalidate_cache_directly
 from plane.throttles.asset import AssetRateThrottle
-from plane.utils.path_validator import sanitize_filename
+from plane.utils.file_asset_copy import AssetCopyError, copyable_asset, duplicate_file_asset
 from plane.utils.file_asset_upload import (
     UPLOAD_URL_EXPIRATION_SECONDS,
     UPLOAD_VALIDATION_VERSION,
@@ -1096,85 +1096,25 @@ class DuplicateAssetEndpoint(BaseAPIView):
 
         storage = S3Storage(request=request)
         # Only copy a server-validated immutable source from this workspace.
-        original_asset = FileAsset.objects.filter(
-            id=asset_id,
-            is_uploaded=True,
-            workspace=workspace,
-            upload_validation_version=UPLOAD_VALIDATION_VERSION,
-        ).first()
-
+        # `copyable_asset` collapses missing and unreadable into one result so
+        # the response cannot confirm an asset the caller may not see.
+        original_asset = copyable_asset(asset_id=asset_id, workspace=workspace, actor_id=request.user.id)
         if not original_asset:
             return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
-        if not can_read_file_asset(user_id=request.user.id, asset=original_asset):
-            return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            metadata = validate_upload_metadata(
-                raw_name=(original_asset.attributes or {}).get("name"),
-                raw_size=original_asset.size,
-                claimed_mime_type=(original_asset.attributes or {}).get("type"),
+            duplicated_asset = duplicate_file_asset(
+                storage=storage,
+                original_asset=original_asset,
+                workspace=workspace,
                 entity_type=entity_type,
+                entity_fields=entity_fields,
+                project_id=project_id,
+                actor_id=request.user.id,
             )
-        except UploadError as error:
-            return Response(upload_error_payload(error), status=error.http_status)
+        except AssetCopyError as error:
+            return Response(error.payload, status=error.status_code)
 
-        source_metadata = storage.get_object_metadata(original_asset.asset.name)
-        source_etag = (source_metadata or {}).get("ETag")
-        if not source_etag:
-            return Response(
-                {"error": "File storage is temporarily unavailable."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-        sanitized_name = sanitize_filename(metadata.name) or "unnamed"
-        destination_key = f"{workspace.id}/{uuid.uuid4().hex}-{sanitized_name}"
-        copied = storage.copy_object(
-            original_asset.asset.name,
-            destination_key,
-            source_etag=source_etag,
-            content_type=metadata.mime_type,
-        )
-        final_metadata = storage.get_object_metadata(destination_key) if copied else None
-        final_type = ((final_metadata or {}).get("ContentType") or "").split(";", 1)[0].strip().lower()
-        if (
-            final_metadata is None
-            or final_metadata.get("ContentLength") != metadata.size
-            or final_type != metadata.mime_type
-        ):
-            storage.delete_files([destination_key])
-            return Response(
-                {"error": "File storage is temporarily unavailable."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        create_fields = {"workspace_id": workspace.id, "project_id": project_id, **entity_fields}
-        try:
-            duplicated_asset = FileAsset.objects.create(
-                attributes={
-                    "name": metadata.name,
-                    "type": metadata.mime_type,
-                    "size": metadata.size,
-                },
-                asset=destination_key,
-                size=metadata.size,
-                created_by_id=request.user.id,
-                entity_type=entity_type,
-                storage_metadata={
-                    **final_metadata,
-                    "DetectedContentType": (original_asset.storage_metadata or {}).get(
-                        "DetectedContentType",
-                        metadata.mime_type,
-                    ),
-                    "ValidatedAt": timezone.now().isoformat(),
-                    "ValidationVersion": UPLOAD_VALIDATION_VERSION,
-                    "ValidationSource": "validated-asset-copy",
-                },
-                is_uploaded=True,
-                upload_validation_version=UPLOAD_VALIDATION_VERSION,
-                **create_fields,
-            )
-        except Exception:
-            storage.delete_files([destination_key])
-            raise
         return Response({"asset_id": str(duplicated_asset.id)}, status=status.HTTP_200_OK)
 
 

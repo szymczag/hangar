@@ -29,7 +29,7 @@ type Props = {
 };
 
 function ProjectCreateHeader(props: Props) {
-  const { handleClose, isMobile = false, handleFormOnChange, isClosable = true } = props;
+  const { handleClose, isMobile = false, handleFormOnChange, isClosable = true, handleTemplateSelect } = props;
   const { watch, control, setValue } = useFormContext<IProject>();
   const { t } = useTranslation();
   // derived values
@@ -45,6 +45,17 @@ function ProjectCreateHeader(props: Props) {
         alt={t("project_cover_image_alt")}
         className="absolute top-0 left-0 h-full w-full rounded-lg"
       />
+      {handleTemplateSelect && (
+        <div className="absolute top-3 left-3">
+          <button
+            type="button"
+            onClick={handleTemplateSelect}
+            className="rounded-md bg-surface-1/90 px-2.5 py-1.5 text-11 font-medium text-secondary hover:bg-surface-1"
+          >
+            {t("start_from_an_existing_project")}
+          </button>
+        </div>
+      )}
       {isClosable && (
         <div className="absolute top-2 right-2 p-2">
           <button type="button" onClick={handleClose} tabIndex={getIndex("close")}>
