@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Predvolené nastavenie domovskej stránky",
+        "description": "Čo ľudia uvidia na domovskej stránke, keď sa pripoja k tomuto pracovnému priestoru. Každý si to môže ďalej upraviť.",
+        "widgets": "Widgety",
+        "shared_links": "Zdieľané rýchle odkazy",
+        "apply_to_new": "Použiť len na nových členov",
+        "apply_to_everyone": "Použiť na všetkých teraz",
+        "hide": "Skryť",
+        "show_hidden": "Zobraziť skryté"
+      },
       "exports": {
         "heading": "Exporty",
         "description": "Exportujte údaje o projektoch v rôznych formátoch a získajte prístup k histórii exportov s odkazmi na stiahnutie.",

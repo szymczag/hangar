@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Domyślny wygląd strony głównej",
+        "description": "To, co ludzie zobaczą na swojej stronie głównej po dołączeniu do tego obszaru roboczego. Każdy może to potem zmienić.",
+        "widgets": "Widżety",
+        "shared_links": "Współdzielone szybkie linki",
+        "apply_to_new": "Zastosuj tylko do nowych członków",
+        "apply_to_everyone": "Zastosuj teraz do wszystkich",
+        "hide": "Ukryj",
+        "show_hidden": "Pokaż ukryte"
+      },
       "exports": {
         "heading": "Eksporty",
         "description": "Eksportuj dane projektu w różnych formatach i uzyskaj dostęp do historii eksportów z linkami do pobrania.",

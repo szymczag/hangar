@@ -10,3 +10,4 @@ export * from "./notification.service";
 export * from "./view.service";
 export * from "./workspace.service";
 export * from "./instance-workspace.service";
+export * from "./workspace-defaults.service";

@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Default halaman beranda",
+        "description": "Yang dilihat orang di halaman beranda mereka saat bergabung dengan ruang kerja ini. Setiap orang tetap bisa menyesuaikannya.",
+        "widgets": "Widget",
+        "shared_links": "Tautan cepat bersama",
+        "apply_to_new": "Terapkan hanya untuk anggota baru",
+        "apply_to_everyone": "Terapkan ke semua orang sekarang",
+        "hide": "Sembunyikan",
+        "show_hidden": "Tampilkan yang disembunyikan"
+      },
       "exports": {
         "heading": "Ekspor",
         "description": "Ekspor data proyek Anda dalam berbagai format dan akses riwayat ekspor Anda dengan tautan unduhan.",

@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Setări implicite pentru pagina principală",
+        "description": "Ce văd oamenii pe pagina lor principală când se alătură acestui spațiu de lucru. Fiecare o poate ajusta în continuare.",
+        "widgets": "Widgeturi",
+        "shared_links": "Linkuri rapide partajate",
+        "apply_to_new": "Aplică doar membrilor noi",
+        "apply_to_everyone": "Aplică tuturor acum",
+        "hide": "Ascunde",
+        "show_hidden": "Arată elementele ascunse"
+      },
       "exports": {
         "heading": "Exporturi",
         "description": "Exportă datele proiectelor tale în diverse formate și accesează istoricul exporturilor cu link-uri de descărcare.",

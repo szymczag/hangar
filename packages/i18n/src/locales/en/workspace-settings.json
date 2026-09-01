@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Home defaults",
+        "description": "What people see on their home page when they join this workspace. Everyone can still adjust their own.",
+        "widgets": "Widgets",
+        "shared_links": "Shared quick links",
+        "apply_to_new": "Apply to new members only",
+        "apply_to_everyone": "Apply to everyone now",
+        "hide": "Hide",
+        "show_hidden": "Show hidden"
+      },
       "exports": {
         "heading": "Exports",
         "description": "Export your project data in various formats and access your export history with download links.",

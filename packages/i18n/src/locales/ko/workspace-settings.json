@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "홈 기본값",
+        "description": "이 워크스페이스에 참여한 사람의 홈에 표시되는 내용입니다. 참여 후에도 각자 조정할 수 있습니다.",
+        "widgets": "위젯",
+        "shared_links": "공유 빠른 링크",
+        "apply_to_new": "새 멤버에게만 적용",
+        "apply_to_everyone": "지금 모든 사람에게 적용",
+        "hide": "숨기기",
+        "show_hidden": "숨긴 항목 표시"
+      },
       "exports": {
         "heading": "내보내기",
         "description": "프로젝트 데이터를 다양한 형식으로 내보내고 다운로드 링크가 포함된 내보내기 기록에 접근하세요.",

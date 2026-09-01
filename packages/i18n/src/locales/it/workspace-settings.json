@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Impostazioni predefinite della home",
+        "description": "Ciò che le persone vedono nella loro home quando entrano in questo spazio di lavoro. Ognuno può comunque modificarla.",
+        "widgets": "Widget",
+        "shared_links": "Link rapidi condivisi",
+        "apply_to_new": "Applica solo ai nuovi membri",
+        "apply_to_everyone": "Applica a tutti ora",
+        "hide": "Nascondi",
+        "show_hidden": "Mostra nascosti"
+      },
       "exports": {
         "heading": "Esportazioni",
         "description": "Esporta i dati del tuo progetto in vari formati e accedi alla cronologia delle esportazioni con i link per il download.",

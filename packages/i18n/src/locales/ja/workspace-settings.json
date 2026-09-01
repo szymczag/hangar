@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "ホームの初期設定",
+        "description": "このワークスペースに参加した人のホームに表示される内容です。参加後もそれぞれで変更できます。",
+        "widgets": "ウィジェット",
+        "shared_links": "共有クイックリンク",
+        "apply_to_new": "新しいメンバーにのみ適用",
+        "apply_to_everyone": "今すぐ全員に適用",
+        "hide": "非表示にする",
+        "show_hidden": "非表示の項目を表示"
+      },
       "exports": {
         "heading": "エクスポート",
         "description": "プロジェクトデータをさまざまな形式でエクスポートし、ダウンロードリンク付きのエクスポート履歴にアクセスできます。",

@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Mặc định trang chủ",
+        "description": "Những gì mọi người thấy trên trang chủ khi tham gia không gian làm việc này. Mỗi người vẫn có thể tự điều chỉnh.",
+        "widgets": "Widget",
+        "shared_links": "Liên kết nhanh dùng chung",
+        "apply_to_new": "Chỉ áp dụng cho thành viên mới",
+        "apply_to_everyone": "Áp dụng cho mọi người ngay",
+        "hide": "Ẩn",
+        "show_hidden": "Hiện mục đã ẩn"
+      },
       "exports": {
         "heading": "Xuất",
         "description": "Xuất dữ liệu dự án của bạn dưới nhiều định dạng và truy cập lịch sử xuất với các liên kết tải xuống.",

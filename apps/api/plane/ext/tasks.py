@@ -219,3 +219,63 @@ def cleanup_import_sources() -> None:
             ImportJob.Status.CANCELLED,
         }:
             _delete_job_source(job)
+
+
+@shared_task
+def rewrite_workspace_home_defaults(workspace_id: str, version: int) -> int:
+    """Push the workspace's home defaults over every member's existing layout.
+
+    The inline path in `plane.ext.views.workspace_defaults` does exactly this;
+    above a few hundred members it moves here so the request does not hold a
+    connection open while it writes. Only the keys the defaults name are
+    touched, so a preference the defaults say nothing about survives.
+    """
+    from plane.db.models import WorkspaceHomePreference, WorkspaceMember
+    from plane.ext.models import WorkspaceDefaultsAdoption, WorkspaceHomeDefault
+
+    defaults = list(WorkspaceHomeDefault.objects.filter(workspace_id=workspace_id, deleted_at__isnull=True))
+    if not defaults:
+        return 0
+
+    by_key = {default.key: default for default in defaults}
+    member_ids = list(
+        WorkspaceMember.objects.filter(workspace_id=workspace_id, is_active=True).values_list("member_id", flat=True)
+    )
+
+    for member_id in member_ids:
+        existing = WorkspaceHomePreference.objects.filter(
+            workspace_id=workspace_id, user_id=member_id, key__in=list(by_key)
+        )
+        for preference in existing:
+            default = by_key[preference.key]
+            preference.is_enabled = default.is_enabled
+            preference.sort_order = default.sort_order
+            preference.config = default.config
+            preference.save(update_fields=["is_enabled", "sort_order", "config", "updated_at"])
+
+        present = set(existing.values_list("key", flat=True))
+        WorkspaceHomePreference.objects.bulk_create(
+            [
+                WorkspaceHomePreference(
+                    workspace_id=workspace_id,
+                    user_id=member_id,
+                    key=default.key,
+                    is_enabled=default.is_enabled,
+                    sort_order=default.sort_order,
+                    config=default.config,
+                )
+                for default in defaults
+                if default.key not in present
+            ],
+            batch_size=20,
+            ignore_conflicts=True,
+        )
+
+        WorkspaceDefaultsAdoption.objects.update_or_create(
+            workspace_id=workspace_id, user_id=member_id, defaults={"version": version}
+        )
+
+    logging.getLogger(__name__).info(
+        "rewrote home defaults for %s members in workspace %s", len(member_ids), workspace_id
+    )
+    return len(member_ids)
