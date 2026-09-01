@@ -46,6 +46,10 @@ BRANDING_ASSETS = {
         "INSTANCE_LOGIN_BACKGROUND_ASSET_ID",
         FileAsset.EntityTypeContext.INSTANCE_LOGIN_BACKGROUND,
     ),
+    # PNG, JPEG, WebP or GIF only: the upload validator and the static asset
+    # endpoint both refuse `.ico` and SVG, so the browser gets a raster icon and
+    # legacy `/favicon.ico` requests keep hitting the built-in asset.
+    "favicon": ("INSTANCE_FAVICON_ASSET_ID", FileAsset.EntityTypeContext.INSTANCE_FAVICON),
 }
 
 

@@ -202,18 +202,23 @@ class InstanceEndpoint(BaseAPIView):
             INSTANCE_SIGN_IN_HEADER,
             INSTANCE_SIGN_IN_SUBHEADER,
             INSTANCE_LOGO_ASSET_ID,
+            INSTANCE_FAVICON_ASSET_ID,
         ) = get_configuration_value(
             [
                 {"key": "INSTANCE_BRANDING_NAME", "default": os.environ.get("INSTANCE_BRANDING_NAME", "")},
                 {"key": "INSTANCE_SIGN_IN_HEADER", "default": os.environ.get("INSTANCE_SIGN_IN_HEADER", "")},
                 {"key": "INSTANCE_SIGN_IN_SUBHEADER", "default": os.environ.get("INSTANCE_SIGN_IN_SUBHEADER", "")},
                 {"key": "INSTANCE_LOGO_ASSET_ID", "default": os.environ.get("INSTANCE_LOGO_ASSET_ID", "")},
+                {"key": "INSTANCE_FAVICON_ASSET_ID", "default": os.environ.get("INSTANCE_FAVICON_ASSET_ID", "")},
             ]
         )
         data["branding_name"] = str(INSTANCE_BRANDING_NAME or "")
         data["sign_in_header"] = str(INSTANCE_SIGN_IN_HEADER or "")
         data["sign_in_subheader"] = str(INSTANCE_SIGN_IN_SUBHEADER or "")
         data["logo_url"] = f"/api/assets/v2/static/{INSTANCE_LOGO_ASSET_ID}/" if INSTANCE_LOGO_ASSET_ID else ""
+        data["favicon_url"] = (
+            f"/api/assets/v2/static/{INSTANCE_FAVICON_ASSET_ID}/" if INSTANCE_FAVICON_ASSET_ID else ""
+        )
 
         (
             INSTANCE_LOGIN_BACKGROUND_ASSET_ID,
