@@ -104,6 +104,7 @@ export interface IInstanceConfig {
   is_saml_enabled: boolean;
   saml_provider_name: string | undefined;
   is_todoist_imports_enabled?: boolean;
+  is_google_calendar_capacity_enabled?: boolean;
   // Sign-in page branding. Empty means the built-in wording and wordmark.
   branding_name?: string;
   sign_in_header?: string;

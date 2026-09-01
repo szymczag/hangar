@@ -16,8 +16,10 @@ from plane.ext.auth.views import (
     SAMLCallbackEndpoint,
     SAMLMetadataEndpoint,
 )
+from plane.ext.views.capacity import GoogleCalendarCallbackEndpoint
 
 urlpatterns = [
+    path("google/calendar/callback/", GoogleCalendarCallbackEndpoint.as_view(), name="google-calendar-callback"),
     path("oidc/", OIDCAuthInitiateEndpoint.as_view(), name="oidc-initiate"),
     path("oidc/callback/", OIDCCallbackEndpoint.as_view(), name="oidc-callback"),
     path("spaces/oidc/", OIDCAuthInitiateSpaceEndpoint.as_view(), name="oidc-space-initiate"),

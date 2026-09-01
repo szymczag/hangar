@@ -169,6 +169,14 @@ Below are the most import keys you must refer to. _<span style="color: #fcba03">
 > cleanup reconciler. See
 > [Importing from Todoist](../../../docs/importing-from-todoist.md#operator-controls-and-recovery).
 
+> `ENABLE_GOOGLE_CALENDAR_CAPACITY` - This defaults to `0`. Before setting it
+> to `1`, register the Google OAuth callback at
+> `https://<your-hangar-host>/auth/google/calendar/callback/`, configure the
+> existing Google client ID and secret settings, and set
+> `CALENDAR_TOKEN_ENCRYPTION_KEYS` to a comma-separated Fernet keyring with the
+> newest key first. Hangar stores encrypted refresh tokens and calendar IDs;
+> event names and descriptions are never requested or persisted.
+
 There are many other settings you can play with, but we suggest you configure `EMAIL SETTINGS` as it will enable you to invite your teammates onto the platform.
 
 ---

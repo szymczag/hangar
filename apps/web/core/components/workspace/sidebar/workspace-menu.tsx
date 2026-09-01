@@ -10,9 +10,11 @@ import { useParams } from "next/navigation";
 import { Disclosure, Transition } from "@headlessui/react";
 // plane imports
 import { AnalyticsIcon, CycleIcon, ProjectIcon, ViewsIcon } from "@plane/propel/icons";
+import { CalendarClock } from "lucide-react";
 import { EUserWorkspaceRoles } from "@plane/types";
 // hooks
 import useLocalStorage from "@/hooks/use-local-storage";
+import { useInstance } from "@/hooks/store/use-instance";
 // local imports
 import { SidebarWorkspaceMenuHeader } from "./workspace-menu-header";
 import { SidebarWorkspaceMenuItem } from "./workspace-menu-item";
@@ -20,6 +22,7 @@ import { SidebarWorkspaceMenuItem } from "./workspace-menu-item";
 export const SidebarWorkspaceMenu = observer(function SidebarWorkspaceMenu() {
   // router params
   const { workspaceSlug } = useParams();
+  const { config } = useInstance();
   // local storage
   const { setValue: toggleWorkspaceMenu, storedValue } = useLocalStorage<boolean>("is_workspace_menu_open", true);
   // derived values
@@ -48,6 +51,14 @@ export const SidebarWorkspaceMenu = observer(function SidebarWorkspaceMenu() {
       Icon: CycleIcon,
     },
     {
+      key: "capacity",
+      label: "Trainer capacity",
+      labelTranslationKey: "",
+      href: `/${workspaceSlug}/capacity/`,
+      access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+      Icon: CalendarClock,
+    },
+    {
       key: "analytics",
       labelTranslationKey: "sidebar.analytics",
       href: `/${workspaceSlug}/analytics/`,
@@ -69,7 +80,9 @@ export const SidebarWorkspaceMenu = observer(function SidebarWorkspaceMenu() {
         leaveTo="transform scale-95 opacity-0"
       >
         <Disclosure.Panel as="div" className="mt-0.5 flex flex-col gap-0.5" static>
-          {SIDEBAR_WORKSPACE_MENU_ITEMS.map((item) => (
+          {SIDEBAR_WORKSPACE_MENU_ITEMS.filter(
+            (item) => item.key !== "capacity" || config?.is_google_calendar_capacity_enabled === true
+          ).map((item) => (
             <SidebarWorkspaceMenuItem key={item.key} item={item} />
           ))}
         </Disclosure.Panel>

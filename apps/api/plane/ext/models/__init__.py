@@ -29,6 +29,13 @@ from .workspace_defaults import (
 from .webauthn import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCredential
 from plane.ext.runner.models import RunnerAuditEvent, RunnerInstallation
 from .worklog import IssueWorkLog
+from .capacity import (
+    GoogleCalendarCredential,
+    TrainerCalendarSelection,
+    TrainerProfile,
+    TrainerScheduleException,
+    WorkshopSchedule,
+)
 
 __all__ = [
     "EpicUserProperty",
@@ -56,4 +63,9 @@ __all__ = [
     "WorkspaceHomeDefault",
     "WorkspaceSharedLink",
     "WorkspaceSharedLinkHide",
+    "GoogleCalendarCredential",
+    "TrainerCalendarSelection",
+    "TrainerProfile",
+    "TrainerScheduleException",
+    "WorkshopSchedule",
 ]

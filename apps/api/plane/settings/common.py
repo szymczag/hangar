@@ -78,6 +78,12 @@ IS_SELF_MANAGED = True
 # administrators still need to activate it separately and accept current consent.
 RUNNER_ENABLED = os.environ.get("RUNNER_ENABLED", "0") == "1"
 TODOIST_IMPORTS_ENABLED = os.environ.get("TODOIST_IMPORTS_ENABLED", "0") == "1"
+GOOGLE_CALENDAR_CAPACITY_ENABLED = os.environ.get("ENABLE_GOOGLE_CALENDAR_CAPACITY", "0") == "1"
+CALENDAR_TOKEN_ENCRYPTION_KEYS = tuple(
+    key.strip() for key in os.environ.get("CALENDAR_TOKEN_ENCRYPTION_KEYS", "").split(",") if key.strip()
+)
+if GOOGLE_CALENDAR_CAPACITY_ENABLED and not CALENDAR_TOKEN_ENCRYPTION_KEYS:
+    raise ImproperlyConfigured("CALENDAR_TOKEN_ENCRYPTION_KEYS is required when Google Calendar capacity is enabled")
 TODOIST_IMPORT_LEASE_SECONDS = _bounded_integer_setting("TODOIST_IMPORT_LEASE_SECONDS", 120, 30, 900)
 TODOIST_IMPORT_RECOVERY_GRACE_SECONDS = _bounded_integer_setting("TODOIST_IMPORT_RECOVERY_GRACE_SECONDS", 30, 0, 300)
 TODOIST_IMPORT_SOURCE_RETENTION_HOURS = _bounded_integer_setting("TODOIST_IMPORT_SOURCE_RETENTION_HOURS", 24, 1, 168)

@@ -3,7 +3,7 @@
 
 from django.db import transaction
 
-from plane.db.models import Issue, IssueType, Workspace
+from plane.db.models import Issue, IssueType, Project, Workspace
 from plane.db.models.issue_type import ProjectIssueType
 
 
@@ -73,4 +73,43 @@ def ensure_project_system_types(project):
     ProjectIssueType.objects.filter(pk=epic_link.pk).update(level=1, is_default=False)
     Issue.objects.filter(project=project, type__isnull=True).update(type=task_type)
 
+    # Capacity is opt-in. Once a workspace has a trainer profile, keep the
+    # canonical Workshop type available in every project without making it the
+    # default work item type.
+    from plane.ext.models import TrainerProfile
+
+    if TrainerProfile.objects.filter(workspace_id=project.workspace_id).exists():
+        ensure_project_workshop_type(project)
+
     return task_type, epic_type
+
+
+@transaction.atomic
+def ensure_project_workshop_type(project):
+    Workspace.objects.select_for_update().get(pk=project.workspace_id)
+    workshop, _ = IssueType.objects.get_or_create(
+        workspace_id=project.workspace_id,
+        system_key=IssueType.SystemKey.WORKSHOP,
+        defaults={
+            "name": "Workshop",
+            "is_epic": False,
+            "is_active": True,
+            "is_default": False,
+            "level": 0,
+        },
+    )
+    IssueType.objects.filter(pk=workshop.pk).update(is_epic=False, is_active=True, is_default=False, level=0)
+    workshop.refresh_from_db()
+    ProjectIssueType.objects.get_or_create(
+        project=project,
+        issue_type=workshop,
+        defaults={"workspace_id": project.workspace_id, "level": 0, "is_default": False},
+    )
+    return workshop
+
+
+def ensure_workspace_workshop_type(workspace):
+    workshop = None
+    for project in Project.objects.filter(workspace=workspace, archived_at__isnull=True):
+        workshop = ensure_project_workshop_type(project)
+    return workshop

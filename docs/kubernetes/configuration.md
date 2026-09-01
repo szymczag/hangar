@@ -29,6 +29,7 @@ configurations.
 | `application`                             | Allowed hosts, upload limits, signed URLs, retention, API rate limits, and webhook destination controls |
 | `existingSecrets`                         | Names and keys of pre-existing Secret resources                                                         |
 | `mail`                                    | SES API delivery, feedback, OpenPGP, receipt retention, and dedicated mail-worker settings              |
+| `googleCalendarCapacity`                  | Read-only Google Calendar free/busy integration for trainer capacity                                    |
 | `externalServices`                        | Non-secret external object-storage settings                                                             |
 | `observability`                           | Optional OTLP endpoint and metrics protocol                                                             |
 | `ingress`                                 | Controller class, annotations, and TLS Secret                                                           |
@@ -117,7 +118,7 @@ The chart stores only Secret names and key names in the Helm release.
 
 | Value                           | Default resource        | Default key                                           |
 | ------------------------------- | ----------------------- | ----------------------------------------------------- |
-| `existingSecrets.application`   | `hangar-application`    | `SECRET_KEY`                                          |
+| `existingSecrets.application`   | `hangar-application`    | `SECRET_KEY`, `CALENDAR_TOKEN_ENCRYPTION_KEYS`        |
 | `existingSecrets.live`          | `hangar-live`           | `LIVE_SERVER_SECRET_KEY` (Live and general worker)    |
 | `existingSecrets.database`      | `hangar-database`       | `DATABASE_URL`                                        |
 | `existingSecrets.cache`         | `hangar-cache`          | `REDIS_URL`                                           |
@@ -136,6 +137,39 @@ Evaluation adds dependency keys to the same resources:
 Missing resources or keys appear as `CreateContainerConfigError`; Helm cannot
 validate their contents without Secret-reading RBAC, which the chart does not
 request.
+
+## Google Calendar trainer capacity
+
+The integration is opt-in and disabled by default:
+
+```yaml
+googleCalendarCapacity:
+  enabled: true
+
+existingSecrets:
+  application:
+    name: hangar-application
+    secretKeyKey: SECRET_KEY
+    calendarTokenEncryptionKeysKey: CALENDAR_TOKEN_ENCRYPTION_KEYS
+```
+
+Create a Google OAuth **Web application**, enable the Google Calendar API, and
+register `https://<publicUrl.host>/auth/google/calendar/callback/` as an exact
+redirect URI. Configure the existing Hangar `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` instance settings. The consent screen must allow
+`openid`, `email`, `calendar.calendarlist.readonly`, and
+`calendar.events.freebusy`.
+
+`CALENDAR_TOKEN_ENCRYPTION_KEYS` is a comma-separated Fernet keyring. The first
+key encrypts new refresh tokens and remaining keys are read fallbacks for
+rotation. Keep it distinct from Django `SECRET_KEY`, back it up in the secret
+manager, never place it in Helm values, and do not remove an old key until all
+credentials have been re-encrypted.
+
+Capacity requests query Google live and cache anonymous busy intervals in
+Valkey for five minutes. Hangar does not request or persist event names,
+descriptions, attendees, locations, or conferencing data. Provider or
+credential failures produce unknown availability rather than free time.
 
 ## Secure email delivery
 

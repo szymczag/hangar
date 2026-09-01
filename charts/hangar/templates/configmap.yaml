@@ -31,6 +31,7 @@ data:
   AWS_S3_BUCKET_NAME: {{ .Values.externalServices.objectStorage.bucket | quote }}
   IMPORT_S3_BUCKET_NAME: {{ .Values.externalServices.objectStorage.importBucket | quote }}
   TODOIST_IMPORTS_ENABLED: {{ ternary "1" "0" .Values.todoistImports.enabled | quote }}
+  ENABLE_GOOGLE_CALENDAR_CAPACITY: {{ ternary "1" "0" .Values.googleCalendarCapacity.enabled | quote }}
   TODOIST_IMPORT_LEASE_SECONDS: {{ printf "%d" (int64 .Values.todoistImports.leaseSeconds) | quote }}
   TODOIST_IMPORT_RECOVERY_GRACE_SECONDS: {{ printf "%d" (int64 .Values.todoistImports.recoveryGraceSeconds) | quote }}
   TODOIST_IMPORT_SOURCE_RETENTION_HOURS: {{ printf "%d" (int64 .Values.todoistImports.sourceRetentionHours) | quote }}
