@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.40",
+  version: "0.1.0-rc.41",
   highlights: [
-    "Duplicating a project requires administering it.",
-    "A copy never carries another member's private work.",
-    "Duplication is rate limited per user and per workspace.",
-    "Projects can be duplicated and used as templates.",
-    "The sidebar no longer crashes when a section is collapsed.",
+    "A maintenance notice is private until an operator publishes it.",
+    "Notice text cannot carry invisible direction changes.",
+    "Shared quick links are held to the same URL rules as personal ones.",
+    "Editing shared links stays with administrators; hiding them does not.",
+    "Home defaults never overwrite a choice somebody made, unless asked to.",
   ],
   upstream: {
     version: "1.4.0",
