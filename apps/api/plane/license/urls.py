@@ -28,6 +28,9 @@ from plane.license.api.views import (
 # Fork (see FORK.md): these must stay under /api/instances/ — the session
 # middleware picks the admin cookie by that substring in the path.
 from plane.ext.views.instance_branding import InstanceLogoEndpoint  # noqa: E402
+from plane.ext.views.instance_maintenance import (  # noqa: E402
+    InstanceMaintenanceNoticeAdminEndpoint,
+)
 from plane.ext.views.instance_identity_import import InstanceIdentityImportEndpoint  # noqa: E402
 from plane.ext.views.instance_link_authorization import InstanceLinkAuthorizationEndpoint  # noqa: E402
 from plane.ext.views.instance_openpgp import InstanceUserOpenPGPEndpoint  # noqa: E402
@@ -69,6 +72,13 @@ urlpatterns = [
         "admins/webauthn/credentials/<uuid:pk>/",
         AdminWebAuthnCredentialsEndpoint.as_view(http_method_names=["delete"]),
         name="instance-admin-webauthn-credential",
+    ),
+    # The console side of the maintenance notice. Mounted here, unlike the
+    # public read, precisely because this path selects the admin session cookie.
+    path(
+        "maintenance/",
+        InstanceMaintenanceNoticeAdminEndpoint.as_view(),
+        name="instance-maintenance-notice-admin",
     ),
     path("branding/logo/", InstanceLogoEndpoint.as_view(), name="instance-branding-logo"),
     path(

@@ -33,6 +33,8 @@ export default [
     route("authentication/domains", "./(all)/(dashboard)/authentication/domains/page.tsx"),
     route("authentication/identity-import", "./(all)/(dashboard)/authentication/identity-import/page.tsx"),
     route("branding", "./(all)/(dashboard)/branding/page.tsx"),
+    // Fork (see FORK.md)
+    route("maintenance", "./(all)/(dashboard)/maintenance/page.tsx"),
     route("ai", "./(all)/(dashboard)/ai/page.tsx"),
     route("image", "./(all)/(dashboard)/image/page.tsx"),
   ]),

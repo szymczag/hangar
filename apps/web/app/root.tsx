@@ -25,6 +25,8 @@ import type { Route } from "./+types/root";
 import { LogoSpinner } from "@/components/common/logo-spinner";
 // lib
 import { isStaleAssetError, recoverFromStaleAsset } from "@/lib/stale-asset-error";
+// Hangar extension
+import { MaintenanceBar } from "@/plane-web/components/instance/maintenance-bar";
 // local
 import { CustomErrorComponent } from "./error";
 import { AppProvider } from "./provider";
@@ -116,7 +118,20 @@ export default function Root() {
   return (
     <AppProvider>
       <div className={cn("relative flex h-screen w-full flex-col overflow-hidden bg-canvas", "desktop-app-container")}>
-        <main className="relative h-full w-full overflow-hidden">
+        {/* Fork (see FORK.md): mounted here rather than inside InstanceWrapper,
+            which early-returns its own view on an API error or an unfinished
+            setup -- a bar below it would disappear exactly when things are
+            going wrong. This is the only slot covering sign-in, onboarding and
+            the error routes.
+
+            `<main>` was `h-full`, which inside a `flex-col h-screen` pushes the
+            app's bottom edge past the viewport as soon as it has a sibling, and
+            `overflow-hidden` then clips it. `min-h-0 flex-1` is equivalent to
+            `h-full` while the bar renders null, so with no notice the layout is
+            unchanged; `min-h-0` is required or the nested scroll containers
+            refuse to shrink below their content. */}
+        <MaintenanceBar />
+        <main className="relative min-h-0 w-full flex-1 overflow-hidden">
           <Outlet />
         </main>
       </div>
