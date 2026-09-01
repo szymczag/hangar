@@ -110,6 +110,8 @@ export interface IInstanceConfig {
   sign_in_subheader?: string;
   logo_url?: string;
   login_background_url?: string;
+  // Fork: operator-supplied browser-tab icon, applied over the built-in one.
+  favicon_url?: string;
   /** Empty unless it is a plain hex colour; validated on write and on read. */
   accent_color?: string;
   login_backdrop_color?: string;
@@ -171,6 +173,7 @@ export type TInstanceConfigurationKeys =
   | TInstanceBrandingConfigurationKeys
   | "INSTANCE_LOGO_ASSET_ID"
   | "INSTANCE_LOGIN_BACKGROUND_ASSET_ID"
+  | "INSTANCE_FAVICON_ASSET_ID"
   | "INSTANCE_SHOW_LICENSE_NOTICE"
   | "INSTANCE_SHOW_EXTERNAL_LINKS"
   | "INSTANCE_DEFAULT_START_OF_WEEK"

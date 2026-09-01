@@ -23,6 +23,7 @@ def get_upload_path(instance, filename):
     if instance.entity_type in (
         FileAsset.EntityTypeContext.INSTANCE_LOGO,
         FileAsset.EntityTypeContext.INSTANCE_LOGIN_BACKGROUND,
+        FileAsset.EntityTypeContext.INSTANCE_FAVICON,
     ):
         # Owned by the instance, not by the administrator who happened to
         # upload it, so it does not sit under a personal prefix.
@@ -55,6 +56,7 @@ class FileAsset(BaseModel):
         # than to any workspace, and is shown before anyone has signed in.
         INSTANCE_LOGO = "INSTANCE_LOGO"
         INSTANCE_LOGIN_BACKGROUND = "INSTANCE_LOGIN_BACKGROUND"
+        INSTANCE_FAVICON = "INSTANCE_FAVICON"
 
     attributes = models.JSONField(default=dict)
     asset = models.FileField(upload_to=get_upload_path, max_length=800)
