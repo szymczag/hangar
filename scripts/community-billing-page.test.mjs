@@ -9,6 +9,13 @@ const repoRoot = new URL("../", import.meta.url);
 const billingComponents = new URL("../apps/web/core/components/workspace/billing/", import.meta.url);
 const billingRoot = readFileSync(new URL("root.tsx", billingComponents), "utf8");
 
+// The edition name is defined once, in the dialog that is named after it. Read
+// it from there rather than repeating the literal, so a rename cannot leave the
+// locales and the code disagreeing about what this build is called.
+const editionName = /HANGAR_EDITION_NAME = "([^"]+)"/.exec(
+  readFileSync(new URL("../apps/web/ce/components/license/modal/community-modal.tsx", import.meta.url), "utf8")
+)?.[1];
+
 test("keeps the former billing route static and community focused", () => {
   assert.match(billingRoot, /Enjoy unlimited, free, community-based Hangar\./);
   assert.match(billingRoot, /practical capacity depends only on the infrastructure/);
@@ -28,7 +35,9 @@ test("does not ship the removed commercial comparison components", () => {
   assert.doesNotMatch(componentFiles, /PlansComparison|PlanFrequencyToggle|Upgrade to|Talk to Sales/i);
 });
 
-test("labels the settings entry as Hangar Community in every locale", () => {
+test("labels the settings entry with the edition name in every locale", () => {
+  assert.ok(editionName, "HANGAR_EDITION_NAME must be exported from the community modal");
+
   const localesDirectory = new URL("../packages/i18n/src/locales/", import.meta.url);
   const locales = readdirSync(localesDirectory, { withFileTypes: true }).filter((entry) => entry.isDirectory());
 
@@ -39,7 +48,7 @@ test("labels the settings entry as Hangar Community in every locale", () => {
     const workspaceSettings = JSON.parse(readFileSync(workspaceSettingsUrl, "utf8"));
     assert.equal(
       workspaceSettings.workspace_settings.settings.billing_and_plans.title,
-      "Hangar Community",
+      editionName,
       `${locale.name} still exposes a commercial billing label`
     );
   }
@@ -48,6 +57,6 @@ test("labels the settings entry as Hangar Community in every locale", () => {
     new URL("apps/web/app/(all)/[workspaceSlug]/(settings)/settings/(workspace)/billing/page.tsx", repoRoot),
     "utf8"
   );
-  assert.match(page, /Hangar Community/);
+  assert.ok(page.includes(editionName));
   assert.doesNotMatch(page, /Billing & Plans/);
 });

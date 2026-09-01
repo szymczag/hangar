@@ -23,7 +23,7 @@ function BillingSettingsPage() {
   const { currentWorkspace } = useWorkspace();
   // derived values
   const canPerformWorkspaceAdminActions = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  const pageTitle = currentWorkspace?.name ? `${currentWorkspace.name} - Hangar Community` : undefined;
+  const pageTitle = currentWorkspace?.name ? `${currentWorkspace.name} - Hangar by @szymczag` : undefined;
 
   if (workspaceUserInfo && !canPerformWorkspaceAdminActions) {
     return <NotAuthorizedView section="settings" className="h-auto" />;

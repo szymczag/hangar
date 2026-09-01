@@ -10,11 +10,12 @@ import { observer } from "mobx-react";
 import { useTranslation } from "@plane/i18n";
 import { Tooltip } from "@plane/propel/tooltip";
 // hooks
+import { useInstance } from "@/hooks/store/use-instance";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import packageJson from "package.json";
 import { Button } from "@plane/propel/button";
 // Hangar extension
-import { HangarCommunityModal } from "@/plane-web/components/license/modal/community-modal";
+import { HANGAR_EDITION_NAME, HangarCommunityModal } from "@/plane-web/components/license/modal/community-modal";
 
 export const WorkspaceEditionBadge = observer(function WorkspaceEditionBadge() {
   // states
@@ -23,11 +24,17 @@ export const WorkspaceEditionBadge = observer(function WorkspaceEditionBadge() {
   const { t } = useTranslation();
   // platform
   const { isMobile } = usePlatformOS();
+  // instance
+  const { config } = useInstance();
+
+  // `packageJson.version` is the upstream package's, not this fork's -- it is
+  // only a fallback for a build the API has not answered for yet.
+  const version = config?.product?.version ?? packageJson.version;
 
   return (
     <>
       <HangarCommunityModal isOpen={isCommunityModalOpen} handleClose={() => setIsCommunityModalOpen(false)} />
-      <Tooltip tooltipContent={`Version: v${packageJson.version}`} isMobile={isMobile}>
+      <Tooltip tooltipContent={`Version: ${version}`} isMobile={isMobile}>
         <Button
           variant="tertiary"
           size="lg"
@@ -35,7 +42,7 @@ export const WorkspaceEditionBadge = observer(function WorkspaceEditionBadge() {
           aria-haspopup="dialog"
           aria-label={t("aria_labels.projects_sidebar.edition_badge")}
         >
-          Hangar Community
+          {HANGAR_EDITION_NAME}
         </Button>
       </Tooltip>
     </>

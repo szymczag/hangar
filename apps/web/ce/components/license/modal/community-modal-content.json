@@ -1,14 +1,7 @@
 {
-  "eyebrow": "Included in this build",
-  "title": "Open by design. No paid Hangar plan required.",
-  "description": "Every capability available in this Hangar release is included without a subscription or feature purchase.",
-  "featuresHeading": "Hangar-developed additions",
-  "features": [
-    "OIDC and SAML single sign-on",
-    "Epics",
-    "Custom work-item types and properties",
-    "Time tracking and worklogs"
-  ],
-  "availabilityNote": "Availability may depend on the installed version and administrator configuration.",
+  "description": "Every capability in this build is included. There is no paid tier, no feature purchase, and nothing held back.",
+  "releaseNotesHeading": "What changed in this build",
+  "releaseNotesUnavailable": "This build does not carry release notes. The source link below has the full history.",
+  "builtOnLabel": "Built on Plane",
   "attribution": "Hangar is an independent, community-maintained fork of Plane's AGPL-licensed open-source project. It is not affiliated with, endorsed by, or supported by Plane Software, Inc. Plane's hosted and commercial products are separate offerings."
 }
