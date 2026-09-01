@@ -141,4 +141,21 @@ sso_policy_config_variables = [
     },
 ]
 
-extended_config_variables = [*oidc_config_variables, *saml_config_variables, *sso_policy_config_variables]
+# The browser-tab icon. Stored as an asset id rather than a URL so it goes
+# through the same validated upload path as the logo and the sign-in
+# background; `InstanceEndpoint` turns it into a static asset URL on the way out.
+branding_asset_config_variables = [
+    {
+        "key": "INSTANCE_FAVICON_ASSET_ID",
+        "value": os.environ.get("INSTANCE_FAVICON_ASSET_ID", ""),
+        "category": "BRANDING",
+        "is_encrypted": False,
+    },
+]
+
+extended_config_variables = [
+    *oidc_config_variables,
+    *saml_config_variables,
+    *sso_policy_config_variables,
+    *branding_asset_config_variables,
+]

@@ -90,6 +90,7 @@ export function InstanceBrandingForm(props: Props) {
     "login-background": config.INSTANCE_LOGIN_BACKGROUND_ASSET_ID
       ? `/api/assets/v2/static/${config.INSTANCE_LOGIN_BACKGROUND_ASSET_ID}/`
       : "",
+    favicon: config.INSTANCE_FAVICON_ASSET_ID ? `/api/assets/v2/static/${config.INSTANCE_FAVICON_ASSET_ID}/` : "",
   });
   const [isUploading, setIsUploading] = useState(false);
   const [isLicenseNoticeDirty, setIsLicenseNoticeDirty] = useState(false);
@@ -248,6 +249,16 @@ export function InstanceBrandingForm(props: Props) {
         url={images.logo}
         onUpload={(event) => uploadImage("logo", event)}
         onClear={() => clearImage("logo")}
+        disabled={isUploading || !isConfigurationEditable}
+      />
+
+      <ImageField
+        label="Browser tab icon"
+        hint="Shown in the browser tab and in bookmarks. PNG, JPEG, WebP or GIF; .ico and SVG files are not accepted. A square image of at least 180 pixels looks right at every size."
+        emptyLabel="Hangar mark"
+        url={images.favicon}
+        onUpload={(event) => uploadImage("favicon", event)}
+        onClear={() => clearImage("favicon")}
         disabled={isUploading || !isConfigurationEditable}
       />
 
