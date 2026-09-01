@@ -163,6 +163,7 @@ INLINE_IMAGE_ENTITY_TYPES = {
     FileAsset.EntityTypeContext.WORKSPACE_LOGO,
     FileAsset.EntityTypeContext.INSTANCE_LOGO,
     FileAsset.EntityTypeContext.INSTANCE_LOGIN_BACKGROUND,
+    FileAsset.EntityTypeContext.INSTANCE_FAVICON,
 }
 
 

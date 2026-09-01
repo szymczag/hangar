@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 // components
@@ -12,6 +12,7 @@ import { LogoSpinner } from "@/components/common/logo-spinner";
 import { InstanceNotReady, MaintenanceView } from "@/components/instance";
 // hooks
 import { rememberFailurePageBranding } from "@/helpers/failure-page-branding";
+import { applyInstanceFavicon } from "@/helpers/instance-favicon";
 import { useInstance } from "@/hooks/store/use-instance";
 
 type TInstanceWrapper = {
@@ -25,6 +26,12 @@ const InstanceWrapper = observer(function InstanceWrapper(props: TInstanceWrappe
   // Kept while it can still be asked for: the failure pages below render when
   // this very endpoint could not be reached.
   rememberFailurePageBranding(config);
+
+  // In an effect because it touches the document: the icon links come from
+  // `links()` in root.tsx, which cannot see instance configuration.
+  useEffect(() => {
+    applyInstanceFavicon(config?.favicon_url);
+  }, [config?.favicon_url]);
 
   const { isLoading: isInstanceSWRLoading, error: instanceSWRError } = useSWR(
     "INSTANCE_INFORMATION",

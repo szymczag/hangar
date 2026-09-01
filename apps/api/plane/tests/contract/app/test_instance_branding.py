@@ -226,8 +226,34 @@ def test_a_background_is_readable_without_signing_in(db):
 
 @pytest.mark.contract
 @pytest.mark.django_db
+def test_a_favicon_is_readable_without_signing_in(db):
+    """The browser asks for it before anyone has a session."""
+    asset = _asset(FileAsset.EntityTypeContext.INSTANCE_FAVICON)
+
+    assert APIClient().get(f"/api/assets/v2/static/{asset.id}/").status_code in (200, 302)
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_the_favicon_is_reported_only_once_one_is_set(db, setup_instance):
+    cache.clear()
+    assert APIClient().get("/api/instances/").data["config"]["favicon_url"] == ""
+
+    asset = _asset(FileAsset.EntityTypeContext.INSTANCE_FAVICON)
+    _seed("INSTANCE_FAVICON_ASSET_ID", str(asset.id))
+
+    cache.clear()
+    assert APIClient().get("/api/instances/").data["config"]["favicon_url"] == (
+        f"/api/assets/v2/static/{asset.id}/"
+    )
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
 def test_an_unknown_branding_image_is_refused(admin_client):
-    assert admin_client.delete("/api/instances/branding/images/favicon/").status_code == 404
+    # Not "favicon" -- that is a registered kind now. This needs a name the
+    # registry genuinely does not know.
+    assert admin_client.delete("/api/instances/branding/images/wallpaper/").status_code == 404
 
 
 @pytest.mark.contract
