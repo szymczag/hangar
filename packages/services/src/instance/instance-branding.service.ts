@@ -14,7 +14,7 @@ import { APIService } from "../api.service";
  * Only the image needs its own calls; the wording goes through the ordinary
  * configuration endpoint like every other setting.
  */
-export type TBrandingImage = "logo" | "login-background";
+export type TBrandingImage = "logo" | "login-background" | "favicon";
 
 export class InstanceBrandingService extends APIService {
   constructor() {
