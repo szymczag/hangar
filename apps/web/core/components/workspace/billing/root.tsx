@@ -13,7 +13,7 @@ export const BillingRoot = observer(function BillingRoot() {
   return (
     <section className="relative scrollbar-hide size-full overflow-y-auto">
       <SettingsHeading
-        title="Hangar Community"
+        title="Hangar by @szymczag"
         description="One community edition. No subscriptions, upgrades, or paid tiers."
       />
 

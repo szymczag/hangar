@@ -83,7 +83,7 @@ function main(): void {
   const jsonFiles = fs
     .readdirSync(localesDir)
     .filter((file) => file.endsWith(".json"))
-    .sort();
+    .toSorted();
 
   if (jsonFiles.length === 0) {
     console.error(`Error: No JSON files found in ${localesDir}`);
@@ -133,7 +133,7 @@ function main(): void {
   }
 
   // Detect path conflicts
-  const sortedKeys = [...allKeys].sort();
+  const sortedKeys = [...allKeys].toSorted();
   const pathConflicts = detectPathConflicts(sortedKeys);
 
   if (pathConflicts.length > 0) {
@@ -150,6 +150,9 @@ function main(): void {
   }
 
   // Generate the output file
+  // The semicolon terminates the last member rather than sitting on its own
+  // line, which is what the formatter expects -- otherwise every generated file
+  // fails `check:format`, and that failure blocks type-checking everything downstream.
   const keyLines = sortedKeys.map((key) => `  | "${key}"`).join("\n");
   const output = `${COPYRIGHT_HEADER}
 
@@ -158,8 +161,7 @@ function main(): void {
 // Run: pnpm run generate:types
 
 export type TTranslationKeys =
-${keyLines}
-  ;
+${keyLines};
 `;
 
   fs.writeFileSync(outputFile, output, "utf-8");

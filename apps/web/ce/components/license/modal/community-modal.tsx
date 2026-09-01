@@ -5,7 +5,7 @@
  */
 
 import { Dialog } from "@headlessui/react";
-import { BookOpen, Check, ExternalLink, FileCode2, X } from "lucide-react";
+import { ExternalLink, FileCode2, X } from "lucide-react";
 import { observer } from "mobx-react";
 import { DOCUMENTATION_URL, SOURCE_CODE_URL } from "@plane/constants";
 // helpers
@@ -19,7 +19,10 @@ import { cn } from "@plane/utils";
 import { useInstance } from "@/hooks/store/use-instance";
 import packageJson from "package.json";
 // content
+import { RELEASE_NOTES } from "../release-notes.generated";
 import content from "./community-modal-content.json";
+
+export const HANGAR_EDITION_NAME = "Hangar by @szymczag";
 
 export type HangarCommunityModalProps = {
   isOpen: boolean;
@@ -34,7 +37,13 @@ export const HangarCommunityModal = observer(function HangarCommunityModal(props
   const sourceUrl = config?.product?.source_url ?? SOURCE_CODE_URL;
   const linksAllowed = showExternalLinks(config);
   const version = config?.product?.version ?? packageJson.version;
-  const releaseNotesUrl = `${sourceUrl.replace(/\/$/, "")}/releases`;
+
+  // The notes are bundled from the release file at build time, so they describe
+  // a specific version. If this build is running a different one -- APP_VERSION
+  // is an environment variable, and a dev build has none -- say nothing rather
+  // than describe the previous release as though it were this one.
+  const highlights = RELEASE_NOTES.version === version ? RELEASE_NOTES.highlights : [];
+  const upstream = RELEASE_NOTES.upstream.version || packageJson.version;
 
   return (
     <ModalCore
@@ -44,78 +53,68 @@ export const HangarCommunityModal = observer(function HangarCommunityModal(props
       width={EModalWidth.XXXL}
       className="overflow-hidden"
     >
-      <div className="border-b border-subtle bg-layer-1 px-6 py-5 sm:px-8">
+      {/* The identity is the point of this dialog, so it gets the room: the
+          mark at a size that reads, the name at heading weight, and the build
+          it is running underneath in a face that makes a version look like a
+          version. */}
+      <div className="border-b border-subtle bg-layer-1 px-6 py-6 sm:px-8">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-subtle bg-surface-1 shadow-raised-100">
-              <HangarLogo className="h-6 w-auto text-primary" />
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="grid size-14 shrink-0 place-items-center rounded-xl border border-subtle bg-surface-1 shadow-raised-100">
+              <HangarLogo className="h-9 w-auto text-primary" />
             </div>
             <div className="min-w-0">
-              <p className="text-11 font-semibold tracking-[0.12em] text-secondary uppercase">Hangar Community</p>
-              <p className="truncate text-13 text-tertiary">Version {version}</p>
+              <Dialog.Title as="h2" className="truncate text-20 leading-7 font-semibold text-primary">
+                {HANGAR_EDITION_NAME}
+              </Dialog.Title>
+              <p className="font-mono mt-1 truncate text-12 text-tertiary">
+                {version}
+                <span className="mx-2 text-placeholder" aria-hidden="true">
+                  ·
+                </span>
+                {content.builtOnLabel} {upstream}
+                {RELEASE_NOTES.upstream.revision ? ` (${RELEASE_NOTES.upstream.revision})` : ""}
+              </p>
             </div>
           </div>
           <IconButton
             variant="ghost"
             size="base"
             icon={X}
-            aria-label="Close Hangar Community information"
+            aria-label={`Close ${HANGAR_EDITION_NAME} information`}
             onClick={handleClose}
           />
         </div>
       </div>
 
-      <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-7 sm:px-8 sm:py-8">
-        <div className="max-w-2xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-accent-strong/20 bg-accent-primary/10 px-3 py-1 text-11 font-semibold tracking-wide text-accent-primary uppercase">
-            <span className="size-1.5 rounded-full bg-accent-primary" aria-hidden="true" />
-            {content.eyebrow}
-          </div>
-          <Dialog.Title as="h2" className="text-24 leading-8 font-semibold text-primary">
-            {content.title}
-          </Dialog.Title>
-          <Dialog.Description className="mt-3 max-w-xl text-14 leading-6 text-secondary">
-            {content.description}
-          </Dialog.Description>
-        </div>
+      <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-7 sm:px-8">
+        <Dialog.Description className="max-w-xl text-14 leading-6 text-secondary">
+          {content.description}
+        </Dialog.Description>
 
-        <section className="mt-7" aria-labelledby="hangar-community-features">
-          <h3 id="hangar-community-features" className="text-13 font-semibold text-primary">
-            {content.featuresHeading}
+        <section className="mt-7" aria-labelledby="hangar-release-notes">
+          <h3 id="hangar-release-notes" className="text-13 font-semibold text-primary">
+            {content.releaseNotesHeading}
           </h3>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-            {content.features.map((feature) => (
-              <li
-                key={feature}
-                className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle bg-surface-2 px-3.5 py-2.5 text-13 font-medium text-primary"
-              >
-                <span className="grid size-5 shrink-0 place-items-center rounded-full bg-success-subtle text-success-primary">
-                  <Check className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
-                </span>
-                {feature}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-12 leading-5 text-tertiary">{content.availabilityNote}</p>
+          {highlights.length > 0 ? (
+            // A rule per line rather than bullets or check marks: this is a
+            // record of what changed, not a list of things you are getting.
+            <ul className="mt-3 divide-y divide-subtle border-t border-subtle">
+              {highlights.map((highlight) => (
+                <li key={highlight} className="py-2.5 text-13 leading-5 text-secondary">
+                  {highlight}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-13 leading-5 text-tertiary">{content.releaseNotesUnavailable}</p>
+          )}
         </section>
 
         <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-          {/* Release notes and documentation live on hosts this instance does not
-              run, so they appear only where an operator allows that. The source
-              offer below is not covered: AGPL-3.0 section 13 requires it of
-              anyone running a modified version over a network. */}
-          {linksAllowed && (
-            <a
-              href={releaseNotesUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(getButtonStyling("primary", "base"), "justify-center gap-2")}
-            >
-              <BookOpen className="size-4" aria-hidden="true" />
-              View release notes
-              <ExternalLink className="size-3.5" aria-hidden="true" />
-            </a>
-          )}
+          {/* AGPL-3.0 section 13 requires the source offer of anyone running a
+              modified version over a network, so it is not gated. Documentation
+              lives on a host this instance does not run, so it is. */}
           <a
             href={sourceUrl}
             target="_blank"
