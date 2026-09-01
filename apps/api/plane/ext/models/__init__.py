@@ -12,6 +12,7 @@ from .import_job import (
     ImportWorkspaceBudget,
 )
 from .link_authorization import FederatedLinkAudit, FederatedLinkAuthorization
+from .maintenance import InstanceMaintenanceNotice
 from .openpgp_policy import OpenPGPAdminAction, UserOpenPGPPolicy
 from .issue_property import (
     IssueProperty,
@@ -39,6 +40,7 @@ __all__ = [
     "IssueWorkLog",
     "FederatedLinkAudit",
     "FederatedLinkAuthorization",
+    "InstanceMaintenanceNotice",
     "OpenPGPAdminAction",
     "UserOpenPGPPolicy",
     "PropertyTypeChoices",

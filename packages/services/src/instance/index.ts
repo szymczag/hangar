@@ -9,3 +9,4 @@ export * from "./instance-webauthn.service";
 export * from "./instance-identity-import.service";
 export * from "./instance-openpgp.service";
 export * from "./instance-branding.service";
+export * from "./instance-maintenance.service";

@@ -16,6 +16,8 @@ export function useSidebarMenu(): TSidebarMenuItem[] {
     coreSidebarMenuLinks.workspace,
     coreSidebarMenuLinks.users,
     coreSidebarMenuLinks.branding,
+    // Fork (see FORK.md)
+    coreSidebarMenuLinks.maintenance,
     coreSidebarMenuLinks.ai,
     coreSidebarMenuLinks.image,
   ];

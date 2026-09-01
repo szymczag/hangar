@@ -41,6 +41,7 @@ from plane.ext.views.import_job import (
     TodoistImportEndpoint,
     TodoistImportPreviewEndpoint,
 )
+from plane.ext.views.instance_maintenance import InstanceMaintenanceNoticeEndpoint
 from plane.ext.views.project_copy import ProjectDuplicateEndpoint
 from plane.ext.views.worklog import (
     IssueWorkLogDetailEndpoint,
@@ -52,6 +53,14 @@ PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
 EPIC_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>/epics"
 
 urlpatterns = [
+    # Read-only, anonymous, and deliberately NOT under /api/instances/: the
+    # session middleware switches to the admin cookie on any path containing
+    # "instances", which would leave every signed-in reader looking anonymous.
+    path(
+        "maintenance/",
+        InstanceMaintenanceNoticeEndpoint.as_view(),
+        name="instance-maintenance-notice",
+    ),
     path(
         "workspaces/<str:slug>/runner/",
         include("plane.ext.runner.urls"),

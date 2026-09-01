@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { Image, BrainCog, Cog, Mail, Palette, Users } from "lucide-react";
+import { Image, BrainCog, Cog, Mail, Megaphone, Palette, Users } from "lucide-react";
 // plane imports
 import { LockIcon, WorkspaceIcon } from "@plane/propel/icons";
 // types
@@ -17,6 +17,7 @@ export type TCoreSidebarMenuKey =
   | "users"
   | "authentication"
   | "branding"
+  | "maintenance"
   | "ai"
   | "image";
 
@@ -56,6 +57,12 @@ export const coreSidebarMenuLinks: Record<TCoreSidebarMenuKey, TSidebarMenuItem>
     name: "Branding",
     description: "Your logo and wording on the sign-in page.",
     href: `/branding/`,
+  },
+  maintenance: {
+    Icon: Megaphone,
+    name: "Maintenance notice",
+    description: "Announce downtime across the instance.",
+    href: `/maintenance/`,
   },
   ai: {
     Icon: BrainCog,
