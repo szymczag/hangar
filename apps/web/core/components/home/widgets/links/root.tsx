@@ -15,6 +15,8 @@ import { useHome } from "@/hooks/store/use-home";
 import { LinkCreateUpdateModal } from "./create-update-link-modal";
 import { ProjectLinkList } from "./links";
 import { useLinks } from "./use-links";
+// Hangar extension
+import { WorkspaceSharedLinks } from "@/plane-web/components/home/shared-links";
 
 export const DashboardQuickLinks = observer(function DashboardQuickLinks(props: THomeWidgetProps) {
   const { workspaceSlug } = props;
@@ -56,6 +58,9 @@ export const DashboardQuickLinks = observer(function DashboardQuickLinks(props: 
             <PlusIcon className="my-auto size-4" /> <span>{t("home.quick_links.add")}</span>
           </button>
         </div>
+        {/* Fork (see FORK.md): the links the workspace gives everyone, above
+            the reader's own. Renders nothing when there are none. */}
+        <WorkspaceSharedLinks workspaceSlug={workspaceSlug} />
         <div className="flex w-full flex-wrap">
           {/* rendering links */}
           <ProjectLinkList workspaceSlug={workspaceSlug} linkOperations={linkOperations} />

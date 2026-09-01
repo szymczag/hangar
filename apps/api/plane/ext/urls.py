@@ -43,6 +43,12 @@ from plane.ext.views.import_job import (
 )
 from plane.ext.views.instance_maintenance import InstanceMaintenanceNoticeEndpoint
 from plane.ext.views.project_copy import ProjectDuplicateEndpoint
+from plane.ext.views.workspace_defaults import (
+    WorkspaceHomeDefaultsEndpoint,
+    WorkspaceSharedLinkDetailEndpoint,
+    WorkspaceSharedLinkHideEndpoint,
+    WorkspaceSharedLinksEndpoint,
+)
 from plane.ext.views.worklog import (
     IssueWorkLogDetailEndpoint,
     IssueWorkLogsEndpoint,
@@ -64,6 +70,26 @@ urlpatterns = [
     path(
         "workspaces/<str:slug>/runner/",
         include("plane.ext.runner.urls"),
+    ),
+    path(
+        "workspaces/<str:slug>/home-defaults/",
+        WorkspaceHomeDefaultsEndpoint.as_view(),
+        name="workspace-home-defaults",
+    ),
+    path(
+        "workspaces/<str:slug>/shared-links/",
+        WorkspaceSharedLinksEndpoint.as_view(),
+        name="workspace-shared-links",
+    ),
+    path(
+        "workspaces/<str:slug>/shared-links/<uuid:link_id>/",
+        WorkspaceSharedLinkDetailEndpoint.as_view(),
+        name="workspace-shared-link",
+    ),
+    path(
+        "workspaces/<str:slug>/shared-links/<uuid:link_id>/hide/",
+        WorkspaceSharedLinkHideEndpoint.as_view(),
+        name="workspace-shared-link-hide",
     ),
     path(
         "workspaces/<str:slug>/imports/todoist/preview/",

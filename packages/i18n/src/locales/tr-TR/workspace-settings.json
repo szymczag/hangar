@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Ana sayfa varsayılanları",
+        "description": "Bu çalışma alanına katılan kişilerin ana sayfasında göreceği şeyler. Herkes bunu yine de kendine göre ayarlayabilir.",
+        "widgets": "Widget'lar",
+        "shared_links": "Paylaşılan hızlı bağlantılar",
+        "apply_to_new": "Yalnızca yeni üyelere uygula",
+        "apply_to_everyone": "Şimdi herkese uygula",
+        "hide": "Gizle",
+        "show_hidden": "Gizlenenleri göster"
+      },
       "exports": {
         "heading": "Dışa Aktarımlar",
         "description": "Proje verilerinizi çeşitli formatlarda dışa aktarın ve indirme bağlantılarıyla dışa aktarma geçmişinize erişin.",

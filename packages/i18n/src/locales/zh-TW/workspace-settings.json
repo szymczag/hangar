@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "首頁預設設定",
+        "description": "他人加入此工作區時在首頁上看到的內容。每個人之後仍可自行調整。",
+        "widgets": "小工具",
+        "shared_links": "共用快捷連結",
+        "apply_to_new": "僅套用於新成員",
+        "apply_to_everyone": "立即套用於所有人",
+        "hide": "隱藏",
+        "show_hidden": "顯示已隱藏項目"
+      },
       "exports": {
         "heading": "匯出",
         "description": "以各種格式匯出您的專案資料，並透過下載連結存取您的匯出歷史記錄。",

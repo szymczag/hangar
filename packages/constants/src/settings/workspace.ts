@@ -62,6 +62,14 @@ export const WORKSPACE_SETTINGS: Record<TWorkspaceSettingsTabs, TWorkspaceSettin
     access: [EUserWorkspaceRoles.ADMIN],
     highlight: (pathname: string, baseUrl: string) => pathname === `${baseUrl}/settings/imports/`,
   },
+  // Fork (see FORK.md)
+  "home-defaults": {
+    key: "home-defaults",
+    i18n_label: "workspace_settings.settings.home_defaults.title",
+    href: `/settings/home-defaults`,
+    access: [EUserWorkspaceRoles.ADMIN],
+    highlight: (pathname: string, baseUrl: string) => pathname === `${baseUrl}/settings/home-defaults/`,
+  },
   webhooks: {
     key: "webhooks",
     i18n_label: "workspace_settings.settings.webhooks.title",
@@ -83,6 +91,7 @@ export const GROUPED_WORKSPACE_SETTINGS: Record<WORKSPACE_SETTINGS_CATEGORY, TWo
     WORKSPACE_SETTINGS["export"],
     WORKSPACE_SETTINGS["imports"],
   ],
-  [WORKSPACE_SETTINGS_CATEGORY.FEATURES]: [],
+  // Fork (see FORK.md): upstream ships this category empty.
+  [WORKSPACE_SETTINGS_CATEGORY.FEATURES]: [WORKSPACE_SETTINGS["home-defaults"]],
   [WORKSPACE_SETTINGS_CATEGORY.DEVELOPER]: [WORKSPACE_SETTINGS["webhooks"]],
 };

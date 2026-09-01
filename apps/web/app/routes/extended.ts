@@ -30,6 +30,13 @@ export const extendedRoutes: RouteConfigEntry[] = [
         ]),
       ]),
       layout("./(all)/[workspaceSlug]/(settings)/layout.tsx", [
+        layout("./(all)/[workspaceSlug]/(settings)/settings/(workspace)/layout.tsx", [
+          // The home page a workspace gives its people.
+          route(
+            ":workspaceSlug/settings/home-defaults",
+            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/home-defaults/page.tsx"
+          ),
+        ]),
         layout("./(all)/[workspaceSlug]/(settings)/settings/projects/layout.tsx", [
           layout("./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/layout.tsx", [
             // Work item types settings

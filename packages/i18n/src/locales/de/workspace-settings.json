@@ -68,6 +68,16 @@
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
       },
+      "home_defaults": {
+        "title": "Startseiten-Standard",
+        "description": "Was Menschen auf ihrer Startseite sehen, wenn sie diesem Arbeitsbereich beitreten. Jede Person kann es weiterhin anpassen.",
+        "widgets": "Widgets",
+        "shared_links": "Geteilte Schnelllinks",
+        "apply_to_new": "Nur auf neue Mitglieder anwenden",
+        "apply_to_everyone": "Jetzt auf alle anwenden",
+        "hide": "Ausblenden",
+        "show_hidden": "Ausgeblendete anzeigen"
+      },
       "exports": {
         "heading": "Exporte",
         "description": "Exportieren Sie Ihre Projektdaten in verschiedenen Formaten und greifen Sie auf Ihre Exporthistorie mit Download-Links zu.",
