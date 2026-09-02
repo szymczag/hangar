@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from plane.db.models import Project, ProjectNetwork
 from plane.ext.services.project_copy import COPY_OPTIONS
+from plane.ext.utils.plain_text import PlainTextError, validate_single_line_text
 
 
 class ProjectCopyOptionsSerializer(serializers.Serializer):
@@ -52,9 +53,15 @@ class ProjectDuplicateSerializer(serializers.Serializer):
     include = ProjectCopyOptionsSerializer(required=False)
 
     def validate_name(self, name):
-        if re.match(Project.FORBIDDEN_IDENTIFIER_CHARS_PATTERN, name):
+        # The duplicate modal prefills "<source> (Copy)", and parentheses are in
+        # the identifier pattern this used to apply -- so the modal's own default
+        # was rejected by this endpoint and duplication never worked from the
+        # interface at all. A display name is held to what one line of human text
+        # must be; the identifier below keeps the strict pattern.
+        try:
+            return validate_single_line_text(name, max_length=255, field="Project name")
+        except PlainTextError:
             raise serializers.ValidationError("PROJECT_NAME_CANNOT_CONTAIN_SPECIAL_CHARACTERS")
-        return name
 
     def validate_identifier(self, identifier):
         identifier = identifier.strip().upper()

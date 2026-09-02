@@ -171,6 +171,7 @@
   "project_name_already_taken": "Назва проекту вже використовується.",
   "project_name_cannot_contain_special_characters": "Назва проєкту не може містити спеціальні символи.",
   "project_identifier_already_taken": "Ідентифікатор проекту вже використовується.",
+  "project_identifier_cannot_contain_special_characters": "Ідентифікатор проєкту може містити лише літери та цифри.",
   "project_cover_image_alt": "Обкладинка проєкту",
   "name_is_required": "Назва є обов'язковою",
   "title_should_be_less_than_255_characters": "Назва має бути коротшою за 255 символів",

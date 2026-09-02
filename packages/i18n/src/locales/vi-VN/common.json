@@ -171,6 +171,7 @@
   "project_name_already_taken": "Tên dự án đã được sử dụng.",
   "project_name_cannot_contain_special_characters": "Tên dự án không được chứa ký tự đặc biệt.",
   "project_identifier_already_taken": "ID dự án đã được sử dụng.",
+  "project_identifier_cannot_contain_special_characters": "Mã định danh dự án chỉ có thể chứa chữ cái và số.",
   "project_cover_image_alt": "Ảnh bìa dự án",
   "name_is_required": "Tên là bắt buộc",
   "title_should_be_less_than_255_characters": "Tiêu đề phải ít hơn 255 ký tự",

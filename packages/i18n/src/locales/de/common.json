@@ -171,6 +171,7 @@
   "project_name_already_taken": "Der Projektname ist bereits vergeben.",
   "project_name_cannot_contain_special_characters": "Der Projektname darf keine Sonderzeichen enthalten.",
   "project_identifier_already_taken": "Der Projekt-Identifier ist bereits vergeben.",
+  "project_identifier_cannot_contain_special_characters": "Die Projektkennung darf nur Buchstaben und Zahlen enthalten.",
   "project_cover_image_alt": "Titelbild des Projekts",
   "name_is_required": "Name ist erforderlich",
   "title_should_be_less_than_255_characters": "Der Titel sollte weniger als 255 Zeichen enthalten",

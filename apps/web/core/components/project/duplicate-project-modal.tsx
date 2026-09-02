@@ -114,16 +114,33 @@ export function DuplicateProjectModal(props: TDuplicateProjectModalProps) {
       });
       router.push(`/${workspaceSlug}/projects/${copy.id}/issues`);
     } catch (error) {
-      // `duplicateProject` rejects with the response, so the API's error codes
-      // are on `.data.error` -- the same shape the create form decodes.
-      const code = (error as { data?: { error?: string } })?.data?.error;
+      // The endpoint answers in two shapes, and only one of them was decoded
+      // here before: the service raises `{ error: CODE }`, but a serializer
+      // rejection is DRF's field map, `{ name: [CODE] }`. A validation failure
+      // therefore fell through to the generic toast with nothing said about the
+      // field that caused it.
+      const body = (error as { data?: Record<string, unknown> })?.data ?? {};
+      const fieldCodes = (field: string): string[] => {
+        const value = body[field];
+        return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+      };
+      const code = typeof body.error === "string" ? body.error : undefined;
+      const has = (field: string, wanted: string) => code === wanted || fieldCodes(field).includes(wanted);
 
-      if (code === "PROJECT_NAME_ALREADY_EXIST") {
+      if (has("name", "PROJECT_NAME_ALREADY_EXIST")) {
         setError("name", { message: t("project_name_already_taken") });
         return;
       }
-      if (code === "PROJECT_IDENTIFIER_ALREADY_EXIST") {
+      if (has("identifier", "PROJECT_IDENTIFIER_ALREADY_EXIST")) {
         setError("identifier", { message: t("project_identifier_already_taken") });
+        return;
+      }
+      if (has("name", "PROJECT_NAME_CANNOT_CONTAIN_SPECIAL_CHARACTERS")) {
+        setError("name", { message: t("project_name_cannot_contain_special_characters") });
+        return;
+      }
+      if (has("identifier", "PROJECT_IDENTIFIER_CANNOT_CONTAIN_SPECIAL_CHARACTERS")) {
+        setError("identifier", { message: t("project_identifier_cannot_contain_special_characters") });
         return;
       }
 

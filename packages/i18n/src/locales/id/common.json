@@ -171,6 +171,7 @@
   "project_name_already_taken": "Nama proyek sudah digunakan",
   "project_name_cannot_contain_special_characters": "Nama proyek tidak boleh mengandung karakter khusus.",
   "project_identifier_already_taken": "ID proyek sudah digunakan",
+  "project_identifier_cannot_contain_special_characters": "Pengidentifikasi proyek hanya boleh berisi huruf dan angka.",
   "project_cover_image_alt": "Gambar sampul proyek",
   "name_is_required": "Nama diperlukan",
   "title_should_be_less_than_255_characters": "Judul harus kurang dari 255 karakter",
