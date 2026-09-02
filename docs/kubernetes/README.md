@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.42`. It is qualified for evaluation on
+The current release is `0.1.0-rc.43`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.42` qualification boundary is:
+The `0.1.0-rc.43` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -116,15 +116,15 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.42`                               |
-| Helm chart version | `0.1.0-rc.42`                                |
-| Git tag            | `hangar-v0.1.0-rc.42`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.42` |
+| Product version    | `v0.1.0-rc.43`                               |
+| Helm chart version | `0.1.0-rc.43`                                |
+| Git tag            | `hangar-v0.1.0-rc.43`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.43` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, and `rc.33` were consumed by
 incomplete publication attempts. Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
-installation, upgrade, or rollback targets. `rc.41` is the immediately previous
+installation, upgrade, or rollback targets. `rc.42` is the immediately previous
 retained GitHub release.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
 There is no security-equivalent rollback target among the earlier release
@@ -134,7 +134,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.42` notes](../releases/hangar-v0.1.0-rc.42.md) — review
+- [Release `v0.1.0-rc.43` notes](../releases/hangar-v0.1.0-rc.43.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -169,7 +169,7 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The public `rc.42` chart archive, OCI chart, and digest-pinned Hangar images are
+The public `rc.43` chart archive, OCI chart, and digest-pinned Hangar images are
 anonymously downloadable. The release workflow also created provenance
 attestations and keyless Cosign signatures.
 
