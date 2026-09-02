@@ -1,17 +1,23 @@
+/**
+ * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
 import { useMemo, useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, CircleAlert, Link2, Plus, Trash2, Unplug } from "lucide-react";
 import useSWR from "swr";
 import { Button } from "@plane/propel/button";
+import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { Spinner } from "@plane/ui";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
-import { useUser } from "@/hooks/store/user";
+import { useUserPermissions } from "@/hooks/store/user";
 import { useInstance } from "@/hooks/store/use-instance";
 import {
   CapacityService,
   type TGoogleCalendar,
-  type TScheduleInterval,
   type TTrainerException,
   type TTrainerProfile,
 } from "@/services/capacity.service";
@@ -46,6 +52,15 @@ function ExceptionsEditor({
 }) {
   const [exceptions, setExceptions] = useState<TTrainerException[]>(profile.exceptions);
   const [saving, setSaving] = useState(false);
+  const setExceptionInterval = (exceptionIndex: number, intervalIndex: number, field: "start" | "end", value: string) =>
+    setExceptions((current) =>
+      current.map((entry, position) => {
+        if (position !== exceptionIndex) return entry;
+        const intervals = [...entry.intervals];
+        intervals[intervalIndex] = { ...intervals[intervalIndex], [field]: value };
+        return { ...entry, intervals };
+      })
+    );
   const addDate = () => {
     const date = new Date().toISOString().slice(0, 10);
     if (!exceptions.some((item) => item.date === date))
@@ -54,7 +69,7 @@ function ExceptionsEditor({
   const save = async () => {
     setSaving(true);
     try {
-      await capacityService.updateSchedule(workspaceSlug, profile.user_id, { exceptions });
+      await capacityService.updateSchedule(workspaceSlug, profile.user_id, profile.schedule_revision, { exceptions });
       setToast({
         type: TOAST_TYPE.SUCCESS,
         title: "Exceptions saved",
@@ -75,9 +90,9 @@ function ExceptionsEditor({
     <section className="rounded-lg border border-subtle bg-surface-1 p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-body-sm-medium">Days away</h2>
+          <h2 className="text-body-sm-medium">Schedule exceptions</h2>
           <p className="mt-1 text-body-xs-regular text-secondary">
-            Block holidays and other one-off unavailable dates.
+            Mark a date unavailable, or override it with specific working intervals.
           </p>
         </div>
         <div className="flex gap-2">
@@ -93,27 +108,110 @@ function ExceptionsEditor({
       {exceptions.length ? (
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {exceptions.map((item, index) => (
-            <div key={item.date} className="flex items-center gap-2 rounded-md border border-subtle p-2">
-              <input
-                type="date"
-                value={item.date}
-                onChange={(event) =>
-                  setExceptions((current) =>
-                    current.map((entry, position) =>
-                      position === index ? { ...entry, date: event.target.value } : entry
+            <div key={item.date} className="rounded-md border border-subtle p-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={item.date}
+                  onChange={(event) =>
+                    setExceptions((current) =>
+                      current.map((entry, position) =>
+                        position === index ? { ...entry, date: event.target.value } : entry
+                      )
                     )
-                  )
-                }
-                className="min-w-0 flex-1 rounded border border-subtle bg-surface-2 px-2 py-1 text-body-xs-regular"
-              />
-              <button
-                type="button"
-                aria-label="Remove unavailable date"
-                className="rounded p-1 text-secondary hover:text-danger-primary"
-                onClick={() => setExceptions((current) => current.filter((_, position) => position !== index))}
-              >
-                <Trash2 className="size-4" />
-              </button>
+                  }
+                  className="min-w-0 flex-1 rounded border border-subtle bg-surface-2 px-2 py-1 text-body-xs-regular"
+                />
+                <select
+                  aria-label={`Availability mode for ${item.date}`}
+                  value={item.mode}
+                  onChange={(event) =>
+                    setExceptions((current) =>
+                      current.map((entry, position) =>
+                        position === index
+                          ? {
+                              ...entry,
+                              mode: event.target.value as TTrainerException["mode"],
+                              intervals:
+                                event.target.value === "override" && entry.intervals.length === 0
+                                  ? [{ start: "09:00", end: "17:00" }]
+                                  : entry.intervals,
+                            }
+                          : entry
+                      )
+                    )
+                  }
+                  className="rounded border border-subtle bg-surface-2 px-2 py-1 text-body-xs-regular"
+                >
+                  <option value="unavailable">Unavailable</option>
+                  <option value="override">Custom hours</option>
+                </select>
+                <button
+                  type="button"
+                  aria-label={`Remove exception for ${item.date}`}
+                  className="rounded p-1 text-secondary hover:text-danger-primary"
+                  onClick={() => setExceptions((current) => current.filter((_, position) => position !== index))}
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+              {item.mode === "override" ? (
+                <div className="mt-2 flex flex-col gap-1">
+                  {item.intervals.map((interval, intervalIndex) => (
+                    <div key={`${interval.start}-${interval.end}`} className="flex items-center gap-1">
+                      <input
+                        aria-label={`Override interval ${intervalIndex + 1} start`}
+                        type="time"
+                        value={interval.start}
+                        onChange={(event) => setExceptionInterval(index, intervalIndex, "start", event.target.value)}
+                        className="rounded border border-subtle bg-surface-2 px-1 py-1 text-11"
+                      />
+                      <span className="text-11 text-secondary">–</span>
+                      <input
+                        aria-label={`Override interval ${intervalIndex + 1} end`}
+                        type="time"
+                        value={interval.end}
+                        onChange={(event) => setExceptionInterval(index, intervalIndex, "end", event.target.value)}
+                        className="rounded border border-subtle bg-surface-2 px-1 py-1 text-11"
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Remove override interval ${intervalIndex + 1}`}
+                        onClick={() =>
+                          setExceptions((current) =>
+                            current.map((entry, position) =>
+                              position === index
+                                ? {
+                                    ...entry,
+                                    intervals: entry.intervals.filter((_, itemIndex) => itemIndex !== intervalIndex),
+                                  }
+                                : entry
+                            )
+                          )
+                        }
+                        className="rounded p-1 text-secondary hover:text-danger-primary"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="self-start text-11 text-accent-primary"
+                    onClick={() =>
+                      setExceptions((current) =>
+                        current.map((entry, position) =>
+                          position === index
+                            ? { ...entry, intervals: [...entry.intervals, { start: "13:00", end: "17:00" }] }
+                            : entry
+                        )
+                      )
+                    }
+                  >
+                    + Add interval
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -137,6 +235,15 @@ function connectionCopy(status: string) {
   return "Availability unknown";
 }
 
+function availabilityCopy(status: string) {
+  if (status === "fresh") return "Live availability";
+  if (status === "stale") return "Last known availability";
+  if (status === "reauthentication_required") return "Reconnect Google";
+  if (status === "rate_limited") return "Google rate limited";
+  if (status === "provider_unavailable") return "Google unavailable";
+  return connectionCopy(status);
+}
+
 function ScheduleEditor({
   profile,
   workspaceSlug,
@@ -147,14 +254,25 @@ function ScheduleEditor({
   onSaved: () => void;
 }) {
   const [schedule, setSchedule] = useState(profile.weekly_schedule);
+  const [trainerTimezone, setTrainerTimezone] = useState(profile.timezone);
   const [saving, setSaving] = useState(false);
 
-  const setTime = (day: string, field: "start" | "end", value: string) => {
+  const setTime = (day: string, intervalIndex: number, field: "start" | "end", value: string) => {
     setSchedule((current) => {
-      const existing: TScheduleInterval = current[day]?.[0] ?? { start: "09:00", end: "17:00" };
-      return { ...current, [day]: [{ ...existing, [field]: value }] };
+      const intervals = [...(current[day] ?? [])];
+      intervals[intervalIndex] = { ...intervals[intervalIndex], [field]: value };
+      return { ...current, [day]: intervals };
     });
   };
+
+  const addInterval = (day: string) =>
+    setSchedule((current) => ({ ...current, [day]: [...(current[day] ?? []), { start: "13:00", end: "17:00" }] }));
+
+  const removeInterval = (day: string, intervalIndex: number) =>
+    setSchedule((current) => ({
+      ...current,
+      [day]: (current[day] ?? []).filter((_, index) => index !== intervalIndex),
+    }));
 
   const toggleDay = (day: string) => {
     setSchedule((current) => ({
@@ -166,7 +284,10 @@ function ScheduleEditor({
   const save = async () => {
     setSaving(true);
     try {
-      await capacityService.updateSchedule(workspaceSlug, profile.user_id, { weekly_schedule: schedule });
+      await capacityService.updateSchedule(workspaceSlug, profile.user_id, profile.schedule_revision, {
+        weekly_schedule: schedule,
+        timezone: trainerTimezone,
+      });
       setToast({
         type: TOAST_TYPE.SUCCESS,
         title: "Working hours saved",
@@ -188,39 +309,68 @@ function ScheduleEditor({
     <section className="rounded-lg border border-subtle bg-surface-1 p-4">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-body-sm-medium">Your working week</h2>
+          <h2 className="text-body-sm-medium">Working week · {profile.display_name}</h2>
           <p className="mt-1 text-body-xs-regular text-secondary">Busy time is subtracted only inside these hours.</p>
         </div>
         <Button variant="primary" size="sm" loading={saving} onClick={save}>
           Save hours
         </Button>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <label className="mb-4 block max-w-sm text-body-xs-medium">
+        Trainer timezone
+        <input
+          aria-label="Trainer timezone"
+          value={trainerTimezone}
+          onChange={(event) => setTrainerTimezone(event.target.value)}
+          placeholder="Europe/Warsaw"
+          className="mt-1 w-full rounded border border-subtle bg-surface-2 px-2 py-1.5 text-body-xs-regular"
+        />
+      </label>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {DAY_KEYS.map((day, index) => {
-          const interval = schedule[day]?.[0];
+          const intervals = schedule[day] ?? [];
           return (
             <div key={day} className="flex min-h-12 items-center gap-2 rounded-md border border-subtle px-3 py-2">
-              <label className="flex w-10 cursor-pointer items-center gap-2 text-body-xs-medium">
-                <input type="checkbox" checked={Boolean(interval)} onChange={() => toggleDay(day)} />
+              <label className="flex w-10 cursor-pointer items-center gap-2 self-start pt-1 text-body-xs-medium">
+                <input type="checkbox" checked={intervals.length > 0} onChange={() => toggleDay(day)} />
                 {DAY_LABELS[index]}
               </label>
-              {interval ? (
-                <div className="flex min-w-0 items-center gap-1 text-11 text-secondary">
-                  <input
-                    aria-label={`${DAY_LABELS[index]} start`}
-                    type="time"
-                    value={interval.start}
-                    onChange={(event) => setTime(day, "start", event.target.value)}
-                    className="min-w-0 rounded border border-subtle bg-surface-2 px-1 py-1"
-                  />
-                  <span>–</span>
-                  <input
-                    aria-label={`${DAY_LABELS[index]} end`}
-                    type="time"
-                    value={interval.end}
-                    onChange={(event) => setTime(day, "end", event.target.value)}
-                    className="min-w-0 rounded border border-subtle bg-surface-2 px-1 py-1"
-                  />
+              {intervals.length ? (
+                <div className="flex min-w-0 flex-1 flex-col gap-1 text-11 text-secondary">
+                  {intervals.map((interval, intervalIndex) => (
+                    <div key={`${interval.start}-${interval.end}`} className="flex items-center gap-1">
+                      <input
+                        aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} start`}
+                        type="time"
+                        value={interval.start}
+                        onChange={(event) => setTime(day, intervalIndex, "start", event.target.value)}
+                        className="min-w-0 rounded border border-subtle bg-surface-2 px-1 py-1"
+                      />
+                      <span>–</span>
+                      <input
+                        aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} end`}
+                        type="time"
+                        value={interval.end}
+                        onChange={(event) => setTime(day, intervalIndex, "end", event.target.value)}
+                        className="min-w-0 rounded border border-subtle bg-surface-2 px-1 py-1"
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Remove ${DAY_LABELS[index]} interval ${intervalIndex + 1}`}
+                        onClick={() => removeInterval(day, intervalIndex)}
+                        className="rounded p-1 hover:text-danger-primary"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addInterval(day)}
+                    className="self-start text-11 text-accent-primary"
+                  >
+                    + Add interval
+                  </button>
                 </div>
               ) : (
                 <span className="text-11 text-placeholder">Off</span>
@@ -236,10 +386,12 @@ function ScheduleEditor({
 function CalendarPicker({
   workspaceSlug,
   calendars,
+  selectionRevision,
   onSaved,
 }: {
   workspaceSlug: string;
   calendars: TGoogleCalendar[];
+  selectionRevision: number;
   onSaved: () => void;
 }) {
   const [selected, setSelected] = useState(
@@ -249,7 +401,7 @@ function CalendarPicker({
   const save = async () => {
     setSaving(true);
     try {
-      await capacityService.selectCalendars(workspaceSlug, [...selected]);
+      await capacityService.selectCalendars(workspaceSlug, [...selected], selectionRevision);
       setToast({
         type: TOAST_TYPE.SUCCESS,
         title: "Calendars saved",
@@ -305,25 +457,37 @@ function CalendarPicker({
 export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   const workspaceSlug = params.workspaceSlug;
   const { config } = useInstance();
-  const { data: currentUser } = useUser();
+  const { allowPermissions } = useUserPermissions();
+  const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
+  const [trainerCursor, setTrainerCursor] = useState<string | undefined>();
+  const [cursorHistory, setCursorHistory] = useState<Array<string | undefined>>([]);
+  const [editingTrainerId, setEditingTrainerId] = useState<string | null>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const weekEnd = useMemo(() => new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000), [weekStart]);
   const rangeKey = `${weekStart.toISOString()}:${weekEnd.toISOString()}`;
   const {
-    data: trainers,
+    data: trainerPage,
     mutate: mutateTrainers,
     isLoading: trainersLoading,
-  } = useSWR(["capacity-trainers", workspaceSlug], () => capacityService.listTrainers(workspaceSlug));
+  } = useSWR(["capacity-trainers", workspaceSlug, trainerCursor], () =>
+    capacityService.listTrainers(workspaceSlug, trainerCursor)
+  );
+  const trainers = trainerPage?.results;
+  const trainerIds = trainers?.map((trainer) => trainer.user_id) ?? [];
   const {
     data: capacity,
+    error: capacityError,
     mutate: mutateCapacity,
     isLoading: capacityLoading,
   } = useSWR(
-    ["capacity", workspaceSlug, rangeKey],
-    () => capacityService.getCapacity(workspaceSlug, weekStart.toISOString(), weekEnd.toISOString()),
+    trainers ? ["capacity", workspaceSlug, rangeKey, trainerIds.join(",")] : null,
+    () => capacityService.getCapacity(workspaceSlug, weekStart.toISOString(), weekEnd.toISOString(), trainerIds),
     { keepPreviousData: true }
   );
-  const ownProfile = trainers?.find((trainer) => trainer.user_id === currentUser?.id);
+  const { data: ownProfile, mutate: mutateOwnProfile } = useSWR(["capacity-trainer-self", workspaceSlug], () =>
+    capacityService.getOwnTrainerProfile(workspaceSlug)
+  );
+  const editingProfile = trainers?.find((trainer) => trainer.user_id === editingTrainerId);
   const hasActiveProfile = ownProfile?.status === "active";
   const isConnected = hasActiveProfile && ownProfile?.connection_status === "connected";
   const { data: calendars, mutate: mutateCalendars } = useSWR(
@@ -331,7 +495,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
     () => capacityService.listCalendars(workspaceSlug)
   );
 
-  const refresh = () => Promise.all([mutateTrainers(), mutateCapacity()]);
+  const refresh = () => Promise.all([mutateTrainers(), mutateOwnProfile(), mutateCapacity()]);
   const optIn = async () => {
     await capacityService.optIn(workspaceSlug);
     await refresh();
@@ -401,6 +565,15 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
             <div className="grid min-h-56 place-items-center">
               <Spinner />
             </div>
+          ) : capacityError ? (
+            <div role="alert" className="flex min-h-56 flex-col items-center justify-center gap-2 px-5 text-center">
+              <CircleAlert className="size-6 text-danger-primary" />
+              <h2 className="text-body-sm-medium">Capacity could not be loaded</h2>
+              <p className="text-body-xs-regular text-secondary">{errorMessage(capacityError, "Try again shortly.")}</p>
+              <Button variant="secondary" size="sm" onClick={() => mutateCapacity()}>
+                Retry
+              </Button>
+            </div>
           ) : capacity?.trainers.length ? (
             <div className="divide-y divide-subtle">
               {capacity.trainers.map((trainer) => {
@@ -416,7 +589,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                     <div>
                       <h2 className="text-body-sm-medium text-primary">{trainer.display_name}</h2>
                       <p className="mt-1 text-11 text-secondary">
-                        {connectionCopy(trainer.connection_status)} · {trainer.timezone}
+                        {availabilityCopy(trainer.availability_status)} · {trainer.timezone}
                       </p>
                     </div>
                     <div>
@@ -448,6 +621,15 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                           {trainer.conflicts.length === 1 ? "" : "s"}
                         </div>
                       ) : null}
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          className="mt-2 text-11 text-accent-primary"
+                          onClick={() => setEditingTrainerId(trainer.trainer_id)}
+                        >
+                          Manage schedule
+                        </button>
+                      ) : null}
                     </div>
                   </article>
                 );
@@ -469,16 +651,80 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               ) : null}
             </div>
           )}
+          {(cursorHistory.length > 0 || trainerPage?.next_cursor) && (
+            <div className="flex items-center justify-end gap-2 border-t border-subtle px-5 py-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={cursorHistory.length === 0}
+                onClick={() => {
+                  setTrainerCursor(cursorHistory[cursorHistory.length - 1]);
+                  setCursorHistory((current) => current.slice(0, -1));
+                }}
+              >
+                Previous trainers
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!trainerPage?.next_cursor}
+                onClick={() => {
+                  setCursorHistory((current) => [...current, trainerCursor]);
+                  setTrainerCursor(trainerPage?.next_cursor ?? undefined);
+                }}
+              >
+                Next trainers
+              </Button>
+            </div>
+          )}
         </section>
+
+        {isAdmin && editingProfile ? (
+          <section aria-label={`Manage ${editingProfile.display_name}`} className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-body-sm-medium">Managing {editingProfile.display_name}</h2>
+              <Button variant="secondary" size="sm" onClick={() => setEditingTrainerId(null)}>
+                Close
+              </Button>
+            </div>
+            <ScheduleEditor
+              key={`${editingProfile.id}-${editingProfile.schedule_revision}-schedule`}
+              profile={editingProfile}
+              workspaceSlug={workspaceSlug}
+              onSaved={refresh}
+            />
+            <ExceptionsEditor
+              key={`${editingProfile.id}-${editingProfile.schedule_revision}-exceptions`}
+              profile={editingProfile}
+              workspaceSlug={workspaceSlug}
+              onSaved={refresh}
+            />
+          </section>
+        ) : null}
 
         {ownProfile && hasActiveProfile ? (
           <>
-            <ScheduleEditor profile={ownProfile} workspaceSlug={workspaceSlug} onSaved={refresh} />
-            <ExceptionsEditor profile={ownProfile} workspaceSlug={workspaceSlug} onSaved={refresh} />
+            {!isAdmin || editingTrainerId !== ownProfile.user_id ? (
+              <>
+                <ScheduleEditor
+                  key={`${ownProfile.id}-${ownProfile.schedule_revision}-schedule`}
+                  profile={ownProfile}
+                  workspaceSlug={workspaceSlug}
+                  onSaved={refresh}
+                />
+                <ExceptionsEditor
+                  key={`${ownProfile.id}-${ownProfile.schedule_revision}-exceptions`}
+                  profile={ownProfile}
+                  workspaceSlug={workspaceSlug}
+                  onSaved={refresh}
+                />
+              </>
+            ) : null}
             {isConnected && calendars ? (
               <CalendarPicker
                 workspaceSlug={workspaceSlug}
-                calendars={calendars}
+                calendars={calendars.calendars}
+                selectionRevision={calendars.selection_revision}
                 onSaved={() => Promise.all([mutateCalendars(), mutateCapacity()]).then(() => undefined)}
               />
             ) : (

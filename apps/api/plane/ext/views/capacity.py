@@ -5,11 +5,13 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import secrets
 from datetime import date, timedelta
 from urllib.parse import urlencode
 from uuid import UUID
+import base64 as cursor_base64
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -101,6 +103,7 @@ def _profile_payload(profile):
         "status": profile.status,
         "timezone": profile.timezone,
         "weekly_schedule": profile.weekly_schedule,
+        "schedule_revision": profile.schedule_revision,
         "connection_status": connection_status,
         "exceptions": [
             {"date": item.local_date.isoformat(), "mode": item.mode, "intervals": item.intervals}
@@ -111,6 +114,18 @@ def _profile_payload(profile):
 
 class TrainerSelfEndpoint(BaseAPIView):
     authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def get(self, request, slug):
+        if response := _disabled():
+            return response
+        profile = (
+            TrainerProfile.objects.filter(workspace__slug=slug, user=request.user)
+            .select_related("user")
+            .prefetch_related("schedule_exceptions", "calendar_selection__credential")
+            .first()
+        )
+        return Response(_profile_payload(profile) if profile else None)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     @transaction.atomic
@@ -164,7 +179,19 @@ class TrainerListEndpoint(BaseAPIView):
             .select_related("user")
             .prefetch_related("schedule_exceptions", "calendar_selection__credential")
         )
-        return Response([_profile_payload(profile) for profile in profiles])
+        cursor = request.query_params.get("cursor")
+        if cursor:
+            try:
+                cursor_id = UUID(cursor_base64.urlsafe_b64decode(cursor.encode()).decode())
+            except (binascii.Error, ValueError, UnicodeDecodeError):
+                return Response({"error": "Invalid trainer cursor."}, status=400)
+            profiles = profiles.filter(id__gt=cursor_id)
+        rows = list(profiles.order_by("id")[:26])
+        next_cursor = None
+        if len(rows) > 25:
+            rows = rows[:25]
+            next_cursor = cursor_base64.urlsafe_b64encode(str(rows[-1].id).encode()).decode()
+        return Response({"results": [_profile_payload(profile) for profile in rows], "next_cursor": next_cursor})
 
 
 class TrainerScheduleEndpoint(BaseAPIView):
@@ -199,6 +226,17 @@ class TrainerScheduleEndpoint(BaseAPIView):
         profile = self._profile(slug, user_id)
         if not self._may_edit(request, profile):
             return Response({"error": "You cannot edit this trainer."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            supplied_revision = int(request.data.get("schedule_revision"))
+        except (TypeError, ValueError):
+            return Response({"error": "schedule_revision is required."}, status=400)
+        locked_profile = TrainerProfile.objects.select_for_update().get(pk=profile.pk)
+        if supplied_revision != locked_profile.schedule_revision:
+            return Response(
+                {"error": "This schedule changed after you opened it.", "current": _profile_payload(profile)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        profile = locked_profile
         if "timezone" in request.data:
             profile.timezone = validate_timezone(request.data["timezone"])
         if "weekly_schedule" in request.data:
@@ -211,6 +249,7 @@ class TrainerScheduleEndpoint(BaseAPIView):
             if request.data["status"] not in TrainerProfile.Status.values:
                 return Response({"error": "Invalid trainer status."}, status=400)
             profile.status = request.data["status"]
+        profile.schedule_revision += 1
         profile.save()
         if "exceptions" in request.data:
             exceptions = request.data["exceptions"]
@@ -358,7 +397,7 @@ class GoogleCalendarsEndpoint(BaseAPIView):
         selected = set(selection.calendar_id_hashes)
         for calendar in calendars:
             calendar["selected"] = TrainerCalendarSelection.calendar_hash(calendar["id"]) in selected
-        return Response(calendars)
+        return Response({"calendars": calendars, "selection_revision": selection.revision})
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     @transaction.atomic
@@ -367,6 +406,16 @@ class GoogleCalendarsEndpoint(BaseAPIView):
             return response
         selection = self._selection(request, slug)
         calendar_ids = request.data.get("calendar_ids")
+        try:
+            supplied_revision = int(request.data.get("selection_revision"))
+        except (TypeError, ValueError):
+            return Response({"error": "selection_revision is required."}, status=400)
+        selection = TrainerCalendarSelection.objects.select_for_update().get(pk=selection.pk)
+        if supplied_revision != selection.revision:
+            return Response(
+                {"error": "Calendar selection changed after you opened it.", "selection_revision": selection.revision},
+                status=status.HTTP_409_CONFLICT,
+            )
         if (
             not isinstance(calendar_ids, list)
             or not 1 <= len(calendar_ids) <= 50

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { Button } from "@plane/propel/button";
@@ -43,6 +49,7 @@ export function WorkshopScheduleProperty({ workspaceSlug, projectId, issueId, is
   const [travelBeforeMinutes, setTravelBeforeMinutes] = useState(0);
   const [travelAfterMinutes, setTravelAfterMinutes] = useState(0);
   const [saving, setSaving] = useState(false);
+  const viewerTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   useEffect(() => {
     setStartsAt(localValue(data?.starts_at));
@@ -92,6 +99,12 @@ export function WorkshopScheduleProperty({ workspaceSlug, projectId, issueId, is
         title: "Workshop schedule removed",
         message: "Trainer capacity has been updated.",
       });
+    } catch {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Workshop schedule not removed",
+        message: "Try again. The existing schedule is still active.",
+      });
     } finally {
       setSaving(false);
     }
@@ -115,6 +128,7 @@ export function WorkshopScheduleProperty({ workspaceSlug, projectId, issueId, is
   return (
     <SidebarPropertyListItem icon={CalendarClock} label="Workshop schedule">
       <div className="space-y-2 rounded-md border border-subtle bg-surface-2 p-2">
+        <p className="text-11 text-placeholder">Times shown in {viewerTimezone}</p>
         <label className="block text-11 text-secondary">
           Starts
           <input

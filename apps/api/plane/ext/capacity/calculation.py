@@ -14,7 +14,11 @@ from django.db import close_old_connections
 
 from plane.db.models import ProjectMember
 from plane.ext.capacity.crypto import decrypt_value
-from plane.ext.capacity.cache import BUSY_CACHE_TTL_SECONDS, register_busy_cache_key
+from plane.ext.capacity.cache import (
+    BUSY_CACHE_TTL_SECONDS,
+    STALE_BUSY_CACHE_TTL_SECONDS,
+    register_busy_cache_key,
+)
 from plane.ext.capacity.google import GoogleCalendarClient, GoogleCalendarError
 from plane.ext.models import TrainerProfile, WorkshopSchedule
 from plane.license.utils.instance_value import get_configuration_value
@@ -110,10 +114,10 @@ def _google_busy(trainer, start, end):
     try:
         selection = trainer.calendar_selection
     except ObjectDoesNotExist:
-        return [], "not_connected"
+        return [], "not_connected", "not_connected"
     credential = selection.credential
     if credential.status != credential.Status.CONNECTED:
-        return [], credential.status
+        return [], credential.status, "reauthentication_required"
     normalized_start = start.replace(
         minute=(start.minute // GOOGLE_CACHE_WINDOW_MINUTES) * GOOGLE_CACHE_WINDOW_MINUTES,
         second=0,
@@ -131,13 +135,14 @@ def _google_busy(trainer, start, end):
     cached = cache.get(cache_key)
     if isinstance(cached, list):
         cached_intervals = [(datetime.fromisoformat(item[0]), datetime.fromisoformat(item[1])) for item in cached]
-        return _intersections(cached_intervals, [(start, end)]), "connected"
+        return _intersections(cached_intervals, [(start, end)]), "connected", "fresh"
+    stale_cache_key = cache_key.replace("gcal:busy:", "gcal:busy-stale:", 1)
     try:
         calendar_ids = [
             decrypt_value(value, credential.encryption_key_id) for value in selection.encrypted_calendar_ids
         ]
         if not calendar_ids:
-            return [], "no_calendars_selected"
+            return [], "no_calendars_selected", "not_connected"
         payload = _google_client().freebusy(
             credential,
             calendar_ids,
@@ -157,10 +162,21 @@ def _google_busy(trainer, start, end):
             [(a.isoformat(), b.isoformat()) for a, b in intervals],
             BUSY_CACHE_TTL_SECONDS,
         )
+        cache.set(
+            stale_cache_key,
+            [(a.isoformat(), b.isoformat()) for a, b in intervals],
+            STALE_BUSY_CACHE_TTL_SECONDS,
+        )
         register_busy_cache_key(selection.id, cache_key)
-        return _intersections(intervals, [(start, end)]), "connected"
+        register_busy_cache_key(selection.id, stale_cache_key)
+        return _intersections(intervals, [(start, end)]), "connected", "fresh"
     except (GoogleCalendarError, ValueError) as exc:
-        return [], getattr(exc, "code", "credential_error")
+        stale = cache.get(stale_cache_key)
+        if isinstance(stale, list):
+            stale_intervals = [(datetime.fromisoformat(item[0]), datetime.fromisoformat(item[1])) for item in stale]
+            return _intersections(stale_intervals, [(start, end)]), "connected", "stale"
+        error_code = getattr(exc, "code", "provider_unavailable")
+        return [], error_code, error_code
 
 
 def _load_google_busy(trainer, start, end):
@@ -225,7 +241,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
     output = []
     for trainer in trainers:
         working = _working_intervals(trainer, start, end)
-        google_busy, connection_status = google_results[trainer.id]
+        google_busy, connection_status, availability_status = google_results[trainer.id]
         workshop_records = workshop_map.get(trainer.user_id, [])
         workshop_intervals = [(a, b) for a, b, _ in workshop_records]
         combined_busy = _merge([*google_busy, *workshop_intervals])
@@ -270,6 +286,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
                 "display_name": trainer.user.display_name,
                 "timezone": trainer.timezone,
                 "connection_status": connection_status,
+                "availability_status": availability_status,
                 "working_minutes": working_minutes,
                 "google_busy_minutes": _minutes(_intersections(working, google_busy)),
                 "workshop_minutes": _minutes(_intersections(working, workshop_intervals)),

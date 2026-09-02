@@ -121,10 +121,11 @@ def test_google_busy_normalizes_provider_window_and_clips_result(monkeypatch):
     monkeypatch.setattr(calculation.cache, "set", MagicMock())
     monkeypatch.setattr(calculation, "register_busy_cache_key", MagicMock())
 
-    intervals, connection_status = _google_busy(trainer, start, end)
+    intervals, connection_status, availability_status = _google_busy(trainer, start, end)
 
     assert intervals == [(start, end)]
     assert connection_status == "connected"
+    assert availability_status == "fresh"
     client.freebusy.assert_called_once_with(
         credential,
         ["calendar-id"],

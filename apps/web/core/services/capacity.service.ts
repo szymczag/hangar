@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
 import { API_BASE_URL } from "@plane/constants";
 import { APIService } from "@/services/api.service";
 
@@ -10,6 +16,7 @@ export type TTrainerProfile = {
   status: "active" | "suspended";
   timezone: string;
   weekly_schedule: Record<string, TScheduleInterval[]>;
+  schedule_revision: number;
   connection_status: string;
   exceptions: TTrainerException[];
 };
@@ -24,6 +31,14 @@ export type TTrainerCapacity = {
   display_name: string;
   timezone: string;
   connection_status: string;
+  availability_status:
+    | "fresh"
+    | "stale"
+    | "not_connected"
+    | "reauthentication_required"
+    | "rate_limited"
+    | "provider_unavailable"
+    | string;
   working_minutes: number;
   google_busy_minutes: number;
   workshop_minutes: number;
@@ -33,6 +48,8 @@ export type TTrainerCapacity = {
   conflicts: Array<{ start: string; end: string; kind: string; work_item_id?: string }>;
 };
 export type TCapacityResponse = { from: string; to: string; trainers: TTrainerCapacity[] };
+export type TTrainerListResponse = { results: TTrainerProfile[]; next_cursor: string | null };
+export type TGoogleCalendarList = { calendars: TGoogleCalendar[]; selection_revision: number };
 export type TGoogleCalendar = {
   id: string;
   summary: string;
@@ -62,17 +79,26 @@ export class CapacityService extends APIService {
       });
   }
 
-  listTrainers(workspaceSlug: string) {
-    return this.data<TTrainerProfile[]>(this.get(`/api/workspaces/${workspaceSlug}/capacity/trainers/`));
+  listTrainers(workspaceSlug: string, cursor?: string) {
+    return this.data<TTrainerListResponse>(
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/trainers/`, { params: cursor ? { cursor } : undefined })
+    );
   }
 
   optIn(workspaceSlug: string) {
     return this.data<TTrainerProfile>(this.post(`/api/workspaces/${workspaceSlug}/capacity/trainers/me/`));
   }
 
-  updateSchedule(workspaceSlug: string, userId: string, payload: Partial<TTrainerProfile>) {
+  getOwnTrainerProfile(workspaceSlug: string) {
+    return this.data<TTrainerProfile | null>(this.get(`/api/workspaces/${workspaceSlug}/capacity/trainers/me/`));
+  }
+
+  updateSchedule(workspaceSlug: string, userId: string, scheduleRevision: number, payload: Partial<TTrainerProfile>) {
     return this.data<TTrainerProfile>(
-      this.patch(`/api/workspaces/${workspaceSlug}/capacity/trainers/${userId}/schedule/`, payload)
+      this.patch(`/api/workspaces/${workspaceSlug}/capacity/trainers/${userId}/schedule/`, {
+        ...payload,
+        schedule_revision: scheduleRevision,
+      })
     );
   }
 
@@ -83,12 +109,15 @@ export class CapacityService extends APIService {
   }
 
   listCalendars(workspaceSlug: string) {
-    return this.data<TGoogleCalendar[]>(this.get(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`));
+    return this.data<TGoogleCalendarList>(this.get(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`));
   }
 
-  selectCalendars(workspaceSlug: string, calendarIds: string[]) {
+  selectCalendars(workspaceSlug: string, calendarIds: string[], selectionRevision: number) {
     return this.data<{ selected: number; revision: number }>(
-      this.put(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`, { calendar_ids: calendarIds })
+      this.put(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`, {
+        calendar_ids: calendarIds,
+        selection_revision: selectionRevision,
+      })
     );
   }
 
@@ -96,9 +125,11 @@ export class CapacityService extends APIService {
     return this.delete(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`);
   }
 
-  getCapacity(workspaceSlug: string, from: string, to: string) {
+  getCapacity(workspaceSlug: string, from: string, to: string, trainerIds: string[]) {
     return this.data<TCapacityResponse>(
-      this.get(`/api/workspaces/${workspaceSlug}/capacity/`, { params: { from, to } })
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/`, {
+        params: { from, to, trainer_ids: trainerIds.join(",") },
+      })
     );
   }
 

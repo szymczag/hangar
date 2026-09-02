@@ -72,6 +72,7 @@ class TrainerProfile(BaseModel):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     timezone = models.CharField(max_length=255, default="UTC")
     weekly_schedule = models.JSONField(default=empty_week)
+    schedule_revision = models.PositiveBigIntegerField(default=1)
 
     class Meta:
         db_table = "ext_trainer_profiles"
