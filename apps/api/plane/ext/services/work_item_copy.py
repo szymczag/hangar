@@ -51,6 +51,7 @@ from plane.db.models import (
     ProjectMember,
 )
 from plane.ext.models import IssuePropertyValue
+from plane.ext.services.issue_description_copy import copy_descriptions
 
 # Big enough that the per-batch overhead is amortised, small enough that a
 # killed worker loses little and a transaction stays short.
@@ -233,6 +234,7 @@ def copy_issue_batch(*, sources, target_project, remap, type_ids) -> list:
     return created
 
 
+@transaction.atomic
 def link_parents(*, source_project_id, target_project, tally: CopyTally) -> None:
     """Second pass: rebuild the sub-item tree.
 
@@ -267,6 +269,23 @@ def link_parents(*, source_project_id, target_project, tally: CopyTally) -> None
         tally.note("work_items:parent-dropped")
 
 
+def _already_written(model, target_ids, field="issue_id") -> set:
+    """Target work items this pass has already written rows for.
+
+    Per issue rather than per row, and that is exact rather than approximate
+    because each pass is atomic: an issue either has all of its rows for a model
+    or none of them, so one row is proof the issue is done.
+
+    This is what makes a resumed job add the remainder instead of a second copy.
+    Without it the passes below either raise -- `IssueAssignee`, `CycleIssue`,
+    `ModuleIssue` and `IssuePropertyValue` all carry partial uniques -- or
+    silently duplicate, which `IssueLabel` and `IssueLink` do, having no
+    uniqueness at all.
+    """
+    return set(model.objects.filter(**{f"{field}__in": target_ids}).values_list(field, flat=True))
+
+
+@transaction.atomic
 def copy_satellites(*, source_project_id, target_project, ids, remap: StoredRemap, plan, tally: CopyTally) -> None:
     """Labels, assignees, links, and cycle and module membership.
 
@@ -282,6 +301,7 @@ def copy_satellites(*, source_project_id, target_project, ids, remap: StoredRema
 
     # Labels
     if plan.get("labels"):
+        done = _already_written(IssueLabel, list(ids.values()))
         rows, seen = [], set()
         for issue_id, label_id in IssueLabel.objects.filter(issue_id__in=source_ids).values_list(
             "issue_id", "label_id"
@@ -290,7 +310,7 @@ def copy_satellites(*, source_project_id, target_project, ids, remap: StoredRema
             key = (ids[issue_id], new_label_id)
             # The source can hold duplicates: IssueLabel has no unique
             # constraint at all, so nothing there stopped them being created.
-            if new_label_id is None or key in seen:
+            if new_label_id is None or key in seen or ids[issue_id] in done:
                 continue
             seen.add(key)
             rows.append(IssueLabel(issue_id=ids[issue_id], label_id=new_label_id, **stamp))
@@ -303,12 +323,15 @@ def copy_satellites(*, source_project_id, target_project, ids, remap: StoredRema
     members = set(
         ProjectMember.objects.filter(project=target_project, is_active=True).values_list("member_id", flat=True)
     )
+    done = _already_written(IssueAssignee, list(ids.values()))
     rows, dropped = [], 0
     for issue_id, assignee_id in IssueAssignee.objects.filter(issue_id__in=source_ids).values_list(
         "issue_id", "assignee_id"
     ):
         if assignee_id not in members:
             dropped += 1
+            continue
+        if ids[issue_id] in done:
             continue
         rows.append(IssueAssignee(issue_id=ids[issue_id], assignee_id=assignee_id, **stamp))
     IssueAssignee.objects.bulk_create(rows, batch_size=BATCH_SIZE)
@@ -318,8 +341,11 @@ def copy_satellites(*, source_project_id, target_project, ids, remap: StoredRema
         tally.note("work_items:assignees-not-in-copy")
 
     # Links
+    done = _already_written(IssueLink, list(ids.values()))
     rows, seen = [], set()
     for link in IssueLink.objects.filter(issue_id__in=source_ids):
+        if ids[link.issue_id] in done:
+            continue
         key = (ids[link.issue_id], link.url)
         # Uniqueness of (url, issue) is a serializer rule, not a constraint, so
         # the source may already carry duplicates.
@@ -340,16 +366,18 @@ def copy_satellites(*, source_project_id, target_project, ids, remap: StoredRema
         if not enabled:
             tally.note(f"work_items:{label}-not-copied")
             continue
+        done = _already_written(model, list(ids.values()))
         rows = []
         for issue_id, old_id in model.objects.filter(issue_id__in=source_ids).values_list("issue_id", field_name):
             new_id = remap.get(namespace, old_id)
-            if new_id is None:
+            if new_id is None or ids[issue_id] in done:
                 continue
             rows.append(model(issue_id=ids[issue_id], **{field_name: new_id}, **stamp))
         model.objects.bulk_create(rows, batch_size=BATCH_SIZE)
         tally.add(f"{label}_membership", len(rows))
 
 
+@transaction.atomic
 def copy_property_values(*, source_project_id, target_project, ids, tally: CopyTally) -> None:
     """Custom work-item property values.
 
@@ -370,8 +398,11 @@ def copy_property_values(*, source_project_id, target_project, ids, tally: CopyT
         ProjectMember.objects.filter(project=target_project, is_active=True).values_list("member_id", flat=True)
     )
 
+    done = _already_written(IssuePropertyValue, list(ids.values()))
     rows, stale, dropped_members = [], 0, 0
     for value in IssuePropertyValue.objects.filter(issue_id__in=source_ids).select_related("property"):
+        if ids[value.issue_id] in done:
+            continue
         if value.property.issue_type_id != types.get(value.issue_id):
             stale += 1
             continue
@@ -402,6 +433,7 @@ def copy_property_values(*, source_project_id, target_project, ids, tally: CopyT
         tally.note("work_items:property-members-not-in-copy")
 
 
+@transaction.atomic
 def copy_relations(*, source_project_id, target_project, ids, tally: CopyTally) -> None:
     """Relations, but only where both ends were copied.
 
@@ -415,10 +447,15 @@ def copy_relations(*, source_project_id, target_project, ids, tally: CopyTally) 
     if not source_ids:
         return
 
+    # `ignore_conflicts` below already makes a rerun harmless; skipping makes it
+    # free as well, and keeps this pass consistent with its neighbours.
+    done = _already_written(IssueRelation, list(ids.values()))
     rows, dropped = [], 0
     for relation in IssueRelation.objects.filter(issue_id__in=source_ids):
         if relation.related_issue_id not in source_ids:
             dropped += 1
+            continue
+        if ids[relation.issue_id] in done:
             continue
         rows.append(
             IssueRelation(
@@ -543,6 +580,13 @@ def copy_work_items(job) -> CopyTally:
     job.stage = ProjectCopyJob.Stage.RELATIONS
     job.save(update_fields=["stage", "updated_at"])
     copy_relations(source_project_id=job.source_project_id, target_project=target, ids=ids, tally=tally)
+
+    # Last, and deliberately outside a transaction: it copies objects in storage,
+    # which cannot be rolled back with the database. It is resumable instead --
+    # it asks the result whether each item was already done.
+    job.stage = ProjectCopyJob.Stage.ASSETS
+    job.save(update_fields=["stage", "updated_at"])
+    copy_descriptions(job=job, target_project=target, ids=ids, tally=tally)
 
     for note in ("comments", "attachments", "history", "worklogs"):
         tally.note(f"work_items:{note}-not-copied")

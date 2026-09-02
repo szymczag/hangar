@@ -15,6 +15,7 @@ of a specific line that would be easy to remove.
 """
 
 import uuid
+from unittest import mock
 
 import pytest
 from django.core.cache import cache
@@ -22,6 +23,7 @@ from rest_framework import status
 
 from plane.db.models import (
     Cycle,
+    FileAsset,
     CycleIssue,
     Issue,
     IssueAssignee,
@@ -40,6 +42,7 @@ from plane.ext.models import ProjectCopyJob
 from plane.ext.services import work_item_copy
 from plane.ext.services.issue_types import ensure_project_system_types
 from plane.ext.tasks import copy_project_work_items
+from plane.utils.file_asset_upload import UPLOAD_VALIDATION_VERSION
 
 ADMIN = 20
 MEMBER = 15
@@ -297,15 +300,33 @@ def test_a_relation_with_one_end_outside_the_copy_is_dropped(session_client, wor
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_a_resumed_copy_adds_the_remainder_and_never_a_duplicate(session_client, workspace, source):
-    """The whole resume design, exercised by running the job twice.
+def test_a_resumed_copy_adds_the_remainder_and_never_a_duplicate(session_client, workspace, source, create_user):
+    """Running the job twice must change nothing the second time.
 
-    The second run must find its work already done and add nothing -- which is
-    what a redispatch after a killed worker looks like.
+    Every pass is exercised, not just the work items. Against the first version
+    of this feature the assignee insert raised an IntegrityError on the rerun,
+    and labels and links duplicated silently, because only the work item pass
+    skipped what it had already written. The earlier version of this test missed
+    all of it: its fixture had no assignees and no copied cycle, and it asserted
+    on work items alone.
     """
-    copy_id = _duplicate(session_client, workspace, source).data["id"]
+    parent = Issue.objects.get(project=source, name="Parent")
+    IssueAssignee.objects.create(issue=parent, assignee=create_user, project=source, workspace=workspace)
+
+    copy_id = _duplicate(session_client, workspace, source, cycles=True).data["id"]
     _run_job(copy_id)
-    first = list(Issue.objects.filter(project_id=copy_id).values_list("id", flat=True))
+
+    def counts():
+        return {
+            "issues": Issue.objects.filter(project_id=copy_id).count(),
+            "labels": IssueLabel.objects.filter(project_id=copy_id).count(),
+            "assignees": IssueAssignee.objects.filter(project_id=copy_id).count(),
+            "links": IssueLink.objects.filter(project_id=copy_id).count(),
+            "cycle_membership": CycleIssue.objects.filter(project_id=copy_id).count(),
+        }
+
+    first = counts()
+    assert first["assignees"] == 1 and first["labels"] == 1 and first["cycle_membership"] == 1
 
     job = ProjectCopyJob.objects.get(target_project_id=copy_id)
     job.status = ProjectCopyJob.Status.QUEUED
@@ -313,8 +334,9 @@ def test_a_resumed_copy_adds_the_remainder_and_never_a_duplicate(session_client,
     job.save(update_fields=["status", "completed_at"])
     copy_project_work_items(str(job.id))
 
-    second = list(Issue.objects.filter(project_id=copy_id).values_list("id", flat=True))
-    assert sorted(second) == sorted(first), "a rerun must not create a second copy"
+    assert counts() == first, "a rerun must add nothing, in any pass"
+    job.refresh_from_db()
+    assert job.status == ProjectCopyJob.Status.COMPLETED, "and must not fail on a unique constraint"
 
 
 @pytest.mark.contract
@@ -390,3 +412,191 @@ def test_a_project_that_was_never_copied_reports_no_job(session_client, workspac
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["job"] is None
+
+
+# --------------------------------------------------------------------------
+# description images
+# --------------------------------------------------------------------------
+
+ASSET_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+
+
+def _storage_mock():
+    """The two heads `duplicate_file_asset` performs: source, then destination."""
+    storage = mock.MagicMock()
+    head = {"ContentType": "image/png", "ContentLength": 100, "ETag": '"source-etag"'}
+    storage.get_object_metadata.side_effect = [head, head]
+    storage.copy_object.return_value = {"CopyObjectResult": {}}
+    return storage
+
+
+@pytest.fixture
+def source_with_image(db, workspace, source, create_user):
+    """A source work item whose description embeds one uploaded image."""
+    issue = Issue.objects.get(project=source, name="Parent")
+    Issue.objects.filter(pk=issue.pk).update(
+        description_html=f'<p>see</p><image-component src="{ASSET_ID}"></image-component>'
+    )
+    FileAsset.objects.create(
+        id=ASSET_ID,
+        attributes={"name": "diagram.png", "type": "image/png", "size": 100},
+        asset="source/diagram.png",
+        size=100,
+        entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
+        issue=issue,
+        project=source,
+        workspace=workspace,
+        created_by=create_user,
+        is_uploaded=True,
+        upload_validation_version=UPLOAD_VALIDATION_VERSION,
+    )
+    return source
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_copied_image_belongs_to_the_copy(session_client, workspace, source_with_image):
+    """The test that fails if the upstream `copy_assets` is ever reused.
+
+    That helper filters candidates by `project_id`, which across projects is the
+    target, so it silently copies nothing and reports success -- every other
+    assertion in this file would still pass.
+    """
+    copy_id = _duplicate(session_client, workspace, source_with_image).data["id"]
+
+    with (
+        mock.patch("plane.ext.services.issue_description_copy.S3Storage", return_value=_storage_mock()),
+        mock.patch(
+            "plane.ext.services.issue_description_copy.sync_with_external_service",
+            return_value={"description_json": {"ok": True}, "description_binary": "AAEC"},
+        ),
+    ):
+        _run_job(copy_id)
+
+    copied = Issue.objects.get(project_id=copy_id, name="Parent")
+    assert str(ASSET_ID) not in copied.description_html, "must not still point at the source's asset"
+
+    duplicated = FileAsset.objects.filter(project_id=copy_id, entity_type="ISSUE_DESCRIPTION")
+    assert duplicated.count() == 1
+    new_asset = duplicated.first()
+    assert new_asset.issue_id == copied.id
+    assert str(new_asset.id) in copied.description_html
+
+    # The source is untouched: this copies, it does not move.
+    original = FileAsset.objects.get(pk=ASSET_ID)
+    assert original.project_id == source_with_image.id
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_copying_the_images_does_not_renumber_the_work_item(session_client, workspace, source_with_image):
+    """Proves the description is written with a queryset update, not `save()`.
+
+    `Issue.save()` on a row it thinks is new allocates a sequence number; writing
+    through the instance here would hand the item a second one.
+    """
+    copy_id = _duplicate(session_client, workspace, source_with_image).data["id"]
+    with (
+        mock.patch("plane.ext.services.issue_description_copy.S3Storage", return_value=_storage_mock()),
+        mock.patch("plane.ext.services.issue_description_copy.sync_with_external_service", return_value={}),
+    ):
+        _run_job(copy_id)
+
+    copied = Issue.objects.get(project_id=copy_id, name="Parent")
+    assert copied.sequence_id == Issue.objects.get(project=source_with_image, name="Parent").sequence_id
+    assert IssueSequence.objects.filter(issue=copied).count() == 1
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_an_unreadable_image_is_removed_rather_than_left_pointing_at_the_source(
+    session_client, workspace, source_with_image
+):
+    """A broken 403 reads as a faulty copy; a missing image reads as a gap."""
+    # An asset that cannot be validated is exactly what `copyable_asset` refuses.
+    FileAsset.objects.filter(pk=ASSET_ID).update(is_uploaded=False)
+
+    copy_id = _duplicate(session_client, workspace, source_with_image).data["id"]
+    with (
+        mock.patch("plane.ext.services.issue_description_copy.S3Storage", return_value=_storage_mock()),
+        mock.patch("plane.ext.services.issue_description_copy.sync_with_external_service", return_value={}),
+    ):
+        job = _run_job(copy_id)
+
+    copied = Issue.objects.get(project_id=copy_id, name="Parent")
+    assert str(ASSET_ID) not in copied.description_html
+    assert "image-component" not in copied.description_html
+    assert "see" in copied.description_html, "the rest of the description survives"
+    assert "work_items:assets-not-readable" in job.skipped
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_running_the_pass_twice_does_not_copy_the_image_twice(session_client, workspace, source_with_image):
+    """Object storage copies cannot be rolled back, so the pass asks the result."""
+    copy_id = _duplicate(session_client, workspace, source_with_image).data["id"]
+
+    for _ in range(2):
+        job = ProjectCopyJob.objects.get(target_project_id=copy_id)
+        job.status = ProjectCopyJob.Status.QUEUED
+        job.completed_at = None
+        job.save(update_fields=["status", "completed_at"])
+        with (
+            mock.patch("plane.ext.services.issue_description_copy.S3Storage", return_value=_storage_mock()),
+            mock.patch(
+                "plane.ext.services.issue_description_copy.sync_with_external_service",
+                return_value={"description_json": {}, "description_binary": "AAEC"},
+            ),
+        ):
+            copy_project_work_items(str(job.id))
+
+    assert FileAsset.objects.filter(project_id=copy_id, entity_type="ISSUE_DESCRIPTION").count() == 1
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_an_unreachable_live_server_keeps_the_copy_rather_than_failing_it(session_client, workspace, source_with_image):
+    """The work items are fine; only their collaborative form is stale."""
+    copy_id = _duplicate(session_client, workspace, source_with_image).data["id"]
+    with (
+        mock.patch("plane.ext.services.issue_description_copy.S3Storage", return_value=_storage_mock()),
+        mock.patch("plane.ext.services.issue_description_copy.sync_with_external_service", return_value={}),
+    ):
+        job = _run_job(copy_id)
+
+    assert job.status == ProjectCopyJob.Status.COMPLETED
+    assert "work_items:descriptions-not-reconverted" in job.skipped
+    # The image still moved across; only the re-conversion did not happen.
+    assert FileAsset.objects.filter(project_id=copy_id, entity_type="ISSUE_DESCRIPTION").count() == 1
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_an_item_without_images_costs_no_live_server_call(session_client, workspace, source):
+    """Keeps the round trips proportional to images, not to work items."""
+    copy_id = _duplicate(session_client, workspace, source).data["id"]
+
+    with (
+        mock.patch("plane.ext.services.issue_description_copy.S3Storage") as storage,
+        mock.patch("plane.ext.services.issue_description_copy.sync_with_external_service") as sync,
+    ):
+        _run_job(copy_id)
+
+    sync.assert_not_called()
+    storage.return_value.copy_object.assert_not_called()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_the_images_are_left_alone_when_nobody_can_be_authorised(session_client, workspace, source_with_image):
+    """`copyable_asset` authorises against the initiator; without one there is
+    no safe default."""
+    copy_id = _duplicate(session_client, workspace, source_with_image).data["id"]
+    ProjectCopyJob.objects.filter(target_project_id=copy_id).update(initiated_by=None)
+
+    with mock.patch("plane.ext.services.issue_description_copy.S3Storage") as storage:
+        job = _run_job(copy_id)
+
+    storage.return_value.copy_object.assert_not_called()
+    assert "work_items:assets-no-initiator" in job.skipped
+    assert job.status == ProjectCopyJob.Status.COMPLETED
