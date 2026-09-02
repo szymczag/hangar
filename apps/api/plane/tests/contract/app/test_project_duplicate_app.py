@@ -540,8 +540,28 @@ class TestProjectDuplicate:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["error"] == "PROJECT_ARCHIVED"
 
-    def test_no_work_items_or_publication_state_are_copied(self, session_client, workspace, source_project):
-        from plane.db.models import DeployBoard, Issue
+    def test_no_publication_state_is_copied(self, session_client, workspace, source_project):
+        """A copy is not published anywhere its source was."""
+        from plane.db.models import DeployBoard
+
+        response = session_client.post(
+            duplicate_url(workspace.slug, source_project.id),
+            {"include": {"cycles": True, "modules": True}},
+            format="json",
+        )
+        copy_id = response.data["id"]
+
+        assert not DeployBoard.objects.filter(project_id=copy_id).exists()
+        assert "webhooks:not-copied" in response.data["copy_summary"]["skipped"]
+
+    def test_work_items_are_not_copied_unless_they_are_asked_for(self, session_client, workspace, source_project):
+        """Work items are copyable now, but never by default.
+
+        They are the most expensive thing a copy can carry and the only one that
+        brings other people's work with it, so like members they stay opt-in.
+        `test_work_item_copy.py` covers what happens when they are requested.
+        """
+        from plane.db.models import Issue
 
         response = session_client.post(
             duplicate_url(workspace.slug, source_project.id),
@@ -551,5 +571,4 @@ class TestProjectDuplicate:
         copy_id = response.data["id"]
 
         assert not Issue.objects.filter(project_id=copy_id).exists()
-        assert not DeployBoard.objects.filter(project_id=copy_id).exists()
-        assert "webhooks:not-copied" in response.data["copy_summary"]["skipped"]
+        assert "work_items:not-copied" in response.data["copy_summary"]["skipped"]

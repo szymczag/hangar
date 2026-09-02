@@ -14,6 +14,7 @@ from .import_job import (
 from .link_authorization import FederatedLinkAudit, FederatedLinkAuthorization
 from .maintenance import InstanceMaintenanceNotice
 from .openpgp_policy import OpenPGPAdminAction, UserOpenPGPPolicy
+from .project_copy_job import ProjectCopyJob
 from .issue_property import (
     IssueProperty,
     IssuePropertyOption,

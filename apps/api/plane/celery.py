@@ -140,6 +140,12 @@ app.conf.beat_schedule = {
         "task": "plane.ext.tasks.cleanup_import_sources",
         "schedule": 300.0,
     },
+    "reclaim-stalled-project-copies": {
+        # Covers a worker killed mid-copy and a broker that never delivered the
+        # dispatch. Resuming is safe: every phase skips what it already wrote.
+        "task": "plane.ext.tasks.reclaim_stalled_project_copies",
+        "schedule": crontab(minute="*/5"),
+    },
     "dispatch-pending-todoist-imports": {
         "task": "plane.ext.tasks.dispatch_pending_imports",
         "schedule": 30.0,

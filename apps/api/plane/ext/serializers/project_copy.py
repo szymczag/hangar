@@ -7,6 +7,7 @@ import re
 from rest_framework import serializers
 
 from plane.db.models import Project, ProjectNetwork
+from plane.ext.models import ProjectCopyJob
 from plane.ext.services.project_copy import COPY_OPTIONS
 from plane.ext.utils.plain_text import PlainTextError, validate_single_line_text
 
@@ -28,6 +29,7 @@ class ProjectCopyOptionsSerializer(serializers.Serializer):
     cycles = serializers.BooleanField(required=False)
     modules = serializers.BooleanField(required=False)
     views = serializers.BooleanField(required=False)
+    work_items = serializers.BooleanField(required=False)
 
     def to_internal_value(self, data):
         if not isinstance(data, dict):
@@ -68,3 +70,31 @@ class ProjectDuplicateSerializer(serializers.Serializer):
         if re.match(Project.FORBIDDEN_IDENTIFIER_CHARS_PATTERN, identifier):
             raise serializers.ValidationError("PROJECT_IDENTIFIER_CANNOT_CONTAIN_SPECIAL_CHARACTERS")
         return identifier
+
+
+class ProjectCopyJobSerializer(serializers.ModelSerializer):
+    """What the interface needs to report a copy in progress.
+
+    Read-only throughout: nothing about a running copy is client-settable. The
+    lease, the cursor and the stored translation are machinery and are not
+    exposed -- progress is `copied` against `total`, and the outcome is `status`
+    plus `counts` and `skipped`.
+    """
+
+    class Meta:
+        model = ProjectCopyJob
+        fields = [
+            "id",
+            "status",
+            "stage",
+            "total",
+            "copied",
+            "counts",
+            "skipped",
+            "errors",
+            "reason",
+            "started_at",
+            "completed_at",
+            "created_at",
+        ]
+        read_only_fields = fields
