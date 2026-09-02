@@ -8,6 +8,9 @@ import test from "node:test";
 const content = JSON.parse(
   readFileSync(new URL("../apps/web/ce/components/license/modal/community-modal-content.json", import.meta.url), "utf8")
 );
+/** Strip the tag's leading `v`, which only the running version carries. */
+const strip = (value) => value.replace(/^v/, "");
+
 const generated = readFileSync(
   new URL("../apps/web/ce/components/license/release-notes.generated.ts", import.meta.url),
   "utf8"
@@ -57,7 +60,36 @@ test("notes from a different build are not shown as though they were this one", 
 
   assert.match(
     modal,
-    /RELEASE_NOTES\.version === version \? RELEASE_NOTES\.highlights : \[\]/,
+    /sameVersion\(RELEASE_NOTES\.version, version\) \? RELEASE_NOTES\.highlights : \[\]/,
     "highlights must be gated on the bundled version matching the running one"
   );
+});
+
+test("the gate actually matches the version the API reports", () => {
+  // The two sides spell the version differently and always have: the release
+  // file is `hangar-v<version>.md`, so the generator yields "0.1.0-rc.41",
+  // while APP_VERSION carries the tag's leading `v`. Compared raw, the gate was
+  // permanently false and the highlights were silently off in EVERY build --
+  // which is exactly what shipped in rc.41. The previous test passed anyway,
+  // because it only ever checked each side in isolation.
+  const bundled = /"?version"?:\s*"([^"]+)"/.exec(generated)?.[1];
+  assert.ok(bundled, "the generated module must carry a version");
+
+  assert.equal(
+    strip(bundled),
+    strip(`v${bundled}`),
+    "the comparison must ignore the leading v that only the running version carries"
+  );
+
+  // And the component must not go back to comparing them raw.
+  const modal = readFileSync(
+    new URL("../apps/web/ce/components/license/modal/community-modal.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.doesNotMatch(
+    modal,
+    /RELEASE_NOTES\.version === version/,
+    "a raw === between the bundled and running versions can never be true"
+  );
+  assert.match(modal, /replace\(\/\^v\/, ""\)/, "the leading v must be stripped before comparing");
 });

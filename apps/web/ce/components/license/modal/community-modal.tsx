@@ -24,6 +24,10 @@ import content from "./community-modal-content.json";
 
 export const HANGAR_EDITION_NAME = "Hangar by @szymczag";
 
+/** Compare versions ignoring the tag's leading `v`, which only one side carries. */
+const sameVersion = (a: string, b: string): boolean =>
+  a.replace(/^v/, "") === b.replace(/^v/, "") && a.replace(/^v/, "") !== "";
+
 export type HangarCommunityModalProps = {
   isOpen: boolean;
   handleClose: () => void;
@@ -42,7 +46,13 @@ export const HangarCommunityModal = observer(function HangarCommunityModal(props
   // a specific version. If this build is running a different one -- APP_VERSION
   // is an environment variable, and a dev build has none -- say nothing rather
   // than describe the previous release as though it were this one.
-  const highlights = RELEASE_NOTES.version === version ? RELEASE_NOTES.highlights : [];
+  //
+  // The two sides spell the version differently and always have: the notes are
+  // named `docs/releases/hangar-v<version>.md`, so the generator yields
+  // "0.1.0-rc.41", while APP_VERSION carries the tag's leading `v`. Comparing
+  // them raw made this gate permanently false, which silently turned the
+  // highlights off in every build rather than in the mismatched ones.
+  const highlights = sameVersion(RELEASE_NOTES.version, version) ? RELEASE_NOTES.highlights : [];
   const upstream = RELEASE_NOTES.upstream.version || packageJson.version;
 
   return (
