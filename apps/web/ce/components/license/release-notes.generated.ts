@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.43",
+  version: "0.1.0-rc.44",
   highlights: [
-    "Google Calendar trainer capacity is off unless an operator turns it on, and refuses to start half-configured.",
-    "Calendar OAuth tokens are encrypted at rest with rotatable keys.",
-    "Every capacity action is recorded in an append-only audit trail.",
-    "The capacity endpoints are throttled per user and per workspace, atomically.",
-    "Operator-authored branding text now has a length cap and character validation.",
+    "A copied work item never carries another member's private work, and only an administrator can start one.",
+    "Assignees who are not members of the copy are dropped, and the number is reported.",
+    "Relations are copied only where both ends are inside the copy.",
+    "Images inside a copied work item are copied too, and authorised against the person who asked for the copy.",
+    "A copy that is interrupted resumes rather than duplicating.",
   ],
   upstream: {
     version: "1.4.0",

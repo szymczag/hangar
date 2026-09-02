@@ -60,7 +60,7 @@ Confirm the chart is public:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.43
+  --version 0.1.0-rc.44
 ```
 
 Confirm the node architecture:
@@ -69,7 +69,7 @@ Confirm the node architecture:
 kubectl get nodes --label-columns kubernetes.io/arch
 ```
 
-`0.1.0-rc.43` is AMD64-only. An ARM64-only cluster cannot schedule or run the
+`0.1.0-rc.44` is AMD64-only. An ARM64-only cluster cannot schedule or run the
 qualified images.
 
 Published charts use digest references. Inspect the failed Pod's image without
