@@ -23,6 +23,15 @@ image digests from the release tag; source defaults remain fail-closed.
 - [Troubleshooting](../../docs/kubernetes/troubleshooting.md)
 - [Secure email and OpenPGP operations](../../docs/aws-ses-email-operations.md)
 
+Google Calendar trainer capacity remains disabled unless
+`googleCalendarCapacity.enabled=true`. Before enabling it, add the dedicated
+Fernet keyring named by `existingSecrets.application.calendarTokenEncryptionKeysKey`
+and register the public `/auth/google/calendar/callback/` URI. The API fails
+closed when encryption is not configured; see the configuration reference.
+Capacity queries are capped at 25 trainers and 14 days. The chart defaults to
+atomic Valkey-backed limits of 10 requests/minute per user and 30/minute per
+workspace; tune them through `googleCalendarCapacity.limits`.
+
 Inspect the published chart without registry credentials:
 
 ```bash

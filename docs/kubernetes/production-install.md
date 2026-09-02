@@ -101,6 +101,12 @@ Use your certificate-management system instead when it owns the TLS Secret.
 
 ## 5. Create application Secrets
 
+When enabling Google Calendar trainer capacity, add a dedicated Fernet keyring
+as `CALENDAR_TOKEN_ENCRYPTION_KEYS` to the `hangar-application` Secret. Enable
+the Google Calendar API and register the exact public
+`/auth/google/calendar/callback/` URI before rollout. Do not enable the chart
+value first: application startup intentionally fails closed without the key.
+
 Create these resources through an external secret operator or another managed
 secret-delivery workflow:
 

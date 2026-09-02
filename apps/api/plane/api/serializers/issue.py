@@ -28,6 +28,7 @@ from plane.db.models import (
     EstimatePoint,
 )
 from plane.ext.services import WorkItemInvariantError, project_default_issue_type, validate_work_item_assignment
+from plane.ext.models import TrainerProfile, WorkshopSchedule
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
@@ -160,6 +161,32 @@ class IssueSerializer(BaseSerializer):
             raise serializers.ValidationError({exc.field: exc.message}) from exc
         if "parent" in data:
             data["parent"] = scoped_parent
+
+        if (
+            self.instance
+            and WorkshopSchedule.objects.filter(issue=self.instance).exists()
+            and (effective_type is None or effective_type.system_key != IssueType.SystemKey.WORKSHOP)
+        ):
+            raise serializers.ValidationError({"type_id": "Remove the workshop schedule before changing its type."})
+        if effective_type and effective_type.system_key == IssueType.SystemKey.WORKSHOP:
+            assignee_ids = (
+                set(data["assignees"])
+                if "assignees" in data
+                else set(self.instance.assignees.values_list("id", flat=True))
+                if self.instance
+                else set()
+            )
+            active_trainers = set(
+                TrainerProfile.objects.filter(
+                    workspace_id=self.context.get("workspace_id"),
+                    user_id__in=assignee_ids,
+                    status=TrainerProfile.Status.ACTIVE,
+                ).values_list("user_id", flat=True)
+            )
+            if not assignee_ids:
+                raise serializers.ValidationError({"assignees": "A Workshop requires at least one trainer."})
+            if assignee_ids - active_trainers:
+                raise serializers.ValidationError({"assignees": "Workshop assignees must be active trainers."})
 
         if (
             data.get("estimate_point")

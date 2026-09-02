@@ -188,6 +188,7 @@ class InstanceEndpoint(BaseAPIView):
         data["is_saml_enabled"] = IS_SAML_ENABLED == "1"
         data["saml_provider_name"] = str(SAML_PROVIDER_NAME)
         data["is_todoist_imports_enabled"] = settings.TODOIST_IMPORTS_ENABLED
+        data["is_google_calendar_capacity_enabled"] = settings.GOOGLE_CALENDAR_CAPACITY_ENABLED
 
         # Fork (see FORK.md): which providers overwrite a person's name and
         # avatar on every sign-in. The clients need this to stop offering an
@@ -216,9 +217,7 @@ class InstanceEndpoint(BaseAPIView):
         data["sign_in_header"] = str(INSTANCE_SIGN_IN_HEADER or "")
         data["sign_in_subheader"] = str(INSTANCE_SIGN_IN_SUBHEADER or "")
         data["logo_url"] = f"/api/assets/v2/static/{INSTANCE_LOGO_ASSET_ID}/" if INSTANCE_LOGO_ASSET_ID else ""
-        data["favicon_url"] = (
-            f"/api/assets/v2/static/{INSTANCE_FAVICON_ASSET_ID}/" if INSTANCE_FAVICON_ASSET_ID else ""
-        )
+        data["favicon_url"] = f"/api/assets/v2/static/{INSTANCE_FAVICON_ASSET_ID}/" if INSTANCE_FAVICON_ASSET_ID else ""
 
         (
             INSTANCE_LOGIN_BACKGROUND_ASSET_ID,
@@ -292,9 +291,9 @@ class InstanceEndpoint(BaseAPIView):
         default_workspace_id = str(INSTANCE_DEFAULT_WORKSPACE_ID or "").strip()
         try:
             parsed_workspace_id = uuid.UUID(default_workspace_id) if default_workspace_id else None
-            default_workspace_exists = parsed_workspace_id is not None and Workspace.objects.filter(
-                id=parsed_workspace_id
-            ).exists()
+            default_workspace_exists = (
+                parsed_workspace_id is not None and Workspace.objects.filter(id=parsed_workspace_id).exists()
+            )
         except (ValueError, TypeError):
             default_workspace_exists = False
         data["default_workspace_id"] = default_workspace_id if default_workspace_exists else ""

@@ -89,6 +89,13 @@ app.kubernetes.io/part-of: hangar
     secretKeyRef:
       name: {{ .Values.existingSecrets.application.name }}
       key: {{ .Values.existingSecrets.application.secretKeyKey }}
+{{- if .Values.googleCalendarCapacity.enabled }}
+- name: CALENDAR_TOKEN_ENCRYPTION_KEYS
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecrets.application.name }}
+      key: {{ .Values.existingSecrets.application.calendarTokenEncryptionKeysKey }}
+{{- end }}
 - name: DATABASE_URL
   valueFrom:
     secretKeyRef:

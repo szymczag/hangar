@@ -45,6 +45,7 @@ import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/prop
 import { IssueCycleSelect } from "./cycle-select";
 import { IssueLabel } from "./label/root";
 import { IssueModuleSelect } from "./module-select";
+import { WorkshopScheduleProperty } from "./workshop-schedule";
 import type { TIssueOperations } from "./root";
 
 type Props = {
@@ -188,6 +189,14 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                 />
               </div>
             </SidebarPropertyListItem>
+
+            <WorkshopScheduleProperty
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              issueId={issueId}
+              issueTypeId={issue.type_id}
+              isEditable={isEditable}
+            />
 
             {projectId && areEstimateEnabledByProjectId(projectId) && (
               <SidebarPropertyListItem icon={EstimatePropertyIcon} label={t("common.estimate")}>

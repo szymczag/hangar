@@ -37,6 +37,7 @@ existingSecrets:
   application:
     name: hangar-application
     secretKeyKey: SECRET_KEY
+    calendarTokenEncryptionKeysKey: CALENDAR_TOKEN_ENCRYPTION_KEYS
   live:
     name: hangar-live
     secretKeyKey: LIVE_SERVER_SECRET_KEY
@@ -119,6 +120,12 @@ todoistImports:
     pdb:
       enabled: false
       maxUnavailable: 1
+
+googleCalendarCapacity:
+  enabled: false
+  limits:
+    userRate: 10/minute
+    workspaceRate: 30/minute
 
 externalServices:
   objectStorage:

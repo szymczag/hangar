@@ -15,6 +15,7 @@ class IssueType(BaseModel):
     class SystemKey(models.TextChoices):
         TASK = "task", "Task"
         EPIC = "epic", "Epic"
+        WORKSHOP = "workshop", "Workshop"
 
     workspace = models.ForeignKey("db.Workspace", related_name="issue_types", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
@@ -56,6 +57,13 @@ class IssueType(BaseModel):
                         is_epic=False,
                         is_active=True,
                         is_default=True,
+                        level=0,
+                    )
+                    | Q(
+                        system_key="workshop",
+                        is_epic=False,
+                        is_active=True,
+                        is_default=False,
                         level=0,
                     )
                 ),

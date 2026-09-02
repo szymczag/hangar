@@ -16,6 +16,7 @@ gateway_render="$tmp_dir/gateway.yaml"
 evaluation_gateway_render="$tmp_dir/evaluation-gateway.yaml"
 traefik_render="$tmp_dir/traefik.yaml"
 imports_render="$tmp_dir/imports.yaml"
+calendar_render="$tmp_dir/calendar.yaml"
 kube_version="${KUBE_VERSION:-1.36.2}"
 
 fail() {
@@ -89,6 +90,8 @@ helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_versi
     --set todoistImports.enabled=true \
     --set todoistImports.worker.replicas=2 \
     --set todoistImports.worker.pdb.enabled=true >"$imports_render"
+helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
+    --set googleCalendarCapacity.enabled=true >"$calendar_render"
 helm template custom "$chart_dir" --namespace hangar --kube-version "$kube_version" \
     --set-string networkPolicy.ingressController.preset=custom \
     --set-string 'networkPolicy.ingressController.namespaceSelector.matchLabels.kubernetes\.io/metadata\.name=edge-system' \
@@ -136,6 +139,13 @@ assert_present '^  TODOIST_IMPORTS_ENABLED: "1"$' "$imports_render" "enabled imp
 assert_present '^  TODOIST_IMPORT_MAX_ACTIVE_SOURCE_BYTES_PER_WORKSPACE: "10485760"$' "$imports_render" "import byte limits must render as exact decimal integers"
 assert_present '^kind: PodDisruptionBudget$' "$imports_render" "the enabled multi-replica import worker must render a PDB"
 assert_absent '^[[:space:]]+TODOIST_IMPORT_[A-Z_]+: "?[-+0-9.]+[eE][-+0-9]+' "$imports_render" "import integer settings must not use exponent notation"
+
+assert_present '^  ENABLE_GOOGLE_CALENDAR_CAPACITY: "1"$' "$calendar_render" "enabled calendar capacity must reach every application workload"
+assert_present '^  CALENDAR_CAPACITY_USER_RATE: "10/minute"$' "$calendar_render" "calendar user admission rate must render"
+assert_present '^  CALENDAR_CAPACITY_WORKSPACE_RATE: "30/minute"$' "$calendar_render" "calendar workspace admission rate must render"
+calendar_key_consumers="$(grep -Ec '^[[:space:]]+- name: CALENDAR_TOKEN_ENCRYPTION_KEYS$' "$calendar_render")"
+[[ "$calendar_key_consumers" -eq 4 ]] || fail "API, workers, and migrator must receive the calendar token keyring when enabled"
+assert_absent '^[[:space:]]+- name: CALENDAR_TOKEN_ENCRYPTION_KEYS$' "$production_render" "disabled calendar capacity must not mount its keyring"
 
 assert_present '^  FILE_SIZE_LIMIT: "1073741824"$' "$boundary_render" "maximum file-size limit must render as an exact decimal integer"
 assert_present '^  SIGNED_URL_EXPIRATION: "86400"$' "$boundary_render" "maximum signed-URL expiration must render as an exact decimal integer"

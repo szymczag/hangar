@@ -11,6 +11,7 @@
     "existingSecrets",
     "mail",
     "todoistImports",
+    "googleCalendarCapacity",
     "externalServices",
     "observability",
     "ingress",
@@ -284,6 +285,23 @@
             "prefetchMultiplier": { "type": "integer", "minimum": 1, "maximum": 4 },
             "resources": { "$ref": "#/definitions/resources" },
             "pdb": { "$ref": "#/definitions/pdb" }
+          }
+        }
+      }
+    },
+    "googleCalendarCapacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "limits"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["userRate", "workspaceRate"],
+          "properties": {
+            "userRate": { "type": "string", "pattern": "^[1-9][0-9]*/(second|minute|hour|day)$" },
+            "workspaceRate": { "type": "string", "pattern": "^[1-9][0-9]*/(second|minute|hour|day)$" }
           }
         }
       }
@@ -621,10 +639,11 @@
     "applicationSecret": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "secretKeyKey"],
+      "required": ["name", "secretKeyKey", "calendarTokenEncryptionKeysKey"],
       "properties": {
         "name": { "$ref": "#/definitions/nonEmptyString" },
-        "secretKeyKey": { "$ref": "#/definitions/nonEmptyString" }
+        "secretKeyKey": { "$ref": "#/definitions/nonEmptyString" },
+        "calendarTokenEncryptionKeysKey": { "$ref": "#/definitions/nonEmptyString" }
       }
     },
     "liveSecret": {

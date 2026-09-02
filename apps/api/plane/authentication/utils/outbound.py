@@ -272,6 +272,7 @@ def request_validated(
     target,
     *,
     data=None,
+    json_body=None,
     headers=None,
     timeout=DEFAULT_TIMEOUT,
     max_response_bytes=DEFAULT_MAX_RESPONSE_BYTES,
@@ -280,7 +281,12 @@ def request_validated(
     """Perform one request against an already-validated target."""
     body = None
     request_headers = {"Accept": "application/json", "Connection": "close", **(headers or {})}
-    if data is not None:
+    if data is not None and json_body is not None:
+        raise ValueError("Only one outbound request body may be supplied")
+    if json_body is not None:
+        body = json.dumps(json_body, separators=(",", ":")).encode("utf-8")
+        request_headers.setdefault("Content-Type", "application/json")
+    elif data is not None:
         body = urlencode(data).encode("utf-8")
         request_headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
 
