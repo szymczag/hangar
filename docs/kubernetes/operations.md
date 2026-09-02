@@ -59,37 +59,39 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.42` to `rc.43`
+### Upgrade from `rc.43` to `rc.44`
 
-Upgrade directly from the immediately previous retained GitHub release, `rc.42`.
-This release adds **four additive migrations** -- `db.0131`, `ext.0017`,
-`ext.0018` and `ext.0019` -- which create the trainer capacity tables, an audit
-event table and a schedule revision column. No existing table is rewritten.
-Existing values, Secrets, storage, RBAC, and NetworkPolicies remain compatible.
+Upgrade directly from the immediately previous retained GitHub release, `rc.43`.
+This release adds **one additive migration**, `ext.0020`, which creates the table
+tracking a work item copy in progress. No existing table is altered and no data
+is rewritten. Existing values, Secrets, storage, RBAC, and NetworkPolicies remain
+compatible.
 
-Two new environment variables arrive with the Google Calendar trainer capacity
-feature: `ENABLE_GOOGLE_CALENDAR_CAPACITY`, which defaults to `0`, and
-`CALENDAR_TOKEN_ENCRYPTION_KEYS`, which is empty. Leave both as shipped and the
-feature is inert -- the tables exist and nothing reads them. Turning the feature
-on without encryption keys is refused at start-up rather than at first use, so a
-half-configured deployment fails visibly when it changes rather than quietly
-later.
+Work items are copied by a background job on the **default queue**, which every
+deployment already runs -- no new worker or queue is required. A scheduled sweep
+every five minutes redispatches copies whose worker died and copies the broker
+never delivered, so the beat worker must be running for a copy to recover from a
+crash.
 
-Deploy the web and API images together. After deploying, confirm the instance
-starts, then set a support message in God Mode longer than 300 characters and
-confirm it is refused.
+Copying work items writes to object storage, because each inline image in a
+copied description is duplicated. Hangar has no per-workspace storage limit, so a
+copy of an image-heavy project increases storage use by roughly the size of those
+images; the number of images a single copy will duplicate is capped.
+
+Deploy the web and API images together. After deploying, duplicate a project with
+work items selected, and confirm the progress strip counts up and stops, the
+sub-item tree matches the source, and the work item numbers match the source's.
 
 Before upgrading, back up PostgreSQL, record the current Helm revision, render
-the existing values against `0.1.0-rc.43`, and verify the signed tag, chart, image
-digests, and attestations. Rolling back to `rc.42` needs no schema reversal: the
-migrations only add, so the previous application version runs against this schema
-and does not read the new tables. If the capacity feature was enabled, unset
-`ENABLE_GOOGLE_CALENDAR_CAPACITY` as part of the rollback.
+the existing values against `0.1.0-rc.44`, and verify the signed tag, chart, image
+digests, and attestations. Rolling back to `rc.43` needs no schema reversal: the
+migration only adds, so the previous application version runs against this schema
+and does not read the new table.
 
-### Upgrade from `rc.27` to `rc.43`
+### Upgrade from `rc.27` to `rc.44`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
-Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.43`.
+Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.44`.
 
 This release closes two Todoist import admission gaps. Starting an import now
 requires a server-signed, 15-minute, single-use preview grant bound to the
@@ -109,13 +111,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.43`, its application version is
-   `v0.1.0-rc.43`, and its signatures and digests pass the
+2. confirm the target chart is `0.1.0-rc.44`, its application version is
+   `v0.1.0-rc.44`, and its signatures and digests pass the
    [release verification procedure](security.md#verify-release-010-rc39);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
-   `rc.27` and `rc.43` web or API images because their preview-execution request
+   `rc.27` and `rc.44` web or API images because their preview-execution request
    contract intentionally changed together.
 
 Wait for the revision-scoped migration Job to complete before admitting traffic.
@@ -128,7 +130,7 @@ also fail without creating a job or retaining a source object.
 target; the nullable column may remain in the database. It restores the preview
 bypass and duplicate-confirmation race, however, so it is not a
 security-equivalent rollback. Prefer a forward correction and return every
-application component to `rc.43` promptly.
+application component to `rc.44` promptly.
 
 ### Upgrade from `rc.26` to `rc.27`
 
