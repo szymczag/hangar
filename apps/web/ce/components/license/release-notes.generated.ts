@@ -11,10 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.42",
+  version: "0.1.0-rc.43",
   highlights: [
-    "A project's display name is no longer held to the identifier's character rule.",
-    "Duplication failures now name the field that caused them.",
+    "Google Calendar trainer capacity is off unless an operator turns it on, and refuses to start half-configured.",
+    "Calendar OAuth tokens are encrypted at rest with rotatable keys.",
+    "Every capacity action is recorded in an append-only audit trail.",
+    "The capacity endpoints are throttled per user and per workspace, atomically.",
+    "Operator-authored branding text now has a length cap and character validation.",
   ],
   upstream: {
     version: "1.4.0",

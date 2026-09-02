@@ -93,3 +93,33 @@ test("the gate actually matches the version the API reports", () => {
   );
   assert.match(modal, /replace\(\/\^v\/, ""\)/, "the leading v must be stripped before comparing");
 });
+
+test("a highlight that wraps across lines is still picked up", async () => {
+  // The lead-ins are hand-written prose, so the long ones wrap. Matching only
+  // single-line ones dropped exactly those -- and the longest tend to be the
+  // most important -- with nothing to show that anything was missing.
+  const { latestReleaseNotes } = await import("./generate-release-notes.mjs");
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+
+  const dir = mkdtempSync(join(tmpdir(), "release-notes-"));
+  writeFileSync(
+    join(dir, "hangar-v9.9.9.md"),
+    [
+      "## Security and privacy",
+      "",
+      "**One line.** Body.",
+      "",
+      "**A lead-in long enough that it wraps onto",
+      "a second line before it closes.** Body.",
+      "",
+    ].join("\n")
+  );
+
+  const { highlights } = latestReleaseNotes(dir);
+  assert.deepEqual(highlights, [
+    "One line.",
+    "A lead-in long enough that it wraps onto a second line before it closes.",
+  ]);
+});

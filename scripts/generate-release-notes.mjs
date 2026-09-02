@@ -66,7 +66,10 @@ export function latestReleaseNotes(directory = notesDirectory) {
   // The curated notes lead each item with a bold sentence stating what changed;
   // the paragraph after it is the reasoning, which a dialog has no room for.
   const section = markdown.split(/^## /m).find((block) => block.startsWith("Security and privacy")) ?? "";
-  const highlights = [...section.matchAll(/^\*\*(.+?)\*\*/gm)]
+  // `[\s\S]` rather than `.` on purpose: a lead-in long enough to wrap across
+  // lines is still one sentence, and matching only single-line ones dropped the
+  // longest -- which tend to be the most important -- without saying so.
+  const highlights = [...section.matchAll(/^\*\*([\s\S]+?)\*\*/gm)]
     .map((match) => match[1].replace(/\s+/g, " ").trim())
     .slice(0, MAX_HIGHLIGHTS);
 

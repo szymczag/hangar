@@ -59,30 +59,37 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.41` to `rc.42`
+### Upgrade from `rc.42` to `rc.43`
 
-Upgrade directly from the immediately previous retained GitHub release, `rc.41`.
-This release adds **no database migration**, so the schema is unchanged in both
-directions. Existing values, Secrets, storage, RBAC, and NetworkPolicies remain
-compatible.
+Upgrade directly from the immediately previous retained GitHub release, `rc.42`.
+This release adds **four additive migrations** -- `db.0131`, `ext.0017`,
+`ext.0018` and `ext.0019` -- which create the trainer capacity tables, an audit
+event table and a schedule revision column. No existing table is rewritten.
+Existing values, Secrets, storage, RBAC, and NetworkPolicies remain compatible.
 
-Deploy the web and API images together. The API image carries the corrected
-project-name validation; the web image carries it too, along with the duplicate
-form's error handling and the build identity dialog's release highlights.
+Two new environment variables arrive with the Google Calendar trainer capacity
+feature: `ENABLE_GOOGLE_CALENDAR_CAPACITY`, which defaults to `0`, and
+`CALENDAR_TOKEN_ENCRYPTION_KEYS`, which is empty. Leave both as shipped and the
+feature is inert -- the tables exist and nothing reads them. Turning the feature
+on without encryption keys is refused at start-up rather than at first use, so a
+half-configured deployment fails visibly when it changes rather than quietly
+later.
 
-After deploying, create a project whose name contains a hyphen or a full stop --
-both were refused before -- and duplicate a project, accepting the name the form
-prefills. Open the build identity dialog and confirm it lists what changed in
-this build rather than reporting that it carries no notes.
+Deploy the web and API images together. After deploying, confirm the instance
+starts, then set a support message in God Mode longer than 300 characters and
+confirm it is refused.
 
 Before upgrading, back up PostgreSQL, record the current Helm revision, render
-the existing values against `0.1.0-rc.42`, and verify the signed tag, chart, image
-digests, and attestations. Rolling back to `rc.41` needs no schema reversal.
+the existing values against `0.1.0-rc.43`, and verify the signed tag, chart, image
+digests, and attestations. Rolling back to `rc.42` needs no schema reversal: the
+migrations only add, so the previous application version runs against this schema
+and does not read the new tables. If the capacity feature was enabled, unset
+`ENABLE_GOOGLE_CALENDAR_CAPACITY` as part of the rollback.
 
-### Upgrade from `rc.27` to `rc.42`
+### Upgrade from `rc.27` to `rc.43`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
-Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.42`.
+Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.43`.
 
 This release closes two Todoist import admission gaps. Starting an import now
 requires a server-signed, 15-minute, single-use preview grant bound to the
@@ -102,13 +109,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.42`, its application version is
-   `v0.1.0-rc.42`, and its signatures and digests pass the
+2. confirm the target chart is `0.1.0-rc.43`, its application version is
+   `v0.1.0-rc.43`, and its signatures and digests pass the
    [release verification procedure](security.md#verify-release-010-rc39);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
-   `rc.27` and `rc.42` web or API images because their preview-execution request
+   `rc.27` and `rc.43` web or API images because their preview-execution request
    contract intentionally changed together.
 
 Wait for the revision-scoped migration Job to complete before admitting traffic.
@@ -121,7 +128,7 @@ also fail without creating a job or retaining a source object.
 target; the nullable column may remain in the database. It restores the preview
 bypass and duplicate-confirmation race, however, so it is not a
 security-equivalent rollback. Prefer a forward correction and return every
-application component to `rc.42` promptly.
+application component to `rc.43` promptly.
 
 ### Upgrade from `rc.26` to `rc.27`
 
