@@ -246,7 +246,8 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         workshop_intervals = [(a, b) for a, b, _ in workshop_records]
         combined_busy = _merge([*google_busy, *workshop_intervals])
         unavailable = _intersections(working, combined_busy)
-        intervals = [_serialize_interval(a, b, "google_busy") for a, b in google_busy]
+        intervals = [_serialize_interval(a, b, "working") for a, b in working]
+        intervals.extend(_serialize_interval(a, b, "google_busy") for a, b in google_busy)
         for block_start, block_end, schedule in workshop_records:
             work_item = None
             if schedule.project_id in visible_projects:

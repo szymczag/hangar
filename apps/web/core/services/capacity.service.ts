@@ -23,7 +23,7 @@ export type TTrainerProfile = {
 export type TCapacityInterval = {
   start: string;
   end: string;
-  kind: "google_busy" | "workshop" | "available" | "outside_hours";
+  kind: "working" | "google_busy" | "workshop";
   work_item?: { id: string; name: string; project_id: string } | null;
 };
 export type TTrainerCapacity = {
@@ -121,8 +121,10 @@ export class CapacityService extends APIService {
     );
   }
 
-  disconnectGoogle(workspaceSlug: string) {
-    return this.delete(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`);
+  disconnectGoogle(workspaceSlug: string, forceLocal = false) {
+    return this.delete(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`, {
+      params: forceLocal ? { force_local: "true" } : undefined,
+    });
   }
 
   getCapacity(workspaceSlug: string, from: string, to: string, trainerIds: string[]) {

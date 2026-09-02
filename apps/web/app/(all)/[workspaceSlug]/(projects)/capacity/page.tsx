@@ -18,10 +18,12 @@ import { useInstance } from "@/hooks/store/use-instance";
 import {
   CapacityService,
   type TGoogleCalendar,
+  type TTrainerCapacity,
   type TTrainerException,
   type TTrainerProfile,
 } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
+import { dayBounds, intervalLabel, intervalPosition } from "./capacity-timeline.utils";
 
 const capacityService = new CapacityService();
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
@@ -38,6 +40,12 @@ function startOfWeek(value: Date) {
   const day = result.getDay() || 7;
   result.setDate(result.getDate() - day + 1);
   result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function shiftWeek(value: Date, weeks: number) {
+  const result = new Date(value);
+  result.setDate(result.getDate() + weeks * 7);
   return result;
 }
 
@@ -242,6 +250,63 @@ function availabilityCopy(status: string) {
   if (status === "rate_limited") return "Google rate limited";
   if (status === "provider_unavailable") return "Google unavailable";
   return connectionCopy(status);
+}
+
+function TrainerWeekTimeline({ trainer, weekStart }: { trainer: TTrainerCapacity; weekStart: Date }) {
+  return (
+    <div className="bg-subtle grid grid-cols-7 gap-px overflow-hidden rounded-md border border-subtle">
+      {DAY_KEYS.map((day, dayIndex) => {
+        const bounds = dayBounds(weekStart, dayIndex);
+        return (
+          <div
+            key={day}
+            className="relative h-12 min-w-24 bg-surface-2"
+            aria-label={`${DAY_LABELS[dayIndex]} schedule`}
+          >
+            {trainer.intervals.map((interval) => {
+              const position = intervalPosition(interval, bounds.start, bounds.end);
+              if (!position) return null;
+              const className =
+                interval.kind === "working"
+                  ? "top-1 bottom-1 bg-success-secondary"
+                  : interval.kind === "google_busy"
+                    ? "top-2 bottom-2 bg-neutral-500/55"
+                    : "top-2 bottom-2 bg-accent-primary/70";
+              const label = intervalLabel(interval);
+              return (
+                <button
+                  key={`${interval.kind}-${interval.start}-${interval.end}`}
+                  type="button"
+                  aria-label={`${label}, ${new Date(interval.start).toLocaleString()} to ${new Date(interval.end).toLocaleString()}`}
+                  title={label}
+                  className={`absolute rounded-sm ${className}`}
+                  style={position}
+                />
+              );
+            })}
+            {trainer.conflicts.map((conflict) => {
+              const position = intervalPosition(conflict, bounds.start, bounds.end);
+              if (!position) return null;
+              return (
+                <span
+                  key={`${conflict.kind}-${conflict.start}-${conflict.end}`}
+                  role="img"
+                  aria-label={`Conflict: ${conflict.kind.replaceAll("_", " ")}`}
+                  title={`Conflict: ${conflict.kind.replaceAll("_", " ")}`}
+                  className="border-danger-primary absolute top-0 bottom-0 border"
+                  style={{
+                    ...position,
+                    backgroundImage:
+                      "repeating-linear-gradient(135deg, transparent, transparent 3px, rgb(var(--color-danger-primary)) 3px, rgb(var(--color-danger-primary)) 5px)",
+                  }}
+                />
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function ScheduleEditor({
@@ -457,19 +522,23 @@ function CalendarPicker({
 export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   const workspaceSlug = params.workspaceSlug;
   const { config } = useInstance();
+  const featureEnabled = config?.is_google_calendar_capacity_enabled === true;
   const { allowPermissions } = useUserPermissions();
   const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
   const [trainerCursor, setTrainerCursor] = useState<string | undefined>();
   const [cursorHistory, setCursorHistory] = useState<Array<string | undefined>>([]);
   const [editingTrainerId, setEditingTrainerId] = useState<string | null>(null);
+  const [optingIn, setOptingIn] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const weekEnd = useMemo(() => new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000), [weekStart]);
+  const weekEnd = useMemo(() => shiftWeek(weekStart, 1), [weekStart]);
   const rangeKey = `${weekStart.toISOString()}:${weekEnd.toISOString()}`;
   const {
     data: trainerPage,
     mutate: mutateTrainers,
     isLoading: trainersLoading,
-  } = useSWR(["capacity-trainers", workspaceSlug, trainerCursor], () =>
+  } = useSWR(featureEnabled ? ["capacity-trainers", workspaceSlug, trainerCursor] : null, () =>
     capacityService.listTrainers(workspaceSlug, trainerCursor)
   );
   const trainers = trainerPage?.results;
@@ -480,27 +549,34 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
     mutate: mutateCapacity,
     isLoading: capacityLoading,
   } = useSWR(
-    trainers ? ["capacity", workspaceSlug, rangeKey, trainerIds.join(",")] : null,
+    featureEnabled && trainers ? ["capacity", workspaceSlug, rangeKey, trainerIds.join(",")] : null,
     () => capacityService.getCapacity(workspaceSlug, weekStart.toISOString(), weekEnd.toISOString(), trainerIds),
     { keepPreviousData: true }
   );
-  const { data: ownProfile, mutate: mutateOwnProfile } = useSWR(["capacity-trainer-self", workspaceSlug], () =>
-    capacityService.getOwnTrainerProfile(workspaceSlug)
+  const { data: ownProfile, mutate: mutateOwnProfile } = useSWR(
+    featureEnabled ? ["capacity-trainer-self", workspaceSlug] : null,
+    () => capacityService.getOwnTrainerProfile(workspaceSlug)
   );
   const editingProfile = trainers?.find((trainer) => trainer.user_id === editingTrainerId);
   const hasActiveProfile = ownProfile?.status === "active";
   const isConnected = hasActiveProfile && ownProfile?.connection_status === "connected";
   const { data: calendars, mutate: mutateCalendars } = useSWR(
-    isConnected ? ["capacity-calendars", workspaceSlug] : null,
+    featureEnabled && isConnected ? ["capacity-calendars", workspaceSlug] : null,
     () => capacityService.listCalendars(workspaceSlug)
   );
 
   const refresh = () => Promise.all([mutateTrainers(), mutateOwnProfile(), mutateCapacity()]);
   const optIn = async () => {
-    await capacityService.optIn(workspaceSlug);
-    await refresh();
+    setOptingIn(true);
+    try {
+      await capacityService.optIn(workspaceSlug);
+      await refresh();
+    } finally {
+      setOptingIn(false);
+    }
   };
   const connect = async () => {
+    setConnecting(true);
     try {
       const { authorization_url } = await capacityService.startGoogle(workspaceSlug);
       window.location.assign(authorization_url);
@@ -510,6 +586,43 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
         title: "Google Calendar not connected",
         message: errorMessage(error, "Try again."),
       });
+      setConnecting(false);
+    }
+  };
+  const disconnect = async () => {
+    if (!window.confirm("Disconnect Google Calendar and remove its cached availability from Hangar?")) return;
+    setDisconnecting(true);
+    try {
+      await capacityService.disconnectGoogle(workspaceSlug);
+      await refresh();
+      setToast({
+        type: TOAST_TYPE.SUCCESS,
+        title: "Google Calendar disconnected",
+        message: "Cached Google availability was removed.",
+      });
+    } catch (error: unknown) {
+      const mayForce =
+        typeof error === "object" &&
+        error !== null &&
+        "can_force_local_disconnect" in error &&
+        error.can_force_local_disconnect === true;
+      if (
+        mayForce &&
+        window.confirm(
+          "Google could not revoke the token. Remove the connection from Hangar anyway? You may also need to revoke Hangar in your Google Account."
+        )
+      ) {
+        await capacityService.disconnectGoogle(workspaceSlug, true);
+        await refresh();
+      } else {
+        setToast({
+          type: TOAST_TYPE.ERROR,
+          title: "Google Calendar remains connected",
+          message: errorMessage(error, "Try again later."),
+        });
+      }
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -526,21 +639,22 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               <div className="mb-2 flex items-center gap-2 text-11 font-semibold tracking-[0.16em] text-placeholder uppercase">
                 <CalendarClock className="size-3.5" /> Capacity ledger
               </div>
-              <h1 className="text-xl font-semibold text-primary">See the week before it becomes a conflict.</h1>
+              <h1 className="text-xl font-semibold text-primary">Find a trainer and time.</h1>
               <p className="mt-1 max-w-2xl text-body-sm-regular text-secondary">
                 Working hours, anonymous Google busy time, and scheduled workshops in one planning rail.
               </p>
             </div>
             <div className="flex items-center gap-2">
               {!hasActiveProfile ? (
-                <Button variant="primary" size="sm" onClick={optIn}>
+                <Button variant="primary" size="sm" loading={optingIn} onClick={optIn}>
                   {ownProfile ? "Reactivate trainer" : "Become a trainer"}
                 </Button>
               ) : null}
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setWeekStart((current) => new Date(current.getTime() - 7 * 86400000))}
+                aria-label="Previous week"
+                onClick={() => setWeekStart((current) => shiftWeek(current, -1))}
               >
                 <ChevronLeft className="size-4" />
               </Button>
@@ -555,7 +669,8 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setWeekStart((current) => new Date(current.getTime() + 7 * 86400000))}
+                aria-label="Next week"
+                onClick={() => setWeekStart((current) => shiftWeek(current, 1))}
               >
                 <ChevronRight className="size-4" />
               </Button>
@@ -575,65 +690,86 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               </Button>
             </div>
           ) : capacity?.trainers.length ? (
-            <div className="divide-y divide-subtle">
-              {capacity.trainers.map((trainer) => {
-                const availablePercent = trainer.working_minutes
-                  ? Math.round((trainer.available_minutes / trainer.working_minutes) * 100)
-                  : 0;
-                const busyPercent = Math.max(0, 100 - availablePercent);
-                return (
-                  <article
-                    key={trainer.trainer_id}
-                    className="grid gap-4 px-5 py-4 lg:grid-cols-[220px_1fr_180px] lg:items-center"
-                  >
-                    <div>
-                      <h2 className="text-body-sm-medium text-primary">{trainer.display_name}</h2>
-                      <p className="mt-1 text-11 text-secondary">
-                        {availabilityCopy(trainer.availability_status)} · {trainer.timezone}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="bg-success-secondary flex h-7 overflow-hidden rounded-md">
-                        <div
-                          className="bg-danger-secondary transition-[width]"
-                          style={{ width: `${busyPercent}%` }}
-                          title={`${formatMinutes(trainer.unavailable_minutes)} unavailable`}
-                        />
-                        <div
-                          className="border-success-primary/30 border-l"
-                          style={{ width: `${availablePercent}%` }}
-                          title={`${formatMinutes(trainer.available_minutes)} available`}
-                        />
+            <div className="overflow-x-auto">
+              <div className="min-w-[1040px]">
+                <div className="grid grid-cols-[190px_1fr_160px] items-end gap-4 border-b border-subtle bg-surface-2 px-5 py-3">
+                  <div className="text-11 font-semibold tracking-wide text-placeholder uppercase">Trainer</div>
+                  <div className="grid grid-cols-7 gap-px text-center text-11 text-secondary">
+                    {DAY_KEYS.map((day, index) => (
+                      <div key={day}>
+                        <span className="font-medium text-primary">{DAY_LABELS[index]}</span>{" "}
+                        {dayBounds(weekStart, index).start.toLocaleDateString(undefined, { day: "numeric" })}
                       </div>
-                      <div className="mt-2 flex gap-4 text-11 text-secondary">
-                        <span>Google {formatMinutes(trainer.google_busy_minutes)}</span>
-                        <span>Workshops {formatMinutes(trainer.workshop_minutes)}</span>
+                    ))}
+                  </div>
+                  <div className="text-right text-11 font-semibold tracking-wide text-placeholder uppercase">Free</div>
+                </div>
+                <div className="divide-y divide-subtle">
+                  {capacity.trainers.map((trainer) => (
+                    <article
+                      key={trainer.trainer_id}
+                      className="grid grid-cols-[190px_1fr_160px] items-center gap-4 px-5 py-4"
+                    >
+                      <div>
+                        <h2 className="text-body-sm-medium text-primary">{trainer.display_name}</h2>
+                        <p className="mt-1 text-11 text-secondary">
+                          {availabilityCopy(trainer.availability_status)} · {trainer.timezone}
+                        </p>
                       </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 lg:block lg:text-right">
-                      <div className="text-lg font-semibold text-primary tabular-nums">
-                        {formatMinutes(trainer.available_minutes)}
-                      </div>
-                      <div className="text-11 text-placeholder">of {formatMinutes(trainer.working_minutes)} free</div>
-                      {trainer.conflicts.length ? (
-                        <div className="mt-1 inline-flex items-center gap-1 text-11 text-danger-primary">
-                          <CircleAlert className="size-3" /> {trainer.conflicts.length} conflict
-                          {trainer.conflicts.length === 1 ? "" : "s"}
+                      <div>
+                        <TrainerWeekTimeline trainer={trainer} weekStart={weekStart} />
+                        <div className="mt-2 flex gap-4 text-11 text-secondary">
+                          <span>Google {formatMinutes(trainer.google_busy_minutes)}</span>
+                          <span>Workshops {formatMinutes(trainer.workshop_minutes)}</span>
                         </div>
-                      ) : null}
-                      {isAdmin ? (
-                        <button
-                          type="button"
-                          className="mt-2 text-11 text-accent-primary"
-                          onClick={() => setEditingTrainerId(trainer.trainer_id)}
-                        >
-                          Manage schedule
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-semibold text-primary tabular-nums">
+                          {formatMinutes(trainer.available_minutes)}
+                        </div>
+                        <div className="text-11 text-placeholder">of {formatMinutes(trainer.working_minutes)} free</div>
+                        {trainer.conflicts.length ? (
+                          <div className="mt-1 inline-flex items-center gap-1 text-11 text-danger-primary">
+                            <CircleAlert className="size-3" /> {trainer.conflicts.length} conflict
+                            {trainer.conflicts.length === 1 ? "" : "s"}
+                          </div>
+                        ) : null}
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            className="mt-2 text-11 text-accent-primary"
+                            onClick={() => setEditingTrainerId(trainer.trainer_id)}
+                          >
+                            Manage schedule
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div
+                  className="flex flex-wrap items-center gap-4 border-t border-subtle bg-surface-2 px-5 py-3 text-11 text-secondary"
+                  aria-label="Timeline legend"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="bg-success-secondary ring-success-primary/30 size-2.5 rounded-sm ring-1" />
+                    Working hours
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="bg-neutral-500/55 size-2.5 rounded-sm" />
+                    Google busy
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-sm bg-accent-primary/70" />
+                    Workshop
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="border-danger-primary bg-danger-secondary size-2.5 rounded-sm border" />
+                    Conflict
+                  </span>
+                  <span className="ml-auto">Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex min-h-56 flex-col items-center justify-center gap-3 px-5 text-center">
@@ -645,7 +781,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                 </p>
               </div>
               {!hasActiveProfile ? (
-                <Button variant="primary" onClick={optIn}>
+                <Button variant="primary" loading={optingIn} onClick={optIn}>
                   {ownProfile ? "Reactivate trainer" : "Become a trainer"}
                 </Button>
               ) : null}
@@ -735,7 +871,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                     Connect read-only free/busy access. Event names and details never enter Hangar.
                   </p>
                 </div>
-                <Button variant="primary" onClick={connect}>
+                <Button variant="primary" loading={connecting} onClick={connect}>
                   <Link2 className="mr-2 size-4" />
                   Connect Google Calendar
                 </Button>
@@ -745,13 +881,11 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               <button
                 type="button"
                 className="self-end text-11 text-secondary hover:text-danger-primary"
-                onClick={async () => {
-                  await capacityService.disconnectGoogle(workspaceSlug);
-                  await refresh();
-                }}
+                disabled={disconnecting}
+                onClick={disconnect}
               >
                 <Unplug className="mr-1 inline size-3" />
-                Disconnect Google Calendar
+                {disconnecting ? "Disconnecting…" : "Disconnect Google Calendar"}
               </button>
             ) : null}
           </>
