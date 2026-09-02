@@ -28,6 +28,9 @@ Google Calendar trainer capacity remains disabled unless
 Fernet keyring named by `existingSecrets.application.calendarTokenEncryptionKeysKey`
 and register the public `/auth/google/calendar/callback/` URI. The API fails
 closed when encryption is not configured; see the configuration reference.
+Capacity queries are capped at 25 trainers and 14 days. The chart defaults to
+atomic Valkey-backed limits of 10 requests/minute per user and 30/minute per
+workspace; tune them through `googleCalendarCapacity.limits`.
 
 Inspect the published chart without registry credentials:
 

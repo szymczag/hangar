@@ -145,6 +145,9 @@ The integration is opt-in and disabled by default:
 ```yaml
 googleCalendarCapacity:
   enabled: true
+  limits:
+    userRate: 10/minute
+    workspaceRate: 30/minute
 
 existingSecrets:
   application:
@@ -170,6 +173,13 @@ Capacity requests query Google live and cache anonymous busy intervals in
 Valkey for five minutes. Hangar does not request or persist event names,
 descriptions, attendees, locations, or conferencing data. Provider or
 credential failures produce unknown availability rather than free time.
+
+Each request is limited to 25 explicitly selected trainers and a 14-day range.
+The per-user and per-workspace limits are enforced atomically through Valkey;
+requests fail closed with HTTP 503 if admission cannot be checked. Keep the
+workspace limit at least as high as the user limit. Disconnect revokes the
+Google token when the account has no other workspace connection and clears
+cached access tokens and busy windows.
 
 ## Secure email delivery
 

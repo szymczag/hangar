@@ -155,6 +155,10 @@ container sets and published no chart or GitHub Release.
 Google Calendar trainer capacity is disabled by default. Enable
 `googleCalendarCapacity.enabled` only after registering the Calendar OAuth
 callback and adding `CALENDAR_TOKEN_ENCRYPTION_KEYS` to the application Secret.
+Capacity lookups are bounded to 25 trainers and 14 days. Atomic Valkey-backed
+admission is configured through `googleCalendarCapacity.limits.userRate` and
+`googleCalendarCapacity.limits.workspaceRate`; defaults are `10/minute` and
+`30/minute`, and admission fails closed while Valkey is unavailable.
 Hangar consumes anonymous free/busy ranges and never imports event details; the
 full operator contract and key-rotation rules are in the configuration reference.
 

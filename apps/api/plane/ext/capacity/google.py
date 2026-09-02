@@ -1,3 +1,7 @@
+# Copyright (c) 2026-present Maciej Szymczak and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+
 from __future__ import annotations
 
 import logging
@@ -96,6 +100,24 @@ class GoogleCalendarClient:
         ttl = max(60, min(int(payload.get("expires_in", 3600)) - 60, 3540))
         cache.set(cache_key, token, ttl)
         return token
+
+    def revoke(self, credential: GoogleCalendarCredential) -> None:
+        refresh_token = decrypt_value(credential.encrypted_refresh_token, credential.encryption_key_id)
+        try:
+            _request(
+                "POST",
+                "https://oauth2.googleapis.com/revoke",
+                origin=GOOGLE_TOKEN_ORIGIN,
+                data={"token": refresh_token},
+                max_bytes=64 * 1024,
+            )
+        except requests.HTTPError as exc:
+            # Google returns 400 when a token is already invalid. The desired
+            # disconnected state has therefore already been reached.
+            if "HTTP 400" not in str(exc):
+                raise GoogleCalendarError("revocation_failed") from exc
+        except requests.RequestException as exc:
+            raise GoogleCalendarError("revocation_failed") from exc
 
     def _authorized_json(self, credential, method, url, *, json_body=None, max_bytes=1024 * 1024):
         for attempt in range(2):

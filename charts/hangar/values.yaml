@@ -123,6 +123,9 @@ todoistImports:
 
 googleCalendarCapacity:
   enabled: false
+  limits:
+    userRate: 10/minute
+    workspaceRate: 30/minute
 
 externalServices:
   objectStorage:

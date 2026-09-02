@@ -30,6 +30,7 @@ from .webauthn import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCrede
 from plane.ext.runner.models import RunnerAuditEvent, RunnerInstallation
 from .worklog import IssueWorkLog
 from .capacity import (
+    CapacityAuditEvent,
     GoogleCalendarCredential,
     TrainerCalendarSelection,
     TrainerProfile,
@@ -64,6 +65,7 @@ __all__ = [
     "WorkspaceSharedLink",
     "WorkspaceSharedLinkHide",
     "GoogleCalendarCredential",
+    "CapacityAuditEvent",
     "TrainerCalendarSelection",
     "TrainerProfile",
     "TrainerScheduleException",

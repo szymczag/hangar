@@ -292,8 +292,19 @@
     "googleCalendarCapacity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled"],
-      "properties": { "enabled": { "type": "boolean" } }
+      "required": ["enabled", "limits"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["userRate", "workspaceRate"],
+          "properties": {
+            "userRate": { "type": "string", "pattern": "^[1-9][0-9]*/(second|minute|hour|day)$" },
+            "workspaceRate": { "type": "string", "pattern": "^[1-9][0-9]*/(second|minute|hour|day)$" }
+          }
+        }
+      }
     },
     "observability": {
       "type": "object",

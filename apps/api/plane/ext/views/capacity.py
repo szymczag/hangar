@@ -1,3 +1,7 @@
+# Copyright (c) 2026-present Maciej Szymczak and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+
 from __future__ import annotations
 
 import base64
@@ -5,6 +9,7 @@ import hashlib
 import secrets
 from datetime import date, timedelta
 from urllib.parse import urlencode
+from uuid import UUID
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -31,7 +36,10 @@ from plane.ext.capacity import (
     validate_weekly_schedule,
 )
 from plane.ext.capacity.schedules import validate_timezone
+from plane.ext.capacity.cache import clear_credential_cache, clear_selection_cache
+from plane.ext.capacity.throttles import CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle
 from plane.ext.models import (
+    CapacityAuditEvent,
     GoogleCalendarCredential,
     TrainerCalendarSelection,
     TrainerProfile,
@@ -49,6 +57,17 @@ CALENDAR_SCOPES = {
     "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
     "https://www.googleapis.com/auth/calendar.events.freebusy",
 }
+
+
+def _audit(request, *, workspace_id, action, trainer_id=None, issue_id=None, metadata=None):
+    CapacityAuditEvent.objects.create(
+        workspace_id=workspace_id,
+        actor_id=request.user.id,
+        trainer_id=trainer_id,
+        issue_id=issue_id,
+        action=action,
+        metadata=metadata or {},
+    )
 
 
 def _disabled():
@@ -94,6 +113,7 @@ class TrainerSelfEndpoint(BaseAPIView):
     authentication_classes = [CsrfEnforcedSessionAuthentication]
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
     def post(self, request, slug):
         if response := _disabled():
             return response
@@ -105,6 +125,12 @@ class TrainerSelfEndpoint(BaseAPIView):
         )
         profile.status = TrainerProfile.Status.ACTIVE
         profile.save(update_fields=["status", "updated_at"])
+        _audit(
+            request,
+            workspace_id=workspace.id,
+            trainer_id=profile.user_id,
+            action=CapacityAuditEvent.Action.TRAINER_ACTIVATED,
+        )
         ensure_workspace_workshop_type(workspace)
         profile = (
             TrainerProfile.objects.prefetch_related("schedule_exceptions").select_related("user").get(pk=profile.pk)
@@ -112,12 +138,19 @@ class TrainerSelfEndpoint(BaseAPIView):
         return Response(_profile_payload(profile), status=status.HTTP_201_CREATED)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
     def delete(self, request, slug):
         if response := _disabled():
             return response
         profile = get_object_or_404(TrainerProfile, workspace__slug=slug, user=request.user)
         profile.status = TrainerProfile.Status.SUSPENDED
         profile.save(update_fields=["status", "updated_at"])
+        _audit(
+            request,
+            workspace_id=profile.workspace_id,
+            trainer_id=profile.user_id,
+            action=CapacityAuditEvent.Action.TRAINER_SUSPENDED,
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -204,6 +237,13 @@ class TrainerScheduleEndpoint(BaseAPIView):
                 )
             TrainerScheduleException.objects.filter(trainer=profile).delete()
             TrainerScheduleException.objects.bulk_create(rows)
+        _audit(
+            request,
+            workspace_id=profile.workspace_id,
+            trainer_id=profile.user_id,
+            action=CapacityAuditEvent.Action.SCHEDULE_UPDATED,
+            metadata={"exception_count": len(request.data.get("exceptions", profile.schedule_exceptions.all()))},
+        )
         return Response(_profile_payload(self._profile(slug, user_id)))
 
 
@@ -244,6 +284,7 @@ class GoogleCalendarStartEndpoint(BaseAPIView):
 
 
 class GoogleCalendarCallbackEndpoint(BaseAPIView):
+    @transaction.atomic
     def get(self, request):
         transaction_data, valid = consume_oauth_transaction(request, OAUTH_SESSION_KEY, request.GET.get("state"))
         slug = transaction_data.get("workspace_slug", "")
@@ -284,6 +325,12 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                 },
             )
             TrainerCalendarSelection.objects.update_or_create(trainer=trainer, defaults={"credential": credential})
+            _audit(
+                request,
+                workspace_id=trainer.workspace_id,
+                trainer_id=trainer.user_id,
+                action=CapacityAuditEvent.Action.GOOGLE_CONNECTED,
+            )
         except (GoogleCalendarError, KeyError, ValueError):
             return HttpResponseRedirect(failure)
         return HttpResponseRedirect(f"/{slug}/capacity?google=connected")
@@ -339,6 +386,13 @@ class GoogleCalendarsEndpoint(BaseAPIView):
         ]
         selection.revision += 1
         selection.save(update_fields=["encrypted_calendar_ids", "calendar_id_hashes", "revision", "updated_at"])
+        _audit(
+            request,
+            workspace_id=selection.trainer.workspace_id,
+            trainer_id=selection.trainer.user_id,
+            action=CapacityAuditEvent.Action.CALENDARS_UPDATED,
+            metadata={"calendar_count": len(encrypted), "revision": selection.revision},
+        )
         return Response({"selected": len(encrypted), "revision": selection.revision})
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
@@ -348,15 +402,38 @@ class GoogleCalendarsEndpoint(BaseAPIView):
             return response
         selection = self._selection(request, slug)
         credential = selection.credential
+        last_selection = not credential.trainer_selections.exclude(pk=selection.pk).exists()
+        if last_selection and request.query_params.get("force_local") != "true":
+            try:
+                _google_client()[0].revoke(credential)
+            except GoogleCalendarError:
+                return Response(
+                    {
+                        "error": "revocation_failed",
+                        "can_force_local_disconnect": True,
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+        clear_selection_cache(selection.id)
         # Disconnect is a privacy boundary: erase selected calendar identifiers
         # rather than retaining them through the application's soft-delete layer.
         selection.delete(soft=False)
-        if not credential.trainer_selections.exists():
+        if last_selection:
+            clear_credential_cache(credential.id)
             credential.delete(soft=False)
+        _audit(
+            request,
+            workspace_id=selection.trainer.workspace_id,
+            trainer_id=selection.trainer.user_id,
+            action=CapacityAuditEvent.Action.GOOGLE_DISCONNECTED,
+            metadata={"forced_local": request.query_params.get("force_local") == "true"},
+        )
         return Response(status=204)
 
 
 class WorkspaceCapacityEndpoint(BaseAPIView):
+    throttle_classes = [CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle]
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
         if response := _disabled():
@@ -364,10 +441,23 @@ class WorkspaceCapacityEndpoint(BaseAPIView):
         start, end = parse_datetime(request.GET.get("from", "")), parse_datetime(request.GET.get("to", ""))
         if not start or not end or timezone.is_naive(start) or timezone.is_naive(end) or not start < end:
             return Response({"error": "from and to must be timezone-aware RFC3339 values."}, status=400)
-        if end - start > timedelta(days=42):
-            return Response({"error": "Capacity range may not exceed 42 days."}, status=400)
+        if end - start > timedelta(days=14):
+            return Response({"error": "Capacity range may not exceed 14 days."}, status=400)
         trainer_ids = [value for value in request.GET.get("trainer_ids", "").split(",") if value]
         workspace = Workspace.objects.get(slug=slug)
+        if len(trainer_ids) > 25:
+            return Response({"error": "Select at most 25 trainers."}, status=400)
+        try:
+            trainer_ids = [str(UUID(value)) for value in trainer_ids]
+        except ValueError:
+            return Response({"error": "trainer_ids must contain valid UUIDs."}, status=400)
+        if not trainer_ids:
+            active_count = TrainerProfile.objects.filter(workspace=workspace, status="active").count()
+            if active_count > 25:
+                return Response(
+                    {"error": "This workspace has more than 25 trainers; select trainer_ids explicitly."},
+                    status=400,
+                )
         return Response(
             {
                 "from": start.isoformat(),
@@ -412,6 +502,8 @@ class WorkshopScheduleEndpoint(BaseAPIView):
             or starts_at >= ends_at
         ):
             return Response({"error": "A valid timezone-aware workshop range is required."}, status=400)
+        if ends_at - starts_at > timedelta(days=7):
+            return Response({"error": "A Workshop may not exceed seven days."}, status=400)
         assignees = set(issue.issue_assignee.values_list("assignee_id", flat=True))
         if not assignees:
             return Response({"error": "A Workshop requires at least one trainer."}, status=400)
@@ -434,15 +526,29 @@ class WorkshopScheduleEndpoint(BaseAPIView):
         schedule, _ = WorkshopSchedule.objects.update_or_create(
             issue=issue, defaults={"starts_at": starts_at, "ends_at": ends_at, **values}
         )
+        _audit(
+            request,
+            workspace_id=issue.workspace_id,
+            issue_id=issue.id,
+            action=CapacityAuditEvent.Action.WORKSHOP_UPDATED,
+        )
         return Response(self._payload(schedule))
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    @transaction.atomic
     def delete(self, request, slug, project_id, issue_id):
         if response := _disabled():
             return response
         # A schedule can be recreated later; hard deletion avoids the one-to-one
         # uniqueness conflict that a soft-deleted row would otherwise retain.
-        WorkshopSchedule.objects.filter(issue=self._issue(slug, project_id, issue_id)).delete(soft=False)
+        issue = self._issue(slug, project_id, issue_id)
+        WorkshopSchedule.objects.filter(issue=issue).delete(soft=False)
+        _audit(
+            request,
+            workspace_id=issue.workspace_id,
+            issue_id=issue.id,
+            action=CapacityAuditEvent.Action.WORKSHOP_REMOVED,
+        )
         return Response(status=204)
 
     @staticmethod

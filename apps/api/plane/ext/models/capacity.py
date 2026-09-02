@@ -3,8 +3,10 @@
 
 import hashlib
 import hmac
+import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
@@ -14,6 +16,50 @@ from plane.db.models.base import BaseModel
 
 def empty_week():
     return {day: [] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")}
+
+
+class ImmutableCapacityAuditEventQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Capacity audit events are immutable.")
+
+    def delete(self):
+        raise ValidationError("Capacity audit events are immutable.")
+
+
+class CapacityAuditEvent(models.Model):
+    class Action(models.TextChoices):
+        TRAINER_ACTIVATED = "trainer.activated", "Trainer activated"
+        TRAINER_SUSPENDED = "trainer.suspended", "Trainer suspended"
+        SCHEDULE_UPDATED = "schedule.updated", "Schedule updated"
+        GOOGLE_CONNECTED = "google.connected", "Google connected"
+        CALENDARS_UPDATED = "google.calendars_updated", "Calendars updated"
+        GOOGLE_DISCONNECTED = "google.disconnected", "Google disconnected"
+        WORKSHOP_UPDATED = "workshop.updated", "Workshop updated"
+        WORKSHOP_REMOVED = "workshop.removed", "Workshop removed"
+
+    id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
+    workspace_id = models.UUIDField(db_index=True)
+    actor_id = models.UUIDField(db_index=True)
+    trainer_id = models.UUIDField(null=True, blank=True, db_index=True)
+    issue_id = models.UUIDField(null=True, blank=True, db_index=True)
+    action = models.CharField(max_length=64, choices=Action.choices)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = ImmutableCapacityAuditEventQuerySet.as_manager()
+
+    class Meta:
+        db_table = "ext_capacity_audit_events"
+        ordering = ("-created_at",)
+        indexes = [models.Index(fields=["workspace_id", "created_at"], name="ext_cap_audit_ws_time_idx")]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Capacity audit events are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Capacity audit events are immutable.")
 
 
 class TrainerProfile(BaseModel):

@@ -1,3 +1,7 @@
+# Copyright (c) 2026-present Maciej Szymczak and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta, timezone as dt_timezone
@@ -10,11 +14,13 @@ from django.db import close_old_connections
 
 from plane.db.models import ProjectMember
 from plane.ext.capacity.crypto import decrypt_value
+from plane.ext.capacity.cache import BUSY_CACHE_TTL_SECONDS, register_busy_cache_key
 from plane.ext.capacity.google import GoogleCalendarClient, GoogleCalendarError
 from plane.ext.models import TrainerProfile, WorkshopSchedule
 from plane.license.utils.instance_value import get_configuration_value
 
 DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+GOOGLE_CACHE_WINDOW_MINUTES = 15
 
 
 def _merge(intervals):
@@ -108,10 +114,24 @@ def _google_busy(trainer, start, end):
     credential = selection.credential
     if credential.status != credential.Status.CONNECTED:
         return [], credential.status
-    cache_key = f"gcal:busy:{trainer.id}:{selection.revision}:{start.isoformat()}:{end.isoformat()}"
+    normalized_start = start.replace(
+        minute=(start.minute // GOOGLE_CACHE_WINDOW_MINUTES) * GOOGLE_CACHE_WINDOW_MINUTES,
+        second=0,
+        microsecond=0,
+    )
+    normalized_end = end.replace(second=0, microsecond=0)
+    if normalized_end < end or normalized_end.minute % GOOGLE_CACHE_WINDOW_MINUTES:
+        normalized_end += timedelta(
+            minutes=GOOGLE_CACHE_WINDOW_MINUTES - normalized_end.minute % GOOGLE_CACHE_WINDOW_MINUTES
+        )
+    cache_key = (
+        f"gcal:busy:{trainer.id}:{selection.revision}:"
+        f"{normalized_start.isoformat()}:{normalized_end.isoformat()}"
+    )
     cached = cache.get(cache_key)
     if isinstance(cached, list):
-        return [(datetime.fromisoformat(item[0]), datetime.fromisoformat(item[1])) for item in cached], "connected"
+        cached_intervals = [(datetime.fromisoformat(item[0]), datetime.fromisoformat(item[1])) for item in cached]
+        return _intersections(cached_intervals, [(start, end)]), "connected"
     try:
         calendar_ids = [
             decrypt_value(value, credential.encryption_key_id) for value in selection.encrypted_calendar_ids
@@ -121,8 +141,8 @@ def _google_busy(trainer, start, end):
         payload = _google_client().freebusy(
             credential,
             calendar_ids,
-            time_min=start.isoformat().replace("+00:00", "Z"),
-            time_max=end.isoformat().replace("+00:00", "Z"),
+            time_min=normalized_start.isoformat().replace("+00:00", "Z"),
+            time_max=normalized_end.isoformat().replace("+00:00", "Z"),
         )
         intervals = _merge(
             (
@@ -132,8 +152,13 @@ def _google_busy(trainer, start, end):
             for item in payload
             if isinstance(item, dict) and item.get("start") and item.get("end")
         )
-        cache.set(cache_key, [(a.isoformat(), b.isoformat()) for a, b in intervals], 300)
-        return intervals, "connected"
+        cache.set(
+            cache_key,
+            [(a.isoformat(), b.isoformat()) for a, b in intervals],
+            BUSY_CACHE_TTL_SECONDS,
+        )
+        register_busy_cache_key(selection.id, cache_key)
+        return _intersections(intervals, [(start, end)]), "connected"
     except (GoogleCalendarError, ValueError) as exc:
         return [], getattr(exc, "code", "credential_error")
 
@@ -151,7 +176,7 @@ def _workshops(workspace_id, trainer_ids, start, end):
         WorkshopSchedule.objects.filter(
             workspace_id=workspace_id,
             issue__issue_assignee__assignee_id__in=trainer_ids,
-            starts_at__lt=end + timedelta(days=1),
+            starts_at__lt=end + timedelta(days=2),
             ends_at__gt=start - timedelta(days=1),
         )
         .select_related("issue", "project")
@@ -166,7 +191,9 @@ def _workshops(workspace_id, trainer_ids, start, end):
         block_end = schedule.ends_at + timedelta(minutes=schedule.travel_after_minutes)
         for assignment in schedule.issue.issue_assignee.all():
             if assignment.assignee_id in result:
-                result[assignment.assignee_id].append((block_start, block_end, schedule))
+                clipped_start, clipped_end = max(block_start, start), min(block_end, end)
+                if clipped_start < clipped_end:
+                    result[assignment.assignee_id].append((clipped_start, clipped_end, schedule))
     return result
 
 
@@ -182,7 +209,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
     )
     if trainer_ids:
         trainers = trainers.filter(user_id__in=trainer_ids)
-    trainers = list(trainers[:200])
+    trainers = list(trainers[:25])
     workshop_map = _workshops(workspace.id, [trainer.user_id for trainer in trainers], start, end)
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(trainers)))) as executor:
         google_results = {

@@ -70,11 +70,27 @@ EPIC_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>/epics"
 urlpatterns = [
     path("workspaces/<str:slug>/capacity/trainers/me/", TrainerSelfEndpoint.as_view(), name="capacity-trainer-self"),
     path("workspaces/<str:slug>/capacity/trainers/", TrainerListEndpoint.as_view(), name="capacity-trainers"),
-    path("workspaces/<str:slug>/capacity/trainers/<uuid:user_id>/schedule/", TrainerScheduleEndpoint.as_view(), name="capacity-trainer-schedule"),
-    path("workspaces/<str:slug>/capacity/google/start/", GoogleCalendarStartEndpoint.as_view(), name="capacity-google-start"),
-    path("workspaces/<str:slug>/capacity/google/calendars/", GoogleCalendarsEndpoint.as_view(), name="capacity-google-calendars"),
+    path(
+        "workspaces/<str:slug>/capacity/trainers/<uuid:user_id>/schedule/",
+        TrainerScheduleEndpoint.as_view(),
+        name="capacity-trainer-schedule",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/google/start/",
+        GoogleCalendarStartEndpoint.as_view(),
+        name="capacity-google-start",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/google/calendars/",
+        GoogleCalendarsEndpoint.as_view(),
+        name="capacity-google-calendars",
+    ),
     path("workspaces/<str:slug>/capacity/", WorkspaceCapacityEndpoint.as_view(), name="workspace-capacity"),
-    path(f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/", WorkshopScheduleEndpoint.as_view(), name="workshop-schedule"),
+    path(
+        f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/",
+        WorkshopScheduleEndpoint.as_view(),
+        name="workshop-schedule",
+    ),
     # Read-only, anonymous, and deliberately NOT under /api/instances/: the
     # session middleware switches to the admin cookie on any path containing
     # "instances", which would leave every signed-in reader looking anonymous.
