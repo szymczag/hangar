@@ -37,6 +37,7 @@ type TFormValues = {
   cycles: boolean;
   modules: boolean;
   views: boolean;
+  work_items: boolean;
 };
 
 /**
@@ -51,6 +52,7 @@ const OPTIONAL_COPY_FIELDS = [
   { key: "cycles", labelKey: "cycles" },
   { key: "modules", labelKey: "modules" },
   { key: "views", labelKey: "views" },
+  { key: "work_items", labelKey: "work_items" },
 ] as const;
 
 export function DuplicateProjectModal(props: TDuplicateProjectModalProps) {
@@ -85,6 +87,7 @@ export function DuplicateProjectModal(props: TDuplicateProjectModalProps) {
       cycles: false,
       modules: false,
       views: false,
+      work_items: false,
     });
   }, [isOpen, project.name, project.identifier, reset]);
 
@@ -103,6 +106,7 @@ export function DuplicateProjectModal(props: TDuplicateProjectModalProps) {
           cycles: values.cycles,
           modules: values.modules,
           views: values.views,
+          work_items: values.work_items,
         },
       });
 

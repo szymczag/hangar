@@ -17,6 +17,8 @@ import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferences";
 // layouts
 import { ProjectAuthWrapper } from "@/layouts/auth-layout/project-wrapper";
+// Hangar extension
+import { ProjectCopyProgress } from "@/plane-web/components/project/copy-progress";
 // local imports
 import type { Route } from "./+types/layout";
 
@@ -50,6 +52,10 @@ function ProjectLayout({ params }: Route.ComponentProps) {
           </Row>
         </div>
       )}
+      {/* Fork (see FORK.md): a duplicated project appears before its work items
+          do, so without this it looks broken rather than busy. Renders nothing
+          for a project that was never copied, which is nearly all of them. */}
+      <ProjectCopyProgress workspaceSlug={workspaceSlug} projectId={projectId} />
       <ProjectAuthWrapper workspaceSlug={workspaceSlug} projectId={projectId}>
         <Outlet />
       </ProjectAuthWrapper>

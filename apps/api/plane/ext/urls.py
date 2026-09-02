@@ -42,7 +42,11 @@ from plane.ext.views.import_job import (
     TodoistImportPreviewEndpoint,
 )
 from plane.ext.views.instance_maintenance import InstanceMaintenanceNoticeEndpoint
-from plane.ext.views.project_copy import ProjectDuplicateEndpoint
+from plane.ext.views.project_copy import (
+    ProjectCopyRetryEndpoint,
+    ProjectCopyStatusEndpoint,
+    ProjectDuplicateEndpoint,
+)
 from plane.ext.views.workspace_defaults import (
     WorkspaceHomeDefaultsEndpoint,
     WorkspaceSharedLinkDetailEndpoint,
@@ -164,6 +168,16 @@ urlpatterns = [
         # A distinct name on purpose: `name="project"` is declared three times in
         # plane.app.urls.project, which is why its tests build URLs by hand.
         name="project-duplicate",
+    ),
+    path(
+        f"{PROJECT_BASE}/copy-status/",
+        ProjectCopyStatusEndpoint.as_view(),
+        name="project-copy-status",
+    ),
+    path(
+        f"{PROJECT_BASE}/copy-status/retry/",
+        ProjectCopyRetryEndpoint.as_view(),
+        name="project-copy-retry",
     ),
     path(
         f"{PROJECT_BASE}/issue-types/",

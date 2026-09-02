@@ -37,7 +37,23 @@ export type TDuplicateProjectPayload = {
     cycles?: boolean;
     modules?: boolean;
     views?: boolean;
+    work_items?: boolean;
   };
+};
+
+/** A work item copy in progress. Absent on a project that was never copied. */
+export type TProjectCopyJob = {
+  id: string;
+  status: "queued" | "processing" | "completed" | "completed_with_errors" | "failed" | "cancelled";
+  stage: string;
+  total: number;
+  copied: number;
+  counts: Record<string, number>;
+  skipped: string[];
+  errors: unknown[];
+  reason: string;
+  started_at: string | null;
+  completed_at: string | null;
 };
 
 export class ProjectService extends APIService {
@@ -63,6 +79,21 @@ export class ProjectService extends APIService {
    * Rejects with `error.response` (not `.response.data`) to match
    * `createProject`, whose callers decode `err.data` for the API's error codes.
    */
+  /**
+   * How far this project's work item copy has got.
+   *
+   * Keyed on the project rather than the job, because that is what the client
+   * has: the duplicate form navigates straight to the copy, and a reload loses
+   * any job id held in memory.
+   */
+  async retrieveCopyStatus(workspaceSlug: string, projectId: string): Promise<{ job: TProjectCopyJob | null }> {
+    return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/copy-status/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response;
+      });
+  }
+
   async duplicateProject(workspaceSlug: string, projectId: string, data: TDuplicateProjectPayload): Promise<TProject> {
     return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/duplicate/`, data)
       .then((response) => response?.data)
