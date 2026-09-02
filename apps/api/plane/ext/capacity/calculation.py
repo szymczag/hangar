@@ -129,8 +129,7 @@ def _google_busy(trainer, start, end):
             minutes=GOOGLE_CACHE_WINDOW_MINUTES - normalized_end.minute % GOOGLE_CACHE_WINDOW_MINUTES
         )
     cache_key = (
-        f"gcal:busy:{trainer.id}:{selection.revision}:"
-        f"{normalized_start.isoformat()}:{normalized_end.isoformat()}"
+        f"gcal:busy:{trainer.id}:{selection.revision}:{normalized_start.isoformat()}:{normalized_end.isoformat()}"
     )
     cached = cache.get(cache_key)
     if isinstance(cached, list):
