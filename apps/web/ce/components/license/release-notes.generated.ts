@@ -11,13 +11,10 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.41",
+  version: "0.1.0-rc.42",
   highlights: [
-    "A maintenance notice is private until an operator publishes it.",
-    "Notice text cannot carry invisible direction changes.",
-    "Shared quick links are held to the same URL rules as personal ones.",
-    "Editing shared links stays with administrators; hiding them does not.",
-    "Home defaults never overwrite a choice somebody made, unless asked to.",
+    "A project's display name is no longer held to the identifier's character rule.",
+    "Duplication failures now name the field that caused them.",
   ],
   upstream: {
     version: "1.4.0",

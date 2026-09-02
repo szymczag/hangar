@@ -59,33 +59,30 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.40` to `rc.41`
+### Upgrade from `rc.41` to `rc.42`
 
-Upgrade directly from the immediately previous retained GitHub release, `rc.40`.
-This release adds **two additive migrations**, `ext.0015` and `ext.0016`. They
-create new tables only; no existing table is altered and no data is rewritten.
-Existing values, Secrets, storage, RBAC, and NetworkPolicies remain compatible.
+Upgrade directly from the immediately previous retained GitHub release, `rc.41`.
+This release adds **no database migration**, so the schema is unchanged in both
+directions. Existing values, Secrets, storage, RBAC, and NetworkPolicies remain
+compatible.
 
-Deploy all application images together. The API image carries the maintenance
-notice and workspace home-defaults endpoints; the web image carries the
-maintenance bar, the home-defaults settings page, and the redesigned build
-identity dialog; the God Mode image carries the maintenance and favicon forms.
+Deploy the web and API images together. The API image carries the corrected
+project-name validation; the web image carries it too, along with the duplicate
+form's error handling and the build identity dialog's release highlights.
 
-After deploying, raise a maintenance notice in God Mode and confirm it appears
-in an already-open tab within a minute, then switch it off. Set a favicon and
-hard-reload. Open the build identity dialog and confirm the version matches this
-release.
+After deploying, create a project whose name contains a hyphen or a full stop --
+both were refused before -- and duplicate a project, accepting the name the form
+prefills. Open the build identity dialog and confirm it lists what changed in
+this build rather than reporting that it carries no notes.
 
 Before upgrading, back up PostgreSQL, record the current Helm revision, render
-the existing values against `0.1.0-rc.41`, and verify the signed tag, chart, image
-digests, and attestations. Rolling back to `rc.40` needs **no schema reversal**:
-because both migrations are additive, the previous application version runs
-against this schema unchanged and simply does not read the new tables.
+the existing values against `0.1.0-rc.42`, and verify the signed tag, chart, image
+digests, and attestations. Rolling back to `rc.41` needs no schema reversal.
 
-### Upgrade from `rc.27` to `rc.41`
+### Upgrade from `rc.27` to `rc.42`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
-Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.41`.
+Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.42`.
 
 This release closes two Todoist import admission gaps. Starting an import now
 requires a server-signed, 15-minute, single-use preview grant bound to the
@@ -105,13 +102,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.41`, its application version is
-   `v0.1.0-rc.41`, and its signatures and digests pass the
+2. confirm the target chart is `0.1.0-rc.42`, its application version is
+   `v0.1.0-rc.42`, and its signatures and digests pass the
    [release verification procedure](security.md#verify-release-010-rc39);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
-   `rc.27` and `rc.41` web or API images because their preview-execution request
+   `rc.27` and `rc.42` web or API images because their preview-execution request
    contract intentionally changed together.
 
 Wait for the revision-scoped migration Job to complete before admitting traffic.
@@ -124,7 +121,7 @@ also fail without creating a job or retaining a source object.
 target; the nullable column may remain in the database. It restores the preview
 bypass and duplicate-confirmation race, however, so it is not a
 security-equivalent rollback. Prefer a forward correction and return every
-application component to `rc.41` promptly.
+application component to `rc.42` promptly.
 
 ### Upgrade from `rc.26` to `rc.27`
 
