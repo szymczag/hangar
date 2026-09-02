@@ -171,6 +171,7 @@
   "project_name_already_taken": "Le nom du projet est déjà pris.",
   "project_name_cannot_contain_special_characters": "Le nom du projet ne peut pas contenir de caractères spéciaux.",
   "project_identifier_already_taken": "L’identifiant du projet est déjà pris.",
+  "project_identifier_cannot_contain_special_characters": "L'identifiant du projet ne peut contenir que des lettres et des chiffres.",
   "project_cover_image_alt": "Image de couverture du projet",
   "name_is_required": "Le nom est requis",
   "title_should_be_less_than_255_characters": "Le titre doit faire moins de 255 caractères",

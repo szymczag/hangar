@@ -13,6 +13,7 @@ from .base import BaseSerializer, DynamicBaseSerializer
 from django.db.models import Max
 from plane.app.serializers.workspace import WorkspaceLiteSerializer
 from plane.app.serializers.user import UserLiteSerializer, UserAdminLiteSerializer
+from plane.ext.utils.plain_text import PlainTextError, validate_single_line_text
 from plane.db.models import (
     Project,
     ProjectMember,
@@ -46,7 +47,19 @@ class ProjectSerializer(BaseSerializer):
         project_id = self.instance.id if self.instance else None
         workspace_id = self.context["workspace_id"]
 
-        if re.match(Project.FORBIDDEN_IDENTIFIER_CHARS_PATTERN, name):
+        # Fork (see FORK.md): upstream applies FORBIDDEN_IDENTIFIER_CHARS_PATTERN
+        # here as well as to the identifier. That pattern forbids `- . ' & ( )`
+        # among others, which is correct for an identifier -- it becomes part of
+        # a work-item key and a URL -- and wrong for a display name, where those
+        # characters are ordinary. It rejected "Pentest - Client X" and "v1.0",
+        # so a great many real projects simply could not be created.
+        #
+        # The name is held instead to what a single line of human text has to
+        # be: no control characters, no bidirectional overrides, and a length
+        # cap. The identifier keeps the strict pattern, below.
+        try:
+            name = validate_single_line_text(name, max_length=255, field="Project name")
+        except PlainTextError:
             raise serializers.ValidationError(detail="PROJECT_NAME_CANNOT_CONTAIN_SPECIAL_CHARACTERS")
 
         project = Project.objects.filter(name=name, workspace_id=workspace_id)

@@ -171,6 +171,7 @@
   "project_name_already_taken": "Názov projektu je už použitý.",
   "project_name_cannot_contain_special_characters": "Názov projektu nesmie obsahovať špeciálne znaky.",
   "project_identifier_already_taken": "Identifikátor projektu je už použitý.",
+  "project_identifier_cannot_contain_special_characters": "Identifikátor projektu môže obsahovať iba písmená a číslice.",
   "project_cover_image_alt": "Úvodný obrázok projektu",
   "name_is_required": "Názov je povinný",
   "title_should_be_less_than_255_characters": "Názov by mal byť kratší ako 255 znakov",

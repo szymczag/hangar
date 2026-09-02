@@ -48,9 +48,34 @@ test("duplication failures reach the form with the API's error code intact", () 
     /throw error\?\.response;/,
     "duplicateProject must reject with the response, matching createProject"
   );
-  assert.match(modal, /\?\.data\?\.error/, "the modal must decode the API error code from the rejected response");
+  // The endpoint answers in two shapes and the modal has to read both: the copy
+  // service raises `{ error: CODE }`, while a serializer rejection is DRF's
+  // field map, `{ name: [CODE] }`. Decoding only the first sent every
+  // validation failure to the generic toast with nothing said about the field.
+  assert.match(modal, /body\.error/, "the modal must decode the service's { error: CODE } shape");
+  assert.match(modal, /Array\.isArray\(value\)/, "the modal must decode DRF's { field: [CODE] } shape");
   assert.match(modal, /PROJECT_NAME_ALREADY_EXIST/);
   assert.match(modal, /PROJECT_IDENTIFIER_ALREADY_EXIST/);
+  assert.match(modal, /PROJECT_NAME_CANNOT_CONTAIN_SPECIAL_CHARACTERS/);
+});
+
+test("the name the modal prefills is one the endpoint accepts", () => {
+  // These two drifted apart once already: the modal seeds "<source> (Copy)"
+  // while the endpoint applied the identifier's character rule to the name, so
+  // the modal's own default value was rejected and duplication could never
+  // succeed from the interface. Pin them together.
+  const seeded = /name: `\$\{project\.name\} \(Copy\)`/.test(modal);
+  assert.ok(seeded, "the modal seeds the name with a (Copy) suffix");
+
+  const serializer = readFileSync(new URL("../../api/plane/ext/serializers/project_copy.py", import.meta.url), "utf8");
+  const validateName = serializer.match(/def validate_name[\s\S]*?(?=\n    def )/)[0];
+
+  assert.doesNotMatch(
+    validateName,
+    /FORBIDDEN_IDENTIFIER_CHARS_PATTERN/,
+    "the display name must not be held to the identifier's character rule"
+  );
+  assert.match(validateName, /validate_single_line_text/);
 });
 
 test("a duplicated project lands in the store without a refetch", () => {

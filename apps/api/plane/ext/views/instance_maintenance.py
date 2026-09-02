@@ -50,10 +50,7 @@ from rest_framework.response import Response
 from plane.app.views.base import BaseAPIView
 from plane.authentication.session import BaseSessionAuthentication
 from plane.ext.models import InstanceMaintenanceNotice
-from plane.ext.utils.announcement_text import (
-    AnnouncementTextError,
-    validate_announcement_text,
-)
+from plane.ext.utils.plain_text import PlainTextError, validate_single_line_text
 from plane.license.api.permissions import InstanceAdminPermission
 
 CACHE_KEY = "instance:maintenance-notice"
@@ -160,8 +157,8 @@ class InstanceMaintenanceNoticeAdminEndpoint(BaseAPIView):
 
         if "message" in data:
             try:
-                notice.message = validate_announcement_text(data.get("message"), max_length=MESSAGE_MAX_LENGTH)
-            except AnnouncementTextError as error:
+                notice.message = validate_single_line_text(data.get("message"), max_length=MESSAGE_MAX_LENGTH)
+            except PlainTextError as error:
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
         if "severity" in data:

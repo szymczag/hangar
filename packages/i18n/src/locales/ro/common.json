@@ -171,6 +171,7 @@
   "project_name_already_taken": "Numele proiectului este deja folosit.",
   "project_name_cannot_contain_special_characters": "Numele proiectului nu poate conține caractere speciale.",
   "project_identifier_already_taken": "Identificatorul proiectului este deja folosit.",
+  "project_identifier_cannot_contain_special_characters": "Identificatorul proiectului poate conține doar litere și cifre.",
   "project_cover_image_alt": "Coperta proiectului",
   "name_is_required": "Numele este obligatoriu",
   "title_should_be_less_than_255_characters": "Titlul trebuie să conțină mai puțin de 255 de caractere",

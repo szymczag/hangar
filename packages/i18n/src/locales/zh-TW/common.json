@@ -171,6 +171,7 @@
   "project_name_already_taken": "專案名稱已被使用。",
   "project_name_cannot_contain_special_characters": "專案名稱不能包含特殊字元。",
   "project_identifier_already_taken": "專案識別碼已被使用。",
+  "project_identifier_cannot_contain_special_characters": "專案識別碼只能包含字母和數字。",
   "project_cover_image_alt": "專案封面圖片",
   "name_is_required": "名稱為必填",
   "title_should_be_less_than_255_characters": "標題不應超過 255 個字元",
