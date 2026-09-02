@@ -131,6 +131,7 @@ export function InstanceBrandingForm(props: Props) {
       placeholder: "Your organisation",
       error: Boolean(errors.INSTANCE_BRANDING_NAME),
       required: false,
+      maxLength: 100,
     },
     {
       key: "INSTANCE_SIGN_IN_HEADER",
@@ -140,6 +141,7 @@ export function InstanceBrandingForm(props: Props) {
       placeholder: "Work in all dimensions.",
       error: Boolean(errors.INSTANCE_SIGN_IN_HEADER),
       required: false,
+      maxLength: 120,
     },
     {
       key: "INSTANCE_ACCENT_COLOR",
@@ -172,6 +174,7 @@ export function InstanceBrandingForm(props: Props) {
       placeholder: "Welcome back to Hangar.",
       error: Boolean(errors.INSTANCE_SIGN_IN_SUBHEADER),
       required: false,
+      maxLength: 300,
     },
     {
       key: "INSTANCE_SUPPORT_TEXT",
@@ -186,6 +189,7 @@ export function InstanceBrandingForm(props: Props) {
       placeholder: "Contact the IT service desk on extension 4200.",
       error: false,
       required: false,
+      maxLength: 300,
     },
   ];
 
@@ -285,6 +289,7 @@ export function InstanceBrandingForm(props: Props) {
               placeholder={field.placeholder}
               error={field.error}
               required={field.required}
+              maxLength={field.maxLength}
             />
           ))}
         </div>

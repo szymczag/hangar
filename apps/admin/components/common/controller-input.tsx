@@ -22,6 +22,8 @@ type Props<T extends FieldValues> = {
   placeholder: string;
   error: boolean;
   required: boolean;
+  /** Fork (see FORK.md): the server's cap, so it is visible before submitting. */
+  maxLength?: number;
 };
 
 export type TControllerInputFormField<T extends FieldValues = FieldValues> = {
@@ -32,10 +34,12 @@ export type TControllerInputFormField<T extends FieldValues = FieldValues> = {
   placeholder: string;
   error: boolean;
   required: boolean;
+  /** Fork (see FORK.md): the server's cap, so it is visible before submitting. */
+  maxLength?: number;
 };
 
 export function ControllerInput<T extends FieldValues>(props: Props<T>) {
-  const { name, control, type, label, description, placeholder, error, required } = props;
+  const { name, control, type, label, description, placeholder, error, required, maxLength } = props;
   // states
   const [showPassword, setShowPassword] = useState(false);
 
@@ -57,6 +61,7 @@ export function ControllerInput<T extends FieldValues>(props: Props<T>) {
               ref={ref}
               hasError={error}
               placeholder={placeholder}
+              maxLength={maxLength}
               className={cn("w-full rounded-md font-medium", {
                 "pr-10": type === "password",
               })}

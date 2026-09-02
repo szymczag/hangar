@@ -21,6 +21,7 @@ from plane.utils.visibility_policy import (
     apply_private_visibility,
 )
 from plane.license.api.permissions import InstanceAdminPermission
+from plane.ext.utils.plain_text import PlainTextError, validate_single_line_text
 from plane.license.models import InstanceConfiguration
 from plane.db.models import Workspace
 from plane.license.api.serializers import InstanceConfigurationSerializer
@@ -35,6 +36,22 @@ DEPLOYMENT_MANAGED_CONFIGURATION_KEYS = {"POSTHOG_HOST"}
 # the environment decides, which would otherwise make every form in the panel
 # look editable while changing nothing.
 COLOUR_CONFIGURATION_KEYS = {"INSTANCE_ACCENT_COLOR", "INSTANCE_LOGIN_BACKDROP_COLOR"}
+
+# Fork (see FORK.md): operator-authored text rendered to people verbatim, with
+# the longest each is allowed to be. Every one of these had no length cap and no
+# character validation at all, which is how a support message could carry a
+# bidirectional override onto the page shown when the instance is unreachable,
+# or a sign-in header could be long enough to push the form off the screen.
+#
+# The caps are what each field is actually for: a name, a heading, a sentence of
+# instruction. They are not arbitrary -- a support message has to fit on a
+# failure page beside an error nobody wants to read.
+TEXT_CONFIGURATION_KEYS = {
+    "INSTANCE_BRANDING_NAME": 100,
+    "INSTANCE_SIGN_IN_HEADER": 120,
+    "INSTANCE_SIGN_IN_SUBHEADER": 300,
+    "INSTANCE_SUPPORT_TEXT": 300,
+}
 CONFIGURATION_SOURCE_KEY = "CONFIGURATION_SOURCE"
 CONFIGURATION_SOURCE_DATABASE = "database"
 CONFIGURATION_SOURCE_ENVIRONMENT = "environment"
@@ -104,6 +121,21 @@ class InstanceConfigurationEndpoint(BaseAPIView):
                     {"error": f"{key} must be a colour such as #1d4ed8, or empty."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+        # The same rule the maintenance notice and project names use: no
+        # characters in Unicode category Cc or Cf, and a length cap. That bans
+        # line breaks in something rendered as one line and, more importantly,
+        # the bidirectional overrides -- U+202E in the support text reorders the
+        # sentence telling somebody how to get help, on the page they see when
+        # nothing else works, and escaping downstream cannot help because the
+        # characters are not markup.
+        for key, max_length in TEXT_CONFIGURATION_KEYS.items():
+            if key not in request.data:
+                continue
+            try:
+                validate_single_line_text(request.data.get(key), max_length=max_length, field=key)
+            except PlainTextError as error:
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
         if CONFIGURATION_SOURCE_KEY in request.data:
             return Response(
