@@ -71,6 +71,13 @@ export class CapacityService extends APIService {
     super(API_BASE_URL);
   }
 
+  private async csrfToken(): Promise<string> {
+    const response = await this.get("/auth/get-csrf-token/");
+    const token = response.data?.csrf_token;
+    if (!token) throw new Error("CSRF token not found");
+    return token;
+  }
+
   private data<T>(request: Promise<{ data: T }>): Promise<T> {
     return request
       .then((response) => response.data)
@@ -85,26 +92,44 @@ export class CapacityService extends APIService {
     );
   }
 
-  optIn(workspaceSlug: string) {
-    return this.data<TTrainerProfile>(this.post(`/api/workspaces/${workspaceSlug}/capacity/trainers/me/`));
+  async optIn(workspaceSlug: string) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TTrainerProfile>(
+      this.post(`/api/workspaces/${workspaceSlug}/capacity/trainers/me/`, undefined, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
   }
 
   getOwnTrainerProfile(workspaceSlug: string) {
     return this.data<TTrainerProfile | null>(this.get(`/api/workspaces/${workspaceSlug}/capacity/trainers/me/`));
   }
 
-  updateSchedule(workspaceSlug: string, userId: string, scheduleRevision: number, payload: Partial<TTrainerProfile>) {
+  async updateSchedule(
+    workspaceSlug: string,
+    userId: string,
+    scheduleRevision: number,
+    payload: Partial<TTrainerProfile>
+  ) {
+    const csrfToken = await this.csrfToken();
     return this.data<TTrainerProfile>(
-      this.patch(`/api/workspaces/${workspaceSlug}/capacity/trainers/${userId}/schedule/`, {
-        ...payload,
-        schedule_revision: scheduleRevision,
-      })
+      this.patch(
+        `/api/workspaces/${workspaceSlug}/capacity/trainers/${userId}/schedule/`,
+        {
+          ...payload,
+          schedule_revision: scheduleRevision,
+        },
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
     );
   }
 
-  startGoogle(workspaceSlug: string) {
+  async startGoogle(workspaceSlug: string) {
+    const csrfToken = await this.csrfToken();
     return this.data<{ authorization_url: string }>(
-      this.post(`/api/workspaces/${workspaceSlug}/capacity/google/start/`)
+      this.post(`/api/workspaces/${workspaceSlug}/capacity/google/start/`, undefined, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
     );
   }
 
@@ -112,17 +137,24 @@ export class CapacityService extends APIService {
     return this.data<TGoogleCalendarList>(this.get(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`));
   }
 
-  selectCalendars(workspaceSlug: string, calendarIds: string[], selectionRevision: number) {
+  async selectCalendars(workspaceSlug: string, calendarIds: string[], selectionRevision: number) {
+    const csrfToken = await this.csrfToken();
     return this.data<{ selected: number; revision: number }>(
-      this.put(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`, {
-        calendar_ids: calendarIds,
-        selection_revision: selectionRevision,
-      })
+      this.put(
+        `/api/workspaces/${workspaceSlug}/capacity/google/calendars/`,
+        {
+          calendar_ids: calendarIds,
+          selection_revision: selectionRevision,
+        },
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
     );
   }
 
-  disconnectGoogle(workspaceSlug: string, forceLocal = false) {
-    return this.delete(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`, {
+  async disconnectGoogle(workspaceSlug: string, forceLocal = false) {
+    const csrfToken = await this.csrfToken();
+    return this.delete(`/api/workspaces/${workspaceSlug}/capacity/google/calendars/`, undefined, {
+      headers: { "X-CSRFTOKEN": csrfToken },
       params: forceLocal ? { force_local: "true" } : undefined,
     });
   }
@@ -141,23 +173,28 @@ export class CapacityService extends APIService {
     );
   }
 
-  saveWorkshopSchedule(
+  async saveWorkshopSchedule(
     workspaceSlug: string,
     projectId: string,
     issueId: string,
     schedule: Omit<TWorkshopSchedule, "issue_id">
   ) {
+    const csrfToken = await this.csrfToken();
     return this.data<TWorkshopSchedule>(
       this.put(
         `/api/workspaces/${workspaceSlug}/projects/${projectId}/work-items/${issueId}/workshop-schedule/`,
-        schedule
+        schedule,
+        { headers: { "X-CSRFTOKEN": csrfToken } }
       )
     );
   }
 
-  deleteWorkshopSchedule(workspaceSlug: string, projectId: string, issueId: string) {
+  async deleteWorkshopSchedule(workspaceSlug: string, projectId: string, issueId: string) {
+    const csrfToken = await this.csrfToken();
     return this.delete(
-      `/api/workspaces/${workspaceSlug}/projects/${projectId}/work-items/${issueId}/workshop-schedule/`
+      `/api/workspaces/${workspaceSlug}/projects/${projectId}/work-items/${issueId}/workshop-schedule/`,
+      undefined,
+      { headers: { "X-CSRFTOKEN": csrfToken } }
     );
   }
 }
