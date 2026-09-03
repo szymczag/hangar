@@ -11,13 +11,10 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.44",
+  version: "0.1.0-rc.45",
   highlights: [
-    "A copied work item never carries another member's private work, and only an administrator can start one.",
-    "Assignees who are not members of the copy are dropped, and the number is reported.",
-    "Relations are copied only where both ends are inside the copy.",
-    "Images inside a copied work item are copied too, and authorised against the person who asked for the copy.",
-    "A copy that is interrupted resumes rather than duplicating.",
+    "Trainer capacity changes send the CSRF proof the server requires.",
+    "Every part of workspace Home defaults is reachable again.",
   ],
   upstream: {
     version: "1.4.0",
