@@ -41,7 +41,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("needs: [setup, signing_tools]", self.workflow)
         self.assertIn("name: cosign-${{ github.run_id }}", self.workflow)
         self.assertEqual(self.workflow.count("actions/download-artifact@"), 3)
-        self.assertIn("needs: [setup, signing_tools, components, aio]", self.workflow)
+        self.assertIn("needs: [setup, signing_tools, components]", self.workflow)
 
         preflight_position = self.workflow.index("name: Prepare release signing tool")
         approval_position = self.workflow.index("name: Approve release publication")
@@ -146,6 +146,13 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         )
         self.assertLess(prepare_position, qualification_position)
         self.assertLess(qualification_position, publication_position)
+
+    def test_release_chart_qualification_does_not_wait_for_aio(self):
+        chart = self.workflow.split("  chart:", maxsplit=1)[1].split(
+            "  verify_publication:", maxsplit=1
+        )[0]
+        self.assertIn("needs: [setup, signing_tools, components]", chart)
+        self.assertNotIn("needs: [setup, signing_tools, components, aio]", chart)
 
     def test_release_chart_is_signed_and_attached_as_evidence(self):
         self.assertIn('cosign sign --yes "$chart_ref"', self.workflow)
