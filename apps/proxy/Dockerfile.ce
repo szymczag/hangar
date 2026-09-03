@@ -1,4 +1,6 @@
-FROM caddy:2.11.3-builder-alpine AS caddy-builder
+# Keep the readable patch version and immutable AMD64 manifest digest together.
+# The release workflow currently publishes linux/amd64 only.
+FROM docker.io/library/caddy:2.11.4-builder-alpine@sha256:8c78bf0a666541cd56e36ea40d02f1c84847a2b4fd490f600aa38f7221d73c67 AS caddy-builder
 
 RUN xcaddy build \
         --with github.com/caddy-dns/cloudflare@v0.2.1 \
@@ -6,11 +8,11 @@ RUN xcaddy build \
         --with github.com/mholt/caddy-l4@6faae83b167fda94e62b686be5cbeb9b3f8fe002 \
         --with github.com/go-jose/go-jose/v3@v3.0.5 \
         --with github.com/go-jose/go-jose/v4@v4.1.4 \
-        --with google.golang.org/grpc@v1.80.0 \
+        --with google.golang.org/grpc@v1.81.0 \
         --with go.opentelemetry.io/otel@v1.43.0 \
         --with go.opentelemetry.io/otel/sdk@v1.43.0
 
-FROM caddy:2.11.3-alpine
+FROM docker.io/library/caddy:2.11.4-alpine@sha256:98eb57d882ccd5213d1688764db10c1ca2c58a1ca3a6717a3411ad798f7a423a
 
 RUN apk update && apk upgrade --no-cache && apk add --no-cache nss-tools bash curl
 
