@@ -417,7 +417,7 @@ global:
 Use a component's `image.pullSecrets` for a narrower credential. Worker, beat,
 and migrator Pods use `api.image.pullSecrets` because they run the API image.
 Public release images currently pull anonymously, so a GHCR credential is not
-required for `0.1.0-rc.45`.
+required for `0.1.0-rc.46`.
 
 ## Replicas and disruption budgets
 
@@ -444,7 +444,7 @@ spread, and a termination grace period. Component templates combine these values
 with their security constraints.
 
 Evaluation dependencies are fixed to `kubernetes.io/arch: amd64`. All application
-images in `0.1.0-rc.45` are also AMD64-only.
+images in `0.1.0-rc.46` are also AMD64-only.
 
 ## Evaluation storage
 

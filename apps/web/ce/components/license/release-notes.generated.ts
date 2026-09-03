@@ -11,10 +11,11 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.45",
+  version: "0.1.0-rc.46",
   highlights: [
-    "Trainer capacity changes send the CSRF proof the server requires.",
-    "Every part of workspace Home defaults is reachable again.",
+    "Google Calendar consent accepts Google's canonical email scope.",
+    "OAuth callback failures expose only fixed diagnostic codes to logs.",
+    "The proxy build is reproducible against immutable Caddy base images.",
   ],
   upstream: {
     version: "1.4.0",

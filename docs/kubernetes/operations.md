@@ -59,34 +59,38 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.44` to `rc.45`
+### Upgrade from `rc.45` to `rc.46`
 
-Upgrade directly from the immediately previous retained GitHub release, `rc.44`.
+Upgrade directly from the immediately previous retained GitHub release, `rc.45`.
 This release has no database migration and does not change Helm values, Secrets,
 storage, RBAC, NetworkPolicies, or public routes. Existing deployment
 configuration remains compatible.
 
-The web client now obtains a server-issued CSRF token before every trainer
-capacity mutation. This restores opting in, editing trainer availability,
-starting or disconnecting Google Calendar, selecting calendars, and saving or
-deleting a workshop schedule on deployments that enforce Django's CSRF checks.
-The workspace home-defaults page now uses the same bounded scroll container as
-the rest of workspace settings, so content below the viewport remains reachable.
+Google Calendar consent now accepts both the short `email` scope requested by
+Hangar and Google's canonical `userinfo.email` scope returned by the token
+endpoint. The `openid` and two Calendar scopes remain mandatory. Callback
+failures record only fixed diagnostic codes; values derived from the OAuth
+request, authorization code, and tokens are not logged.
 
-Deploy the web and API images together. After deploying, exercise one capacity
-mutation and confirm it succeeds without a CSRF rejection, then open workspace
-Home defaults at a short viewport height and confirm the page reaches its Save
-button by scrolling.
+The proxy image now uses Caddy 2.11.4 for both build and runtime stages. Both
+official base images are pinned to immutable Linux AMD64 manifest digests, and
+the explicit gRPC module pin is aligned with that Caddy patch release. This does
+not change the Caddyfile or any operator-facing proxy configuration.
+
+Deploy the release as one unit. After deploying, reconnect one trainer's Google
+Calendar account and confirm the callback reports `google=connected`, then
+verify the proxy serves HTTPS and WebSocket traffic normally.
 
 Before upgrading, back up PostgreSQL, record the current Helm revision, render
-the existing values against `0.1.0-rc.45`, and verify the signed tag, chart, image
-digests, and attestations. Rolling back to `rc.44` needs no schema reversal and
-restores only the two corrected web behaviours.
+the existing values against `0.1.0-rc.46`, and verify the signed tag, chart, image
+digests, and attestations. Rolling back to `rc.45` needs no schema reversal or
+configuration change, but restores the Google scope-alias rejection and the
+older floating Caddy base-image references.
 
-### Upgrade from `rc.27` to `rc.45`
+### Upgrade from `rc.27` to `rc.46`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
-Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.45`.
+Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.46`.
 
 This release closes two Todoist import admission gaps. Starting an import now
 requires a server-signed, 15-minute, single-use preview grant bound to the
@@ -106,13 +110,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.45`, its application version is
-   `v0.1.0-rc.45`, and its signatures and digests pass the
+2. confirm the target chart is `0.1.0-rc.46`, its application version is
+   `v0.1.0-rc.46`, and its signatures and digests pass the
    [release verification procedure](security.md#verify-release-010-rc39);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
-   `rc.27` and `rc.45` web or API images because their preview-execution request
+   `rc.27` and `rc.46` web or API images because their preview-execution request
    contract intentionally changed together.
 
 Wait for the revision-scoped migration Job to complete before admitting traffic.
@@ -125,7 +129,7 @@ also fail without creating a job or retaining a source object.
 target; the nullable column may remain in the database. It restores the preview
 bypass and duplicate-confirmation race, however, so it is not a
 security-equivalent rollback. Prefer a forward correction and return every
-application component to `rc.45` promptly.
+application component to `rc.46` promptly.
 
 ### Upgrade from `rc.26` to `rc.27`
 
