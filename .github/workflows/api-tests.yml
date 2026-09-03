@@ -27,25 +27,45 @@ jobs:
     outputs:
       api: ${{ steps.filter.outputs.api }}
     steps:
-      # Asked of the API rather than computed from a checkout: the answer is one
-      # request, and it needs no clone and no reasoning about how deep to fetch.
+      - name: Check out the pushed commits
+        if: github.event_name == 'push'
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+        with:
+          fetch-depth: 2
+          filter: blob:none
+
       - name: Decide whether the API changed
         id: filter
         env:
+          BEFORE_SHA: ${{ github.event.before }}
+          COMMIT_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          # Anything that is not a pull request — a push to preview, a manual
-          # run — gets the full suite rather than a guess.
-          if [ -z "${PR:-}" ]; then
+          if [ -n "${PR:-}" ]; then
+            changed=$(gh api --paginate "repos/$REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          elif [ "$EVENT_NAME" = "push" ]; then
+            # A normal preview push has both ends of the exact range available
+            # from the two-commit checkout. Fail open to the full suite for a
+            # new branch, force push, or any other incomplete history.
+            if [[ ! "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ "$BEFORE_SHA" =~ ^0{40}$ ]] ||
+              ! git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+              echo "Could not establish the pushed range; running all API tests."
+              echo "api=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            changed=$(git diff --name-only "$BEFORE_SHA" "$COMMIT_SHA")
+          else
+            # A manual run has no trustworthy comparison range.
             echo "api=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          changed=$(gh api --paginate "repos/$REPOSITORY/pulls/$PR/files" --jq '.[].filename')
           if printf '%s\n' "$changed" | grep -qE '^(apps/api/|docker-compose-test\.yml$|\.github/workflows/api-tests\.yml$)'; then
             echo "api=true" >> "$GITHUB_OUTPUT"
           else
@@ -185,4 +205,3 @@ jobs:
             echo "API tests did not complete successfully." >&2
             exit 1
           fi
-

@@ -60,10 +60,10 @@ jobs:
 
       - name: Check formatting
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm turbo run check:format --affected
-          else
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             pnpm turbo run check:format
+          else
+            pnpm turbo run check:format --affected
           fi
 
   # Build packages - required for lint and type checks
@@ -118,10 +118,10 @@ jobs:
 
       - name: Build packages
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm turbo run build --affected
-          else
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             pnpm turbo run build
+          else
+            pnpm turbo run build --affected
           fi
 
       - name: Save Turbo cache
@@ -172,10 +172,10 @@ jobs:
 
       - name: Run check:lint
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm turbo run check:lint --affected
-          else
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             pnpm turbo run check:lint
+          else
+            pnpm turbo run check:lint --affected
           fi
 
       - name: Check React runtime contracts
@@ -240,8 +240,8 @@ jobs:
 
       - name: Run check:types
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm turbo run check:types --affected
-          else
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             pnpm turbo run check:types
+          else
+            pnpm turbo run check:types --affected
           fi

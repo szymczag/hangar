@@ -527,7 +527,9 @@ jobs:
   chart:
     name: Publish Helm chart
     if: needs.setup.outputs.is_release == 'true'
-    needs: [setup, signing_tools, components, aio]
+    # The chart only resolves the five images it deploys. AIO is a separate
+    # distribution artifact, so qualifying the chart can run alongside its build.
+    needs: [setup, signing_tools, components]
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     outputs:
