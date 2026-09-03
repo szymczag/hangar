@@ -5,6 +5,9 @@
  */
 
 export default {
+  resolve: {
+    tsconfigPaths: true,
+  },
   test: {
     environment: "node",
     // Restricted to TypeScript suites. apps/web/tests/*.test.mjs are node:test
