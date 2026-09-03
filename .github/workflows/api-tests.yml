@@ -70,7 +70,7 @@ jobs:
       - name: Run API test suite
         run: |
           docker compose -f docker-compose-test.yml run --rm --build \
-            api-tests pytest \
+            api-tests pytest -m "not storage" \
             --ignore=plane/tests/contract/app/test_todoist_import_app.py \
             --ignore=plane/tests/unit/ext/test_import_storage.py \
             --ignore=plane/tests/unit/ext/test_todoist_import_execution.py \
@@ -121,6 +121,34 @@ jobs:
         if: always()
         run: docker compose -f docker-compose-test.yml down -v
 
+  storage-tests:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Generate API environment
+        run: |
+          cp apps/api/.env.example apps/api/.env
+          printf '\nSECRET_KEY="%s"\n' "$(openssl rand -hex 32)" >> apps/api/.env
+
+      # Every other storage test in the suite mocks S3Storage, which cannot
+      # answer whether an object was really written or who can read it back.
+      # These talk to the MinIO the compose file has always started and nothing
+      # has ever connected to.
+      - name: Run tests that use real object storage
+        run: |
+          docker compose -f docker-compose-test.yml run --rm --build \
+            api-tests pytest -m storage plane/tests/integration
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose-test.yml down -v
+
   security-migrations:
     needs: changes
     if: needs.changes.outputs.api == 'true'
@@ -153,7 +181,7 @@ jobs:
   # a front-end-only change is not held up by tests that had no reason to run.
   api-tests:
     name: API tests
-    needs: [changes, pytest, todoist-import, security-migrations]
+    needs: [changes, pytest, todoist-import, security-migrations, storage-tests]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -164,6 +192,7 @@ jobs:
           PYTEST_RESULT: ${{ needs.pytest.result }}
           TODOIST_RESULT: ${{ needs.todoist-import.result }}
           MIGRATIONS_RESULT: ${{ needs.security-migrations.result }}
+          STORAGE_RESULT: ${{ needs.storage-tests.result }}
         run: |
           set -euo pipefail
 
@@ -172,7 +201,8 @@ jobs:
             "changes=$CHANGES_RESULT" \
             "pytest=$PYTEST_RESULT" \
             "todoist-import=$TODOIST_RESULT" \
-            "security-migrations=$MIGRATIONS_RESULT"; do
+            "security-migrations=$MIGRATIONS_RESULT" \
+            "storage-tests=$STORAGE_RESULT"; do
             name="${entry%%=*}"
             result="${entry#*=}"
             case "$result" in
