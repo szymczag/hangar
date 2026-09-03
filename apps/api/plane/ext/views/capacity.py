@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import logging
 import secrets
 from datetime import date, timedelta
 from urllib.parse import urlencode
@@ -59,6 +60,21 @@ CALENDAR_SCOPES = {
     "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
     "https://www.googleapis.com/auth/calendar.events.freebusy",
 }
+EMAIL_SCOPE_ALIASES = {
+    "email",
+    "https://www.googleapis.com/auth/userinfo.email",
+}
+REQUIRED_CALENDAR_SCOPES = CALENDAR_SCOPES - {"email"}
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_granted_scopes(scope: object) -> set[str]:
+    return set(scope.split()) if isinstance(scope, str) else set()
+
+
+def _has_required_calendar_scopes(granted: set[str]) -> bool:
+    return REQUIRED_CALENDAR_SCOPES.issubset(granted) and not EMAIL_SCOPE_ALIASES.isdisjoint(granted)
 
 
 def _audit(request, *, workspace_id, action, trainer_id=None, issue_id=None, metadata=None):
@@ -341,8 +357,8 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
             token = client.exchange_code(
                 code=request.GET["code"], redirect_uri=redirect_uri, code_verifier=transaction_data["code_verifier"]
             )
-            granted = set(str(token.get("scope", "")).split())
-            if not CALENDAR_SCOPES.issubset(granted):
+            granted = _parse_granted_scopes(token.get("scope"))
+            if not _has_required_calendar_scopes(granted):
                 raise GoogleCalendarError("missing_scopes")
             userinfo = client.userinfo(token["access_token"])
             existing = GoogleCalendarCredential.objects.filter(user=request.user, google_subject=userinfo["id"]).first()
@@ -370,7 +386,21 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                 trainer_id=trainer.user_id,
                 action=CapacityAuditEvent.Action.GOOGLE_CONNECTED,
             )
-        except (GoogleCalendarError, KeyError, ValueError):
+        except GoogleCalendarError as exc:
+            logger.warning(
+                "Google Calendar OAuth callback failed",
+                extra={"error_code": exc.code, "workspace_slug": slug},
+            )
+            return HttpResponseRedirect(failure)
+        except (KeyError, ValueError) as exc:
+            logger.warning(
+                "Google Calendar OAuth callback returned an invalid token response",
+                extra={
+                    "error_code": "invalid_token_response",
+                    "error_type": type(exc).__name__,
+                    "workspace_slug": slug,
+                },
+            )
             return HttpResponseRedirect(failure)
         return HttpResponseRedirect(f"/{slug}/capacity?google=connected")
 

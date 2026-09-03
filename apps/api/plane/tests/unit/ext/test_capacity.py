@@ -16,6 +16,16 @@ from plane.ext.capacity.calculation import _google_busy, _intersections, _merge,
 from plane.ext.capacity.crypto import decrypt_value, encrypt_value
 from plane.ext.capacity.schedules import validate_intervals, validate_weekly_schedule
 from plane.ext.models import GoogleCalendarCredential
+from plane.ext.views.capacity import (
+    _has_required_calendar_scopes,
+    _parse_granted_scopes,
+)
+
+REQUIRED_SCOPES = {
+    "openid",
+    "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+    "https://www.googleapis.com/auth/calendar.events.freebusy",
+}
 
 
 def test_calendar_credential_round_trip_and_key_rotation(settings):
@@ -37,6 +47,48 @@ def test_calendar_credential_configuration_fails_closed(settings):
 
     with pytest.raises(ImproperlyConfigured):
         encrypt_value("refresh-token")
+
+
+@pytest.mark.parametrize(
+    "email_scope",
+    [
+        "email",
+        "https://www.googleapis.com/auth/userinfo.email",
+    ],
+)
+def test_google_calendar_scopes_accept_email_aliases_and_additional_grants(email_scope):
+    granted = REQUIRED_SCOPES | {email_scope, "https://www.googleapis.com/auth/calendar.readonly"}
+
+    assert _has_required_calendar_scopes(granted)
+
+
+def test_google_calendar_scopes_accept_both_email_aliases():
+    granted = REQUIRED_SCOPES | {
+        "email",
+        "https://www.googleapis.com/auth/userinfo.email",
+    }
+
+    assert _has_required_calendar_scopes(granted)
+
+
+@pytest.mark.parametrize("missing_scope", [None, *sorted(REQUIRED_SCOPES)])
+def test_google_calendar_scopes_reject_missing_required_grants(missing_scope):
+    granted = REQUIRED_SCOPES | {"email"}
+    if missing_scope is None:
+        granted.remove("email")
+    else:
+        granted.remove(missing_scope)
+
+    assert not _has_required_calendar_scopes(granted)
+
+
+@pytest.mark.parametrize("scope", [None, [], {"email"}, 42])
+def test_google_calendar_scope_parser_rejects_non_string_values(scope):
+    assert _parse_granted_scopes(scope) == set()
+
+
+def test_google_calendar_scope_parser_splits_space_delimited_response():
+    assert _parse_granted_scopes("openid  email\ncalendar") == {"openid", "email", "calendar"}
 
 
 def test_schedule_validation_normalizes_and_rejects_overlap():
