@@ -18,6 +18,7 @@ import { Loader } from "@plane/ui";
 import { cn } from "@plane/utils";
 // components
 import { PageHead } from "@/components/core/page-title";
+import { SettingsContentWrapper } from "@/components/settings/content-wrapper";
 
 const service = new WorkspaceDefaultsService();
 
@@ -131,16 +132,18 @@ const HomeDefaultsSettingsPage = observer(function HomeDefaultsSettingsPage() {
 
   if (!data) {
     return (
-      <Loader className="space-y-6 p-6">
-        <Loader.Item height="40px" width="30%" />
-        <Loader.Item height="180px" />
-        <Loader.Item height="140px" />
-      </Loader>
+      <SettingsContentWrapper>
+        <Loader className="space-y-6 p-6">
+          <Loader.Item height="40px" width="30%" />
+          <Loader.Item height="180px" />
+          <Loader.Item height="140px" />
+        </Loader>
+      </SettingsContentWrapper>
     );
   }
 
   return (
-    <>
+    <SettingsContentWrapper>
       <PageHead title={heading} />
       <div className="flex w-full max-w-3xl flex-col gap-10 py-6">
         <header className="flex flex-col gap-1">
@@ -290,7 +293,7 @@ const HomeDefaultsSettingsPage = observer(function HomeDefaultsSettingsPage() {
           </Button>
         </div>
       </div>
-    </>
+    </SettingsContentWrapper>
   );
 });
 
