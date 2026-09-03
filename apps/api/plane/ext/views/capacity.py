@@ -387,19 +387,16 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                 action=CapacityAuditEvent.Action.GOOGLE_CONNECTED,
             )
         except GoogleCalendarError as exc:
+            error_code = "missing_scopes" if exc.code == "missing_scopes" else "google_calendar_error"
             logger.warning(
                 "Google Calendar OAuth callback failed",
-                extra={"error_code": exc.code, "workspace_slug": slug},
+                extra={"error_code": error_code},
             )
             return HttpResponseRedirect(failure)
-        except (KeyError, ValueError) as exc:
+        except (KeyError, ValueError):
             logger.warning(
                 "Google Calendar OAuth callback returned an invalid token response",
-                extra={
-                    "error_code": "invalid_token_response",
-                    "error_type": type(exc).__name__,
-                    "workspace_slug": slug,
-                },
+                extra={"error_code": "invalid_token_response"},
             )
             return HttpResponseRedirect(failure)
         return HttpResponseRedirect(f"/{slug}/capacity?google=connected")

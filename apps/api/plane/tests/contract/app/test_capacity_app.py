@@ -159,7 +159,6 @@ def test_google_calendar_callback_rejects_missing_email_scope_without_logging_se
     assert not CapacityAuditEvent.objects.filter(action=CapacityAuditEvent.Action.GOOGLE_CONNECTED).exists()
     record = caplog.records[-1]
     assert record.error_code == "missing_scopes"
-    assert record.workspace_slug == workspace.slug
     assert "secret-authorization-code" not in caplog.text
     assert "secret-access-token" not in caplog.text
     assert "secret-refresh-token" not in caplog.text
@@ -189,6 +188,5 @@ def test_google_calendar_callback_logs_malformed_token_response(settings, worksp
     assert response.url == f"/{workspace.slug}/capacity?google=failed"
     record = caplog.records[-1]
     assert record.error_code == "invalid_token_response"
-    assert record.error_type == "KeyError"
     assert "secret-authorization-code" not in caplog.text
     assert "secret-refresh-token" not in caplog.text
