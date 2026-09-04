@@ -81,6 +81,21 @@ export type TWorkshopSchedule = {
 export type TWorkshopScheduleInput = {
   sessions: Array<Omit<TWorkshopSession, "id">>;
 };
+export type TWorkshopPlanDraftInput = {
+  title: string;
+  duration_minutes: number;
+  preparation_minutes: number;
+  travel_before_minutes: number;
+  travel_after_minutes: number;
+  window_starts_at: string;
+  window_ends_at: string;
+  trainer_ids: string[];
+};
+export type TWorkshopPlanDraft = TWorkshopPlanDraftInput & {
+  id: string;
+  revision: number;
+  updated_at: string;
+};
 
 export class CapacityRequestError extends Error {
   constructor(
@@ -212,6 +227,44 @@ export class CapacityService extends APIService {
           parseRetryAfterSeconds(response?.headers?.["retry-after"])
         );
       });
+  }
+
+  listWorkshopPlanDrafts(workspaceSlug: string) {
+    return this.data<{ results: TWorkshopPlanDraft[] }>(this.get(`/api/workspaces/${workspaceSlug}/capacity/plans/`));
+  }
+
+  async createWorkshopPlanDraft(workspaceSlug: string, payload: TWorkshopPlanDraftInput) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopPlanDraft>(
+      this.post(`/api/workspaces/${workspaceSlug}/capacity/plans/`, payload, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
+  }
+
+  async updateWorkshopPlanDraft(
+    workspaceSlug: string,
+    draftId: string,
+    revision: number,
+    payload: TWorkshopPlanDraftInput
+  ) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopPlanDraft>(
+      this.put(
+        `/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/`,
+        { ...payload, revision },
+        {
+          headers: { "X-CSRFTOKEN": csrfToken },
+        }
+      )
+    );
+  }
+
+  async deleteWorkshopPlanDraft(workspaceSlug: string, draftId: string) {
+    const csrfToken = await this.csrfToken();
+    return this.delete(`/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/`, undefined, {
+      headers: { "X-CSRFTOKEN": csrfToken },
+    });
   }
 
   getWorkshopSchedule(workspaceSlug: string, projectId: string, issueId: string) {

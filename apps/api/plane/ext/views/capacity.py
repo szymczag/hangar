@@ -44,6 +44,7 @@ from plane.ext.models import (
     GoogleCalendarCredential,
     TrainerCalendarSelection,
     TrainerProfile,
+    WorkshopPlanDraft,
     WorkshopSchedule,
     WorkshopSession,
 )
@@ -540,6 +541,156 @@ class WorkspaceCapacityEndpoint(BaseAPIView):
                 ),
             }
         )
+
+
+def _draft_payload(draft):
+    return {
+        "id": str(draft.id),
+        "title": draft.title,
+        "duration_minutes": draft.duration_minutes,
+        "preparation_minutes": draft.preparation_minutes,
+        "travel_before_minutes": draft.travel_before_minutes,
+        "travel_after_minutes": draft.travel_after_minutes,
+        "window_starts_at": draft.window_starts_at.isoformat(),
+        "window_ends_at": draft.window_ends_at.isoformat(),
+        "trainer_ids": draft.trainer_ids,
+        "revision": draft.revision,
+        "updated_at": draft.updated_at.isoformat(),
+    }
+
+
+def _validate_draft(request, workspace):
+    title = request.data.get("title")
+    if not isinstance(title, str) or not title.strip() or len(title.strip()) > 255:
+        return None, Response({"error": "title must contain between 1 and 255 characters."}, status=400)
+    values = {"title": title.strip()}
+    for field, minimum, maximum in (
+        ("duration_minutes", 15, 10080),
+        ("preparation_minutes", 0, 1440),
+        ("travel_before_minutes", 0, 1440),
+        ("travel_after_minutes", 0, 1440),
+    ):
+        try:
+            value = int(request.data.get(field, 0))
+        except (TypeError, ValueError):
+            return None, Response({"error": f"{field} must be an integer."}, status=400)
+        if not minimum <= value <= maximum:
+            return None, Response({"error": f"{field} must be between {minimum} and {maximum}."}, status=400)
+        values[field] = value
+    window_start = parse_datetime(request.data.get("window_starts_at", ""))
+    window_end = parse_datetime(request.data.get("window_ends_at", ""))
+    if (
+        not window_start
+        or not window_end
+        or timezone.is_naive(window_start)
+        or timezone.is_naive(window_end)
+        or window_start >= window_end
+        or window_end - window_start > timedelta(days=14)
+    ):
+        return None, Response({"error": "A valid planning window of at most 14 days is required."}, status=400)
+    raw_trainer_ids = request.data.get("trainer_ids")
+    if not isinstance(raw_trainer_ids, list) or not 1 <= len(raw_trainer_ids) <= 25:
+        return None, Response({"error": "Select between 1 and 25 trainers."}, status=400)
+    try:
+        trainer_ids = sorted({str(UUID(str(value))) for value in raw_trainer_ids})
+    except (TypeError, ValueError, AttributeError):
+        return None, Response({"error": "trainer_ids must contain valid UUIDs."}, status=400)
+    active_ids = set(
+        TrainerProfile.objects.filter(workspace=workspace, status="active", user_id__in=trainer_ids).values_list(
+            "user_id", flat=True
+        )
+    )
+    if active_ids != {UUID(value) for value in trainer_ids}:
+        return None, Response({"error": "Every selected trainer must be active in this workspace."}, status=400)
+    values.update({"window_starts_at": window_start, "window_ends_at": window_end, "trainer_ids": trainer_ids})
+    return values, None
+
+
+class WorkshopPlanDraftListEndpoint(BaseAPIView):
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def get(self, request, slug):
+        if response := _disabled():
+            return response
+        drafts = WorkshopPlanDraft.objects.filter(workspace__slug=slug, owner=request.user)[:50]
+        return Response({"results": [_draft_payload(draft) for draft in drafts]})
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
+    def post(self, request, slug):
+        if response := _disabled():
+            return response
+        workspace = Workspace.objects.get(slug=slug)
+        values, error = _validate_draft(request, workspace)
+        if error:
+            return error
+        draft = WorkshopPlanDraft.objects.create(
+            workspace=workspace, owner=request.user, created_by=request.user, updated_by=request.user, **values
+        )
+        _audit(
+            request,
+            workspace_id=workspace.id,
+            action=CapacityAuditEvent.Action.PLAN_DRAFT_CREATED,
+            metadata={"draft_id": str(draft.id)},
+        )
+        return Response(_draft_payload(draft), status=status.HTTP_201_CREATED)
+
+
+class WorkshopPlanDraftDetailEndpoint(BaseAPIView):
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @staticmethod
+    def _draft(request, slug, draft_id):
+        return get_object_or_404(WorkshopPlanDraft, workspace__slug=slug, owner=request.user, pk=draft_id)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
+    def put(self, request, slug, draft_id):
+        if response := _disabled():
+            return response
+        draft = get_object_or_404(
+            WorkshopPlanDraft.objects.select_for_update(), workspace__slug=slug, owner=request.user, pk=draft_id
+        )
+        try:
+            revision = int(request.data.get("revision"))
+        except (TypeError, ValueError):
+            return Response({"error": "revision is required."}, status=400)
+        if revision != draft.revision:
+            return Response(
+                {"error": "Draft changed after you opened it.", "revision": draft.revision},
+                status=status.HTTP_409_CONFLICT,
+            )
+        values, error = _validate_draft(request, draft.workspace)
+        if error:
+            return error
+        for field, value in values.items():
+            setattr(draft, field, value)
+        draft.revision += 1
+        draft.updated_by = request.user
+        draft.save()
+        _audit(
+            request,
+            workspace_id=draft.workspace_id,
+            action=CapacityAuditEvent.Action.PLAN_DRAFT_UPDATED,
+            metadata={"draft_id": str(draft.id), "revision": draft.revision},
+        )
+        return Response(_draft_payload(draft))
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
+    def delete(self, request, slug, draft_id):
+        if response := _disabled():
+            return response
+        draft = self._draft(request, slug, draft_id)
+        draft.delete(soft=False)
+        _audit(
+            request,
+            workspace_id=draft.workspace_id,
+            action=CapacityAuditEvent.Action.PLAN_DRAFT_REMOVED,
+            metadata={"draft_id": str(draft.id)},
+        )
+        return Response(status=204)
 
 
 class WorkshopScheduleEndpoint(BaseAPIView):

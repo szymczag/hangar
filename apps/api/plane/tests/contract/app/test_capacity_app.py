@@ -12,7 +12,7 @@ from django.apps import apps as django_apps
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from plane.db.models import Issue, IssueAssignee, Project, ProjectMember, State
+from plane.db.models import Issue, IssueAssignee, Project, ProjectMember, State, WorkspaceMember
 from plane.ext.models import (
     CapacityAuditEvent,
     GoogleCalendarCredential,
@@ -20,6 +20,7 @@ from plane.ext.models import (
     TrainerProfile,
     WorkshopSchedule,
     WorkshopSession,
+    WorkshopPlanDraft,
 )
 from plane.ext.capacity import GoogleCalendarError, decrypt_value, encrypt_value
 from plane.ext.views import capacity as capacity_views
@@ -293,6 +294,51 @@ def test_workshop_session_rejects_a_trainer_who_is_not_an_assignee(settings, wor
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data == {"error": "Every trainer in session 1 must be an active Workshop assignee."}
     assert not WorkshopSchedule.objects.filter(issue=issue).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_workshop_plan_drafts_are_private_and_revision_protected(settings, workspace, create_user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    payload = {
+        "title": "NetSec workshop",
+        "duration_minutes": 240,
+        "preparation_minutes": 30,
+        "travel_before_minutes": 60,
+        "travel_after_minutes": 60,
+        "window_starts_at": "2026-09-07T00:00:00+02:00",
+        "window_ends_at": "2026-09-14T00:00:00+02:00",
+        "trainer_ids": [str(create_user.id)],
+    }
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+    collection_url = f"/api/workspaces/{workspace.slug}/capacity/plans/"
+
+    created = client.post(collection_url, payload, format="json", HTTP_X_CSRFTOKEN=csrf)
+
+    assert created.status_code == status.HTTP_201_CREATED
+    assert created.data["title"] == "NetSec workshop"
+    assert created.data["revision"] == 1
+    detail_url = f"{collection_url}{created.data['id']}/"
+    stale = client.put(detail_url, {**payload, "revision": 0}, format="json", HTTP_X_CSRFTOKEN=csrf)
+    assert stale.status_code == status.HTTP_409_CONFLICT
+    assert stale.data["revision"] == 1
+
+    outsider = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=outsider, role=15)
+    outsider_client = APIClient(enforce_csrf_checks=True)
+    outsider_client.force_login(outsider)
+    outsider_csrf = outsider_client.get("/auth/get-csrf-token/").data["csrf_token"]
+    assert outsider_client.get(collection_url).data == {"results": []}
+    assert (
+        outsider_client.put(
+            detail_url, {**payload, "revision": 1}, format="json", HTTP_X_CSRFTOKEN=outsider_csrf
+        ).status_code
+        == status.HTTP_404_NOT_FOUND
+    )
+    assert WorkshopPlanDraft.objects.filter(owner=create_user, workspace=workspace).count() == 1
 
 
 @pytest.mark.contract

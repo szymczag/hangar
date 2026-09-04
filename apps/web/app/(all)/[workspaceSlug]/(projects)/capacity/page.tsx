@@ -33,6 +33,7 @@ import {
   intervalPosition,
   rangeMinutes,
 } from "./capacity-timeline.utils";
+import { WorkshopPlanner } from "./workshop-planner";
 
 const capacityService = new CapacityService();
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
@@ -585,6 +586,14 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
     <div className="h-full overflow-y-auto bg-surface-2">
       <PageHead title="Trainer capacity" />
       <div className="mx-auto flex max-w-[1440px] flex-col gap-5 p-4 md:p-6">
+        {capacity?.trainers.length ? (
+          <WorkshopPlanner
+            workspaceSlug={workspaceSlug}
+            trainers={capacity.trainers}
+            weekStart={weekStart}
+            weekEnd={weekEnd}
+          />
+        ) : null}
         <section className="overflow-hidden rounded-xl border border-subtle bg-surface-1">
           <div className="flex flex-col justify-between gap-4 border-b border-subtle px-5 py-5 md:flex-row md:items-end">
             <div>
