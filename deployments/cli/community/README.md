@@ -177,7 +177,7 @@ Below are the most import keys you must refer to. _<span style="color: #fcba03">
 > newest key first. Hangar stores encrypted refresh tokens and calendar IDs;
 > event names and descriptions are never requested or persisted.
 > `CALENDAR_CAPACITY_USER_RATE` and `CALENDAR_CAPACITY_WORKSPACE_RATE` default
-> to `10/minute` and `30/minute`; requests are also capped at 25 trainers and
+> to `20/minute` and `60/minute`; requests are also capped at 25 trainers and
 > 14 days. Admission fails closed if Valkey is unavailable.
 
 There are many other settings you can play with, but we suggest you configure `EMAIL SETTINGS` as it will enable you to invite your teammates onto the platform.

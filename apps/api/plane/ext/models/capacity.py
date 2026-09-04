@@ -15,7 +15,16 @@ from plane.db.models.base import BaseModel
 
 
 def empty_week():
+    """Retained for historical migrations."""
     return {day: [] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")}
+
+
+def default_working_week():
+    working_day = [{"start": "09:00", "end": "22:00"}]
+    return {
+        day: ([dict(working_day[0])] if day not in ("sat", "sun") else [])
+        for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+    }
 
 
 class ImmutableCapacityAuditEventQuerySet(models.QuerySet):
@@ -71,7 +80,7 @@ class TrainerProfile(BaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="trainer_profiles")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     timezone = models.CharField(max_length=255, default="UTC")
-    weekly_schedule = models.JSONField(default=empty_week)
+    weekly_schedule = models.JSONField(default=default_working_week)
     schedule_revision = models.PositiveBigIntegerField(default=1)
 
     class Meta:
@@ -84,28 +93,6 @@ class TrainerProfile(BaseModel):
             )
         ]
         indexes = [models.Index(fields=["workspace", "status"], name="ext_trainer_ws_status_idx")]
-
-
-class TrainerScheduleException(BaseModel):
-    class Mode(models.TextChoices):
-        UNAVAILABLE = "unavailable", "Unavailable"
-        OVERRIDE = "override", "Override"
-
-    trainer = models.ForeignKey(TrainerProfile, on_delete=models.CASCADE, related_name="schedule_exceptions")
-    local_date = models.DateField()
-    mode = models.CharField(max_length=16, choices=Mode.choices)
-    intervals = models.JSONField(default=list, blank=True)
-
-    class Meta:
-        db_table = "ext_trainer_schedule_exceptions"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["trainer", "local_date"],
-                condition=Q(deleted_at__isnull=True),
-                name="ext_trainer_exception_unique_date",
-            )
-        ]
-        indexes = [models.Index(fields=["trainer", "local_date"], name="ext_trainer_exc_date_idx")]
 
 
 class GoogleCalendarCredential(BaseModel):

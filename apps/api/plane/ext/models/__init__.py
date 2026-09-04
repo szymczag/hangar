@@ -35,7 +35,6 @@ from .capacity import (
     GoogleCalendarCredential,
     TrainerCalendarSelection,
     TrainerProfile,
-    TrainerScheduleException,
     WorkshopSchedule,
 )
 
@@ -69,6 +68,5 @@ __all__ = [
     "CapacityAuditEvent",
     "TrainerCalendarSelection",
     "TrainerProfile",
-    "TrainerScheduleException",
     "WorkshopSchedule",
 ]

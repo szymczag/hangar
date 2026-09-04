@@ -8,7 +8,6 @@ import { API_BASE_URL } from "@plane/constants";
 import { APIService } from "@/services/api.service";
 
 export type TScheduleInterval = { start: string; end: string };
-export type TTrainerException = { date: string; mode: "unavailable" | "override"; intervals: TScheduleInterval[] };
 export type TTrainerProfile = {
   id: string;
   user_id: string;
@@ -18,7 +17,6 @@ export type TTrainerProfile = {
   weekly_schedule: Record<string, TScheduleInterval[]>;
   schedule_revision: number;
   connection_status: string;
-  exceptions: TTrainerException[];
 };
 export type TCapacityInterval = {
   start: string;
@@ -65,6 +63,25 @@ export type TWorkshopSchedule = {
   travel_before_minutes: number;
   travel_after_minutes: number;
 };
+
+export class CapacityRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly retryAfterSeconds?: number
+  ) {
+    super(message);
+    this.name = "CapacityRequestError";
+  }
+}
+
+function parseRetryAfterSeconds(value: unknown): number | undefined {
+  if (typeof value !== "string") return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? undefined : Math.max(0, Math.ceil((at - Date.now()) / 1000));
+}
 
 export class CapacityService extends APIService {
   constructor() {
@@ -160,11 +177,23 @@ export class CapacityService extends APIService {
   }
 
   getCapacity(workspaceSlug: string, from: string, to: string, trainerIds: string[]) {
-    return this.data<TCapacityResponse>(
-      this.get(`/api/workspaces/${workspaceSlug}/capacity/`, {
-        params: { from, to, trainer_ids: trainerIds.join(",") },
-      })
-    );
+    return this.get(`/api/workspaces/${workspaceSlug}/capacity/`, {
+      params: { from, to, trainer_ids: trainerIds.join(",") },
+    })
+      .then((response) => response.data as TCapacityResponse)
+      .catch((error) => {
+        const response = error?.response;
+        const payload = response?.data;
+        const message =
+          (typeof payload?.error === "string" && payload.error) ||
+          (typeof payload?.detail === "string" && payload.detail) ||
+          "Capacity could not be loaded.";
+        throw new CapacityRequestError(
+          message,
+          typeof response?.status === "number" ? response.status : undefined,
+          parseRetryAfterSeconds(response?.headers?.["retry-after"])
+        );
+      });
   }
 
   getWorkshopSchedule(workspaceSlug: string, projectId: string, issueId: string) {

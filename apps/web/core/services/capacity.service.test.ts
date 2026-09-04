@@ -6,7 +6,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CapacityService, type TTrainerProfile, type TWorkshopSchedule } from "./capacity.service";
+import {
+  CapacityRequestError,
+  CapacityService,
+  type TTrainerProfile,
+  type TWorkshopSchedule,
+} from "./capacity.service";
 
 const csrfToken = "server-issued-csrf-token";
 const csrfHeaders = { headers: { "X-CSRFTOKEN": csrfToken } };
@@ -118,5 +123,27 @@ describe("CapacityService CSRF requests", () => {
 
     await expect(service.optIn("workspace")).rejects.toThrow("CSRF token not found");
     expect(post).not.toHaveBeenCalled();
+  });
+
+  it("retains status, DRF detail, and Retry-After for capacity throttling", async () => {
+    vi.mocked(service.get).mockRejectedValue({
+      response: {
+        status: 429,
+        data: { detail: "Request was throttled." },
+        headers: { "retry-after": "12" },
+      },
+    });
+
+    const error = await service
+      .getCapacity("workspace", "2026-09-07T00:00:00Z", "2026-09-14T00:00:00Z", [])
+      .catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(CapacityRequestError);
+    expect(error).toMatchObject({
+      name: "CapacityRequestError",
+      message: "Request was throttled.",
+      status: 429,
+      retryAfterSeconds: 12,
+    });
   });
 });

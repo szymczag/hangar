@@ -129,6 +129,7 @@ export function WorkshopScheduleProperty({ workspaceSlug, projectId, issueId, is
     <SidebarPropertyListItem icon={CalendarClock} label="Workshop schedule">
       <div className="space-y-2 rounded-md border border-subtle bg-surface-2 p-2">
         <p className="text-11 text-placeholder">Times shown in {viewerTimezone}</p>
+        <p className="text-11 text-placeholder">Every assignee must have an active trainer profile.</p>
         <label className="block text-11 text-secondary">
           Starts
           <input

@@ -16,6 +16,7 @@ from plane.ext.capacity.calculation import _google_busy, _intersections, _merge,
 from plane.ext.capacity.crypto import decrypt_value, encrypt_value
 from plane.ext.capacity.schedules import validate_intervals, validate_weekly_schedule
 from plane.ext.models import GoogleCalendarCredential
+from plane.ext.models.capacity import default_working_week
 from plane.ext.views.capacity import (
     _has_required_calendar_scopes,
     _parse_granted_scopes,
@@ -104,6 +105,14 @@ def test_schedule_validation_normalizes_and_rejects_overlap():
 def test_weekly_schedule_requires_every_day():
     with pytest.raises(ValidationError, match="exactly"):
         validate_weekly_schedule({"mon": []})
+
+
+def test_default_working_week_covers_weekdays_from_nine_to_twenty_two():
+    schedule = default_working_week()
+
+    assert all(schedule[day] == [{"start": "09:00", "end": "22:00"}] for day in ("mon", "tue", "wed", "thu", "fri"))
+    assert schedule["sat"] == []
+    assert schedule["sun"] == []
 
 
 def test_capacity_interval_math_unions_before_subtraction():
