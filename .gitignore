@@ -109,12 +109,19 @@ build/
 build/
 .react-router/
 temp/
+# Two things about this pattern, both learned the hard way.
+#
 # Bare `scripts/` matches a directory of that name at *any* depth, not just the
 # one at the root -- which silently kept apps/visual-tests/scripts out of the
-# repository, so CI ran a lint script that was not there. Anchored to the root,
-# with the handful of tracked files named so the pre-commit hook can stage the
-# formatting it applies to them; it aborts on a path git refuses.
-/scripts/
+# repository, so CI ran a lint script that was not there. Hence the leading
+# slash.
+#
+# And `/scripts/` excludes the *directory*, which git will not descend into, so
+# the negations below could not re-include anything: `git add scripts` was
+# refused, and the pre-commit hook aborts its whole run on a path git refuses --
+# silently dropping the formatting it had just applied to every other file.
+# `/scripts/*` excludes the contents instead, which leaves the negations working.
+/scripts/*
 !scripts/branding-allowlist.json
 !scripts/check-branding.mjs
 !scripts/check-branding.test.mjs
