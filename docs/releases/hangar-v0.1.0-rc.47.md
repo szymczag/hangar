@@ -23,8 +23,6 @@ modal now renders the project type selector, including the canonical Workshop ty
 when capacity is active. Workshop scheduling remains available in the issue
 sidebar and requires every assignee to have an active trainer profile.
 
-## Testing
-
 Project description-image copying now has a real object-storage integration test.
 The test writes and reads an object through MinIO using an independent client,
 proves that the copied asset uses a different object key, and verifies that a
