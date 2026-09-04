@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import type { StorybookConfig } from "@storybook/react-webpack5";
+import type { StorybookConfig } from "@storybook/react-vite";
 
 import { createRequire } from "module";
 import { join, dirname } from "path";
@@ -20,16 +20,16 @@ function getAbsolutePath(value: string): any {
 }
 const config: StorybookConfig = {
   stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
-  addons: [
-    getAbsolutePath("@storybook/addon-webpack5-compiler-swc"),
-    getAbsolutePath("@storybook/addon-onboarding"),
-    getAbsolutePath("@storybook/addon-links"),
-    getAbsolutePath("@storybook/addon-docs"),
-    getAbsolutePath("@chromatic-com/storybook"),
-    "@storybook/addon-styling-webpack",
-  ],
+  addons: [getAbsolutePath("@storybook/addon-links"), getAbsolutePath("@storybook/addon-docs")],
   framework: {
-    name: getAbsolutePath("@storybook/react-webpack5"),
+    // Vite, matching packages/propel. The webpack builder this used to name has
+    // no postcss step: its default CSS rule is style-loader + css-loader only,
+    // and the `@storybook/addon-styling-webpack` that was meant to supply one
+    // was registered as a bare string with no options, which makes it a no-op.
+    // Tailwind therefore never ran, which is why this Storybook depended on a
+    // pre-built stylesheet that nothing built. Vite picks up postcss.config.js
+    // on its own, so the source CSS is processed with no wiring at all.
+    name: getAbsolutePath("@storybook/react-vite"),
     options: {},
   },
 };
