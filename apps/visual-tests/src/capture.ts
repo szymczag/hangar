@@ -55,3 +55,25 @@ export async function settled(dialog: Locator): Promise<void> {
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveCSS("opacity", "1");
 }
+
+/**
+ * Open an instance-console page and wait for it to be a page rather than a
+ * skeleton.
+ *
+ * Every console page is `formattedConfig ? <Form/> : <Loader/>`, and the header
+ * above that ternary renders immediately either way. So "the heading is
+ * visible" is true while the body is still three grey rectangles -- which is
+ * precisely how the first version of the god-mode story came to record the
+ * console's *error* screen as its baseline.
+ *
+ * Two assertions, in this order. `ready` must be something only the loaded form
+ * produces, and it is asserted first because it is the one that actually waits:
+ * a page that has not rendered yet has no skeleton either, so the count check
+ * alone would pass on an empty document. `<Loader>` carries `role="status"`
+ * (packages/ui/src/loader.tsx), and nothing else in the console does.
+ */
+export async function consolePage(page: Page, path: string, ready: Locator): Promise<void> {
+  await page.goto(path);
+  await expect(ready).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(0);
+}

@@ -29,7 +29,14 @@ import process from "node:process";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const COMPOSE_FILE = "docker-compose-visual.yml";
-const WEB_ASSETS = path.join(ROOT, "apps/web/build/client/assets");
+// Both SPAs, because both bake their own base URLs in and both are served by
+// the edge. Checking only the web app let a stale admin bundle through that was
+// still calling http://localhost:8000, and the symptom was the console showing
+// "Unable to fetch instance details" on a screen nobody had a baseline for yet.
+const BUILDS = [
+  ["web", path.join(ROOT, "apps/web/build/client/assets")],
+  ["admin", path.join(ROOT, "apps/admin/build/client/assets")],
+];
 
 // Same origin for everything: the edge routes /api, /god-mode and / itself.
 const SAME_ORIGIN_ENV = {
@@ -85,20 +92,23 @@ function composeCommand() {
  * readiness locator -- points at the specs instead of at the build.
  */
 function assertBundleIsSameOrigin() {
-  if (!existsSync(WEB_ASSETS)) throw new Error(`No web build at ${WEB_ASSETS}.`);
+  for (const [app, assets] of BUILDS) {
+    if (!existsSync(assets)) throw new Error(`No ${app} build at ${assets}.`);
 
-  const offenders = readdirSync(WEB_ASSETS)
-    .filter((f) => f.endsWith(".js"))
-    .filter((f) =>
-      /https?:\/\/localhost:(8000|3000|3001|3002|3100)/.test(readFileSync(path.join(WEB_ASSETS, f), "utf8"))
-    );
+    const offenders = readdirSync(assets)
+      .filter((f) => f.endsWith(".js"))
+      .filter((f) =>
+        /https?:\/\/localhost:(8000|3000|3001|3002|3100)/.test(readFileSync(path.join(assets, f), "utf8"))
+      );
 
-  if (offenders.length > 0) {
-    throw new Error(
-      `The web bundle has an absolute base URL baked in (${offenders.slice(0, 3).join(", ")}).\n` +
-        "It was built without this script's environment and would talk to a host that\n" +
-        "does not exist in the VR network. Delete apps/web/build and re-run `pnpm vr`."
-    );
+    if (offenders.length > 0) {
+      throw new Error(
+        `The ${app} bundle has an absolute base URL baked in (${offenders.slice(0, 3).join(", ")}).\n` +
+          "It was built without this script's environment, or restored from a cache entry\n" +
+          "that was, and would talk to a host that does not exist in the VR network.\n" +
+          `Run \`pnpm turbo run build --filter=${app} --force\` and re-run \`pnpm vr\`.`
+      );
+    }
   }
 }
 
