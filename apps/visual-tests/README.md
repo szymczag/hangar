@@ -41,8 +41,15 @@ Both go through `scripts/vr.mjs`, and that is the only supported entry point.
 time. Inside the VR network that host does not exist, so the app renders its
 "didn't start correctly" page — and a baseline captured from _that_ is stable,
 green, and worthless. Everything is served from one origin here, so every base
-URL must be empty. `scripts/vr.mjs` sets them, and then refuses to run if the
-built bundle still contains an absolute URL.
+URL must be empty. `scripts/vr.mjs` sets them, and then refuses to run if
+either built bundle still contains an absolute URL.
+
+**Both** bundles, and that word was earned. The check originally looked only at
+`apps/web`, and a stale `apps/admin` bundle still calling `http://localhost:8000`
+went straight past it -- every console page rendered "Unable to fetch instance
+details", which is a perfectly stable thing to photograph. Building by hand and
+restarting only the edge skips this check entirely, so generate baselines with
+`pnpm vr:update` rather than driving compose directly.
 
 `dotenv` does not overwrite a variable that is already set, which is why
 exporting wins over the file. All of these are in turbo's `globalEnv`, so the
@@ -120,8 +127,47 @@ generalise:
   produce** — so it now waits on that page's own description text, and asserts
   the error text is absent.
 
+The console stories learned a third variant, and it is the sneakiest. Their first
+readiness locator was the page's own description text -- which turns out to live
+in `apps/admin/hooks/use-sidebar-menu/core.ts`, i.e. in the **sidebar**, which
+renders before the page has fetched anything. It was not satisfied by a skeleton
+or by an error screen; it was satisfied by the furniture around them.
+
+So every console story goes through `consolePage()` in `src/capture.ts`, which
+waits for content inside `<main>` and then asserts the `<Loader>` skeleton
+(`role="status"`, `packages/ui/src/loader.tsx`) is gone. Neither the shell nor
+the console's "Unable to fetch instance details" screen can satisfy that: the
+error screen renders no `<main>` at all.
+
 The general rule: ask what the page looks like when the thing you are testing is
-broken, and check that your locator would not be satisfied by it.
+broken, **and what it looks like before it has loaded**, and check that your
+locator would not be satisfied by either.
+
+To confirm that guard still holds, block the console's configuration request and
+check the story refuses rather than captures:
+
+```ts
+await page.route("**/api/instances/configurations/**", (r) => r.abort());
+// consolePage(...) must now throw
+```
+
+That is a manual check rather than a committed test, because the failure path
+costs a full assertion timeout every run.
+
+## The instance console
+
+Nineteen of the baselines are God Mode pages, captured through `<main>` rather
+than the viewport. The console sidebar is identical on every one of them, so
+putting it inside nineteen images would mean one sidebar tweak touches nineteen
+files and review becomes a formality. The sidebar and shell get exactly one
+baseline, `god-mode-general`, which is the only console story shot
+full-viewport.
+
+Four of the provider pages are inherited from upstream. They are here because
+the fork put config-source badges, "this setting would be ignored" refusals and
+the secret-field behaviour into the _shared_ console form components (FORK.md
+rows 27, 35, 51), so a regression there lands on an upstream page as readily as
+on OIDC or SAML.
 
 ## Scope
 
