@@ -32,10 +32,15 @@ export function intervalLabel(interval: TCapacityInterval) {
 }
 
 function mergeRanges(ranges: TTimelineRange[]) {
-  const sorted = ranges
+  const normalized = ranges
     .map((range) => ({ start: new Date(range.start).getTime(), end: new Date(range.end).getTime() }))
-    .filter((range) => range.start < range.end)
-    .toSorted((left, right) => left.start - right.start);
+    .filter((range) => range.start < range.end);
+  const sorted: Array<{ start: number; end: number }> = [];
+  for (const range of normalized) {
+    const insertionIndex = sorted.findIndex((candidate) => candidate.start > range.start);
+    if (insertionIndex === -1) sorted.push(range);
+    else sorted.splice(insertionIndex, 0, range);
+  }
   const merged: Array<{ start: number; end: number }> = [];
   for (const range of sorted) {
     const previous = merged.at(-1);
