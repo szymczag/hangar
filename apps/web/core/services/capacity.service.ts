@@ -55,13 +55,31 @@ export type TGoogleCalendar = {
   access_role: string;
   selected: boolean;
 };
-export type TWorkshopSchedule = {
-  issue_id: string;
+export type TWorkshopSession = {
+  id: string | null;
   starts_at: string;
   ends_at: string;
   preparation_minutes: number;
   travel_before_minutes: number;
   travel_after_minutes: number;
+  trainer_ids: string[];
+};
+export type TWorkshopSchedule = {
+  issue_id: string;
+  /** @deprecated Read sessions instead. Retained during the rolling migration. */
+  starts_at: string;
+  /** @deprecated Read sessions instead. Retained during the rolling migration. */
+  ends_at: string;
+  /** @deprecated Read sessions instead. Retained during the rolling migration. */
+  preparation_minutes: number;
+  /** @deprecated Read sessions instead. Retained during the rolling migration. */
+  travel_before_minutes: number;
+  /** @deprecated Read sessions instead. Retained during the rolling migration. */
+  travel_after_minutes: number;
+  sessions: TWorkshopSession[];
+};
+export type TWorkshopScheduleInput = {
+  sessions: Array<Omit<TWorkshopSession, "id">>;
 };
 
 export class CapacityRequestError extends Error {
@@ -209,7 +227,7 @@ export class CapacityService extends APIService {
     workspaceSlug: string,
     projectId: string,
     issueId: string,
-    schedule: Omit<TWorkshopSchedule, "issue_id">
+    schedule: TWorkshopScheduleInput
   ) {
     const csrfToken = await this.csrfToken();
     return this.data<TWorkshopSchedule>(

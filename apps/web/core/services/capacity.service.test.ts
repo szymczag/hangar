@@ -85,13 +85,22 @@ describe("CapacityService CSRF requests", () => {
 
   it("sends the token when saving a workshop schedule", async () => {
     const schedule = {
-      starts_at: "2026-09-07T09:00:00+02:00",
-      ends_at: "2026-09-07T10:00:00+02:00",
-      preparation_minutes: 15,
-      travel_before_minutes: 0,
-      travel_after_minutes: 0,
+      sessions: [
+        {
+          starts_at: "2026-09-07T09:00:00+02:00",
+          ends_at: "2026-09-07T10:00:00+02:00",
+          preparation_minutes: 15,
+          travel_before_minutes: 0,
+          travel_after_minutes: 0,
+          trainer_ids: ["trainer-id"],
+        },
+      ],
     };
-    const savedSchedule = { ...schedule, issue_id: "issue-id" } satisfies TWorkshopSchedule;
+    const savedSchedule = {
+      issue_id: "issue-id",
+      ...schedule.sessions[0],
+      sessions: schedule.sessions.map((session) => ({ ...session, id: "session-id" })),
+    } satisfies TWorkshopSchedule;
     const put = vi.spyOn(service, "put").mockResolvedValue({ data: savedSchedule } as never);
 
     await expect(service.saveWorkshopSchedule("workspace", "project-id", "issue-id", schedule)).resolves.toBe(
