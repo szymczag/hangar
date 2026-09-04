@@ -30,6 +30,7 @@ from reasoning about it, which is the habit this suite is meant to encourage.
 ```bash
 pnpm vr            # build the SPAs, bring the stack up, compare
 pnpm vr:update     # the same, but rewrite the baselines
+pnpm vr:stack      # build and bring the stack up, then leave it running
 ```
 
 Both go through `scripts/vr.mjs`, and that is the only supported entry point.
@@ -43,6 +44,26 @@ time. Inside the VR network that host does not exist, so the app renders its
 green, and worthless. Everything is served from one origin here, so every base
 URL must be empty. `scripts/vr.mjs` sets them, and then refuses to run if
 either built bundle still contains an absolute URL.
+
+### The trap that eats the stack
+
+This package declares `web` and `admin` as workspace dependencies, so that
+`turbo --affected` marks the suite dirty when either changes. The cost of that
+edge is not obvious: `check:types` here `dependsOn: ["^build"]`, so **`web#build`
+and `admin#build` are in its task graph**. Running any turbo check while the VR
+stack is up rebuilds both SPAs with whatever environment is ambient — replacing
+the bundles the edge is serving from disk with ones pointed at
+`http://localhost:8000`.
+
+The symptom is every story failing on its readiness locator while the stack
+looks perfectly healthy, because the application is rendering "Hangar didn't
+start correctly". It cost several rounds of confusion before the mechanism was
+found, so `src/guards.ts` now asks the edge what it is actually **serving**,
+rather than trusting what was on disk when the stack started. That check runs in
+`globalSetup` and fails with one line naming the cause.
+
+If you are iterating — stack up, edit a spec, run it — use `pnpm vr:stack` to
+bring the stack back after any turbo command.
 
 **Both** bundles, and that word was earned. The check originally looked only at
 `apps/web`, and a stale `apps/admin` bundle still calling `http://localhost:8000`
