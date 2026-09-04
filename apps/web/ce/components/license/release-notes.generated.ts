@@ -11,11 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.46",
+  version: "0.1.0-rc.47",
   highlights: [
-    "Google Calendar consent accepts Google's canonical email scope.",
-    "OAuth callback failures expose only fixed diagnostic codes to logs.",
-    "The proxy build is reproducible against immutable Caddy base images.",
+    "Booking hours now describe the window in which a trainer may be booked.",
+    "Google Calendar is the source of busy-time exceptions.",
+    "The capacity view is clearer and more resilient.",
+    "Workshop can be selected when creating or editing a work item.",
   ],
   upstream: {
     version: "1.4.0",

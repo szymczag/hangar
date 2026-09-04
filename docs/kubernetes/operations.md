@@ -59,6 +59,41 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.46` to `rc.47`
+
+Upgrade directly from the immediately previous retained GitHub release, `rc.46`.
+This release adds migration `ext.0021_booking_hours`. It preserves every trainer
+profile with at least one configured weekly interval, changes semantically empty
+schedules to Monday through Friday, 09:00–22:00, increments their schedule
+revision, and removes the trainer schedule-exception table. Existing exception
+rows are intentionally discarded because selected Google calendars now provide
+the only exception and busy-time source.
+
+The chart keeps the same resources, Secrets, storage, RBAC, NetworkPolicies, and
+public routes. The default capacity admission limits increase from `10/minute`
+to `20/minute` per user and from `30/minute` to `60/minute` per workspace. If
+existing values explicitly override these settings, Helm retains those values.
+
+Deploy the web and API images together and wait for the revision-scoped migration
+Job before admitting traffic. Then verify that an empty trainer schedule reads
+Monday–Friday, 09:00–22:00; connect Google Calendar and confirm Primary is selected;
+add a second blocking calendar; and create a work item with type `Workshop`, active
+trainer assignees, and a workshop schedule. Confirm Google busy intervals and the
+workshop render above booking hours on the capacity timeline. Exercise the capacity
+view repeatedly and confirm a transient `429` retains the last successful data.
+
+Before upgrading, back up PostgreSQL, record the current Helm revision, and export
+any schedule exceptions that must be retained as Google Calendar events. Render
+the existing values against `0.1.0-rc.47`, then verify the signed tag, chart, image
+digests, and attestations.
+
+Rollback to `rc.46` is not data-preserving for schedule exceptions: reversing the
+migration can recreate the table but cannot restore deleted rows, and schedules
+populated with 09:00–22:00 remain populated. Prefer a forward correction. If an
+emergency rollback is required, restore PostgreSQL from the pre-upgrade backup or
+accept those losses explicitly before returning every application image to
+`rc.46`.
+
 ### Upgrade from `rc.45` to `rc.46`
 
 Upgrade directly from the immediately previous retained GitHub release, `rc.45`.
@@ -87,10 +122,10 @@ digests, and attestations. Rolling back to `rc.45` needs no schema reversal or
 configuration change, but restores the Google scope-alias rejection and the
 older floating Caddy base-image references.
 
-### Upgrade from `rc.27` to `rc.46`
+### Upgrade from `rc.27` to `rc.47`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
-Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.46`.
+Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.47`.
 
 This release closes two Todoist import admission gaps. Starting an import now
 requires a server-signed, 15-minute, single-use preview grant bound to the
@@ -110,13 +145,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.46`, its application version is
-   `v0.1.0-rc.46`, and its signatures and digests pass the
+2. confirm the target chart is `0.1.0-rc.47`, its application version is
+   `v0.1.0-rc.47`, and its signatures and digests pass the
    [release verification procedure](security.md#verify-release-010-rc39);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
-   `rc.27` and `rc.46` web or API images because their preview-execution request
+   `rc.27` and `rc.47` web or API images because their preview-execution request
    contract intentionally changed together.
 
 Wait for the revision-scoped migration Job to complete before admitting traffic.
@@ -129,7 +164,7 @@ also fail without creating a job or retaining a source object.
 target; the nullable column may remain in the database. It restores the preview
 bypass and duplicate-confirmation race, however, so it is not a
 security-equivalent rollback. Prefer a forward correction and return every
-application component to `rc.46` promptly.
+application component to `rc.47` promptly.
 
 ### Upgrade from `rc.26` to `rc.27`
 
