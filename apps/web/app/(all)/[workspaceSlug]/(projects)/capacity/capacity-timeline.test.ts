@@ -5,7 +5,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { CAPACITY_INTERVAL_LAYERS, dayBounds, intervalLabel, intervalPosition } from "./capacity-timeline.utils";
+import {
+  CAPACITY_INTERVAL_LAYERS,
+  availableRanges,
+  dayBounds,
+  intervalLabel,
+  intervalPosition,
+  rangeMinutes,
+} from "./capacity-timeline.utils";
 
 describe("capacity timeline", () => {
   it("clips an interval to the visible day", () => {
@@ -50,5 +57,43 @@ describe("capacity timeline", () => {
         end: "2026-09-07T10:00:00Z",
       })
     ).toBe("Busy — Google Calendar");
+  });
+
+  it("returns the exact free ranges inside working time", () => {
+    const dayStart = new Date("2026-09-07T00:00:00.000Z");
+    const dayEnd = new Date("2026-09-08T00:00:00.000Z");
+    const ranges = availableRanges(
+      [
+        { kind: "working", start: "2026-09-07T09:00:00.000Z", end: "2026-09-07T22:00:00.000Z" },
+        { kind: "google_busy", start: "2026-09-07T10:00:00.000Z", end: "2026-09-07T12:00:00.000Z" },
+        { kind: "workshop", start: "2026-09-07T14:00:00.000Z", end: "2026-09-07T18:00:00.000Z" },
+      ],
+      dayStart,
+      dayEnd
+    );
+
+    expect(ranges).toEqual([
+      { start: "2026-09-07T09:00:00.000Z", end: "2026-09-07T10:00:00.000Z" },
+      { start: "2026-09-07T12:00:00.000Z", end: "2026-09-07T14:00:00.000Z" },
+      { start: "2026-09-07T18:00:00.000Z", end: "2026-09-07T22:00:00.000Z" },
+    ]);
+    expect(rangeMinutes(ranges)).toBe(420);
+  });
+
+  it("merges overlapping blockers before subtracting them", () => {
+    const ranges = availableRanges(
+      [
+        { kind: "working", start: "2026-09-07T09:00:00.000Z", end: "2026-09-07T17:00:00.000Z" },
+        { kind: "google_busy", start: "2026-09-07T10:00:00.000Z", end: "2026-09-07T13:00:00.000Z" },
+        { kind: "workshop", start: "2026-09-07T12:00:00.000Z", end: "2026-09-07T15:00:00.000Z" },
+      ],
+      new Date("2026-09-07T00:00:00.000Z"),
+      new Date("2026-09-08T00:00:00.000Z")
+    );
+
+    expect(ranges).toEqual([
+      { start: "2026-09-07T09:00:00.000Z", end: "2026-09-07T10:00:00.000Z" },
+      { start: "2026-09-07T15:00:00.000Z", end: "2026-09-07T17:00:00.000Z" },
+    ]);
   });
 });

@@ -105,6 +105,23 @@ describe("CapacityService CSRF requests", () => {
     );
   });
 
+  it("treats a missing workshop schedule as an empty property", async () => {
+    vi.mocked(service.get).mockRejectedValue({ response: { status: 404 } });
+
+    await expect(service.getWorkshopSchedule("workspace", "project-id", "issue-id")).resolves.toBeNull();
+  });
+
+  it("preserves a workshop schedule loading failure", async () => {
+    vi.mocked(service.get).mockRejectedValue({ response: { status: 503 } });
+
+    const error = await service
+      .getWorkshopSchedule("workspace", "project-id", "issue-id")
+      .catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(CapacityRequestError);
+    expect(error).toMatchObject({ status: 503, message: "Workshop schedule could not be loaded." });
+  });
+
   it("sends the token when deleting a workshop schedule", async () => {
     const deleteRequest = vi.spyOn(service, "delete").mockResolvedValue({ data: undefined } as never);
 

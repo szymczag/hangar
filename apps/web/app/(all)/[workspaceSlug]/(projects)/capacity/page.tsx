@@ -23,7 +23,16 @@ import {
   type TTrainerProfile,
 } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
-import { CAPACITY_INTERVAL_LAYERS, dayBounds, intervalLabel, intervalPosition } from "./capacity-timeline.utils";
+import {
+  CAPACITY_INTERVAL_LAYERS,
+  availableRanges,
+  clippedRanges,
+  dayBounds,
+  formatRange,
+  intervalLabel,
+  intervalPosition,
+  rangeMinutes,
+} from "./capacity-timeline.utils";
 
 const capacityService = new CapacityService();
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
@@ -73,73 +82,106 @@ function availabilityCopy(status: string) {
   return connectionCopy(status);
 }
 
-function TrainerWeekTimeline({ trainer, weekStart }: { trainer: TTrainerCapacity; weekStart: Date }) {
+function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Date) {
+  const free = availableRanges(trainer.intervals, dayStart, dayEnd);
+  const rangesFor = (kind: "working" | "google_busy" | "workshop") =>
+    clippedRanges(
+      trainer.intervals.filter((interval) => interval.kind === kind),
+      dayStart,
+      dayEnd
+    );
+  const conflicts = trainer.conflicts.filter((conflict) => intervalPosition(conflict, dayStart, dayEnd));
+  return {
+    free,
+    freeMinutes: rangeMinutes(free),
+    workingMinutes: rangeMinutes(rangesFor("working")),
+    googleBusyMinutes: rangeMinutes(rangesFor("google_busy")),
+    workshopMinutes: rangeMinutes(rangesFor("workshop")),
+    conflicts,
+  };
+}
+
+function TrainerDayTimeline({
+  trainer,
+  dayStart,
+  dayEnd,
+}: {
+  trainer: TTrainerCapacity;
+  dayStart: Date;
+  dayEnd: Date;
+}) {
+  const free = availableRanges(trainer.intervals, dayStart, dayEnd);
   return (
-    <div className="bg-subtle grid min-w-[1120px] grid-cols-7 gap-px overflow-hidden rounded-md border border-subtle">
-      {DAY_KEYS.map((day, dayIndex) => {
-        const bounds = dayBounds(weekStart, dayIndex);
-        return (
-          <div
-            key={day}
-            className="relative h-14 min-w-40 bg-surface-2"
-            aria-label={`${DAY_LABELS[dayIndex]} schedule`}
+    <div>
+      <div className="relative h-20 min-w-[760px] overflow-hidden rounded-md border border-subtle bg-surface-2">
+        {[0, 3, 6, 9, 12, 15, 18, 21, 24].map((hour) => (
+          <span
+            key={hour}
+            aria-hidden="true"
+            className="absolute top-0 bottom-0 z-0 border-l border-subtle text-[9px] text-placeholder"
+            style={{ left: `${(hour / 24) * 100}%` }}
           >
-            {[0, 6, 12, 18, 24].map((hour) => (
-              <span
-                key={hour}
-                aria-hidden="true"
-                className="absolute top-0 bottom-0 z-0 border-l border-subtle text-[8px] text-placeholder"
-                style={{ left: `${(hour / 24) * 100}%` }}
-              >
-                <span className={hour === 24 ? "-translate-x-full" : ""}>{String(hour).padStart(2, "0")}</span>
-              </span>
-            ))}
-            {CAPACITY_INTERVAL_LAYERS.flatMap((kind) =>
-              trainer.intervals
-                .filter((interval) => interval.kind === kind)
-                .map((interval) => {
-                  const position = intervalPosition(interval, bounds.start, bounds.end);
-                  if (!position) return null;
-                  const className =
-                    interval.kind === "working"
-                      ? "top-3 bottom-1 z-10 bg-success-secondary"
-                      : interval.kind === "google_busy"
-                        ? "top-4 bottom-2 z-20 bg-neutral-500/70"
-                        : "top-4 bottom-2 z-20 bg-accent-primary/80";
-                  const label = intervalLabel(interval);
-                  return (
-                    <button
-                      key={`${interval.kind}-${interval.start}-${interval.end}-${interval.work_item?.id ?? "anonymous"}`}
-                      type="button"
-                      aria-label={`${label}, ${new Date(interval.start).toLocaleString()} to ${new Date(interval.end).toLocaleString()}`}
-                      title={label}
-                      className={`absolute rounded-sm ${className}`}
-                      style={position}
-                    />
-                  );
-                })
-            )}
-            {trainer.conflicts.map((conflict) => {
-              const position = intervalPosition(conflict, bounds.start, bounds.end);
+            <span className={hour === 24 ? "-translate-x-full" : "px-1"}>{String(hour).padStart(2, "0")}:00</span>
+          </span>
+        ))}
+        {free.map((range) => {
+          const position = intervalPosition(range, dayStart, dayEnd);
+          if (!position) return null;
+          const label = `Available ${formatRange(range)}`;
+          return (
+            <span
+              key={`available-${range.start}-${range.end}`}
+              role="img"
+              aria-label={label}
+              title={label}
+              className="bg-success-secondary ring-success-primary/30 absolute top-6 bottom-2 z-10 rounded-sm ring-1 ring-inset"
+              style={position}
+            />
+          );
+        })}
+        {CAPACITY_INTERVAL_LAYERS.filter((kind) => kind !== "working").flatMap((kind) =>
+          trainer.intervals
+            .filter((interval) => interval.kind === kind)
+            .map((interval) => {
+              const position = intervalPosition(interval, dayStart, dayEnd);
               if (!position) return null;
+              const className = interval.kind === "google_busy" ? "bg-neutral-500/70" : "bg-accent-primary/80";
+              const label = intervalLabel(interval);
               return (
-                <span
-                  key={`${conflict.kind}-${conflict.start}-${conflict.end}`}
-                  role="img"
-                  aria-label={`Conflict: ${conflict.kind.replaceAll("_", " ")}`}
-                  title={`Conflict: ${conflict.kind.replaceAll("_", " ")}`}
-                  className="border-danger-primary absolute top-0 bottom-0 z-30 border"
-                  style={{
-                    ...position,
-                    backgroundImage:
-                      "repeating-linear-gradient(135deg, transparent, transparent 3px, rgb(var(--color-danger-primary)) 3px, rgb(var(--color-danger-primary)) 5px)",
-                  }}
+                <button
+                  key={`${interval.kind}-${interval.start}-${interval.end}-${interval.work_item?.id ?? "anonymous"}`}
+                  type="button"
+                  aria-label={`${label}, ${formatRange(interval)}`}
+                  title={`${label} · ${formatRange(interval)}`}
+                  className={`absolute top-6 bottom-2 z-20 min-w-1 rounded-sm ${className}`}
+                  style={position}
                 />
               );
-            })}
-          </div>
-        );
-      })}
+            })
+        )}
+        {trainer.conflicts.map((conflict) => {
+          const position = intervalPosition(conflict, dayStart, dayEnd);
+          if (!position) return null;
+          return (
+            <span
+              key={`${conflict.kind}-${conflict.start}-${conflict.end}`}
+              role="img"
+              aria-label={`Conflict: ${conflict.kind.replaceAll("_", " ")}`}
+              title={`Conflict: ${conflict.kind.replaceAll("_", " ")}`}
+              className="border-danger-primary absolute top-5 bottom-1 z-30 min-w-1 rounded-sm border"
+              style={{
+                ...position,
+                backgroundImage:
+                  "repeating-linear-gradient(135deg, transparent, transparent 4px, rgb(var(--color-danger-primary)) 4px, rgb(var(--color-danger-primary)) 6px)",
+              }}
+            />
+          );
+        })}
+      </div>
+      <p className="mt-2 text-11 whitespace-normal text-secondary">
+        <span className="font-medium text-primary">Available:</span>{" "}
+        {free.length ? free.map(formatRange).join(", ") : "No free time in booking hours"}
+      </p>
     </div>
   );
 }
@@ -413,8 +455,13 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
+    const day = new Date().getDay();
+    return day === 0 || day === 6 ? 0 : day - 1;
+  });
   const capacityRefreshRef = useRef<Promise<unknown> | null>(null);
   const weekEnd = useMemo(() => shiftWeek(weekStart, 1), [weekStart]);
+  const selectedDay = useMemo(() => dayBounds(weekStart, selectedDayIndex), [selectedDayIndex, weekStart]);
   const rangeKey = `${weekStart.toISOString()}:${weekEnd.toISOString()}`;
   const {
     data: trainerPage,
@@ -595,62 +642,91 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               </Button>
             </div>
           ) : capacity?.trainers.length ? (
-            <div className="overflow-x-auto">
-              <div className="min-w-[1510px]">
-                {capacityError ? (
-                  <div
-                    role="status"
-                    className="bg-warning-secondary border-b border-subtle px-5 py-2 text-11 text-secondary"
-                  >
-                    Availability is being refreshed. The last request was rate limited or temporarily unavailable.
-                  </div>
-                ) : null}
-                <div className="grid grid-cols-[190px_1fr_160px] items-end gap-4 border-b border-subtle bg-surface-2 px-5 py-3">
-                  <div className="text-11 font-semibold tracking-wide text-placeholder uppercase">Trainer</div>
-                  <div className="grid grid-cols-7 gap-px text-center text-11 text-secondary">
-                    {DAY_KEYS.map((day, index) => (
-                      <div key={day}>
-                        <span className="font-medium text-primary">{DAY_LABELS[index]}</span>{" "}
-                        {dayBounds(weekStart, index).start.toLocaleDateString(undefined, { day: "numeric" })}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="text-right text-11 font-semibold tracking-wide text-placeholder uppercase">Free</div>
+            <div>
+              <div className="border-b border-subtle bg-surface-1 px-5 py-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7" aria-label="Choose planning day">
+                  {DAY_KEYS.map((day, index) => {
+                    const bounds = dayBounds(weekStart, index);
+                    const availableCount = capacity.trainers.filter(
+                      (trainer) => availableRanges(trainer.intervals, bounds.start, bounds.end).length > 0
+                    ).length;
+                    const conflictCount = capacity.trainers.reduce(
+                      (count, trainer) =>
+                        count +
+                        trainer.conflicts.filter((conflict) => intervalPosition(conflict, bounds.start, bounds.end))
+                          .length,
+                      0
+                    );
+                    const selected = selectedDayIndex === index;
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setSelectedDayIndex(index)}
+                        className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                          selected
+                            ? "border-accent-primary bg-accent-primary/10"
+                            : "border-subtle bg-surface-2 hover:border-strong"
+                        }`}
+                      >
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="text-body-xs-medium text-primary">{DAY_LABELS[index]}</span>
+                          <span className="text-11 text-placeholder">
+                            {bounds.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                          </span>
+                        </span>
+                        <span className="mt-1 block text-11 text-secondary">
+                          {availableCount} available
+                          {conflictCount ? (
+                            <span className="text-danger-primary"> · {conflictCount} conflicts</span>
+                          ) : null}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="divide-y divide-subtle">
-                  {capacity.trainers.map((trainer) => (
-                    <article
-                      key={trainer.trainer_id}
-                      className="grid grid-cols-[190px_1fr_160px] items-center gap-4 px-5 py-4"
-                    >
-                      <div>
-                        <h2 className="text-body-sm-medium text-primary">{trainer.display_name}</h2>
-                        <p className="mt-1 text-11 text-secondary">
-                          {availabilityCopy(trainer.availability_status)} · {trainer.timezone}
-                        </p>
-                      </div>
-                      <div>
-                        <TrainerWeekTimeline trainer={trainer} weekStart={weekStart} />
-                        <div className="mt-2 flex gap-4 text-11 text-secondary">
-                          <span>Google {formatMinutes(trainer.google_busy_minutes)}</span>
-                          <span>Workshops {formatMinutes(trainer.workshop_minutes)}</span>
+              </div>
+              <div className="divide-y divide-subtle lg:hidden">
+                {capacity.trainers.map((trainer) => {
+                  const metrics = trainerDayMetrics(trainer, selectedDay.start, selectedDay.end);
+                  return (
+                    <article key={trainer.trainer_id} className="space-y-3 px-5 py-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h2 className="text-body-sm-medium text-primary">{trainer.display_name}</h2>
+                          <p className="mt-1 text-11 text-secondary">
+                            {availabilityCopy(trainer.availability_status)} · {trainer.timezone}
+                          </p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-semibold text-primary tabular-nums">
-                          {formatMinutes(trainer.available_minutes)}
-                        </div>
-                        <div className="text-11 text-placeholder">of {formatMinutes(trainer.working_minutes)} free</div>
-                        {trainer.conflicts.length ? (
-                          <div className="mt-1 inline-flex items-center gap-1 text-11 text-danger-primary">
-                            <CircleAlert className="size-3" /> {trainer.conflicts.length} conflict
-                            {trainer.conflicts.length === 1 ? "" : "s"}
+                        <div className="shrink-0 text-right">
+                          <div className="text-body-sm-medium text-primary tabular-nums">
+                            {formatMinutes(metrics.freeMinutes)} free
                           </div>
+                          <div className="text-11 text-placeholder">of {formatMinutes(metrics.workingMinutes)}</div>
+                        </div>
+                      </div>
+                      <div className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-body-xs-regular whitespace-normal">
+                        <span className="font-medium text-primary">Available:</span>{" "}
+                        <span className="text-secondary">
+                          {metrics.free.length
+                            ? metrics.free.map(formatRange).join(", ")
+                            : "No free time in booking hours"}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-11 text-secondary">
+                        <span>Google busy {formatMinutes(metrics.googleBusyMinutes)}</span>
+                        <span>Workshops {formatMinutes(metrics.workshopMinutes)}</span>
+                        {metrics.conflicts.length ? (
+                          <span className="inline-flex items-center gap-1 text-danger-primary">
+                            <CircleAlert className="size-3" /> {metrics.conflicts.length} conflict
+                            {metrics.conflicts.length === 1 ? "" : "s"}
+                          </span>
                         ) : null}
                         {isAdmin || trainer.trainer_id === ownProfile?.user_id ? (
                           <button
                             type="button"
-                            className="mt-2 text-11 text-accent-primary"
+                            className="ml-auto text-accent-primary"
                             onClick={() => setEditingTrainerId(trainer.trainer_id)}
                           >
                             Manage schedule
@@ -658,29 +734,106 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                         ) : null}
                       </div>
                     </article>
-                  ))}
-                </div>
-                <div
-                  className="flex flex-wrap items-center gap-4 border-t border-subtle bg-surface-2 px-5 py-3 text-11 text-secondary"
-                  aria-label="Timeline legend"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="bg-success-secondary ring-success-primary/30 size-2.5 rounded-sm ring-1" />
-                    Working hours
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="bg-neutral-500/55 size-2.5 rounded-sm" />
-                    Google busy
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-sm bg-accent-primary/70" />
-                    Workshop
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="border-danger-primary bg-danger-secondary size-2.5 rounded-sm border" />
-                    Conflict
-                  </span>
-                  <span className="ml-auto">Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+                  );
+                })}
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
+                <div className="min-w-[1180px]">
+                  {capacityError ? (
+                    <div
+                      role="status"
+                      className="bg-warning-secondary border-b border-subtle px-5 py-2 text-11 text-secondary"
+                    >
+                      Availability is being refreshed. The last request was rate limited or temporarily unavailable.
+                    </div>
+                  ) : null}
+                  <div className="grid grid-cols-[210px_1fr_150px] items-end gap-5 border-b border-subtle bg-surface-2 px-5 py-3">
+                    <div className="text-11 font-semibold tracking-wide text-placeholder uppercase">Trainer</div>
+                    <div className="text-11 font-semibold tracking-wide text-placeholder uppercase">
+                      {selectedDay.start.toLocaleDateString(undefined, {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                      })}
+                    </div>
+                    <div className="text-right text-11 font-semibold tracking-wide text-placeholder uppercase">
+                      Day capacity
+                    </div>
+                  </div>
+                  <div className="divide-y divide-subtle">
+                    {capacity.trainers.map((trainer) => {
+                      const metrics = trainerDayMetrics(trainer, selectedDay.start, selectedDay.end);
+                      return (
+                        <article
+                          key={trainer.trainer_id}
+                          className="grid grid-cols-[210px_1fr_150px] items-center gap-5 px-5 py-5"
+                        >
+                          <div>
+                            <h2 className="text-body-sm-medium text-primary">{trainer.display_name}</h2>
+                            <p className="mt-1 text-11 text-secondary">
+                              {availabilityCopy(trainer.availability_status)} · {trainer.timezone}
+                            </p>
+                          </div>
+                          <div>
+                            <TrainerDayTimeline
+                              trainer={trainer}
+                              dayStart={selectedDay.start}
+                              dayEnd={selectedDay.end}
+                            />
+                            <div className="mt-2 flex gap-4 text-11 text-secondary">
+                              <span>Google {formatMinutes(metrics.googleBusyMinutes)}</span>
+                              <span>Workshops {formatMinutes(metrics.workshopMinutes)}</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-semibold text-primary tabular-nums">
+                              {formatMinutes(metrics.freeMinutes)}
+                            </div>
+                            <div className="text-11 text-placeholder">
+                              of {formatMinutes(metrics.workingMinutes)} free
+                            </div>
+                            {metrics.conflicts.length ? (
+                              <div className="mt-1 inline-flex items-center gap-1 text-11 text-danger-primary">
+                                <CircleAlert className="size-3" /> {metrics.conflicts.length} conflict
+                                {metrics.conflicts.length === 1 ? "" : "s"}
+                              </div>
+                            ) : null}
+                            {isAdmin || trainer.trainer_id === ownProfile?.user_id ? (
+                              <button
+                                type="button"
+                                className="mt-2 text-11 text-accent-primary"
+                                onClick={() => setEditingTrainerId(trainer.trainer_id)}
+                              >
+                                Manage schedule
+                              </button>
+                            ) : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                  <div
+                    className="flex flex-wrap items-center gap-4 border-t border-subtle bg-surface-2 px-5 py-3 text-11 text-secondary"
+                    aria-label="Timeline legend"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="bg-success-secondary ring-success-primary/30 size-2.5 rounded-sm ring-1" />
+                      Available
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="bg-neutral-500/55 size-2.5 rounded-sm" />
+                      Google busy
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2.5 rounded-sm bg-accent-primary/70" />
+                      Workshop
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="border-danger-primary bg-danger-secondary size-2.5 rounded-sm border" />
+                      Conflict
+                    </span>
+                    <span className="ml-auto">Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+                  </div>
                 </div>
               </div>
             </div>
