@@ -109,7 +109,19 @@ build/
 build/
 .react-router/
 temp/
-scripts/
+# Bare `scripts/` matches a directory of that name at *any* depth, not just the
+# one at the root -- which silently kept apps/visual-tests/scripts out of the
+# repository, so CI ran a lint script that was not there. Anchored to the root,
+# with the handful of tracked files named so the pre-commit hook can stage the
+# formatting it applies to them; it aborts on a path git refuses.
+/scripts/
+!scripts/branding-allowlist.json
+!scripts/check-branding.mjs
+!scripts/check-branding.test.mjs
+!scripts/community-billing-page.test.mjs
+!scripts/community-modal.test.mjs
+!scripts/generate-release-notes.mjs
+!scripts/vr.mjs
 !packages/i18n/scripts/
 !.github/scripts/
 !.github/scripts/release_metadata.py

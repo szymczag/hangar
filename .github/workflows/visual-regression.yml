@@ -1,0 +1,140 @@
+name: Visual regression
+
+# A workflow of its own rather than a job inside the web workflow: that one
+# skips on drafts and for some reviewers, and shares a concurrency group. A
+# visual suite that silently does not run on draft pull requests is a visual
+# suite that does not run.
+on:
+  pull_request:
+  push:
+    branches:
+      - preview
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: visual-regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect front-end changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: Decide whether anything visual changed
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Anything that is not a pull request gets the full suite rather than
+          # a guess.
+          if [ -z "${PR:-}" ]; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(gh api --paginate "repos/$REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          if printf '%s\n' "$changed" | grep -qE '^(apps/web/|apps/admin/|apps/visual-tests/|packages/|apps/api/plane/ext/|docker-compose-visual\.yml$|scripts/vr\.mjs$|\.github/workflows/visual-regression\.yml$)'; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "web=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  visual:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: "--max-old-space-size=4096"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+
+      - name: Enable Corepack and pnpm
+        run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate API environment
+        run: |
+          cp apps/api/.env.example apps/api/.env
+
+      # `pnpm vr` owns the build environment, brings the stack up, runs the
+      # suite and tears it down. Deliberately not open-coded here: the build
+      # environment is the one thing that produces a *passing* run against the
+      # wrong application, and it must not have two definitions.
+      #
+      # Note this builds with --filter rather than --affected. On a pull request
+      # touching only packages/ui, --affected may not rebuild web at all, and a
+      # comparison against a stale build/client would pass -- the worst outcome
+      # available.
+      - name: Run the visual suite
+        run: pnpm vr
+
+      # Without this a red job says "some pixels changed" and nothing more, and
+      # the suite is abandoned within a month.
+      - name: Upload failure artefacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-failures
+          path: |
+            apps/visual-tests/test-results/**
+            apps/visual-tests/playwright-report/**
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # The context to require on the branch ruleset. Skipped counts as success so a
+  # back-end-only change is not held up by a suite that had no reason to run.
+  visual-regression:
+    name: Visual regression
+    needs: [changes, visual]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the visual job to have succeeded or been skipped
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          VISUAL_RESULT: ${{ needs.visual.result }}
+        run: |
+          set -euo pipefail
+
+          failed=0
+          for entry in "changes:$CHANGES_RESULT" "visual:$VISUAL_RESULT"; do
+            name="${entry%%:*}"
+            result="${entry#*:}"
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "::error::$name reported '$result'"
+              failed=1
+            fi
+          done
+
+          [ "$failed" -eq 0 ] || exit 1
+          echo "Visual regression gate satisfied."

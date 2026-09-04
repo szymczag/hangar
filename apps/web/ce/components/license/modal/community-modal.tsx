@@ -11,7 +11,7 @@ import { DOCUMENTATION_URL, SOURCE_CODE_URL } from "@plane/constants";
 // helpers
 import { showExternalLinks } from "@/helpers/external-links";
 import { getButtonStyling } from "@plane/propel/button";
-import { HangarLogo } from "@plane/propel/icons";
+import { HangarMark } from "@plane/propel/icons";
 import { IconButton } from "@plane/propel/icon-button";
 import { EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
 import { cn } from "@plane/utils";
@@ -71,7 +71,10 @@ export const HangarCommunityModal = observer(function HangarCommunityModal(props
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">
             <div className="grid size-14 shrink-0 place-items-center rounded-xl border border-subtle bg-surface-1 shadow-raised-100">
-              <HangarLogo className="h-9 w-auto text-primary" />
+              {/* The mark, not the wordmark: this badge is a 56px square, and
+                  the wordmark is 868x258, so at `h-9 w-auto` it rendered 119px
+                  wide and spilled ~32px out of either side of its own box. */}
+              <HangarMark className="h-9 w-auto text-primary" />
             </div>
             <div className="min-w-0">
               <Dialog.Title as="h2" className="truncate text-20 leading-7 font-semibold text-primary">

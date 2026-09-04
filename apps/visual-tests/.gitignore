@@ -1,0 +1,5 @@
+# Written by a failing run: the actual/expected/diff images and the HTML report.
+# They are uploaded as CI artefacts, never committed -- the baselines are the
+# only images this suite keeps in the repository.
+test-results/
+playwright-report/

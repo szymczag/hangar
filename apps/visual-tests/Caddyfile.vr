@@ -1,0 +1,45 @@
+# Copyright (c) 2026-present Maciej Szymczak and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# One origin for the visual regression stack, mirroring the routes
+# apps/proxy/Caddyfile.ce serves in production.
+#
+# Single origin is not a convenience here, it is what removes the cookie problem
+# entirely: no COOKIE_DOMAIN, no CORS configuration, and no SameSite reasoning,
+# because the browser never leaves the origin it was given the session on.
+#
+# Published boards and the live collaboration server are deliberately not routed.
+# They are out of scope for this suite; wiring them up would mean seeding and
+# stabilising two more surfaces nobody has asked to screenshot.
+
+:80 {
+	# Every route is a `handle` block, deliberately. Caddy orders `handle`
+	# ahead of a bare `reverse_proxy` regardless of where each appears in the
+	# file, so mixing the two silently sends /api to the catch-all and the
+	# browser receives the single-page app where it expected JSON.
+	handle /api/* {
+		reverse_proxy vr-api:8000
+	}
+	handle /auth/* {
+		reverse_proxy vr-api:8000
+	}
+	handle /static/* {
+		reverse_proxy vr-api:8000
+	}
+	handle /uploads/* {
+		reverse_proxy vr-minio:9000
+	}
+
+	redir /god-mode /god-mode/ permanent
+	handle_path /god-mode/* {
+		root * /srv/admin
+		try_files {path} /index.html
+		file_server
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}
