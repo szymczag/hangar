@@ -349,9 +349,7 @@ class Command(BaseCommand):
     )
 
     def _work_item_properties(self, workspace, project) -> None:
-        task_type = IssueType.objects.filter(
-            workspace=workspace, system_key=IssueType.SystemKey.TASK
-        ).first()
+        task_type = IssueType.objects.filter(workspace=workspace, system_key=IssueType.SystemKey.TASK).first()
         if task_type is None:
             return
 
