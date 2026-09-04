@@ -29,7 +29,11 @@ export async function capture(
     target?: Locator;
   }
 ): Promise<void> {
-  await expect(options.ready).toBeVisible({ timeout: 30_000 });
+  // No timeout here on purpose. It is set once, for every assertion in the
+  // suite, in playwright.config.ts. A local override is how this ended up
+  // waiting 30s in some places and 60s in others, and the shorter number then
+  // decided which stories failed under load.
+  await expect(options.ready).toBeVisible();
 
   // Fonts settle after first paint, and a shot taken before they do captures a
   // fallback face that will never match the baseline.

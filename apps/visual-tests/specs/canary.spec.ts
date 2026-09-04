@@ -4,7 +4,9 @@
  * See the LICENSE file for details.
  */
 
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
+
+import { capture } from "../src/capture.js";
 
 /**
  * A page with no application in it at all.
@@ -40,8 +42,9 @@ const CANARY = `<!doctype html>
 
 test("the environment renders as it did when the baselines were taken", async ({ page }) => {
   await page.setContent(CANARY);
-  await page.evaluate(() => document.fonts.ready);
 
-  await expect(page.locator(".shadow")).toBeVisible();
-  await expect(page).toHaveScreenshot("canary.png");
+  // Through capture() like every other story, even though this one renders no
+  // application code: the rule that every screenshot goes through one helper is
+  // worth more than the two lines an exception here would save.
+  await capture(page, "canary", { ready: page.locator(".shadow") });
 });

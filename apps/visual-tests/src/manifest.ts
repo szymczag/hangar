@@ -12,6 +12,8 @@ export type VisualFixtures = {
   workspace: { slug: string; id: string };
   project: { id: string; identifier: string };
   copyTarget: { id: string };
+  /** Names of the seeded work items, in the order they were created. */
+  workItems: string[];
   users: Record<string, { email: string; sessionCookie?: string; adminSessionCookie?: string }>;
 };
 
@@ -32,7 +34,7 @@ export function fixtures(): VisualFixtures {
   } catch (error) {
     throw new Error(
       `Could not read the seed manifest at ${path}. The API container writes it after seeding; ` +
-        `if it is missing, the stack came up without seeding. (${String(error)})`
+        `if it is missing, the stack came up without seeding. (${String(error)})`, { cause: error }
     );
   }
   return cached;

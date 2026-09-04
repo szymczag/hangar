@@ -1043,9 +1043,15 @@ importers:
         specifier: workspace:*
         version: link:../web
     devDependencies:
+      '@plane/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.62.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.12.0
       typescript:
         specifier: 5.8.3
         version: 5.8.3
