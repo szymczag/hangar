@@ -169,3 +169,31 @@ class WorkshopSchedule(BaseModel):
         self.workspace_id = self.issue.workspace_id
         self.project_id = self.issue.project_id
         super().save(*args, **kwargs)
+
+
+class WorkshopSession(BaseModel):
+    schedule = models.ForeignKey(WorkshopSchedule, on_delete=models.CASCADE, related_name="sessions")
+    position = models.PositiveIntegerField(default=0)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    preparation_minutes = models.PositiveIntegerField(
+        default=0, validators=[MinValueValidator(0), MaxValueValidator(1440)]
+    )
+    travel_before_minutes = models.PositiveIntegerField(
+        default=0, validators=[MinValueValidator(0), MaxValueValidator(1440)]
+    )
+    travel_after_minutes = models.PositiveIntegerField(
+        default=0, validators=[MinValueValidator(0), MaxValueValidator(1440)]
+    )
+    trainers = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="workshop_sessions")
+
+    class Meta:
+        db_table = "ext_workshop_sessions"
+        ordering = ("position", "starts_at", "id")
+        indexes = [models.Index(fields=["starts_at", "ends_at"], name="ext_workshop_session_range_idx")]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(ends_at__gt=models.F("starts_at")), name="ext_workshop_session_valid_range"
+            ),
+            models.UniqueConstraint(fields=["schedule", "position"], name="ext_workshop_session_position"),
+        ]

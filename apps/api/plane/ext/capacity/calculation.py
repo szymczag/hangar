@@ -20,7 +20,7 @@ from plane.ext.capacity.cache import (
     register_busy_cache_key,
 )
 from plane.ext.capacity.google import GoogleCalendarClient, GoogleCalendarError
-from plane.ext.models import TrainerProfile, WorkshopSchedule
+from plane.ext.models import TrainerProfile, WorkshopSchedule, WorkshopSession
 from plane.license.utils.instance_value import get_configuration_value
 
 DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
@@ -180,19 +180,43 @@ def _load_google_busy(trainer, start, end):
 
 
 def _workshops(workspace_id, trainer_ids, start, end):
-    schedules = (
+    sessions = (
+        WorkshopSession.objects.filter(
+            schedule__workspace_id=workspace_id,
+            trainers__id__in=trainer_ids,
+            starts_at__lt=end + timedelta(days=2),
+            ends_at__gt=start - timedelta(days=1),
+        )
+        .select_related("schedule__issue", "schedule__project")
+        .prefetch_related("trainers")
+        .distinct()
+    )
+    result = {trainer_id: [] for trainer_id in trainer_ids}
+    for session in sessions:
+        schedule = session.schedule
+        block_start = session.starts_at - timedelta(minutes=session.preparation_minutes + session.travel_before_minutes)
+        block_end = session.ends_at + timedelta(minutes=session.travel_after_minutes)
+        for trainer in session.trainers.all():
+            if trainer.id in result:
+                clipped_start, clipped_end = max(block_start, start), min(block_end, end)
+                if clipped_start < clipped_end:
+                    result[trainer.id].append((clipped_start, clipped_end, schedule))
+
+    # This compatibility path covers a rolling deployment before the data
+    # migration has backfilled an existing schedule.
+    legacy_schedules = (
         WorkshopSchedule.objects.filter(
             workspace_id=workspace_id,
             issue__issue_assignee__assignee_id__in=trainer_ids,
             starts_at__lt=end + timedelta(days=2),
             ends_at__gt=start - timedelta(days=1),
         )
+        .filter(sessions__isnull=True)
         .select_related("issue", "project")
         .prefetch_related("issue__issue_assignee")
         .distinct()
     )
-    result = {trainer_id: [] for trainer_id in trainer_ids}
-    for schedule in schedules:
+    for schedule in legacy_schedules:
         block_start = schedule.starts_at - timedelta(
             minutes=schedule.preparation_minutes + schedule.travel_before_minutes
         )
