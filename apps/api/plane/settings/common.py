@@ -265,7 +265,12 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework.authentication.SessionAuthentication",),
     "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.AnonRateThrottle",),
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "30/minute",
+        # Fork (see FORK.md): configurable like every other rate beside it. The
+        # unauthenticated rate is per client address, so anything that puts many
+        # browsers behind one address -- the visual regression stack, a corporate
+        # NAT -- exhausts thirty requests a minute and gets 429s that the web app
+        # reports as "Hangar didn't start correctly".
+        "anon": os.environ.get("ANON_RATE_LIMIT", "30/minute"),
         "asset_id": "5/minute",
         "runner_user_read": os.environ.get("RUNNER_API_USER_READ_RATE", "240/minute"),
         "runner_user_mutation": os.environ.get("RUNNER_API_USER_MUTATION_RATE", "60/minute"),

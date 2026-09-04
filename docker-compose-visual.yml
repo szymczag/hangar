@@ -1,0 +1,212 @@
+# Docker Compose for the visual regression suite.
+#
+# A sibling of docker-compose-test.yml rather than an extension of it: that
+# file's contract is "pytest in a box" and its service names would collide.
+#
+# Prerequisite:
+#   ./setup.sh                                   # creates apps/api/.env
+#   pnpm turbo run build --filter=web --filter=admin
+#
+# Usage:
+#   docker compose -f docker-compose-visual.yml up -d --wait
+#   docker compose -f docker-compose-visual.yml run --rm vr-playwright
+#   docker compose -f docker-compose-visual.yml down -v
+#
+# Notes:
+# - One origin. `vr-edge` serves the built SPAs and proxies /api, /auth and
+#   /static to the API, which is what removes the cookie-domain problem: the
+#   browser never leaves the origin it was handed a session on.
+# - There is a broker but deliberately no celery worker, and the distinction
+#   matters in both directions. Without a broker the API 500s wherever it
+#   enqueues (opening a project records a recent visit), which reads as an empty
+#   work-item list. Without a worker nothing advances the copy job, so the
+#   copy-progress strip's three-second poll returns byte-identical JSON and the
+#   page is stable to screenshot even though the network is not.
+# - The settings pinned on vr-api are the ones that would otherwise move every
+#   baseline: the instance default theme is configurable at runtime, so a stray
+#   change to it would silently reshoot every authenticated surface.
+
+services:
+  vr-db:
+    image: docker.io/library/postgres:15.7-alpine
+    networks: [vr_env]
+    env_file: [./apps/api/.env]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-plane}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-plane}
+      POSTGRES_DB: ${POSTGRES_DB:-plane}
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-plane} -d ${POSTGRES_DB:-plane}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  vr-redis:
+    image: docker.io/valkey/valkey:7.2.11-alpine
+    networks: [vr_env]
+    tmpfs: [/data]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  vr-minio:
+    image: quay.io/minio/minio
+    networks: [vr_env]
+    env_file: [./apps/api/.env]
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-access-key}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-secret-key}
+    entrypoint: >
+      /bin/sh -c "
+      mkdir -p /export/${AWS_S3_BUCKET_NAME:-uploads} &&
+      minio server /export --console-address ':9090' &
+      sleep 3 &&
+      mc alias set local http://localhost:9000 ${AWS_ACCESS_KEY_ID:-access-key} ${AWS_SECRET_ACCESS_KEY:-secret-key} &&
+      mc mb local/${AWS_S3_BUCKET_NAME:-uploads} -p || true &&
+      tail -f /dev/null
+      "
+    tmpfs: [/export]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  vr-api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.dev
+    networks: [vr_env]
+    env_file: [./apps/api/.env]
+    environment:
+      DJANGO_SETTINGS_MODULE: plane.settings.production
+      DEBUG: "0"
+      POSTGRES_HOST: vr-db
+      DATABASE_URL: postgresql://${POSTGRES_USER:-plane}:${POSTGRES_PASSWORD:-plane}@vr-db:5432/${POSTGRES_DB:-plane}
+      REDIS_HOST: vr-redis
+      REDIS_URL: redis://vr-redis:6379/
+      # A broker, but deliberately no worker. The API enqueues on paths the
+      # suite walks through -- opening a project records a recent visit -- and
+      # `.delay()` raises if it cannot reach a broker, which surfaced as a 500
+      # on the project endpoint and an empty work-item list. Pointing celery at
+      # the Redis already here means those enqueue and are never consumed, which
+      # is exactly what the copy-progress story needs: the job stays frozen at
+      # the counts the seed wrote instead of racing to completion.
+      AMQP_URL: redis://vr-redis:6379/1
+      AWS_S3_ENDPOINT_URL: http://vr-minio:9000
+      CORS_ALLOWED_ORIGINS: http://vr-edge,http://localhost:8100
+      # Fixed rather than random: a changing key changes what encrypted instance
+      # configuration decrypts to, and with it what the interface renders.
+      SECRET_KEY: visual-regression-fixed-key-do-not-use-anywhere-else
+      # Each of these is rendered somewhere, and each is configurable at runtime.
+      INSTANCE_DEFAULT_THEME: light
+      INSTANCE_DEFAULT_TIMEZONE: UTC
+      INSTANCE_DEFAULT_START_OF_WEEK: "1"
+      EMAIL_HOST: vr-smtp.invalid
+      # Every browser in the suite shares one address, and the sign-in page is
+      # unauthenticated, so the default thirty-a-minute is spent within a few
+      # runs. The symptom is a 429 on /api/instances/, which the web app renders
+      # as its "didn't start correctly" page -- indistinguishable, from a
+      # screenshot, from the application actually being broken.
+      ANON_RATE_LIMIT: 100000/minute
+      # Passed in by scripts/vr.mjs, read from the generated release notes. The
+      # build identity dialog hides its notes when this disagrees with the
+      # version compiled into the bundle -- which is the defect that prompted
+      # this suite -- so the story would otherwise screenshot the empty state
+      # and call it a pass.
+      APP_VERSION: ${APP_VERSION}
+      # Everything is behind one origin, so every cross-app URL must be relative.
+      # The API hands `admin_base_url` to the web app, which uses it to leave for
+      # the console; the default points at localhost:3001, which does not exist
+      # inside this network.
+      WEB_URL: ""
+      ADMIN_BASE_URL: ""
+      SPACE_BASE_URL: ""
+      LIVE_BASE_URL: ""
+      ADMIN_BASE_PATH: /god-mode
+      SPACE_BASE_PATH: /spaces
+    volumes:
+      - ./apps/api:/code
+      - vr-fixtures:/vr
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        python manage.py wait_for_db
+        python manage.py migrate --noinput
+        python manage.py register_instance "$${MACHINE_SIGNATURE:-visual-regression}" || true
+        python manage.py configure_instance || true
+        python manage.py create_bucket || true
+        python manage.py seed_visual_fixtures --out /vr/fixtures.json
+        # A real ASGI server rather than `manage.py runserver`, for two reasons
+        # that each cost a baseline. The dev server serves the suite's parallel
+        # workers slowly enough that a request can outlast the readiness timeout,
+        # and the app then renders its "didn't start correctly" page -- which
+        # failed the sign-in story roughly one run in four. It also watches the
+        # bind-mounted source and restarts on a change, mid-run if the timing is
+        # unlucky. uvicorn directly rather than behind gunicorn only because the
+        # dev image ships uvicorn and not gunicorn; production serves this same
+        # ASGI application through gunicorn's uvicorn worker.
+        exec python -m uvicorn plane.asgi:application --host 0.0.0.0 --port 8000 --workers 4
+    healthcheck:
+      # Probes the port, not the seed file. The manifest lives on a volume that
+      # outlives the container, so testing for it reports healthy while a
+      # replacement container is still running migrations -- and the edge then
+      # starts and 502s.
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/instances/',timeout=3)"
+          && test -f /vr/fixtures.json
+      interval: 5s
+      timeout: 10s
+      retries: 90
+    depends_on:
+      vr-db: { condition: service_healthy }
+      vr-redis: { condition: service_healthy }
+      vr-minio: { condition: service_healthy }
+
+  vr-edge:
+    image: docker.io/library/caddy:2-alpine
+    networks: [vr_env]
+    ports:
+      - "8100:80"
+    volumes:
+      - ./apps/visual-tests/Caddyfile.vr:/etc/caddy/Caddyfile:ro
+      - ./apps/web/build/client:/srv/web:ro
+      - ./apps/admin/build/client:/srv/admin:ro
+    depends_on:
+      vr-api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  vr-playwright:
+    # Pinned to the resolved @playwright/test version. The suite refuses to run
+    # if the two disagree, so bump them together.
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
+    networks: [vr_env]
+    environment:
+      VR_IN_CONTAINER: "1"
+      VR_PLAYWRIGHT_VERSION: "1.62.1"
+      VR_BASE_URL: http://vr-edge
+      VR_FIXTURES: /vr/fixtures.json
+      CI: "1"
+    volumes:
+      - .:/work
+      - vr-fixtures:/vr:ro
+    working_dir: /work/apps/visual-tests
+    command: ["npx", "playwright", "test"]
+    depends_on:
+      vr-edge: { condition: service_healthy }
+
+networks:
+  vr_env:
+
+volumes:
+  vr-fixtures:

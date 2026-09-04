@@ -1,0 +1,57 @@
+/**
+ * Copyright (c) 2026-present Maciej Szymczak and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
+import { expect, type Locator, type Page } from "@playwright/test";
+
+/**
+ * The only sanctioned way to take a screenshot in this suite.
+ *
+ * The readiness locator is mandatory, and that is the point. The translation
+ * provider renders nothing until it has loaded its strings, and several surfaces
+ * render nothing at all until their data arrives -- so a screenshot taken "when
+ * the page has loaded" is frequently a screenshot of an empty box, which is
+ * stable, pretty, and proves nothing forever.
+ *
+ * Waiting on the network is not an option either: the maintenance bar polls
+ * every sixty seconds and the copy strip every three, so `networkidle` does not
+ * merely under-deliver on those pages, it never fires.
+ */
+export async function capture(
+  page: Page,
+  name: string,
+  options: {
+    /** Something only present once the real content has rendered. */
+    ready: Locator;
+    /** Element to capture. Omit only for a deliberate full-viewport layout shot. */
+    target?: Locator;
+  }
+): Promise<void> {
+  // No timeout here on purpose. It is set once, for every assertion in the
+  // suite, in playwright.config.ts. A local override is how this ended up
+  // waiting 30s in some places and 60s in others, and the shorter number then
+  // decided which stories failed under load.
+  await expect(options.ready).toBeVisible();
+
+  // Fonts settle after first paint, and a shot taken before they do captures a
+  // fallback face that will never match the baseline.
+  await page.evaluate(() => document.fonts.ready);
+
+  const subject = options.target ?? page;
+  await expect(subject).toHaveScreenshot(`${name}.png`);
+}
+
+/**
+ * Wait for a headless-ui dialog to finish opening.
+ *
+ * `toBeVisible()` is satisfied at the *start* of a 300ms transition, so a
+ * screenshot taken on it catches the panel mid-fade. Asserting the settled
+ * values is a real assertion rather than a sleep, and it fails loudly if the
+ * transition is ever changed.
+ */
+export async function settled(dialog: Locator): Promise<void> {
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveCSS("opacity", "1");
+}

@@ -36,6 +36,7 @@ catalog:
   "@radix-ui/react-scroll-area": "^1.2.3"
   "@react-pdf/renderer": "^4.3.0"
   "@react-pdf/types": "^2.9.2"
+  "@playwright/test": "1.62.1"
   "@react-router/dev": "8.3.0"
   "@react-router/node": "8.3.0"
   "@react-router/serve": "8.3.0"

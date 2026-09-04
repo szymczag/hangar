@@ -234,6 +234,12 @@ jobs:
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ env.TURBO_SCM_BASE }}-${{ env.TURBO_SCM_HEAD }}
+          # Without a fallback this key misses on every push after the first --
+          # it names both SHAs -- so the cache was restored almost never and the
+          # job rebuilt its dependencies from cold each time.
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ env.TURBO_SCM_BASE }}-
+            turbo-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

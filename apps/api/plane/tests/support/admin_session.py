@@ -19,9 +19,8 @@ it installs a user without a session and thus without a marker.
 from importlib import import_module
 
 from django.conf import settings
-from django.utils import timezone
 
-from plane.ext.auth.webauthn import pending
+from plane.ext.auth.sessions import mint_admin_session
 
 
 def read_admin_session(client):
@@ -42,16 +41,15 @@ def authenticate_admin(client, user, verified=True):
     ``verified=False`` produces the half-authenticated state: a real session
     that has not presented a second factor, which every console endpoint must
     still refuse.
+
+    The minting itself lives in :mod:`plane.ext.auth.sessions`, shared with the
+    visual fixture seed so that what a browser is handed and what these tests
+    assert cannot drift apart.
     """
+    key = mint_admin_session(user, verified=verified)
+    client.cookies[settings.ADMIN_SESSION_COOKIE_NAME] = key
     engine = import_module(settings.SESSION_ENGINE)
-    session = engine.SessionStore()
-    session["_auth_user_id"] = str(user.id)
-    session["_auth_user_backend"] = "django.contrib.auth.backends.ModelBackend"
-    session["_auth_user_hash"] = user.get_session_auth_hash()
-    if verified:
-        session[pending.VERIFIED_AT_KEY] = timezone.now().isoformat()
-    store_admin_session(client, session)
-    return session
+    return engine.SessionStore(key)
 
 
 __all__ = ["authenticate_admin", "read_admin_session", "store_admin_session"]

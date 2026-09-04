@@ -1,0 +1,23 @@
+{
+  "name": "@hangar/visual-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "vr": "playwright test",
+    "vr:update": "playwright test --update-snapshots",
+    "check:lint": "node scripts/check-suite-invariants.mjs",
+    "check:types": "tsc --noEmit",
+    "check:format": "oxfmt --check ."
+  },
+  "dependencies": {
+    "admin": "workspace:*",
+    "web": "workspace:*"
+  },
+  "devDependencies": {
+    "@plane/typescript-config": "workspace:*",
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}
