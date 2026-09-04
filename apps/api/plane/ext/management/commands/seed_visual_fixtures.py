@@ -301,12 +301,8 @@ class Command(BaseCommand):
             # rendered down the left of the list. CI seeds a fresh volume and a
             # developer re-seeds a warm one, so without this the two disagree on
             # every baseline showing a work item.
-            Issue.objects.filter(pk=issue.pk).update(
-                created_at=stamped, updated_at=stamped, sequence_id=index
-            )
-            IssueSequence.objects.filter(issue=issue).update(
-                created_at=stamped, updated_at=stamped, sequence=index
-            )
+            Issue.objects.filter(pk=issue.pk).update(created_at=stamped, updated_at=stamped, sequence_id=index)
+            IssueSequence.objects.filter(issue=issue).update(created_at=stamped, updated_at=stamped, sequence=index)
 
     def _maintenance_notice(self) -> None:
         """An active notice, deliberately with no scheduled window.
