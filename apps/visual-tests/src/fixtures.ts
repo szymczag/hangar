@@ -8,9 +8,11 @@ import { test as base, type BrowserContext, type Page } from "@playwright/test";
 import { fixtures } from "./manifest.js";
 
 type Personas = {
-  /** Signed in. The persona decides the theme, because a signed-in user's
-   *  theme comes from their stored profile and overwrites anything else. */
-  asUser: (persona: "light" | "dark") => Promise<Page>;
+  /** Signed in to the web application. The persona decides the theme, because a
+   *  signed-in user's theme comes from their stored profile and overwrites
+   *  anything else -- and, for "admin", the workspace role: several settings
+   *  pages render "you are not authorized" for an ordinary member. */
+  asUser: (persona: "light" | "dark" | "admin") => Promise<Page>;
   /** Signed in to the instance console, second factor already presented. */
   asAdmin: () => Promise<Page>;
 };

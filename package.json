@@ -9,6 +9,7 @@
     "build": "turbo run build",
     "vr": "node scripts/vr.mjs",
     "vr:update": "node scripts/vr.mjs --update-snapshots",
+    "vr:stack": "node scripts/vr.mjs --stack-only",
     "dev": "turbo run dev --concurrency=18",
     "start": "turbo run start",
     "clean": "turbo run clean && rm -rf .turbo && rm -rf .next && rm -rf node_modules && rm -rf dist",

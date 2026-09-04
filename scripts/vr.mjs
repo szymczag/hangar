@@ -113,6 +113,13 @@ function assertBundleIsSameOrigin() {
 }
 
 const updating = process.argv.includes("--update-snapshots");
+// Bring the stack up, correctly, and leave it running for iteration. Driving
+// compose by hand instead skips two things that are easy to forget and hard to
+// diagnose: the bundles get built without this script's environment (so the app
+// talks to localhost:8000 and renders its "didn't start correctly" page), and
+// APP_VERSION goes unexpanded (so the API reports a literal "${APP_VERSION}").
+// Both have happened. `pnpm vr:stack` is the supported way to iterate.
+const stackOnly = process.argv.includes("--stack-only");
 const [composeBin, composeArgs] = composeCommand();
 const compose = (...rest) => run(composeBin, [...composeArgs, "-f", COMPOSE_FILE, ...rest]);
 
@@ -180,6 +187,24 @@ async function warmUp() {
   const html = await (await fetch(`${EDGE}/`)).text();
   const assets = [...html.matchAll(/["'](\/assets\/[^"']+)["']/g)].map((m) => m[1]);
   await Promise.all([...new Set(assets)].map((a) => fetch(`${EDGE}${a}`).catch(() => {})));
+}
+
+if (stackOnly) {
+  // Same teardown as the main path: `up` collides on container names otherwise,
+  // and a stack carried over from a previous iteration keeps its old seed.
+  try {
+    compose("down", "-v");
+  } catch {
+    // Nothing to tear down.
+  }
+  compose("up", "-d");
+  await warmUp();
+  console.log(
+    `\nStack is up and warm at ${EDGE}. Run specs against it with:\n` +
+      "  podman-compose -f docker-compose-visual.yml run --rm --no-deps vr-playwright npx playwright test\n" +
+      "and tear it down with `podman-compose -f docker-compose-visual.yml down -v`."
+  );
+  process.exit(0);
 }
 
 try {
