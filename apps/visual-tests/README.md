@@ -65,6 +65,19 @@ committing them, and it only works if the diff is actually looked at.
 4. **`--update-snapshots` never runs in CI.** If CI could rewrite baselines, the
    review would be theatre.
 
+### The one baseline that changes on a schedule
+
+`build-identity-*.png` photographs the release notes, so **preparing a release
+changes it**. That is not drift: the dialog's content genuinely changed, the
+diff shows exactly which lines, and the number of notes changes the dialog's
+height, so there is nothing to mask that would leave the story worth telling.
+
+Run `pnpm vr:update` as part of the release preparation and commit the two PNGs
+with the notes. If a release PR is red on `visual-regression` and the only diff
+is this dialog, that is the expected path and not a regression — but read the
+image anyway, because it is the one moment anybody looks at the release notes
+rendered rather than as markdown.
+
 ## Determinism
 
 The suite refuses to run outside its pinned container (`src/guards.ts`), and
