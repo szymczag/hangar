@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { dayBounds, intervalLabel, intervalPosition } from "./capacity-timeline.utils";
+import { CAPACITY_INTERVAL_LAYERS, dayBounds, intervalLabel, intervalPosition } from "./capacity-timeline.utils";
 
 describe("capacity timeline", () => {
   it("clips an interval to the visible day", () => {
@@ -36,5 +36,19 @@ describe("capacity timeline", () => {
         work_item: null,
       })
     ).toBe("Workshop (details restricted)");
+  });
+
+  it("renders working time below busy time and workshops", () => {
+    expect(CAPACITY_INTERVAL_LAYERS).toEqual(["working", "google_busy", "workshop"]);
+  });
+
+  it("labels Google intervals without exposing event details", () => {
+    expect(
+      intervalLabel({
+        kind: "google_busy",
+        start: "2026-09-07T09:00:00Z",
+        end: "2026-09-07T10:00:00Z",
+      })
+    ).toBe("Busy — Google Calendar");
   });
 });

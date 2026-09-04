@@ -9,7 +9,7 @@ import binascii
 import hashlib
 import logging
 import secrets
-from datetime import date, timedelta
+from datetime import timedelta
 from urllib.parse import urlencode
 from uuid import UUID
 import base64 as cursor_base64
@@ -22,7 +22,6 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from plane.app.views.base import BaseAPIView
@@ -35,7 +34,6 @@ from plane.ext.capacity import (
     calculate_workspace_capacity,
     decrypt_value,
     encrypt_value,
-    validate_intervals,
     validate_weekly_schedule,
 )
 from plane.ext.capacity.schedules import validate_timezone
@@ -46,7 +44,6 @@ from plane.ext.models import (
     GoogleCalendarCredential,
     TrainerCalendarSelection,
     TrainerProfile,
-    TrainerScheduleException,
     WorkshopSchedule,
 )
 from plane.ext.services import ensure_workspace_workshop_type
@@ -75,6 +72,28 @@ def _parse_granted_scopes(scope: object) -> set[str]:
 
 def _has_required_calendar_scopes(granted: set[str]) -> bool:
     return REQUIRED_CALENDAR_SCOPES.issubset(granted) and not EMAIL_SCOPE_ALIASES.isdisjoint(granted)
+
+
+def _select_primary_calendar(client, selection, *, created: bool) -> None:
+    if selection.calendar_id_hashes:
+        return
+    try:
+        primary = next((item for item in client.list_calendars(selection.credential) if item["primary"]), None)
+        if primary is None:
+            raise GoogleCalendarError("primary_calendar_missing")
+        encrypted, key_id = encrypt_value(primary["id"])
+        if key_id != selection.credential.encryption_key_id:
+            raise GoogleCalendarError("calendar_encryption_key_mismatch")
+        selection.encrypted_calendar_ids = [encrypted]
+        selection.calendar_id_hashes = [TrainerCalendarSelection.calendar_hash(primary["id"])]
+        if not created:
+            selection.revision += 1
+        selection.save(update_fields=["encrypted_calendar_ids", "calendar_id_hashes", "revision", "updated_at"])
+    except (GoogleCalendarError, KeyError, ValueError):
+        logger.warning(
+            "Google Calendar primary calendar was not selected automatically",
+            extra={"error_code": "primary_calendar_autoselect_failed"},
+        )
 
 
 def _audit(request, *, workspace_id, action, trainer_id=None, issue_id=None, metadata=None):
@@ -121,10 +140,6 @@ def _profile_payload(profile):
         "weekly_schedule": profile.weekly_schedule,
         "schedule_revision": profile.schedule_revision,
         "connection_status": connection_status,
-        "exceptions": [
-            {"date": item.local_date.isoformat(), "mode": item.mode, "intervals": item.intervals}
-            for item in profile.schedule_exceptions.all()
-        ],
     }
 
 
@@ -138,7 +153,7 @@ class TrainerSelfEndpoint(BaseAPIView):
         profile = (
             TrainerProfile.objects.filter(workspace__slug=slug, user=request.user)
             .select_related("user")
-            .prefetch_related("schedule_exceptions", "calendar_selection__credential")
+            .prefetch_related("calendar_selection__credential")
             .first()
         )
         return Response(_profile_payload(profile) if profile else None)
@@ -163,9 +178,7 @@ class TrainerSelfEndpoint(BaseAPIView):
             action=CapacityAuditEvent.Action.TRAINER_ACTIVATED,
         )
         ensure_workspace_workshop_type(workspace)
-        profile = (
-            TrainerProfile.objects.prefetch_related("schedule_exceptions").select_related("user").get(pk=profile.pk)
-        )
+        profile = TrainerProfile.objects.select_related("user").get(pk=profile.pk)
         return Response(_profile_payload(profile), status=status.HTTP_201_CREATED)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
@@ -193,7 +206,7 @@ class TrainerListEndpoint(BaseAPIView):
         profiles = (
             TrainerProfile.objects.filter(workspace__slug=slug)
             .select_related("user")
-            .prefetch_related("schedule_exceptions", "calendar_selection__credential")
+            .prefetch_related("calendar_selection__credential")
         )
         cursor = request.query_params.get("cursor")
         if cursor:
@@ -215,7 +228,7 @@ class TrainerScheduleEndpoint(BaseAPIView):
 
     def _profile(self, slug, user_id):
         return get_object_or_404(
-            TrainerProfile.objects.select_related("user").prefetch_related("schedule_exceptions"),
+            TrainerProfile.objects.select_related("user"),
             workspace__slug=slug,
             user_id=user_id,
         )
@@ -242,6 +255,11 @@ class TrainerScheduleEndpoint(BaseAPIView):
         profile = self._profile(slug, user_id)
         if not self._may_edit(request, profile):
             return Response({"error": "You cannot edit this trainer."}, status=status.HTTP_403_FORBIDDEN)
+        if "exceptions" in request.data:
+            return Response(
+                {"error": "Schedule exceptions are no longer supported. Block that time in Google Calendar."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             supplied_revision = int(request.data.get("schedule_revision"))
         except (TypeError, ValueError):
@@ -267,37 +285,12 @@ class TrainerScheduleEndpoint(BaseAPIView):
             profile.status = request.data["status"]
         profile.schedule_revision += 1
         profile.save()
-        if "exceptions" in request.data:
-            exceptions = request.data["exceptions"]
-            if not isinstance(exceptions, list) or len(exceptions) > 366:
-                raise ValidationError({"error": "Invalid schedule exceptions."})
-            rows = []
-            seen = set()
-            for item in exceptions:
-                try:
-                    local_date = date.fromisoformat(item["date"])
-                    mode = item["mode"]
-                except (KeyError, TypeError, ValueError):
-                    raise ValidationError({"error": "Invalid schedule exception."})
-                if local_date in seen or mode not in TrainerScheduleException.Mode.values:
-                    raise ValidationError({"error": "Invalid schedule exception."})
-                seen.add(local_date)
-                intervals = (
-                    []
-                    if mode == TrainerScheduleException.Mode.UNAVAILABLE
-                    else validate_intervals(item.get("intervals", []))
-                )
-                rows.append(
-                    TrainerScheduleException(trainer=profile, local_date=local_date, mode=mode, intervals=intervals)
-                )
-            TrainerScheduleException.objects.filter(trainer=profile).delete()
-            TrainerScheduleException.objects.bulk_create(rows)
         _audit(
             request,
             workspace_id=profile.workspace_id,
             trainer_id=profile.user_id,
             action=CapacityAuditEvent.Action.SCHEDULE_UPDATED,
-            metadata={"exception_count": len(request.data.get("exceptions", profile.schedule_exceptions.all()))},
+            metadata={},
         )
         return Response(_profile_payload(self._profile(slug, user_id)))
 
@@ -379,7 +372,10 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                     "last_error_code": "",
                 },
             )
-            TrainerCalendarSelection.objects.update_or_create(trainer=trainer, defaults={"credential": credential})
+            selection, created = TrainerCalendarSelection.objects.update_or_create(
+                trainer=trainer, defaults={"credential": credential}
+            )
+            _select_primary_calendar(client, selection, created=created)
             _audit(
                 request,
                 workspace_id=trainer.workspace_id,

@@ -146,8 +146,8 @@ The integration is opt-in and disabled by default:
 googleCalendarCapacity:
   enabled: true
   limits:
-    userRate: 10/minute
-    workspaceRate: 30/minute
+    userRate: 20/minute
+    workspaceRate: 60/minute
 
 existingSecrets:
   application:

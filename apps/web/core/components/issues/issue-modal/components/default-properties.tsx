@@ -32,6 +32,7 @@ import { useProjectEstimates } from "@/hooks/store/estimates";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
 import { usePlatformOS } from "@/hooks/use-platform-os";
+import { IssueTypeSelect } from "@/plane-web/components/issues/issue-modal/issue-type-select";
 
 type TIssueDefaultPropertiesProps = {
   control: Control<TIssue>;
@@ -85,6 +86,14 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <div className="h-7">
+        <IssueTypeSelect
+          control={control}
+          projectId={projectId}
+          placeholder="Work item type"
+          handleFormChange={handleFormChange}
+        />
+      </div>
       <Controller
         control={control}
         name="state_id"

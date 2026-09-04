@@ -4,8 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import { useMemo, useState } from "react";
-import { CalendarClock, ChevronLeft, ChevronRight, CircleAlert, Link2, Plus, Trash2, Unplug } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { CalendarClock, ChevronLeft, ChevronRight, CircleAlert, Link2, Trash2, Unplug } from "lucide-react";
 import useSWR from "swr";
 import { Button } from "@plane/propel/button";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
@@ -17,22 +17,24 @@ import { useUserPermissions } from "@/hooks/store/user";
 import { useInstance } from "@/hooks/store/use-instance";
 import {
   CapacityService,
+  CapacityRequestError,
   type TGoogleCalendar,
   type TTrainerCapacity,
-  type TTrainerException,
   type TTrainerProfile,
 } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
-import { dayBounds, intervalLabel, intervalPosition } from "./capacity-timeline.utils";
+import { CAPACITY_INTERVAL_LAYERS, dayBounds, intervalLabel, intervalPosition } from "./capacity-timeline.utils";
 
 const capacityService = new CapacityService();
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function errorMessage(error: unknown, fallback: string) {
-  return typeof error === "object" && error !== null && "error" in error && typeof error.error === "string"
-    ? error.error
-    : fallback;
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error !== "object" || error === null) return fallback;
+  if ("error" in error && typeof error.error === "string") return error.error;
+  if ("detail" in error && typeof error.detail === "string") return error.detail;
+  return fallback;
 }
 
 function startOfWeek(value: Date) {
@@ -47,187 +49,6 @@ function shiftWeek(value: Date, weeks: number) {
   const result = new Date(value);
   result.setDate(result.getDate() + weeks * 7);
   return result;
-}
-
-function ExceptionsEditor({
-  profile,
-  workspaceSlug,
-  onSaved,
-}: {
-  profile: TTrainerProfile;
-  workspaceSlug: string;
-  onSaved: () => void;
-}) {
-  const [exceptions, setExceptions] = useState<TTrainerException[]>(profile.exceptions);
-  const [saving, setSaving] = useState(false);
-  const setExceptionInterval = (exceptionIndex: number, intervalIndex: number, field: "start" | "end", value: string) =>
-    setExceptions((current) =>
-      current.map((entry, position) => {
-        if (position !== exceptionIndex) return entry;
-        const intervals = [...entry.intervals];
-        intervals[intervalIndex] = { ...intervals[intervalIndex], [field]: value };
-        return { ...entry, intervals };
-      })
-    );
-  const addDate = () => {
-    const date = new Date().toISOString().slice(0, 10);
-    if (!exceptions.some((item) => item.date === date))
-      setExceptions((current) => [...current, { date, mode: "unavailable", intervals: [] }]);
-  };
-  const save = async () => {
-    setSaving(true);
-    try {
-      await capacityService.updateSchedule(workspaceSlug, profile.user_id, profile.schedule_revision, { exceptions });
-      setToast({
-        type: TOAST_TYPE.SUCCESS,
-        title: "Exceptions saved",
-        message: "The capacity ledger now reflects these dates.",
-      });
-      onSaved();
-    } catch (error: unknown) {
-      setToast({
-        type: TOAST_TYPE.ERROR,
-        title: "Exceptions not saved",
-        message: errorMessage(error, "Check the dates and try again."),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-  return (
-    <section className="rounded-lg border border-subtle bg-surface-1 p-4">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-body-sm-medium">Schedule exceptions</h2>
-          <p className="mt-1 text-body-xs-regular text-secondary">
-            Mark a date unavailable, or override it with specific working intervals.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={addDate}>
-            <Plus className="mr-1 size-3.5" />
-            Add date
-          </Button>
-          <Button variant="primary" size="sm" loading={saving} onClick={save}>
-            Save dates
-          </Button>
-        </div>
-      </div>
-      {exceptions.length ? (
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {exceptions.map((item, index) => (
-            <div key={item.date} className="rounded-md border border-subtle p-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={item.date}
-                  onChange={(event) =>
-                    setExceptions((current) =>
-                      current.map((entry, position) =>
-                        position === index ? { ...entry, date: event.target.value } : entry
-                      )
-                    )
-                  }
-                  className="min-w-0 flex-1 rounded border border-subtle bg-surface-2 px-2 py-1 text-body-xs-regular"
-                />
-                <select
-                  aria-label={`Availability mode for ${item.date}`}
-                  value={item.mode}
-                  onChange={(event) =>
-                    setExceptions((current) =>
-                      current.map((entry, position) =>
-                        position === index
-                          ? {
-                              ...entry,
-                              mode: event.target.value as TTrainerException["mode"],
-                              intervals:
-                                event.target.value === "override" && entry.intervals.length === 0
-                                  ? [{ start: "09:00", end: "17:00" }]
-                                  : entry.intervals,
-                            }
-                          : entry
-                      )
-                    )
-                  }
-                  className="rounded border border-subtle bg-surface-2 px-2 py-1 text-body-xs-regular"
-                >
-                  <option value="unavailable">Unavailable</option>
-                  <option value="override">Custom hours</option>
-                </select>
-                <button
-                  type="button"
-                  aria-label={`Remove exception for ${item.date}`}
-                  className="rounded p-1 text-secondary hover:text-danger-primary"
-                  onClick={() => setExceptions((current) => current.filter((_, position) => position !== index))}
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-              {item.mode === "override" ? (
-                <div className="mt-2 flex flex-col gap-1">
-                  {item.intervals.map((interval, intervalIndex) => (
-                    <div key={`${interval.start}-${interval.end}`} className="flex items-center gap-1">
-                      <input
-                        aria-label={`Override interval ${intervalIndex + 1} start`}
-                        type="time"
-                        value={interval.start}
-                        onChange={(event) => setExceptionInterval(index, intervalIndex, "start", event.target.value)}
-                        className="rounded border border-subtle bg-surface-2 px-1 py-1 text-11"
-                      />
-                      <span className="text-11 text-secondary">–</span>
-                      <input
-                        aria-label={`Override interval ${intervalIndex + 1} end`}
-                        type="time"
-                        value={interval.end}
-                        onChange={(event) => setExceptionInterval(index, intervalIndex, "end", event.target.value)}
-                        className="rounded border border-subtle bg-surface-2 px-1 py-1 text-11"
-                      />
-                      <button
-                        type="button"
-                        aria-label={`Remove override interval ${intervalIndex + 1}`}
-                        onClick={() =>
-                          setExceptions((current) =>
-                            current.map((entry, position) =>
-                              position === index
-                                ? {
-                                    ...entry,
-                                    intervals: entry.intervals.filter((_, itemIndex) => itemIndex !== intervalIndex),
-                                  }
-                                : entry
-                            )
-                          )
-                        }
-                        className="rounded p-1 text-secondary hover:text-danger-primary"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="self-start text-11 text-accent-primary"
-                    onClick={() =>
-                      setExceptions((current) =>
-                        current.map((entry, position) =>
-                          position === index
-                            ? { ...entry, intervals: [...entry.intervals, { start: "13:00", end: "17:00" }] }
-                            : entry
-                        )
-                      )
-                    }
-                  >
-                    + Add interval
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-body-xs-regular text-placeholder">No dates blocked.</p>
-      )}
-    </section>
-  );
 }
 
 function formatMinutes(value: number) {
@@ -254,36 +75,50 @@ function availabilityCopy(status: string) {
 
 function TrainerWeekTimeline({ trainer, weekStart }: { trainer: TTrainerCapacity; weekStart: Date }) {
   return (
-    <div className="bg-subtle grid grid-cols-7 gap-px overflow-hidden rounded-md border border-subtle">
+    <div className="bg-subtle grid min-w-[1120px] grid-cols-7 gap-px overflow-hidden rounded-md border border-subtle">
       {DAY_KEYS.map((day, dayIndex) => {
         const bounds = dayBounds(weekStart, dayIndex);
         return (
           <div
             key={day}
-            className="relative h-12 min-w-24 bg-surface-2"
+            className="relative h-14 min-w-40 bg-surface-2"
             aria-label={`${DAY_LABELS[dayIndex]} schedule`}
           >
-            {trainer.intervals.map((interval) => {
-              const position = intervalPosition(interval, bounds.start, bounds.end);
-              if (!position) return null;
-              const className =
-                interval.kind === "working"
-                  ? "top-1 bottom-1 bg-success-secondary"
-                  : interval.kind === "google_busy"
-                    ? "top-2 bottom-2 bg-neutral-500/55"
-                    : "top-2 bottom-2 bg-accent-primary/70";
-              const label = intervalLabel(interval);
-              return (
-                <button
-                  key={`${interval.kind}-${interval.start}-${interval.end}`}
-                  type="button"
-                  aria-label={`${label}, ${new Date(interval.start).toLocaleString()} to ${new Date(interval.end).toLocaleString()}`}
-                  title={label}
-                  className={`absolute rounded-sm ${className}`}
-                  style={position}
-                />
-              );
-            })}
+            {[0, 6, 12, 18, 24].map((hour) => (
+              <span
+                key={hour}
+                aria-hidden="true"
+                className="absolute top-0 bottom-0 z-0 border-l border-subtle text-[8px] text-placeholder"
+                style={{ left: `${(hour / 24) * 100}%` }}
+              >
+                <span className={hour === 24 ? "-translate-x-full" : ""}>{String(hour).padStart(2, "0")}</span>
+              </span>
+            ))}
+            {CAPACITY_INTERVAL_LAYERS.flatMap((kind) =>
+              trainer.intervals
+                .filter((interval) => interval.kind === kind)
+                .map((interval) => {
+                  const position = intervalPosition(interval, bounds.start, bounds.end);
+                  if (!position) return null;
+                  const className =
+                    interval.kind === "working"
+                      ? "top-3 bottom-1 z-10 bg-success-secondary"
+                      : interval.kind === "google_busy"
+                        ? "top-4 bottom-2 z-20 bg-neutral-500/70"
+                        : "top-4 bottom-2 z-20 bg-accent-primary/80";
+                  const label = intervalLabel(interval);
+                  return (
+                    <button
+                      key={`${interval.kind}-${interval.start}-${interval.end}-${interval.work_item?.id ?? "anonymous"}`}
+                      type="button"
+                      aria-label={`${label}, ${new Date(interval.start).toLocaleString()} to ${new Date(interval.end).toLocaleString()}`}
+                      title={label}
+                      className={`absolute rounded-sm ${className}`}
+                      style={position}
+                    />
+                  );
+                })
+            )}
             {trainer.conflicts.map((conflict) => {
               const position = intervalPosition(conflict, bounds.start, bounds.end);
               if (!position) return null;
@@ -293,7 +128,7 @@ function TrainerWeekTimeline({ trainer, weekStart }: { trainer: TTrainerCapacity
                   role="img"
                   aria-label={`Conflict: ${conflict.kind.replaceAll("_", " ")}`}
                   title={`Conflict: ${conflict.kind.replaceAll("_", " ")}`}
-                  className="border-danger-primary absolute top-0 bottom-0 border"
+                  className="border-danger-primary absolute top-0 bottom-0 z-30 border"
                   style={{
                     ...position,
                     backgroundImage:
@@ -306,6 +141,42 @@ function TrainerWeekTimeline({ trainer, weekStart }: { trainer: TTrainerCapacity
         );
       })}
     </div>
+  );
+}
+
+function bookingHoursSummary(profile: TTrainerProfile) {
+  const grouped = new Map<string, number[]>();
+  DAY_KEYS.forEach((day, index) => {
+    const intervals = profile.weekly_schedule[day] ?? [];
+    if (!intervals.length) return;
+    const label = intervals.map((interval) => `${interval.start}–${interval.end}`).join(", ");
+    grouped.set(label, [...(grouped.get(label) ?? []), index]);
+  });
+  const groups = [...grouped.entries()].map(([hours, dayIndexes]) => {
+    const consecutive = dayIndexes.every((dayIndex, index) => index === 0 || dayIndex === dayIndexes[index - 1] + 1);
+    const days =
+      consecutive && dayIndexes.length > 1
+        ? `${DAY_LABELS[dayIndexes[0]]}–${DAY_LABELS[dayIndexes.at(-1) ?? 0]}`
+        : dayIndexes.map((dayIndex) => DAY_LABELS[dayIndex]).join(", ");
+    return `${days} ${hours}`;
+  });
+  return groups.length ? groups.join(" · ") : "No booking hours";
+}
+
+function BookingHoursSummary({ profile, onManage }: { profile: TTrainerProfile; onManage: () => void }) {
+  return (
+    <section className="flex flex-col justify-between gap-4 rounded-lg border border-subtle bg-surface-1 p-4 md:flex-row md:items-center">
+      <div>
+        <h2 className="text-body-sm-medium">Booking hours · {profile.display_name}</h2>
+        <p className="mt-1 text-body-xs-regular text-secondary">{bookingHoursSummary(profile)}</p>
+        <p className="mt-1 text-11 text-placeholder">
+          {profile.timezone} · Google busy time and scheduled workshops are subtracted inside these hours.
+        </p>
+      </div>
+      <Button variant="secondary" size="sm" onClick={onManage}>
+        Manage schedule
+      </Button>
+    </section>
   );
 }
 
@@ -342,7 +213,7 @@ function ScheduleEditor({
   const toggleDay = (day: string) => {
     setSchedule((current) => ({
       ...current,
-      [day]: current[day]?.length ? [] : [{ start: "09:00", end: "17:00" }],
+      [day]: current[day]?.length ? [] : [{ start: "09:00", end: "22:00" }],
     }));
   };
 
@@ -355,14 +226,14 @@ function ScheduleEditor({
       });
       setToast({
         type: TOAST_TYPE.SUCCESS,
-        title: "Working hours saved",
+        title: "Booking hours saved",
         message: "Capacity now uses this weekly schedule.",
       });
       onSaved();
     } catch (error: unknown) {
       setToast({
         type: TOAST_TYPE.ERROR,
-        title: "Working hours not saved",
+        title: "Booking hours not saved",
         message: errorMessage(error, "Check the time ranges and try again."),
       });
     } finally {
@@ -374,8 +245,11 @@ function ScheduleEditor({
     <section className="rounded-lg border border-subtle bg-surface-1 p-4">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-body-sm-medium">Working week · {profile.display_name}</h2>
-          <p className="mt-1 text-body-xs-regular text-secondary">Busy time is subtracted only inside these hours.</p>
+          <h2 className="text-body-sm-medium">Booking hours · {profile.display_name}</h2>
+          <p className="mt-1 text-body-xs-regular text-secondary">
+            Set the weekly windows in which this trainer may be booked. Google busy time and scheduled workshops are
+            subtracted inside them.
+          </p>
         </div>
         <Button variant="primary" size="sm" loading={saving} onClick={save}>
           Save hours
@@ -459,9 +333,11 @@ function CalendarPicker({
   selectionRevision: number;
   onSaved: () => void;
 }) {
-  const [selected, setSelected] = useState(
-    () => new Set(calendars.filter((item) => item.selected).map((item) => item.id))
-  );
+  const [selected, setSelected] = useState(() => {
+    const saved = calendars.filter((item) => item.selected).map((item) => item.id);
+    const primary = calendars.find((item) => item.primary)?.id;
+    return new Set(saved.length || !primary ? saved : [primary]);
+  });
   const [saving, setSaving] = useState(false);
   const save = async () => {
     setSaving(true);
@@ -515,6 +391,11 @@ function CalendarPicker({
           </label>
         ))}
       </div>
+      {selected.size === 0 ? (
+        <p role="alert" className="mt-2 text-11 text-danger-primary">
+          Select at least one blocking calendar. Primary may be replaced by another calendar.
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -532,6 +413,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const capacityRefreshRef = useRef<Promise<unknown> | null>(null);
   const weekEnd = useMemo(() => shiftWeek(weekStart, 1), [weekStart]);
   const rangeKey = `${weekStart.toISOString()}:${weekEnd.toISOString()}`;
   const {
@@ -551,13 +433,26 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   } = useSWR(
     featureEnabled && trainers ? ["capacity", workspaceSlug, rangeKey, trainerIds.join(",")] : null,
     () => capacityService.getCapacity(workspaceSlug, weekStart.toISOString(), weekEnd.toISOString(), trainerIds),
-    { keepPreviousData: true }
+    {
+      keepPreviousData: true,
+      dedupingInterval: 5_000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
+        if (retryCount >= 3) return;
+        const retryAfter = error instanceof CapacityRequestError ? error.retryAfterSeconds : undefined;
+        const delay = Math.min(60, Math.max(retryAfter ?? 0, 5 * 2 ** retryCount));
+        globalThis.setTimeout(() => revalidate({ retryCount }), delay * 1000);
+      },
+    }
   );
   const { data: ownProfile, mutate: mutateOwnProfile } = useSWR(
     featureEnabled ? ["capacity-trainer-self", workspaceSlug] : null,
     () => capacityService.getOwnTrainerProfile(workspaceSlug)
   );
-  const editingProfile = trainers?.find((trainer) => trainer.user_id === editingTrainerId);
+  const editingProfile =
+    trainers?.find((trainer) => trainer.user_id === editingTrainerId) ??
+    (ownProfile?.user_id === editingTrainerId ? ownProfile : undefined);
   const hasActiveProfile = ownProfile?.status === "active";
   const isConnected = hasActiveProfile && ownProfile?.connection_status === "connected";
   const { data: calendars, mutate: mutateCalendars } = useSWR(
@@ -565,7 +460,17 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
     () => capacityService.listCalendars(workspaceSlug)
   );
 
-  const refresh = () => Promise.all([mutateTrainers(), mutateOwnProfile(), mutateCapacity()]);
+  const refreshCapacity = useCallback(() => {
+    if (capacityRefreshRef.current) return capacityRefreshRef.current;
+    capacityRefreshRef.current = mutateCapacity().finally(() => {
+      capacityRefreshRef.current = null;
+    });
+    return capacityRefreshRef.current;
+  }, [mutateCapacity]);
+  const refresh = useCallback(async () => {
+    await Promise.all([mutateTrainers(), mutateOwnProfile()]);
+    await refreshCapacity();
+  }, [mutateOwnProfile, mutateTrainers, refreshCapacity]);
   const optIn = async () => {
     setOptingIn(true);
     try {
@@ -676,22 +581,30 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               </Button>
             </div>
           </div>
-          {capacityLoading || trainersLoading ? (
+          {(capacityLoading || trainersLoading) && !capacity ? (
             <div className="grid min-h-56 place-items-center">
               <Spinner />
             </div>
-          ) : capacityError ? (
+          ) : capacityError && !capacity ? (
             <div role="alert" className="flex min-h-56 flex-col items-center justify-center gap-2 px-5 text-center">
               <CircleAlert className="size-6 text-danger-primary" />
               <h2 className="text-body-sm-medium">Capacity could not be loaded</h2>
               <p className="text-body-xs-regular text-secondary">{errorMessage(capacityError, "Try again shortly.")}</p>
-              <Button variant="secondary" size="sm" onClick={() => mutateCapacity()}>
+              <Button variant="secondary" size="sm" onClick={() => refreshCapacity()}>
                 Retry
               </Button>
             </div>
           ) : capacity?.trainers.length ? (
             <div className="overflow-x-auto">
-              <div className="min-w-[1040px]">
+              <div className="min-w-[1510px]">
+                {capacityError ? (
+                  <div
+                    role="status"
+                    className="bg-warning-secondary border-b border-subtle px-5 py-2 text-11 text-secondary"
+                  >
+                    Availability is being refreshed. The last request was rate limited or temporarily unavailable.
+                  </div>
+                ) : null}
                 <div className="grid grid-cols-[190px_1fr_160px] items-end gap-4 border-b border-subtle bg-surface-2 px-5 py-3">
                   <div className="text-11 font-semibold tracking-wide text-placeholder uppercase">Trainer</div>
                   <div className="grid grid-cols-7 gap-px text-center text-11 text-secondary">
@@ -734,7 +647,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                             {trainer.conflicts.length === 1 ? "" : "s"}
                           </div>
                         ) : null}
-                        {isAdmin ? (
+                        {isAdmin || trainer.trainer_id === ownProfile?.user_id ? (
                           <button
                             type="button"
                             className="mt-2 text-11 text-accent-primary"
@@ -815,7 +728,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
           )}
         </section>
 
-        {isAdmin && editingProfile ? (
+        {editingProfile && (isAdmin || editingProfile.user_id === ownProfile?.user_id) ? (
           <section aria-label={`Manage ${editingProfile.display_name}`} className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-body-sm-medium">Managing {editingProfile.display_name}</h2>
@@ -829,39 +742,23 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               workspaceSlug={workspaceSlug}
               onSaved={refresh}
             />
-            <ExceptionsEditor
-              key={`${editingProfile.id}-${editingProfile.schedule_revision}-exceptions`}
-              profile={editingProfile}
-              workspaceSlug={workspaceSlug}
-              onSaved={refresh}
-            />
           </section>
         ) : null}
 
         {ownProfile && hasActiveProfile ? (
           <>
-            {!isAdmin || editingTrainerId !== ownProfile.user_id ? (
-              <>
-                <ScheduleEditor
-                  key={`${ownProfile.id}-${ownProfile.schedule_revision}-schedule`}
-                  profile={ownProfile}
-                  workspaceSlug={workspaceSlug}
-                  onSaved={refresh}
-                />
-                <ExceptionsEditor
-                  key={`${ownProfile.id}-${ownProfile.schedule_revision}-exceptions`}
-                  profile={ownProfile}
-                  workspaceSlug={workspaceSlug}
-                  onSaved={refresh}
-                />
-              </>
+            {editingTrainerId !== ownProfile.user_id ? (
+              <BookingHoursSummary profile={ownProfile} onManage={() => setEditingTrainerId(ownProfile.user_id)} />
             ) : null}
             {isConnected && calendars ? (
               <CalendarPicker
                 workspaceSlug={workspaceSlug}
                 calendars={calendars.calendars}
                 selectionRevision={calendars.selection_revision}
-                onSaved={() => Promise.all([mutateCalendars(), mutateCapacity()]).then(() => undefined)}
+                onSaved={async () => {
+                  await mutateCalendars();
+                  await refreshCapacity();
+                }}
               />
             ) : (
               <section className="flex flex-col justify-between gap-4 rounded-lg border border-subtle bg-surface-1 p-4 md:flex-row md:items-center">

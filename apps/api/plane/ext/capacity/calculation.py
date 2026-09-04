@@ -73,18 +73,11 @@ def _subtract(intervals, blockers):
 
 def _working_intervals(trainer, start, end):
     zone = ZoneInfo(trainer.timezone)
-    exceptions = {item.local_date: item for item in trainer.schedule_exceptions.all()}
     local_date = start.astimezone(zone).date()
     last_date = (end - timedelta(microseconds=1)).astimezone(zone).date()
     result = []
     while local_date <= last_date:
-        exception = exceptions.get(local_date)
-        if exception and exception.mode == exception.Mode.UNAVAILABLE:
-            values = []
-        elif exception and exception.mode == exception.Mode.OVERRIDE:
-            values = exception.intervals
-        else:
-            values = trainer.weekly_schedule.get(DAY_KEYS[local_date.weekday()], [])
+        values = trainer.weekly_schedule.get(DAY_KEYS[local_date.weekday()], [])
         for value in values:
             local_start = datetime.combine(local_date, time.fromisoformat(value["start"]), tzinfo=zone)
             local_end = datetime.combine(local_date, time.fromisoformat(value["end"]), tzinfo=zone)
@@ -220,7 +213,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
     trainers = (
         TrainerProfile.objects.filter(workspace=workspace, status=TrainerProfile.Status.ACTIVE)
         .select_related("user")
-        .prefetch_related("schedule_exceptions", "calendar_selection__credential")
+        .prefetch_related("calendar_selection__credential")
     )
     if trainer_ids:
         trainers = trainers.filter(user_id__in=trainer_ids)

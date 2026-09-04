@@ -141,8 +141,8 @@ assert_present '^kind: PodDisruptionBudget$' "$imports_render" "the enabled mult
 assert_absent '^[[:space:]]+TODOIST_IMPORT_[A-Z_]+: "?[-+0-9.]+[eE][-+0-9]+' "$imports_render" "import integer settings must not use exponent notation"
 
 assert_present '^  ENABLE_GOOGLE_CALENDAR_CAPACITY: "1"$' "$calendar_render" "enabled calendar capacity must reach every application workload"
-assert_present '^  CALENDAR_CAPACITY_USER_RATE: "10/minute"$' "$calendar_render" "calendar user admission rate must render"
-assert_present '^  CALENDAR_CAPACITY_WORKSPACE_RATE: "30/minute"$' "$calendar_render" "calendar workspace admission rate must render"
+assert_present '^  CALENDAR_CAPACITY_USER_RATE: "20/minute"$' "$calendar_render" "calendar user admission rate must render"
+assert_present '^  CALENDAR_CAPACITY_WORKSPACE_RATE: "60/minute"$' "$calendar_render" "calendar workspace admission rate must render"
 calendar_key_consumers="$(grep -Ec '^[[:space:]]+- name: CALENDAR_TOKEN_ENCRYPTION_KEYS$' "$calendar_render")"
 [[ "$calendar_key_consumers" -eq 4 ]] || fail "API, workers, and migrator must receive the calendar token keyring when enabled"
 assert_absent '^[[:space:]]+- name: CALENDAR_TOKEN_ENCRYPTION_KEYS$' "$production_render" "disabled calendar capacity must not mount its keyring"
