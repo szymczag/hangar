@@ -92,7 +92,9 @@ deploy/selfhost/plane-app/
 
 ## Storybook
 *storybook.log
-output.css
+# `output.css` used to be listed here: a pre-built stylesheet that
+# packages/ui/.storybook/preview.ts imported and that nothing built. Storybook
+# now compiles the source stylesheet through Vite, so no such artifact exists.
 
 dev-editor
 # Redis

@@ -1,6 +1,6 @@
 {
   "extends": "@plane/typescript-config/react-library.json",
-  "include": ["src"],
+  "include": ["src", ".storybook"],
   "compilerOptions": {
     "noUnusedLocals": false,
     "noUnusedParameters": false,
