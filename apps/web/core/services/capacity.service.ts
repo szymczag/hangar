@@ -197,9 +197,12 @@ export class CapacityService extends APIService {
   }
 
   getWorkshopSchedule(workspaceSlug: string, projectId: string, issueId: string) {
-    return this.data<TWorkshopSchedule>(
-      this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/work-items/${issueId}/workshop-schedule/`)
-    );
+    return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/work-items/${issueId}/workshop-schedule/`)
+      .then((response) => response.data as TWorkshopSchedule)
+      .catch((error) => {
+        if (error?.response?.status === 404) return null;
+        throw new CapacityRequestError("Workshop schedule could not be loaded.", error?.response?.status);
+      });
   }
 
   async saveWorkshopSchedule(
