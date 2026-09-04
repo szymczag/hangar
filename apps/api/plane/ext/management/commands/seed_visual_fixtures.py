@@ -26,6 +26,7 @@ from django.db import transaction
 
 from plane.db.models import (
     Issue,
+    IssueType,
     IssueSequence,
     Label,
     Profile,
@@ -38,7 +39,17 @@ from plane.db.models import (
     WorkspaceUserPreference,
 )
 from plane.ext.auth.sessions import mint_admin_session, mint_app_session
-from plane.ext.models import InstanceMaintenanceNotice, ProjectCopyJob
+from plane.ext.models import (
+    InstanceMaintenanceNotice,
+    IssueProperty,
+    IssuePropertyOption,
+    IssuePropertyValue,
+    IssueWorkLog,
+    ProjectCopyJob,
+    PropertyTypeChoices,
+    WorkspaceSharedLink,
+    WorkspaceSharedLinkHide,
+)
 from plane.ext.services.issue_types import ensure_project_system_types
 from plane.license.models import InstanceAdmin, Instance
 from plane.utils.cache import invalidate_cache_directly
@@ -112,6 +123,9 @@ class Command(BaseCommand):
         workspace = self._workspace(users["admin"])
         project = self._project(workspace, users)
         self._work_items(workspace, project, users["light"])
+        self._work_item_properties(workspace, project)
+        self._worklogs(workspace, project, users["light"])
+        self._shared_links(workspace, users)
         self._maintenance_notice()
         copy_target = self._copy_in_flight(workspace, project, users)
 
@@ -123,6 +137,12 @@ class Command(BaseCommand):
             # Published so a spec can wait on real seeded content rather than on
             # a string typed into the spec, which drifts from the seed silently.
             "workItems": [name for name, _ in WORK_ITEMS],
+            # Published so the specs assert seeded content instead of strings
+            "properties": [name for name, _, _ in Command.PROPERTIES],
+            "sharedLinks": {
+                "visible": [t for t, _, hidden in Command.SHARED_LINKS if not hidden],
+                "hidden": [t for t, _, hidden in Command.SHARED_LINKS if hidden],
+            },
             "users": {
                 "light": {
                     "email": users["light"].email,
@@ -166,7 +186,14 @@ class Command(BaseCommand):
             # only deterministic lever.
             profile, _ = Profile.objects.get_or_create(user=user)
             profile.theme = {"theme": theme}
-            profile.save(update_fields=["theme"])
+            # Onboarding is a first-run artifact, and the product tour is a
+            # modal over the whole page. It covered the workspace home story
+            # entirely -- and note the readiness assertion still passed, because
+            # a locator behind an overlay is "visible" as far as Playwright is
+            # concerned. Nothing here is testing the tour.
+            profile.is_tour_completed = True
+            profile.is_onboarded = True
+            profile.save(update_fields=["theme", "is_tour_completed", "is_onboarded"])
             made[key] = user
 
         instance = Instance.objects.first()
@@ -303,6 +330,112 @@ class Command(BaseCommand):
             # every baseline showing a work item.
             Issue.objects.filter(pk=issue.pk).update(created_at=stamped, updated_at=stamped, sequence_id=index)
             IssueSequence.objects.filter(issue=issue).update(created_at=stamped, updated_at=stamped, sequence=index)
+
+    # Custom properties on the Task type.
+    #
+    # One of every kind the interface can render, because the property widget is
+    # a switch on `property_type` and a baseline that only exercises text says
+    # nothing about the other six. Attached to the system Task type rather than
+    # a custom type: the settings screen and the sidebar widget do not care
+    # which type owns a property, and a custom type would need its own
+    # ProjectIssueType row for no additional coverage.
+    PROPERTIES = (
+        ("Impact", PropertyTypeChoices.SELECT, ("Blocker", "Major", "Minor")),
+        ("Reviewers", PropertyTypeChoices.MULTI_SELECT, ("Design", "Security", "Docs")),
+        ("Story points", PropertyTypeChoices.NUMBER, ()),
+        ("Needs migration", PropertyTypeChoices.BOOLEAN, ()),
+        ("Target date", PropertyTypeChoices.DATE, ()),
+        ("Release note", PropertyTypeChoices.TEXT, ()),
+    )
+
+    def _work_item_properties(self, workspace, project) -> None:
+        task_type = IssueType.objects.filter(workspace=workspace, system_key=IssueType.SystemKey.TASK).first()
+        if task_type is None:
+            return
+
+        first_issue = Issue.objects.filter(project=project).order_by("sequence_id").first()
+        if first_issue is not None:
+            Issue.objects.filter(pk=first_issue.pk).update(type=task_type)
+
+        for index, (name, kind, options) in enumerate(self.PROPERTIES):
+            prop, _ = IssueProperty.objects.update_or_create(
+                workspace=workspace,
+                issue_type=task_type,
+                display_name=name,
+                defaults={
+                    "property_type": kind,
+                    "is_multi": kind == PropertyTypeChoices.MULTI_SELECT,
+                    "is_active": True,
+                    # Distinct and explicit: the settings screen lists these in
+                    # sort order, and equal values would leave the order to
+                    # whatever the database felt like returning.
+                    "sort_order": 10000.0 * (index + 1),
+                },
+            )
+            for option_index, option in enumerate(options):
+                IssuePropertyOption.objects.update_or_create(
+                    workspace=workspace,
+                    property=prop,
+                    name=option,
+                    defaults={"sort_order": 10000.0 * (option_index + 1), "is_active": True},
+                )
+
+            if first_issue is None:
+                continue
+            value = {
+                PropertyTypeChoices.NUMBER: {"value_number": 8},
+                PropertyTypeChoices.BOOLEAN: {"value_boolean": True},
+                PropertyTypeChoices.TEXT: {"value_text": "Copying a project now carries its work items."},
+                PropertyTypeChoices.DATE: {"value_date": CLOCK + timedelta(days=14)},
+            }.get(kind)
+            if kind == PropertyTypeChoices.SELECT and options:
+                value = {"value_option": prop.options.order_by("sort_order").first()}
+            if value:
+                IssuePropertyValue.objects.update_or_create(
+                    workspace=workspace,
+                    project=project,
+                    issue=first_issue,
+                    property=prop,
+                    defaults=value,
+                )
+
+    def _worklogs(self, workspace, project, author) -> None:
+        """Time tracking, which is off by default and hides the whole widget."""
+        Project.objects.filter(pk=project.pk).update(is_time_tracking_enabled=True)
+
+        issue = Issue.objects.filter(project=project).order_by("sequence_id").first()
+        if issue is None:
+            return
+        for minutes, description in ((90, "Traced the failing request"), (45, "Wrote the regression test")):
+            IssueWorkLog.objects.update_or_create(
+                workspace=workspace,
+                project=project,
+                issue=issue,
+                logged_by=author,
+                description=description,
+                defaults={"duration": minutes},
+            )
+
+    # Two visible and one hidden. The widget renders a "show hidden (n)"
+    # affordance only when something is hidden, so a seed with three visible
+    # links would photograph a different component.
+    SHARED_LINKS = (
+        ("Runbook", "https://example.invalid/runbook", False),
+        ("On-call rota", "https://example.invalid/on-call", False),
+        ("Archived wiki", "https://example.invalid/wiki", True),
+    )
+
+    def _shared_links(self, workspace, users) -> None:
+        for index, (title, url, hidden) in enumerate(self.SHARED_LINKS):
+            link, _ = WorkspaceSharedLink.objects.update_or_create(
+                workspace=workspace,
+                title=title,
+                defaults={"url": url, "sort_order": 10000.0 * (index + 1)},
+            )
+            if hidden:
+                WorkspaceSharedLinkHide.objects.update_or_create(
+                    workspace=workspace, user=users["light"], shared_link=link
+                )
 
     def _maintenance_notice(self) -> None:
         """An active notice, deliberately with no scheduled window.

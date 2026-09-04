@@ -14,6 +14,10 @@ export type VisualFixtures = {
   copyTarget: { id: string };
   /** Names of the seeded work items, in the order they were created. */
   workItems: string[];
+  /** Custom property names on the Task type, in sort order. */
+  properties: string[];
+  /** Shared quick links, split by whether the light user has hidden them. */
+  sharedLinks: { visible: string[]; hidden: string[] };
   users: Record<string, { email: string; sessionCookie?: string; adminSessionCookie?: string }>;
 };
 

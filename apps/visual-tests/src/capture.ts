@@ -39,6 +39,28 @@ export async function capture(
   // fallback face that will never match the baseline.
   await page.evaluate(() => document.fonts.ready);
 
+  // So do images, and for a while this waited only for fonts. CI caught what no
+  // local run ever did: the build identity dialog's mark is an SVG <image>
+  // loaded when the dialog opens, well after the navigation settled, and on a
+  // cold runner the screenshot recorded an empty white square where the logo
+  // goes -- a baseline identical to the real one in every other pixel.
+  //
+  // <img> exposes `complete`, so it can simply be waited on. SVG <image>
+  // exposes nothing: no `complete`, no `naturalWidth`, and -- checked, not
+  // assumed -- no entry in resource timing either, which is what a first
+  // attempt at this wrongly relied on. Fetching each href is the available
+  // signal that the bytes are resident; the request is served from cache when
+  // the element has already loaded, and forces the load when it has not.
+  await page.waitForFunction(() => Array.from(document.images).every((image) => image.complete));
+
+  await page.evaluate(async () => {
+    const hrefs = Array.from(document.querySelectorAll("image"))
+      .map((element) => element.getAttribute("href") ?? element.getAttribute("xlink:href"))
+      .filter((href): href is string => href !== null && !href.startsWith("data:"));
+
+    await Promise.all(hrefs.map((href) => fetch(href, { cache: "force-cache" }).catch(() => undefined)));
+  });
+
   const subject = options.target ?? page;
   await expect(subject).toHaveScreenshot(`${name}.png`);
 }
