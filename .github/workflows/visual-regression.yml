@@ -9,6 +9,17 @@ on:
   push:
     branches:
       - preview
+  # The soak. A flake is a statistical claim and a single green run says nothing
+  # about one, so this runs the suite repeatedly on one commit and fails if any
+  # iteration needed a retry. It is the evidence for whether this workflow is fit
+  # to be a required check -- run it by hand rather than on every push, because
+  # it costs five times a normal run.
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "How many times to run the suite against one stack"
+        required: false
+        default: "5"
 
 permissions:
   contents: read
@@ -51,7 +62,7 @@ jobs:
 
   visual:
     needs: changes
-    if: needs.changes.outputs.web == 'true'
+    if: needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -95,7 +106,15 @@ jobs:
       # comparison against a stale build/client would pass -- the worst outcome
       # available.
       - name: Run the visual suite
+        if: github.event_name != 'workflow_dispatch'
         run: pnpm vr
+
+      # One stack, N runs against it. Counting a *flaky* result as a failure is
+      # the point: Playwright exits zero for green-on-retry, and green-on-retry
+      # is exactly what is being measured.
+      - name: Soak the visual suite
+        if: github.event_name == 'workflow_dispatch'
+        run: node scripts/vr.mjs --soak=${{ inputs.iterations }}
 
       # Without this a red job says "some pixels changed" and nothing more, and
       # the suite is abandoned within a month.

@@ -1,0 +1,24 @@
+/*
+ * Copyright (c) 2026-present Maciej Szymczak and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
+/*
+ * Applied to every screenshot this suite takes, via `stylePath` in
+ * playwright.config.ts.
+ *
+ * The route progress indicator is `position: fixed; top: 0`, which puts it
+ * directly over the top rows of anything captured at the top of the page --
+ * the maintenance bar most of all. It cannot be waited out: its width comes
+ * from a `Math.random()` trickle, it is driven in JavaScript so
+ * `animations: "disabled"` does not reach it, `BProgress.done()` removes it on
+ * a 400ms timeout rather than synchronously, and the element stays in the DOM
+ * afterwards, so waiting for it to disappear never succeeds.
+ *
+ * Hiding it loses nothing this suite could ever have checked. A bar whose width
+ * is deliberately random has no correct appearance to compare against.
+ */
+.bprogress {
+  display: none !important;
+}

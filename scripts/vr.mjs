@@ -120,6 +120,23 @@ const updating = process.argv.includes("--update-snapshots");
 // APP_VERSION goes unexpanded (so the API reports a literal "${APP_VERSION}").
 // Both have happened. `pnpm vr:stack` is the supported way to iterate.
 const stackOnly = process.argv.includes("--stack-only");
+
+/**
+ * How many times to run the suite against one stack.
+ *
+ * A flake is a statistical claim, and one green run is not evidence about one.
+ * This is the measurement that decides whether `visual-regression` is fit to be
+ * a required check: the stack comes up once and the suite runs N times against
+ * it, so five iterations cost one build rather than five.
+ *
+ * A *flaky* result counts as a failure here even though Playwright exits zero
+ * for it. Green-on-retry is precisely the thing being measured.
+ */
+const soakArgument = process.argv.find((argument) => argument.startsWith("--soak"));
+const soakRuns = soakArgument ? Number(soakArgument.split("=")[1] ?? 5) : 0;
+if (soakArgument && (!Number.isInteger(soakRuns) || soakRuns < 1)) {
+  throw new Error(`--soak needs a positive integer, got "${soakArgument}".`);
+}
 const [composeBin, composeArgs] = composeCommand();
 const compose = (...rest) => run(composeBin, [...composeArgs, "-f", COMPOSE_FILE, ...rest]);
 
@@ -225,16 +242,76 @@ try {
   // --no-deps because `up --wait` already started everything. Without it compose
   // recreates the dependencies around a browser that is about to start, and
   // Chromium aborts every request in flight with ERR_NETWORK_CHANGED.
-  compose(
-    "run",
-    "--rm",
-    "--no-deps",
-    "vr-playwright",
-    "npx",
-    "playwright",
-    "test",
-    ...(updating ? ["--update-snapshots"] : [])
-  );
+  const runSuite = (label) => {
+    const argv = [
+      ...composeArgs,
+      "-f",
+      COMPOSE_FILE,
+      "run",
+      "--rm",
+      "--no-deps",
+      "vr-playwright",
+      "npx",
+      "playwright",
+      "test",
+      ...(updating ? ["--update-snapshots"] : []),
+    ];
+
+    // A single run streams: nine minutes of silence is not a good command.
+    // Only the soak captures, because only the soak needs to read the result
+    // back out rather than just propagate an exit code.
+    if (soakRuns === 0) {
+      run(composeBin, argv);
+      return true;
+    }
+
+    let output = "";
+    let failed = false;
+    try {
+      // Captured rather than inherited, because the flaky count has to be read
+      // back. `maxBuffer` is generous on purpose: at the default 1MB the pipe
+      // closes mid-run and podman dies with "write /dev/stdout: broken pipe",
+      // which looks like an infrastructure fault rather than a buffer limit.
+      output = execFileSync(composeBin, argv, {
+        cwd: ROOT,
+        env,
+        encoding: "utf8",
+        maxBuffer: 256 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      failed = true;
+      output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+    }
+
+    process.stdout.write(output);
+
+    // Playwright prints "N flaky" only when something needed a retry to pass,
+    // and exits zero for it. Here that counts as not clean: green-on-retry is
+    // the thing being measured.
+    const flaky = /(\d+) flaky/.exec(output);
+    const clean = !failed && !flaky;
+    console.log(`${label}: ${clean ? "clean" : failed ? "FAILED" : `${flaky[1]} flaky`}`);
+    return clean;
+  };
+
+  if (soakRuns > 0) {
+    const results = [];
+    for (let attempt = 1; attempt <= soakRuns; attempt++) {
+      // Sequential by definition: each iteration is a separate observation.
+      // oxlint-disable-next-line eslint/no-await-in-loop
+      results.push(runSuite(`soak ${attempt}/${soakRuns}`));
+    }
+    const dirty = results.filter((clean) => !clean).length;
+    console.log(`\nSoak: ${results.length - dirty}/${results.length} runs clean.`);
+    if (dirty > 0) {
+      throw new Error(
+        `${dirty} of ${results.length} soak runs were not clean. The suite is not ready to be a required check.`
+      );
+    }
+  } else {
+    runSuite("run");
+  }
 } finally {
   // Cleanup must not decide the outcome. podman is prone to a non-zero exit
   // here when a container needs SIGKILL to stop, and a green suite reported as
