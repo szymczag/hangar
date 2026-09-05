@@ -65,6 +65,8 @@ from plane.ext.views.capacity import (
     TrainerSelfEndpoint,
     WorkspaceCapacityEndpoint,
     WorkshopScheduleEndpoint,
+    WorkshopPlanDraftDetailEndpoint,
+    WorkshopPlanDraftListEndpoint,
 )
 
 PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
@@ -90,6 +92,16 @@ urlpatterns = [
         name="capacity-google-calendars",
     ),
     path("workspaces/<str:slug>/capacity/", WorkspaceCapacityEndpoint.as_view(), name="workspace-capacity"),
+    path(
+        "workspaces/<str:slug>/capacity/plans/",
+        WorkshopPlanDraftListEndpoint.as_view(),
+        name="workshop-plan-drafts",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/plans/<uuid:draft_id>/",
+        WorkshopPlanDraftDetailEndpoint.as_view(),
+        name="workshop-plan-draft",
+    ),
     path(
         f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/",
         WorkshopScheduleEndpoint.as_view(),

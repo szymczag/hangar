@@ -45,6 +45,9 @@ class CapacityAuditEvent(models.Model):
         GOOGLE_DISCONNECTED = "google.disconnected", "Google disconnected"
         WORKSHOP_UPDATED = "workshop.updated", "Workshop updated"
         WORKSHOP_REMOVED = "workshop.removed", "Workshop removed"
+        PLAN_DRAFT_CREATED = "plan_draft.created", "Plan draft created"
+        PLAN_DRAFT_UPDATED = "plan_draft.updated", "Plan draft updated"
+        PLAN_DRAFT_REMOVED = "plan_draft.removed", "Plan draft removed"
 
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)
@@ -196,4 +199,35 @@ class WorkshopSession(BaseModel):
                 condition=Q(ends_at__gt=models.F("starts_at")), name="ext_workshop_session_valid_range"
             ),
             models.UniqueConstraint(fields=["schedule", "position"], name="ext_workshop_session_position"),
+        ]
+
+
+class WorkshopPlanDraft(BaseModel):
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workshop_plan_drafts")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="workshop_plan_drafts")
+    title = models.CharField(max_length=255)
+    duration_minutes = models.PositiveIntegerField(validators=[MinValueValidator(15), MaxValueValidator(10080)])
+    preparation_minutes = models.PositiveIntegerField(
+        default=0, validators=[MinValueValidator(0), MaxValueValidator(1440)]
+    )
+    travel_before_minutes = models.PositiveIntegerField(
+        default=0, validators=[MinValueValidator(0), MaxValueValidator(1440)]
+    )
+    travel_after_minutes = models.PositiveIntegerField(
+        default=0, validators=[MinValueValidator(0), MaxValueValidator(1440)]
+    )
+    window_starts_at = models.DateTimeField()
+    window_ends_at = models.DateTimeField()
+    trainer_ids = models.JSONField(default=list)
+    revision = models.PositiveBigIntegerField(default=1)
+
+    class Meta:
+        db_table = "ext_workshop_plan_drafts"
+        ordering = ("-updated_at", "-created_at")
+        indexes = [models.Index(fields=["workspace", "owner", "updated_at"], name="ext_plan_draft_owner_idx")]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(window_ends_at__gt=models.F("window_starts_at")),
+                name="ext_plan_draft_valid_window",
+            )
         ]
