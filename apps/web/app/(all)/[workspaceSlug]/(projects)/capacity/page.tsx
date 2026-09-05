@@ -85,7 +85,7 @@ function availabilityCopy(status: string) {
 
 function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Date) {
   const free = availableRanges(trainer.intervals, dayStart, dayEnd);
-  const rangesFor = (kind: "working" | "google_busy" | "workshop") =>
+  const rangesFor = (kind: "working" | "google_busy" | "workshop" | "workshop_hold") =>
     clippedRanges(
       trainer.intervals.filter((interval) => interval.kind === kind),
       dayStart,
@@ -98,6 +98,7 @@ function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Da
     workingMinutes: rangeMinutes(rangesFor("working")),
     googleBusyMinutes: rangeMinutes(rangesFor("google_busy")),
     workshopMinutes: rangeMinutes(rangesFor("workshop")),
+    holdMinutes: rangeMinutes(rangesFor("workshop_hold")),
     conflicts,
   };
 }
@@ -146,7 +147,12 @@ function TrainerDayTimeline({
             .map((interval) => {
               const position = intervalPosition(interval, dayStart, dayEnd);
               if (!position) return null;
-              const className = interval.kind === "google_busy" ? "bg-neutral-500/70" : "bg-accent-primary/80";
+              const className =
+                interval.kind === "google_busy"
+                  ? "bg-neutral-500/70"
+                  : interval.kind === "workshop_hold"
+                    ? "bg-warning-primary/70"
+                    : "bg-accent-primary/80";
               const label = intervalLabel(interval);
               return (
                 <button
@@ -726,6 +732,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-11 text-secondary">
                         <span>Google busy {formatMinutes(metrics.googleBusyMinutes)}</span>
                         <span>Workshops {formatMinutes(metrics.workshopMinutes)}</span>
+                        {metrics.holdMinutes ? <span>Holds {formatMinutes(metrics.holdMinutes)}</span> : null}
                         {metrics.conflicts.length ? (
                           <span className="inline-flex items-center gap-1 text-danger-primary">
                             <CircleAlert className="size-3" /> {metrics.conflicts.length} conflict
@@ -792,6 +799,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                             <div className="mt-2 flex gap-4 text-11 text-secondary">
                               <span>Google {formatMinutes(metrics.googleBusyMinutes)}</span>
                               <span>Workshops {formatMinutes(metrics.workshopMinutes)}</span>
+                              {metrics.holdMinutes ? <span>Holds {formatMinutes(metrics.holdMinutes)}</span> : null}
                             </div>
                           </div>
                           <div className="text-right">

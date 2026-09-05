@@ -45,6 +45,7 @@ from plane.ext.models import (
     TrainerCalendarSelection,
     TrainerProfile,
     WorkshopPlanDraft,
+    WorkshopPlanHold,
     WorkshopSchedule,
     WorkshopSession,
 )
@@ -544,6 +545,12 @@ class WorkspaceCapacityEndpoint(BaseAPIView):
 
 
 def _draft_payload(draft):
+    now = timezone.now()
+    hold = (
+        draft.holds.filter(status=WorkshopPlanHold.Status.ACTIVE, expires_at__gt=now)
+        .select_related("trainer")
+        .first()
+    )
     return {
         "id": str(draft.id),
         "title": draft.title,
@@ -556,6 +563,21 @@ def _draft_payload(draft):
         "trainer_ids": draft.trainer_ids,
         "revision": draft.revision,
         "updated_at": draft.updated_at.isoformat(),
+        "hold": _hold_payload(hold) if hold else None,
+    }
+
+
+def _hold_payload(hold):
+    return {
+        "id": str(hold.id),
+        "trainer_id": str(hold.trainer_id),
+        "trainer_name": hold.trainer.display_name,
+        "workshop_starts_at": hold.workshop_starts_at.isoformat(),
+        "workshop_ends_at": hold.workshop_ends_at.isoformat(),
+        "blocked_starts_at": hold.blocked_starts_at.isoformat(),
+        "blocked_ends_at": hold.blocked_ends_at.isoformat(),
+        "expires_at": hold.expires_at.isoformat(),
+        "status": hold.status,
     }
 
 
@@ -661,6 +683,8 @@ class WorkshopPlanDraftDetailEndpoint(BaseAPIView):
                 {"error": "Draft changed after you opened it.", "revision": draft.revision},
                 status=status.HTTP_409_CONFLICT,
             )
+        if draft.holds.filter(status=WorkshopPlanHold.Status.ACTIVE, expires_at__gt=timezone.now()).exists():
+            return Response({"error": "Release the active hold before editing this plan."}, status=409)
         values, error = _validate_draft(request, draft.workspace)
         if error:
             return error
@@ -691,6 +715,137 @@ class WorkshopPlanDraftDetailEndpoint(BaseAPIView):
             metadata={"draft_id": str(draft.id)},
         )
         return Response(status=204)
+
+
+class WorkshopPlanHoldEndpoint(BaseAPIView):
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @staticmethod
+    def _draft(request, slug, draft_id):
+        return get_object_or_404(
+            WorkshopPlanDraft.objects.select_for_update(),
+            workspace__slug=slug,
+            owner=request.user,
+            pk=draft_id,
+        )
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
+    def post(self, request, slug, draft_id):
+        if response := _disabled():
+            return response
+        draft = self._draft(request, slug, draft_id)
+        try:
+            revision = int(request.data.get("revision"))
+            trainer_id = UUID(str(request.data.get("trainer_id")))
+        except (TypeError, ValueError, AttributeError):
+            return Response({"error": "revision and a valid trainer_id are required."}, status=400)
+        if revision != draft.revision:
+            return Response(
+                {"error": "Draft changed after you opened it.", "revision": draft.revision},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if str(trainer_id) not in draft.trainer_ids:
+            return Response({"error": "The trainer is not eligible for this plan."}, status=400)
+        workshop_start = parse_datetime(request.data.get("workshop_starts_at", ""))
+        if not workshop_start or timezone.is_naive(workshop_start):
+            return Response({"error": "A timezone-aware workshop_starts_at is required."}, status=400)
+        workshop_end = workshop_start + timedelta(minutes=draft.duration_minutes)
+        blocked_start = workshop_start - timedelta(
+            minutes=draft.preparation_minutes + draft.travel_before_minutes
+        )
+        blocked_end = workshop_end + timedelta(minutes=draft.travel_after_minutes)
+        if blocked_start < draft.window_starts_at or blocked_end > draft.window_ends_at:
+            return Response({"error": "The complete trainer block must fit in the planning window."}, status=400)
+
+        trainer = get_object_or_404(
+            TrainerProfile.objects.select_for_update().select_related("user"),
+            workspace=draft.workspace,
+            user_id=trainer_id,
+            status=TrainerProfile.Status.ACTIVE,
+        )
+        now = timezone.now()
+        WorkshopPlanHold.objects.filter(
+            workspace=draft.workspace,
+            status=WorkshopPlanHold.Status.ACTIVE,
+            expires_at__lte=now,
+        ).update(status=WorkshopPlanHold.Status.RELEASED, updated_by=request.user)
+        conflict = WorkshopPlanHold.objects.filter(
+            workspace=draft.workspace,
+            trainer_id=trainer_id,
+            status=WorkshopPlanHold.Status.ACTIVE,
+            expires_at__gt=now,
+            blocked_starts_at__lt=blocked_end,
+            blocked_ends_at__gt=blocked_start,
+        ).exclude(draft=draft).exists()
+        if not conflict:
+            sessions = WorkshopSession.objects.filter(
+                schedule__workspace=draft.workspace, trainers=trainer.user
+            ).distinct()
+            conflict = any(
+                session.starts_at
+                - timedelta(minutes=session.preparation_minutes + session.travel_before_minutes)
+                < blocked_end
+                and session.ends_at + timedelta(minutes=session.travel_after_minutes) > blocked_start
+                for session in sessions
+            )
+        if conflict:
+            return Response(
+                {"error": "This trainer is no longer available for the complete block."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        WorkshopPlanHold.objects.filter(draft=draft, status=WorkshopPlanHold.Status.ACTIVE).update(
+            status=WorkshopPlanHold.Status.RELEASED,
+            updated_by=request.user,
+        )
+        hold = WorkshopPlanHold.objects.create(
+            draft=draft,
+            workspace=draft.workspace,
+            trainer=trainer.user,
+            workshop_starts_at=workshop_start,
+            workshop_ends_at=workshop_end,
+            blocked_starts_at=blocked_start,
+            blocked_ends_at=blocked_end,
+            expires_at=now + timedelta(hours=72),
+            created_by=request.user,
+            updated_by=request.user,
+        )
+        draft.revision += 1
+        draft.updated_by = request.user
+        draft.save(update_fields=["revision", "updated_by", "updated_at"])
+        _audit(
+            request,
+            workspace_id=draft.workspace_id,
+            trainer_id=trainer_id,
+            action=CapacityAuditEvent.Action.PLAN_HOLD_CREATED,
+            metadata={"draft_id": str(draft.id), "hold_id": str(hold.id)},
+        )
+        return Response({"hold": _hold_payload(hold), "revision": draft.revision}, status=status.HTTP_201_CREATED)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
+    def delete(self, request, slug, draft_id):
+        if response := _disabled():
+            return response
+        draft = self._draft(request, slug, draft_id)
+        hold = draft.holds.filter(status=WorkshopPlanHold.Status.ACTIVE).first()
+        if hold is None:
+            return Response(status=204)
+        hold.status = WorkshopPlanHold.Status.RELEASED
+        hold.updated_by = request.user
+        hold.save(update_fields=["status", "updated_by", "updated_at"])
+        draft.revision += 1
+        draft.updated_by = request.user
+        draft.save(update_fields=["revision", "updated_by", "updated_at"])
+        _audit(
+            request,
+            workspace_id=draft.workspace_id,
+            trainer_id=hold.trainer_id,
+            action=CapacityAuditEvent.Action.PLAN_HOLD_RELEASED,
+            metadata={"draft_id": str(draft.id), "hold_id": str(hold.id)},
+        )
+        return Response({"revision": draft.revision})
 
 
 class WorkshopScheduleEndpoint(BaseAPIView):
