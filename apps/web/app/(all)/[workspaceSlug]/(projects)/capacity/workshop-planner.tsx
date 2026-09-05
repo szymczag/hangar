@@ -7,12 +7,13 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { CalendarSearch, Clock3, Save, Trash2, Users } from "lucide-react";
+import { CalendarSearch, Clock3, Save, ShieldCheck, Trash2, Users } from "lucide-react";
 import {
   CapacityService,
   type TTrainerCapacity,
   type TWorkshopPlanDraft,
   type TWorkshopPlanDraftInput,
+  type TWorkshopPlanHold,
 } from "@/services/capacity.service";
 import { findWorkshopCandidates } from "./workshop-planner.utils";
 
@@ -20,6 +21,14 @@ const capacityService = new CapacityService();
 
 const dateTimeLabel = (value: string) =>
   new Date(value).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", timeStyle: "short" });
+
+const planSignature = (plan: TWorkshopPlanDraftInput) =>
+  JSON.stringify({
+    ...plan,
+    window_starts_at: new Date(plan.window_starts_at).toISOString(),
+    window_ends_at: new Date(plan.window_ends_at).toISOString(),
+    trainer_ids: [...plan.trainer_ids].toSorted(),
+  });
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   return (
@@ -65,6 +74,8 @@ export function WorkshopPlanner({
   const [travelAfterMinutes, setTravelAfterMinutes] = useState(60);
   const [trainerIds, setTrainerIds] = useState(() => trainers.map((trainer) => trainer.trainer_id));
   const [saving, setSaving] = useState(false);
+  const [hold, setHold] = useState<TWorkshopPlanHold | null>(null);
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
 
   const candidates = useMemo(
     () =>
@@ -100,6 +111,7 @@ export function WorkshopPlanner({
     window_ends_at: weekEnd.toISOString(),
     trainer_ids: trainerIds,
   });
+  const planNeedsSaving = savedSignature !== planSignature(payload());
 
   const loadDraft = (draft: TWorkshopPlanDraft) => {
     setDraftId(draft.id);
@@ -110,6 +122,19 @@ export function WorkshopPlanner({
     setTravelBeforeMinutes(draft.travel_before_minutes);
     setTravelAfterMinutes(draft.travel_after_minutes);
     setTrainerIds(draft.trainer_ids.filter((id) => trainers.some((trainer) => trainer.trainer_id === id)));
+    setHold(draft.hold);
+    setSavedSignature(
+      planSignature({
+        title: draft.title,
+        duration_minutes: draft.duration_minutes,
+        preparation_minutes: draft.preparation_minutes,
+        travel_before_minutes: draft.travel_before_minutes,
+        travel_after_minutes: draft.travel_after_minutes,
+        window_starts_at: draft.window_starts_at,
+        window_ends_at: draft.window_ends_at,
+        trainer_ids: draft.trainer_ids.filter((id) => trainers.some((trainer) => trainer.trainer_id === id)),
+      })
+    );
   };
 
   const reset = () => {
@@ -121,6 +146,8 @@ export function WorkshopPlanner({
     setTravelBeforeMinutes(60);
     setTravelAfterMinutes(60);
     setTrainerIds(trainers.map((trainer) => trainer.trainer_id));
+    setHold(null);
+    setSavedSignature(null);
   };
 
   const saveDraft = async () => {
@@ -151,6 +178,49 @@ export function WorkshopPlanner({
     try {
       await capacityService.deleteWorkshopPlanDraft(workspaceSlug, draftId);
       reset();
+      await mutateDrafts();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const holdCandidate = async (trainerId: string, workshopStartsAt: string) => {
+    if (!draftId || revision === null) return;
+    setSaving(true);
+    try {
+      const result = await capacityService.holdWorkshopPlan(
+        workspaceSlug,
+        draftId,
+        revision,
+        trainerId,
+        workshopStartsAt
+      );
+      setHold(result.hold);
+      setRevision(result.revision);
+      await mutateDrafts();
+      setToast({
+        type: TOAST_TYPE.SUCCESS,
+        title: "Trainer held for 72 hours",
+        message: "This is an internal hold. Nothing was written to Google Calendar.",
+      });
+    } catch {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Slot could not be held",
+        message: "Availability may have changed. Refresh capacity and choose another slot.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const releaseHold = async () => {
+    if (!draftId) return;
+    setSaving(true);
+    try {
+      const result = await capacityService.releaseWorkshopPlanHold(workspaceSlug, draftId);
+      setHold(null);
+      setRevision(result.revision);
       await mutateDrafts();
     } finally {
       setSaving(false);
@@ -253,6 +323,24 @@ export function WorkshopPlanner({
         </div>
 
         <div className="p-5">
+          {hold ? (
+            <div className="bg-accent-secondary/10 mb-5 flex flex-col gap-3 rounded-lg border border-accent-subtle p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex gap-3">
+                <ShieldCheck className="mt-0.5 size-5 shrink-0 text-accent-primary" />
+                <div>
+                  <h3 className="text-body-sm-medium text-primary">{hold.trainer_name} is held</h3>
+                  <p className="mt-1 text-body-xs-regular text-secondary">
+                    {dateTimeLabel(hold.workshop_starts_at)} –{" "}
+                    {new Date(hold.workshop_ends_at).toLocaleTimeString(undefined, { timeStyle: "short" })}. Expires{" "}
+                    {dateTimeLabel(hold.expires_at)}. Internal only; no Google event was created.
+                  </p>
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" disabled={saving} onClick={releaseHold}>
+                Release hold
+              </Button>
+            </div>
+          ) : null}
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <h3 className="text-body-sm-medium text-primary">Matching slots</h3>
@@ -300,6 +388,18 @@ export function WorkshopPlanner({
                       </div>
                     </div>
                   </div>
+                  <Button
+                    className="mt-4 w-full"
+                    variant="secondary"
+                    size="sm"
+                    disabled={planNeedsSaving || revision === null || saving || Boolean(hold)}
+                    onClick={() => holdCandidate(candidate.trainerId, candidate.workshopStartsAt)}
+                  >
+                    <ShieldCheck className="size-3.5" /> Hold for 72h
+                  </Button>
+                  {planNeedsSaving ? (
+                    <p className="mt-2 text-center text-11 text-placeholder">Save this version of the plan first</p>
+                  ) : null}
                 </article>
               ))}
             </div>

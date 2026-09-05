@@ -167,6 +167,25 @@ describe("CapacityService CSRF requests", () => {
     );
   });
 
+  it("creates and releases a workshop hold with CSRF", async () => {
+    const post = vi.spyOn(service, "post").mockResolvedValue({ data: { hold: {}, revision: 2 } } as never);
+    const deleteRequest = vi.spyOn(service, "delete").mockResolvedValue({ data: { revision: 3 } } as never);
+
+    await service.holdWorkshopPlan("workspace", "draft-id", 1, "trainer-id", "2026-09-07T08:30:00Z");
+    await service.releaseWorkshopPlanHold("workspace", "draft-id");
+
+    expect(post).toHaveBeenCalledWith(
+      "/api/workspaces/workspace/capacity/plans/draft-id/hold/",
+      { revision: 1, trainer_id: "trainer-id", workshop_starts_at: "2026-09-07T08:30:00Z" },
+      csrfHeaders
+    );
+    expect(deleteRequest).toHaveBeenCalledWith(
+      "/api/workspaces/workspace/capacity/plans/draft-id/hold/",
+      undefined,
+      csrfHeaders
+    );
+  });
+
   it("does not send a mutation when the CSRF endpoint omits the token", async () => {
     vi.mocked(service.get).mockResolvedValue({ data: {} } as never);
     const post = vi.spyOn(service, "post");
