@@ -12,15 +12,19 @@ from django.apps import apps as django_apps
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from plane.db.models import Issue, IssueAssignee, Project, ProjectMember, State
 from plane.ext.models import (
     CapacityAuditEvent,
     GoogleCalendarCredential,
     TrainerCalendarSelection,
     TrainerProfile,
+    WorkshopSchedule,
+    WorkshopSession,
 )
 from plane.ext.capacity import GoogleCalendarError, decrypt_value, encrypt_value
 from plane.ext.views import capacity as capacity_views
 from plane.tests.factories import UserFactory
+from plane.ext.services.issue_types import ensure_project_workshop_type
 
 REQUIRED_CALENDAR_SCOPES = {
     "openid",
@@ -141,6 +145,154 @@ def test_booking_hours_migration_populates_only_empty_profiles(workspace, create
     assert empty_profile.schedule_revision == 4
     assert custom_profile.weekly_schedule == custom_schedule
     assert custom_profile.schedule_revision == 5
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_workshop_session_migration_preserves_existing_schedule(workspace, create_user):
+    project = Project.objects.create(name="Training", identifier="TRN", workspace=workspace, created_by=create_user)
+    state = State.objects.create(
+        name="Backlog", color="#000000", group="backlog", project=project, workspace=workspace, sequence=1000
+    )
+    workshop_type = ensure_project_workshop_type(project)
+    issue = Issue.objects.create(
+        name="Existing workshop",
+        project=project,
+        workspace=workspace,
+        state=state,
+        type=workshop_type,
+        created_by=create_user,
+    )
+    IssueAssignee.objects.create(issue=issue, assignee=create_user, project=project, workspace=workspace)
+    schedule = WorkshopSchedule.objects.create(
+        issue=issue,
+        starts_at="2026-09-07T09:00:00+02:00",
+        ends_at="2026-09-07T13:00:00+02:00",
+        preparation_minutes=30,
+        travel_before_minutes=60,
+        travel_after_minutes=45,
+    )
+    migration = import_module("plane.ext.migrations.0022_workshop_sessions")
+
+    migration.backfill_workshop_sessions(django_apps, None)
+
+    schedule.refresh_from_db()
+    session = WorkshopSession.objects.get(schedule=schedule)
+    assert session.starts_at == schedule.starts_at
+    assert session.ends_at == schedule.ends_at
+    assert session.preparation_minutes == 30
+    assert session.travel_before_minutes == 60
+    assert session.travel_after_minutes == 45
+    assert list(session.trainers.values_list("id", flat=True)) == [create_user.id]
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_workshop_schedule_replaces_multiple_sessions_atomically(settings, workspace, create_user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    second_trainer = UserFactory()
+    project = Project.objects.create(name="Training", identifier="TRN", workspace=workspace, created_by=create_user)
+    ProjectMember.objects.create(project=project, member=create_user, workspace=workspace, role=20)
+    state = State.objects.create(
+        name="Backlog", color="#000000", group="backlog", project=project, workspace=workspace, sequence=1000
+    )
+    workshop_type = ensure_project_workshop_type(project)
+    issue = Issue.objects.create(
+        name="NetSec", project=project, workspace=workspace, state=state, type=workshop_type, created_by=create_user
+    )
+    for trainer in (create_user, second_trainer):
+        TrainerProfile.objects.create(workspace=workspace, user=trainer)
+        IssueAssignee.objects.create(issue=issue, assignee=trainer, project=project, workspace=workspace)
+
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+    url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/work-items/{issue.id}/workshop-schedule/"
+    payload = {
+        "sessions": [
+            {
+                "starts_at": "2026-09-07T09:00:00+02:00",
+                "ends_at": "2026-09-07T13:00:00+02:00",
+                "preparation_minutes": 30,
+                "travel_before_minutes": 60,
+                "travel_after_minutes": 60,
+                "trainer_ids": [str(create_user.id), str(second_trainer.id)],
+            },
+            {
+                "starts_at": "2026-09-08T10:00:00+02:00",
+                "ends_at": "2026-09-08T12:00:00+02:00",
+                "preparation_minutes": 15,
+                "travel_before_minutes": 0,
+                "travel_after_minutes": 0,
+                "trainer_ids": [str(second_trainer.id)],
+            },
+        ]
+    }
+
+    response = client.put(url, payload, format="json", HTTP_X_CSRFTOKEN=csrf)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["sessions"]) == 2
+    assert response.data["sessions"][1]["trainer_ids"] == [str(second_trainer.id)]
+    schedule = WorkshopSchedule.objects.get(issue=issue)
+    assert schedule.sessions.count() == 2
+    assert set(schedule.sessions.get(position=0).trainers.values_list("id", flat=True)) == {
+        create_user.id,
+        second_trainer.id,
+    }
+    assert CapacityAuditEvent.objects.filter(
+        issue_id=issue.id,
+        action=CapacityAuditEvent.Action.WORKSHOP_UPDATED,
+        metadata={"session_count": 2},
+    ).exists()
+
+    replacement = {"sessions": [payload["sessions"][1]]}
+    replaced = client.put(url, replacement, format="json", HTTP_X_CSRFTOKEN=csrf)
+
+    assert replaced.status_code == status.HTTP_200_OK
+    assert WorkshopSession.objects.filter(schedule=schedule).count() == 1
+    assert replaced.data["sessions"][0]["starts_at"] == "2026-09-08T08:00:00+00:00"
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_workshop_session_rejects_a_trainer_who_is_not_an_assignee(settings, workspace, create_user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    outsider = UserFactory()
+    project = Project.objects.create(name="Training", identifier="TRN", workspace=workspace, created_by=create_user)
+    ProjectMember.objects.create(project=project, member=create_user, workspace=workspace, role=20)
+    state = State.objects.create(
+        name="Backlog", color="#000000", group="backlog", project=project, workspace=workspace, sequence=1000
+    )
+    workshop_type = ensure_project_workshop_type(project)
+    issue = Issue.objects.create(
+        name="NetSec", project=project, workspace=workspace, state=state, type=workshop_type, created_by=create_user
+    )
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(workspace=workspace, user=outsider)
+    IssueAssignee.objects.create(issue=issue, assignee=create_user, project=project, workspace=workspace)
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+
+    response = client.put(
+        f"/api/workspaces/{workspace.slug}/projects/{project.id}/work-items/{issue.id}/workshop-schedule/",
+        {
+            "sessions": [
+                {
+                    "starts_at": "2026-09-07T09:00:00+02:00",
+                    "ends_at": "2026-09-07T13:00:00+02:00",
+                    "trainer_ids": [str(outsider.id)],
+                }
+            ]
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data == {"error": "Every trainer in session 1 must be an active Workshop assignee."}
+    assert not WorkshopSchedule.objects.filter(issue=issue).exists()
 
 
 @pytest.mark.contract

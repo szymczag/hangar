@@ -45,6 +45,7 @@ from plane.ext.models import (
     TrainerCalendarSelection,
     TrainerProfile,
     WorkshopSchedule,
+    WorkshopSession,
 )
 from plane.ext.services import ensure_workspace_workshop_type
 from plane.license.utils.instance_value import get_configuration_value
@@ -562,20 +563,6 @@ class WorkshopScheduleEndpoint(BaseAPIView):
         issue = self._issue(slug, project_id, issue_id)
         if not issue.type_id or issue.type.system_key != IssueType.SystemKey.WORKSHOP:
             return Response({"error": "Only Workshop work items may be scheduled."}, status=400)
-        starts_at, ends_at = (
-            parse_datetime(request.data.get("starts_at", "")),
-            parse_datetime(request.data.get("ends_at", "")),
-        )
-        if (
-            not starts_at
-            or not ends_at
-            or timezone.is_naive(starts_at)
-            or timezone.is_naive(ends_at)
-            or starts_at >= ends_at
-        ):
-            return Response({"error": "A valid timezone-aware workshop range is required."}, status=400)
-        if ends_at - starts_at > timedelta(days=7):
-            return Response({"error": "A Workshop may not exceed seven days."}, status=400)
         assignees = set(issue.issue_assignee.values_list("assignee_id", flat=True))
         if not assignees:
             return Response({"error": "A Workshop requires at least one trainer."}, status=400)
@@ -586,23 +573,76 @@ class WorkshopScheduleEndpoint(BaseAPIView):
         )
         if assignees - active_trainers:
             return Response({"error": "Every Workshop assignee must be an active trainer."}, status=400)
-        values = {}
-        for field in ("preparation_minutes", "travel_before_minutes", "travel_after_minutes"):
+
+        raw_sessions = request.data.get("sessions")
+        if raw_sessions is None:
+            raw_sessions = [request.data]
+        if not isinstance(raw_sessions, list) or not 1 <= len(raw_sessions) <= 50:
+            return Response({"error": "A Workshop requires between 1 and 50 sessions."}, status=400)
+
+        parsed_sessions = []
+        for position, item in enumerate(raw_sessions):
+            if not isinstance(item, dict):
+                return Response({"error": f"Session {position + 1} must be an object."}, status=400)
+            starts_at = parse_datetime(item.get("starts_at", ""))
+            ends_at = parse_datetime(item.get("ends_at", ""))
+            if (
+                not starts_at
+                or not ends_at
+                or timezone.is_naive(starts_at)
+                or timezone.is_naive(ends_at)
+                or starts_at >= ends_at
+            ):
+                return Response({"error": f"Session {position + 1} requires a valid timezone-aware range."}, status=400)
+            if ends_at - starts_at > timedelta(days=7):
+                return Response({"error": f"Session {position + 1} may not exceed seven days."}, status=400)
+            values = {}
+            for field in ("preparation_minutes", "travel_before_minutes", "travel_after_minutes"):
+                try:
+                    value = int(item.get(field, 0))
+                except (TypeError, ValueError):
+                    return Response({"error": f"Session {position + 1}: {field} must be an integer."}, status=400)
+                if not 0 <= value <= 1440:
+                    return Response(
+                        {"error": f"Session {position + 1}: {field} must be between 0 and 1440."}, status=400
+                    )
+                values[field] = value
+            raw_trainer_ids = item.get("trainer_ids", list(assignees))
+            if not isinstance(raw_trainer_ids, list) or not raw_trainer_ids:
+                return Response({"error": f"Session {position + 1} requires at least one trainer."}, status=400)
             try:
-                value = int(request.data.get(field, 0))
-            except (TypeError, ValueError):
-                return Response({"error": f"{field} must be an integer."}, status=400)
-            if not 0 <= value <= 1440:
-                return Response({"error": f"{field} must be between 0 and 1440."}, status=400)
-            values[field] = value
+                trainer_ids = {UUID(str(value)) for value in raw_trainer_ids}
+            except (TypeError, ValueError, AttributeError):
+                return Response({"error": f"Session {position + 1} contains an invalid trainer ID."}, status=400)
+            if not trainer_ids.issubset(active_trainers):
+                return Response(
+                    {"error": f"Every trainer in session {position + 1} must be an active Workshop assignee."},
+                    status=400,
+                )
+            parsed_sessions.append({"starts_at": starts_at, "ends_at": ends_at, "trainer_ids": trainer_ids, **values})
+
+        first = parsed_sessions[0]
         schedule, _ = WorkshopSchedule.objects.update_or_create(
-            issue=issue, defaults={"starts_at": starts_at, "ends_at": ends_at, **values}
+            issue=issue,
+            defaults={
+                "starts_at": first["starts_at"],
+                "ends_at": first["ends_at"],
+                "preparation_minutes": first["preparation_minutes"],
+                "travel_before_minutes": first["travel_before_minutes"],
+                "travel_after_minutes": first["travel_after_minutes"],
+            },
         )
+        schedule.sessions.all().delete(soft=False)
+        for position, values in enumerate(parsed_sessions):
+            trainer_ids = values.pop("trainer_ids")
+            session = WorkshopSession.objects.create(schedule=schedule, position=position, **values)
+            session.trainers.add(*trainer_ids)
         _audit(
             request,
             workspace_id=issue.workspace_id,
             issue_id=issue.id,
             action=CapacityAuditEvent.Action.WORKSHOP_UPDATED,
+            metadata={"session_count": len(parsed_sessions)},
         )
         return Response(self._payload(schedule))
 
@@ -625,6 +665,33 @@ class WorkshopScheduleEndpoint(BaseAPIView):
 
     @staticmethod
     def _payload(schedule):
+        sessions = list(schedule.sessions.prefetch_related("trainers").all())
+        if not sessions:
+            trainer_ids = [str(value) for value in schedule.issue.issue_assignee.values_list("assignee_id", flat=True)]
+            session_payloads = [
+                {
+                    "id": None,
+                    "starts_at": schedule.starts_at.isoformat(),
+                    "ends_at": schedule.ends_at.isoformat(),
+                    "preparation_minutes": schedule.preparation_minutes,
+                    "travel_before_minutes": schedule.travel_before_minutes,
+                    "travel_after_minutes": schedule.travel_after_minutes,
+                    "trainer_ids": trainer_ids,
+                }
+            ]
+        else:
+            session_payloads = [
+                {
+                    "id": str(session.id),
+                    "starts_at": session.starts_at.isoformat(),
+                    "ends_at": session.ends_at.isoformat(),
+                    "preparation_minutes": session.preparation_minutes,
+                    "travel_before_minutes": session.travel_before_minutes,
+                    "travel_after_minutes": session.travel_after_minutes,
+                    "trainer_ids": [str(trainer.id) for trainer in session.trainers.all()],
+                }
+                for session in sessions
+            ]
         return {
             "issue_id": str(schedule.issue_id),
             "starts_at": schedule.starts_at.isoformat(),
@@ -632,4 +699,5 @@ class WorkshopScheduleEndpoint(BaseAPIView):
             "preparation_minutes": schedule.preparation_minutes,
             "travel_before_minutes": schedule.travel_before_minutes,
             "travel_after_minutes": schedule.travel_after_minutes,
+            "sessions": session_payloads,
         }

@@ -36,6 +36,7 @@ from .capacity import (
     TrainerCalendarSelection,
     TrainerProfile,
     WorkshopSchedule,
+    WorkshopSession,
 )
 
 __all__ = [
@@ -69,4 +70,5 @@ __all__ = [
     "TrainerCalendarSelection",
     "TrainerProfile",
     "WorkshopSchedule",
+    "WorkshopSession",
 ]
