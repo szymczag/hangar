@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { capture, settled } from "../src/capture.js";
+import { capture } from "../src/capture.js";
 import { expect, fixtures, test } from "../src/fixtures.js";
 
 /**
@@ -36,7 +36,10 @@ import { expect, fixtures, test } from "../src/fixtures.js";
  */
 for (const [name, width] of [
   ["wide", 1440],
-  ["narrow", 768],
+  // 800, not 768: `sidebar-wrapper.tsx` collapses the entire sidebar at
+  // `windowSize[0] < 768`, so 768 is calibrated one pixel from a completely
+  // different layout. The story wants a narrow viewport, not a cliff edge.
+  ["narrow", 800],
 ] as const) {
   test(`the maintenance bar does not clip the page (${name})`, async ({ asUser }) => {
     const page = await asUser("light");
@@ -46,10 +49,12 @@ for (const [name, width] of [
     await page.goto(`/${seed.workspace.slug}/projects/${seed.project.id}/issues`);
 
     const bar = page.getByRole("status").filter({ hasText: /Maintenance/ });
-    // The bar fades in under framer-motion, which animates in JavaScript and so
-    // is untouched by `animations: "disabled"`. Without this the shot lands
-    // partway through the fade and the baseline records a half-opacity bar.
-    await settled(bar);
+    // Just visible. An earlier version called `settled()` here with a comment
+    // claiming the bar fades in under framer-motion -- there is no framer-motion
+    // anywhere in this chain, `Banner` is a plain div, and its computed opacity
+    // is 1 on the first painted frame. The call was satisfied instantly and
+    // guarded nothing, which is worse than no guard because it reads like one.
+    await expect(bar).toBeVisible();
 
     // The bar arrives long before the work items do, so waiting on it alone
     // captures a blank content pane -- stable today, and different the moment
@@ -83,7 +88,7 @@ test("the maintenance bar in dark", async ({ asUser }) => {
   await page.goto(`/${seed.workspace.slug}/projects/${seed.project.id}/issues`);
 
   const bar = page.getByRole("status").filter({ hasText: /Maintenance/ });
-  await settled(bar);
+  await expect(bar).toBeVisible();
 
   // Wait for the page behind it as well, even though only the bar is captured.
   // The route progress indicator is a thin line pinned to the very top of the
