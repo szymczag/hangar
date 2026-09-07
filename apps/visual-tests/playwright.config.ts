@@ -92,6 +92,9 @@ export default defineConfig({
       maxDiffPixels: 0,
       threshold: 0,
       animations: "disabled",
+      // Applied to every screenshot; see the file for why the route progress
+      // indicator has to be hidden rather than waited out.
+      stylePath: "./screenshot.css",
       caret: "hide",
       scale: "css",
     },

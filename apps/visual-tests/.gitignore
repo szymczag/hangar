@@ -3,3 +3,4 @@
 # only images this suite keeps in the repository.
 test-results/
 playwright-report/
+soak-results/

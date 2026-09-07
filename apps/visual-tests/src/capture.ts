@@ -48,9 +48,7 @@ export async function capture(
   // <img> exposes `complete`, so it can simply be waited on. SVG <image>
   // exposes nothing: no `complete`, no `naturalWidth`, and -- checked, not
   // assumed -- no entry in resource timing either, which is what a first
-  // attempt at this wrongly relied on. Fetching each href is the available
-  // signal that the bytes are resident; the request is served from cache when
-  // the element has already loaded, and forces the load when it has not.
+  // attempt at this wrongly relied on.
   await page.waitForFunction(() => Array.from(document.images).every((image) => image.complete));
 
   await page.evaluate(async () => {
@@ -58,7 +56,20 @@ export async function capture(
       .map((element) => element.getAttribute("href") ?? element.getAttribute("xlink:href"))
       .filter((href): href is string => href !== null && !href.startsWith("data:"));
 
-    await Promise.all(hrefs.map((href) => fetch(href, { cache: "force-cache" }).catch(() => undefined)));
+    await Promise.all(
+      hrefs.map(async (href) => {
+        const probe = new Image();
+        probe.src = href;
+        // decode(), not fetch(). Fetching proves the bytes are resident; it does
+        // not prove the browser has a decoded bitmap ready to paint, and the SVG
+        // was still painting an empty box after the fetch resolved. That is why
+        // the first version of this only downgraded the failure from
+        // deterministic to flaky -- the retry passed because it found the image
+        // in cache, which is a symptom of the fix being incomplete, not of it
+        // working. Same URL, so the SVG paints from the same cache entry.
+        await probe.decode().catch(() => undefined);
+      })
+    );
   });
 
   const subject = options.target ?? page;
