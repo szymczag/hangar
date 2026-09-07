@@ -16,6 +16,7 @@ const trainer = {
   working_minutes: 480,
   google_busy_minutes: 60,
   workshop_minutes: 0,
+  hold_minutes: 0,
   unavailable_minutes: 60,
   available_minutes: 420,
   intervals: [

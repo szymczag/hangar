@@ -21,6 +21,7 @@ from plane.ext.models import (
     WorkshopSchedule,
     WorkshopSession,
     WorkshopPlanDraft,
+    WorkshopPlanHold,
 )
 from plane.ext.capacity import GoogleCalendarError, decrypt_value, encrypt_value
 from plane.ext.views import capacity as capacity_views
@@ -339,6 +340,74 @@ def test_workshop_plan_drafts_are_private_and_revision_protected(settings, works
         == status.HTTP_404_NOT_FOUND
     )
     assert WorkshopPlanDraft.objects.filter(owner=create_user, workspace=workspace).count() == 1
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings, workspace, create_user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+    plans_url = f"/api/workspaces/{workspace.slug}/capacity/plans/"
+    payload = {
+        "title": "NetSec workshop",
+        "duration_minutes": 240,
+        "preparation_minutes": 30,
+        "travel_before_minutes": 60,
+        "travel_after_minutes": 60,
+        "window_starts_at": "2026-09-07T00:00:00+02:00",
+        "window_ends_at": "2026-09-14T00:00:00+02:00",
+        "trainer_ids": [str(create_user.id)],
+    }
+    first = client.post(plans_url, payload, format="json", HTTP_X_CSRFTOKEN=csrf).data
+    second = client.post(plans_url, payload, format="json", HTTP_X_CSRFTOKEN=csrf).data
+    hold_payload = {
+        "revision": first["revision"],
+        "trainer_id": str(create_user.id),
+        "workshop_starts_at": "2026-09-07T10:30:00+02:00",
+    }
+
+    held = client.post(
+        f"{plans_url}{first['id']}/hold/", hold_payload, format="json", HTTP_X_CSRFTOKEN=csrf
+    )
+
+    assert held.status_code == status.HTTP_201_CREATED
+    assert held.data["revision"] == 2
+    assert held.data["hold"]["blocked_starts_at"] == "2026-09-07T09:00:00+02:00"
+    assert held.data["hold"]["workshop_starts_at"] == "2026-09-07T10:30:00+02:00"
+    assert held.data["hold"]["workshop_ends_at"] == "2026-09-07T14:30:00+02:00"
+    assert held.data["hold"]["blocked_ends_at"] == "2026-09-07T15:30:00+02:00"
+    assert WorkshopPlanHold.objects.filter(status=WorkshopPlanHold.Status.ACTIVE).count() == 1
+    assert not WorkshopSchedule.objects.exists()
+    capacity = client.get(
+        f"/api/workspaces/{workspace.slug}/capacity/",
+        {
+            "from": "2026-09-07T00:00:00+02:00",
+            "to": "2026-09-08T00:00:00+02:00",
+            "trainer_ids": str(create_user.id),
+        },
+    )
+    assert capacity.status_code == status.HTTP_200_OK
+    trainer_capacity = capacity.data["trainers"][0]
+    assert trainer_capacity["hold_minutes"] == 270
+    assert any(interval["kind"] == "workshop_hold" for interval in trainer_capacity["intervals"])
+
+    conflict = client.post(
+        f"{plans_url}{second['id']}/hold/",
+        {**hold_payload, "revision": second["revision"], "workshop_starts_at": "2026-09-07T11:00:00+02:00"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert conflict.status_code == status.HTTP_409_CONFLICT
+
+    released = client.delete(f"{plans_url}{first['id']}/hold/", HTTP_X_CSRFTOKEN=csrf)
+    assert released.status_code == status.HTTP_200_OK
+    assert released.data["revision"] == 3
+    assert not WorkshopPlanHold.objects.filter(status=WorkshopPlanHold.Status.ACTIVE).exists()
+    assert CapacityAuditEvent.objects.filter(action=CapacityAuditEvent.Action.PLAN_HOLD_CREATED).exists()
+    assert CapacityAuditEvent.objects.filter(action=CapacityAuditEvent.Action.PLAN_HOLD_RELEASED).exists()
 
 
 @pytest.mark.contract

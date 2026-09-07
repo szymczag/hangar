@@ -21,7 +21,7 @@ export type TTrainerProfile = {
 export type TCapacityInterval = {
   start: string;
   end: string;
-  kind: "working" | "google_busy" | "workshop";
+  kind: "working" | "google_busy" | "workshop" | "workshop_hold";
   work_item?: { id: string; name: string; project_id: string } | null;
 };
 export type TTrainerCapacity = {
@@ -40,6 +40,7 @@ export type TTrainerCapacity = {
   working_minutes: number;
   google_busy_minutes: number;
   workshop_minutes: number;
+  hold_minutes: number;
   unavailable_minutes: number;
   available_minutes: number;
   intervals: TCapacityInterval[];
@@ -95,6 +96,18 @@ export type TWorkshopPlanDraft = TWorkshopPlanDraftInput & {
   id: string;
   revision: number;
   updated_at: string;
+  hold: TWorkshopPlanHold | null;
+};
+export type TWorkshopPlanHold = {
+  id: string;
+  trainer_id: string;
+  trainer_name: string;
+  workshop_starts_at: string;
+  workshop_ends_at: string;
+  blocked_starts_at: string;
+  blocked_ends_at: string;
+  expires_at: string;
+  status: "active" | "released" | "confirmed";
 };
 
 export class CapacityRequestError extends Error {
@@ -265,6 +278,32 @@ export class CapacityService extends APIService {
     return this.delete(`/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/`, undefined, {
       headers: { "X-CSRFTOKEN": csrfToken },
     });
+  }
+
+  async holdWorkshopPlan(
+    workspaceSlug: string,
+    draftId: string,
+    revision: number,
+    trainerId: string,
+    workshopStartsAt: string
+  ) {
+    const csrfToken = await this.csrfToken();
+    return this.data<{ hold: TWorkshopPlanHold; revision: number }>(
+      this.post(
+        `/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/hold/`,
+        { revision, trainer_id: trainerId, workshop_starts_at: workshopStartsAt },
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
+    );
+  }
+
+  async releaseWorkshopPlanHold(workspaceSlug: string, draftId: string) {
+    const csrfToken = await this.csrfToken();
+    return this.data<{ revision: number }>(
+      this.delete(`/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/hold/`, undefined, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
   }
 
   getWorkshopSchedule(workspaceSlug: string, projectId: string, issueId: string) {
