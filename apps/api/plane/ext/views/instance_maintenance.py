@@ -158,8 +158,16 @@ class InstanceMaintenanceNoticeAdminEndpoint(BaseAPIView):
         if "message" in data:
             try:
                 notice.message = validate_single_line_text(data.get("message"), max_length=MESSAGE_MAX_LENGTH)
-            except PlainTextError as error:
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            except PlainTextError:
+                return Response(
+                    {
+                        "error": (
+                            f"Message must be {MESSAGE_MAX_LENGTH} characters or fewer and cannot contain "
+                            "control or formatting characters, including line breaks."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if "severity" in data:
             severity = (data.get("severity") or "").strip()

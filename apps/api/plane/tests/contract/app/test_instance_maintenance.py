@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from plane.db.models import User
 from plane.ext.models import InstanceMaintenanceNotice
+from plane.ext.utils.plain_text import PlainTextError
 from plane.license.models import InstanceAdmin
 from plane.tests.contract.app import test_google_auth as _google_auth
 from plane.tests.support.admin_session import authenticate_admin
@@ -186,6 +187,21 @@ def test_a_line_break_is_refused(admin_client):
     response = admin_client.patch(ADMIN_URL, {"message": "One line\nTwo lines"}, format="json")
 
     assert response.status_code == 400
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_validation_exception_details_are_not_returned(admin_client, mocker):
+    secret_detail = "internal validator path /srv/hangar/private.py:42"
+    mocker.patch(
+        "plane.ext.views.instance_maintenance.validate_single_line_text",
+        side_effect=PlainTextError(secret_detail),
+    )
+
+    response = admin_client.patch(ADMIN_URL, {"message": "Maintenance"}, format="json")
+
+    assert response.status_code == 400
+    assert secret_detail not in response.json()["error"]
 
 
 @pytest.mark.contract
