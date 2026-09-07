@@ -547,9 +547,7 @@ class WorkspaceCapacityEndpoint(BaseAPIView):
 def _draft_payload(draft):
     now = timezone.now()
     hold = (
-        draft.holds.filter(status=WorkshopPlanHold.Status.ACTIVE, expires_at__gt=now)
-        .select_related("trainer")
-        .first()
+        draft.holds.filter(status=WorkshopPlanHold.Status.ACTIVE, expires_at__gt=now).select_related("trainer").first()
     )
     return {
         "id": str(draft.id),
@@ -751,9 +749,7 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
         if not workshop_start or timezone.is_naive(workshop_start):
             return Response({"error": "A timezone-aware workshop_starts_at is required."}, status=400)
         workshop_end = workshop_start + timedelta(minutes=draft.duration_minutes)
-        blocked_start = workshop_start - timedelta(
-            minutes=draft.preparation_minutes + draft.travel_before_minutes
-        )
+        blocked_start = workshop_start - timedelta(minutes=draft.preparation_minutes + draft.travel_before_minutes)
         blocked_end = workshop_end + timedelta(minutes=draft.travel_after_minutes)
         if blocked_start < draft.window_starts_at or blocked_end > draft.window_ends_at:
             return Response({"error": "The complete trainer block must fit in the planning window."}, status=400)
@@ -770,21 +766,24 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
             status=WorkshopPlanHold.Status.ACTIVE,
             expires_at__lte=now,
         ).update(status=WorkshopPlanHold.Status.RELEASED, updated_by=request.user)
-        conflict = WorkshopPlanHold.objects.filter(
-            workspace=draft.workspace,
-            trainer_id=trainer_id,
-            status=WorkshopPlanHold.Status.ACTIVE,
-            expires_at__gt=now,
-            blocked_starts_at__lt=blocked_end,
-            blocked_ends_at__gt=blocked_start,
-        ).exclude(draft=draft).exists()
+        conflict = (
+            WorkshopPlanHold.objects.filter(
+                workspace=draft.workspace,
+                trainer_id=trainer_id,
+                status=WorkshopPlanHold.Status.ACTIVE,
+                expires_at__gt=now,
+                blocked_starts_at__lt=blocked_end,
+                blocked_ends_at__gt=blocked_start,
+            )
+            .exclude(draft=draft)
+            .exists()
+        )
         if not conflict:
             sessions = WorkshopSession.objects.filter(
                 schedule__workspace=draft.workspace, trainers=trainer.user
             ).distinct()
             conflict = any(
-                session.starts_at
-                - timedelta(minutes=session.preparation_minutes + session.travel_before_minutes)
+                session.starts_at - timedelta(minutes=session.preparation_minutes + session.travel_before_minutes)
                 < blocked_end
                 and session.ends_at + timedelta(minutes=session.travel_after_minutes) > blocked_start
                 for session in sessions
