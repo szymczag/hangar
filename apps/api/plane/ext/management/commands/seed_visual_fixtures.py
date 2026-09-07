@@ -36,10 +36,12 @@ from plane.db.models import (
     User,
     Workspace,
     WorkspaceMember,
+    WorkspaceMemberInvite,
     WorkspaceUserPreference,
 )
 from plane.ext.auth.sessions import mint_admin_session, mint_app_session
 from plane.ext.models import (
+    ImportJob,
     InstanceMaintenanceNotice,
     IssueProperty,
     IssuePropertyOption,
@@ -126,6 +128,8 @@ class Command(BaseCommand):
         self._work_item_properties(workspace, project)
         self._worklogs(workspace, project, users["light"])
         self._shared_links(workspace, users)
+        self._import_jobs(workspace, project, users["admin"])
+        self._invitations(workspace, users["admin"])
         self._maintenance_notice()
         copy_target = self._copy_in_flight(workspace, project, users)
 
@@ -139,6 +143,7 @@ class Command(BaseCommand):
             "workItems": [name for name, _ in WORK_ITEMS],
             # Published so the specs assert seeded content instead of strings
             "properties": [name for name, _, _ in Command.PROPERTIES],
+            "invitations": [email for email, _ in Command.INVITATIONS],
             "sharedLinks": {
                 "visible": [t for t, _, hidden in Command.SHARED_LINKS if not hidden],
                 "hidden": [t for t, _, hidden in Command.SHARED_LINKS if hidden],
@@ -184,6 +189,13 @@ class Command(BaseCommand):
             # any attribute a test could set: `store-wrapper` applies it on first
             # load and overwrites whatever the markup said. Seeding it is the
             # only deterministic lever.
+            # Pinned, because the members table prints it. `date_joined` defaults
+            # to real time, so without this the workspace members baseline
+            # changes date every single day -- and with `visual-regression` a
+            # required check, that would block every merge until somebody
+            # re-baselined it.
+            User.objects.filter(pk=user.pk).update(date_joined=CLOCK - timedelta(days=30))
+
             profile, _ = Profile.objects.get_or_create(user=user)
             profile.theme = {"theme": theme}
             # Onboarding is a first-run artifact, and the product tour is a
@@ -436,6 +448,84 @@ class Command(BaseCommand):
                 WorkspaceSharedLinkHide.objects.update_or_create(
                     workspace=workspace, user=users["light"], shared_link=link
                 )
+
+    # Two finished imports, and deliberately no running one.
+    #
+    # An active job makes the history poll every three seconds and renders a
+    # spinning loader; terminal rows give a completely static DOM and still show
+    # every part of the row worth photographing -- the status icon, the task
+    # tallies, the retry action on a failure and the report link on both.
+    #
+    # `ImportJob` is fussier than most of what this seed writes. Both digests are
+    # CHECK-constrained to 64 hex characters, and a terminal status must have
+    # `completed_at` set with the lease fields NULL, so these are not values that
+    # can be left to defaults.
+    IMPORTS = (
+        (
+            "completed",
+            "0" * 64,
+            {"planned_tasks": 128, "imported_tasks": 120, "reused_tasks": 8},
+            "",
+        ),
+        (
+            "failed",
+            "1" * 64,
+            {"planned_tasks": 64, "imported_tasks": 41, "reused_tasks": 0},
+            "row_limit_exceeded",
+        ),
+    )
+
+    def _import_jobs(self, workspace, project, actor) -> None:
+        for index, (status, digest, stats, reason) in enumerate(self.IMPORTS, start=1):
+            stamped = CLOCK - timedelta(days=index)
+            job, _ = ImportJob.objects.update_or_create(
+                workspace=workspace,
+                project=project,
+                source_digest=digest,
+                defaults={
+                    "provider": ImportJob.Provider.TODOIST_CSV,
+                    "status": status,
+                    "manifest_digest": digest,
+                    "stats": stats,
+                    "reason": reason,
+                    "initiated_by": actor,
+                    "completed_at": stamped,
+                    "queued_at": stamped,
+                    "started_at": stamped,
+                    "lease_token": None,
+                    "lease_expires_at": None,
+                },
+            )
+            # `created_at` is auto_now_add and the history orders by it, so the
+            # row order is otherwise whatever the insert happened to produce.
+            ImportJob.objects.filter(pk=job.pk).update(created_at=stamped, updated_at=stamped)
+
+    # Invitations that have been sent and not yet answered. "Pending" is not a
+    # stored state: the endpoint returns every invite that has not been revoked
+    # and the interface labels each row unconditionally.
+    INVITATIONS = (
+        ("invited-admin@hangar.test", ADMIN),
+        ("invited-member@hangar.test", MEMBER),
+    )
+
+    def _invitations(self, workspace, actor) -> None:
+        for index, (email, role) in enumerate(self.INVITATIONS, start=1):
+            stamped = CLOCK - timedelta(days=index)
+            invite, _ = WorkspaceMemberInvite.objects.update_or_create(
+                workspace=workspace,
+                email=email,
+                defaults={
+                    "role": role,
+                    "accepted": False,
+                    "responded_at": None,
+                    # Fixed rather than random: it is not rendered, but a seed
+                    # that mints a value per run invites somebody to render it.
+                    "token": f"vr-invite-token-{index:02d}",
+                    "expires_at": CLOCK + timedelta(days=7),
+                    "created_by": actor,
+                },
+            )
+            WorkspaceMemberInvite.objects.filter(pk=invite.pk).update(created_at=stamped, updated_at=stamped)
 
     def _maintenance_notice(self) -> None:
         """An active notice, deliberately with no scheduled window.
