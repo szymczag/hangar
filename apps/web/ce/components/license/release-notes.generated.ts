@@ -11,12 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.47",
+  version: "0.1.0-rc.48",
   highlights: [
-    "Booking hours now describe the window in which a trainer may be booked.",
-    "Google Calendar is the source of busy-time exceptions.",
-    "The capacity view is clearer and more resilient.",
-    "Workshop can be selected when creating or editing a work item.",
+    "Workshop planning finds trainers without exposing calendar event details.",
+    "Saved drafts and expiring holds support safe coordinator hand-offs.",
+    "Multi-session workshops assign logistics precisely.",
+    "Scheduling surfaces are easier to scan.",
   ],
   upstream: {
     version: "1.4.0",
