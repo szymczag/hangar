@@ -134,8 +134,16 @@ class InstanceConfigurationEndpoint(BaseAPIView):
                 continue
             try:
                 validate_single_line_text(request.data.get(key), max_length=max_length, field=key)
-            except PlainTextError as error:
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            except PlainTextError:
+                return Response(
+                    {
+                        "error": (
+                            f"{key} must be {max_length} characters or fewer and cannot contain "
+                            "control or formatting characters, including line breaks."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if CONFIGURATION_SOURCE_KEY in request.data:
             return Response(
