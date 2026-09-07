@@ -48,6 +48,8 @@ class CapacityAuditEvent(models.Model):
         PLAN_DRAFT_CREATED = "plan_draft.created", "Plan draft created"
         PLAN_DRAFT_UPDATED = "plan_draft.updated", "Plan draft updated"
         PLAN_DRAFT_REMOVED = "plan_draft.removed", "Plan draft removed"
+        PLAN_HOLD_CREATED = "plan_hold.created", "Plan hold created"
+        PLAN_HOLD_RELEASED = "plan_hold.released", "Plan hold released"
 
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)
@@ -230,4 +232,39 @@ class WorkshopPlanDraft(BaseModel):
                 condition=Q(window_ends_at__gt=models.F("window_starts_at")),
                 name="ext_plan_draft_valid_window",
             )
+        ]
+
+
+class WorkshopPlanHold(BaseModel):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        RELEASED = "released", "Released"
+        CONFIRMED = "confirmed", "Confirmed"
+
+    draft = models.ForeignKey(WorkshopPlanDraft, on_delete=models.CASCADE, related_name="holds")
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workshop_plan_holds")
+    trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="workshop_plan_holds")
+    workshop_starts_at = models.DateTimeField()
+    workshop_ends_at = models.DateTimeField()
+    blocked_starts_at = models.DateTimeField()
+    blocked_ends_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+
+    class Meta:
+        db_table = "ext_workshop_plan_holds"
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["workspace", "trainer", "status", "expires_at"], name="ext_plan_hold_lookup_idx"),
+            models.Index(fields=["draft", "status"], name="ext_plan_hold_draft_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(workshop_ends_at__gt=models.F("workshop_starts_at")),
+                name="ext_plan_hold_workshop_range",
+            ),
+            models.CheckConstraint(
+                condition=Q(blocked_ends_at__gt=models.F("blocked_starts_at")),
+                name="ext_plan_hold_blocked_range",
+            ),
         ]

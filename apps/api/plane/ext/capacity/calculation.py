@@ -20,7 +20,7 @@ from plane.ext.capacity.cache import (
     register_busy_cache_key,
 )
 from plane.ext.capacity.google import GoogleCalendarClient, GoogleCalendarError
-from plane.ext.models import TrainerProfile, WorkshopSchedule, WorkshopSession
+from plane.ext.models import TrainerProfile, WorkshopPlanHold, WorkshopSchedule, WorkshopSession
 from plane.license.utils.instance_value import get_configuration_value
 
 DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
@@ -229,6 +229,23 @@ def _workshops(workspace_id, trainer_ids, start, end):
     return result
 
 
+def _holds(workspace_id, trainer_ids, start, end):
+    holds = WorkshopPlanHold.objects.filter(
+        workspace_id=workspace_id,
+        trainer_id__in=trainer_ids,
+        status=WorkshopPlanHold.Status.ACTIVE,
+        expires_at__gt=datetime.now(dt_timezone.utc),
+        blocked_starts_at__lt=end,
+        blocked_ends_at__gt=start,
+    )
+    result = {trainer_id: [] for trainer_id in trainer_ids}
+    for hold in holds:
+        clipped_start, clipped_end = max(hold.blocked_starts_at, start), min(hold.blocked_ends_at, end)
+        if clipped_start < clipped_end:
+            result[hold.trainer_id].append((clipped_start, clipped_end))
+    return result
+
+
 def _serialize_interval(start, end, kind, **extra):
     return {"start": start.isoformat(), "end": end.isoformat(), "kind": kind, **extra}
 
@@ -243,6 +260,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         trainers = trainers.filter(user_id__in=trainer_ids)
     trainers = list(trainers[:25])
     workshop_map = _workshops(workspace.id, [trainer.user_id for trainer in trainers], start, end)
+    hold_map = _holds(workspace.id, [trainer.user_id for trainer in trainers], start, end)
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(trainers)))) as executor:
         google_results = {
             trainer.id: result
@@ -260,7 +278,8 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         google_busy, connection_status, availability_status = google_results[trainer.id]
         workshop_records = workshop_map.get(trainer.user_id, [])
         workshop_intervals = [(a, b) for a, b, _ in workshop_records]
-        combined_busy = _merge([*google_busy, *workshop_intervals])
+        hold_intervals = hold_map.get(trainer.user_id, [])
+        combined_busy = _merge([*google_busy, *workshop_intervals, *hold_intervals])
         unavailable = _intersections(working, combined_busy)
         intervals = [_serialize_interval(a, b, "working") for a, b in working]
         intervals.extend(_serialize_interval(a, b, "google_busy") for a, b in google_busy)
@@ -273,6 +292,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
                     "project_id": str(schedule.project_id),
                 }
             intervals.append(_serialize_interval(block_start, block_end, "workshop", work_item=work_item))
+        intervals.extend(_serialize_interval(a, b, "workshop_hold") for a, b in hold_intervals)
         conflicts = []
         for block_start, block_end, schedule in workshop_records:
             for overlap_start, overlap_end in _intersections([(block_start, block_end)], google_busy):
@@ -307,6 +327,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
                 "working_minutes": working_minutes,
                 "google_busy_minutes": _minutes(_intersections(working, google_busy)),
                 "workshop_minutes": _minutes(_intersections(working, workshop_intervals)),
+                "hold_minutes": _minutes(_intersections(working, hold_intervals)),
                 "unavailable_minutes": unavailable_minutes,
                 "available_minutes": max(0, working_minutes - unavailable_minutes),
                 "intervals": sorted(intervals, key=lambda item: (item["start"], item["kind"])),
