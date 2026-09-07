@@ -27,7 +27,9 @@ const planSignature = (plan: TWorkshopPlanDraftInput) =>
     ...plan,
     window_starts_at: new Date(plan.window_starts_at).toISOString(),
     window_ends_at: new Date(plan.window_ends_at).toISOString(),
-    trainer_ids: [...plan.trainer_ids].toSorted(),
+    // ES2022 is the web app's current target; the copied array keeps sort() mutation local.
+    // oxlint-disable-next-line unicorn/no-array-sort
+    trainer_ids: [...plan.trainer_ids].sort(),
   });
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
