@@ -143,6 +143,30 @@ describe("CapacityService CSRF requests", () => {
     );
   });
 
+  it("saves a coordinator planning draft with CSRF and optimistic revision", async () => {
+    const payload = {
+      title: "NetSec workshop",
+      duration_minutes: 240,
+      preparation_minutes: 30,
+      travel_before_minutes: 60,
+      travel_after_minutes: 60,
+      window_starts_at: "2026-09-07T00:00:00.000Z",
+      window_ends_at: "2026-09-14T00:00:00.000Z",
+      trainer_ids: ["trainer-id"],
+    };
+    const put = vi
+      .spyOn(service, "put")
+      .mockResolvedValue({ data: { ...payload, id: "draft-id", revision: 4 } } as never);
+
+    await service.updateWorkshopPlanDraft("workspace", "draft-id", 3, payload);
+
+    expect(put).toHaveBeenCalledWith(
+      "/api/workspaces/workspace/capacity/plans/draft-id/",
+      { ...payload, revision: 3 },
+      csrfHeaders
+    );
+  });
+
   it("does not send a mutation when the CSRF endpoint omits the token", async () => {
     vi.mocked(service.get).mockResolvedValue({ data: {} } as never);
     const post = vi.spyOn(service, "post");
