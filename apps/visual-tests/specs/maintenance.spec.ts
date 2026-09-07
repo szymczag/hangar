@@ -59,7 +59,14 @@ for (const [name, width] of [
     // The bar arrives long before the work items do, so waiting on it alone
     // captures a blank content pane -- stable today, and different the moment
     // the list happens to win the race. Wait for seeded content instead.
-    await expect(page.getByText(seed.workItems.at(-1)!, { exact: false }).first()).toBeVisible();
+    // The *first* item, not the last. Waiting on the last was my own attempt at
+    // a stricter signal and it is the flakiest line in the suite: the list
+    // paints progressively, and a failure snapshot from CI shows it settled with
+    // VR-1 to VR-18 in the DOM and no loader -- the thirtieth row simply never
+    // arrives. Only about fourteen rows fit the viewport anyway, so the rows
+    // that decide the screenshot are long since painted; the rest was strictness
+    // for its own sake, bought at the price of a one-in-three flake.
+    await expect(page.getByText(seed.workItems[0], { exact: false }).first()).toBeVisible();
 
     // And wait for the sidebar separately, because nothing about the work items
     // implies it has finished. Its personal entries are rendered from

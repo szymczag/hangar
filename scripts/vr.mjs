@@ -23,7 +23,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
@@ -285,6 +285,17 @@ try {
     }
 
     process.stdout.write(output);
+
+    // Keep this iteration's evidence. Playwright wipes `test-results` at the
+    // start of every run, so without this a soak reports "3 of 5 were not clean"
+    // and hands you the artefacts of the fifth only -- which is how the first
+    // soak lost the one diff that mattered.
+    const results = path.join(ROOT, "apps/visual-tests/test-results");
+    if (existsSync(results)) {
+      cpSync(results, path.join(ROOT, `apps/visual-tests/soak-results/${label.replace(/\W+/g, "-")}`), {
+        recursive: true,
+      });
+    }
 
     // Playwright prints "N flaky" only when something needed a retry to pass,
     // and exits zero for it. Here that counts as not clean: green-on-retry is
