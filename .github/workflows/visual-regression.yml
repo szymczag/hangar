@@ -108,30 +108,16 @@ jobs:
           node apps/visual-tests/scripts/check-baseline-churn.mjs \
             "origin/${{ github.event.pull_request.base.ref }}" /tmp/pr-body.txt
 
-      # The bill this job actually pays. Of roughly nine minutes, about five are
-      # spent building the API image -- pip compiling psycopg-c from source --
-      # and about one is the turbo build. The suite itself is under two. Compose
-      # has no layer cache across runners, so the image is built here instead,
-      # against the Actions cache, and `up` finds it already present.
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build the API image with a layer cache
-        uses: docker/build-push-action@v6
-        with:
-          context: ./apps/api
-          file: ./apps/api/Dockerfile.dev
-          # The name docker compose derives for this service --
-          # `<project>-<service>`, the project being the checkout directory. Tag
-          # it here and `up` finds the image already present and skips building.
-          tags: hangar-vr-api
-          load: true
-          cache-from: type=gha,scope=vr-api
-          cache-to: type=gha,mode=max,scope=vr-api
-
-      # The other half. Without this the SPAs are rebuilt from cold every run;
-      # the two-level fallback matters because a key naming both SHAs misses on
-      # every push after the first.
+      # Restoring the turbo cache, and only that.
+      #
+      # An attempt at caching the API image belongs here and is deliberately
+      # absent: building it with buildx against the Actions cache and letting
+      # compose reuse the tag was measured over two runs and made the job
+      # *slower* -- 484s before, 583s after. The cache manifest imported and
+      # several layers reported CACHED, but the pip layer rebuilt anyway and
+      # compose did not adopt the tag, so the image was effectively paid for
+      # twice. Roughly five minutes a run is worth having, but not on the
+      # strength of an approach the numbers say does not work.
       - name: Restore Turbo cache
         uses: actions/cache/restore@v5
         with:
