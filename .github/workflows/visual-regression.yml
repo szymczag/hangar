@@ -20,13 +20,25 @@ on:
         description: "How many times to run the suite against one stack"
         required: false
         default: "5"
+  # And weekly, unprompted, because the failure this catches is invisible on the
+  # day it is introduced.
+  #
+  # A baseline can encode the date it was recorded -- the members table did,
+  # through the workspace membership row it prints -- and every run on that day
+  # passes. It only breaks the following morning, by which time nobody is
+  # looking, and with this workflow required that blocks every merge in the
+  # repository until somebody works out why. A soak on a day that is not the day
+  # the baselines were taken is the cheapest way to find the next one of those
+  # before it finds us.
+  schedule:
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: visual-regression-${{ github.workflow }}-${{ github.ref }}
+  group: visual-regression-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -62,7 +74,7 @@ jobs:
 
   visual:
     needs: changes
-    if: needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -141,15 +153,17 @@ jobs:
       # comparison against a stale build/client would pass -- the worst outcome
       # available.
       - name: Run the visual suite
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name != 'workflow_dispatch' && github.event_name != 'schedule'
         run: pnpm vr
 
       # One stack, N runs against it. Counting a *flaky* result as a failure is
       # the point: Playwright exits zero for green-on-retry, and green-on-retry
       # is exactly what is being measured.
+      # `inputs` is empty on a schedule, so the fallback is what the weekly run
+      # uses.
       - name: Soak the visual suite
-        if: github.event_name == 'workflow_dispatch'
-        run: node scripts/vr.mjs --soak=${{ inputs.iterations }}
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: node scripts/vr.mjs --soak=${{ inputs.iterations || '5' }}
 
       # Without this a red job says "some pixels changed" and nothing more, and
       # the suite is abandoned within a month.
