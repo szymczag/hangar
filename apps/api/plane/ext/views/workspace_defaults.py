@@ -60,9 +60,7 @@ def _defaults_payload(workspace):
     # defaults before those two keys were withdrawn still has rows for them, and
     # returning a key the client is no longer allowed to send back would make the
     # next save fail validation on data it never chose.
-    rows = WorkspaceHomeDefault.objects.filter(
-        workspace=workspace, deleted_at__isnull=True, key__in=ALLOWED_KEYS
-    )
+    rows = WorkspaceHomeDefault.objects.filter(workspace=workspace, deleted_at__isnull=True, key__in=ALLOWED_KEYS)
     return {
         "defaults": [
             {
