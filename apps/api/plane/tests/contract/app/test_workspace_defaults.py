@@ -92,6 +92,37 @@ def test_an_unknown_widget_is_refused(admin_client, workspace):
 
 @pytest.mark.contract
 @pytest.mark.django_db
+def test_a_widget_that_draws_nothing_is_not_offered(admin_client, workspace):
+    """`new_at_plane` and `quick_tutorial` are registered with `component: null`.
+
+    Upstream's own home endpoint refuses to create preference rows for them for
+    that reason. Offering them here gave an operator two switches that could not
+    affect anybody's home page.
+    """
+    keys = admin_client.get(_defaults_url(workspace.slug)).json()["available_keys"]
+
+    assert "new_at_plane" not in keys
+    assert "quick_tutorial" not in keys
+    assert "quick_links" in keys
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_withdrawn_widget_already_saved_is_not_returned(admin_client, workspace):
+    """An instance that saved one before it was withdrawn must not be stuck.
+
+    Returning a key the client may no longer send back would fail validation on
+    the next save, on data the operator never chose.
+    """
+    WorkspaceHomeDefault.objects.create(workspace=workspace, key="new_at_plane", is_enabled=True, sort_order=1)
+
+    body = admin_client.get(_defaults_url(workspace.slug)).json()
+
+    assert all(row["key"] != "new_at_plane" for row in body["defaults"])
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
 def test_a_member_may_read_but_not_change_the_defaults(workspace):
     member = _user("member@acme.example")
     _join(workspace, member)

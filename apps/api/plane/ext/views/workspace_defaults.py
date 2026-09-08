@@ -32,7 +32,16 @@ from plane.ext.models import (
 
 # The keys upstream's home page actually renders. Anything else would be stored
 # and then silently ignored, which looks identical to the feature being broken.
-ALLOWED_KEYS = {key for key, _ in WorkspaceHomePreference.HomeWidgetKeys.choices}
+#
+# Two of the choices are exactly that. `new_at_plane` and `quick_tutorial` are
+# registered in `home-dashboard-widgets.tsx` with `component: null`, so they
+# draw nothing at all, and upstream's own home endpoint refuses to create
+# preference rows for them for the same reason
+# (plane/app/views/workspace/home.py). Offering them here gave an operator two
+# switches that could not affect anybody's home page -- and they rendered as
+# raw key names, because nothing ever intended to display them.
+DEAD_WIDGET_KEYS = {"new_at_plane", "quick_tutorial"}
+ALLOWED_KEYS = {key for key, _ in WorkspaceHomePreference.HomeWidgetKeys.choices} - DEAD_WIDGET_KEYS
 
 # Above this, rewriting every member's rows inline would hold a request open too
 # long; the operation is the same either way, so it just moves to a worker.
@@ -47,7 +56,11 @@ def _workspace(slug):
 
 
 def _defaults_payload(workspace):
-    rows = WorkspaceHomeDefault.objects.filter(workspace=workspace, deleted_at__isnull=True)
+    # Filtered, not just excluded from `available_keys`: an instance that saved
+    # defaults before those two keys were withdrawn still has rows for them, and
+    # returning a key the client is no longer allowed to send back would make the
+    # next save fail validation on data it never chose.
+    rows = WorkspaceHomeDefault.objects.filter(workspace=workspace, deleted_at__isnull=True, key__in=ALLOWED_KEYS)
     return {
         "defaults": [
             {
