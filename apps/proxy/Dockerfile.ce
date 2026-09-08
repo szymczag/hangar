@@ -2,19 +2,37 @@
 # The release workflow currently publishes linux/amd64 only.
 FROM docker.io/library/caddy:2.11.4-builder-alpine@sha256:8c78bf0a666541cd56e36ea40d02f1c84847a2b4fd490f600aa38f7221d73c67 AS caddy-builder
 
-RUN xcaddy build \
+RUN XCADDY_SKIP_CLEANUP=1 xcaddy build \
         --with github.com/caddy-dns/cloudflare@v0.2.1 \
         --with github.com/caddy-dns/digitalocean@04bde2867106aa1b44c2f9da41a285fa02e629c5 \
         --with github.com/mholt/caddy-l4@6faae83b167fda94e62b686be5cbeb9b3f8fe002 \
         --with github.com/go-jose/go-jose/v3@v3.0.5 \
         --with github.com/go-jose/go-jose/v4@v4.1.4 \
-        --with google.golang.org/grpc@v1.81.0 \
-        --with go.opentelemetry.io/otel@v1.43.0 \
-        --with go.opentelemetry.io/otel/sdk@v1.43.0
+        --with google.golang.org/grpc@v1.83.1 \
+        --with go.opentelemetry.io/otel@v1.44.0 \
+        --with go.opentelemetry.io/otel/sdk@v1.44.0
+
+# Caddy itself can pin vulnerable transitive Go modules. Upgrade them in the
+# preserved xcaddy build directory and rebuild the exact module set.
+RUN cd "$(find /tmp -maxdepth 1 -name 'buildenv_*' -type d | head -1)" && \
+    go get golang.org/x/crypto@v0.55.0 && \
+    go get golang.org/x/net@v0.57.0 && \
+    go get golang.org/x/text@v0.41.0 && \
+    go get google.golang.org/grpc@v1.83.1 && \
+    go get go.opentelemetry.io/otel@v1.44.0 && \
+    go get go.opentelemetry.io/otel/sdk@v1.44.0 && \
+    go mod tidy && \
+    go build -o /usr/bin/caddy -ldflags "-w -s" -trimpath .
+
+RUN go version -m /usr/bin/caddy | grep -qE 'golang.org/x/crypto[[:space:]]+v0.55.0[[:space:]]' && \
+    go version -m /usr/bin/caddy | grep -qE 'golang.org/x/net[[:space:]]+v0.57.0[[:space:]]' && \
+    go version -m /usr/bin/caddy | grep -qE 'golang.org/x/text[[:space:]]+v0.41.0[[:space:]]' && \
+    go version -m /usr/bin/caddy | grep -qE 'google.golang.org/grpc[[:space:]]+v1.83.1[[:space:]]'
 
 FROM docker.io/library/caddy:2.11.4-alpine@sha256:98eb57d882ccd5213d1688764db10c1ca2c58a1ca3a6717a3411ad798f7a423a
 
-RUN apk update && apk upgrade --no-cache && apk add --no-cache nss-tools bash curl
+ARG APK_SECURITY_PATCH=2026-09-08
+RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available && apk add --no-cache nss-tools bash curl
 
 COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 

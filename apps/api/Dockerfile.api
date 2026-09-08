@@ -1,4 +1,4 @@
-FROM python:3.12.10-alpine
+FROM python:3.12.12-alpine
 
 ARG APP_VERSION=v0.1.0
 
@@ -11,8 +11,9 @@ ENV APP_VERSION=${APP_VERSION}
 ARG HANGAR_SOURCE_REVISION=""
 ENV HANGAR_SOURCE_REVISION=$HANGAR_SOURCE_REVISION
 
-# Update system packages for security
-RUN apk update && apk upgrade
+# Force the security-upgrade layer to refresh when the patch epoch changes.
+ARG APK_SECURITY_PATCH=2026-09-08
+RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
 
 WORKDIR /code
 
@@ -29,7 +30,7 @@ COPY requirements.txt ./
 COPY requirements ./requirements
 RUN apk add --no-cache libffi-dev
 RUN apk add --no-cache --virtual .build-deps \
-    "bash~=5.2" \
+    "bash~=5.3" \
     "g++" \
     "gcc" \
     "cargo" \
@@ -55,7 +56,7 @@ COPY plane plane/
 COPY templates templates/
 COPY package.json package.json
 
-RUN apk --no-cache add "bash~=5.2"
+RUN apk --no-cache add "bash~=5.3"
 COPY ./bin ./bin/
 
 RUN addgroup -g 10001 hangar && adduser -D -u 10001 -G hangar hangar
