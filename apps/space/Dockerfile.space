@@ -79,12 +79,15 @@ FROM base AS runner
 
 ENV NODE_ENV=production
 
+# Refresh runtime OS packages independently of the application layers.
+ARG APK_SECURITY_PATCH=2026-09-08
+RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
+
 # Remove go from Alpine APK database; not needed at runtime and carries stdlib CVEs
 RUN apk del go 2>/dev/null || true
 
-# Remove vulnerable picomatch bundled inside npm (CVE-2026-33671)
-# npx only needs picomatch when installing packages, not when running a locally-installed binary
-RUN rm -rf /usr/local/lib/node_modules/npm/node_modules/picomatch
+# npm is build tooling; react-router-serve is executed from the installed workspace.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --chown=node:node --from=installer /app/apps/space/build ./apps/space/build
 COPY --chown=node:node --from=installer /app/apps/space/node_modules ./apps/space/node_modules
@@ -104,4 +107,4 @@ USER node
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -fsS http://127.0.0.1:3000/spaces/ >/dev/null || exit 1
 
-CMD ["npx", "react-router-serve", "./build/server/index.js"]
+CMD ["./node_modules/.bin/react-router-serve", "./build/server/index.js"]

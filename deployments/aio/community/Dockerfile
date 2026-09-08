@@ -17,9 +17,12 @@ FROM ${IMAGE_PREFIX}proxy:${PLANE_VERSION} AS proxy-img
 # **************************************************
 #  STAGE 1: Runner
 # **************************************************
-FROM python:3.12.10-alpine AS runner
+FROM python:3.12.12-alpine AS runner
 
 WORKDIR /app
+
+ARG APK_SECURITY_PATCH=2026-09-08
+RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
 
 RUN apk add --no-cache \
     "libpq" \
@@ -31,6 +34,10 @@ COPY --from=node /usr/lib /usr/lib
 COPY --from=node /usr/local/lib /usr/local/lib
 COPY --from=node /usr/local/include /usr/local/include
 COPY --from=node /usr/local/bin /usr/local/bin
+
+# Runtime services execute node and workspace binaries directly; the package
+# manager and its dependency tree are not needed in the final AIO image.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=web-img /usr/share/nginx/html /app/web
 COPY --from=space-img /app /app/space
