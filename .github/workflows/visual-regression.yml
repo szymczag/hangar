@@ -70,6 +70,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # The churn check diffs against the base branch, and the default
+          # shallow clone has no history to diff against.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -91,6 +95,37 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Counted before anything is built: if the pull request rewrites a pile of
+      # baselines without saying why, that is worth knowing in ten seconds
+      # rather than after a nine-minute run.
+      - name: Check baseline churn
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "$PR_BODY" > /tmp/pr-body.txt
+          node apps/visual-tests/scripts/check-baseline-churn.mjs \
+            "origin/${{ github.event.pull_request.base.ref }}" /tmp/pr-body.txt
+
+      # Restoring the turbo cache, and only that.
+      #
+      # An attempt at caching the API image belongs here and is deliberately
+      # absent: building it with buildx against the Actions cache and letting
+      # compose reuse the tag was measured over two runs and made the job
+      # *slower* -- 484s before, 583s after. The cache manifest imported and
+      # several layers reported CACHED, but the pip layer rebuilt anyway and
+      # compose did not adopt the tag, so the image was effectively paid for
+      # twice. Roughly five minutes a run is worth having, but not on the
+      # strength of an approach the numbers say does not work.
+      - name: Restore Turbo cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-visual-${{ github.event.pull_request.base.sha || github.sha }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-visual-${{ github.event.pull_request.base.sha || github.sha }}-
+            turbo-${{ runner.os }}-visual-
 
       - name: Generate API environment
         run: |
@@ -118,6 +153,13 @@ jobs:
 
       # Without this a red job says "some pixels changed" and nothing more, and
       # the suite is abandoned within a month.
+      - name: Save Turbo cache
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-visual-${{ github.event.pull_request.base.sha || github.sha }}-${{ github.sha }}
+
       - name: Upload failure artefacts
         if: failure()
         uses: actions/upload-artifact@v4
