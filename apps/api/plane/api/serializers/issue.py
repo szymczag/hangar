@@ -127,18 +127,32 @@ class IssueSerializer(BaseSerializer):
 
         # Validate assignees are from project
         if data.get("assignees", []):
-            data["assignees"] = ProjectMember.objects.filter(
-                project_id=self.context.get("project_id"),
-                is_active=True,
-                role__gte=15,
-                member_id__in=data["assignees"],
-            ).values_list("member_id", flat=True)
+            requested_assignee_ids = list(dict.fromkeys(data["assignees"]))
+            valid_assignee_ids = set(
+                ProjectMember.objects.filter(
+                    project_id=self.context.get("project_id"),
+                    is_active=True,
+                    role__gte=15,
+                    member_id__in=requested_assignee_ids,
+                ).values_list("member_id", flat=True)
+            )
+            if set(requested_assignee_ids) - valid_assignee_ids:
+                raise serializers.ValidationError(
+                    {"assignees": "One or more assignees are not active members of this project."}
+                )
+            data["assignees"] = requested_assignee_ids
 
         # Validate labels are from project
         if data.get("labels", []):
-            data["labels"] = Label.objects.filter(
-                project_id=self.context.get("project_id"), id__in=data["labels"]
-            ).values_list("id", flat=True)
+            requested_label_ids = list(dict.fromkeys(data["labels"]))
+            valid_label_ids = set(
+                Label.objects.filter(
+                    project_id=self.context.get("project_id"), id__in=requested_label_ids
+                ).values_list("id", flat=True)
+            )
+            if set(requested_label_ids) - valid_label_ids:
+                raise serializers.ValidationError({"labels": "One or more labels do not belong to this project."})
+            data["labels"] = requested_label_ids
 
         # Check state is from the project only else raise validation error
         if (
