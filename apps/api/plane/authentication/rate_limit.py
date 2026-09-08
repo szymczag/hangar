@@ -4,6 +4,10 @@
 
 # Python imports
 import os
+from functools import wraps
+
+# Django imports
+from django.http import HttpResponseRedirect
 
 # Third party imports
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
@@ -15,6 +19,8 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
     AUTHENTICATION_ERROR_CODES,
 )
+from plane.authentication.utils.host import base_host
+from plane.utils.path_validator import get_safe_redirect_url
 
 
 class AuthenticationThrottle(AnonRateThrottle):
@@ -47,6 +53,33 @@ def authentication_throttle_allows(request):
     # SimpleRateThrottle.allow_request only reads request.META and
     # request.user, both available on a plain Django HttpRequest.
     return throttle.allow_request(request, None)
+
+
+def throttle_auth_redirect(*, is_app=False, is_space=False):
+    """Rate-limit a redirect-based authentication POST before any DB work."""
+    if is_app == is_space:
+        raise ValueError("exactly one authentication surface must be selected")
+
+    def decorator(post_method):
+        @wraps(post_method)
+        def wrapper(self, request, *args, **kwargs):
+            if not authentication_throttle_allows(request):
+                exc = AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+                    error_message="RATE_LIMIT_EXCEEDED",
+                )
+                return HttpResponseRedirect(
+                    get_safe_redirect_url(
+                        base_url=base_host(request=request, is_app=is_app, is_space=is_space),
+                        next_path=request.POST.get("next_path"),
+                        params=exc.get_error_dict(),
+                    )
+                )
+            return post_method(self, request, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 class EmailVerificationThrottle(UserRateThrottle):
@@ -100,4 +133,3 @@ class AdminWebAuthnVerifyThrottle(_AdminWebAuthnThrottle):
 class AdminWebAuthnRegisterThrottle(_AdminWebAuthnThrottle):
     rate = os.environ.get("ADMIN_WEBAUTHN_REGISTER_RATE", "10/minute")
     scope = "admin_webauthn_register"
-
