@@ -31,7 +31,22 @@ from reasoning about it, which is the habit this suite is meant to encourage.
 pnpm vr            # build the SPAs, bring the stack up, compare
 pnpm vr:update     # the same, but rewrite the baselines
 pnpm vr:stack      # build and bring the stack up, then leave it running
+pnpm vr:soak       # five runs against one stack; a flaky result counts as failure
 ```
+
+### The weekly soak
+
+`visual-regression` also runs the soak on a schedule, every Monday, and that is
+not belt-and-braces. A baseline can encode the date it was recorded -- the
+members table did, through the workspace membership row it prints -- and every
+run _on that day_ passes. It breaks the following morning, when nobody is
+looking, and because this workflow is a required check it then blocks every
+merge in the repository until somebody works out why.
+
+That is exactly how the joining-date bomb was found: a single run passed on both
+days, and only a soak on a day that was not the day the baselines were taken
+made it visible. The weekly run is the cheapest way to meet the next one of
+those on a Monday morning rather than in somebody's blocked pull request.
 
 Both go through `scripts/vr.mjs`, and that is the only supported entry point.
 
