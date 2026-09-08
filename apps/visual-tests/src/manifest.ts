@@ -18,6 +18,8 @@ export type VisualFixtures = {
   properties: string[];
   /** Shared quick links, split by whether the light user has hidden them. */
   sharedLinks: { visible: string[]; hidden: string[] };
+  /** Email addresses of the seeded, unanswered workspace invitations. */
+  invitations: string[];
   users: Record<string, { email: string; sessionCookie?: string; adminSessionCookie?: string }>;
 };
 
