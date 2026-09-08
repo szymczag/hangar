@@ -112,6 +112,11 @@ services:
       # as its "didn't start correctly" page -- indistinguishable, from a
       # screenshot, from the application actually being broken.
       ANON_RATE_LIMIT: 100000/minute
+      # The workspace Imports screen is gated on this, and it is a process
+      # environment variable rather than instance configuration -- so no amount
+      # of seeding makes that page render without it. `.env.example` defaults it
+      # to "0", which is why the page shows "not authorized" otherwise.
+      TODOIST_IMPORTS_ENABLED: "1"
       # Passed in by scripts/vr.mjs, read from the generated release notes. The
       # build identity dialog hides its notes when this disagrees with the
       # version compiled into the bundle -- which is the defect that prompted
