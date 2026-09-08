@@ -679,6 +679,57 @@ class TestAuthenticationThrottle:
             response = django_client.post(url, {"email": "throttle-up@plane.so", "code": "000000"}, follow=False)
             assert "RATE_LIMIT_EXCEEDED" in response.url
 
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("route_name", ["sign-in", "sign-up", "space-sign-in", "space-sign-up"])
+    def test_password_auth_surfaces_are_throttled_before_authentication(
+        self, django_client, setup_instance, route_name
+    ):
+        url = reverse(route_name)
+        with patch.object(AuthenticationThrottle, "rate", "1/minute"):
+            first = django_client.post(
+                url,
+                {"email": "password-throttle@plane.so", "password": "wrong"},
+                follow=False,
+            )
+            second = django_client.post(
+                url,
+                {"email": "password-throttle@plane.so", "password": "wrong"},
+                follow=False,
+            )
+
+        assert first.status_code == 302
+        assert "RATE_LIMIT_EXCEEDED" not in first.url
+        assert second.status_code == 302
+        assert "RATE_LIMIT_EXCEEDED" in second.url
+
+    @pytest.mark.django_db
+    def test_password_and_magic_auth_share_the_per_ip_budget(self, django_client, setup_instance):
+        with patch.object(AuthenticationThrottle, "rate", "1/minute"):
+            first = django_client.post(
+                reverse("sign-in"),
+                {"email": "first@plane.so", "password": "wrong"},
+                follow=False,
+            )
+            second = django_client.post(
+                reverse("magic-sign-up"),
+                {"email": "different@plane.so", "code": "000000"},
+                follow=False,
+            )
+
+        assert "RATE_LIMIT_EXCEEDED" not in first.url
+        assert "RATE_LIMIT_EXCEEDED" in second.url
+
+    @pytest.mark.django_db
+    def test_password_auth_budget_is_independent_per_client_address(self, django_client, setup_instance):
+        url = reverse("sign-in")
+        payload = {"email": "address-throttle@plane.so", "password": "wrong"}
+        with patch.object(AuthenticationThrottle, "rate", "1/minute"):
+            first = django_client.post(url, payload, REMOTE_ADDR="192.0.2.10", follow=False)
+            second = django_client.post(url, payload, REMOTE_ADDR="192.0.2.11", follow=False)
+
+        assert "RATE_LIMIT_EXCEEDED" not in first.url
+        assert "RATE_LIMIT_EXCEEDED" not in second.url
+
 
 @pytest.mark.contract
 class TestBotUserLoginBlocked:

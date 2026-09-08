@@ -10,6 +10,7 @@ from django.views import View
 
 # Module imports
 from plane.authentication.provider.credentials.email import EmailProvider
+from plane.authentication.rate_limit import throttle_auth_redirect
 from plane.authentication.utils.login import user_login
 from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
@@ -24,6 +25,7 @@ from plane.utils.path_validator import get_safe_redirect_url
 
 
 class SignInAuthEndpoint(View):
+    @throttle_auth_redirect(is_app=True)
     def post(self, request):
         next_path = request.POST.get("next_path")
         # Check instance configuration
@@ -133,6 +135,7 @@ class SignInAuthEndpoint(View):
 
 
 class SignUpAuthEndpoint(View):
+    @throttle_auth_redirect(is_app=True)
     def post(self, request):
         next_path = request.POST.get("next_path")
         # Check instance configuration
