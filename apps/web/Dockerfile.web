@@ -82,7 +82,8 @@ FROM docker.io/nginxinc/nginx-unprivileged:1.31-alpine AS production
 
 USER root
 
-RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
+ARG APK_SECURITY_PATCH=2026-09-08
+RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available && rm -rf /var/cache/apk/*
 
 COPY --chown=101:101 apps/web/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY --chown=101:101 --from=installer /app/apps/web/build/client /usr/share/nginx/html
