@@ -272,10 +272,21 @@ class Command(BaseCommand):
             Label.objects.create(name="backend", color="#2563eb", project=project, workspace=workspace, sort_order=1)
             Label.objects.create(name="interface", color="#db2777", project=project, workspace=workspace, sort_order=2)
 
-        for key in ("light", "dark", "admin"):
+        for index, key in enumerate(("light", "dark", "admin")):
             user = users[key]
-            WorkspaceMember.objects.get_or_create(
+            membership, _ = WorkspaceMember.objects.get_or_create(
                 workspace=workspace, member=user, defaults={"role": MEMBER, "is_active": True}
+            )
+            # The members table's "Joining date" column. It does not come from
+            # `User.date_joined` -- confirmed against the API, where the member
+            # object carries no `joining_date` at all and the row's own
+            # `created_at` is what reaches the interface. Pinning `date_joined`
+            # therefore fixed nothing, and the baseline still moved every day.
+            # Staggered rather than identical: the table sorts on this, and
+            # three rows sharing one timestamp leave the order to whatever the
+            # database returns.
+            WorkspaceMember.objects.filter(pk=membership.pk).update(
+                created_at=CLOCK - timedelta(days=30 + index)
             )
             ProjectMember.objects.get_or_create(
                 project=project,
