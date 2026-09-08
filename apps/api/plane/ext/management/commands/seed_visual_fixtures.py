@@ -285,9 +285,7 @@ class Command(BaseCommand):
             # Staggered rather than identical: the table sorts on this, and
             # three rows sharing one timestamp leave the order to whatever the
             # database returns.
-            WorkspaceMember.objects.filter(pk=membership.pk).update(
-                created_at=CLOCK - timedelta(days=30 + index)
-            )
+            WorkspaceMember.objects.filter(pk=membership.pk).update(created_at=CLOCK - timedelta(days=30 + index))
             ProjectMember.objects.get_or_create(
                 project=project,
                 member=user,
