@@ -55,11 +55,15 @@ FROM base AS runner
 ARG APP_VERSION=v0.1.0
 WORKDIR /app
 
+# Refresh runtime OS packages independently of the application layers.
+ARG APK_SECURITY_PATCH=2026-09-08
+RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
+
 # Remove go from Alpine APK database; not needed at runtime and carries stdlib CVEs
 RUN apk del go 2>/dev/null || true
 
-# Remove vulnerable picomatch bundled inside npm (CVE-2026-33671); npm is not used at runtime
-RUN rm -rf /usr/local/lib/node_modules/npm/node_modules/picomatch
+# npm is build tooling and is not used by the runtime command.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --chown=node:node --from=installer /app/packages ./packages
 COPY --chown=node:node --from=installer /app/apps/live/dist ./apps/live/dist
