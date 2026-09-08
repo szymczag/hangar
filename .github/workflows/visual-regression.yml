@@ -70,6 +70,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # The churn check diffs against the base branch, and the default
+          # shallow clone has no history to diff against.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -91,6 +95,51 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Counted before anything is built: if the pull request rewrites a pile of
+      # baselines without saying why, that is worth knowing in ten seconds
+      # rather than after a nine-minute run.
+      - name: Check baseline churn
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "$PR_BODY" > /tmp/pr-body.txt
+          node apps/visual-tests/scripts/check-baseline-churn.mjs \
+            "origin/${{ github.event.pull_request.base.ref }}" /tmp/pr-body.txt
+
+      # The bill this job actually pays. Of roughly nine minutes, about five are
+      # spent building the API image -- pip compiling psycopg-c from source --
+      # and about one is the turbo build. The suite itself is under two. Compose
+      # has no layer cache across runners, so the image is built here instead,
+      # against the Actions cache, and `up` finds it already present.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the API image with a layer cache
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile.dev
+          # The name docker compose derives for this service --
+          # `<project>-<service>`, the project being the checkout directory. Tag
+          # it here and `up` finds the image already present and skips building.
+          tags: hangar-vr-api
+          load: true
+          cache-from: type=gha,scope=vr-api
+          cache-to: type=gha,mode=max,scope=vr-api
+
+      # The other half. Without this the SPAs are rebuilt from cold every run;
+      # the two-level fallback matters because a key naming both SHAs misses on
+      # every push after the first.
+      - name: Restore Turbo cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-visual-${{ github.event.pull_request.base.sha || github.sha }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-visual-${{ github.event.pull_request.base.sha || github.sha }}-
+            turbo-${{ runner.os }}-visual-
 
       - name: Generate API environment
         run: |
@@ -118,6 +167,13 @@ jobs:
 
       # Without this a red job says "some pixels changed" and nothing more, and
       # the suite is abandoned within a month.
+      - name: Save Turbo cache
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-visual-${{ github.event.pull_request.base.sha || github.sha }}-${{ github.sha }}
+
       - name: Upload failure artefacts
         if: failure()
         uses: actions/upload-artifact@v4

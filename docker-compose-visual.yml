@@ -76,6 +76,11 @@ services:
       retries: 20
 
   vr-api:
+    # Deliberately no `image:` key. Naming it made podman try to *pull* the tag
+    # rather than build it, and the local stack stopped coming up entirely.
+    # CI instead builds this image itself, tagged as the name compose derives
+    # (`<project>-<service>`), so `up` finds it already present and skips the
+    # build -- see the visual-regression workflow.
     build:
       context: ./apps/api
       dockerfile: Dockerfile.dev
