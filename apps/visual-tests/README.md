@@ -144,8 +144,9 @@ The hazards this suite has actually hit, and how each is handled:
 | Modals animate for 300ms                  | `settled()` asserts the finished state rather than sleeping                                                                                                                                      |
 | The bar renders `null` without a notice   | the seed must produce one, so a silently broken seed fails instead of recording an empty baseline                                                                                                |
 | Work item numbers follow database history | the seed writes `sequence_id` explicitly, so a fresh volume in CI and a re-seed on a developer's machine agree                                                                                   |
+| A spec writes to the shared stack         | `fixtures.ts` aborts any non-GET to `/api/` and fails the test that sent it — one write makes every other spec order-dependent, and that reads as flakiness rather than as a state bug           |
 | The API rate-limits anonymous requests    | every browser shares one address and the sign-in page is unauthenticated, so `ANON_RATE_LIMIT` is raised for this stack — otherwise 429s arrive in bursts and render as "didn't start correctly" |
-| Hydration is starved under parallelism    | `workers: 3` and a 60s assertion ceiling, plus `retries: 2` — which cannot mask a pixel regression, since that reproduces on every attempt, as the icon experiment above shows                   |
+| Hydration is starved under parallelism    | `workers: 2` and a 60s assertion ceiling, plus `retries: 2` — which cannot mask a pixel regression, since that reproduces on every attempt, as the icon experiment above shows                   |
 
 ### Waiting on the right thing
 
