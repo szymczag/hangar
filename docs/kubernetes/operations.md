@@ -59,7 +59,7 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
-### Upgrade from `rc.47` to `rc.49`
+### Upgrade from `rc.47` to `rc.50`
 
 Upgrade directly from the immediately previous retained GitHub release, `rc.47`.
 This release adds migrations `ext.0022_workshop_sessions`,
@@ -72,7 +72,7 @@ planner drafts, expiring trainer/time holds, and their immutable audit actions.
 The chart keeps the same resources, Secrets, storage, RBAC, NetworkPolicies,
 public routes, and configuration values. Deploy the web and API images together
 and wait for the revision-scoped migration Job before admitting traffic; mixed
-`rc.47` and `rc.49` versions are unsupported because their workshop contracts
+`rc.47` and `rc.50` versions are unsupported because their workshop contracts
 differ.
 
 After upgrading, open an existing Workshop and confirm its original schedule is
@@ -154,10 +154,10 @@ digests, and attestations. Rolling back to `rc.45` needs no schema reversal or
 configuration change, but restores the Google scope-alias rejection and the
 older floating Caddy base-image references.
 
-### Upgrade from `rc.27` to `rc.49`
+### Upgrade from `rc.27` to `rc.50`
 
 `rc.28` was consumed by an incomplete publication and is not an upgrade target.
-Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.49`.
+Releases `rc.31` through `rc.38` are retired. Upgrade directly to `rc.50`.
 
 This release closes two Todoist import admission gaps. Starting an import now
 requires a server-signed, 15-minute, single-use preview grant bound to the
@@ -177,13 +177,13 @@ Before upgrading:
 
 1. take a PostgreSQL backup, prove that it can be restored in isolation, and
    record the current Helm revision and application image digests;
-2. confirm the target chart is `0.1.0-rc.49`, its application version is
-   `v0.1.0-rc.49`, and its signatures and digests pass the
+2. confirm the target chart is `0.1.0-rc.50`, its application version is
+   `v0.1.0-rc.50`, and its signatures and digests pass the
    [release verification procedure](security.md#verify-release-010-rc39);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
-   `rc.27` and `rc.49` web or API images because their preview-execution request
+   `rc.27` and `rc.50` web or API images because their preview-execution request
    contract intentionally changed together.
 
 Wait for the revision-scoped migration Job to complete before admitting traffic.
@@ -196,7 +196,7 @@ also fail without creating a job or retaining a source object.
 target; the nullable column may remain in the database. It restores the preview
 bypass and duplicate-confirmation race, however, so it is not a
 security-equivalent rollback. Prefer a forward correction and return every
-application component to `rc.49` promptly.
+application component to `rc.50` promptly.
 
 ### Upgrade from `rc.26` to `rc.27`
 
