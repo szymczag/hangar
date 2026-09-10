@@ -4,7 +4,7 @@
  */
 
 import type { TTrainerCapacity } from "@/services/capacity.service";
-import { availableRanges } from "./capacity-timeline.utils";
+import { availableRanges } from "../shared/capacity-timeline.utils";
 
 export type TWorkshopCandidate = {
   trainerId: string;
