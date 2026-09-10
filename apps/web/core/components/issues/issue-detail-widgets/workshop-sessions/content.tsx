@@ -105,7 +105,7 @@ export function WorkshopSessionRow({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 @md:grid-cols-2 @3xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
         <Field label="Starts">
           <input
             aria-label={`Session ${index + 1} starts in ${timezone}`}
@@ -126,6 +126,15 @@ export function WorkshopSessionRow({
             className={FIELD}
           />
         </Field>
+      </div>
+
+      {/* Buffers in their own row of three. Five fields in one two-column grid
+          wrapped 2+2+1 and left "Travel after" stranded beside dead space, and
+          the five-across breakpoint never fired: the body column is around
+          700px even at a 1440 viewport, because the properties panel takes the
+          rest. Grouping by meaning is balanced at every width the widget
+          actually gets. */}
+      <div className="mt-3 grid grid-cols-1 gap-3 @sm:grid-cols-3">
         <Minutes
           label="Preparation"
           icon={Timer}
