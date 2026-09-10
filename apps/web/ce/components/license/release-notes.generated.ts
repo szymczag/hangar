@@ -11,12 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.48",
+  version: "0.1.0-rc.49",
   highlights: [
-    "Workshop planning finds trainers without exposing calendar event details.",
-    "Saved drafts and expiring holds support safe coordinator hand-offs.",
-    "Multi-session workshops assign logistics precisely.",
-    "Scheduling surfaces are easier to scan.",
+    "Password authentication is rate-limited.",
+    "Two API write paths no longer accept fields they never intended to expose.",
+    "Error responses disclose less.",
+    "Production container runtimes are hardened.",
   ],
   upstream: {
     version: "1.4.0",
