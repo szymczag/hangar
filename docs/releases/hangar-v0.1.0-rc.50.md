@@ -36,6 +36,12 @@ are filtered out of the preferences the home endpoint creates, so they could
 never appear on anybody's home page. They rendered as raw key names, because
 nothing ever intended to display them.
 
+**The all-in-one image builds again.** Its runner stage upgrades `apk-tools`,
+then overwrites `/usr/lib` wholesale from the node stage, which put an upgraded
+`/sbin/apk` next to an older `libapk.so` and broke every later `apk` call. All
+package installation now happens before that copy. This blocked `rc.49` from
+publishing at all.
+
 ## Migrations and compatibility
 
 This release adds no migrations. No tables, columns or audit actions change, and
@@ -56,7 +62,9 @@ it was recorded passes on that day and breaks the following morning.
 
 ## Known limitations and rollback
 
-Rolling back to `rc.48` restores the workshop planner crash. Nothing in this
+Rolling back to `rc.48` restores the workshop planner crash. `rc.49` was
+tagged but never published -- its all-in-one image failed to build -- so `rc.48`
+is the previous released version. Nothing in this
 release writes schema, so there is no data to reverse: a rollback is a matter of
 returning every application image to `rc.48` as one unit.
 

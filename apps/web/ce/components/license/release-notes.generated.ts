@@ -11,7 +11,7 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.49",
+  version: "0.1.0-rc.50",
   highlights: [
     "The workshop planner no longer crashes on the holds it renders.",
     "Password authentication is rate-limited.",
