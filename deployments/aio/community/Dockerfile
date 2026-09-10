@@ -24,10 +24,22 @@ WORKDIR /app
 ARG APK_SECURITY_PATCH=2026-09-08
 RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
 
+# Every apk invocation has to happen before `/usr/lib` is overwritten from the
+# node stage below. That copy replaces libapk.so with node:22-alpine's older
+# build while /sbin/apk stays the upgraded one, and apk then dies with
+# "Error relocating /sbin/apk: apk_fs_is_malicious_filename: symbol not found".
+# The packages themselves survive the copy -- checked, not assumed -- so the
+# only thing that must not outlive it is apk itself.
 RUN apk add --no-cache \
     "libpq" \
     "libxslt" \
-    "xmlsec"
+    "xmlsec" \
+    "nss-tools" \
+    "bash" \
+    "curl" \
+    "uuidgen" \
+    "ncdu" \
+    "vim"
 
 
 COPY --from=node /usr/lib /usr/lib
@@ -52,8 +64,6 @@ COPY dist/Caddyfile /app/proxy/Caddyfile
 COPY --from=backend-img /code /app/backend
 COPY --from=backend-img /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
 COPY --from=backend-img /usr/local/bin/ /usr/local/bin/
-
-RUN apk add --no-cache nss-tools bash curl uuidgen ncdu vim
 
 RUN pip install supervisor
 RUN mkdir -p /etc/supervisor/conf.d
