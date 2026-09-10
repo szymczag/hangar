@@ -34,6 +34,16 @@ for (const [name, width] of [
 
     await page.goto(`/${seed.workspace.slug}/projects/${seed.project.id}/issues`);
 
+    // The backdrop behind this dialog is only 30% opaque
+    // (`oklch(0.1482 0.0034 196.79 / 0.3)`), so the corners outside the panel's
+    // border radius are seven parts the page underneath to three parts backdrop.
+    // That makes the work-item list part of this photograph whether the story
+    // means it or not, and nothing here used to wait for it: the badge below
+    // lives in the sidebar footer and is visible long before the list arrives.
+    // A run that opened the dialog first captured a blank content pane through
+    // the backdrop and failed all three attempts on ~750 pixels.
+    await expect(page.getByText(seed.workItems[0], { exact: false }).first()).toBeVisible();
+
     // The badge lives in the sidebar footer and doubles as the trigger.
     const badge = page.getByRole("button", { name: /Hangar by @szymczag/i }).first();
     await expect(badge).toBeVisible();
