@@ -196,7 +196,6 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
               issueId={issueId}
               issueTypeId={issue.type_id}
               assigneeIds={issue.assignee_ids ?? []}
-              isEditable={isEditable}
             />
 
             {projectId && areEstimateEnabledByProjectId(projectId) && (

@@ -16,6 +16,7 @@ import { AttachmentsCollapsible } from "./attachments";
 import { LinksCollapsible } from "./links";
 import { RelationsCollapsible } from "./relations";
 import { SubIssuesCollapsible } from "./sub-issues";
+import { WorkshopSessionsCollapsible } from "./workshop-sessions";
 
 type Props = {
   workspaceSlug: string;
@@ -78,6 +79,19 @@ export const IssueDetailWidgetCollapsibles = observer(function IssueDetailWidget
           issueServiceType={issueServiceType}
         />
       )}
+      {/* Fork (see FORK.md): workshop sessions are a Hangar work item type. The
+          component returns null for every other type, so this costs nothing on
+          an upstream work item. Mounted here rather than in the properties
+          sidebar because the session editor needs the body's width -- and
+          because this host renders in the peek panel too, which never showed it. */}
+      <WorkshopSessionsCollapsible
+        workspaceSlug={workspaceSlug}
+        projectId={projectId}
+        issueId={issueId}
+        issueTypeId={issue?.type_id ?? null}
+        assigneeIds={issue?.assignee_ids ?? []}
+        disabled={disabled}
+      />
       {shouldRenderAttachments && (
         <AttachmentsCollapsible
           workspaceSlug={workspaceSlug}
