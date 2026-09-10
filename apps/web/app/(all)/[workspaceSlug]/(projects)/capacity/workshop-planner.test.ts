@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { TTrainerCapacity } from "@/services/capacity.service";
-import { findWorkshopCandidates } from "./workshop-planner.utils";
+import { dateTimeLabel, findWorkshopCandidates } from "./workshop-planner.utils";
 
 const trainer = {
   trainer_id: "trainer-1",
@@ -78,5 +78,26 @@ describe("findWorkshopCandidates", () => {
         0
       )
     ).toEqual([]);
+  });
+});
+
+describe("dateTimeLabel", () => {
+  // The shipped version passed `timeStyle` alongside `weekday`/`day`/`month`.
+  // ECMA-402 treats the shorthands as exclusive of the individual field options
+  // and throws a TypeError rather than merging them, so every render showing a
+  // hold died. It threw in every locale, which is why this asserts across three
+  // rather than trusting one -- and it calls the real helper, so it fails if
+  // the invalid combination ever comes back.
+  it.each(["pl-PL", "en-US", "de-DE"])("renders a date and a time in %s", (locale) => {
+    const label = dateTimeLabel("2026-09-10T14:30:00.000Z", locale);
+
+    // A date part and a time part, rather than an exact string: the wording is
+    // ICU's to decide, and pinning it would test the runtime instead of this.
+    expect(label).toMatch(/\d{1,2}/);
+    expect(label).toMatch(/\d{1,2}[:.]\d{2}/);
+  });
+
+  it("uses the runtime locale when none is given", () => {
+    expect(() => dateTimeLabel("2026-09-10T14:30:00.000Z")).not.toThrow();
   });
 });

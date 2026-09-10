@@ -65,3 +65,20 @@ export function findWorkshopCandidates(
   }
   return ordered;
 }
+
+/**
+ * A hold's start or expiry, as a short weekday-date-time label.
+ *
+ * The time is spelled out field by field rather than with `timeStyle`. ECMA-402
+ * treats `dateStyle`/`timeStyle` as shorthands that cannot be mixed with the
+ * individual field options, and rejects the combination with a TypeError rather
+ * than merging them -- which is what this threw on every render showing a hold.
+ */
+export const dateTimeLabel = (value: string, locales?: Intl.LocalesArgument) =>
+  new Date(value).toLocaleString(locales, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });

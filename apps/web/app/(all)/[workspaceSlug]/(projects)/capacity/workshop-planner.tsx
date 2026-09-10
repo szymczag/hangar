@@ -15,12 +15,9 @@ import {
   type TWorkshopPlanDraftInput,
   type TWorkshopPlanHold,
 } from "@/services/capacity.service";
-import { findWorkshopCandidates } from "./workshop-planner.utils";
+import { dateTimeLabel, findWorkshopCandidates } from "./workshop-planner.utils";
 
 const capacityService = new CapacityService();
-
-const dateTimeLabel = (value: string) =>
-  new Date(value).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", timeStyle: "short" });
 
 const planSignature = (plan: TWorkshopPlanDraftInput) =>
   JSON.stringify({
