@@ -27,6 +27,18 @@ test("the duplicate project modal", async ({ asUser }) => {
 
   await page.goto(`/${seed.workspace.slug}/settings/projects/${seed.project.id}`);
 
+  // The Duplicate trigger is not gated on the project having loaded: the section
+  // holding it renders as a sibling of the `currentProjectDetails ? Form :
+  // Loader` ternary, gated only on being an admin. So the button is clickable
+  // while the form above it is still a skeleton, and the prefill asserted below
+  // is then racing the project fetch rather than reading a settled form.
+  //
+  // Not a backdrop problem, despite this modal sharing build-identity's 30%
+  // backdrop: hiding the form and re-photographing the dialog leaves the image
+  // byte-identical, so nothing behind this panel reaches the corners. Checked,
+  // because assuming it did would have put a confident and false comment here.
+  await expect(main.locator("#identifier")).toHaveValue(seed.project.identifier);
+
   const trigger = main.getByRole("button", { name: "Duplicate", exact: true });
   await expect(trigger).toBeVisible();
   await trigger.click();
