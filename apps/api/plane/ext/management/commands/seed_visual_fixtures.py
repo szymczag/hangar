@@ -71,6 +71,14 @@ TRAINER_PROFILE_IDS = {
     "light": uuid.UUID("a0000000-0000-4000-8000-000000000091"),
     "dark": uuid.UUID("a0000000-0000-4000-8000-000000000092"),
 }
+# The same problem one table over, and the one the first fix missed: the session
+# editor lists its trainers from the work item's assignees, and `IssueAssignee`
+# rows are ordered by their own random id. Pinning the trainer profiles fixed the
+# ledger and the planner while leaving the checkboxes free to swap.
+ASSIGNEE_IDS = {
+    "light": uuid.UUID("a0000000-0000-4000-8000-000000000093"),
+    "dark": uuid.UUID("a0000000-0000-4000-8000-000000000094"),
+}
 
 ADMIN, MEMBER = 20, 15
 
@@ -616,8 +624,14 @@ class Command(BaseCommand):
         Issue.objects.filter(pk=issue.pk).update(created_at=CLOCK, updated_at=CLOCK)
 
         trainers = [users["light"], users["dark"]]
-        for trainer in trainers:
-            IssueAssignee.objects.create(issue=issue, assignee=trainer, project=project, workspace=workspace)
+        for key in ("light", "dark"):
+            IssueAssignee.objects.create(
+                id=ASSIGNEE_IDS[key],
+                issue=issue,
+                assignee=users[key],
+                project=project,
+                workspace=workspace,
+            )
 
         first = CLOCK.replace(hour=9, minute=0) + timedelta(days=1)
         schedule = WorkshopSchedule.objects.create(
