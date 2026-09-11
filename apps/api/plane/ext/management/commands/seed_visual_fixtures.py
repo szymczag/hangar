@@ -61,6 +61,16 @@ from plane.utils.cache import invalidate_cache_directly
 # that fails the suite on a schedule.
 CLOCK = datetime(2026, 1, 15, 12, 0, 0, tzinfo=dt_timezone.utc)
 WORKSHOP_ISSUE_ID = uuid.UUID("a0000000-0000-4000-8000-000000000090")
+# `TrainerProfile` declares no ordering and `TrainerListEndpoint` sorts by `id`,
+# which is a random UUID. Left to itself the ledger listed the two trainers in
+# whichever order the seed happened to generate, so four baselines flipped
+# between runs -- stable within a run, different the next time, which is the
+# shape of a flake that looks like a real change. Pinned in seed order, the way
+# the workspace, project and work item numbers already are.
+TRAINER_PROFILE_IDS = {
+    "light": uuid.UUID("a0000000-0000-4000-8000-000000000091"),
+    "dark": uuid.UUID("a0000000-0000-4000-8000-000000000092"),
+}
 
 ADMIN, MEMBER = 20, 15
 
@@ -573,7 +583,7 @@ class Command(BaseCommand):
             profile, _ = TrainerProfile.objects.update_or_create(
                 workspace=workspace,
                 user=users[key],
-                defaults={"status": "active", "timezone": "UTC"},
+                defaults={"id": TRAINER_PROFILE_IDS[key], "status": "active", "timezone": "UTC"},
             )
             profiles.append(profile)
 
