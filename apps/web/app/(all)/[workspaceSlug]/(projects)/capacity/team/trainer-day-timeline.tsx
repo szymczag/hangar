@@ -25,15 +25,20 @@ export function TrainerDayTimeline({
   const free = availableRanges(trainer.intervals, dayStart, dayEnd);
   return (
     <div>
-      <div className="relative h-20 min-w-[760px] overflow-hidden rounded-md border border-subtle bg-surface-2">
+      <div className="relative h-20 min-w-[680px] overflow-hidden rounded-md border border-subtle bg-surface-2">
+        {/* Midnight anchors to the right edge instead of sitting at `left: 100%`
+            pulled back by a transform. A transform moves what is drawn, not the
+            layout box, so the old version left a label twenty-seven pixels wide
+            hanging past the end of the strip: invisible behind `overflow-hidden`,
+            and enough to make the element report a scroll width wider than itself. */}
         {[0, 3, 6, 9, 12, 15, 18, 21, 24].map((hour) => (
           <span
             key={hour}
             aria-hidden="true"
             className="absolute top-0 bottom-0 z-0 border-l border-subtle text-[9px] text-placeholder"
-            style={{ left: `${(hour / 24) * 100}%` }}
+            style={hour === 24 ? { right: 0 } : { left: `${(hour / 24) * 100}%` }}
           >
-            <span className={hour === 24 ? "-translate-x-full" : "px-1"}>{String(hour).padStart(2, "0")}:00</span>
+            <span className={hour === 24 ? "pr-1" : "px-1"}>{String(hour).padStart(2, "0")}:00</span>
           </span>
         ))}
         {free.map((range) => {
