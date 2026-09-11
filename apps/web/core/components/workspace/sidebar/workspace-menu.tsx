@@ -10,7 +10,7 @@ import { useParams } from "next/navigation";
 import { Disclosure, Transition } from "@headlessui/react";
 // plane imports
 import { AnalyticsIcon, CycleIcon, ProjectIcon, ViewsIcon } from "@plane/propel/icons";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, CalendarSearch, Users } from "lucide-react";
 import { EUserWorkspaceRoles } from "@plane/types";
 // hooks
 import useLocalStorage from "@/hooks/use-local-storage";
@@ -51,12 +51,28 @@ export const SidebarWorkspaceMenu = observer(function SidebarWorkspaceMenu() {
       Icon: CycleIcon,
     },
     {
-      key: "capacity",
-      label: "Trainer capacity",
+      key: "capacity-personal",
+      label: "My capacity",
       labelTranslationKey: "",
       href: `/${workspaceSlug}/capacity/`,
       access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
       Icon: CalendarClock,
+    },
+    {
+      key: "capacity-team",
+      label: "Team capacity",
+      labelTranslationKey: "",
+      href: `/${workspaceSlug}/capacity/team/`,
+      access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+      Icon: Users,
+    },
+    {
+      key: "capacity-planner",
+      label: "Workshop planner",
+      labelTranslationKey: "",
+      href: `/${workspaceSlug}/capacity/planner/`,
+      access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+      Icon: CalendarSearch,
     },
     {
       key: "analytics",
@@ -81,7 +97,7 @@ export const SidebarWorkspaceMenu = observer(function SidebarWorkspaceMenu() {
       >
         <Disclosure.Panel as="div" className="mt-0.5 flex flex-col gap-0.5" static>
           {SIDEBAR_WORKSPACE_MENU_ITEMS.filter(
-            (item) => item.key !== "capacity" || config?.is_google_calendar_capacity_enabled === true
+            (item) => !item.key.startsWith("capacity-") || config?.is_google_calendar_capacity_enabled === true
           ).map((item) => (
             <SidebarWorkspaceMenuItem key={item.key} item={item} />
           ))}

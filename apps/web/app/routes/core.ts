@@ -65,6 +65,8 @@ export const coreRoutes: RouteConfigEntry[] = [
         // Trainer capacity
         layout("./(all)/[workspaceSlug]/(projects)/capacity/layout.tsx", [
           route(":workspaceSlug/capacity", "./(all)/[workspaceSlug]/(projects)/capacity/page.tsx"),
+          route(":workspaceSlug/capacity/team", "./(all)/[workspaceSlug]/(projects)/capacity/team/page.tsx"),
+          route(":workspaceSlug/capacity/planner", "./(all)/[workspaceSlug]/(projects)/capacity/planner/page.tsx"),
         ]),
 
         // Active Cycles
