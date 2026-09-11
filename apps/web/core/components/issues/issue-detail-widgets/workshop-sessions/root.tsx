@@ -4,11 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { CalendarClock, ChevronRight, CircleAlert, Plus } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { useMember } from "@/hooks/store/use-member";
 import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
 import { CapacityService, type TWorkshopSchedule } from "@/services/capacity.service";
 import { WorkshopSessionRow } from "./content";
@@ -63,7 +64,33 @@ export function WorkshopSessionsCollapsible({
   disabled = false,
 }: Props) {
   const { getTypeById } = useIssueTypes(workspaceSlug, projectId);
+  const { getUserDetails } = useMember();
   const isWorkshop = getTypeById(issueTypeId)?.system_key === "workshop";
+
+  /**
+   * Trainers in a fixed order, by name.
+   *
+   * `assignee_ids` arrives from `ArrayAgg("assignee_id", distinct=True)` with no
+   * `ordering`, and `array_agg(DISTINCT ...)` makes no promise about the order it
+   * returns. So the checkbox list reshuffled between requests -- caught by a
+   * screenshot of this panel that would not hold still, and visible to anyone
+   * who reloads a workshop and finds the trainers swapped.
+   *
+   * Sorted here rather than in the query because that annotation is upstream's
+   * and appears seventeen times across three files; every work item in Plane
+   * inherits the same unordered list. This is the fork's own surface, and by
+   * name matches the order the capacity ledger now uses.
+   */
+  const orderedAssigneeIds = useMemo(
+    () =>
+      // ES2022 is the web app's current target; the copied array keeps sort() mutation local.
+      // oxlint-disable-next-line unicorn/no-array-sort
+      [...assigneeIds].sort((left, right) => {
+        const name = (id: string) => getUserDetails(id)?.display_name ?? id;
+        return name(left).localeCompare(name(right)) || left.localeCompare(right);
+      }),
+    [assigneeIds, getUserDetails]
+  );
 
   const { data, error, isLoading, mutate } = useSWR<TWorkshopSchedule | null>(
     isWorkshop ? workshopScheduleKey(workspaceSlug, projectId, issueId) : null,
@@ -75,7 +102,10 @@ export function WorkshopSessionsCollapsible({
   const [isOpen, setIsOpen] = useState(true);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  useEffect(() => setSessions(toEditableSessions(data, assigneeIds)), [assigneeIds, data]);
+  // The ordered list here too: a schedule saved before multi-session support has
+  // its trainers synthesised from the assignees, and that list is written back on
+  // the next save.
+  useEffect(() => setSessions(toEditableSessions(data, orderedAssigneeIds)), [orderedAssigneeIds, data]);
 
   if (!isWorkshop) return null;
 
@@ -165,7 +195,7 @@ export function WorkshopSessionsCollapsible({
               session={session}
               index={index}
               total={sessions.length}
-              assigneeIds={assigneeIds}
+              assigneeIds={orderedAssigneeIds}
               disabled={disabled}
               timezone={timezone}
               onChange={(patch) => updateSession(session.localId, patch)}
@@ -186,7 +216,7 @@ export function WorkshopSessionsCollapsible({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setSessions((current) => [...current, newSession(assigneeIds)])}
+                onClick={() => setSessions((current) => [...current, newSession(orderedAssigneeIds)])}
               >
                 <Plus className="size-3.5" /> Add session
               </Button>

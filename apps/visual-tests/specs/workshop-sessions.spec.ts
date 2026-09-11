@@ -38,20 +38,16 @@ test("workshop sessions in the work item", async ({ asUser }) => {
 /**
  * The same sessions in the peek panel.
  *
- * Asserted, not photographed. This surface would not hold still at zero
- * tolerance: across CI runs it moved by roughly fourteen hundred pixels, and
- * within a single run the first attempt differed from both retries by another
- * fifty-five. The full-page story covers the same component and is stable, so
- * the pixels are not lost -- what this adds is the guarantee that the section
- * exists here at all, which is the defect it was written for: the editor used to
- * be mounted only by the full page, so a workshop opened from a board or a list
- * had no session UI whatsoever.
+ * Worth its own baseline because for a long time this rendered nothing at all:
+ * the editor was mounted only by the full page's sidebar, so a workshop opened
+ * from a board or a list simply had no session UI.
  *
- * The README's rule is that a story which cannot be made stable does not ship a
- * baseline, and raising the tolerance to keep one is how a visual suite turns
- * into noise. Left as an assertion until the instability is understood; the
- * candidate is the peek panel's own mount and transition, not the session
- * markup, since the same markup is stable one route away.
+ * It lost that baseline for one release because it would not hold still, and the
+ * reason was worth finding: `assignee_ids` comes from
+ * `ArrayAgg("assignee_id", distinct=True)` with no `ordering`, and
+ * `array_agg(DISTINCT ...)` promises nothing about order, so the trainers
+ * arrived differently between requests and the checkbox list reshuffled. The
+ * widget sorts them by name now.
  */
 test("workshop sessions in the peek panel", async ({ asUser }) => {
   const page = await asUser("light");
@@ -61,12 +57,18 @@ test("workshop sessions in the peek panel", async ({ asUser }) => {
   const row = page.getByText(seed.workshop.name, { exact: true }).first();
   await expect(row).toBeVisible();
   await row.click();
+  // Take the pointer off the panel. Opening the peek means clicking a row, which
+  // leaves the cursor where that row was -- and once the panel covers it, a
+  // button lands under the pointer and plays its hover transition on
+  // `background-color` and `color`. Whether that had finished when the shot was
+  // taken is what made this story move; the full-page one navigates by URL, is
+  // never hovered, and never moved.
+  await page.mouse.move(0, 0);
 
   const sessions = page.locator("#workshop-sessions");
-  await expect(sessions.getByRole("button", { name: /Save schedule/i })).toBeVisible();
-  // The content, since there is no picture of it: three sessions, both trainers,
-  // and the fields the sidebar could not fit.
+  const ready = sessions.getByRole("button", { name: /Save schedule/i });
+  await expect(ready).toBeVisible();
   await expect(sessions.getByText(/Session 3 of 3/)).toBeVisible();
-  await expect(sessions.getByText(seed.trainers[0], { exact: false }).first()).toBeVisible();
-  await expect(sessions.getByLabel(/Session 1 starts/i)).toBeVisible();
+
+  await capture(page, "workshop-sessions-peek", { ready, target: sessions });
 });
