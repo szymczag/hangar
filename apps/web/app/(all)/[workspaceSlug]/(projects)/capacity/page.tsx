@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, CircleAlert, Link2, Trash2, Unplug } from "lucide-react";
 import useSWR from "swr";
 import { Button } from "@plane/propel/button";
@@ -17,7 +17,6 @@ import { useUserPermissions } from "@/hooks/store/user";
 import { useInstance } from "@/hooks/store/use-instance";
 import {
   CapacityService,
-  CapacityRequestError,
   type TGoogleCalendar,
   type TTrainerCapacity,
   type TTrainerProfile,
@@ -31,56 +30,20 @@ import {
   intervalPosition,
   rangeMinutes,
 } from "./shared/capacity-timeline.utils";
+import {
+  DAY_KEYS,
+  DAY_LABELS,
+  availabilityCopy,
+  bookingHoursSummary,
+  errorMessage,
+  formatMinutes,
+  shiftWeek,
+} from "./shared/capacity-format.utils";
+import { useCapacityData } from "./shared/use-capacity-data";
 import { WorkshopPlanner } from "./planner/workshop-planner";
 import { TrainerDayTimeline } from "./team/trainer-day-timeline";
 
 const capacityService = new CapacityService();
-const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-function errorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) return error.message;
-  if (typeof error !== "object" || error === null) return fallback;
-  if ("error" in error && typeof error.error === "string") return error.error;
-  if ("detail" in error && typeof error.detail === "string") return error.detail;
-  return fallback;
-}
-
-function startOfWeek(value: Date) {
-  const result = new Date(value);
-  const day = result.getDay() || 7;
-  result.setDate(result.getDate() - day + 1);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-function shiftWeek(value: Date, weeks: number) {
-  const result = new Date(value);
-  result.setDate(result.getDate() + weeks * 7);
-  return result;
-}
-
-function formatMinutes(value: number) {
-  const hours = Math.floor(value / 60);
-  const minutes = value % 60;
-  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
-}
-
-function connectionCopy(status: string) {
-  if (status === "connected") return "Google connected";
-  if (status === "not_connected") return "Calendar not connected";
-  if (status === "no_calendars_selected") return "Choose calendars";
-  return "Availability unknown";
-}
-
-function availabilityCopy(status: string) {
-  if (status === "fresh") return "Live availability";
-  if (status === "stale") return "Last known availability";
-  if (status === "reauthentication_required") return "Reconnect Google";
-  if (status === "rate_limited") return "Google rate limited";
-  if (status === "provider_unavailable") return "Google unavailable";
-  return connectionCopy(status);
-}
 
 function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Date) {
   const free = availableRanges(trainer.intervals, dayStart, dayEnd);
@@ -100,25 +63,6 @@ function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Da
     holdMinutes: rangeMinutes(rangesFor("workshop_hold")),
     conflicts,
   };
-}
-
-function bookingHoursSummary(profile: TTrainerProfile) {
-  const grouped = new Map<string, number[]>();
-  DAY_KEYS.forEach((day, index) => {
-    const intervals = profile.weekly_schedule[day] ?? [];
-    if (!intervals.length) return;
-    const label = intervals.map((interval) => `${interval.start}–${interval.end}`).join(", ");
-    grouped.set(label, [...(grouped.get(label) ?? []), index]);
-  });
-  const groups = [...grouped.entries()].map(([hours, dayIndexes]) => {
-    const consecutive = dayIndexes.every((dayIndex, index) => index === 0 || dayIndex === dayIndexes[index - 1] + 1);
-    const days =
-      consecutive && dayIndexes.length > 1
-        ? `${DAY_LABELS[dayIndexes[0]]}–${DAY_LABELS[dayIndexes.at(-1) ?? 0]}`
-        : dayIndexes.map((dayIndex) => DAY_LABELS[dayIndex]).join(", ");
-    return `${days} ${hours}`;
-  });
-  return groups.length ? groups.join(" · ") : "No booking hours";
 }
 
 function BookingHoursSummary({ profile, onManage }: { profile: TTrainerProfile; onManage: () => void }) {
@@ -364,51 +308,32 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   const featureEnabled = config?.is_google_calendar_capacity_enabled === true;
   const { allowPermissions } = useUserPermissions();
   const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  const [trainerCursor, setTrainerCursor] = useState<string | undefined>();
-  const [cursorHistory, setCursorHistory] = useState<Array<string | undefined>>([]);
+  const {
+    trainerPage,
+    trainers,
+    trainersLoading,
+    mutateTrainers,
+    capacity,
+    capacityError,
+    capacityLoading,
+    refreshCapacity,
+    weekStart,
+    weekEnd,
+    setWeekStart,
+    trainerCursor,
+    setTrainerCursor,
+    cursorHistory,
+    setCursorHistory,
+  } = useCapacityData(workspaceSlug, featureEnabled);
   const [editingTrainerId, setEditingTrainerId] = useState<string | null>(null);
   const [optingIn, setOptingIn] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
     const day = new Date().getDay();
     return day === 0 || day === 6 ? 0 : day - 1;
   });
-  const capacityRefreshRef = useRef<Promise<unknown> | null>(null);
-  const weekEnd = useMemo(() => shiftWeek(weekStart, 1), [weekStart]);
   const selectedDay = useMemo(() => dayBounds(weekStart, selectedDayIndex), [selectedDayIndex, weekStart]);
-  const rangeKey = `${weekStart.toISOString()}:${weekEnd.toISOString()}`;
-  const {
-    data: trainerPage,
-    mutate: mutateTrainers,
-    isLoading: trainersLoading,
-  } = useSWR(featureEnabled ? ["capacity-trainers", workspaceSlug, trainerCursor] : null, () =>
-    capacityService.listTrainers(workspaceSlug, trainerCursor)
-  );
-  const trainers = trainerPage?.results;
-  const trainerIds = trainers?.map((trainer) => trainer.user_id) ?? [];
-  const {
-    data: capacity,
-    error: capacityError,
-    mutate: mutateCapacity,
-    isLoading: capacityLoading,
-  } = useSWR(
-    featureEnabled && trainers ? ["capacity", workspaceSlug, rangeKey, trainerIds.join(",")] : null,
-    () => capacityService.getCapacity(workspaceSlug, weekStart.toISOString(), weekEnd.toISOString(), trainerIds),
-    {
-      keepPreviousData: true,
-      dedupingInterval: 5_000,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
-        if (retryCount >= 3) return;
-        const retryAfter = error instanceof CapacityRequestError ? error.retryAfterSeconds : undefined;
-        const delay = Math.min(60, Math.max(retryAfter ?? 0, 5 * 2 ** retryCount));
-        globalThis.setTimeout(() => revalidate({ retryCount }), delay * 1000);
-      },
-    }
-  );
   const { data: ownProfile, mutate: mutateOwnProfile } = useSWR(
     featureEnabled ? ["capacity-trainer-self", workspaceSlug] : null,
     () => capacityService.getOwnTrainerProfile(workspaceSlug)
@@ -423,13 +348,6 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
     () => capacityService.listCalendars(workspaceSlug)
   );
 
-  const refreshCapacity = useCallback(() => {
-    if (capacityRefreshRef.current) return capacityRefreshRef.current;
-    capacityRefreshRef.current = mutateCapacity().finally(() => {
-      capacityRefreshRef.current = null;
-    });
-    return capacityRefreshRef.current;
-  }, [mutateCapacity]);
   const refresh = useCallback(async () => {
     await Promise.all([mutateTrainers(), mutateOwnProfile()]);
     await refreshCapacity();
