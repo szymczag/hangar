@@ -20,10 +20,7 @@ function useCapacityCrumb() {
   const { pathname } = useLocation();
   if (pathname.includes("/capacity/team")) return "Team capacity";
   if (pathname.includes("/capacity/planner")) return "Workshop planner";
-  // Still "Trainer capacity" rather than "My capacity": until the cutover step,
-  // `/capacity` really does still show the ledger and the planner as well, and a
-  // crumb that claims otherwise would be the only lie on the page.
-  return "Trainer capacity";
+  return "My capacity";
 }
 
 function CapacityHeader() {
