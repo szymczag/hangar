@@ -60,6 +60,7 @@ from plane.utils.cache import invalidate_cache_directly
 # relative timestamp rendered in the interface is stable rather than a slow leak
 # that fails the suite on a schedule.
 CLOCK = datetime(2026, 1, 15, 12, 0, 0, tzinfo=dt_timezone.utc)
+WORKSHOP_ISSUE_ID = uuid.UUID("a0000000-0000-4000-8000-000000000090")
 
 ADMIN, MEMBER = 20, 15
 
@@ -130,6 +131,8 @@ class Command(BaseCommand):
         self._shared_links(workspace, users)
         self._import_jobs(workspace, project, users["admin"])
         self._invitations(workspace, users["admin"])
+        trainers = self._trainers(workspace, project, users)
+        workshop = self._workshop(workspace, project, users)
         self._maintenance_notice()
         copy_target = self._copy_in_flight(workspace, project, users)
 
@@ -138,6 +141,13 @@ class Command(BaseCommand):
             "workspace": {"slug": workspace.slug, "id": str(workspace.id)},
             "project": {"id": str(project.id), "identifier": project.identifier},
             "copyTarget": {"id": str(copy_target.id)},
+            # The Workshop work item, so the session specs address it by id rather
+            # than by hunting for its name in a list.
+            "workshop": {"id": str(workshop.id), "name": workshop.name, "sessions": 3},
+            # Published for the same reason as the work item names: a spec that
+            # waits on a trainer should wait on the seeded one, not on a string
+            # typed into the spec that drifts the moment the seed changes.
+            "trainers": [profile.user.display_name for profile in trainers],
             # Published so a spec can wait on real seeded content rather than on
             # a string typed into the spec, which drifts from the seed silently.
             "workItems": [name for name, _ in WORK_ITEMS],
@@ -535,6 +545,94 @@ class Command(BaseCommand):
                 },
             )
             WorkspaceMemberInvite.objects.filter(pk=invite.pk).update(created_at=stamped, updated_at=stamped)
+
+    def _trainers(self, workspace, project, users) -> list:
+        """Trainer profiles, and the Workshop type they unlock.
+
+        Capacity is opt-in by design: `ensure_project_system_types` only adds the
+        Workshop work item type once a workspace has a trainer profile, and the
+        profile only appears when somebody opts in. So the ledger, the planner
+        and the workshop session editor are all downstream of these two rows --
+        without them those three surfaces render nothing worth photographing.
+
+        The weekly schedule is left at the model default: it is already a fixed
+        weekday window, not anything derived from "today". That matters because
+        the ledger draws a timeline against it, and hours that moved with the
+        wall clock would be exactly the baseline that passes on the day it is
+        recorded and breaks the next morning.
+        """
+        from plane.ext.models import TrainerProfile
+        from plane.ext.services.issue_types import ensure_project_workshop_type
+
+        profiles = []
+        for key in ("light", "dark"):
+            # `weekly_schedule` is left at the model default, which is already a
+            # fixed weekday window rather than anything derived from today. A
+            # schedule restated here would be a second copy to keep in step for
+            # no gain.
+            profile, _ = TrainerProfile.objects.update_or_create(
+                workspace=workspace,
+                user=users[key],
+                defaults={"status": "active", "timezone": "UTC"},
+            )
+            profiles.append(profile)
+
+        ensure_project_workshop_type(project)
+        return profiles
+
+    def _workshop(self, workspace, project, users) -> "Issue":
+        """One Workshop work item with three sessions.
+
+        Three rather than one because the session editor's failure mode was a
+        layout that only showed up with more than one -- it used to render seven
+        stacked rows per session in a sidebar too narrow for any of them.
+        """
+        from plane.db.models import IssueAssignee
+        from plane.ext.models import WorkshopSchedule, WorkshopSession
+        from plane.ext.services.issue_types import ensure_project_workshop_type
+
+        workshop_type = ensure_project_workshop_type(project)
+        state = State.objects.filter(project=project).order_by("sequence").first()
+        issue = Issue.objects.create(
+            id=WORKSHOP_ISSUE_ID,
+            name="Network security workshop",
+            project=project,
+            workspace=workspace,
+            state=state,
+            type=workshop_type,
+            created_by=users["admin"],
+            sequence_id=len(WORK_ITEMS) + 2,
+        )
+        Issue.objects.filter(pk=issue.pk).update(created_at=CLOCK, updated_at=CLOCK)
+
+        trainers = [users["light"], users["dark"]]
+        for trainer in trainers:
+            IssueAssignee.objects.create(issue=issue, assignee=trainer, project=project, workspace=workspace)
+
+        first = CLOCK.replace(hour=9, minute=0) + timedelta(days=1)
+        schedule = WorkshopSchedule.objects.create(
+            issue=issue,
+            workspace=workspace,
+            project=project,
+            starts_at=first,
+            ends_at=first + timedelta(hours=4),
+            preparation_minutes=30,
+            travel_before_minutes=60,
+            travel_after_minutes=45,
+        )
+        for position in range(3):
+            starts_at = first + timedelta(days=position)
+            session = WorkshopSession.objects.create(
+                schedule=schedule,
+                position=position,
+                starts_at=starts_at,
+                ends_at=starts_at + timedelta(hours=4),
+                preparation_minutes=30,
+                travel_before_minutes=60,
+                travel_after_minutes=45,
+            )
+            session.trainers.add(*[trainer.id for trainer in trainers])
+        return issue
 
     def _maintenance_notice(self) -> None:
         """An active notice, deliberately with no scheduled window.
