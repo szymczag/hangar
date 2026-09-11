@@ -11,13 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.50",
+  version: "0.1.0-rc.51",
   highlights: [
-    "The workshop planner no longer crashes on the holds it renders.",
-    "Password authentication is rate-limited.",
-    "Two API write paths no longer accept fields they never intended to expose.",
-    "Error responses disclose less.",
-    "Production container runtimes are hardened.",
+    "Workshop sessions are editable again, and in every view of a work item.",
+    "Capacity is three pages instead of one.",
+    "Editing another trainer's schedule is an administrator's action, and now looks like one.",
+    "The planner can look past the week on screen.",
   ],
   upstream: {
     version: "1.4.0",

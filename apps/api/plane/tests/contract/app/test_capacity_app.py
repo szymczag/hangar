@@ -3,12 +3,14 @@
 # See the LICENSE file for details.
 
 import logging
+from datetime import timedelta
 from importlib import import_module
 from unittest.mock import MagicMock
 
 import pytest
 from cryptography.fernet import Fernet
 from django.apps import apps as django_apps
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -369,9 +371,7 @@ def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings
         "workshop_starts_at": "2026-09-07T10:30:00+02:00",
     }
 
-    held = client.post(
-        f"{plans_url}{first['id']}/hold/", hold_payload, format="json", HTTP_X_CSRFTOKEN=csrf
-    )
+    held = client.post(f"{plans_url}{first['id']}/hold/", hold_payload, format="json", HTTP_X_CSRFTOKEN=csrf)
 
     assert held.status_code == status.HTTP_201_CREATED
     assert held.data["revision"] == 2
@@ -587,3 +587,37 @@ def test_google_calendar_callback_keeps_connection_when_primary_autoselect_fails
     assert response.url == f"/{workspace.slug}/capacity?google=connected"
     assert TrainerCalendarSelection.objects.get(trainer=trainer).calendar_id_hashes == []
     assert caplog.records[-1].error_code == "primary_calendar_autoselect_failed"
+
+
+@pytest.mark.django_db
+def test_workspace_capacity_lists_trainers_in_a_stable_order(settings, workspace, create_user):
+    """The ledger is a roster, so it has to come back the same way twice.
+
+    `TrainerProfile` declares no ordering, so before this was pinned the database
+    returned trainers in whatever order it liked. A coordinator scanning the
+    capacity ledger saw rows move between loads, and two screenshot baselines
+    photographing that list swapped between runs, which is how it was found.
+    """
+    from plane.ext.capacity.calculation import calculate_workspace_capacity
+
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+
+    # Created out of alphabetical order on purpose: insertion order must not be
+    # what makes this pass.
+    for display_name in ("Zoe Trainer", "Adam Trainer", "Mia Trainer"):
+        user = UserFactory(display_name=display_name)
+        WorkspaceMember.objects.create(workspace=workspace, member=user, role=15)
+        TrainerProfile.objects.create(workspace=workspace, user=user)
+
+    start = timezone.now()
+    end = start + timedelta(days=7)
+    names = [
+        [
+            row["display_name"]
+            for row in calculate_workspace_capacity(workspace=workspace, viewer=create_user, start=start, end=end)
+        ]
+        for _ in range(3)
+    ]
+
+    assert names[0] == names[1] == names[2]
+    assert names[0] == ["Adam Trainer", "Mia Trainer", "Zoe Trainer"]
