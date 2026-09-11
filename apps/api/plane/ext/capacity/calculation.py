@@ -255,6 +255,14 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         TrainerProfile.objects.filter(workspace=workspace, status=TrainerProfile.Status.ACTIVE)
         .select_related("user")
         .prefetch_related("calendar_selection__credential")
+        # Ordered because this list is read by people. `TrainerProfile` declares
+        # no ordering, so without this PostgreSQL returns whatever it likes and
+        # the capacity ledger can put a trainer in a different row on every load
+        # -- which is unreadable for a coordinator scanning a roster, and was
+        # found because two baselines photographing this list kept swapping.
+        # By name, because that is the order someone looking for a person
+        # expects; by id after it, so identical names still sort stably.
+        .order_by("user__display_name", "id")
     )
     if trainer_ids:
         trainers = trainers.filter(user_id__in=trainer_ids)
