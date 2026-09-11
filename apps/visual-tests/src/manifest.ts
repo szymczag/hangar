@@ -11,6 +11,10 @@ export type VisualFixtures = {
   clock: string;
   workspace: { slug: string; id: string };
   project: { id: string; identifier: string };
+  /** The seeded Workshop work item, which carries three sessions. */
+  workshop: { id: string; name: string; sessions: number };
+  /** Display names of the seeded trainers, in ledger order. */
+  trainers: string[];
   copyTarget: { id: string };
   /** Names of the seeded work items, in the order they were created. */
   workItems: string[];

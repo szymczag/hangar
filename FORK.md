@@ -138,6 +138,7 @@ frontend, workspace settings route, and [administrator how-to](docs/importing-fr
 
 Planned (added when the phase lands):
 
-| File                          | Phase | Nature              |
-| ----------------------------- | ----- | ------------------- |
-| `packages/i18n/src/locales/*` | all   | append-only strings |
+| File                          | Phase                                                                                                                       | Nature              |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/i18n/src/locales/*` | all                                                                                                                         | append-only strings |
+| 80                            | `apps/web/app/routes/core.ts`, `apps/web/core/components/workspace/sidebar/workspace-menu.tsx`, `docker-compose-visual.yml` | Capacity            | register the three capacity routes and their sidebar entries, all gated on the same instance flag; the visual stack sets that flag so the ledger, planner and workshop sessions render rather than photographing "not authorized" |

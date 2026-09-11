@@ -122,6 +122,16 @@ services:
       # of seeding makes that page render without it. `.env.example` defaults it
       # to "0", which is why the page shows "not authorized" otherwise.
       TODOIST_IMPORTS_ENABLED: "1"
+      # Capacity is opt-in, and gated the same way. The Workshop work item type
+      # is not provisioned until a workspace has a trainer profile, so without
+      # this the seed's trainers, ledger and planner simply do not exist and
+      # three routes photograph "not authorized".
+      ENABLE_GOOGLE_CALENDAR_CAPACITY: "1"
+      # Required whenever the flag above is on, or Django refuses to start. It
+      # only ever encrypts Google refresh tokens, and this stack never obtains
+      # one: nothing here talks to Google. A fixed throwaway key keeps the stack
+      # reproducible, which is the whole point of it.
+      CALENDAR_TOKEN_ENCRYPTION_KEYS: "dmlzdWFsLXJlZ3Jlc3Npb24tZml4dHVyZS1rZXktMDE="
       # Passed in by scripts/vr.mjs, read from the generated release notes. The
       # build identity dialog hides its notes when this disagrees with the
       # version compiled into the bundle -- which is the defect that prompted
