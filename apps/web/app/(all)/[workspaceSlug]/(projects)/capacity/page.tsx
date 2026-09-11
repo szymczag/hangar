@@ -6,21 +6,16 @@
 
 import { useCallback, useState } from "react";
 import { Link2, Unplug } from "lucide-react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { Button } from "@plane/propel/button";
-import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
-import { useUserPermissions } from "@/hooks/store/user";
 import { useInstance } from "@/hooks/store/use-instance";
 import { CapacityService, type TGoogleCalendar, type TTrainerProfile } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
 import { bookingHoursSummary, errorMessage } from "./shared/capacity-format.utils";
-import { useCapacityData } from "./shared/use-capacity-data";
 import { ScheduleEditor } from "./shared/schedule-editor";
-import { CapacityLedger } from "./team/capacity-ledger";
-import { WorkshopPlanner } from "./planner/workshop-planner";
 
 const capacityService = new CapacityService();
 
@@ -123,13 +118,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   const workspaceSlug = params.workspaceSlug;
   const { config } = useInstance();
   const featureEnabled = config?.is_google_calendar_capacity_enabled === true;
-  const { allowPermissions } = useUserPermissions();
-  const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  const capacityData = useCapacityData(workspaceSlug, featureEnabled);
-  // The ledger owns the rest of the hook's surface; the page keeps only what it
-  // renders itself (the planner) and what its own actions invalidate.
-  const { trainers, mutateTrainers, capacity, refreshCapacity, weekStart, weekEnd } = capacityData;
-  const [editingTrainerId, setEditingTrainerId] = useState<string | null>(null);
+  const [editingOwnSchedule, setEditingOwnSchedule] = useState(false);
   const [optingIn, setOptingIn] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -137,9 +126,6 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
     featureEnabled ? ["capacity-trainer-self", workspaceSlug] : null,
     () => capacityService.getOwnTrainerProfile(workspaceSlug)
   );
-  const editingProfile =
-    trainers?.find((trainer) => trainer.user_id === editingTrainerId) ??
-    (ownProfile?.user_id === editingTrainerId ? ownProfile : undefined);
   const hasActiveProfile = ownProfile?.status === "active";
   const isConnected = hasActiveProfile && ownProfile?.connection_status === "connected";
   const { data: calendars, mutate: mutateCalendars } = useSWR(
@@ -147,10 +133,17 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
     () => capacityService.listCalendars(workspaceSlug)
   );
 
+  /**
+   * Opting in, connecting a calendar and changing booking hours all change what
+   * the team ledger and the planner show, but this page renders neither. So it
+   * invalidates those cache entries by key rather than subscribing to them
+   * through `useCapacityData` -- subscribing would make a personal settings page
+   * fetch the whole workspace's capacity to throw it away.
+   */
   const refresh = useCallback(async () => {
-    await Promise.all([mutateTrainers(), mutateOwnProfile()]);
-    await refreshCapacity();
-  }, [mutateOwnProfile, mutateTrainers, refreshCapacity]);
+    await mutateOwnProfile();
+    await mutate((key) => Array.isArray(key) && typeof key[0] === "string" && key[0].startsWith("capacity"));
+  }, [mutateOwnProfile]);
   const optIn = async () => {
     setOptingIn(true);
     try {
@@ -216,35 +209,39 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
 
   return (
     <div className="h-full overflow-y-auto bg-surface-2">
-      <PageHead title="Trainer capacity" />
+      <PageHead title="My capacity" />
       <div className="mx-auto flex max-w-[1440px] flex-col gap-5 p-4 md:p-6">
-        {capacity?.trainers.length ? (
-          <WorkshopPlanner
-            workspaceSlug={workspaceSlug}
-            trainers={capacity.trainers}
-            weekStart={weekStart}
-            weekEnd={weekEnd}
-          />
+        {/* Opting in used to live in the team ledger's header, which this route
+            no longer renders. Without it here a colleague who is not yet a
+            trainer would find an empty page and no way off it. */}
+        {!hasActiveProfile ? (
+          <section className="flex flex-col justify-between gap-4 rounded-xl border border-subtle bg-surface-1 p-5 md:flex-row md:items-center">
+            <div>
+              <h1 className="text-body-sm-medium text-primary">
+                {ownProfile ? "You are not an active trainer." : "You are not a trainer yet."}
+              </h1>
+              <p className="mt-1 text-body-xs-regular text-secondary">
+                Opt in to put your booking hours on the workspace capacity ledger. You choose the hours, and which
+                calendars block your time.
+              </p>
+            </div>
+            <Button variant="primary" loading={optingIn} onClick={optIn}>
+              {ownProfile ? "Reactivate trainer" : "Become a trainer"}
+            </Button>
+          </section>
         ) : null}
-        <CapacityLedger
-          data={capacityData}
-          isAdmin={isAdmin}
-          ownProfile={ownProfile}
-          onManageSchedule={setEditingTrainerId}
-          becomeTrainer={{ onClick: optIn, busy: optingIn }}
-        />
 
-        {editingProfile && (isAdmin || editingProfile.user_id === ownProfile?.user_id) ? (
-          <section aria-label={`Manage ${editingProfile.display_name}`} className="flex flex-col gap-4">
+        {ownProfile && editingOwnSchedule ? (
+          <section aria-label="Manage your schedule" className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-body-sm-medium">Managing {editingProfile.display_name}</h2>
-              <Button variant="secondary" size="sm" onClick={() => setEditingTrainerId(null)}>
+              <h2 className="text-body-sm-medium">Your booking hours</h2>
+              <Button variant="secondary" size="sm" onClick={() => setEditingOwnSchedule(false)}>
                 Close
               </Button>
             </div>
             <ScheduleEditor
-              key={`${editingProfile.id}-${editingProfile.schedule_revision}-schedule`}
-              profile={editingProfile}
+              key={`${ownProfile.id}-${ownProfile.schedule_revision}-schedule`}
+              profile={ownProfile}
               workspaceSlug={workspaceSlug}
               onSaved={refresh}
             />
@@ -253,8 +250,8 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
 
         {ownProfile && hasActiveProfile ? (
           <>
-            {editingTrainerId !== ownProfile.user_id ? (
-              <BookingHoursSummary profile={ownProfile} onManage={() => setEditingTrainerId(ownProfile.user_id)} />
+            {!editingOwnSchedule ? (
+              <BookingHoursSummary profile={ownProfile} onManage={() => setEditingOwnSchedule(true)} />
             ) : null}
             {isConnected && calendars ? (
               <CalendarPicker
@@ -263,7 +260,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                 selectionRevision={calendars.selection_revision}
                 onSaved={async () => {
                   await mutateCalendars();
-                  await refreshCapacity();
+                  await refresh();
                 }}
               />
             ) : (
