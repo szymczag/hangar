@@ -4,66 +4,25 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useMemo, useState } from "react";
-import { CalendarClock, ChevronLeft, ChevronRight, CircleAlert, Link2, Trash2, Unplug } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Link2, Unplug } from "lucide-react";
 import useSWR from "swr";
 import { Button } from "@plane/propel/button";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Spinner } from "@plane/ui";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useInstance } from "@/hooks/store/use-instance";
-import {
-  CapacityService,
-  type TGoogleCalendar,
-  type TTrainerCapacity,
-  type TTrainerProfile,
-} from "@/services/capacity.service";
+import { CapacityService, type TGoogleCalendar, type TTrainerProfile } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
-import {
-  availableRanges,
-  clippedRanges,
-  dayBounds,
-  formatRange,
-  intervalPosition,
-  rangeMinutes,
-} from "./shared/capacity-timeline.utils";
-import {
-  DAY_KEYS,
-  DAY_LABELS,
-  availabilityCopy,
-  bookingHoursSummary,
-  errorMessage,
-  formatMinutes,
-  shiftWeek,
-} from "./shared/capacity-format.utils";
+import { bookingHoursSummary, errorMessage } from "./shared/capacity-format.utils";
 import { useCapacityData } from "./shared/use-capacity-data";
+import { ScheduleEditor } from "./shared/schedule-editor";
+import { CapacityLedger } from "./team/capacity-ledger";
 import { WorkshopPlanner } from "./planner/workshop-planner";
-import { TrainerDayTimeline } from "./team/trainer-day-timeline";
 
 const capacityService = new CapacityService();
-
-function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Date) {
-  const free = availableRanges(trainer.intervals, dayStart, dayEnd);
-  const rangesFor = (kind: "working" | "google_busy" | "workshop" | "workshop_hold") =>
-    clippedRanges(
-      trainer.intervals.filter((interval) => interval.kind === kind),
-      dayStart,
-      dayEnd
-    );
-  const conflicts = trainer.conflicts.filter((conflict) => intervalPosition(conflict, dayStart, dayEnd));
-  return {
-    free,
-    freeMinutes: rangeMinutes(free),
-    workingMinutes: rangeMinutes(rangesFor("working")),
-    googleBusyMinutes: rangeMinutes(rangesFor("google_busy")),
-    workshopMinutes: rangeMinutes(rangesFor("workshop")),
-    holdMinutes: rangeMinutes(rangesFor("workshop_hold")),
-    conflicts,
-  };
-}
 
 function BookingHoursSummary({ profile, onManage }: { profile: TTrainerProfile; onManage: () => void }) {
   return (
@@ -78,148 +37,6 @@ function BookingHoursSummary({ profile, onManage }: { profile: TTrainerProfile; 
       <Button variant="secondary" size="sm" onClick={onManage}>
         Manage schedule
       </Button>
-    </section>
-  );
-}
-
-function ScheduleEditor({
-  profile,
-  workspaceSlug,
-  onSaved,
-}: {
-  profile: TTrainerProfile;
-  workspaceSlug: string;
-  onSaved: () => void;
-}) {
-  const [schedule, setSchedule] = useState(profile.weekly_schedule);
-  const [trainerTimezone, setTrainerTimezone] = useState(profile.timezone);
-  const [saving, setSaving] = useState(false);
-
-  const setTime = (day: string, intervalIndex: number, field: "start" | "end", value: string) => {
-    setSchedule((current) => {
-      const intervals = [...(current[day] ?? [])];
-      intervals[intervalIndex] = { ...intervals[intervalIndex], [field]: value };
-      return { ...current, [day]: intervals };
-    });
-  };
-
-  const addInterval = (day: string) =>
-    setSchedule((current) => ({ ...current, [day]: [...(current[day] ?? []), { start: "13:00", end: "17:00" }] }));
-
-  const removeInterval = (day: string, intervalIndex: number) =>
-    setSchedule((current) => ({
-      ...current,
-      [day]: (current[day] ?? []).filter((_, index) => index !== intervalIndex),
-    }));
-
-  const toggleDay = (day: string) => {
-    setSchedule((current) => ({
-      ...current,
-      [day]: current[day]?.length ? [] : [{ start: "09:00", end: "22:00" }],
-    }));
-  };
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await capacityService.updateSchedule(workspaceSlug, profile.user_id, profile.schedule_revision, {
-        weekly_schedule: schedule,
-        timezone: trainerTimezone,
-      });
-      setToast({
-        type: TOAST_TYPE.SUCCESS,
-        title: "Booking hours saved",
-        message: "Capacity now uses this weekly schedule.",
-      });
-      onSaved();
-    } catch (error: unknown) {
-      setToast({
-        type: TOAST_TYPE.ERROR,
-        title: "Booking hours not saved",
-        message: errorMessage(error, "Check the time ranges and try again."),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <section className="rounded-lg border border-subtle bg-surface-1 p-4">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-body-sm-medium">Booking hours · {profile.display_name}</h2>
-          <p className="mt-1 text-body-xs-regular text-secondary">
-            Set the weekly windows in which this trainer may be booked. Google busy time and scheduled workshops are
-            subtracted inside them.
-          </p>
-        </div>
-        <Button variant="primary" size="sm" loading={saving} onClick={save}>
-          Save hours
-        </Button>
-      </div>
-      <label className="mb-4 block max-w-sm text-body-xs-medium">
-        Trainer timezone
-        <input
-          aria-label="Trainer timezone"
-          value={trainerTimezone}
-          onChange={(event) => setTrainerTimezone(event.target.value)}
-          placeholder="Europe/Warsaw"
-          className="mt-1 w-full rounded border border-subtle bg-surface-2 px-2 py-1.5 text-body-xs-regular"
-        />
-      </label>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {DAY_KEYS.map((day, index) => {
-          const intervals = schedule[day] ?? [];
-          return (
-            <div key={day} className="flex min-h-12 items-center gap-2 rounded-md border border-subtle px-3 py-2">
-              <label className="flex w-10 cursor-pointer items-center gap-2 self-start pt-1 text-body-xs-medium">
-                <input type="checkbox" checked={intervals.length > 0} onChange={() => toggleDay(day)} />
-                {DAY_LABELS[index]}
-              </label>
-              {intervals.length ? (
-                <div className="flex min-w-0 flex-1 flex-col gap-1 text-11 text-secondary">
-                  {intervals.map((interval, intervalIndex) => (
-                    <div key={`${interval.start}-${interval.end}`} className="flex items-center gap-1">
-                      <input
-                        aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} start`}
-                        type="time"
-                        value={interval.start}
-                        onChange={(event) => setTime(day, intervalIndex, "start", event.target.value)}
-                        className="min-w-0 rounded border border-subtle bg-surface-2 px-1 py-1"
-                      />
-                      <span>–</span>
-                      <input
-                        aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} end`}
-                        type="time"
-                        value={interval.end}
-                        onChange={(event) => setTime(day, intervalIndex, "end", event.target.value)}
-                        className="min-w-0 rounded border border-subtle bg-surface-2 px-1 py-1"
-                      />
-                      <button
-                        type="button"
-                        aria-label={`Remove ${DAY_LABELS[index]} interval ${intervalIndex + 1}`}
-                        onClick={() => removeInterval(day, intervalIndex)}
-                        className="rounded p-1 hover:text-danger-primary"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => addInterval(day)}
-                    className="self-start text-11 text-accent-primary"
-                  >
-                    + Add interval
-                  </button>
-                </div>
-              ) : (
-                <span className="text-11 text-placeholder">Off</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </section>
   );
 }
@@ -308,32 +125,14 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   const featureEnabled = config?.is_google_calendar_capacity_enabled === true;
   const { allowPermissions } = useUserPermissions();
   const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  const {
-    trainerPage,
-    trainers,
-    trainersLoading,
-    mutateTrainers,
-    capacity,
-    capacityError,
-    capacityLoading,
-    refreshCapacity,
-    weekStart,
-    weekEnd,
-    setWeekStart,
-    trainerCursor,
-    setTrainerCursor,
-    cursorHistory,
-    setCursorHistory,
-  } = useCapacityData(workspaceSlug, featureEnabled);
+  const capacityData = useCapacityData(workspaceSlug, featureEnabled);
+  // The ledger owns the rest of the hook's surface; the page keeps only what it
+  // renders itself (the planner) and what its own actions invalidate.
+  const { trainers, mutateTrainers, capacity, refreshCapacity, weekStart, weekEnd } = capacityData;
   const [editingTrainerId, setEditingTrainerId] = useState<string | null>(null);
   const [optingIn, setOptingIn] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
-    const day = new Date().getDay();
-    return day === 0 || day === 6 ? 0 : day - 1;
-  });
-  const selectedDay = useMemo(() => dayBounds(weekStart, selectedDayIndex), [selectedDayIndex, weekStart]);
   const { data: ownProfile, mutate: mutateOwnProfile } = useSWR(
     featureEnabled ? ["capacity-trainer-self", workspaceSlug] : null,
     () => capacityService.getOwnTrainerProfile(workspaceSlug)
@@ -427,303 +226,13 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
             weekEnd={weekEnd}
           />
         ) : null}
-        <section className="overflow-hidden rounded-xl border border-subtle bg-surface-1">
-          <div className="flex flex-col justify-between gap-4 border-b border-subtle px-5 py-5 md:flex-row md:items-end">
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-11 font-semibold tracking-[0.16em] text-placeholder uppercase">
-                <CalendarClock className="size-3.5" /> Capacity ledger
-              </div>
-              <h1 className="text-xl font-semibold text-primary">Find a trainer and time.</h1>
-              <p className="mt-1 max-w-2xl text-body-sm-regular text-secondary">
-                Working hours, anonymous Google busy time, and scheduled workshops in one planning rail.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {!hasActiveProfile ? (
-                <Button variant="primary" size="sm" loading={optingIn} onClick={optIn}>
-                  {ownProfile ? "Reactivate trainer" : "Become a trainer"}
-                </Button>
-              ) : null}
-              <Button
-                variant="secondary"
-                size="sm"
-                aria-label="Previous week"
-                onClick={() => setWeekStart((current) => shiftWeek(current, -1))}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <div className="min-w-44 text-center text-body-xs-medium">
-                {weekStart.toLocaleDateString(undefined, { day: "numeric", month: "short" })} –{" "}
-                {new Date(weekEnd.getTime() - 1).toLocaleDateString(undefined, {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                aria-label="Next week"
-                onClick={() => setWeekStart((current) => shiftWeek(current, 1))}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-          {(capacityLoading || trainersLoading) && !capacity ? (
-            <div className="grid min-h-56 place-items-center">
-              <Spinner />
-            </div>
-          ) : capacityError && !capacity ? (
-            <div role="alert" className="flex min-h-56 flex-col items-center justify-center gap-2 px-5 text-center">
-              <CircleAlert className="size-6 text-danger-primary" />
-              <h2 className="text-body-sm-medium">Capacity could not be loaded</h2>
-              <p className="text-body-xs-regular text-secondary">{errorMessage(capacityError, "Try again shortly.")}</p>
-              <Button variant="secondary" size="sm" onClick={() => refreshCapacity()}>
-                Retry
-              </Button>
-            </div>
-          ) : capacity?.trainers.length ? (
-            <div>
-              <div className="border-b border-subtle bg-surface-1 px-5 py-3">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7" aria-label="Choose planning day">
-                  {DAY_KEYS.map((day, index) => {
-                    const bounds = dayBounds(weekStart, index);
-                    const availableCount = capacity.trainers.filter(
-                      (trainer) => availableRanges(trainer.intervals, bounds.start, bounds.end).length > 0
-                    ).length;
-                    const conflictCount = capacity.trainers.reduce(
-                      (count, trainer) =>
-                        count +
-                        trainer.conflicts.filter((conflict) => intervalPosition(conflict, bounds.start, bounds.end))
-                          .length,
-                      0
-                    );
-                    const selected = selectedDayIndex === index;
-                    return (
-                      <button
-                        key={day}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => setSelectedDayIndex(index)}
-                        className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-                          selected
-                            ? "border-accent-primary bg-accent-primary/10"
-                            : "border-subtle bg-surface-2 hover:border-strong"
-                        }`}
-                      >
-                        <span className="flex items-baseline justify-between gap-2">
-                          <span className="text-body-xs-medium text-primary">{DAY_LABELS[index]}</span>
-                          <span className="text-11 text-placeholder">
-                            {bounds.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
-                          </span>
-                        </span>
-                        <span className="mt-1 block text-11 text-secondary">
-                          {availableCount} available
-                          {conflictCount ? (
-                            <span className="text-danger-primary"> · {conflictCount} conflicts</span>
-                          ) : null}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="divide-y divide-subtle lg:hidden">
-                {capacity.trainers.map((trainer) => {
-                  const metrics = trainerDayMetrics(trainer, selectedDay.start, selectedDay.end);
-                  return (
-                    <article key={trainer.trainer_id} className="space-y-3 px-5 py-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h2 className="text-body-sm-medium text-primary">{trainer.display_name}</h2>
-                          <p className="mt-1 text-11 text-secondary">
-                            {availabilityCopy(trainer.availability_status)} · {trainer.timezone}
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <div className="text-body-sm-medium text-primary tabular-nums">
-                            {formatMinutes(metrics.freeMinutes)} free
-                          </div>
-                          <div className="text-11 text-placeholder">of {formatMinutes(metrics.workingMinutes)}</div>
-                        </div>
-                      </div>
-                      <div className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-body-xs-regular whitespace-normal">
-                        <span className="font-medium text-primary">Available:</span>{" "}
-                        <span className="text-secondary">
-                          {metrics.free.length
-                            ? metrics.free.map(formatRange).join(", ")
-                            : "No free time in booking hours"}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-11 text-secondary">
-                        <span>Google busy {formatMinutes(metrics.googleBusyMinutes)}</span>
-                        <span>Workshops {formatMinutes(metrics.workshopMinutes)}</span>
-                        {metrics.holdMinutes ? <span>Holds {formatMinutes(metrics.holdMinutes)}</span> : null}
-                        {metrics.conflicts.length ? (
-                          <span className="inline-flex items-center gap-1 text-danger-primary">
-                            <CircleAlert className="size-3" /> {metrics.conflicts.length} conflict
-                            {metrics.conflicts.length === 1 ? "" : "s"}
-                          </span>
-                        ) : null}
-                        {isAdmin || trainer.trainer_id === ownProfile?.user_id ? (
-                          <button
-                            type="button"
-                            className="ml-auto text-accent-primary"
-                            onClick={() => setEditingTrainerId(trainer.trainer_id)}
-                          >
-                            Manage schedule
-                          </button>
-                        ) : null}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-              <div className="hidden overflow-x-auto lg:block">
-                <div className="min-w-[1180px]">
-                  {capacityError ? (
-                    <div
-                      role="status"
-                      className="bg-warning-secondary border-b border-subtle px-5 py-2 text-11 text-secondary"
-                    >
-                      Availability is being refreshed. The last request was rate limited or temporarily unavailable.
-                    </div>
-                  ) : null}
-                  <div className="grid grid-cols-[210px_1fr_150px] items-end gap-5 border-b border-subtle bg-surface-2 px-5 py-3">
-                    <div className="text-11 font-semibold tracking-wide text-placeholder uppercase">Trainer</div>
-                    <div className="text-11 font-semibold tracking-wide text-placeholder uppercase">
-                      {selectedDay.start.toLocaleDateString(undefined, {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                      })}
-                    </div>
-                    <div className="text-right text-11 font-semibold tracking-wide text-placeholder uppercase">
-                      Day capacity
-                    </div>
-                  </div>
-                  <div className="divide-y divide-subtle">
-                    {capacity.trainers.map((trainer) => {
-                      const metrics = trainerDayMetrics(trainer, selectedDay.start, selectedDay.end);
-                      return (
-                        <article
-                          key={trainer.trainer_id}
-                          className="grid grid-cols-[210px_1fr_150px] items-center gap-5 px-5 py-5"
-                        >
-                          <div>
-                            <h2 className="text-body-sm-medium text-primary">{trainer.display_name}</h2>
-                            <p className="mt-1 text-11 text-secondary">
-                              {availabilityCopy(trainer.availability_status)} · {trainer.timezone}
-                            </p>
-                          </div>
-                          <div>
-                            <TrainerDayTimeline
-                              trainer={trainer}
-                              dayStart={selectedDay.start}
-                              dayEnd={selectedDay.end}
-                            />
-                            <div className="mt-2 flex gap-4 text-11 text-secondary">
-                              <span>Google {formatMinutes(metrics.googleBusyMinutes)}</span>
-                              <span>Workshops {formatMinutes(metrics.workshopMinutes)}</span>
-                              {metrics.holdMinutes ? <span>Holds {formatMinutes(metrics.holdMinutes)}</span> : null}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-semibold text-primary tabular-nums">
-                              {formatMinutes(metrics.freeMinutes)}
-                            </div>
-                            <div className="text-11 text-placeholder">
-                              of {formatMinutes(metrics.workingMinutes)} free
-                            </div>
-                            {metrics.conflicts.length ? (
-                              <div className="mt-1 inline-flex items-center gap-1 text-11 text-danger-primary">
-                                <CircleAlert className="size-3" /> {metrics.conflicts.length} conflict
-                                {metrics.conflicts.length === 1 ? "" : "s"}
-                              </div>
-                            ) : null}
-                            {isAdmin || trainer.trainer_id === ownProfile?.user_id ? (
-                              <button
-                                type="button"
-                                className="mt-2 text-11 text-accent-primary"
-                                onClick={() => setEditingTrainerId(trainer.trainer_id)}
-                              >
-                                Manage schedule
-                              </button>
-                            ) : null}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                  <div
-                    className="flex flex-wrap items-center gap-4 border-t border-subtle bg-surface-2 px-5 py-3 text-11 text-secondary"
-                    aria-label="Timeline legend"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="bg-success-secondary ring-success-primary/30 size-2.5 rounded-sm ring-1" />
-                      Available
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="bg-neutral-500/55 size-2.5 rounded-sm" />
-                      Google busy
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-sm bg-accent-primary/70" />
-                      Workshop
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="border-danger-primary bg-danger-secondary size-2.5 rounded-sm border" />
-                      Conflict
-                    </span>
-                    <span className="ml-auto">Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex min-h-56 flex-col items-center justify-center gap-3 px-5 text-center">
-              <CalendarClock className="size-8 text-placeholder" />
-              <div>
-                <h2 className="text-body-sm-medium">No trainers yet</h2>
-                <p className="mt-1 text-body-xs-regular text-secondary">
-                  Opt in to start the workspace capacity ledger.
-                </p>
-              </div>
-              {!hasActiveProfile ? (
-                <Button variant="primary" loading={optingIn} onClick={optIn}>
-                  {ownProfile ? "Reactivate trainer" : "Become a trainer"}
-                </Button>
-              ) : null}
-            </div>
-          )}
-          {(cursorHistory.length > 0 || trainerPage?.next_cursor) && (
-            <div className="flex items-center justify-end gap-2 border-t border-subtle px-5 py-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={cursorHistory.length === 0}
-                onClick={() => {
-                  setTrainerCursor(cursorHistory[cursorHistory.length - 1]);
-                  setCursorHistory((current) => current.slice(0, -1));
-                }}
-              >
-                Previous trainers
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!trainerPage?.next_cursor}
-                onClick={() => {
-                  setCursorHistory((current) => [...current, trainerCursor]);
-                  setTrainerCursor(trainerPage?.next_cursor ?? undefined);
-                }}
-              >
-                Next trainers
-              </Button>
-            </div>
-          )}
-        </section>
+        <CapacityLedger
+          data={capacityData}
+          isAdmin={isAdmin}
+          ownProfile={ownProfile}
+          onManageSchedule={setEditingTrainerId}
+          becomeTrainer={{ onClick: optIn, busy: optingIn }}
+        />
 
         {editingProfile && (isAdmin || editingProfile.user_id === ownProfile?.user_id) ? (
           <section aria-label={`Manage ${editingProfile.display_name}`} className="flex flex-col gap-4">
