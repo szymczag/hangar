@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { TTrainerCapacity } from "@/services/capacity.service";
-import { dateTimeLabel, findWorkshopCandidates } from "./workshop-planner.utils";
+import { dateTimeLabel, findFirstAvailable, findWorkshopCandidates } from "./workshop-planner.utils";
 
 const trainer = {
   trainer_id: "trainer-1",
@@ -99,5 +99,98 @@ describe("dateTimeLabel", () => {
 
   it("uses the runtime locale when none is given", () => {
     expect(() => dateTimeLabel("2026-09-10T14:30:00.000Z")).not.toThrow();
+  });
+});
+
+describe("findFirstAvailable", () => {
+  const spec = {
+    trainerIds: [trainer.trainer_id],
+    durationMinutes: 120,
+    preparationMinutes: 30,
+    travelBeforeMinutes: 60,
+    travelAfterMinutes: 45,
+  };
+  const busyTrainer = { ...trainer, intervals: [] } satisfies TTrainerCapacity;
+
+  it("stops at the first window that has a slot, and does not look further", async () => {
+    const asked: string[] = [];
+    const result = await findFirstAvailable(new Date("2026-09-07T00:00:00.000Z"), spec, async (windowStart) => {
+      asked.push(windowStart.toISOString());
+      return [trainer];
+    });
+
+    expect(result.found).toBe(true);
+    expect(asked).toHaveLength(1);
+  });
+
+  it("walks forward when earlier windows are empty", async () => {
+    const asked: string[] = [];
+    // The fixture trainer is only free on 2026-09-07, so "free in the third
+    // window" has to be built by moving those hours into that window rather than
+    // by handing back the same trainer and hoping.
+    const freeInside = (windowStart: Date): TTrainerCapacity => ({
+      ...trainer,
+      intervals: [
+        {
+          start: new Date(windowStart.getTime() + 7 * 3_600_000).toISOString(),
+          end: new Date(windowStart.getTime() + 15 * 3_600_000).toISOString(),
+          kind: "working",
+        },
+      ],
+    });
+    const result = await findFirstAvailable(new Date("2026-09-07T00:00:00.000Z"), spec, async (windowStart) => {
+      asked.push(windowStart.toISOString());
+      return asked.length === 3 ? [freeInside(windowStart)] : [busyTrainer];
+    });
+
+    expect(result.found).toBe(true);
+    if (result.found) expect(result.windowsSearched).toBe(3);
+    expect(asked).toHaveLength(3);
+    // Fourteen-day steps, because the endpoint refuses a longer range.
+    expect(asked[1]).toBe("2026-09-21T00:00:00.000Z");
+    expect(asked[2]).toBe("2026-10-05T00:00:00.000Z");
+  });
+
+  it("gives up honestly rather than looping", async () => {
+    const result = await findFirstAvailable(new Date("2026-09-07T00:00:00.000Z"), spec, async () => [busyTrainer], {
+      maxWindows: 4,
+    });
+
+    expect(result.found).toBe(false);
+    if (!result.found) {
+      expect(result.windowsSearched).toBe(4);
+      expect(result.searchedUntil.toISOString()).toBe("2026-11-02T00:00:00.000Z");
+    }
+  });
+
+  it("fetches one window at a time, because the endpoint is throttled", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    await findFirstAvailable(
+      new Date("2026-09-07T00:00:00.000Z"),
+      spec,
+      async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inFlight -= 1;
+        return [busyTrainer];
+      },
+      { maxWindows: 5 }
+    );
+
+    expect(maxInFlight).toBe(1);
+  });
+
+  it("answers for one trainer when asked for one trainer", async () => {
+    const other = { ...trainer, trainer_id: "trainer-2", display_name: "B Trainer" } satisfies TTrainerCapacity;
+    const result = await findFirstAvailable(
+      new Date("2026-09-07T00:00:00.000Z"),
+      { ...spec, trainerIds: [other.trainer_id] },
+      async () => [trainer, other]
+    );
+
+    expect(result.found).toBe(true);
+    if (result.found) expect(result.candidate.trainerId).toBe("trainer-2");
   });
 });

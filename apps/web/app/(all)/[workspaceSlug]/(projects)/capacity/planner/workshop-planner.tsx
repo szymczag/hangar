@@ -8,6 +8,7 @@ import useSWR from "swr";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { CalendarSearch, Clock3, Save, ShieldCheck, Trash2, Users } from "lucide-react";
+import { errorMessage } from "../shared/capacity-format.utils";
 import {
   CapacityService,
   type TTrainerCapacity,
@@ -15,7 +16,12 @@ import {
   type TWorkshopPlanDraftInput,
   type TWorkshopPlanHold,
 } from "@/services/capacity.service";
-import { dateTimeLabel, findWorkshopCandidates } from "./workshop-planner.utils";
+import {
+  dateTimeLabel,
+  findFirstAvailable,
+  findWorkshopCandidates,
+  type TFirstAvailable,
+} from "./workshop-planner.utils";
 
 const capacityService = new CapacityService();
 
@@ -75,6 +81,54 @@ export function WorkshopPlanner({
   const [saving, setSaving] = useState(false);
   const [hold, setHold] = useState<TWorkshopPlanHold | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const [search, setSearch] = useState<
+    | { state: "idle" }
+    | { state: "running"; from: Date }
+    | { state: "done"; result: TFirstAvailable; forTrainer: string | null }
+  >({ state: "idle" });
+
+  /**
+   * Look past the week on screen for the next time this fits.
+   *
+   * `only` restricts the search to one trainer, which is the same question with
+   * a smaller eligible set -- "when could she do it?" rather than "when could
+   * anybody?". Passing null asks about everyone currently ticked.
+   */
+  const findNext = async (only: string | null) => {
+    const ids = only ? [only] : trainerIds;
+    if (!ids.length) return;
+    setSearch({ state: "running", from: weekStart });
+    try {
+      const result = await findFirstAvailable(
+        weekStart,
+        {
+          trainerIds: ids,
+          durationMinutes,
+          preparationMinutes,
+          travelBeforeMinutes,
+          travelAfterMinutes,
+        },
+        async (windowStart, windowEnd) => {
+          const response = await capacityService.getCapacity(
+            workspaceSlug,
+            windowStart.toISOString(),
+            windowEnd.toISOString(),
+            ids
+          );
+          return response.trainers;
+        },
+        { onProgress: (windowStart) => setSearch({ state: "running", from: windowStart }) }
+      );
+      setSearch({ state: "done", result, forTrainer: only });
+    } catch (error: unknown) {
+      setSearch({ state: "idle" });
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Could not look ahead",
+        message: errorMessage(error, "The capacity service is rate-limited. Try again shortly."),
+      });
+    }
+  };
 
   const candidates = useMemo(
     () =>
@@ -315,6 +369,20 @@ export function WorkshopPlanner({
                   />
                   <span className="min-w-0 flex-1 truncate text-primary">{trainer.display_name}</span>
                   <span className="text-11 text-placeholder">{trainer.timezone}</span>
+                  <button
+                    type="button"
+                    title={`Find the first time ${trainer.display_name} could do this`}
+                    disabled={search.state === "running"}
+                    onClick={(event) => {
+                      // The row is a label, so a click here would otherwise toggle
+                      // the checkbox it wraps.
+                      event.preventDefault();
+                      void findNext(trainer.trainer_id);
+                    }}
+                    className="shrink-0 rounded px-1.5 py-0.5 text-11 text-accent-primary hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    When?
+                  </button>
                 </label>
               ))}
             </div>
@@ -345,10 +413,55 @@ export function WorkshopPlanner({
               <h3 className="text-body-sm-medium text-primary">Matching slots</h3>
               <p className="mt-1 text-11 text-secondary">Earliest fit in every free range during the selected week.</p>
             </div>
-            <span className="rounded-full bg-surface-2 px-2.5 py-1 text-11 text-secondary">
-              {candidates.length} options
-            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={search.state === "running"}
+                disabled={!trainerIds.length || search.state === "running"}
+                onClick={() => void findNext(null)}
+              >
+                <CalendarSearch className="size-3.5" /> Find first available
+              </Button>
+              <span className="rounded-full bg-surface-2 px-2.5 py-1 text-11 text-secondary">
+                {candidates.length} options
+              </span>
+            </div>
           </div>
+
+          {search.state === "running" ? (
+            <p className="mb-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 text-11 text-secondary">
+              Looking ahead — checking the fortnight from {dateTimeLabel(search.from.toISOString())}. One window at a
+              time, because the capacity service is rate-limited.
+            </p>
+          ) : null}
+
+          {search.state === "done" ? (
+            <div className="mb-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 text-body-xs-regular">
+              {search.result.found ? (
+                <>
+                  <p className="text-primary">
+                    <span className="font-medium">{search.result.candidate.trainerName}</span> is the first who can:{" "}
+                    {dateTimeLabel(search.result.candidate.workshopStartsAt)} –{" "}
+                    {dateTimeLabel(search.result.candidate.workshopEndsAt)}.
+                  </p>
+                  <p className="mt-1 text-secondary">
+                    {search.result.windowsSearched === 1
+                      ? "It is in the week already on screen, below."
+                      : `Not in the week on screen — move to ${dateTimeLabel(search.result.windowStart.toISOString())} to hold it.`}
+                    {search.forTrainer ? " Searched that trainer only." : ""}
+                  </p>
+                </>
+              ) : (
+                <p className="text-secondary">
+                  Nothing fits in the next {search.result.windowsSearched} fortnights, up to{" "}
+                  {dateTimeLabel(search.result.searchedUntil.toISOString())}
+                  {search.forTrainer ? " for that trainer" : ""}. Shorten the workshop, trim the buffers, or widen the
+                  eligible trainers.
+                </p>
+              )}
+            </div>
+          ) : null}
           {candidates.length ? (
             <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
               {candidates.map((candidate) => (
