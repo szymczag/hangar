@@ -245,7 +245,7 @@ overrides:
   "@opentelemetry/core": 2.8.0
   "@opentelemetry/resources": 2.8.0
   "@opentelemetry/sdk-trace-base": 2.8.0
-  morgan: 1.11.0
+  morgan: 1.12.0
 
 allowBuilds:
   "@parcel/watcher": true
