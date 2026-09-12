@@ -4,7 +4,7 @@
  */
 
 import { useMemo, useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { CalendarCheck, CalendarSearch, Clock3, Save, ShieldCheck, Trash2, Users } from "lucide-react";
@@ -337,6 +337,14 @@ export function WorkshopPlanner({
       setRevision(result.revision);
       setHold(null);
       await mutateDrafts();
+      /**
+       * The block just moved from being a hold to being a session, and both are
+       * subtracted from availability -- so the candidate list on screen is stale
+       * in a way that matters: it would still offer the slot that was just
+       * booked. Invalidated by key prefix rather than through `useCapacityData`,
+       * which this component is not the one holding.
+       */
+      await mutate((key) => Array.isArray(key) && typeof key[0] === "string" && key[0].startsWith("capacity"));
       setToast({
         type: TOAST_TYPE.SUCCESS,
         title: "Workshop scheduled",
