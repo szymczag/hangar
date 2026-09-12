@@ -88,8 +88,6 @@ export type TWorkshopPlanDraftInput = {
   preparation_minutes: number;
   travel_before_minutes: number;
   travel_after_minutes: number;
-  window_starts_at: string;
-  window_ends_at: string;
   trainer_ids: string[];
 };
 export type TWorkshopPlanDraft = TWorkshopPlanDraftInput & {

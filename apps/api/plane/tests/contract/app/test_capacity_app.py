@@ -299,6 +299,20 @@ def test_workshop_session_rejects_a_trainer_who_is_not_an_assignee(settings, wor
     assert not WorkshopSchedule.objects.filter(issue=issue).exists()
 
 
+def _future_monday():
+    """
+    The next Monday, as a date.
+
+    A hold may not be taken for a block that has already started, so the hold
+    tests cannot pin their dates to a literal the way the schedule tests do: a
+    fixed Monday stops being a future Monday once the calendar passes it. Monday
+    specifically because the default working week is Mon-Fri, and `hold_minutes`
+    is the block clipped to those hours.
+    """
+    today = timezone.localdate()
+    return today + timedelta(days=(7 - today.weekday()) or 7)
+
+
 @pytest.mark.contract
 @pytest.mark.django_db
 def test_workshop_plan_drafts_are_private_and_revision_protected(settings, workspace, create_user):
@@ -310,8 +324,6 @@ def test_workshop_plan_drafts_are_private_and_revision_protected(settings, works
         "preparation_minutes": 30,
         "travel_before_minutes": 60,
         "travel_after_minutes": 60,
-        "window_starts_at": "2026-09-07T00:00:00+02:00",
-        "window_ends_at": "2026-09-14T00:00:00+02:00",
         "trainer_ids": [str(create_user.id)],
     }
     client = APIClient(enforce_csrf_checks=True)
@@ -359,33 +371,33 @@ def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings
         "preparation_minutes": 30,
         "travel_before_minutes": 60,
         "travel_after_minutes": 60,
-        "window_starts_at": "2026-09-07T00:00:00+02:00",
-        "window_ends_at": "2026-09-14T00:00:00+02:00",
         "trainer_ids": [str(create_user.id)],
     }
+    monday = _future_monday().isoformat()
+    tuesday = (_future_monday() + timedelta(days=1)).isoformat()
     first = client.post(plans_url, payload, format="json", HTTP_X_CSRFTOKEN=csrf).data
     second = client.post(plans_url, payload, format="json", HTTP_X_CSRFTOKEN=csrf).data
     hold_payload = {
         "revision": first["revision"],
         "trainer_id": str(create_user.id),
-        "workshop_starts_at": "2026-09-07T10:30:00+02:00",
+        "workshop_starts_at": f"{monday}T10:30:00+02:00",
     }
 
     held = client.post(f"{plans_url}{first['id']}/hold/", hold_payload, format="json", HTTP_X_CSRFTOKEN=csrf)
 
     assert held.status_code == status.HTTP_201_CREATED
     assert held.data["revision"] == 2
-    assert held.data["hold"]["blocked_starts_at"] == "2026-09-07T09:00:00+02:00"
-    assert held.data["hold"]["workshop_starts_at"] == "2026-09-07T10:30:00+02:00"
-    assert held.data["hold"]["workshop_ends_at"] == "2026-09-07T14:30:00+02:00"
-    assert held.data["hold"]["blocked_ends_at"] == "2026-09-07T15:30:00+02:00"
+    assert held.data["hold"]["blocked_starts_at"] == f"{monday}T09:00:00+02:00"
+    assert held.data["hold"]["workshop_starts_at"] == f"{monday}T10:30:00+02:00"
+    assert held.data["hold"]["workshop_ends_at"] == f"{monday}T14:30:00+02:00"
+    assert held.data["hold"]["blocked_ends_at"] == f"{monday}T15:30:00+02:00"
     assert WorkshopPlanHold.objects.filter(status=WorkshopPlanHold.Status.ACTIVE).count() == 1
     assert not WorkshopSchedule.objects.exists()
     capacity = client.get(
         f"/api/workspaces/{workspace.slug}/capacity/",
         {
-            "from": "2026-09-07T00:00:00+02:00",
-            "to": "2026-09-08T00:00:00+02:00",
+            "from": f"{monday}T00:00:00+02:00",
+            "to": f"{tuesday}T00:00:00+02:00",
             "trainer_ids": str(create_user.id),
         },
     )
@@ -396,7 +408,7 @@ def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings
 
     conflict = client.post(
         f"{plans_url}{second['id']}/hold/",
-        {**hold_payload, "revision": second["revision"], "workshop_starts_at": "2026-09-07T11:00:00+02:00"},
+        {**hold_payload, "revision": second["revision"], "workshop_starts_at": f"{monday}T11:00:00+02:00"},
         format="json",
         HTTP_X_CSRFTOKEN=csrf,
     )
@@ -408,6 +420,85 @@ def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings
     assert not WorkshopPlanHold.objects.filter(status=WorkshopPlanHold.Status.ACTIVE).exists()
     assert CapacityAuditEvent.objects.filter(action=CapacityAuditEvent.Action.PLAN_HOLD_CREATED).exists()
     assert CapacityAuditEvent.objects.filter(action=CapacityAuditEvent.Action.PLAN_HOLD_RELEASED).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_workshop_plan_hold_is_bound_to_availability_not_to_a_planning_window(settings, workspace, create_user):
+    """
+    A plan is the same plan whichever week you are looking at.
+
+    Drafts used to carry the fortnight the coordinator happened to have on
+    screen, and a hold had to fall inside it. That made the week part of the
+    plan's identity: stepping forward marked the draft unsaved, and saving a
+    held draft is refused, so a slot found six weeks out could not be held at
+    all. What remains is the rule that actually protects anyone -- a held plan
+    is frozen until the hold is released -- plus a floor at the present.
+    """
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+    plans_url = f"/api/workspaces/{workspace.slug}/capacity/plans/"
+    payload = {
+        "title": "NetSec workshop",
+        "duration_minutes": 240,
+        "preparation_minutes": 30,
+        "travel_before_minutes": 60,
+        "travel_after_minutes": 60,
+        "trainer_ids": [str(create_user.id)],
+    }
+    draft = client.post(plans_url, payload, format="json", HTTP_X_CSRFTOKEN=csrf).data
+    hold_url = f"{plans_url}{draft['id']}/hold/"
+    detail_url = f"{plans_url}{draft['id']}/"
+    far_ahead = (_future_monday() + timedelta(weeks=5)).isoformat()
+
+    held = client.post(
+        hold_url,
+        {
+            "revision": draft["revision"],
+            "trainer_id": str(create_user.id),
+            "workshop_starts_at": f"{far_ahead}T10:30:00+02:00",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert held.status_code == status.HTTP_201_CREATED
+    assert held.data["hold"]["workshop_starts_at"] == f"{far_ahead}T10:30:00+02:00"
+
+    frozen = client.put(
+        detail_url, {**payload, "revision": held.data["revision"]}, format="json", HTTP_X_CSRFTOKEN=csrf
+    )
+    assert frozen.status_code == status.HTTP_409_CONFLICT
+    assert "Release the active hold" in frozen.data["error"]
+
+    released = client.delete(hold_url, HTTP_X_CSRFTOKEN=csrf)
+    assert released.status_code == status.HTTP_200_OK
+    thawed = client.put(
+        detail_url,
+        {**payload, "title": "NetSec workshop, two days", "revision": released.data["revision"]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert thawed.status_code == status.HTTP_200_OK
+    assert thawed.data["title"] == "NetSec workshop, two days"
+    assert "window_starts_at" not in thawed.data
+
+    already_gone = (_future_monday() - timedelta(weeks=2)).isoformat()
+    stale = client.post(
+        hold_url,
+        {
+            "revision": thawed.data["revision"],
+            "trainer_id": str(create_user.id),
+            "workshop_starts_at": f"{already_gone}T10:30:00+02:00",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert stale.status_code == status.HTTP_400_BAD_REQUEST
+    assert not WorkshopPlanHold.objects.filter(status=WorkshopPlanHold.Status.ACTIVE).exists()
 
 
 @pytest.mark.contract

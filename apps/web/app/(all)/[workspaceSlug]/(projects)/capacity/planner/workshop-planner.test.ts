@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import type { TTrainerCapacity } from "@/services/capacity.service";
 import { dateTimeLabel, findFirstAvailable, findWorkshopCandidates } from "./workshop-planner.utils";
+import { planSignature } from "./workshop-planner";
 
 const trainer = {
   trainer_id: "trainer-1",
@@ -192,5 +193,25 @@ describe("findFirstAvailable", () => {
 
     expect(result.found).toBe(true);
     if (result.found) expect(result.candidate.trainerId).toBe("trainer-2");
+  });
+});
+
+describe("planSignature", () => {
+  const plan = {
+    title: "NetSec workshop",
+    duration_minutes: 240,
+    preparation_minutes: 30,
+    travel_before_minutes: 60,
+    travel_after_minutes: 60,
+    trainer_ids: ["trainer-2", "trainer-1"],
+  };
+
+  it("does not care in which order the eligible trainers were ticked", () => {
+    expect(planSignature(plan)).toBe(planSignature({ ...plan, trainer_ids: ["trainer-1", "trainer-2"] }));
+  });
+
+  it("changes when the plan itself changes", () => {
+    expect(planSignature(plan)).not.toBe(planSignature({ ...plan, duration_minutes: 300 }));
+    expect(planSignature(plan)).not.toBe(planSignature({ ...plan, trainer_ids: ["trainer-1"] }));
   });
 });

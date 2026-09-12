@@ -218,8 +218,6 @@ class WorkshopPlanDraft(BaseModel):
     travel_after_minutes = models.PositiveIntegerField(
         default=0, validators=[MinValueValidator(0), MaxValueValidator(1440)]
     )
-    window_starts_at = models.DateTimeField()
-    window_ends_at = models.DateTimeField()
     trainer_ids = models.JSONField(default=list)
     revision = models.PositiveBigIntegerField(default=1)
 
@@ -227,12 +225,6 @@ class WorkshopPlanDraft(BaseModel):
         db_table = "ext_workshop_plan_drafts"
         ordering = ("-updated_at", "-created_at")
         indexes = [models.Index(fields=["workspace", "owner", "updated_at"], name="ext_plan_draft_owner_idx")]
-        constraints = [
-            models.CheckConstraint(
-                condition=Q(window_ends_at__gt=models.F("window_starts_at")),
-                name="ext_plan_draft_valid_window",
-            )
-        ]
 
 
 class WorkshopPlanHold(BaseModel):
