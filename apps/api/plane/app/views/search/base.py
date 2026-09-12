@@ -182,14 +182,14 @@ class GlobalSearchEndpoint(BaseAPIView):
             )
             .annotate(
                 project_ids=Coalesce(
-                    ArrayAgg("projects__id", distinct=True, filter=~Q(projects__id=True)),
+                    ArrayAgg("projects__id", order_by="projects__id", distinct=True, filter=~Q(projects__id=True)),
                     Value([], output_field=ArrayField(UUIDField())),
                 )
             )
             .annotate(
                 project_identifiers=Coalesce(
                     ArrayAgg(
-                        "projects__identifier",
+                        "projects__identifier", order_by="projects__identifier",
                         distinct=True,
                         filter=~Q(projects__id=True),
                     ),

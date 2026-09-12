@@ -224,7 +224,7 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
             .annotate(
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "issue_cycle__issue__assignees__id",
+                        "issue_cycle__issue__assignees__id", order_by="issue_cycle__issue__assignees__id",
                         distinct=True,
                         filter=~Q(issue_cycle__issue__assignees__id__isnull=True),
                     ),

@@ -61,7 +61,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "labels__id",
+                        "labels__id", order_by="labels__id",
                         distinct=True,
                         filter=Q(~Q(labels__id__isnull=True) & (Q(draft_label_issue__deleted_at__isnull=True))),
                     ),
@@ -69,7 +69,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "assignees__id",
+                        "assignees__id", order_by="assignees__id",
                         distinct=True,
                         filter=Q(
                             ~Q(assignees__id__isnull=True)
@@ -81,7 +81,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
                 ),
                 module_ids=Coalesce(
                     ArrayAgg(
-                        "draft_issue_module__module_id",
+                        "draft_issue_module__module_id", order_by="draft_issue_module__module_id",
                         distinct=True,
                         filter=Q(
                             ~Q(draft_issue_module__module_id__isnull=True)

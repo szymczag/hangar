@@ -245,7 +245,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .annotate(
                 member_ids=Coalesce(
                     ArrayAgg(
-                        "members__id",
+                        "members__id", order_by="members__id",
                         distinct=True,
                         filter=~Q(members__id__isnull=True),
                     ),
