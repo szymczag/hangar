@@ -355,6 +355,7 @@ describe("planSignature", () => {
     travel_before_minutes: 60,
     travel_after_minutes: 60,
     trainer_ids: ["trainer-2", "trainer-1"],
+    issue_id: null,
   };
 
   it("does not care in which order the eligible trainers were ticked", () => {
@@ -364,5 +365,8 @@ describe("planSignature", () => {
   it("changes when the plan itself changes", () => {
     expect(planSignature(plan)).not.toBe(planSignature({ ...plan, duration_minutes: 300 }));
     expect(planSignature(plan)).not.toBe(planSignature({ ...plan, trainer_ids: ["trainer-1"] }));
+    // Attaching the plan to a work item changes what it is a plan for, and the
+    // hold button turns on it, so it has to count as unsaved.
+    expect(planSignature(plan)).not.toBe(planSignature({ ...plan, issue_id: "issue-1" }));
   });
 });

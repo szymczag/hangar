@@ -11,6 +11,7 @@ import pytest
 from cryptography.fernet import Fernet
 from django.apps import apps as django_apps
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -499,6 +500,284 @@ def test_workshop_plan_hold_is_bound_to_availability_not_to_a_planning_window(se
     )
     assert stale.status_code == status.HTTP_400_BAD_REQUEST
     assert not WorkshopPlanHold.objects.filter(status=WorkshopPlanHold.Status.ACTIVE).exists()
+
+
+def _workshop_issue(workspace, owner, *, name="NetSec workshop"):
+    """A Workshop work item in a project the owner is an admin of."""
+    project = Project.objects.create(
+        name=f"Training {name}", identifier=name[:4].upper(), workspace=workspace, created_by=owner
+    )
+    ProjectMember.objects.create(project=project, member=owner, workspace=workspace, role=20)
+    state = State.objects.create(name="Backlog", project=project, workspace=workspace, group="backlog")
+    return Issue.objects.create(
+        name=name,
+        project=project,
+        workspace=workspace,
+        state=state,
+        type=ensure_project_workshop_type(project),
+        created_by=owner,
+    )
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_held_slot_becomes_a_session_on_the_work_item_it_was_planned_for(settings, workspace, create_user):
+    """
+    The step the planner never had.
+
+    A hold used to name a trainer and a time that existed nowhere else: the
+    coordinator retyped both into the work item by hand, and the hold then sat
+    there blocking that trainer until it expired, on top of the session it had
+    just been used to create. Spending the hold is one call, and it leaves the
+    trainer booked exactly once.
+    """
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    issue = _workshop_issue(workspace, create_user)
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+    plans_url = f"/api/workspaces/{workspace.slug}/capacity/plans/"
+    monday = _future_monday().isoformat()
+    payload = {
+        "title": "NetSec workshop",
+        "duration_minutes": 240,
+        "preparation_minutes": 30,
+        "travel_before_minutes": 60,
+        "travel_after_minutes": 60,
+        "trainer_ids": [str(create_user.id)],
+        "issue_id": str(issue.id),
+    }
+
+    draft = client.post(plans_url, payload, format="json", HTTP_X_CSRFTOKEN=csrf).data
+    assert draft["issue"]["id"] == str(issue.id)
+    assert draft["issue"]["name"] == "NetSec workshop"
+
+    held = client.post(
+        f"{plans_url}{draft['id']}/hold/",
+        {
+            "revision": draft["revision"],
+            "trainer_id": str(create_user.id),
+            "workshop_starts_at": f"{monday}T10:30:00+02:00",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert held.status_code == status.HTTP_201_CREATED
+
+    scheduled = client.post(
+        f"{plans_url}{draft['id']}/schedule/",
+        {"revision": held.data["revision"]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert scheduled.status_code == status.HTTP_201_CREATED
+    # Instants, not strings: the hold endpoint echoes back the offset it was
+    # given, while this reads the stored value, which Django hands back in UTC.
+    # They are the same moment, and that is what the assertion is about.
+    assert parse_datetime(scheduled.data["session"]["starts_at"]) == parse_datetime(f"{monday}T10:30:00+02:00")
+    assert parse_datetime(scheduled.data["session"]["ends_at"]) == parse_datetime(f"{monday}T14:30:00+02:00")
+
+    session = WorkshopSession.objects.get(schedule__issue=issue)
+    assert session.preparation_minutes == 30
+    assert session.travel_before_minutes == 60
+    assert session.travel_after_minutes == 60
+    assert list(session.trainers.values_list("id", flat=True)) == [create_user.id]
+    # The work item's own rule is that every session trainer is an assignee, so
+    # scheduling makes that true rather than refusing over it.
+    assert IssueAssignee.objects.filter(issue=issue, assignee=create_user).exists()
+    # Spent, not merely let go -- and no longer subtracted from the trainer's
+    # availability twice over.
+    hold = WorkshopPlanHold.objects.get(draft_id=draft["id"])
+    assert hold.status == WorkshopPlanHold.Status.SCHEDULED
+    assert not WorkshopPlanHold.objects.filter(status=WorkshopPlanHold.Status.ACTIVE).exists()
+    assert CapacityAuditEvent.objects.filter(
+        action=CapacityAuditEvent.Action.PLAN_SCHEDULED, issue_id=issue.id, trainer_id=create_user.id
+    ).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_scheduling_re_checks_availability_and_keeps_the_hold_when_it_refuses(settings, workspace, create_user):
+    """
+    Seventy-two hours is long enough for the answer to change.
+
+    A hold is good for three days, and the workspace does not stand still in
+    between: the same block can be booked directly on another work item. So the
+    conflict check that guarded the hold runs again here -- and a refusal leaves
+    the hold alone, because losing it would cost the coordinator the slot they
+    were still entitled to argue for.
+    """
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    issue = _workshop_issue(workspace, create_user)
+    rival = _workshop_issue(workspace, create_user, name="Rival workshop")
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+    plans_url = f"/api/workspaces/{workspace.slug}/capacity/plans/"
+    monday = _future_monday()
+    draft = client.post(
+        plans_url,
+        {
+            "title": "NetSec workshop",
+            "duration_minutes": 240,
+            "preparation_minutes": 30,
+            "travel_before_minutes": 60,
+            "travel_after_minutes": 60,
+            "trainer_ids": [str(create_user.id)],
+            "issue_id": str(issue.id),
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    ).data
+    held = client.post(
+        f"{plans_url}{draft['id']}/hold/",
+        {
+            "revision": draft["revision"],
+            "trainer_id": str(create_user.id),
+            "workshop_starts_at": f"{monday.isoformat()}T10:30:00+02:00",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert held.status_code == status.HTTP_201_CREATED
+
+    # Somebody books the same trainer over the same block, directly.
+    IssueAssignee.objects.create(issue=rival, assignee=create_user, project=rival.project, workspace=workspace)
+    rival_schedule = WorkshopSchedule.objects.create(
+        issue=rival,
+        starts_at=f"{monday.isoformat()}T11:00:00+02:00",
+        ends_at=f"{monday.isoformat()}T13:00:00+02:00",
+    )
+    rival_session = WorkshopSession.objects.create(
+        schedule=rival_schedule,
+        starts_at=rival_schedule.starts_at,
+        ends_at=rival_schedule.ends_at,
+    )
+    rival_session.trainers.add(create_user)
+
+    refused = client.post(
+        f"{plans_url}{draft['id']}/schedule/",
+        {"revision": held.data["revision"]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert refused.status_code == status.HTTP_409_CONFLICT
+    assert not WorkshopSchedule.objects.filter(issue=issue).exists()
+    hold = WorkshopPlanHold.objects.get(draft_id=draft["id"])
+    assert hold.status == WorkshopPlanHold.Status.ACTIVE
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_the_workshop_picker_only_offers_workshops_the_viewer_is_in_a_project_for(settings, workspace, create_user):
+    """
+    The picker cannot offer what the scheduler would refuse.
+
+    Both questions -- is it a Workshop, and can this person see it -- are
+    answered server-side, so a coordinator is never invited to attach something
+    that comes back 400 or 404 the moment they try to use it.
+    """
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    mine = _workshop_issue(workspace, create_user, name="NetSec workshop")
+    theirs = _workshop_issue(workspace, create_user, name="Hidden workshop")
+    plain_project = Project.objects.create(name="Plain", identifier="PLN", workspace=workspace, created_by=create_user)
+    ProjectMember.objects.create(project=plain_project, member=create_user, workspace=workspace, role=20)
+    plain_state = State.objects.create(name="Backlog", project=plain_project, workspace=workspace, group="backlog")
+    Issue.objects.create(
+        name="NetSec something else",
+        project=plain_project,
+        workspace=workspace,
+        state=plain_state,
+        created_by=create_user,
+    )
+    search_url = f"/api/workspaces/{workspace.slug}/capacity/workshops/"
+
+    client = APIClient()
+    client.force_login(create_user)
+    everything = client.get(search_url)
+
+    assert everything.status_code == status.HTTP_200_OK
+    # The non-Workshop work item is absent even though its name matches below.
+    assert {row["name"] for row in everything.data["results"]} == {"NetSec workshop", "Hidden workshop"}
+    matching = client.get(search_url, {"query": "netsec"})
+    assert [row["name"] for row in matching.data["results"]] == ["NetSec workshop"]
+    assert matching.data["results"][0]["project_identifier"] == mine.project.identifier
+
+    # A workspace member who is in neither project sees neither Workshop.
+    outsider = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=outsider, role=15)
+    outsider_client = APIClient()
+    outsider_client.force_login(outsider)
+    assert outsider_client.get(search_url).data["results"] == []
+    assert theirs.project_id is not None
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_plan_can_only_be_scheduled_onto_a_workshop_it_is_attached_to(settings, workspace, create_user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+    plans_url = f"/api/workspaces/{workspace.slug}/capacity/plans/"
+    base = {
+        "title": "NetSec workshop",
+        "duration_minutes": 240,
+        "preparation_minutes": 30,
+        "travel_before_minutes": 60,
+        "travel_after_minutes": 60,
+        "trainer_ids": [str(create_user.id)],
+    }
+
+    # Exploring without a work item is allowed, and says so rather than 500ing.
+    unattached = client.post(plans_url, base, format="json", HTTP_X_CSRFTOKEN=csrf).data
+    assert unattached["issue"] is None
+    held = client.post(
+        f"{plans_url}{unattached['id']}/hold/",
+        {
+            "revision": unattached["revision"],
+            "trainer_id": str(create_user.id),
+            "workshop_starts_at": f"{_future_monday().isoformat()}T10:30:00+02:00",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    unattached_refusal = client.post(
+        f"{plans_url}{unattached['id']}/schedule/",
+        {"revision": held.data["revision"]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert unattached_refusal.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Attach a Workshop work item" in unattached_refusal.data["error"]
+
+    # A work item that is not a Workshop cannot be planned at all.
+    plain_project = Project.objects.create(name="Plain", identifier="PLN", workspace=workspace, created_by=create_user)
+    ProjectMember.objects.create(project=plain_project, member=create_user, workspace=workspace, role=20)
+    plain_state = State.objects.create(name="Backlog", project=plain_project, workspace=workspace, group="backlog")
+    plain = Issue.objects.create(
+        name="Not a workshop", project=plain_project, workspace=workspace, state=plain_state, created_by=create_user
+    )
+    wrong_type = client.post(plans_url, {**base, "issue_id": str(plain.id)}, format="json", HTTP_X_CSRFTOKEN=csrf)
+    assert wrong_type.status_code == status.HTTP_400_BAD_REQUEST
+
+    # A Workshop in a project the requester is not in is not found, rather than
+    # forbidden -- the alternative confirms that the identifier exists.
+    outsider = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=outsider, role=15)
+    hidden = _workshop_issue(workspace, create_user, name="Hidden workshop")
+    outsider_client = APIClient(enforce_csrf_checks=True)
+    outsider_client.force_login(outsider)
+    outsider_csrf = outsider_client.get("/auth/get-csrf-token/").data["csrf_token"]
+    invisible = outsider_client.post(
+        plans_url, {**base, "issue_id": str(hidden.id)}, format="json", HTTP_X_CSRFTOKEN=outsider_csrf
+    )
+    assert invisible.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.contract

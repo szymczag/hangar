@@ -68,6 +68,8 @@ from plane.ext.views.capacity import (
     WorkshopPlanDraftDetailEndpoint,
     WorkshopPlanDraftListEndpoint,
     WorkshopPlanHoldEndpoint,
+    WorkshopPlanScheduleEndpoint,
+    WorkshopSearchEndpoint,
 )
 
 PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
@@ -94,6 +96,11 @@ urlpatterns = [
     ),
     path("workspaces/<str:slug>/capacity/", WorkspaceCapacityEndpoint.as_view(), name="workspace-capacity"),
     path(
+        "workspaces/<str:slug>/capacity/workshops/",
+        WorkshopSearchEndpoint.as_view(),
+        name="capacity-workshop-search",
+    ),
+    path(
         "workspaces/<str:slug>/capacity/plans/",
         WorkshopPlanDraftListEndpoint.as_view(),
         name="workshop-plan-drafts",
@@ -107,6 +114,11 @@ urlpatterns = [
         "workspaces/<str:slug>/capacity/plans/<uuid:draft_id>/hold/",
         WorkshopPlanHoldEndpoint.as_view(),
         name="workshop-plan-hold",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/plans/<uuid:draft_id>/schedule/",
+        WorkshopPlanScheduleEndpoint.as_view(),
+        name="workshop-plan-schedule",
     ),
     path(
         f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/",

@@ -4,18 +4,20 @@
  */
 
 import { useMemo, useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { CalendarSearch, Clock3, Save, ShieldCheck, Trash2, Users } from "lucide-react";
+import { CalendarCheck, CalendarSearch, Clock3, Save, ShieldCheck, Trash2, Users } from "lucide-react";
 import { errorMessage } from "../shared/capacity-format.utils";
 import {
   CapacityService,
+  type TPlanIssue,
   type TTrainerCapacity,
   type TWorkshopPlanDraft,
   type TWorkshopPlanDraftInput,
   type TWorkshopPlanHold,
 } from "@/services/capacity.service";
+import { WorkshopPicker, workshopLabel } from "./workshop-picker";
 import {
   dateTimeLabel,
   dayLabel,
@@ -97,6 +99,16 @@ export function WorkshopPlanner({
   const [draftId, setDraftId] = useState<string | null>(null);
   const [revision, setRevision] = useState<number | null>(null);
   const [title, setTitle] = useState("");
+  /**
+   * The Workshop work item this plan is for.
+   *
+   * Held alongside `title` rather than instead of it: the title is still what
+   * names a saved draft in the picker above, and an exploratory plan has one
+   * without having a work item. Attaching a work item adopts its name, so the
+   * two do not drift for the common case.
+   */
+  const [issue, setIssue] = useState<TPlanIssue | null>(null);
+  const [scheduling, setScheduling] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(240);
   const [preparationMinutes, setPreparationMinutes] = useState(30);
   const [travelBeforeMinutes, setTravelBeforeMinutes] = useState(60);
@@ -202,6 +214,7 @@ export function WorkshopPlanner({
     travel_before_minutes: travelBeforeMinutes,
     travel_after_minutes: travelAfterMinutes,
     trainer_ids: trainerIds,
+    issue_id: issue?.id ?? null,
   });
   const planNeedsSaving = savedSignature !== planSignature(payload());
 
@@ -209,6 +222,7 @@ export function WorkshopPlanner({
     setDraftId(draft.id);
     setRevision(draft.revision);
     setTitle(draft.title);
+    setIssue(draft.issue);
     setDurationMinutes(draft.duration_minutes);
     setPreparationMinutes(draft.preparation_minutes);
     setTravelBeforeMinutes(draft.travel_before_minutes);
@@ -223,6 +237,7 @@ export function WorkshopPlanner({
         travel_before_minutes: draft.travel_before_minutes,
         travel_after_minutes: draft.travel_after_minutes,
         trainer_ids: draft.trainer_ids.filter((id) => trainers.some((trainer) => trainer.trainer_id === id)),
+        issue_id: draft.issue?.id ?? null,
       })
     );
   };
@@ -231,6 +246,7 @@ export function WorkshopPlanner({
     setDraftId(null);
     setRevision(null);
     setTitle("");
+    setIssue(null);
     setDurationMinutes(240);
     setPreparationMinutes(30);
     setTravelBeforeMinutes(60);
@@ -308,6 +324,43 @@ export function WorkshopPlanner({
     }
   };
 
+  /**
+   * Spend the hold. The server appends the session, assigns the trainer and
+   * marks the hold scheduled in one transaction, so there is nothing to undo
+   * here if it refuses -- and on a refusal the hold is deliberately left alone.
+   */
+  const scheduleHold = async () => {
+    if (!draftId || revision === null || !issue) return;
+    setScheduling(true);
+    try {
+      const result = await capacityService.scheduleWorkshopPlan(workspaceSlug, draftId, revision);
+      setRevision(result.revision);
+      setHold(null);
+      await mutateDrafts();
+      /**
+       * The block just moved from being a hold to being a session, and both are
+       * subtracted from availability -- so the candidate list on screen is stale
+       * in a way that matters: it would still offer the slot that was just
+       * booked. Invalidated by key prefix rather than through `useCapacityData`,
+       * which this component is not the one holding.
+       */
+      await mutate((key) => Array.isArray(key) && typeof key[0] === "string" && key[0].startsWith("capacity"));
+      setToast({
+        type: TOAST_TYPE.SUCCESS,
+        title: "Workshop scheduled",
+        message: `${hold?.trainer_name ?? "The trainer"} is booked on ${workshopLabel(result.issue)}.`,
+      });
+    } catch (error: unknown) {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Not scheduled",
+        message: errorMessage(error, "The hold is untouched. Refresh capacity and try again."),
+      });
+    } finally {
+      setScheduling(false);
+    }
+  };
+
   const releaseHold = async () => {
     if (!draftId) return;
     setSaving(true);
@@ -373,15 +426,26 @@ export function WorkshopPlanner({
 
       <div className="grid gap-0 xl:grid-cols-[380px_1fr]">
         <div className="space-y-5 border-b border-subtle p-5 xl:border-r xl:border-b-0">
+          <WorkshopPicker
+            workspaceSlug={workspaceSlug}
+            value={issue}
+            disabled={isHeld}
+            onChange={(next) => {
+              setIssue(next);
+              // Adopt the work item's name unless the coordinator has already
+              // named the draft something of their own.
+              if (next && (!title.trim() || title === issue?.name)) setTitle(next.name);
+            }}
+          />
           <label className="block text-body-xs-medium text-secondary">
-            What
+            Draft name
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="e.g. NetSec workshop"
               maxLength={255}
               disabled={isHeld}
-              className="mt-1 h-10 w-full rounded-md border border-subtle bg-surface-1 px-3 text-body-sm-regular text-primary disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-1 h-9 w-full rounded-md border border-subtle bg-surface-1 px-3 text-body-sm-regular text-primary disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -488,14 +552,27 @@ export function WorkshopPlanner({
                     {dateTimeLabel(hold.expires_at)}. Internal only; no Google event was created.
                   </p>
                   <p className="mt-1 text-11 text-placeholder">
-                    The plan is frozen while it is held. Release the hold to change the workshop, the buffers or who is
-                    eligible.
+                    {issue
+                      ? `Scheduling books this on ${workshopLabel(issue)} and assigns ${hold.trainer_name}. The plan is frozen until then — release the hold to change it.`
+                      : "This plan is not attached to a Workshop work item, so it cannot be scheduled. Release the hold to attach one."}
                   </p>
                 </div>
               </div>
-              <Button variant="secondary" size="sm" disabled={saving} onClick={releaseHold}>
-                Release hold
-              </Button>
+              <div className="flex shrink-0 gap-2">
+                <Button variant="secondary" size="sm" disabled={saving || scheduling} onClick={releaseHold}>
+                  Release hold
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={scheduling}
+                  disabled={!issue || saving || scheduling}
+                  title={issue ? undefined : "Attach a Workshop work item to schedule this"}
+                  onClick={scheduleHold}
+                >
+                  <CalendarCheck className="size-3.5" /> Schedule workshop
+                </Button>
+              </div>
             </div>
           ) : null}
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">

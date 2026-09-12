@@ -50,6 +50,7 @@ class CapacityAuditEvent(models.Model):
         PLAN_DRAFT_REMOVED = "plan_draft.removed", "Plan draft removed"
         PLAN_HOLD_CREATED = "plan_hold.created", "Plan hold created"
         PLAN_HOLD_RELEASED = "plan_hold.released", "Plan hold released"
+        PLAN_SCHEDULED = "plan.scheduled", "Plan scheduled"
 
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)
@@ -207,6 +208,16 @@ class WorkshopSession(BaseModel):
 class WorkshopPlanDraft(BaseModel):
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workshop_plan_drafts")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="workshop_plan_drafts")
+    # What this plan is for. Nullable because a coordinator can explore before
+    # there is anything to attach the answer to -- but a plan without one cannot
+    # be scheduled, because there is nowhere for the sessions to land.
+    issue = models.ForeignKey(
+        "db.Issue",
+        on_delete=models.CASCADE,
+        related_name="workshop_plan_drafts",
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=255)
     duration_minutes = models.PositiveIntegerField(validators=[MinValueValidator(15), MaxValueValidator(10080)])
     preparation_minutes = models.PositiveIntegerField(
@@ -232,6 +243,10 @@ class WorkshopPlanHold(BaseModel):
         ACTIVE = "active", "Active"
         RELEASED = "released", "Released"
         CONFIRMED = "confirmed", "Confirmed"
+        # Spent rather than let go: the block it reserved is now a real session
+        # on a work item, and the audit trail should not have to guess which of
+        # the two happened.
+        SCHEDULED = "scheduled", "Scheduled"
 
     draft = models.ForeignKey(WorkshopPlanDraft, on_delete=models.CASCADE, related_name="holds")
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workshop_plan_holds")
