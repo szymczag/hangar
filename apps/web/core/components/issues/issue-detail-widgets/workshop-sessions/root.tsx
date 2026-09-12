@@ -77,7 +77,7 @@ export function WorkshopSessionsCollapsible({
    * who reloads a workshop and finds the trainers swapped.
    *
    * Sorted here rather than in the query because that annotation is upstream's
-   * and appears seventeen times across three files; every work item in Plane
+   * and appears seventeen times across three files; every work item upstream
    * inherits the same unordered list. This is the fork's own surface, and by
    * name matches the order the capacity ledger now uses.
    */
