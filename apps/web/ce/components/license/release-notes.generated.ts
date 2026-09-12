@@ -11,10 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.53",
+  version: "0.1.0-rc.54",
   highlights: [
-    "Three advisories are closed, and the instance no longer carries any open dependency alert.",
-    "Work-item arrays no longer depend on the database happening to sort them.",
+    "The workshop planner no longer finds a slot it cannot let you take.",
+    "The planner offers a choice of times, not one.",
+    "A held slot can become a session on the work item it was planned for.",
+    'The "about this build" dialog names the build it is in.',
   ],
   upstream: {
     version: "1.4.0",
