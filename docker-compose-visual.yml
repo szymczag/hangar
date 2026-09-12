@@ -53,7 +53,7 @@ services:
       retries: 20
 
   vr-minio:
-    image: quay.io/minio/minio
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     networks: [vr_env]
     env_file: [./apps/api/.env]
     environment:
