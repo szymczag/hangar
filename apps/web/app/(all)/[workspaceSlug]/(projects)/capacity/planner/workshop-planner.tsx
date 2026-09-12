@@ -25,17 +25,34 @@ import {
 
 const capacityService = new CapacityService();
 
-const planSignature = (plan: TWorkshopPlanDraftInput) =>
+/**
+ * What makes this plan a different plan.
+ *
+ * Deliberately not the week on screen. The window used to be part of a draft,
+ * so stepping to the next week marked the plan unsaved -- which, with a hold
+ * open, meant a save the server refuses and a candidate list that will not let
+ * you act. A plan is what has to happen and who could deliver it; when you are
+ * looking is the planner's `?week=`, not the plan's.
+ */
+export const planSignature = (plan: TWorkshopPlanDraftInput) =>
   JSON.stringify({
     ...plan,
-    window_starts_at: new Date(plan.window_starts_at).toISOString(),
-    window_ends_at: new Date(plan.window_ends_at).toISOString(),
     // ES2022 is the web app's current target; the copied array keeps sort() mutation local.
     // oxlint-disable-next-line unicorn/no-array-sort
     trainer_ids: [...plan.trainer_ids].sort(),
   });
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function NumberField({
+  label,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+}) {
   return (
     <label className="text-body-xs-medium text-secondary">
       {label}
@@ -45,8 +62,9 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
           min={0}
           step={15}
           value={value}
+          disabled={disabled}
           onChange={(event) => onChange(Math.max(0, Number(event.target.value)))}
-          className="h-9 w-full rounded-md border border-subtle bg-surface-1 px-3 pr-11 text-body-sm-regular text-primary"
+          className="h-9 w-full rounded-md border border-subtle bg-surface-1 px-3 pr-11 text-body-sm-regular text-primary disabled:cursor-not-allowed disabled:opacity-60"
         />
         <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-11 text-placeholder">
           min
@@ -154,14 +172,20 @@ export function WorkshopPlanner({
     ]
   );
 
+  /**
+   * A held plan is frozen, because the server freezes it: `PUT /capacity/plans/`
+   * answers 409 while a hold is active, so that the block someone is holding
+   * still means what it said when they took it. The form reflects that rather
+   * than letting you type into fields whose save is guaranteed to be refused.
+   */
+  const isHeld = Boolean(hold);
+
   const payload = (): TWorkshopPlanDraftInput => ({
     title: title.trim(),
     duration_minutes: durationMinutes,
     preparation_minutes: preparationMinutes,
     travel_before_minutes: travelBeforeMinutes,
     travel_after_minutes: travelAfterMinutes,
-    window_starts_at: weekStart.toISOString(),
-    window_ends_at: weekEnd.toISOString(),
     trainer_ids: trainerIds,
   });
   const planNeedsSaving = savedSignature !== planSignature(payload());
@@ -183,8 +207,6 @@ export function WorkshopPlanner({
         preparation_minutes: draft.preparation_minutes,
         travel_before_minutes: draft.travel_before_minutes,
         travel_after_minutes: draft.travel_after_minutes,
-        window_starts_at: draft.window_starts_at,
-        window_ends_at: draft.window_ends_at,
         trainer_ids: draft.trainer_ids.filter((id) => trainers.some((trainer) => trainer.trainer_id === id)),
       })
     );
@@ -218,8 +240,12 @@ export function WorkshopPlanner({
         title: "Planning draft saved",
         message: "You can return to this search later.",
       });
-    } catch {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Draft not saved", message: "Refresh the draft and try again." });
+    } catch (error: unknown) {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Draft not saved",
+        message: errorMessage(error, "Refresh the draft and try again."),
+      });
     } finally {
       setSaving(false);
     }
@@ -302,7 +328,8 @@ export function WorkshopPlanner({
               if (draft) loadDraft(draft);
               else reset();
             }}
-            className="h-8 rounded-md border border-subtle bg-surface-2 px-2 text-body-xs-regular"
+            disabled={isHeld}
+            className="h-8 rounded-md border border-subtle bg-surface-2 px-2 text-body-xs-regular disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">New plan</option>
             {draftPage?.results.map((draft) => (
@@ -315,7 +342,8 @@ export function WorkshopPlanner({
             variant="primary"
             size="sm"
             loading={saving}
-            disabled={!title.trim() || !trainerIds.length}
+            disabled={isHeld || !title.trim() || !trainerIds.length}
+            title={isHeld ? "Release the hold before changing this plan" : undefined}
             onClick={saveDraft}
           >
             <Save className="size-3.5" /> Save draft
@@ -337,14 +365,30 @@ export function WorkshopPlanner({
               onChange={(event) => setTitle(event.target.value)}
               placeholder="e.g. NetSec workshop"
               maxLength={255}
-              className="mt-1 h-10 w-full rounded-md border border-subtle bg-surface-1 px-3 text-body-sm-regular text-primary"
+              disabled={isHeld}
+              className="mt-1 h-10 w-full rounded-md border border-subtle bg-surface-1 px-3 text-body-sm-regular text-primary disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <NumberField label="Delivery" value={durationMinutes} onChange={setDurationMinutes} />
-            <NumberField label="Preparation" value={preparationMinutes} onChange={setPreparationMinutes} />
-            <NumberField label="Travel before" value={travelBeforeMinutes} onChange={setTravelBeforeMinutes} />
-            <NumberField label="Travel back" value={travelAfterMinutes} onChange={setTravelAfterMinutes} />
+            <NumberField label="Delivery" value={durationMinutes} onChange={setDurationMinutes} disabled={isHeld} />
+            <NumberField
+              label="Preparation"
+              value={preparationMinutes}
+              onChange={setPreparationMinutes}
+              disabled={isHeld}
+            />
+            <NumberField
+              label="Travel before"
+              value={travelBeforeMinutes}
+              onChange={setTravelBeforeMinutes}
+              disabled={isHeld}
+            />
+            <NumberField
+              label="Travel back"
+              value={travelAfterMinutes}
+              onChange={setTravelAfterMinutes}
+              disabled={isHeld}
+            />
           </div>
           <fieldset>
             <legend className="flex items-center gap-2 text-body-xs-medium text-secondary">
@@ -354,11 +398,14 @@ export function WorkshopPlanner({
               {trainers.map((trainer) => (
                 <label
                   key={trainer.trainer_id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-body-xs-regular hover:bg-surface-2"
+                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-body-xs-regular ${
+                    isHeld ? "opacity-60" : "cursor-pointer hover:bg-surface-2"
+                  }`}
                 >
                   <input
                     type="checkbox"
                     checked={trainerIds.includes(trainer.trainer_id)}
+                    disabled={isHeld}
                     onChange={() =>
                       setTrainerIds((current) =>
                         current.includes(trainer.trainer_id)
@@ -400,6 +447,10 @@ export function WorkshopPlanner({
                     {dateTimeLabel(hold.workshop_starts_at)} –{" "}
                     {new Date(hold.workshop_ends_at).toLocaleTimeString(undefined, { timeStyle: "short" })}. Expires{" "}
                     {dateTimeLabel(hold.expires_at)}. Internal only; no Google event was created.
+                  </p>
+                  <p className="mt-1 text-11 text-placeholder">
+                    The plan is frozen while it is held. Release the hold to change the workshop, the buffers or who is
+                    eligible.
                   </p>
                 </div>
               </div>

@@ -556,8 +556,6 @@ def _draft_payload(draft):
         "preparation_minutes": draft.preparation_minutes,
         "travel_before_minutes": draft.travel_before_minutes,
         "travel_after_minutes": draft.travel_after_minutes,
-        "window_starts_at": draft.window_starts_at.isoformat(),
-        "window_ends_at": draft.window_ends_at.isoformat(),
         "trainer_ids": draft.trainer_ids,
         "revision": draft.revision,
         "updated_at": draft.updated_at.isoformat(),
@@ -597,17 +595,6 @@ def _validate_draft(request, workspace):
         if not minimum <= value <= maximum:
             return None, Response({"error": f"{field} must be between {minimum} and {maximum}."}, status=400)
         values[field] = value
-    window_start = parse_datetime(request.data.get("window_starts_at", ""))
-    window_end = parse_datetime(request.data.get("window_ends_at", ""))
-    if (
-        not window_start
-        or not window_end
-        or timezone.is_naive(window_start)
-        or timezone.is_naive(window_end)
-        or window_start >= window_end
-        or window_end - window_start > timedelta(days=14)
-    ):
-        return None, Response({"error": "A valid planning window of at most 14 days is required."}, status=400)
     raw_trainer_ids = request.data.get("trainer_ids")
     if not isinstance(raw_trainer_ids, list) or not 1 <= len(raw_trainer_ids) <= 25:
         return None, Response({"error": "Select between 1 and 25 trainers."}, status=400)
@@ -622,7 +609,7 @@ def _validate_draft(request, workspace):
     )
     if active_ids != {UUID(value) for value in trainer_ids}:
         return None, Response({"error": "Every selected trainer must be active in this workspace."}, status=400)
-    values.update({"window_starts_at": window_start, "window_ends_at": window_end, "trainer_ids": trainer_ids})
+    values["trainer_ids"] = trainer_ids
     return values, None
 
 
@@ -751,8 +738,15 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
         workshop_end = workshop_start + timedelta(minutes=draft.duration_minutes)
         blocked_start = workshop_start - timedelta(minutes=draft.preparation_minutes + draft.travel_before_minutes)
         blocked_end = workshop_end + timedelta(minutes=draft.travel_after_minutes)
-        if blocked_start < draft.window_starts_at or blocked_end > draft.window_ends_at:
-            return Response({"error": "The complete trainer block must fit in the planning window."}, status=400)
+        # The block is checked against the trainer's real availability below, not
+        # against a saved window: a plan is the same plan whichever week you view
+        # it in. All that is required of the block itself is that it has not
+        # already happened -- holding a trainer for last Tuesday reserves nothing.
+        # One `now` for this and for every conflict query, so they cannot disagree
+        # about where the present is.
+        now = timezone.now()
+        if blocked_start < now:
+            return Response({"error": "The trainer block has already started."}, status=400)
 
         trainer = get_object_or_404(
             TrainerProfile.objects.select_for_update().select_related("user"),
@@ -760,7 +754,6 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
             user_id=trainer_id,
             status=TrainerProfile.Status.ACTIVE,
         )
-        now = timezone.now()
         WorkshopPlanHold.objects.filter(
             workspace=draft.workspace,
             status=WorkshopPlanHold.Status.ACTIVE,

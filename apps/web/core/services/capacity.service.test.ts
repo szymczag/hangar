@@ -150,8 +150,6 @@ describe("CapacityService CSRF requests", () => {
       preparation_minutes: 30,
       travel_before_minutes: 60,
       travel_after_minutes: 60,
-      window_starts_at: "2026-09-07T00:00:00.000Z",
-      window_ends_at: "2026-09-14T00:00:00.000Z",
       trainer_ids: ["trainer-id"],
     };
     const put = vi
