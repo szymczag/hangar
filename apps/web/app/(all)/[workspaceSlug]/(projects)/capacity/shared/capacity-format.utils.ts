@@ -31,6 +31,40 @@ export function shiftWeek(value: Date, weeks: number) {
   return result;
 }
 
+/**
+ * The `?week=` parameter, as a local calendar date.
+ *
+ * Deliberately not `toISOString()`. `startOfWeek` returns local midnight on a
+ * Monday; converting that to UTC moves it to the Sunday for every timezone east
+ * of Greenwich, so the URL would name the wrong day and reading it back would
+ * walk the week backwards one reload at a time.
+ */
+export function formatWeekParam(value: Date) {
+  const month = `${value.getMonth() + 1}`.padStart(2, "0");
+  const day = `${value.getDate()}`.padStart(2, "0");
+  return `${value.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Read a `?week=` value, falling back to the week containing `fallback`.
+ *
+ * Anything unparseable gives the fallback rather than an `Invalid Date`, which
+ * would otherwise reach the SWR key and the request as `NaN`. The result is
+ * snapped to the start of its week, so a URL naming any day inside a week
+ * composes the same cache key as one naming the Monday -- without that, two
+ * links to the same week would each pay for their own request.
+ */
+export function parseWeekParam(value: string | null | undefined, fallback: Date) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
+  if (!match) return startOfWeek(fallback);
+  const [, year, month, day] = match;
+  const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+  if (Number.isNaN(parsed.getTime())) return startOfWeek(fallback);
+  // `new Date(2026, 12, 40)` rolls over silently; reject what did not round-trip.
+  if (parsed.getMonth() !== Number(month) - 1 || parsed.getDate() !== Number(day)) return startOfWeek(fallback);
+  return startOfWeek(parsed);
+}
+
 export function formatMinutes(value: number) {
   const hours = Math.floor(value / 60);
   const minutes = value % 60;
