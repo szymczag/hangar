@@ -243,7 +243,7 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
             })}
           </div>
           <div className="hidden overflow-x-auto lg:block">
-            <div className="min-w-[1180px]">
+            <div className="min-w-[1120px]">
               {capacityError ? (
                 <div
                   role="status"
