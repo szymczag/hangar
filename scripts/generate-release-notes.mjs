@@ -102,7 +102,26 @@ function literal(value, indent = "") {
     if (entries.length === 0) return "{}";
     return `{\n${entries.map(([key, item]) => `${inner}${key}: ${literal(item, inner)},\n`).join("")}${indent}}`;
   }
+  if (typeof value === "string") return stringLiteral(value);
   return JSON.stringify(value);
+}
+
+/**
+ * A string quoted the way oxfmt would quote it.
+ *
+ * `JSON.stringify` always double-quotes and escapes any double quote inside.
+ * oxfmt picks whichever quote needs fewer escapes, so a headline that quotes
+ * something -- `The "about this build" dialog ...` -- comes back single-quoted,
+ * and the committed file then disagrees with `--check` permanently. Building on
+ * `JSON.stringify` keeps its handling of backslashes and control characters and
+ * only re-quotes when oxfmt would.
+ */
+function stringLiteral(value) {
+  const json = JSON.stringify(value);
+  const doubles = (value.match(/"/g) ?? []).length;
+  const singles = (value.match(/'/g) ?? []).length;
+  if (doubles <= singles) return json;
+  return `'${json.slice(1, -1).replace(/\\"/g, '"').replace(/'/g, "\\'")}'`;
 }
 
 function render(payload) {
