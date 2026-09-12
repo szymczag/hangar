@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 import hashlib
 import logging
 import secrets
@@ -16,6 +17,7 @@ import base64 as cursor_base64
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -27,7 +29,9 @@ from rest_framework.response import Response
 from plane.app.views.base import BaseAPIView
 from plane.authentication.session import CsrfEnforcedSessionAuthentication
 from plane.authentication.utils.oauth_transaction import consume_oauth_transaction, start_oauth_transaction
-from plane.db.models import Issue, IssueType, Workspace, WorkspaceMember
+from plane.bgtasks.issue_activities_task import issue_activity
+from plane.db.models import Issue, IssueAssignee, IssueType, ProjectMember, Workspace, WorkspaceMember
+from plane.utils.host import base_host
 from plane.ext.capacity import (
     GoogleCalendarClient,
     GoogleCalendarError,
@@ -544,6 +548,17 @@ class WorkspaceCapacityEndpoint(BaseAPIView):
         )
 
 
+def _issue_payload(issue):
+    """Enough to name a work item in a picker and link to it."""
+    return {
+        "id": str(issue.id),
+        "name": issue.name,
+        "sequence_id": issue.sequence_id,
+        "project_id": str(issue.project_id),
+        "project_identifier": issue.project.identifier,
+    }
+
+
 def _draft_payload(draft):
     now = timezone.now()
     hold = (
@@ -557,6 +572,7 @@ def _draft_payload(draft):
         "travel_before_minutes": draft.travel_before_minutes,
         "travel_after_minutes": draft.travel_after_minutes,
         "trainer_ids": draft.trainer_ids,
+        "issue": _issue_payload(draft.issue) if draft.issue_id else None,
         "revision": draft.revision,
         "updated_at": draft.updated_at.isoformat(),
         "hold": _hold_payload(hold) if hold else None,
@@ -610,6 +626,29 @@ def _validate_draft(request, workspace):
     if active_ids != {UUID(value) for value in trainer_ids}:
         return None, Response({"error": "Every selected trainer must be active in this workspace."}, status=400)
     values["trainer_ids"] = trainer_ids
+
+    # The work item the plan is for. Absent and null are both "not attached yet",
+    # which is a legitimate state -- a coordinator may be answering "could we fit
+    # this at all?" before anyone has raised a Workshop for it.
+    raw_issue_id = request.data.get("issue_id")
+    if raw_issue_id in (None, ""):
+        values["issue"] = None
+        return values, None
+    try:
+        issue_id = UUID(str(raw_issue_id))
+    except (TypeError, ValueError, AttributeError):
+        return None, Response({"error": "issue_id must be a valid identifier."}, status=400)
+    issue = Issue.objects.filter(workspace=workspace, pk=issue_id).select_related("type", "project").first()
+    # Not found rather than forbidden for a work item in a project the requester
+    # is not in: the alternative confirms that a given identifier exists.
+    if (
+        issue is None
+        or not ProjectMember.objects.filter(project_id=issue.project_id, member=request.user, is_active=True).exists()
+    ):
+        return None, Response({"error": "No such Workshop work item in this workspace."}, status=404)
+    if not issue.type_id or issue.type.system_key != IssueType.SystemKey.WORKSHOP:
+        return None, Response({"error": "Only Workshop work items can be planned."}, status=400)
+    values["issue"] = issue
     return values, None
 
 
@@ -620,7 +659,9 @@ class WorkshopPlanDraftListEndpoint(BaseAPIView):
     def get(self, request, slug):
         if response := _disabled():
             return response
-        drafts = WorkshopPlanDraft.objects.filter(workspace__slug=slug, owner=request.user)[:50]
+        drafts = WorkshopPlanDraft.objects.filter(workspace__slug=slug, owner=request.user).select_related(
+            "issue__project"
+        )[:50]
         return Response({"results": [_draft_payload(draft) for draft in drafts]})
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
@@ -702,6 +743,42 @@ class WorkshopPlanDraftDetailEndpoint(BaseAPIView):
         return Response(status=204)
 
 
+def _blocks_conflict(*, workspace, trainer, blocked_start, blocked_end, now, excluding_draft=None, excluding_hold=None):
+    """
+    Whether this trainer's complete block collides with anything already taken.
+
+    Asked twice in the life of a plan and it must give the same answer both
+    times: once when a hold is taken, and again up to seventy-two hours later
+    when that hold becomes a session. Availability moves in between -- another
+    coordinator holds the same afternoon, a workshop is scheduled directly on a
+    work item -- so scheduling cannot assume the hold is still honest.
+
+    `excluding_draft` skips the plan's own holds when taking a new one;
+    `excluding_hold` skips the single hold being spent.
+    """
+    holds = WorkshopPlanHold.objects.filter(
+        workspace=workspace,
+        trainer_id=trainer.user_id,
+        status=WorkshopPlanHold.Status.ACTIVE,
+        expires_at__gt=now,
+        blocked_starts_at__lt=blocked_end,
+        blocked_ends_at__gt=blocked_start,
+    )
+    if excluding_draft is not None:
+        holds = holds.exclude(draft=excluding_draft)
+    if excluding_hold is not None:
+        holds = holds.exclude(pk=excluding_hold.pk)
+    if holds.exists():
+        return True
+
+    sessions = WorkshopSession.objects.filter(schedule__workspace=workspace, trainers=trainer.user).distinct()
+    return any(
+        session.starts_at - timedelta(minutes=session.preparation_minutes + session.travel_before_minutes) < blocked_end
+        and session.ends_at + timedelta(minutes=session.travel_after_minutes) > blocked_start
+        for session in sessions
+    )
+
+
 class WorkshopPlanHoldEndpoint(BaseAPIView):
     authentication_classes = [CsrfEnforcedSessionAuthentication]
 
@@ -759,28 +836,14 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
             status=WorkshopPlanHold.Status.ACTIVE,
             expires_at__lte=now,
         ).update(status=WorkshopPlanHold.Status.RELEASED, updated_by=request.user)
-        conflict = (
-            WorkshopPlanHold.objects.filter(
-                workspace=draft.workspace,
-                trainer_id=trainer_id,
-                status=WorkshopPlanHold.Status.ACTIVE,
-                expires_at__gt=now,
-                blocked_starts_at__lt=blocked_end,
-                blocked_ends_at__gt=blocked_start,
-            )
-            .exclude(draft=draft)
-            .exists()
+        conflict = _blocks_conflict(
+            workspace=draft.workspace,
+            trainer=trainer,
+            blocked_start=blocked_start,
+            blocked_end=blocked_end,
+            now=now,
+            excluding_draft=draft,
         )
-        if not conflict:
-            sessions = WorkshopSession.objects.filter(
-                schedule__workspace=draft.workspace, trainers=trainer.user
-            ).distinct()
-            conflict = any(
-                session.starts_at - timedelta(minutes=session.preparation_minutes + session.travel_before_minutes)
-                < blocked_end
-                and session.ends_at + timedelta(minutes=session.travel_after_minutes) > blocked_start
-                for session in sessions
-            )
         if conflict:
             return Response(
                 {"error": "This trainer is no longer available for the complete block."},
@@ -838,6 +901,177 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
             metadata={"draft_id": str(draft.id), "hold_id": str(hold.id)},
         )
         return Response({"revision": draft.revision})
+
+
+class WorkshopPlanScheduleEndpoint(BaseAPIView):
+    """
+    Spend a hold: turn it into a real session on the work item it was for.
+
+    This is the step the planner never had. A hold named a trainer and a block
+    that existed nowhere else, so the only way to act on it was to retype both
+    into the work item by hand -- after which the hold stayed put, quietly
+    blocking that trainer until it expired, on top of the session just created.
+
+    Everything happens in one transaction, and the conflict check that guarded
+    the hold is run again here rather than trusted: up to seventy-two hours pass
+    between taking a hold and spending it, and the workspace does not stand
+    still. A refusal leaves the hold intact, so the coordinator can pick another
+    slot rather than losing the one they had.
+    """
+
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
+    def post(self, request, slug, draft_id):
+        if response := _disabled():
+            return response
+        draft = get_object_or_404(
+            # `of=("self",)` because `issue` is nullable: select_related makes it a
+            # LEFT JOIN, and PostgreSQL refuses FOR UPDATE on the nullable side of
+            # one. The draft row is the only thing that needs locking anyway.
+            WorkshopPlanDraft.objects.select_for_update(of=("self",)).select_related("issue__project", "issue__type"),
+            workspace__slug=slug,
+            owner=request.user,
+            pk=draft_id,
+        )
+        try:
+            revision = int(request.data.get("revision"))
+        except (TypeError, ValueError):
+            return Response({"error": "revision is required."}, status=400)
+        if revision != draft.revision:
+            return Response(
+                {"error": "Draft changed after you opened it.", "revision": draft.revision},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        issue = draft.issue
+        if issue is None:
+            return Response({"error": "Attach a Workshop work item to this plan before scheduling it."}, status=400)
+        # Re-checked rather than trusted from when the draft was saved: a work
+        # item can change type, and the requester can lose the project.
+        if not issue.type_id or issue.type.system_key != IssueType.SystemKey.WORKSHOP:
+            return Response({"error": "Only Workshop work items can be scheduled."}, status=400)
+        if not ProjectMember.objects.filter(project_id=issue.project_id, member=request.user, is_active=True).exists():
+            return Response({"error": "No such Workshop work item in this workspace."}, status=404)
+
+        now = timezone.now()
+        hold = draft.holds.filter(status=WorkshopPlanHold.Status.ACTIVE, expires_at__gt=now).first()
+        if hold is None:
+            return Response({"error": "Hold a slot before scheduling it."}, status=400)
+
+        trainer = (
+            TrainerProfile.objects.select_for_update()
+            .select_related("user")
+            .filter(workspace=draft.workspace, user_id=hold.trainer_id, status=TrainerProfile.Status.ACTIVE)
+            .first()
+        )
+        if trainer is None:
+            return Response({"error": "The held trainer is no longer active in this workspace."}, status=409)
+
+        if _blocks_conflict(
+            workspace=draft.workspace,
+            trainer=trainer,
+            blocked_start=hold.blocked_starts_at,
+            blocked_end=hold.blocked_ends_at,
+            now=now,
+            excluding_hold=hold,
+        ):
+            return Response(
+                {"error": "That block is no longer free. The hold is untouched; pick another slot."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        schedule, created = WorkshopSchedule.objects.get_or_create(
+            issue=issue,
+            defaults={
+                "starts_at": hold.workshop_starts_at,
+                "ends_at": hold.workshop_ends_at,
+                "preparation_minutes": draft.preparation_minutes,
+                "travel_before_minutes": draft.travel_before_minutes,
+                "travel_after_minutes": draft.travel_after_minutes,
+            },
+        )
+        # Appended rather than replacing: a workshop runs over several sessions,
+        # and each is planned on its own. Appending also leaves the schedule's
+        # own mirror of position 0 alone, which is what `_payload` reads when a
+        # schedule predates multi-session support.
+        existing = list(schedule.sessions.values_list("position", flat=True))
+        if len(existing) >= 50:
+            return Response({"error": "A Workshop may not have more than 50 sessions."}, status=400)
+        session = WorkshopSession.objects.create(
+            schedule=schedule,
+            position=max(existing) + 1 if existing else 0,
+            starts_at=hold.workshop_starts_at,
+            ends_at=hold.workshop_ends_at,
+            preparation_minutes=draft.preparation_minutes,
+            travel_before_minutes=draft.travel_before_minutes,
+            travel_after_minutes=draft.travel_after_minutes,
+        )
+        session.trainers.add(trainer.user_id)
+
+        # The work item's own rule is that every session trainer is an assignee,
+        # so scheduling makes that true rather than refusing over it -- and says
+        # so in the work item's history, where an assignment that appeared from
+        # nowhere would otherwise be a small mystery.
+        assignees = list(issue.issue_assignee.values_list("assignee_id", flat=True))
+        if trainer.user_id not in assignees:
+            IssueAssignee.objects.create(
+                issue=issue,
+                assignee_id=trainer.user_id,
+                project_id=issue.project_id,
+                workspace_id=issue.workspace_id,
+                created_by=request.user,
+                updated_by=request.user,
+            )
+            issue_activity.delay(
+                type="issue.activity.updated",
+                requested_data=json.dumps(
+                    {"assignee_ids": [str(value) for value in [*assignees, trainer.user_id]]}, cls=DjangoJSONEncoder
+                ),
+                current_instance=json.dumps(
+                    {"assignee_ids": [str(value) for value in assignees]}, cls=DjangoJSONEncoder
+                ),
+                issue_id=str(issue.id),
+                actor_id=str(request.user.id),
+                project_id=str(issue.project_id),
+                epoch=int(now.timestamp()),
+                notification=True,
+                origin=base_host(request=request, is_app=True),
+            )
+
+        hold.status = WorkshopPlanHold.Status.SCHEDULED
+        hold.updated_by = request.user
+        hold.save(update_fields=["status", "updated_by", "updated_at"])
+        draft.revision += 1
+        draft.updated_by = request.user
+        draft.save(update_fields=["revision", "updated_by", "updated_at"])
+        _audit(
+            request,
+            workspace_id=draft.workspace_id,
+            trainer_id=trainer.user_id,
+            issue_id=issue.id,
+            action=CapacityAuditEvent.Action.PLAN_SCHEDULED,
+            metadata={
+                "draft_id": str(draft.id),
+                "hold_id": str(hold.id),
+                "session_id": str(session.id),
+                "schedule_created": created,
+            },
+        )
+        return Response(
+            {
+                "revision": draft.revision,
+                "issue": _issue_payload(issue),
+                "session": {
+                    "id": str(session.id),
+                    "starts_at": session.starts_at.isoformat(),
+                    "ends_at": session.ends_at.isoformat(),
+                    "trainer_ids": [str(trainer.user_id)],
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class WorkshopScheduleEndpoint(BaseAPIView):
