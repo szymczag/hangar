@@ -31,8 +31,20 @@ resolves to the same image the previous floating reference did -- the pull is
 fixed without the image underneath anyone changing. An existing deployment whose
 image is already pulled keeps running; the break appears on a fresh pull.
 
-This release adds no migrations, changes no API contract, and touches no chart
-resources, Secrets, storage, RBAC, NetworkPolicies, public routes or
+**A workshop plan no longer stores the week it was planned in.** Migration
+`ext.0025` drops `window_starts_at` and `window_ends_at` from
+`ext_workshop_plan_drafts`, with the check constraint over them. Those columns
+recorded the fortnight a coordinator happened to be viewing when they saved a
+plan, and a hold had to fall inside them -- so stepping the week marked the plan
+unsaved, and a held plan may not be saved at all, which left a slot found
+further out visible but impossible to take. `POST` and `PUT` on
+`/api/workspaces/<slug>/capacity/plans/` no longer require or return the two
+fields, and a client that still sends them is unaffected: they are ignored
+rather than rejected. Holds keep every conflict check they had, and gain one --
+a block that has already started is refused.
+
+Beyond that migration this release changes no other API contract, and touches no
+chart resources, Secrets, storage, RBAC, NetworkPolicies, public routes or
 configuration values.
 
 The capacity pages keep their addresses. `/capacity/team` and `/capacity/planner`
@@ -44,8 +56,15 @@ opens on the current week, so existing bookmarks resolve exactly as before.
 Rolling back to `rc.51` restores the `minio/minio` reference that can no longer
 be pulled, so a rollback that is followed by a fresh image pull will fail to
 start object storage. A rollback on a host that already holds the image is
-unaffected. Nothing here writes schema, so rolling back is otherwise a matter of
-returning the images to `rc.51`.
+unaffected.
+
+Rolling back is otherwise a matter of returning the images to `rc.51`, and
+`ext.0025` reverses cleanly with saved plans in the table: the columns come back,
+and each draft is given the fortnight beginning when it was created, because the
+window it originally carried was deliberately discarded and cannot be recovered.
+A plan saved long enough ago therefore reopens on `rc.51` showing a window in the
+past, which that version already handles -- the coordinator steps to the week
+they want and saves.
 
 Two limitations recorded against `rc.51` are resolved. The team ledger no longer
 overflows its container at 1440 wide, and week selection now carries between

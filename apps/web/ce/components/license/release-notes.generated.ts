@@ -11,12 +11,10 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.51",
+  version: "0.1.0-rc.53",
   highlights: [
-    "Workshop sessions are editable again, and in every view of a work item.",
-    "Capacity is three pages instead of one.",
-    "Editing another trainer's schedule is an administrator's action, and now looks like one.",
-    "The planner can look past the week on screen.",
+    "Three advisories are closed, and the instance no longer carries any open dependency alert.",
+    "Work-item arrays no longer depend on the database happening to sort them.",
   ],
   upstream: {
     version: "1.4.0",
