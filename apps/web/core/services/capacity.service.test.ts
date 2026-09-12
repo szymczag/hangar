@@ -151,6 +151,7 @@ describe("CapacityService CSRF requests", () => {
       travel_before_minutes: 60,
       travel_after_minutes: 60,
       trainer_ids: ["trainer-id"],
+      issue_id: null,
     };
     const put = vi
       .spyOn(service, "put")
@@ -163,6 +164,34 @@ describe("CapacityService CSRF requests", () => {
       { ...payload, revision: 3 },
       csrfHeaders
     );
+  });
+
+  it("spends a hold by scheduling it, pinned to the revision it was read at", async () => {
+    const post = vi
+      .spyOn(service, "post")
+      .mockResolvedValue({ data: { revision: 4, issue: {}, session: {} } } as never);
+
+    await service.scheduleWorkshopPlan("workspace", "draft-id", 3);
+
+    // The revision is the whole optimistic-concurrency story: scheduling a plan
+    // that moved under you would book a block nobody chose.
+    expect(post).toHaveBeenCalledWith(
+      "/api/workspaces/workspace/capacity/plans/draft-id/schedule/",
+      { revision: 3 },
+      csrfHeaders
+    );
+  });
+
+  it("searches Workshop work items through the capacity endpoint, not the generic one", async () => {
+    const get = vi.spyOn(service, "get").mockResolvedValue({ data: { results: [] } } as never);
+
+    await service.searchWorkshops("workspace", "netsec");
+
+    // Deliberately not /entity-search/: only Workshop work items in projects the
+    // viewer is a member of can be planned, and that filter lives server-side.
+    expect(get).toHaveBeenCalledWith("/api/workspaces/workspace/capacity/workshops/", {
+      params: { query: "netsec" },
+    });
   });
 
   it("creates and releases a workshop hold with CSRF", async () => {

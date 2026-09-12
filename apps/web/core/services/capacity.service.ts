@@ -82,6 +82,14 @@ export type TWorkshopSchedule = {
 export type TWorkshopScheduleInput = {
   sessions: Array<Omit<TWorkshopSession, "id">>;
 };
+/** The Workshop work item a plan is for, as much of it as a picker needs. */
+export type TPlanIssue = {
+  id: string;
+  name: string;
+  sequence_id: number;
+  project_id: string;
+  project_identifier: string;
+};
 export type TWorkshopPlanDraftInput = {
   title: string;
   duration_minutes: number;
@@ -89,12 +97,20 @@ export type TWorkshopPlanDraftInput = {
   travel_before_minutes: number;
   travel_after_minutes: number;
   trainer_ids: string[];
+  /** Null while the plan is still exploratory; such a plan cannot be scheduled. */
+  issue_id: string | null;
 };
 export type TWorkshopPlanDraft = TWorkshopPlanDraftInput & {
   id: string;
   revision: number;
   updated_at: string;
   hold: TWorkshopPlanHold | null;
+  issue: TPlanIssue | null;
+};
+export type TScheduledPlan = {
+  revision: number;
+  issue: TPlanIssue;
+  session: { id: string; starts_at: string; ends_at: string; trainer_ids: string[] };
 };
 export type TWorkshopPlanHold = {
   id: string;
@@ -240,6 +256,13 @@ export class CapacityService extends APIService {
       });
   }
 
+  /** Workshop work items the viewer can plan, for the planner's picker. */
+  searchWorkshops(workspaceSlug: string, query: string) {
+    return this.data<{ results: TPlanIssue[] }>(
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/workshops/`, { params: { query } })
+    );
+  }
+
   listWorkshopPlanDrafts(workspaceSlug: string) {
     return this.data<{ results: TWorkshopPlanDraft[] }>(this.get(`/api/workspaces/${workspaceSlug}/capacity/plans/`));
   }
@@ -290,6 +313,18 @@ export class CapacityService extends APIService {
       this.post(
         `/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/hold/`,
         { revision, trainer_id: trainerId, workshop_starts_at: workshopStartsAt },
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
+    );
+  }
+
+  /** Spend the hold: it becomes a session on the work item the plan is for. */
+  async scheduleWorkshopPlan(workspaceSlug: string, draftId: string, revision: number) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TScheduledPlan>(
+      this.post(
+        `/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/schedule/`,
+        { revision },
         { headers: { "X-CSRFTOKEN": csrfToken } }
       )
     );

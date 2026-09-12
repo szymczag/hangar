@@ -673,6 +673,51 @@ def test_scheduling_re_checks_availability_and_keeps_the_hold_when_it_refuses(se
 
 @pytest.mark.contract
 @pytest.mark.django_db
+def test_the_workshop_picker_only_offers_workshops_the_viewer_is_in_a_project_for(settings, workspace, create_user):
+    """
+    The picker cannot offer what the scheduler would refuse.
+
+    Both questions -- is it a Workshop, and can this person see it -- are
+    answered server-side, so a coordinator is never invited to attach something
+    that comes back 400 or 404 the moment they try to use it.
+    """
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    mine = _workshop_issue(workspace, create_user, name="NetSec workshop")
+    theirs = _workshop_issue(workspace, create_user, name="Hidden workshop")
+    plain_project = Project.objects.create(name="Plain", identifier="PLN", workspace=workspace, created_by=create_user)
+    ProjectMember.objects.create(project=plain_project, member=create_user, workspace=workspace, role=20)
+    plain_state = State.objects.create(name="Backlog", project=plain_project, workspace=workspace, group="backlog")
+    Issue.objects.create(
+        name="NetSec something else",
+        project=plain_project,
+        workspace=workspace,
+        state=plain_state,
+        created_by=create_user,
+    )
+    search_url = f"/api/workspaces/{workspace.slug}/capacity/workshops/"
+
+    client = APIClient()
+    client.force_login(create_user)
+    everything = client.get(search_url)
+
+    assert everything.status_code == status.HTTP_200_OK
+    # The non-Workshop work item is absent even though its name matches below.
+    assert {row["name"] for row in everything.data["results"]} == {"NetSec workshop", "Hidden workshop"}
+    matching = client.get(search_url, {"query": "netsec"})
+    assert [row["name"] for row in matching.data["results"]] == ["NetSec workshop"]
+    assert matching.data["results"][0]["project_identifier"] == mine.project.identifier
+
+    # A workspace member who is in neither project sees neither Workshop.
+    outsider = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=outsider, role=15)
+    outsider_client = APIClient()
+    outsider_client.force_login(outsider)
+    assert outsider_client.get(search_url).data["results"] == []
+    assert theirs.project_id is not None
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
 def test_a_plan_can_only_be_scheduled_onto_a_workshop_it_is_attached_to(settings, workspace, create_user):
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
     TrainerProfile.objects.create(workspace=workspace, user=create_user)

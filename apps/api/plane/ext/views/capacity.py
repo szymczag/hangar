@@ -903,6 +903,35 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
         return Response({"revision": draft.revision})
 
 
+class WorkshopSearchEndpoint(BaseAPIView):
+    """
+    Workshop work items the requester can actually plan, for the planner's picker.
+
+    Deliberately server-side rather than filtering the generic entity search in
+    the browser. "Only a Workshop work item can be planned" is a rule the
+    scheduling endpoint enforces, and a picker that offered anything else would
+    be inviting a refusal; project visibility is the same story. Doing both here
+    keeps one answer to both questions.
+    """
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def get(self, request, slug):
+        if response := _disabled():
+            return response
+        query = (request.GET.get("query") or "").strip()
+        visible_projects = ProjectMember.objects.filter(member=request.user, is_active=True).values_list(
+            "project_id", flat=True
+        )
+        issues = Issue.objects.filter(
+            workspace__slug=slug,
+            project_id__in=visible_projects,
+            type__system_key=IssueType.SystemKey.WORKSHOP,
+        ).select_related("project")
+        if query:
+            issues = issues.filter(name__icontains=query)
+        return Response({"results": [_issue_payload(issue) for issue in issues.order_by("-created_at")[:20]]})
+
+
 class WorkshopPlanScheduleEndpoint(BaseAPIView):
     """
     Spend a hold: turn it into a real session on the work item it was for.
