@@ -5,7 +5,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { CalendarClock, ChevronLeft, ChevronRight, CircleAlert } from "lucide-react";
+import { CalendarClock, CircleAlert } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { Spinner } from "@plane/ui";
 import type { TTrainerCapacity, TTrainerProfile } from "@/services/capacity.service";
@@ -17,15 +17,9 @@ import {
   formatRange,
   rangeMinutes,
 } from "../shared/capacity-timeline.utils";
-import {
-  DAY_KEYS,
-  DAY_LABELS,
-  availabilityCopy,
-  errorMessage,
-  formatMinutes,
-  shiftWeek,
-} from "../shared/capacity-format.utils";
+import { DAY_KEYS, DAY_LABELS, availabilityCopy, errorMessage, formatMinutes } from "../shared/capacity-format.utils";
 import type { useCapacityData } from "../shared/use-capacity-data";
+import { WeekStepper } from "../shared/week-stepper";
 import { TrainerDayTimeline } from "./trainer-day-timeline";
 
 function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Date) {
@@ -111,30 +105,7 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
               {ownProfile ? "Reactivate trainer" : "Become a trainer"}
             </Button>
           ) : null}
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-label="Previous week"
-            onClick={() => setWeekStart((current) => shiftWeek(current, -1))}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <div className="min-w-44 text-center text-body-xs-medium">
-            {weekStart.toLocaleDateString(undefined, { day: "numeric", month: "short" })} –{" "}
-            {new Date(weekEnd.getTime() - 1).toLocaleDateString(undefined, {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-label="Next week"
-            onClick={() => setWeekStart((current) => shiftWeek(current, 1))}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
+          <WeekStepper weekStart={weekStart} weekEnd={weekEnd} onChange={setWeekStart} />
         </div>
       </div>
       {(capacityLoading || trainersLoading) && !capacity ? (

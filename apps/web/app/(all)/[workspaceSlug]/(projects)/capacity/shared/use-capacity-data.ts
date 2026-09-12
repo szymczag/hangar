@@ -5,9 +5,10 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import useSWR from "swr";
 import { CapacityRequestError, CapacityService } from "@/services/capacity.service";
-import { shiftWeek, startOfWeek } from "./capacity-format.utils";
+import { formatWeekParam, parseWeekParam, shiftWeek } from "./capacity-format.utils";
 
 const capacityService = new CapacityService();
 
@@ -25,6 +26,13 @@ const capacityService = new CapacityService();
  * routes calling this hook compose an identical key and SWR dedupes them, so
  * this stays one request per week regardless of how many callers there are.
  *
+ * The selected week lives in `?week=` rather than in component state. Each route
+ * mounts its own copy of this hook, so state here is state that resets on every
+ * navigation: picking a week in the ledger and opening the planner used to land
+ * you back on today. The URL is the one place both routes already share, and it
+ * makes the week survive a reload and travel in a pasted link, which is what
+ * someone sending "this is the week we are looking at" actually wants.
+ *
  * The retry policy is load-bearing rather than decorative: the endpoint is
  * throttled per user *and* per workspace, and it answers a 429 with
  * `Retry-After`, which `CapacityRequestError` carries. Backing off by that
@@ -34,7 +42,33 @@ const capacityService = new CapacityService();
 export function useCapacityData(workspaceSlug: string, enabled: boolean) {
   const [trainerCursor, setTrainerCursor] = useState<string | undefined>();
   const [cursorHistory, setCursorHistory] = useState<Array<string | undefined>>([]);
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const weekStart = useMemo(() => parseWeekParam(searchParams.get("week"), new Date()), [searchParams]);
+
+  /**
+   * Accepts an updater as well as a value, because the callers step relative to
+   * the week they are on (`shiftWeek(current, -1)`) and should not have to read
+   * it back out to do that.
+   *
+   * `replace` because a stepper is not navigation. Walking forward eight weeks
+   * should not put eight entries in the history stack and turn Back into a
+   * week-by-week rewind of how you got here.
+   */
+  const setWeekStart = useCallback(
+    (next: Date | ((current: Date) => Date)) => {
+      setSearchParams(
+        (previous) => {
+          const current = parseWeekParam(previous.get("week"), new Date());
+          const resolved = typeof next === "function" ? next(current) : next;
+          const params = new URLSearchParams(previous);
+          params.set("week", formatWeekParam(resolved));
+          return params;
+        },
+        { replace: true, preventScrollReset: true }
+      );
+    },
+    [setSearchParams]
+  );
   const capacityRefreshRef = useRef<Promise<unknown> | null>(null);
 
   const weekEnd = useMemo(() => shiftWeek(weekStart, 1), [weekStart]);
