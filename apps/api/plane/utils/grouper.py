@@ -52,7 +52,7 @@ def issue_queryset_grouper(
             deleted_at__isnull=True,
         )
         .values("issue_id")
-        .annotate(arr=ArrayAgg("assignee_id", distinct=True))
+        .annotate(arr=ArrayAgg("assignee_id", order_by="assignee_id", distinct=True))
         .values("arr")
     )
 
@@ -63,14 +63,14 @@ def issue_queryset_grouper(
             module__archived_at__isnull=True,
         )
         .values("issue_id")
-        .annotate(arr=ArrayAgg("module_id", distinct=True))
+        .annotate(arr=ArrayAgg("module_id", order_by="module_id", distinct=True))
         .values("arr")
     )
 
     issue_label_subquery = Subquery(
         IssueLabel.objects.filter(issue_id=OuterRef("pk"), deleted_at__isnull=True)
         .values("issue_id")
-        .annotate(arr=ArrayAgg("label_id", distinct=True))
+        .annotate(arr=ArrayAgg("label_id", order_by="label_id", distinct=True))
         .values("arr")
     )
 

@@ -159,7 +159,7 @@ class IntakeIssueViewSet(BaseViewSet):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "labels__id",
+                        "labels__id", order_by="labels__id",
                         distinct=True,
                         filter=Q(~Q(labels__id__isnull=True) & Q(label_issue__deleted_at__isnull=True)),
                     ),
@@ -167,7 +167,7 @@ class IntakeIssueViewSet(BaseViewSet):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "assignees__id",
+                        "assignees__id", order_by="assignees__id",
                         distinct=True,
                         filter=Q(
                             ~Q(assignees__id__isnull=True)
@@ -179,7 +179,7 @@ class IntakeIssueViewSet(BaseViewSet):
                 ),
                 module_ids=Coalesce(
                     ArrayAgg(
-                        "issue_module__module_id",
+                        "issue_module__module_id", order_by="issue_module__module_id",
                         distinct=True,
                         filter=Q(
                             ~Q(issue_module__module_id__isnull=True)
@@ -207,7 +207,7 @@ class IntakeIssueViewSet(BaseViewSet):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "issue__labels__id",
+                        "issue__labels__id", order_by="issue__labels__id",
                         distinct=True,
                         filter=Q(~Q(issue__labels__id__isnull=True) & Q(issue__label_issue__deleted_at__isnull=True)),
                     ),
@@ -320,7 +320,7 @@ class IntakeIssueViewSet(BaseViewSet):
                 .annotate(
                     label_ids=Coalesce(
                         ArrayAgg(
-                            "issue__labels__id",
+                            "issue__labels__id", order_by="issue__labels__id",
                             distinct=True,
                             filter=Q(
                                 ~Q(issue__labels__id__isnull=True) & Q(issue__label_issue__deleted_at__isnull=True)
@@ -330,7 +330,7 @@ class IntakeIssueViewSet(BaseViewSet):
                     ),
                     assignee_ids=Coalesce(
                         ArrayAgg(
-                            "issue__assignees__id",
+                            "issue__assignees__id", order_by="issue__assignees__id",
                             distinct=True,
                             filter=~Q(issue__assignees__id__isnull=True)
                             & Q(issue__assignees__member_project__is_active=True),
@@ -405,7 +405,7 @@ class IntakeIssueViewSet(BaseViewSet):
             issue = Issue.objects.annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "labels__id",
+                        "labels__id", order_by="labels__id",
                         distinct=True,
                         filter=Q(~Q(labels__id__isnull=True) & Q(label_issue__deleted_at__isnull=True)),
                     ),
@@ -413,7 +413,7 @@ class IntakeIssueViewSet(BaseViewSet):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "assignees__id",
+                        "assignees__id", order_by="assignees__id",
                         distinct=True,
                         filter=Q(~Q(assignees__id__isnull=True) & Q(issue_assignee__deleted_at__isnull=True)),
                     ),
@@ -500,7 +500,7 @@ class IntakeIssueViewSet(BaseViewSet):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "issue__labels__id",
+                        "issue__labels__id", order_by="issue__labels__id",
                         distinct=True,
                         filter=Q(~Q(issue__labels__id__isnull=True) & Q(issue__label_issue__deleted_at__isnull=True)),
                     ),
@@ -508,7 +508,7 @@ class IntakeIssueViewSet(BaseViewSet):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "issue__assignees__id",
+                        "issue__assignees__id", order_by="issue__assignees__id",
                         distinct=True,
                         filter=Q(
                             ~Q(issue__assignees__id__isnull=True) & Q(issue__issue_assignee__deleted_at__isnull=True)
@@ -532,7 +532,7 @@ class IntakeIssueViewSet(BaseViewSet):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "issue__labels__id",
+                        "issue__labels__id", order_by="issue__labels__id",
                         distinct=True,
                         filter=Q(~Q(issue__labels__id__isnull=True) & Q(issue__label_issue__deleted_at__isnull=True)),
                     ),
@@ -540,7 +540,7 @@ class IntakeIssueViewSet(BaseViewSet):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "issue__assignees__id",
+                        "issue__assignees__id", order_by="issue__assignees__id",
                         distinct=True,
                         filter=Q(
                             ~Q(issue__assignees__id__isnull=True) & Q(issue__issue_assignee__deleted_at__isnull=True)

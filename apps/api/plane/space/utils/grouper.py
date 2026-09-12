@@ -59,7 +59,7 @@ def issue_queryset_grouper(
     }
     default_annotations = {
         key: Coalesce(
-            ArrayAgg(field, distinct=True, filter=condition),
+            ArrayAgg(field, order_by=field, distinct=True, filter=condition),
             Value([], output_field=ArrayField(UUIDField())),
         )
         for key, (field, condition) in annotations_map.items()
@@ -107,72 +107,74 @@ def issue_on_results(
 
     required_fields.extend(original_list)
 
+    vote_item = Case(
+        When(
+            votes__isnull=False,
+            votes__deleted_at__isnull=True,
+            then=JSONObject(
+                vote=F("votes__vote"),
+                actor_details=JSONObject(
+                    id=F("votes__actor__id"),
+                    first_name=F("votes__actor__first_name"),
+                    last_name=F("votes__actor__last_name"),
+                    avatar=F("votes__actor__avatar"),
+                    avatar_url=Case(
+                        When(
+                            votes__actor__avatar_asset__isnull=False,
+                            then=Concat(
+                                Value("/api/assets/v2/static/"),
+                                Cast("votes__actor__avatar_asset", CharField()),
+                                Value("/"),
+                            ),
+                        ),
+                        default=F("votes__actor__avatar"),
+                        output_field=CharField(),
+                    ),
+                    display_name=F("votes__actor__display_name"),
+                ),
+            ),
+        ),
+        default=None,
+        output_field=JSONField(),
+    )
+    reaction_item = Case(
+        When(
+            issue_reactions__isnull=False,
+            issue_reactions__deleted_at__isnull=True,
+            then=JSONObject(
+                reaction=F("issue_reactions__reaction"),
+                actor_details=JSONObject(
+                    id=F("issue_reactions__actor__id"),
+                    first_name=F("issue_reactions__actor__first_name"),
+                    last_name=F("issue_reactions__actor__last_name"),
+                    avatar=F("issue_reactions__actor__avatar"),
+                    avatar_url=Case(
+                        When(
+                            issue_reactions__actor__avatar_asset__isnull=False,
+                            then=Concat(
+                                Value("/api/assets/v2/static/"),
+                                Cast("issue_reactions__actor__avatar_asset", CharField()),
+                                Value("/"),
+                            ),
+                        ),
+                        default=F("issue_reactions__actor__avatar"),
+                        output_field=CharField(),
+                    ),
+                    display_name=F("issue_reactions__actor__display_name"),
+                ),
+            ),
+        ),
+        default=None,
+        output_field=JSONField(),
+    )
     issues = issues.annotate(
         vote_items=ArrayAgg(
-            Case(
-                When(
-                    votes__isnull=False,
-                    votes__deleted_at__isnull=True,
-                    then=JSONObject(
-                        vote=F("votes__vote"),
-                        actor_details=JSONObject(
-                            id=F("votes__actor__id"),
-                            first_name=F("votes__actor__first_name"),
-                            last_name=F("votes__actor__last_name"),
-                            avatar=F("votes__actor__avatar"),
-                            avatar_url=Case(
-                                When(
-                                    votes__actor__avatar_asset__isnull=False,
-                                    then=Concat(
-                                        Value("/api/assets/v2/static/"),
-                                        Cast("votes__actor__avatar_asset", CharField()),
-                                        Value("/"),
-                                    ),
-                                ),
-                                default=F("votes__actor__avatar"),
-                                output_field=CharField(),
-                            ),
-                            display_name=F("votes__actor__display_name"),
-                        ),
-                    ),
-                ),
-                default=None,
-                output_field=JSONField(),
-            ),
+            vote_item, order_by=vote_item,
             filter=Q(votes__isnull=False, votes__deleted_at__isnull=True),
             distinct=True,
         ),
         reaction_items=ArrayAgg(
-            Case(
-                When(
-                    issue_reactions__isnull=False,
-                    issue_reactions__deleted_at__isnull=True,
-                    then=JSONObject(
-                        reaction=F("issue_reactions__reaction"),
-                        actor_details=JSONObject(
-                            id=F("issue_reactions__actor__id"),
-                            first_name=F("issue_reactions__actor__first_name"),
-                            last_name=F("issue_reactions__actor__last_name"),
-                            avatar=F("issue_reactions__actor__avatar"),
-                            avatar_url=Case(
-                                When(
-                                    issue_reactions__actor__avatar_asset__isnull=False,
-                                    then=Concat(
-                                        Value("/api/assets/v2/static/"),
-                                        Cast("issue_reactions__actor__avatar_asset", CharField()),
-                                        Value("/"),
-                                    ),
-                                ),
-                                default=F("issue_reactions__actor__avatar"),
-                                output_field=CharField(),
-                            ),
-                            display_name=F("issue_reactions__actor__display_name"),
-                        ),
-                    ),
-                ),
-                default=None,
-                output_field=JSONField(),
-            ),
+            reaction_item, order_by=reaction_item,
             filter=Q(issue_reactions__isnull=False, issue_reactions__deleted_at__isnull=True),
             distinct=True,
         ),

@@ -568,7 +568,7 @@ class IssueViewSet(BaseViewSet):
                     Subquery(
                         IssueLabel.objects.filter(issue_id=OuterRef("pk"))
                         .values("issue_id")
-                        .annotate(arr=ArrayAgg("label_id", distinct=True))
+                        .annotate(arr=ArrayAgg("label_id", order_by="label_id", distinct=True))
                         .values("arr")
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
@@ -580,7 +580,7 @@ class IssueViewSet(BaseViewSet):
                             assignee__member_project__is_active=True,
                         )
                         .values("issue_id")
-                        .annotate(arr=ArrayAgg("assignee_id", distinct=True))
+                        .annotate(arr=ArrayAgg("assignee_id", order_by="assignee_id", distinct=True))
                         .values("arr")
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
@@ -592,7 +592,7 @@ class IssueViewSet(BaseViewSet):
                             module__archived_at__isnull=True,
                         )
                         .values("issue_id")
-                        .annotate(arr=ArrayAgg("module_id", distinct=True))
+                        .annotate(arr=ArrayAgg("module_id", order_by="module_id", distinct=True))
                         .values("arr")
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
@@ -673,7 +673,7 @@ class IssueViewSet(BaseViewSet):
             queryset.annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "labels__id",
+                        "labels__id", order_by="labels__id",
                         distinct=True,
                         filter=Q(~Q(labels__id__isnull=True) & Q(label_issue__deleted_at__isnull=True)),
                     ),
@@ -681,7 +681,7 @@ class IssueViewSet(BaseViewSet):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "assignees__id",
+                        "assignees__id", order_by="assignees__id",
                         distinct=True,
                         filter=Q(
                             ~Q(assignees__id__isnull=True)
@@ -693,7 +693,7 @@ class IssueViewSet(BaseViewSet):
                 ),
                 module_ids=Coalesce(
                     ArrayAgg(
-                        "issue_module__module_id",
+                        "issue_module__module_id", order_by="issue_module__module_id",
                         distinct=True,
                         filter=Q(
                             ~Q(issue_module__module_id__isnull=True)
@@ -964,7 +964,7 @@ class IssuePaginatedViewSet(BaseViewSet):
                 Subquery(
                     IssueLabel.objects.filter(issue_id=OuterRef("pk"))
                     .values("issue_id")
-                    .annotate(arr=ArrayAgg("label_id", distinct=True))
+                    .annotate(arr=ArrayAgg("label_id", order_by="label_id", distinct=True))
                     .values("arr")
                 ),
                 Value([], output_field=ArrayField(UUIDField())),
@@ -976,7 +976,7 @@ class IssuePaginatedViewSet(BaseViewSet):
                         assignee__member_project__is_active=True,
                     )
                     .values("issue_id")
-                    .annotate(arr=ArrayAgg("assignee_id", distinct=True))
+                    .annotate(arr=ArrayAgg("assignee_id", order_by="assignee_id", distinct=True))
                     .values("arr")
                 ),
                 Value([], output_field=ArrayField(UUIDField())),
@@ -988,7 +988,7 @@ class IssuePaginatedViewSet(BaseViewSet):
                         module__archived_at__isnull=True,
                     )
                     .values("issue_id")
-                    .annotate(arr=ArrayAgg("module_id", distinct=True))
+                    .annotate(arr=ArrayAgg("module_id", order_by="module_id", distinct=True))
                     .values("arr")
                 ),
                 Value([], output_field=ArrayField(UUIDField())),
@@ -1296,7 +1296,7 @@ class IssueDetailIdentifierEndpoint(BaseAPIView):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "labels__id",
+                        "labels__id", order_by="labels__id",
                         distinct=True,
                         filter=Q(~Q(labels__id__isnull=True) & Q(label_issue__deleted_at__isnull=True)),
                     ),
@@ -1304,7 +1304,7 @@ class IssueDetailIdentifierEndpoint(BaseAPIView):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "assignees__id",
+                        "assignees__id", order_by="assignees__id",
                         distinct=True,
                         filter=Q(
                             ~Q(assignees__id__isnull=True)
@@ -1316,7 +1316,7 @@ class IssueDetailIdentifierEndpoint(BaseAPIView):
                 ),
                 module_ids=Coalesce(
                     ArrayAgg(
-                        "issue_module__module_id",
+                        "issue_module__module_id", order_by="issue_module__module_id",
                         distinct=True,
                         filter=Q(
                             ~Q(issue_module__module_id__isnull=True)

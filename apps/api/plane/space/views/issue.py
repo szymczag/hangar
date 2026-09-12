@@ -667,6 +667,74 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
             is_disabled=False,
         )
 
+        vote_item = Case(
+            When(
+                votes__isnull=False,
+                votes__deleted_at__isnull=True,
+                then=JSONObject(
+                    vote=F("votes__vote"),
+                    actor_details=JSONObject(
+                        id=F("votes__actor__id"),
+                        first_name=F("votes__actor__first_name"),
+                        last_name=F("votes__actor__last_name"),
+                        avatar=F("votes__actor__avatar"),
+                        avatar_url=Case(
+                            When(
+                                votes__actor__avatar_asset__isnull=False,
+                                then=Concat(
+                                    Value("/api/assets/v2/static/"),
+                                    Cast("votes__actor__avatar_asset", CharField()),
+                                    Value("/"),
+                                ),
+                            ),
+                            When(
+                                votes__actor__avatar_asset__isnull=True,
+                                then=F("votes__actor__avatar"),
+                            ),
+                            default=Value(None),
+                            output_field=CharField(),
+                        ),
+                        display_name=F("votes__actor__display_name"),
+                    ),
+                ),
+            ),
+            default=None,
+            output_field=JSONField(),
+        )
+        reaction_item = Case(
+            When(
+                issue_reactions__isnull=False,
+                issue_reactions__deleted_at__isnull=True,
+                then=JSONObject(
+                    reaction=F("issue_reactions__reaction"),
+                    actor_details=JSONObject(
+                        id=F("issue_reactions__actor__id"),
+                        first_name=F("issue_reactions__actor__first_name"),
+                        last_name=F("issue_reactions__actor__last_name"),
+                        avatar=F("issue_reactions__actor__avatar"),
+                        avatar_url=Case(
+                            When(
+                                votes__actor__avatar_asset__isnull=False,
+                                then=Concat(
+                                    Value("/api/assets/v2/static/"),
+                                    Cast("votes__actor__avatar_asset", CharField()),
+                                    Value("/"),
+                                ),
+                            ),
+                            When(
+                                votes__actor__avatar_asset__isnull=True,
+                                then=F("votes__actor__avatar"),
+                            ),
+                            default=Value(None),
+                            output_field=CharField(),
+                        ),
+                        display_name=F("issue_reactions__actor__display_name"),
+                    ),
+                ),
+            ),
+            default=None,
+            output_field=JSONField(),
+        )
         issue_queryset = (
             Issue.issue_objects.filter(
                 pk=issue_id,
@@ -683,7 +751,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "labels__id",
+                        "labels__id", order_by="labels__id",
                         distinct=True,
                         filter=Q(~Q(labels__id__isnull=True) & Q(label_issue__deleted_at__isnull=True)),
                     ),
@@ -691,7 +759,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "assignees__id",
+                        "assignees__id", order_by="assignees__id",
                         distinct=True,
                         filter=Q(
                             ~Q(assignees__id__isnull=True)
@@ -703,7 +771,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 ),
                 module_ids=Coalesce(
                     ArrayAgg(
-                        "issue_module__module_id",
+                        "issue_module__module_id", order_by="issue_module__module_id",
                         distinct=True,
                         filter=~Q(issue_module__module_id__isnull=True)
                         & Q(issue_module__module__archived_at__isnull=True)
@@ -721,40 +789,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
             .prefetch_related(Prefetch("votes", queryset=IssueVote.objects.select_related("actor")))
             .annotate(
                 vote_items=ArrayAgg(
-                    Case(
-                        When(
-                            votes__isnull=False,
-                            votes__deleted_at__isnull=True,
-                            then=JSONObject(
-                                vote=F("votes__vote"),
-                                actor_details=JSONObject(
-                                    id=F("votes__actor__id"),
-                                    first_name=F("votes__actor__first_name"),
-                                    last_name=F("votes__actor__last_name"),
-                                    avatar=F("votes__actor__avatar"),
-                                    avatar_url=Case(
-                                        When(
-                                            votes__actor__avatar_asset__isnull=False,
-                                            then=Concat(
-                                                Value("/api/assets/v2/static/"),
-                                                Cast("votes__actor__avatar_asset", CharField()),
-                                                Value("/"),
-                                            ),
-                                        ),
-                                        When(
-                                            votes__actor__avatar_asset__isnull=True,
-                                            then=F("votes__actor__avatar"),
-                                        ),
-                                        default=Value(None),
-                                        output_field=CharField(),
-                                    ),
-                                    display_name=F("votes__actor__display_name"),
-                                ),
-                            ),
-                        ),
-                        default=None,
-                        output_field=JSONField(),
-                    ),
+                    vote_item, order_by=vote_item,
                     filter=Case(
                         When(
                             votes__isnull=False,
@@ -767,40 +802,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                     distinct=True,
                 ),
                 reaction_items=ArrayAgg(
-                    Case(
-                        When(
-                            issue_reactions__isnull=False,
-                            issue_reactions__deleted_at__isnull=True,
-                            then=JSONObject(
-                                reaction=F("issue_reactions__reaction"),
-                                actor_details=JSONObject(
-                                    id=F("issue_reactions__actor__id"),
-                                    first_name=F("issue_reactions__actor__first_name"),
-                                    last_name=F("issue_reactions__actor__last_name"),
-                                    avatar=F("issue_reactions__actor__avatar"),
-                                    avatar_url=Case(
-                                        When(
-                                            votes__actor__avatar_asset__isnull=False,
-                                            then=Concat(
-                                                Value("/api/assets/v2/static/"),
-                                                Cast("votes__actor__avatar_asset", CharField()),
-                                                Value("/"),
-                                            ),
-                                        ),
-                                        When(
-                                            votes__actor__avatar_asset__isnull=True,
-                                            then=F("votes__actor__avatar"),
-                                        ),
-                                        default=Value(None),
-                                        output_field=CharField(),
-                                    ),
-                                    display_name=F("issue_reactions__actor__display_name"),
-                                ),
-                            ),
-                        ),
-                        default=None,
-                        output_field=JSONField(),
-                    ),
+                    reaction_item, order_by=reaction_item,
                     filter=Case(
                         When(
                             issue_reactions__isnull=False,

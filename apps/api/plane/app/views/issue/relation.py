@@ -150,7 +150,7 @@ class IssueRelationViewSet(BaseViewSet):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "labels__id",
+                        "labels__id", order_by="labels__id",
                         distinct=True,
                         filter=Q(~Q(labels__id__isnull=True) & (Q(label_issue__deleted_at__isnull=True))),
                     ),
@@ -158,7 +158,7 @@ class IssueRelationViewSet(BaseViewSet):
                 ),
                 assignee_ids=Coalesce(
                     ArrayAgg(
-                        "assignees__id",
+                        "assignees__id", order_by="assignees__id",
                         distinct=True,
                         filter=Q(
                             ~Q(assignees__id__isnull=True)

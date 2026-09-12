@@ -101,7 +101,7 @@ class SubIssuesEndpoint(BaseAPIView):
                         IssueLabel.objects.filter(issue_id=OuterRef("id"), deleted_at__isnull=True)
                         .order_by()
                         .values("issue_id")
-                        .annotate(arr=ArrayAgg("label_id", distinct=True))
+                        .annotate(arr=ArrayAgg("label_id", order_by="label_id", distinct=True))
                         .values("arr"),
                         output_field=ArrayField(UUIDField()),
                     ),
@@ -116,7 +116,7 @@ class SubIssuesEndpoint(BaseAPIView):
                         )
                         .order_by()
                         .values("issue_id")
-                        .annotate(arr=ArrayAgg("assignee_id", distinct=True))
+                        .annotate(arr=ArrayAgg("assignee_id", order_by="assignee_id", distinct=True))
                         .values("arr"),
                         output_field=ArrayField(UUIDField()),
                     ),
@@ -131,7 +131,7 @@ class SubIssuesEndpoint(BaseAPIView):
                         )
                         .order_by()
                         .values("issue_id")
-                        .annotate(arr=ArrayAgg("module_id", distinct=True))
+                        .annotate(arr=ArrayAgg("module_id", order_by="module_id", distinct=True))
                         .values("arr"),
                         output_field=ArrayField(UUIDField()),
                     ),

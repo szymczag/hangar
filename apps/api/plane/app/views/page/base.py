@@ -126,14 +126,14 @@ class PageViewSet(BaseViewSet):
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
-                        "page_labels__label_id",
+                        "page_labels__label_id", order_by="page_labels__label_id",
                         distinct=True,
                         filter=~Q(page_labels__label_id__isnull=True),
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
                 project_ids=Coalesce(
-                    ArrayAgg("projects__id", distinct=True, filter=~Q(projects__id=True)),
+                    ArrayAgg("projects__id", order_by="projects__id", distinct=True, filter=~Q(projects__id=True)),
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
             )
@@ -643,7 +643,7 @@ class PageDuplicateEndpoint(BaseAPIView):
             Page.objects.filter(pk=page.id)
             .annotate(
                 project_ids=Coalesce(
-                    ArrayAgg("projects__id", distinct=True, filter=~Q(projects__id=True)),
+                    ArrayAgg("projects__id", order_by="projects__id", distinct=True, filter=~Q(projects__id=True)),
                     Value([], output_field=ArrayField(UUIDField())),
                 )
             )
