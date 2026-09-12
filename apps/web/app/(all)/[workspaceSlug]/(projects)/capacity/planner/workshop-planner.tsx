@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { CalendarCheck, CalendarSearch, Clock3, Save, ShieldCheck, Trash2, Users } from "lucide-react";
-import { errorMessage } from "../shared/capacity-format.utils";
+import { errorMessage, formatMinutes, startOfWeek } from "../shared/capacity-format.utils";
 import {
   CapacityService,
   type TPlanIssue,
@@ -25,10 +25,14 @@ import {
   findWorkshopCandidates,
   groupByDay,
   MAX_SLOTS_PER_TRAINER_PER_DAY,
+  noWorkshopFitReason,
+  nextBookingMinute,
+  workshopAvailability,
   sameLocalDay,
   timeLabel,
   type TFirstAvailable,
   type TStartWindow,
+  type TWorkshopCandidate,
 } from "./workshop-planner.utils";
 
 const capacityService = new CapacityService();
@@ -55,11 +59,15 @@ function NumberField({
   value,
   onChange,
   disabled = false,
+  min = 0,
+  max = 1440,
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
   disabled?: boolean;
+  min?: number;
+  max?: number;
 }) {
   return (
     <label className="text-body-xs-medium text-secondary">
@@ -67,7 +75,8 @@ function NumberField({
       <div className="relative mt-1">
         <input
           type="number"
-          min={0}
+          min={min}
+          max={max}
           step={15}
           value={value}
           disabled={disabled}
@@ -87,11 +96,19 @@ export function WorkshopPlanner({
   trainers,
   weekStart,
   weekEnd,
+  onViewWeek,
+  capacityState = "ready",
+  capacityError,
+  onRetry,
 }: {
   workspaceSlug: string;
   trainers: TTrainerCapacity[];
   weekStart: Date;
   weekEnd: Date;
+  onViewWeek: (start: Date) => void;
+  capacityState?: "ready" | "loading" | "error";
+  capacityError?: string;
+  onRetry?: () => void;
 }) {
   const { data: draftPage, mutate: mutateDrafts } = useSWR(["workshop-plan-drafts", workspaceSlug], () =>
     capacityService.listWorkshopPlanDrafts(workspaceSlug)
@@ -125,11 +142,62 @@ export function WorkshopPlanner({
   const [saving, setSaving] = useState(false);
   const [hold, setHold] = useState<TWorkshopPlanHold | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
-  const [search, setSearch] = useState<
+  const [now, setNow] = useState(() => new Date());
+  const searchController = useRef<AbortController | null>(null);
+  const [searchState, setSearch] = useState<
     | { state: "idle" }
-    | { state: "running"; from: Date }
-    | { state: "done"; result: TFirstAvailable; forTrainer: string | null }
+    | { state: "running"; from: Date; key: string }
+    | { state: "done"; result: TFirstAvailable; forTrainer: string | null; key: string }
   >({ state: "idle" });
+
+  const spec = useMemo(
+    () => ({
+      trainerIds,
+      durationMinutes,
+      preparationMinutes,
+      travelBeforeMinutes,
+      travelAfterMinutes,
+      startWindow,
+      notBefore: nextBookingMinute(now),
+    }),
+    [trainerIds, durationMinutes, preparationMinutes, travelBeforeMinutes, travelAfterMinutes, startWindow, now]
+  );
+  // A result belongs to the requirements that produced it, including the viewed week.
+  const searchKey = JSON.stringify({
+    workspaceSlug,
+    draftId,
+    week: weekStart.toISOString(),
+    ...spec,
+    notBefore: undefined,
+  });
+  const search =
+    searchState.state !== "idle" && searchState.key === searchKey ? searchState : { state: "idle" as const };
+  useEffect(() => () => searchController.current?.abort(), [searchKey]);
+  useEffect(() => {
+    const timer = globalThis.setInterval(() => setNow(new Date()), 60_000);
+    return () => globalThis.clearInterval(timer);
+  }, []);
+
+  const refreshPlanningData = () =>
+    Promise.allSettled([
+      mutateDrafts(),
+      mutate((key) => Array.isArray(key) && key[0] === "capacity" && key[1] === workspaceSlug),
+    ]);
+  useEffect(() => {
+    if (!hold) return;
+    const timer = globalThis.setTimeout(
+      () => {
+        setHold(null);
+        setNow(new Date());
+        void Promise.allSettled([
+          mutateDrafts(),
+          mutate((key) => Array.isArray(key) && key[0] === "capacity" && key[1] === workspaceSlug),
+        ]);
+      },
+      Math.max(0, new Date(hold.expires_at).getTime() - Date.now())
+    );
+    return () => globalThis.clearTimeout(timer);
+  }, [hold, mutateDrafts, workspaceSlug]);
 
   /**
    * Look past the week on screen for the next time this fits.
@@ -141,61 +209,50 @@ export function WorkshopPlanner({
   const findNext = async (only: string | null) => {
     const ids = only ? [only] : trainerIds;
     if (!ids.length) return;
-    setSearch({ state: "running", from: weekStart });
+    searchController.current?.abort();
+    const controller = new AbortController();
+    searchController.current = controller;
+    const notBefore = nextBookingMinute(new Date());
+    const from = new Date(Math.max(weekStart.getTime(), startOfWeek(notBefore).getTime()));
+    setSearch({ state: "running", from, key: searchKey });
     try {
       const result = await findFirstAvailable(
-        weekStart,
-        {
-          trainerIds: ids,
-          durationMinutes,
-          preparationMinutes,
-          travelBeforeMinutes,
-          travelAfterMinutes,
-          startWindow,
-        },
+        from,
+        { ...spec, trainerIds: ids, notBefore },
         async (windowStart, windowEnd) => {
           const response = await capacityService.getCapacity(
             workspaceSlug,
             windowStart.toISOString(),
             windowEnd.toISOString(),
-            ids
+            ids,
+            controller.signal
           );
           return response.trainers;
         },
-        { onProgress: (windowStart) => setSearch({ state: "running", from: windowStart }) }
+        {
+          signal: controller.signal,
+          onProgress: (windowStart) => setSearch({ state: "running", from: windowStart, key: searchKey }),
+        }
       );
-      setSearch({ state: "done", result, forTrainer: only });
+      if (!controller.signal.aborted) setSearch({ state: "done", result, forTrainer: only, key: searchKey });
     } catch (error: unknown) {
+      if (controller.signal.aborted) return;
       setSearch({ state: "idle" });
       setToast({
         type: TOAST_TYPE.ERROR,
-        title: "Could not look ahead",
-        message: errorMessage(error, "The capacity service is rate-limited. Try again shortly."),
+        title: "Search could not finish",
+        message: errorMessage(error, "Try again shortly. The full date range has not been checked."),
       });
     }
   };
 
   const candidates = useMemo(
-    () =>
-      findWorkshopCandidates(trainers, weekStart, weekEnd, {
-        trainerIds,
-        durationMinutes,
-        preparationMinutes,
-        travelBeforeMinutes,
-        travelAfterMinutes,
-        startWindow,
-      }),
-    [
-      durationMinutes,
-      preparationMinutes,
-      startWindow,
-      trainerIds,
-      trainers,
-      travelAfterMinutes,
-      travelBeforeMinutes,
-      weekEnd,
-      weekStart,
-    ]
+    () => (capacityState === "ready" ? findWorkshopCandidates(trainers, weekStart, weekEnd, spec) : []),
+    [capacityState, trainers, weekStart, weekEnd, spec]
+  );
+  const availability = useMemo(
+    () => workshopAvailability(trainers, weekStart, weekEnd, spec),
+    [trainers, weekStart, weekEnd, spec]
   );
   const candidateDays = useMemo(() => groupByDay(candidates), [candidates]);
 
@@ -206,6 +263,13 @@ export function WorkshopPlanner({
    * than letting you type into fields whose save is guaranteed to be refused.
    */
   const isHeld = Boolean(hold);
+  const busy = saving || scheduling;
+  const formLocked = isHeld || busy;
+  const validDuration = Number.isInteger(durationMinutes) && durationMinutes >= 15 && durationMinutes <= 10080;
+  const validBuffers = [preparationMinutes, travelBeforeMinutes, travelAfterMinutes].every(
+    (value) => Number.isInteger(value) && value >= 0 && value <= 1440
+  );
+  const validPlan = validDuration && validBuffers;
 
   const payload = (): TWorkshopPlanDraftInput => ({
     title: title.trim(),
@@ -219,6 +283,8 @@ export function WorkshopPlanner({
   const planNeedsSaving = savedSignature !== planSignature(payload());
 
   const loadDraft = (draft: TWorkshopPlanDraft) => {
+    searchController.current?.abort();
+    setSearch({ state: "idle" });
     setDraftId(draft.id);
     setRevision(draft.revision);
     setTitle(draft.title);
@@ -243,6 +309,9 @@ export function WorkshopPlanner({
   };
 
   const reset = () => {
+    searchController.current?.abort();
+    setSearch({ state: "idle" });
+    setStartWindow("any");
     setDraftId(null);
     setRevision(null);
     setTitle("");
@@ -256,27 +325,25 @@ export function WorkshopPlanner({
     setSavedSignature(null);
   };
 
+  const persistDraft = async (fallbackTitle?: string) => {
+    const input = { ...payload(), title: title.trim() || fallbackTitle || "Workshop plan" };
+    const saved =
+      draftId && revision !== null
+        ? await capacityService.updateWorkshopPlanDraft(workspaceSlug, draftId, revision, input)
+        : await capacityService.createWorkshopPlanDraft(workspaceSlug, input);
+    loadDraft(saved);
+    return saved;
+  };
+
   const saveDraft = async () => {
-    if (!title.trim() || !trainerIds.length) return;
+    if (!trainerIds.length || !validPlan || formLocked) return;
     setSaving(true);
     try {
-      const saved =
-        draftId && revision !== null
-          ? await capacityService.updateWorkshopPlanDraft(workspaceSlug, draftId, revision, payload())
-          : await capacityService.createWorkshopPlanDraft(workspaceSlug, payload());
-      loadDraft(saved);
+      await persistDraft();
       await mutateDrafts();
-      setToast({
-        type: TOAST_TYPE.SUCCESS,
-        title: "Planning draft saved",
-        message: "You can return to this search later.",
-      });
+      setToast({ type: TOAST_TYPE.SUCCESS, title: "Plan saved", message: "Choose a time to hold it for 72 hours." });
     } catch (error: unknown) {
-      setToast({
-        type: TOAST_TYPE.ERROR,
-        title: "Draft not saved",
-        message: errorMessage(error, "Refresh the draft and try again."),
-      });
+      setToast({ type: TOAST_TYPE.ERROR, title: "Plan not saved", message: errorMessage(error, "Try again.") });
     } finally {
       setSaving(false);
     }
@@ -288,36 +355,55 @@ export function WorkshopPlanner({
     try {
       await capacityService.deleteWorkshopPlanDraft(workspaceSlug, draftId);
       reset();
-      await mutateDrafts();
+      await refreshPlanningData();
+    } catch (error: unknown) {
+      setToast({ type: TOAST_TYPE.ERROR, title: "Plan not deleted", message: errorMessage(error, "Try again.") });
     } finally {
       setSaving(false);
     }
   };
 
-  const holdCandidate = async (trainerId: string, workshopStartsAt: string) => {
-    if (!draftId || revision === null) return;
+  const holdCandidate = async (candidate: TWorkshopCandidate) => {
+    if (formLocked || !validPlan || capacityState !== "ready") return;
+    if (new Date(candidate.blockedStartsAt).getTime() <= Date.now()) {
+      setNow(new Date());
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Choose a later time",
+        message: "Preparation or travel for this slot has already started.",
+      });
+      return;
+    }
     setSaving(true);
     try {
+      // Use the returned revision, not React state from before this save.
+      const saved =
+        planNeedsSaving || !draftId || revision === null
+          ? await persistDraft(`Workshop · ${dateTimeLabel(candidate.workshopStartsAt)}`)
+          : { id: draftId, revision };
       const result = await capacityService.holdWorkshopPlan(
         workspaceSlug,
-        draftId,
-        revision,
-        trainerId,
-        workshopStartsAt
+        saved.id,
+        saved.revision,
+        candidate.trainerId,
+        candidate.workshopStartsAt
       );
       setHold(result.hold);
       setRevision(result.revision);
-      await mutateDrafts();
+      setSearch({ state: "idle" });
+      searchController.current?.abort();
+      await refreshPlanningData();
       setToast({
         type: TOAST_TYPE.SUCCESS,
-        title: "Trainer held for 72 hours",
-        message: "This is an internal hold. Nothing was written to Google Calendar.",
+        title: "Time held for 72 hours",
+        message: "Your plan is saved. Schedule this workshop, or start another plan while this time stays held.",
       });
-    } catch {
+    } catch (error: unknown) {
+      await refreshPlanningData();
       setToast({
         type: TOAST_TYPE.ERROR,
-        title: "Slot could not be held",
-        message: "Availability may have changed. Refresh capacity and choose another slot.",
+        title: "Time could not be held",
+        message: errorMessage(error, "Refresh availability and choose another time."),
       });
     } finally {
       setSaving(false);
@@ -336,19 +422,11 @@ export function WorkshopPlanner({
       const result = await capacityService.scheduleWorkshopPlan(workspaceSlug, draftId, revision);
       setRevision(result.revision);
       setHold(null);
-      await mutateDrafts();
-      /**
-       * The block just moved from being a hold to being a session, and both are
-       * subtracted from availability -- so the candidate list on screen is stale
-       * in a way that matters: it would still offer the slot that was just
-       * booked. Invalidated by key prefix rather than through `useCapacityData`,
-       * which this component is not the one holding.
-       */
-      await mutate((key) => Array.isArray(key) && typeof key[0] === "string" && key[0].startsWith("capacity"));
+      await refreshPlanningData();
       setToast({
         type: TOAST_TYPE.SUCCESS,
         title: "Workshop scheduled",
-        message: `${hold?.trainer_name ?? "The trainer"} is booked on ${workshopLabel(result.issue)}.`,
+        message: `${hold?.trainer_name ?? "The trainer"} is booked on ${workshopLabel(result.issue)}. Choose another time to add a session, or start a new plan.`,
       });
     } catch (error: unknown) {
       setToast({
@@ -368,7 +446,9 @@ export function WorkshopPlanner({
       const result = await capacityService.releaseWorkshopPlanHold(workspaceSlug, draftId);
       setHold(null);
       setRevision(result.revision);
-      await mutateDrafts();
+      await refreshPlanningData();
+    } catch (error: unknown) {
+      setToast({ type: TOAST_TYPE.ERROR, title: "Hold not released", message: errorMessage(error, "Try again.") });
     } finally {
       setSaving(false);
     }
@@ -396,13 +476,14 @@ export function WorkshopPlanner({
               if (draft) loadDraft(draft);
               else reset();
             }}
-            disabled={isHeld}
+            disabled={busy}
             className="h-8 rounded-md border border-subtle bg-surface-2 px-2 text-body-xs-regular disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">New plan</option>
             {draftPage?.results.map((draft) => (
               <option key={draft.id} value={draft.id}>
                 {draft.title}
+                {draft.hold ? " · Time held" : ""}
               </option>
             ))}
           </select>
@@ -410,14 +491,17 @@ export function WorkshopPlanner({
             variant="primary"
             size="sm"
             loading={saving}
-            disabled={isHeld || !title.trim() || !trainerIds.length}
+            disabled={formLocked || !trainerIds.length || !validPlan}
             title={isHeld ? "Release the hold before changing this plan" : undefined}
             onClick={saveDraft}
           >
-            <Save className="size-3.5" /> Save draft
+            <Save className="size-3.5" /> Save plan
+          </Button>
+          <Button variant="secondary" size="sm" disabled={busy} onClick={reset}>
+            Start another plan
           </Button>
           {draftId ? (
-            <Button variant="secondary" size="sm" disabled={saving} onClick={deleteDraft}>
+            <Button variant="secondary" size="sm" disabled={busy} onClick={deleteDraft}>
               <Trash2 className="size-3.5" /> Delete
             </Button>
           ) : null}
@@ -429,7 +513,7 @@ export function WorkshopPlanner({
           <WorkshopPicker
             workspaceSlug={workspaceSlug}
             value={issue}
-            disabled={isHeld}
+            disabled={formLocked}
             onChange={(next) => {
               setIssue(next);
               // Adopt the work item's name unless the coordinator has already
@@ -438,36 +522,67 @@ export function WorkshopPlanner({
             }}
           />
           <label className="block text-body-xs-medium text-secondary">
-            Draft name
+            Plan name (optional)
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="e.g. NetSec workshop"
               maxLength={255}
-              disabled={isHeld}
+              disabled={formLocked}
               className="mt-1 h-9 w-full rounded-md border border-subtle bg-surface-1 px-3 text-body-sm-regular text-primary disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <NumberField label="Delivery" value={durationMinutes} onChange={setDurationMinutes} disabled={isHeld} />
+            <NumberField
+              label="Workshop duration"
+              value={durationMinutes}
+              onChange={setDurationMinutes}
+              disabled={formLocked}
+              min={15}
+              max={10080}
+            />
             <NumberField
               label="Preparation"
               value={preparationMinutes}
               onChange={setPreparationMinutes}
-              disabled={isHeld}
+              disabled={formLocked}
             />
             <NumberField
               label="Travel before"
               value={travelBeforeMinutes}
               onChange={setTravelBeforeMinutes}
-              disabled={isHeld}
+              disabled={formLocked}
             />
             <NumberField
               label="Travel back"
               value={travelAfterMinutes}
               onChange={setTravelAfterMinutes}
-              disabled={isHeld}
+              disabled={formLocked}
             />
+          </div>
+          <div
+            className="rounded-lg border border-accent-subtle bg-layer-2 p-3"
+            aria-label="Time needed for this plan"
+            aria-live="polite"
+          >
+            <p className="text-body-xs-medium text-secondary">One continuous booking</p>
+            <p className="text-xl mt-1 font-semibold text-primary tabular-nums">
+              {formatMinutes(availability.requiredMinutes)}
+            </p>
+            <p className="mt-1 text-body-xs-regular text-secondary">
+              {formatMinutes(durationMinutes)} workshop + {formatMinutes(availability.bufferMinutes)} preparation and
+              travel. All of it must fit inside the trainer’s booking hours.
+            </p>
+            {!validDuration ? (
+              <p role="alert" className="mt-2 text-11 text-danger-primary">
+                Workshop duration must be a whole number from 15 to 10080 minutes.
+              </p>
+            ) : null}
+            {!validBuffers ? (
+              <p role="alert" className="mt-2 text-11 text-danger-primary">
+                Each buffer must be a whole number from 0 to 1440 minutes.
+              </p>
+            ) : null}
           </div>
           <fieldset>
             <legend className="text-body-xs-medium text-secondary">Start</legend>
@@ -483,6 +598,7 @@ export function WorkshopPlanner({
                   key={value}
                   type="button"
                   aria-pressed={startWindow === value}
+                  disabled={busy}
                   onClick={() => setStartWindow(value)}
                   className={`flex-1 rounded px-2 py-1 text-11 ${
                     startWindow === value ? "shadow-xs bg-surface-1 font-medium text-primary" : "text-secondary"
@@ -508,7 +624,7 @@ export function WorkshopPlanner({
                   <input
                     type="checkbox"
                     checked={trainerIds.includes(trainer.trainer_id)}
-                    disabled={isHeld}
+                    disabled={formLocked}
                     onChange={() =>
                       setTrainerIds((current) =>
                         current.includes(trainer.trainer_id)
@@ -522,7 +638,7 @@ export function WorkshopPlanner({
                   <button
                     type="button"
                     title={`Find the first time ${trainer.display_name} could do this`}
-                    disabled={search.state === "running"}
+                    disabled={busy || isHeld || !validPlan || search.state === "running"}
                     onClick={(event) => {
                       // The row is a label, so a click here would otherwise toggle
                       // the checkbox it wraps.
@@ -541,26 +657,26 @@ export function WorkshopPlanner({
 
         <div className="p-5">
           {hold ? (
-            <div className="bg-accent-secondary/10 mb-5 flex flex-col gap-3 rounded-lg border border-accent-subtle p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="bg-accent-secondary/10 mb-5 flex flex-col gap-3 rounded-lg border border-accent-subtle p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex gap-3">
                 <ShieldCheck className="mt-0.5 size-5 shrink-0 text-accent-primary" />
                 <div>
-                  <h3 className="text-body-sm-medium text-primary">{hold.trainer_name} is held</h3>
+                  <h3 className="text-body-sm-medium text-primary">Time held for {hold.trainer_name}</h3>
                   <p className="mt-1 text-body-xs-regular text-secondary">
                     {dateTimeLabel(hold.workshop_starts_at)} –{" "}
                     {new Date(hold.workshop_ends_at).toLocaleTimeString(undefined, { timeStyle: "short" })}. Expires{" "}
-                    {dateTimeLabel(hold.expires_at)}. Internal only; no Google event was created.
+                    {dateTimeLabel(hold.expires_at)}. This is a temporary reservation, not a scheduled workshop.
                   </p>
                   <p className="mt-1 text-11 text-placeholder">
                     {issue
-                      ? `Scheduling books this on ${workshopLabel(issue)} and assigns ${hold.trainer_name}. The plan is frozen until then — release the hold to change it.`
-                      : "This plan is not attached to a Workshop work item, so it cannot be scheduled. Release the hold to attach one."}
+                      ? `Schedule this session on ${workshopLabel(issue)}, or release this time to change the plan. You can add another session after scheduling.`
+                      : "To schedule this session, release the hold and choose a Workshop work item. You can also leave this time held and start another plan."}
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <Button variant="secondary" size="sm" disabled={saving || scheduling} onClick={releaseHold}>
-                  Release hold
+                  Release and edit
                 </Button>
                 <Button
                   variant="primary"
@@ -573,148 +689,177 @@ export function WorkshopPlanner({
                   <CalendarCheck className="size-3.5" /> Schedule workshop
                 </Button>
               </div>
-            </div>
-          ) : null}
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-            <div>
-              <h3 className="text-body-sm-medium text-primary">Matching slots</h3>
-              <p className="mt-1 text-11 text-secondary">
-                Up to {MAX_SLOTS_PER_TRAINER_PER_DAY} starts per trainer per day, spread across each opening.
+              <p className="text-11 text-secondary sm:basis-full">
+                One plan holds one time. Use “Start another plan” to keep this reservation and plan more. Return to it
+                from Saved planning drafts.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                loading={search.state === "running"}
-                disabled={!trainerIds.length || search.state === "running"}
-                onClick={() => void findNext(null)}
-              >
-                <CalendarSearch className="size-3.5" /> Find first available
-              </Button>
-              <span className="rounded-full bg-surface-2 px-2.5 py-1 text-11 text-secondary">
-                {candidates.length} options
-              </span>
-            </div>
-          </div>
-
-          {search.state === "running" ? (
-            <p className="mb-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 text-11 text-secondary">
-              Looking ahead — checking the fortnight from {dateTimeLabel(search.from.toISOString())}. One window at a
-              time, because the capacity service is rate-limited.
-            </p>
           ) : null}
+          {!isHeld ? (
+            <>
+              <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                <div>
+                  <h3 className="text-body-sm-medium text-primary">Matching slots</h3>
+                  <p className="mt-1 text-11 text-secondary">
+                    Up to {MAX_SLOTS_PER_TRAINER_PER_DAY} starts per trainer per day. Times shown in{" "}
+                    {Intl.DateTimeFormat().resolvedOptions().timeZone}.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={search.state === "running"}
+                    disabled={busy || !trainerIds.length || !validPlan || search.state === "running"}
+                    onClick={() => void findNext(null)}
+                  >
+                    <CalendarSearch className="size-3.5" /> Find first available
+                  </Button>
+                  <span className="rounded-full bg-surface-2 px-2.5 py-1 text-11 text-secondary">
+                    {candidates.length} options
+                  </span>
+                </div>
+              </div>
 
-          {search.state === "done" ? (
-            <div className="mb-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 text-body-xs-regular">
-              {search.result.found ? (
-                <>
-                  <p className="text-primary">
-                    <span className="font-medium">{search.result.candidate.trainerName}</span> is the first who can:{" "}
-                    {dateTimeLabel(search.result.candidate.workshopStartsAt)} –{" "}
-                    {dateTimeLabel(search.result.candidate.workshopEndsAt)}.
-                  </p>
-                  <p className="mt-1 text-secondary">
-                    {search.result.windowsSearched === 1
-                      ? "It is in the week already on screen, below."
-                      : `Not in the week on screen — move to ${dateTimeLabel(search.result.windowStart.toISOString())} to hold it.`}
-                    {search.forTrainer ? " Searched that trainer only." : ""}
-                  </p>
-                </>
-              ) : (
-                <p className="text-secondary">
-                  Nothing fits in the next {search.result.windowsSearched} fortnights, up to{" "}
-                  {dateTimeLabel(search.result.searchedUntil.toISOString())}
-                  {search.forTrainer ? " for that trainer" : ""}. Shorten the workshop, trim the buffers, or widen the
-                  eligible trainers.
+              {search.state === "running" ? (
+                <p className="mb-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 text-11 text-secondary">
+                  Looking for a complete {formatMinutes(availability.requiredMinutes)} opening — checking from{" "}
+                  {dateTimeLabel(search.from.toISOString())}.
                 </p>
-              )}
-            </div>
-          ) : null}
-          {candidateDays.length ? (
-            <div className="space-y-6">
-              {candidateDays.map((group) => (
-                <section key={group.day} aria-label={dayLabel(group.candidates[0].workshopStartsAt)}>
-                  <h4 className="mb-2 text-11 font-semibold tracking-[0.12em] text-placeholder uppercase">
-                    {dayLabel(group.candidates[0].workshopStartsAt)}
-                  </h4>
-                  <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                    {group.candidates.map((candidate) => (
-                      <article
-                        key={`${candidate.trainerId}-${candidate.blockedStartsAt}`}
-                        className="rounded-lg border border-subtle bg-surface-2 p-4"
+              ) : null}
+
+              {search.state === "done" ? (
+                <div className="mb-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 text-body-xs-regular">
+                  {search.result.found ? (
+                    <>
+                      <p className="text-primary">
+                        <span className="font-medium">{search.result.candidate.trainerName}</span> is the first who can:{" "}
+                        {dateTimeLabel(search.result.candidate.workshopStartsAt)} –{" "}
+                        {dateTimeLabel(search.result.candidate.workshopEndsAt)}.
+                      </p>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => {
+                          if (search.result.found) {
+                            const candidate = search.result.candidate;
+                            setTrainerIds((current) =>
+                              current.includes(candidate.trainerId) ? current : [...current, candidate.trainerId]
+                            );
+                            onViewWeek(startOfWeek(new Date(candidate.workshopStartsAt)));
+                          }
+                        }}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h4 className="text-body-sm-medium text-primary">{candidate.trainerName}</h4>
-                            <p className="mt-0.5 text-11 text-placeholder">{candidate.timezone}</p>
-                          </div>
-                          {candidate.availabilityStatus !== "fresh" ? (
-                            <span className="text-11 text-warning-primary">Verify calendar</span>
-                          ) : null}
-                        </div>
-                        <div className="mt-4 space-y-2 text-body-xs-regular">
-                          <div className="flex items-start gap-2">
-                            <CalendarSearch className="mt-0.5 size-3.5 shrink-0 text-accent-primary" />
-                            <div>
-                              <span className="block text-11 text-placeholder">Workshop</span>
-                              <span className="text-primary">
-                                {timeLabel(candidate.workshopStartsAt)} – {timeLabel(candidate.workshopEndsAt)}
-                              </span>
+                        Show this week
+                      </Button>
+                      {search.forTrainer ? <p className="mt-1 text-secondary">Searched that trainer only.</p> : null}
+                    </>
+                  ) : (
+                    <div className="text-secondary">
+                      <p>No matching time found up to {dateTimeLabel(search.result.searchedUntil.toISOString())}.</p>
+                      <p className="mt-1">{noWorkshopFitReason(search.result.availability, spec, formatMinutes)}</p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+              {capacityState === "error" ? (
+                <div role="alert" className="rounded-lg border border-subtle p-4">
+                  <p className="text-body-sm-medium">Availability could not be loaded</p>
+                  <p className="mt-1 text-body-xs-regular text-secondary">{capacityError}</p>
+                  <Button variant="secondary" size="sm" className="mt-3" onClick={onRetry}>
+                    Retry
+                  </Button>
+                </div>
+              ) : capacityState === "loading" ? (
+                <p role="status" className="rounded-lg border border-subtle p-4 text-body-xs-regular text-secondary">
+                  Loading availability for this week…
+                </p>
+              ) : candidateDays.length ? (
+                <div className="space-y-6">
+                  {candidateDays.map((group) => (
+                    <section key={group.day} aria-label={dayLabel(group.candidates[0].workshopStartsAt)}>
+                      <h4 className="mb-2 text-11 font-semibold tracking-[0.12em] text-placeholder uppercase">
+                        {dayLabel(group.candidates[0].workshopStartsAt)}
+                      </h4>
+                      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                        {group.candidates.map((candidate) => (
+                          <article
+                            key={`${candidate.trainerId}-${candidate.blockedStartsAt}`}
+                            className="rounded-lg border border-subtle bg-surface-2 p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <h4 className="text-body-sm-medium text-primary">{candidate.trainerName}</h4>
+                                <p className="mt-0.5 text-11 text-placeholder">{candidate.timezone}</p>
+                              </div>
+                              {candidate.availabilityStatus !== "fresh" ? (
+                                <span className="text-11 text-warning-primary">Verify calendar</span>
+                              ) : null}
                             </div>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <Clock3 className="mt-0.5 size-3.5 shrink-0 text-secondary" />
-                            <div>
-                              <span className="block text-11 text-placeholder">Trainer blocked</span>
-                              <span className="text-secondary">
-                                {/* Spelled out in full when travel pushes the block onto
+                            <div className="mt-4 space-y-2 text-body-xs-regular">
+                              <div className="flex items-start gap-2">
+                                <CalendarSearch className="mt-0.5 size-3.5 shrink-0 text-accent-primary" />
+                                <div>
+                                  <span className="block text-11 text-placeholder">Workshop</span>
+                                  <span className="text-primary">
+                                    {timeLabel(candidate.workshopStartsAt)} – {timeLabel(candidate.workshopEndsAt)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-2">
+                                <Clock3 className="mt-0.5 size-3.5 shrink-0 text-secondary" />
+                                <div>
+                                  <span className="block text-11 text-placeholder">Trainer blocked</span>
+                                  <span className="text-secondary">
+                                    {/* Spelled out in full when travel pushes the block onto
                               another day, which the heading above would otherwise
                               contradict. */}
-                                {sameLocalDay(candidate.blockedStartsAt, candidate.workshopStartsAt)
-                                  ? timeLabel(candidate.blockedStartsAt)
-                                  : dateTimeLabel(candidate.blockedStartsAt)}{" "}
-                                –{" "}
-                                {sameLocalDay(candidate.blockedEndsAt, candidate.workshopStartsAt)
-                                  ? timeLabel(candidate.blockedEndsAt)
-                                  : dateTimeLabel(candidate.blockedEndsAt)}
-                              </span>
+                                    {sameLocalDay(candidate.blockedStartsAt, candidate.workshopStartsAt)
+                                      ? timeLabel(candidate.blockedStartsAt)
+                                      : dateTimeLabel(candidate.blockedStartsAt)}{" "}
+                                    –{" "}
+                                    {sameLocalDay(candidate.blockedEndsAt, candidate.workshopStartsAt)
+                                      ? timeLabel(candidate.blockedEndsAt)
+                                      : dateTimeLabel(candidate.blockedEndsAt)}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        <Button
-                          className="mt-4 w-full"
-                          variant="secondary"
-                          size="sm"
-                          disabled={planNeedsSaving || revision === null || saving || Boolean(hold)}
-                          onClick={() => holdCandidate(candidate.trainerId, candidate.workshopStartsAt)}
-                        >
-                          <ShieldCheck className="size-3.5" /> Hold for 72h
-                        </Button>
-                        {planNeedsSaving ? (
-                          <p className="mt-2 text-center text-11 text-placeholder">
-                            Save this version of the plan first
-                          </p>
-                        ) : null}
-                      </article>
-                    ))}
+                            <Button
+                              className="mt-4 w-full"
+                              variant="secondary"
+                              size="sm"
+                              disabled={!validPlan || busy}
+                              onClick={() => holdCandidate(candidate)}
+                            >
+                              <ShieldCheck className="size-3.5" />{" "}
+                              {planNeedsSaving ? "Save plan & hold for 72h" : "Hold for 72h"}
+                            </Button>
+                            {planNeedsSaving ? (
+                              <p className="mt-2 text-center text-11 text-placeholder">
+                                Saves this plan and temporarily reserves the full trainer block.
+                              </p>
+                            ) : null}
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid min-h-48 place-items-center rounded-lg border border-dashed border-subtle bg-surface-2 px-5 text-center">
+                  <div>
+                    <CalendarSearch className="mx-auto size-7 text-placeholder" />
+                    <h3 className="mt-2 text-body-sm-medium text-primary">No matching time this week</h3>
+                    <p className="mt-1 text-body-xs-regular text-secondary">
+                      {noWorkshopFitReason(availability, spec, formatMinutes)}
+                    </p>
                   </div>
-                </section>
-              ))}
-            </div>
-          ) : (
-            <div className="grid min-h-48 place-items-center rounded-lg border border-dashed border-subtle bg-surface-2 px-5 text-center">
-              <div>
-                <CalendarSearch className="mx-auto size-7 text-placeholder" />
-                <h3 className="mt-2 text-body-sm-medium text-primary">No complete block fits</h3>
-                <p className="mt-1 text-body-xs-regular text-secondary">
-                  {startWindow === "any"
-                    ? "Select more trainers, shorten the workshop or buffers, or move to another week."
-                    : "Nothing fits in that half of the day. Try “Any time”, select more trainers, or move to another week."}
-                </p>
-              </div>
-            </div>
-          )}
+                </div>
+              )}
+            </>
+          ) : null}
         </div>
       </div>
     </section>

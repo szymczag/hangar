@@ -28,6 +28,8 @@ export type TWorkshopSpec = {
   travelBeforeMinutes: number;
   travelAfterMinutes: number;
   startWindow?: TStartWindow;
+  /** Earliest allowed start of preparation/travel, not just the workshop. */
+  notBefore?: Date;
 };
 
 /**
@@ -82,17 +84,19 @@ function spread<T>(items: T[], max: number): T[] {
  * different question than the one it is asked. Everything after it sits on the
  * half hour.
  */
-function startsInRange(rangeStart: Date, rangeEnd: Date, totalMinutes: number): Date[] {
+function startsInRange(rangeStart: Date, rangeEnd: Date, totalMinutes: number, beforeMinutes: number): Date[] {
   const totalMs = totalMinutes * 60_000;
   const stepMs = SLOT_STEP_MINUTES * 60_000;
   const latest = rangeEnd.getTime() - totalMs;
   if (latest < rangeStart.getTime()) return [];
 
   const starts = [new Date(rangeStart)];
-  const aligned = new Date(rangeStart);
+  // Align the workshop start: a 15-minute preparation must not hide a noon workshop.
+  const beforeMs = beforeMinutes * 60_000;
+  const aligned = new Date(rangeStart.getTime() + beforeMs);
   aligned.setSeconds(0, 0);
   aligned.setMinutes(Math.ceil(aligned.getMinutes() / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES);
-  for (let time = aligned.getTime(); time <= latest; time += stepMs) {
+  for (let time = aligned.getTime() - beforeMs; time <= latest; time += stepMs) {
     if (time > rangeStart.getTime()) starts.push(new Date(time));
   }
   return starts;
@@ -109,6 +113,7 @@ export function findWorkshopCandidates(
   const totalMinutes = beforeMinutes + durationMinutes + travelAfterMinutes;
   if (durationMinutes <= 0 || totalMinutes <= 0 || windowStart >= windowEnd) return [];
   const startWindow = spec.startWindow ?? "any";
+  const earliest = new Date(Math.max(windowStart.getTime(), spec.notBefore?.getTime() ?? windowStart.getTime()));
   const selected = new Set(spec.trainerIds);
   const candidates: TWorkshopCandidate[] = [];
 
@@ -117,8 +122,13 @@ export function findWorkshopCandidates(
     // Per trainer per day, because the cap is about how much choice one person
     // is offered for one date -- not about the size of the grid.
     const byDay = new Map<string, TWorkshopCandidate[]>();
-    for (const range of availableRanges(trainer.intervals, windowStart, windowEnd)) {
-      for (const blockedStart of startsInRange(new Date(range.start), new Date(range.end), totalMinutes)) {
+    for (const range of availableRanges(trainer.intervals, earliest, windowEnd)) {
+      for (const blockedStart of startsInRange(
+        new Date(range.start),
+        new Date(range.end),
+        totalMinutes,
+        beforeMinutes
+      )) {
         const workshopStart = new Date(blockedStart.getTime() + beforeMinutes * 60_000);
         if (!startsInWindow(workshopStart, startWindow)) continue;
         const day = byDay.get(dayKey(workshopStart)) ?? [];
@@ -148,6 +158,55 @@ export function findWorkshopCandidates(
     else ordered.splice(insertionIndex, 0, candidate);
   }
   return ordered;
+}
+
+/** Leave time to select a slot instead of offering a block that has already started on click. */
+export const nextBookingMinute = (now: Date) => new Date((Math.floor(now.getTime() / 60_000) + 1) * 60_000);
+
+/** Explain the physical fit independently of the number of cards offered. */
+export function workshopAvailability(
+  trainers: TTrainerCapacity[],
+  windowStart: Date,
+  windowEnd: Date,
+  spec: TWorkshopSpec
+) {
+  const bufferMinutes = spec.preparationMinutes + spec.travelBeforeMinutes + spec.travelAfterMinutes;
+  const earliest = new Date(Math.max(windowStart.getTime(), spec.notBefore?.getTime() ?? windowStart.getTime()));
+  const selected = trainers.filter((trainer) => spec.trainerIds.includes(trainer.trainer_id));
+  let longestFreeMinutes = 0;
+  for (const trainer of selected) {
+    for (const range of availableRanges(trainer.intervals, earliest, windowEnd)) {
+      longestFreeMinutes = Math.max(
+        longestFreeMinutes,
+        Math.floor((new Date(range.end).getTime() - new Date(range.start).getTime()) / 60_000)
+      );
+    }
+  }
+  return {
+    bufferMinutes,
+    requiredMinutes: spec.durationMinutes + bufferMinutes,
+    longestFreeMinutes,
+    selectedTrainerCount: selected.length,
+  };
+}
+
+/** An empty search should explain which requirement prevents a fit. */
+export function noWorkshopFitReason(
+  availability: ReturnType<typeof workshopAvailability>,
+  spec: TWorkshopSpec,
+  formatDuration: (minutes: number) => string
+): string {
+  if (!spec.trainerIds.length) return "Select at least one trainer to see available times.";
+  if (spec.durationMinutes < 15) return "Enter a workshop duration of at least 15 minutes.";
+  if (!availability.selectedTrainerCount)
+    return "The selected trainers are no longer available. Choose an active trainer.";
+  if (!availability.longestFreeMinutes) {
+    return "No free booking hours remain in this range. Check the trainers’ booking hours and calendar blocks, or look further ahead.";
+  }
+  if (availability.longestFreeMinutes < availability.requiredMinutes) {
+    return `This plan needs ${formatDuration(availability.requiredMinutes)} without a break, including preparation and travel. The longest free opening is ${formatDuration(availability.longestFreeMinutes)}. Adjust the duration or buffers, or look further ahead.`;
+  }
+  return "No workshop starts fit that half of the day. Try Any time or look further ahead.";
 }
 
 /** Candidates split into the days they start on, in order. */
@@ -197,7 +256,12 @@ export const CAPACITY_WINDOW_DAYS = 14;
 
 export type TFirstAvailable =
   | { found: true; candidate: TWorkshopCandidate; windowStart: Date; windowEnd: Date; windowsSearched: number }
-  | { found: false; windowsSearched: number; searchedUntil: Date };
+  | {
+      found: false;
+      windowsSearched: number;
+      searchedUntil: Date;
+      availability: ReturnType<typeof workshopAvailability>;
+    };
 
 export function windowAfter(start: Date, index: number): { windowStart: Date; windowEnd: Date } {
   const windowStart = new Date(start.getTime() + index * CAPACITY_WINDOW_DAYS * 86_400_000);
@@ -226,11 +290,13 @@ export async function findFirstAvailable(
   from: Date,
   spec: TWorkshopSpec,
   fetchWindow: (windowStart: Date, windowEnd: Date) => Promise<TTrainerCapacity[]>,
-  options: { maxWindows?: number; onProgress?: (windowStart: Date, index: number) => void } = {}
+  options: { maxWindows?: number; onProgress?: (windowStart: Date, index: number) => void; signal?: AbortSignal } = {}
 ): Promise<TFirstAvailable> {
   const maxWindows = options.maxWindows ?? FIRST_AVAILABLE_WINDOWS;
+  const availability = workshopAvailability([], from, from, spec);
 
   for (let index = 0; index < maxWindows; index++) {
+    options.signal?.throwIfAborted();
     const { windowStart, windowEnd } = windowAfter(from, index);
     options.onProgress?.(windowStart, index);
 
@@ -239,6 +305,10 @@ export async function findFirstAvailable(
     // It also means a hit in the first window costs one request rather than eight.
     // oxlint-disable-next-line no-await-in-loop
     const trainers = await fetchWindow(windowStart, windowEnd);
+    options.signal?.throwIfAborted();
+    const current = workshopAvailability(trainers, windowStart, windowEnd, spec);
+    availability.longestFreeMinutes = Math.max(availability.longestFreeMinutes, current.longestFreeMinutes);
+    availability.selectedTrainerCount = Math.max(availability.selectedTrainerCount, current.selectedTrainerCount);
     const candidates = findWorkshopCandidates(trainers, windowStart, windowEnd, spec);
 
     // Candidates are already ordered by start time, then trainer name, so the
@@ -248,5 +318,10 @@ export async function findFirstAvailable(
     }
   }
 
-  return { found: false, windowsSearched: maxWindows, searchedUntil: windowAfter(from, maxWindows).windowStart };
+  return {
+    found: false,
+    windowsSearched: maxWindows,
+    searchedUntil: windowAfter(from, maxWindows).windowStart,
+    availability,
+  };
 }

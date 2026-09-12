@@ -236,9 +236,10 @@ export class CapacityService extends APIService {
     });
   }
 
-  getCapacity(workspaceSlug: string, from: string, to: string, trainerIds: string[]) {
+  getCapacity(workspaceSlug: string, from: string, to: string, trainerIds: string[], signal?: AbortSignal) {
     return this.get(`/api/workspaces/${workspaceSlug}/capacity/`, {
       params: { from, to, trainer_ids: trainerIds.join(",") },
+      signal,
     })
       .then((response) => response.data as TCapacityResponse)
       .catch((error) => {
