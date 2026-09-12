@@ -18,9 +18,15 @@ import {
 } from "@/services/capacity.service";
 import {
   dateTimeLabel,
+  dayLabel,
   findFirstAvailable,
   findWorkshopCandidates,
+  groupByDay,
+  MAX_SLOTS_PER_TRAINER_PER_DAY,
+  sameLocalDay,
+  timeLabel,
   type TFirstAvailable,
+  type TStartWindow,
 } from "./workshop-planner.utils";
 
 const capacityService = new CapacityService();
@@ -96,6 +102,14 @@ export function WorkshopPlanner({
   const [travelBeforeMinutes, setTravelBeforeMinutes] = useState(60);
   const [travelAfterMinutes, setTravelAfterMinutes] = useState(60);
   const [trainerIds, setTrainerIds] = useState(() => trainers.map((trainer) => trainer.trainer_id));
+  /**
+   * Which half of the day to look in.
+   *
+   * Not part of the draft: it narrows the same plan rather than describing a
+   * different one, the way the week does. Saving it would put "I asked about
+   * afternoons once" into the plan for good.
+   */
+  const [startWindow, setStartWindow] = useState<TStartWindow>("any");
   const [saving, setSaving] = useState(false);
   const [hold, setHold] = useState<TWorkshopPlanHold | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
@@ -125,6 +139,7 @@ export function WorkshopPlanner({
           preparationMinutes,
           travelBeforeMinutes,
           travelAfterMinutes,
+          startWindow,
         },
         async (windowStart, windowEnd) => {
           const response = await capacityService.getCapacity(
@@ -150,19 +165,18 @@ export function WorkshopPlanner({
 
   const candidates = useMemo(
     () =>
-      findWorkshopCandidates(
-        trainers,
+      findWorkshopCandidates(trainers, weekStart, weekEnd, {
         trainerIds,
-        weekStart,
-        weekEnd,
         durationMinutes,
         preparationMinutes,
         travelBeforeMinutes,
-        travelAfterMinutes
-      ),
+        travelAfterMinutes,
+        startWindow,
+      }),
     [
       durationMinutes,
       preparationMinutes,
+      startWindow,
       trainerIds,
       trainers,
       travelAfterMinutes,
@@ -171,6 +185,7 @@ export function WorkshopPlanner({
       weekStart,
     ]
   );
+  const candidateDays = useMemo(() => groupByDay(candidates), [candidates]);
 
   /**
    * A held plan is frozen, because the server freezes it: `PUT /capacity/plans/`
@@ -391,6 +406,30 @@ export function WorkshopPlanner({
             />
           </div>
           <fieldset>
+            <legend className="text-body-xs-medium text-secondary">Start</legend>
+            <div className="mt-1 flex rounded-md border border-subtle bg-surface-2 p-0.5">
+              {(
+                [
+                  ["any", "Any time"],
+                  ["morning", "Morning"],
+                  ["afternoon", "Afternoon"],
+                ] as Array<[TStartWindow, string]>
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={startWindow === value}
+                  onClick={() => setStartWindow(value)}
+                  className={`flex-1 rounded px-2 py-1 text-11 ${
+                    startWindow === value ? "shadow-xs bg-surface-1 font-medium text-primary" : "text-secondary"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
             <legend className="flex items-center gap-2 text-body-xs-medium text-secondary">
               <Users className="size-3.5" /> Eligible trainers
             </legend>
@@ -462,7 +501,9 @@ export function WorkshopPlanner({
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <h3 className="text-body-sm-medium text-primary">Matching slots</h3>
-              <p className="mt-1 text-11 text-secondary">Earliest fit in every free range during the selected week.</p>
+              <p className="mt-1 text-11 text-secondary">
+                Up to {MAX_SLOTS_PER_TRAINER_PER_DAY} starts per trainer per day, spread across each opening.
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -513,57 +554,75 @@ export function WorkshopPlanner({
               )}
             </div>
           ) : null}
-          {candidates.length ? (
-            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-              {candidates.map((candidate) => (
-                <article
-                  key={`${candidate.trainerId}-${candidate.blockedStartsAt}`}
-                  className="rounded-lg border border-subtle bg-surface-2 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-body-sm-medium text-primary">{candidate.trainerName}</h4>
-                      <p className="mt-0.5 text-11 text-placeholder">{candidate.timezone}</p>
-                    </div>
-                    {candidate.availabilityStatus !== "fresh" ? (
-                      <span className="text-11 text-warning-primary">Verify calendar</span>
-                    ) : null}
+          {candidateDays.length ? (
+            <div className="space-y-6">
+              {candidateDays.map((group) => (
+                <section key={group.day} aria-label={dayLabel(group.candidates[0].workshopStartsAt)}>
+                  <h4 className="mb-2 text-11 font-semibold tracking-[0.12em] text-placeholder uppercase">
+                    {dayLabel(group.candidates[0].workshopStartsAt)}
+                  </h4>
+                  <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                    {group.candidates.map((candidate) => (
+                      <article
+                        key={`${candidate.trainerId}-${candidate.blockedStartsAt}`}
+                        className="rounded-lg border border-subtle bg-surface-2 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h4 className="text-body-sm-medium text-primary">{candidate.trainerName}</h4>
+                            <p className="mt-0.5 text-11 text-placeholder">{candidate.timezone}</p>
+                          </div>
+                          {candidate.availabilityStatus !== "fresh" ? (
+                            <span className="text-11 text-warning-primary">Verify calendar</span>
+                          ) : null}
+                        </div>
+                        <div className="mt-4 space-y-2 text-body-xs-regular">
+                          <div className="flex items-start gap-2">
+                            <CalendarSearch className="mt-0.5 size-3.5 shrink-0 text-accent-primary" />
+                            <div>
+                              <span className="block text-11 text-placeholder">Workshop</span>
+                              <span className="text-primary">
+                                {timeLabel(candidate.workshopStartsAt)} – {timeLabel(candidate.workshopEndsAt)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <Clock3 className="mt-0.5 size-3.5 shrink-0 text-secondary" />
+                            <div>
+                              <span className="block text-11 text-placeholder">Trainer blocked</span>
+                              <span className="text-secondary">
+                                {/* Spelled out in full when travel pushes the block onto
+                              another day, which the heading above would otherwise
+                              contradict. */}
+                                {sameLocalDay(candidate.blockedStartsAt, candidate.workshopStartsAt)
+                                  ? timeLabel(candidate.blockedStartsAt)
+                                  : dateTimeLabel(candidate.blockedStartsAt)}{" "}
+                                –{" "}
+                                {sameLocalDay(candidate.blockedEndsAt, candidate.workshopStartsAt)
+                                  ? timeLabel(candidate.blockedEndsAt)
+                                  : dateTimeLabel(candidate.blockedEndsAt)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          className="mt-4 w-full"
+                          variant="secondary"
+                          size="sm"
+                          disabled={planNeedsSaving || revision === null || saving || Boolean(hold)}
+                          onClick={() => holdCandidate(candidate.trainerId, candidate.workshopStartsAt)}
+                        >
+                          <ShieldCheck className="size-3.5" /> Hold for 72h
+                        </Button>
+                        {planNeedsSaving ? (
+                          <p className="mt-2 text-center text-11 text-placeholder">
+                            Save this version of the plan first
+                          </p>
+                        ) : null}
+                      </article>
+                    ))}
                   </div>
-                  <div className="mt-4 space-y-2 text-body-xs-regular">
-                    <div className="flex items-start gap-2">
-                      <CalendarSearch className="mt-0.5 size-3.5 shrink-0 text-accent-primary" />
-                      <div>
-                        <span className="block text-11 text-placeholder">Workshop</span>
-                        <span className="text-primary">
-                          {dateTimeLabel(candidate.workshopStartsAt)} –{" "}
-                          {new Date(candidate.workshopEndsAt).toLocaleTimeString(undefined, { timeStyle: "short" })}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Clock3 className="mt-0.5 size-3.5 shrink-0 text-secondary" />
-                      <div>
-                        <span className="block text-11 text-placeholder">Trainer blocked</span>
-                        <span className="text-secondary">
-                          {dateTimeLabel(candidate.blockedStartsAt)} –{" "}
-                          {new Date(candidate.blockedEndsAt).toLocaleTimeString(undefined, { timeStyle: "short" })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    className="mt-4 w-full"
-                    variant="secondary"
-                    size="sm"
-                    disabled={planNeedsSaving || revision === null || saving || Boolean(hold)}
-                    onClick={() => holdCandidate(candidate.trainerId, candidate.workshopStartsAt)}
-                  >
-                    <ShieldCheck className="size-3.5" /> Hold for 72h
-                  </Button>
-                  {planNeedsSaving ? (
-                    <p className="mt-2 text-center text-11 text-placeholder">Save this version of the plan first</p>
-                  ) : null}
-                </article>
+                </section>
               ))}
             </div>
           ) : (
@@ -572,7 +631,9 @@ export function WorkshopPlanner({
                 <CalendarSearch className="mx-auto size-7 text-placeholder" />
                 <h3 className="mt-2 text-body-sm-medium text-primary">No complete block fits</h3>
                 <p className="mt-1 text-body-xs-regular text-secondary">
-                  Select more trainers, shorten the workshop or buffers, or move to another week.
+                  {startWindow === "any"
+                    ? "Select more trainers, shorten the workshop or buffers, or move to another week."
+                    : "Nothing fits in that half of the day. Try “Any time”, select more trainers, or move to another week."}
                 </p>
               </div>
             </div>

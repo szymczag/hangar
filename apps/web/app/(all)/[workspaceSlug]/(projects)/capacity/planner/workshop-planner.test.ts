@@ -5,7 +5,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { TTrainerCapacity } from "@/services/capacity.service";
-import { dateTimeLabel, findFirstAvailable, findWorkshopCandidates } from "./workshop-planner.utils";
+import {
+  dateTimeLabel,
+  findFirstAvailable,
+  findWorkshopCandidates,
+  groupByDay,
+  MAX_SLOTS_PER_TRAINER_PER_DAY,
+  timeLabel,
+} from "./workshop-planner.utils";
 import { planSignature } from "./workshop-planner";
 
 const trainer = {
@@ -27,58 +34,202 @@ const trainer = {
   conflicts: [],
 } satisfies TTrainerCapacity;
 
+/**
+ * Fixtures are built with the local `Date` constructor rather than UTC literals.
+ * Which starts are offered, which day they are grouped under and which half of
+ * the day they fall in are all questions about the viewer's clock, so pinning
+ * them to UTC would pass here and fail wherever the suite runs in another zone.
+ */
+const at = (day: number, hour: number, minute = 0) => new Date(2026, 8, day, hour, minute, 0, 0);
+const freeBetween = (...spans: Array<[Date, Date]>): TTrainerCapacity => ({
+  ...trainer,
+  intervals: spans.map(([from, to]) => ({ start: from.toISOString(), end: to.toISOString(), kind: "working" })),
+});
+const startTimes = (candidates: ReturnType<typeof findWorkshopCandidates>) =>
+  candidates.map((candidate) => timeLabel(candidate.workshopStartsAt, "en-GB"));
+
 describe("findWorkshopCandidates", () => {
+  const spec = {
+    trainerIds: [trainer.trainer_id],
+    durationMinutes: 120,
+    preparationMinutes: 30,
+    travelBeforeMinutes: 60,
+    travelAfterMinutes: 45,
+  };
+
   it("fits preparation and both travel buffers inside a genuinely free range", () => {
     const result = findWorkshopCandidates(
       [trainer],
-      [trainer.trainer_id],
       new Date("2026-09-07T00:00:00.000Z"),
       new Date("2026-09-08T00:00:00.000Z"),
-      120,
-      30,
-      60,
-      45
+      spec
     );
 
-    expect(result).toEqual([
-      {
-        trainerId: "trainer-1",
-        trainerName: "A Trainer",
-        timezone: "Europe/Warsaw",
-        availabilityStatus: "fresh",
-        blockedStartsAt: "2026-09-07T10:00:00.000Z",
-        workshopStartsAt: "2026-09-07T11:30:00.000Z",
-        workshopEndsAt: "2026-09-07T13:30:00.000Z",
-        blockedEndsAt: "2026-09-07T14:15:00.000Z",
-      },
-    ]);
+    // The 07:00-09:00 opening is two hours and the whole block is 4h15, so only
+    // the one after the busy range can hold it.
+    expect(result[0]).toEqual({
+      trainerId: "trainer-1",
+      trainerName: "A Trainer",
+      timezone: "Europe/Warsaw",
+      availabilityStatus: "fresh",
+      blockedStartsAt: "2026-09-07T10:00:00.000Z",
+      workshopStartsAt: "2026-09-07T11:30:00.000Z",
+      workshopEndsAt: "2026-09-07T13:30:00.000Z",
+      blockedEndsAt: "2026-09-07T14:15:00.000Z",
+    });
   });
 
   it("does not suggest unselected trainers or ranges too short for the whole block", () => {
     expect(
-      findWorkshopCandidates(
-        [trainer],
-        [],
-        new Date("2026-09-07T00:00:00.000Z"),
-        new Date("2026-09-08T00:00:00.000Z"),
-        60,
-        0,
-        0,
-        0
-      )
+      findWorkshopCandidates([trainer], new Date("2026-09-07T00:00:00.000Z"), new Date("2026-09-08T00:00:00.000Z"), {
+        ...spec,
+        trainerIds: [],
+      })
     ).toEqual([]);
     expect(
-      findWorkshopCandidates(
-        [trainer],
-        [trainer.trainer_id],
-        new Date("2026-09-07T09:00:00.000Z"),
-        new Date("2026-09-07T10:00:00.000Z"),
-        60,
-        0,
-        0,
-        0
-      )
+      findWorkshopCandidates([trainer], new Date("2026-09-07T09:00:00.000Z"), new Date("2026-09-07T10:00:00.000Z"), {
+        ...spec,
+        durationMinutes: 60,
+        preparationMinutes: 0,
+        travelBeforeMinutes: 0,
+        travelAfterMinutes: 0,
+      })
     ).toEqual([]);
+  });
+
+  it("offers more than the first fit in an opening, so an afternoon can be asked for", () => {
+    // The whole point of the change: 09:00-17:00 with a two-hour block used to
+    // yield exactly one card, at 09:00, and no way to express "later".
+    const result = findWorkshopCandidates([freeBetween([at(7, 9), at(7, 17)])], at(7, 0), at(8, 0), {
+      trainerIds: [trainer.trainer_id],
+      durationMinutes: 120,
+      preparationMinutes: 0,
+      travelBeforeMinutes: 0,
+      travelAfterMinutes: 0,
+    });
+
+    expect(result.length).toBeGreaterThan(1);
+    expect(startTimes(result)[0]).toBe("09:00");
+  });
+
+  it("keeps the genuine earliest start when an opening does not begin on the half hour", () => {
+    // A range that opens when a calendar block closes can start at 09:07. That
+    // is the real earliest fit and `findFirstAvailable` reads it, so it is kept
+    // as-is; everything after it is said the way people say times.
+    // Narrow enough that four fits exist, so the day cap does not thin them and
+    // hide the stepping this is about.
+    const result = findWorkshopCandidates([freeBetween([at(7, 9, 7), at(7, 11, 30)])], at(7, 0), at(8, 0), {
+      trainerIds: [trainer.trainer_id],
+      durationMinutes: 60,
+      preparationMinutes: 0,
+      travelBeforeMinutes: 0,
+      travelAfterMinutes: 0,
+    });
+
+    expect(startTimes(result)).toEqual(["09:07", "09:30", "10:00", "10:30"]);
+  });
+
+  it("caps one trainer's starts for one day, keeping the earliest and spreading the rest", () => {
+    const result = findWorkshopCandidates([freeBetween([at(7, 8), at(7, 22)])], at(7, 0), at(8, 0), {
+      trainerIds: [trainer.trainer_id],
+      durationMinutes: 60,
+      preparationMinutes: 0,
+      travelBeforeMinutes: 0,
+      travelAfterMinutes: 0,
+    });
+
+    // Twenty-seven half-hourly fits, offered as four spread across the day
+    // rather than four consecutive ones at breakfast. The earliest and the
+    // latest are both kept, so the pair bounds what is actually possible.
+    expect(result).toHaveLength(MAX_SLOTS_PER_TRAINER_PER_DAY);
+    expect(startTimes(result)).toEqual(["08:00", "12:30", "16:30", "21:00"]);
+  });
+
+  it("counts the cap per day, not per week", () => {
+    const result = findWorkshopCandidates(
+      [freeBetween([at(7, 9), at(7, 17)], [at(8, 9), at(8, 17)])],
+      at(7, 0),
+      at(9, 0),
+      {
+        trainerIds: [trainer.trainer_id],
+        durationMinutes: 60,
+        preparationMinutes: 0,
+        travelBeforeMinutes: 0,
+        travelAfterMinutes: 0,
+      }
+    );
+
+    expect(result).toHaveLength(MAX_SLOTS_PER_TRAINER_PER_DAY * 2);
+    expect(groupByDay(result).map((group) => group.candidates.length)).toEqual([
+      MAX_SLOTS_PER_TRAINER_PER_DAY,
+      MAX_SLOTS_PER_TRAINER_PER_DAY,
+    ]);
+  });
+
+  it("narrows to the half of the day it is asked about", () => {
+    const base = {
+      trainerIds: [trainer.trainer_id],
+      durationMinutes: 60,
+      preparationMinutes: 0,
+      travelBeforeMinutes: 0,
+      travelAfterMinutes: 0,
+    };
+    const open = [freeBetween([at(7, 9), at(7, 17)])];
+
+    const morning = findWorkshopCandidates(open, at(7, 0), at(8, 0), { ...base, startWindow: "morning" });
+    const afternoon = findWorkshopCandidates(open, at(7, 0), at(8, 0), { ...base, startWindow: "afternoon" });
+
+    expect(morning.length).toBeGreaterThan(0);
+    expect(afternoon.length).toBeGreaterThan(0);
+    for (const candidate of morning) {
+      expect(new Date(candidate.workshopStartsAt).getHours()).toBeLessThan(12);
+    }
+    for (const candidate of afternoon) {
+      expect(new Date(candidate.workshopStartsAt).getHours()).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it("measures the start window from the workshop, not from the travel before it", () => {
+    // An afternoon workshop with an hour of travel in front of it starts in the
+    // afternoon even though the trainer's day starts before noon. Filtering on
+    // the blocked start would hide it.
+    const result = findWorkshopCandidates([freeBetween([at(7, 11), at(7, 17)])], at(7, 0), at(8, 0), {
+      trainerIds: [trainer.trainer_id],
+      durationMinutes: 60,
+      preparationMinutes: 0,
+      travelBeforeMinutes: 60,
+      travelAfterMinutes: 0,
+      startWindow: "afternoon",
+    });
+
+    expect(startTimes(result)[0]).toBe("12:00");
+    expect(timeLabel(result[0].blockedStartsAt, "en-GB")).toBe("11:00");
+  });
+});
+
+describe("groupByDay", () => {
+  it("splits candidates into the local days they start on, in order", () => {
+    const candidates = findWorkshopCandidates(
+      [freeBetween([at(7, 9), at(7, 12)], [at(9, 9), at(9, 12)])],
+      at(7, 0),
+      at(10, 0),
+      {
+        trainerIds: [trainer.trainer_id],
+        durationMinutes: 60,
+        preparationMinutes: 0,
+        travelBeforeMinutes: 0,
+        travelAfterMinutes: 0,
+      }
+    );
+
+    const days = groupByDay(candidates);
+
+    expect(days.map((group) => group.day)).toEqual(["2026-09-07", "2026-09-09"]);
+    expect(days.flatMap((group) => group.candidates)).toEqual(candidates);
+  });
+
+  it("has nothing to group when there is nothing to offer", () => {
+    expect(groupByDay([])).toEqual([]);
   });
 });
 

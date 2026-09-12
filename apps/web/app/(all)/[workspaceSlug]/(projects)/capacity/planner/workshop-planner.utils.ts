@@ -17,41 +17,125 @@ export type TWorkshopCandidate = {
   blockedEndsAt: string;
 };
 
+/** Which half of the day a workshop may start in. */
+export type TStartWindow = "any" | "morning" | "afternoon";
+
+/** The workshop, the buffers around it, and when it may start. */
+export type TWorkshopSpec = {
+  trainerIds: string[];
+  durationMinutes: number;
+  preparationMinutes: number;
+  travelBeforeMinutes: number;
+  travelAfterMinutes: number;
+  startWindow?: TStartWindow;
+};
+
+/**
+ * How far apart two offered starts in the same free range are.
+ *
+ * Half an hour, and on the half hour, because that is how the times get said
+ * out loud -- nobody books a workshop for 09:07, which is what a range that
+ * opens when a calendar block closes would otherwise offer.
+ */
+export const SLOT_STEP_MINUTES = 30;
+
+/**
+ * How many starts one trainer is offered on one day.
+ *
+ * Without a cap a trainer free from nine to ten at night yields two dozen cards
+ * that all say the same thing, and the grid stops being readable long before
+ * that. Four spread across the day answers "when could she do it?" better than
+ * twenty-four consecutive half hours do.
+ */
+export const MAX_SLOTS_PER_TRAINER_PER_DAY = 4;
+
+/** The local day an instant falls in, as a key that sorts. */
+const dayKey = (value: Date) =>
+  `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+
+function startsInWindow(workshopStart: Date, startWindow: TStartWindow) {
+  if (startWindow === "any") return true;
+  const hour = workshopStart.getHours();
+  return startWindow === "morning" ? hour < 12 : hour >= 12;
+}
+
+/**
+ * At most `max` items, keeping the first and spreading the rest.
+ *
+ * Taking the first `max` would hand back four consecutive half hours of the same
+ * morning and call it a choice. The first is kept whatever happens, because the
+ * earliest fit is the answer to a question people actually ask -- and because
+ * `findFirstAvailable` reads it.
+ */
+function spread<T>(items: T[], max: number): T[] {
+  if (items.length <= max) return items;
+  if (max <= 1) return items.slice(0, Math.max(0, max));
+  const step = (items.length - 1) / (max - 1);
+  return Array.from({ length: max }, (_, index) => items[Math.round(index * step)]);
+}
+
+/**
+ * Every start worth offering inside one free range.
+ *
+ * The range's own start comes first and unaligned, because it is the genuine
+ * earliest fit and rounding it away would make the planner answer a slightly
+ * different question than the one it is asked. Everything after it sits on the
+ * half hour.
+ */
+function startsInRange(rangeStart: Date, rangeEnd: Date, totalMinutes: number): Date[] {
+  const totalMs = totalMinutes * 60_000;
+  const stepMs = SLOT_STEP_MINUTES * 60_000;
+  const latest = rangeEnd.getTime() - totalMs;
+  if (latest < rangeStart.getTime()) return [];
+
+  const starts = [new Date(rangeStart)];
+  const aligned = new Date(rangeStart);
+  aligned.setSeconds(0, 0);
+  aligned.setMinutes(Math.ceil(aligned.getMinutes() / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES);
+  for (let time = aligned.getTime(); time <= latest; time += stepMs) {
+    if (time > rangeStart.getTime()) starts.push(new Date(time));
+  }
+  return starts;
+}
+
 export function findWorkshopCandidates(
   trainers: TTrainerCapacity[],
-  trainerIds: string[],
   windowStart: Date,
   windowEnd: Date,
-  durationMinutes: number,
-  preparationMinutes: number,
-  travelBeforeMinutes: number,
-  travelAfterMinutes: number
+  spec: TWorkshopSpec
 ): TWorkshopCandidate[] {
+  const { durationMinutes, preparationMinutes, travelBeforeMinutes, travelAfterMinutes } = spec;
   const beforeMinutes = preparationMinutes + travelBeforeMinutes;
   const totalMinutes = beforeMinutes + durationMinutes + travelAfterMinutes;
   if (durationMinutes <= 0 || totalMinutes <= 0 || windowStart >= windowEnd) return [];
-  const selected = new Set(trainerIds);
+  const startWindow = spec.startWindow ?? "any";
+  const selected = new Set(spec.trainerIds);
   const candidates: TWorkshopCandidate[] = [];
 
   for (const trainer of trainers) {
     if (!selected.has(trainer.trainer_id)) continue;
+    // Per trainer per day, because the cap is about how much choice one person
+    // is offered for one date -- not about the size of the grid.
+    const byDay = new Map<string, TWorkshopCandidate[]>();
     for (const range of availableRanges(trainer.intervals, windowStart, windowEnd)) {
-      const blockedStart = new Date(range.start);
-      const blockedEnd = new Date(blockedStart.getTime() + totalMinutes * 60_000);
-      if (blockedEnd > new Date(range.end)) continue;
-      const workshopStart = new Date(blockedStart.getTime() + beforeMinutes * 60_000);
-      const workshopEnd = new Date(workshopStart.getTime() + durationMinutes * 60_000);
-      candidates.push({
-        trainerId: trainer.trainer_id,
-        trainerName: trainer.display_name,
-        timezone: trainer.timezone,
-        availabilityStatus: trainer.availability_status,
-        workshopStartsAt: workshopStart.toISOString(),
-        workshopEndsAt: workshopEnd.toISOString(),
-        blockedStartsAt: blockedStart.toISOString(),
-        blockedEndsAt: blockedEnd.toISOString(),
-      });
+      for (const blockedStart of startsInRange(new Date(range.start), new Date(range.end), totalMinutes)) {
+        const workshopStart = new Date(blockedStart.getTime() + beforeMinutes * 60_000);
+        if (!startsInWindow(workshopStart, startWindow)) continue;
+        const day = byDay.get(dayKey(workshopStart)) ?? [];
+        day.push({
+          trainerId: trainer.trainer_id,
+          trainerName: trainer.display_name,
+          timezone: trainer.timezone,
+          availabilityStatus: trainer.availability_status,
+          workshopStartsAt: workshopStart.toISOString(),
+          workshopEndsAt: new Date(workshopStart.getTime() + durationMinutes * 60_000).toISOString(),
+          blockedStartsAt: blockedStart.toISOString(),
+          blockedEndsAt: new Date(blockedStart.getTime() + totalMinutes * 60_000).toISOString(),
+        });
+        byDay.set(dayKey(workshopStart), day);
+      }
     }
+    for (const day of byDay.values()) candidates.push(...spread(day, MAX_SLOTS_PER_TRAINER_PER_DAY));
   }
   const ordered: TWorkshopCandidate[] = [];
   for (const candidate of candidates) {
@@ -65,6 +149,29 @@ export function findWorkshopCandidates(
   }
   return ordered;
 }
+
+/** Candidates split into the days they start on, in order. */
+export function groupByDay(candidates: TWorkshopCandidate[]): Array<{ day: string; candidates: TWorkshopCandidate[] }> {
+  const days: Array<{ day: string; candidates: TWorkshopCandidate[] }> = [];
+  for (const candidate of candidates) {
+    const day = dayKey(new Date(candidate.workshopStartsAt));
+    const last = days.at(-1);
+    if (last && last.day === day) last.candidates.push(candidate);
+    else days.push({ day, candidates: [candidate] });
+  }
+  return days;
+}
+
+/** A time of day, with no date. The day heading above the card carries that. */
+export const timeLabel = (value: string, locales?: Intl.LocalesArgument) =>
+  new Date(value).toLocaleTimeString(locales, { hour: "2-digit", minute: "2-digit" });
+
+/** Whether two instants fall on the same local day. */
+export const sameLocalDay = (left: string, right: string) => dayKey(new Date(left)) === dayKey(new Date(right));
+
+/** A day heading: the weekday and the date, without a time. */
+export const dayLabel = (value: string, locales?: Intl.LocalesArgument) =>
+  new Date(value).toLocaleDateString(locales, { weekday: "long", day: "numeric", month: "long" });
 
 /**
  * A hold's start or expiry, as a short weekday-date-time label.
@@ -87,14 +194,6 @@ export const dateTimeLabel = (value: string, locales?: Intl.LocalesArgument) =>
 export const FIRST_AVAILABLE_WINDOWS = 8;
 /** The endpoint refuses a range longer than this, so the walk steps by it. */
 export const CAPACITY_WINDOW_DAYS = 14;
-
-export type TWorkshopSearchSpec = {
-  trainerIds: string[];
-  durationMinutes: number;
-  preparationMinutes: number;
-  travelBeforeMinutes: number;
-  travelAfterMinutes: number;
-};
 
 export type TFirstAvailable =
   | { found: true; candidate: TWorkshopCandidate; windowStart: Date; windowEnd: Date; windowsSearched: number }
@@ -125,7 +224,7 @@ export function windowAfter(start: Date, index: number): { windowStart: Date; wi
  */
 export async function findFirstAvailable(
   from: Date,
-  spec: TWorkshopSearchSpec,
+  spec: TWorkshopSpec,
   fetchWindow: (windowStart: Date, windowEnd: Date) => Promise<TTrainerCapacity[]>,
   options: { maxWindows?: number; onProgress?: (windowStart: Date, index: number) => void } = {}
 ): Promise<TFirstAvailable> {
@@ -140,16 +239,7 @@ export async function findFirstAvailable(
     // It also means a hit in the first window costs one request rather than eight.
     // oxlint-disable-next-line no-await-in-loop
     const trainers = await fetchWindow(windowStart, windowEnd);
-    const candidates = findWorkshopCandidates(
-      trainers,
-      spec.trainerIds,
-      windowStart,
-      windowEnd,
-      spec.durationMinutes,
-      spec.preparationMinutes,
-      spec.travelBeforeMinutes,
-      spec.travelAfterMinutes
-    );
+    const candidates = findWorkshopCandidates(trainers, windowStart, windowEnd, spec);
 
     // Candidates are already ordered by start time, then trainer name, so the
     // earliest for any trainer is simply the first one.
