@@ -43,7 +43,6 @@ vi.mock("@/hooks/use-navigation-preferences", () => ({
 vi.mock("@/components/sidebar/sidebar-navigation", () => ({
   SidebarNavItem: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
 }));
-vi.mock("@/components/workspace/upgrade-badge", () => ({ UpgradeBadge: () => null }));
 vi.mock("./sidebar-item", () => ({ SidebarItemBase: () => null }));
 
 import { SidebarMenuItems } from "./sidebar-menu-items";
@@ -62,6 +61,7 @@ describe("capacity links in the active workspace menu", () => {
       ]) {
         expect(html).toContain(`href="/test-workspace/capacity/${suffix}"`);
         expect(html).toContain(label);
+        expect(html).not.toContain("sidebar.pro");
       }
     }
   );

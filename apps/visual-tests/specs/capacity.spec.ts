@@ -246,3 +246,27 @@ test("planner explains a short opening and keeps earlier holds while planning mo
   expect(drafts[0].hold).toBeNull();
   expect(drafts[1].hold).not.toBeNull();
 });
+
+test("booking hours keep focus while typing and copy to active days", async ({ asUser }) => {
+  const page = await asUser("light");
+  const seed = fixtures();
+  await page.goto(`/${seed.workspace.slug}/capacity`);
+  await page.getByRole("button", { name: "Manage schedule" }).click();
+  const end = page.getByRole("textbox", { name: "Mon interval 1 end" });
+  await end.fill("");
+  await end.pressSequentially("1");
+  await expect(end).toHaveValue("1");
+  await expect(end).toBeFocused();
+  await end.pressSequentially("9");
+  await expect(end).toHaveValue("19");
+  await end.press("Tab");
+  await expect(end).toHaveValue("19:00");
+  await page.getByRole("button", { name: "Copy to active days" }).click();
+  await expect(page.getByRole("textbox", { name: "Tue interval 1 end" })).toHaveValue("19:00");
+  await expect(page.getByRole("textbox", { name: "Sun interval 1 end" })).toHaveCount(0);
+  await page.getByRole("checkbox", { name: "Include days off" }).check();
+  await page.getByRole("button", { name: "Set the same for all days" }).click();
+  await expect(page.getByRole("textbox", { name: "Sun interval 1 end" })).toHaveValue("19:00");
+  // Deliberately leave these edits unsaved: the visual personas share a database.
+  await capture(page, "capacity-booking-hours", { ready: end, target: page.getByRole("main").last() });
+});
