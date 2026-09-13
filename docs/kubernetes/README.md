@@ -124,11 +124,13 @@ The product, chart, and Git identifiers are deliberately different:
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, and `rc.33` were consumed by
 incomplete publication attempts. Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
-installation, upgrade, or rollback targets. `rc.53` is the immediately previous
+installation, upgrade, or rollback targets. `rc.54` is the immediately previous
 retained GitHub release.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-Rollback to rc.53 requires reversing migrations ext.0026 and ext.0025 as
-described in the release notes; preserve a database backup before upgrading.
+Rollback to rc.54 should normally retain the additive database schema. Reversing
+ext.0027–ext.0029 discards booking operation history, origins, timezone metadata
+and training recognition settings. Preserve a database backup before upgrading
+and review the rollback limits in the release notes.
 Published versions are immutable and are never repaired in place. In
 particular, `rc.24`, `rc.25`, and `rc.28` each published only a subset of their
 container sets and published no chart or GitHub Release.
