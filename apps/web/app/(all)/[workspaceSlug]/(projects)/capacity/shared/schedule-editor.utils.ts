@@ -7,8 +7,10 @@ export type EditableInterval = { id: string; start: string; end: string };
 export type EditableWeek = Record<string, EditableInterval[]>;
 export type WeeklyHours = Record<string, { start: string; end: string }[]>;
 
+let intervalSequence = 0;
+
 export function editableInterval(start = "09:00", end = "22:00"): EditableInterval {
-  return { id: crypto.randomUUID(), start, end };
+  return { id: `booking-interval-${++intervalSequence}`, start, end };
 }
 
 export function editWeek(week: WeeklyHours): EditableWeek {

@@ -4,6 +4,7 @@
  */
 
 import { useViewerTimezone } from "../shared/viewer-timezone";
+import { v4 as uuidv4 } from "uuid";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { ModalCore } from "@plane/ui";
@@ -152,6 +153,7 @@ export function WorkshopPlanner({
   >({ state: "idle" });
 
   const timeZone = useViewerTimezone();
+  const selectedTrainerIds = useMemo(() => new Set(trainerIds), [trainerIds]);
   const spec = useMemo(
     () => ({
       trainerIds,
@@ -442,7 +444,7 @@ export function WorkshopPlanner({
           : { id: draftId, revision: revision.current };
       const candidate = scheduleTarget?.candidate;
       const signature = JSON.stringify([saved.id, saved.revision, candidate?.trainerId, candidate?.workshopStartsAt]);
-      if (operation.current?.signature !== signature) operation.current = { signature, key: crypto.randomUUID() };
+      if (operation.current?.signature !== signature) operation.current = { signature, key: uuidv4() };
       const result = await capacityService.scheduleWorkshopPlan(workspaceSlug, saved.id, saved.revision, {
         idempotency_key: operation.current.key,
         ...(candidate ? { trainer_id: candidate.trainerId, workshop_starts_at: candidate.workshopStartsAt } : {}),
@@ -487,7 +489,14 @@ export function WorkshopPlanner({
     savedSignature !== null
       ? planNeedsSaving
       : Boolean(
-          title || issue || durationMinutes !== 240 || preparationMinutes || travelBeforeMinutes || travelAfterMinutes
+          title ||
+          issue ||
+          durationMinutes !== 240 ||
+          preparationMinutes ||
+          travelBeforeMinutes ||
+          travelAfterMinutes ||
+          trainerIds.length !== trainers.length ||
+          trainers.some((trainer) => !selectedTrainerIds.has(trainer.trainer_id))
         );
   const selectPlan = (draft: TWorkshopPlanDraft | null) => {
     if (dirty) setSwitchTarget({ draft });
@@ -682,7 +691,7 @@ export function WorkshopPlanner({
                 >
                   <input
                     type="checkbox"
-                    checked={trainerIds.includes(trainer.trainer_id)}
+                    checked={selectedTrainerIds.has(trainer.trainer_id)}
                     disabled={formLocked}
                     onChange={() =>
                       setTrainerIds((current) =>
@@ -757,7 +766,7 @@ export function WorkshopPlanner({
             <>
               {trainers.some(
                 (trainer) =>
-                  trainerIds.includes(trainer.trainer_id) &&
+                  selectedTrainerIds.has(trainer.trainer_id) &&
                   trainer.availability_status !== "fresh" &&
                   trainer.connection_status !== "not_connected"
               ) && (
