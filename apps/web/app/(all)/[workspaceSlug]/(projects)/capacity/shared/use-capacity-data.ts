@@ -76,6 +76,7 @@ export function useCapacityData(workspaceSlug: string, enabled: boolean) {
 
   const {
     data: trainerPage,
+    error: trainersError,
     mutate: mutateTrainers,
     isLoading: trainersLoading,
   } = useSWR(enabled ? ["capacity-trainers", workspaceSlug, trainerCursor] : null, () =>
@@ -126,6 +127,7 @@ export function useCapacityData(workspaceSlug: string, enabled: boolean) {
     trainers,
     trainerIds,
     trainersLoading,
+    trainersError,
     mutateTrainers,
     capacity,
     capacityError,
