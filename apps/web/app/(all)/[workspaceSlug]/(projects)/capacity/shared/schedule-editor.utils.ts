@@ -38,7 +38,9 @@ export function validateBookingWeek(week: EditableWeek) {
         if (start && end && start >= end) errors[`${interval.id}:end`] = "End must be later than start.";
         return { start: start ?? "", end: end ?? "", id: interval.id };
       })
-      .toSorted((a, b) => a.start.localeCompare(b.start));
+      // Sort the newly mapped array; the application targets ES2022.
+      // oxlint-disable-next-line unicorn/no-array-sort
+      .sort((a, b) => a.start.localeCompare(b.start));
     for (let i = 1; i < normalized.length; i++) {
       if (normalized[i].start && normalized[i].start < normalized[i - 1].end)
         errors[`${normalized[i].id}:start`] = "Intervals must not overlap.";
