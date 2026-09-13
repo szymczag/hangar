@@ -1,6 +1,7 @@
 // Copyright (c) 2026-present Maciej Szymczak and contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { useViewerTimezone } from "../shared/viewer-timezone";
 import { useState } from "react";
 import { Button } from "@plane/propel/button";
 import type { TWorkshopPlanDraft } from "@/services/capacity.service";
@@ -25,6 +26,7 @@ export function PlanToolbar({
   onSelect: (draft: TWorkshopPlanDraft | null) => void;
   onDelete: () => void;
 }) {
+  const timeZone = useViewerTimezone();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const current = drafts.find((draft) => draft.id === currentId);
@@ -75,18 +77,18 @@ export function PlanToolbar({
                       {draft.issue ? ` · ${draft.issue.project_identifier}-${draft.issue.sequence_id}` : ""}
                     </span>
                     <span className="block text-body-xs-regular text-secondary">
-                      {draft.created_at ? `Created ${dateTimeLabel(draft.created_at)} · ` : ""}Updated{" "}
-                      {dateTimeLabel(draft.updated_at)}
+                      {draft.created_at ? `Created ${dateTimeLabel(draft.created_at, undefined, timeZone)} · ` : ""}
+                      Updated {dateTimeLabel(draft.updated_at, undefined, timeZone)}
                     </span>
                     {draft.hold && (
                       <span className="block text-body-xs-regular text-accent-primary">
-                        Session {dateTimeLabel(draft.hold.workshop_starts_at)} · Reserved until{" "}
-                        {dateTimeLabel(draft.hold.expires_at)}
+                        Session {dateTimeLabel(draft.hold.workshop_starts_at, undefined, timeZone)} · Reserved until{" "}
+                        {dateTimeLabel(draft.hold.expires_at, undefined, timeZone)}
                       </span>
                     )}
                     {!draft.hold && draft.last_session && (
                       <span className="block text-body-xs-regular text-secondary">
-                        Scheduled {dateTimeLabel(draft.last_session.starts_at)}
+                        Scheduled {dateTimeLabel(draft.last_session.starts_at, undefined, timeZone)}
                       </span>
                     )}
                   </button>
