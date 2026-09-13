@@ -1338,3 +1338,80 @@ def test_training_import_stale_cache_and_explicit_deduplication(settings, worksp
     selection.save()
     trainer.refresh_from_db()
     assert training_events(trainer, start, end, force=True) == ([], "consent_required")
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_unverified_training_calendar_blocks_hold_even_when_freebusy_is_clear(
+    settings, workspace, create_user, monkeypatch
+):
+    from plane.ext.capacity import booking
+
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    reader = MagicMock(return_value=([], "stale"))
+    monkeypatch.setattr(booking, "training_events", reader)
+    response = client.post(
+        url + "hold/",
+        {
+            "revision": draft["revision"],
+            "trainer_id": str(create_user.id),
+            "workshop_starts_at": f"{_future_monday().isoformat()}T10:00:00Z",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert response.status_code == 503
+    assert response.data["code"] == "availability_unverified"
+    assert reader.call_args.kwargs["force"] is True
+    assert not WorkshopPlanHold.objects.filter(draft_id=draft["id"]).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_plans_cannot_hold_the_same_trainer_time(settings, workspace, create_user, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from django.db import close_old_connections
+    from plane.ext.capacity import booking
+
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    second = WorkshopPlanDraft.objects.create(
+        workspace=workspace,
+        owner=create_user,
+        title="Competing plan",
+        duration_minutes=60,
+        preparation_minutes=0,
+        travel_before_minutes=0,
+        travel_after_minutes=0,
+        trainer_ids=[str(create_user.id)],
+    )
+    barrier = Barrier(2)
+
+    def clear_google(*args, **kwargs):
+        barrier.wait(timeout=10)
+        return [], "not_connected", "not_connected"
+
+    monkeypatch.setattr(booking, "_google_busy", clear_google)
+
+    def reserve(plan_id, revision):
+        close_old_connections()
+        try:
+            actor = APIClient()
+            actor.force_authenticate(user=create_user)
+            return actor.post(
+                f"/api/workspaces/{workspace.slug}/capacity/plans/{plan_id}/hold/",
+                {
+                    "revision": revision,
+                    "trainer_id": str(create_user.id),
+                    "workshop_starts_at": f"{_future_monday().isoformat()}T10:00:00Z",
+                },
+                format="json",
+            ).status_code
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first_result = pool.submit(reserve, draft["id"], draft["revision"])
+        second_result = pool.submit(reserve, second.id, second.revision)
+        assert sorted([first_result.result(timeout=20), second_result.result(timeout=20)]) == [201, 409]
+    assert WorkshopPlanHold.objects.filter(workspace=workspace, status="active").count() == 1

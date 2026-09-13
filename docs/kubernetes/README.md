@@ -170,8 +170,11 @@ configuration remains valid. Capacity links now appear in the active workspace
 sidebar; the planner explains required continuous time and allows separate held
 plans without releasing earlier reservations.
 
-Hangar consumes anonymous free/busy ranges and never imports event details; the
-full operator contract and key-rotation rules are in the configuration reference.
+Basic calendar access consumes anonymous free/busy ranges. Optional training
+recognition requires a separate trainer consent and administrator-configured
+calendar/organizer rules; it reads event times and participation without importing
+titles or descriptions. See the [configuration reference](configuration.md#google-calendar-trainer-capacity)
+and [planner setup](../capacity-planner.md) before enabling those rules.
 
 ## Support boundary
 
