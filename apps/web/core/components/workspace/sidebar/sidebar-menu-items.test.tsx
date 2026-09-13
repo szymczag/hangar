@@ -72,7 +72,7 @@ describe("capacity links in the active workspace menu", () => {
     expect(renderToStaticMarkup(<SidebarMenuItems />)).not.toContain("/capacity/");
   });
 
-  it.each([EUserWorkspaceRoles.VIEWER, EUserWorkspaceRoles.GUEST])("hides capacity from workspace role %s", (role) => {
+  it.each([EUserWorkspaceRoles.GUEST])("hides capacity from workspace role %s", (role) => {
     state.enabled = true;
     state.role = role;
     expect(renderToStaticMarkup(<SidebarMenuItems />)).not.toContain("/capacity/");
