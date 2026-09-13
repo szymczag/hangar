@@ -40,19 +40,20 @@ def event_time(value, zone):
 
 def recognized_event(event, *, organizer, participant, calendar_id):
     """Only exact organizer + verified OAuth email; creator and self are not identity."""
+    organizer_data = event.get("organizer") or {}
+    attendees = event.get("attendees") or []
     if (
-        event.get("status") == "cancelled"
-        or str(event.get("organizer", {}).get("email", "")).casefold() != organizer.casefold()
+        not isinstance(organizer_data, dict)
+        or not isinstance(attendees, list)
+        or any(not isinstance(item, dict) for item in attendees)
     ):
+        raise GoogleCalendarError("invalid_event_participants")
+    if event.get("status") == "cancelled" or str(organizer_data.get("email", "")).casefold() != organizer.casefold():
         return None
     if event.get("attendeesOmitted"):
         raise GoogleCalendarError("incomplete_event_participants")
     attendee = next(
-        (
-            item
-            for item in event.get("attendees", [])
-            if str(item.get("email", "")).casefold() == participant.casefold()
-        ),
+        (item for item in attendees if str(item.get("email", "")).casefold() == participant.casefold()),
         None,
     )
     if attendee is None or attendee.get("responseStatus") == "declined":
@@ -66,6 +67,8 @@ def recognized_event(event, *, organizer, participant, calendar_id):
     # the same invitation seen through multiple configured calendars.
     occurrence = event.get("originalStartTime") or event.get("start")
     origin = event_time(occurrence, event.get("calendar_timezone", "UTC")).astimezone(timezone.utc).isoformat()
+    if not event.get("iCalUID") and not event.get("id"):
+        raise GoogleCalendarError("invalid_event_identity")
     identity = event.get("iCalUID") or f"{calendar_id}:{event.get('id', '')}"
     key = hmac.new(settings.SECRET_KEY.encode(), f"{identity}:{origin}".encode(), hashlib.sha256).hexdigest()
     return {"key": key, "start": start.isoformat(), "end": end.isoformat(), "status": status}

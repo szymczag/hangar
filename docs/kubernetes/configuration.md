@@ -29,7 +29,7 @@ configurations.
 | `application`                             | Allowed hosts, upload limits, signed URLs, retention, API rate limits, and webhook destination controls |
 | `existingSecrets`                         | Names and keys of pre-existing Secret resources                                                         |
 | `mail`                                    | SES API delivery, feedback, OpenPGP, receipt retention, and dedicated mail-worker settings              |
-| `googleCalendarCapacity`                  | Read-only Google Calendar free/busy integration for trainer capacity                                    |
+| `googleCalendarCapacity`                  | Read-only Google Calendar capacity and optional training invitation recognition                         |
 | `externalServices`                        | Non-secret external object-storage settings                                                             |
 | `observability`                           | Optional OTLP endpoint and metrics protocol                                                             |
 | `ingress`                                 | Controller class, annotations, and TLS Secret                                                           |
@@ -161,18 +161,27 @@ register `https://<publicUrl.host>/auth/google/calendar/callback/` as an exact
 redirect URI. Configure the existing Hangar `GOOGLE_CLIENT_ID` and
 `GOOGLE_CLIENT_SECRET` instance settings. The consent screen must allow
 `openid`, `email`, `calendar.calendarlist.readonly`, and
-`calendar.events.freebusy`.
+`calendar.events.freebusy`. For optional training invitation recognition, also
+allow `calendar.events.readonly`; each trainer explicitly grants this additional
+scope from My capacity. Administrators configure calendar + organizer rules in
+Team capacity, not in Helm values or Git. The trainer must have Google access to
+the configured shared calendar. See [planner setup](../capacity-planner.md).
 
 `CALENDAR_TOKEN_ENCRYPTION_KEYS` is a comma-separated Fernet keyring. The first
 key encrypts new refresh tokens and remaining keys are read fallbacks for
 rotation. Keep it distinct from Django `SECRET_KEY`, back it up in the secret
 manager, never place it in Helm values, and do not remove an old key until all
-credentials have been re-encrypted.
+credentials, encrypted Google identities, calendar selections and training rules
+have been re-encrypted. Rules record the key used for their encrypted identifiers.
 
 Capacity requests query Google live and cache anonymous busy intervals in
-Valkey for five minutes. Hangar does not request or persist event names,
-descriptions, attendees, locations, or conferencing data. Provider or
-credential failures produce unknown availability rather than free time.
+Valkey for five minutes. Basic free/busy access reads no event details. Optional
+training recognition reads times, organizer and attendee responses, and retains
+only matched occurrence times, response status and an opaque identity in its cache.
+It requests no titles, descriptions, locations or conferencing data and exposes no
+attendee lists in team capacity. Provider or credential failures produce unknown
+availability rather than free time; new bookings require fresh availability from
+all configured sources. Stale cached results are view-only for up to one hour.
 
 Each request is limited to 25 explicitly selected trainers and a 14-day range.
 The per-user and per-workspace limits are enforced atomically through Valkey;
