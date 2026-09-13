@@ -119,6 +119,7 @@ export function findWorkshopCandidates(
 
   for (const trainer of trainers) {
     if (!selected.has(trainer.trainer_id)) continue;
+    if (trainer.availability_status !== "fresh" && trainer.connection_status !== "not_connected") continue;
     // Per trainer per day, because the cap is about how much choice one person
     // is offered for one date -- not about the size of the grid.
     const byDay = new Map<string, TWorkshopCandidate[]>();
@@ -326,3 +327,11 @@ export async function findFirstAvailable(
     availability,
   };
 }
+
+export const planSignature = (plan: import("@/services/capacity.service").TWorkshopPlanDraftInput) =>
+  JSON.stringify({
+    ...plan,
+    // ES2022 is the web app's current target; the copied array keeps sort() mutation local.
+    // oxlint-disable-next-line unicorn/no-array-sort
+    trainer_ids: [...plan.trainer_ids].sort(),
+  });

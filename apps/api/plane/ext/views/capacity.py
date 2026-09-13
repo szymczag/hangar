@@ -40,6 +40,7 @@ from plane.ext.capacity import (
     encrypt_value,
     validate_weekly_schedule,
 )
+from plane.ext.capacity.booking import booking_preflight, snapshot_error
 from plane.ext.capacity.schedules import validate_timezone
 from plane.ext.capacity.cache import clear_credential_cache, clear_selection_cache
 from plane.ext.capacity.throttles import CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle
@@ -48,6 +49,7 @@ from plane.ext.models import (
     GoogleCalendarCredential,
     TrainerCalendarSelection,
     TrainerProfile,
+    WorkshopBookingOperation,
     WorkshopPlanDraft,
     WorkshopPlanHold,
     WorkshopSchedule,
@@ -559,6 +561,13 @@ def _issue_payload(issue):
     }
 
 
+def _last_plan_session(draft):
+    session = draft.scheduled_sessions.order_by("-created_at").first()
+    if not session:
+        return None
+    return {"id": str(session.id), "starts_at": session.starts_at.isoformat(), "ends_at": session.ends_at.isoformat()}
+
+
 def _draft_payload(draft):
     now = timezone.now()
     hold = (
@@ -574,7 +583,9 @@ def _draft_payload(draft):
         "trainer_ids": draft.trainer_ids,
         "issue": _issue_payload(draft.issue) if draft.issue_id else None,
         "revision": draft.revision,
+        "created_at": draft.created_at.isoformat(),
         "updated_at": draft.updated_at.isoformat(),
+        "last_session": _last_plan_session(draft),
         "hold": _hold_payload(hold) if hold else None,
     }
 
@@ -729,6 +740,50 @@ class WorkshopPlanDraftDetailEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     @transaction.atomic
+    def patch(self, request, slug, draft_id):
+        if response := _disabled():
+            return response
+        draft = self._draft(request, slug, draft_id)
+        if set(request.data) - {"title", "issue_id", "revision"}:
+            return Response({"error": "Only title and issue_id may change while reserved."}, status=400)
+        try:
+            revision = int(request.data.get("revision"))
+        except (TypeError, ValueError):
+            return Response({"error": "revision is required."}, status=400)
+        if revision != draft.revision:
+            return Response({"error": "Draft changed after you opened it.", "revision": draft.revision}, status=409)
+        from types import SimpleNamespace
+
+        data = {
+            field: getattr(draft, field)
+            for field in (
+                "title",
+                "duration_minutes",
+                "preparation_minutes",
+                "travel_before_minutes",
+                "travel_after_minutes",
+                "trainer_ids",
+            )
+        }
+        data["issue_id"] = str(draft.issue_id) if draft.issue_id else None
+        data.update(request.data)
+        values, error = _validate_draft(SimpleNamespace(data=data, user=request.user), draft.workspace)
+        if error:
+            return error
+        draft.title, draft.issue = values["title"], values["issue"]
+        draft.revision += 1
+        draft.updated_by = request.user
+        draft.save()
+        _audit(
+            request,
+            workspace_id=draft.workspace_id,
+            action=CapacityAuditEvent.Action.PLAN_DRAFT_UPDATED,
+            metadata={"draft_id": str(draft.id), "revision": draft.revision},
+        )
+        return Response(_draft_payload(draft))
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @transaction.atomic
     def delete(self, request, slug, draft_id):
         if response := _disabled():
             return response
@@ -792,6 +847,7 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
         )
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @booking_preflight()
     @transaction.atomic
     def post(self, request, slug, draft_id):
         if response := _disabled():
@@ -831,6 +887,8 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
             user_id=trainer_id,
             status=TrainerProfile.Status.ACTIVE,
         )
+        if response := snapshot_error(request, draft, trainer):
+            return response
         WorkshopPlanHold.objects.filter(
             workspace=draft.workspace,
             status=WorkshopPlanHold.Status.ACTIVE,
@@ -951,6 +1009,7 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
     authentication_classes = [CsrfEnforcedSessionAuthentication]
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @booking_preflight(scheduling=True)
     @transaction.atomic
     def post(self, request, slug, draft_id):
         if response := _disabled():
@@ -964,6 +1023,22 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
             owner=request.user,
             pk=draft_id,
         )
+        raw_key = request.data.get("idempotency_key")
+        try:
+            operation_key = UUID(str(raw_key)) if raw_key else None
+        except ValueError:
+            return Response({"error": "idempotency_key must be a UUID."}, status=400)
+        fingerprint = hashlib.sha256(json.dumps(dict(request.data), sort_keys=True).encode()).hexdigest()
+        if operation_key:
+            operation = draft.booking_operations.filter(key=operation_key).first()
+            if operation:
+                if operation.request_fingerprint != fingerprint:
+                    return Response({"error": "This operation key belongs to another request."}, status=409)
+                if not ProjectMember.objects.filter(
+                    project_id=operation.result["issue"]["project_id"], member=request.user, is_active=True
+                ).exists():
+                    return Response({"error": "No such Workshop work item in this workspace."}, status=404)
+                return Response(operation.result, status=200)
         try:
             revision = int(request.data.get("revision"))
         except (TypeError, ValueError):
@@ -986,8 +1061,25 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
 
         now = timezone.now()
         hold = draft.holds.filter(status=WorkshopPlanHold.Status.ACTIVE, expires_at__gt=now).first()
+        direct = "trainer_id" in request.data or "workshop_starts_at" in request.data
+        if hold is None and direct:
+            if operation_key is None:
+                return Response({"error": "idempotency_key is required for direct scheduling."}, status=400)
+            snapshot = request.capacity_booking_snapshot
+            hold = WorkshopPlanHold(
+                draft=draft,
+                workspace=draft.workspace,
+                trainer_id=snapshot["trainer"],
+                workshop_starts_at=snapshot["start"],
+                workshop_ends_at=snapshot["end"],
+                blocked_starts_at=snapshot["blocked_start"],
+                blocked_ends_at=snapshot["blocked_end"],
+                expires_at=now + timedelta(hours=72),
+                created_by=request.user,
+                updated_by=request.user,
+            )
         if hold is None:
-            return Response({"error": "Hold a slot before scheduling it."}, status=400)
+            return Response({"error": "Hold a slot or choose a candidate before scheduling it."}, status=400)
 
         trainer = (
             TrainerProfile.objects.select_for_update()
@@ -998,6 +1090,8 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
         if trainer is None:
             return Response({"error": "The held trainer is no longer active in this workspace."}, status=409)
 
+        if response := snapshot_error(request, draft, trainer):
+            return response
         if _blocks_conflict(
             workspace=draft.workspace,
             trainer=trainer,
@@ -1011,6 +1105,8 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        # Serialize all appenders on the parent issue, including first-session creation.
+        issue = Issue.objects.select_for_update().get(pk=issue.pk)
         schedule, created = WorkshopSchedule.objects.get_or_create(
             issue=issue,
             defaults={
@@ -1028,8 +1124,12 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
         existing = list(schedule.sessions.values_list("position", flat=True))
         if len(existing) >= 50:
             return Response({"error": "A Workshop may not have more than 50 sessions."}, status=400)
+        if hold.pk is None or hold._state.adding:
+            hold.save()
         session = WorkshopSession.objects.create(
             schedule=schedule,
+            source_plan=draft,
+            source_hold=hold,
             position=max(existing) + 1 if existing else 0,
             starts_at=hold.workshop_starts_at,
             ends_at=hold.workshop_ends_at,
@@ -1053,20 +1153,22 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
                 created_by=request.user,
                 updated_by=request.user,
             )
-            issue_activity.delay(
-                type="issue.activity.updated",
-                requested_data=json.dumps(
-                    {"assignee_ids": [str(value) for value in [*assignees, trainer.user_id]]}, cls=DjangoJSONEncoder
-                ),
-                current_instance=json.dumps(
-                    {"assignee_ids": [str(value) for value in assignees]}, cls=DjangoJSONEncoder
-                ),
-                issue_id=str(issue.id),
-                actor_id=str(request.user.id),
-                project_id=str(issue.project_id),
-                epoch=int(now.timestamp()),
-                notification=True,
-                origin=base_host(request=request, is_app=True),
+            transaction.on_commit(
+                lambda: issue_activity.delay(
+                    type="issue.activity.updated",
+                    requested_data=json.dumps(
+                        {"assignee_ids": [str(value) for value in [*assignees, trainer.user_id]]}, cls=DjangoJSONEncoder
+                    ),
+                    current_instance=json.dumps(
+                        {"assignee_ids": [str(value) for value in assignees]}, cls=DjangoJSONEncoder
+                    ),
+                    issue_id=str(issue.id),
+                    actor_id=str(request.user.id),
+                    project_id=str(issue.project_id),
+                    epoch=int(now.timestamp()),
+                    notification=True,
+                    origin=base_host(request=request, is_app=True),
+                )
             )
 
         hold.status = WorkshopPlanHold.Status.SCHEDULED
@@ -1088,19 +1190,26 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
                 "schedule_created": created,
             },
         )
-        return Response(
-            {
-                "revision": draft.revision,
-                "issue": _issue_payload(issue),
-                "session": {
-                    "id": str(session.id),
-                    "starts_at": session.starts_at.isoformat(),
-                    "ends_at": session.ends_at.isoformat(),
-                    "trainer_ids": [str(trainer.user_id)],
-                },
+        result = {
+            "revision": draft.revision,
+            "issue": _issue_payload(issue),
+            "session": {
+                "id": str(session.id),
+                "starts_at": session.starts_at.isoformat(),
+                "ends_at": session.ends_at.isoformat(),
+                "trainer_ids": [str(trainer.user_id)],
             },
-            status=status.HTTP_201_CREATED,
-        )
+        }
+        if operation_key:
+            WorkshopBookingOperation.objects.create(
+                draft=draft,
+                key=operation_key,
+                request_fingerprint=fingerprint,
+                result=result,
+                created_by=request.user,
+                updated_by=request.user,
+            )
+        return Response(result, status=status.HTTP_201_CREATED)
 
 
 class WorkshopScheduleEndpoint(BaseAPIView):

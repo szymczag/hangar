@@ -103,7 +103,7 @@ def _google_client():
     return GoogleCalendarClient(client_id=client_id, client_secret=client_secret)
 
 
-def _google_busy(trainer, start, end):
+def _google_busy(trainer, start, end, *, force=False):
     try:
         selection = trainer.calendar_selection
     except ObjectDoesNotExist:
@@ -125,7 +125,7 @@ def _google_busy(trainer, start, end):
         f"gcal:busy:{trainer.id}:{selection.revision}:{normalized_start.isoformat()}:{normalized_end.isoformat()}"
     )
     cached = cache.get(cache_key)
-    if isinstance(cached, list):
+    if not force and isinstance(cached, list):
         cached_intervals = [(datetime.fromisoformat(item[0]), datetime.fromisoformat(item[1])) for item in cached]
         return _intersections(cached_intervals, [(start, end)]), "connected", "fresh"
     stale_cache_key = cache_key.replace("gcal:busy:", "gcal:busy-stale:", 1)

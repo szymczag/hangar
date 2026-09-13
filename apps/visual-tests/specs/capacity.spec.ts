@@ -214,33 +214,39 @@ test("planner explains a short opening and keeps earlier holds while planning mo
   });
   await page.goto(`/${seed.workspace.slug}/capacity/planner`);
   await expect(page.getByText("No matching time this week")).toBeVisible();
-  await expect(page.getByText(/This plan needs 6h 30m/)).toBeVisible();
+  await expect(page.getByText(/This plan needs 4h/)).toBeVisible();
   await expect(page.getByText(/longest free opening is 3h/)).toBeVisible();
 
   await page.getByRole("button", { name: "Find first available" }).click();
   await expect(page.getByText(/No matching time found up to/)).toBeVisible();
   await page.getByRole("spinbutton", { name: /Workshop duration/ }).fill("30");
   await expect(page.getByText(/No matching time found up to/)).toHaveCount(0);
-  await page.getByRole("button", { name: "Save plan & hold for 72h" }).first().click();
+  await page.getByRole("button", { name: "Reserve for 72 hours" }).first().click();
   await expect(page.getByText("Time held for Planning trainer")).toBeVisible();
   expect(drafts).toHaveLength(1);
   expect(drafts[0].duration_minutes).toBe(30);
   expect(drafts[0].title).not.toBe("");
   await expect(page.getByRole("spinbutton", { name: /Workshop duration/ })).toBeDisabled();
 
-  await page.getByRole("button", { name: "Start another plan" }).click();
+  await page.getByRole("button", { name: "New plan" }).click();
   // The first hold occupies the only remaining opening this week.
   await page.getByRole("button", { name: "Next week" }).click();
   await page.getByRole("spinbutton", { name: /Workshop duration/ }).fill("30");
-  await page.getByRole("button", { name: "Save plan & hold for 72h" }).first().click();
+  await page.getByRole("button", { name: "Reserve for 72 hours" }).first().click();
   await expect(page.getByText("Time held for Planning trainer")).toBeVisible();
   expect(drafts).toHaveLength(2);
   expect(drafts.every((draft) => draft.hold !== null)).toBe(true);
   expect(drafts[0].hold!.workshop_starts_at).not.toBe(drafts[1].hold!.workshop_starts_at);
 
-  await page.getByRole("combobox", { name: "Saved planning drafts" }).selectOption(drafts[0].id);
+  await page.getByRole("button", { name: "Saved plans", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Saved plans" })
+    .getByRole("button")
+    .filter({ hasText: drafts[0].title })
+    .first()
+    .click();
   const readsBeforeRelease = capacityReads;
-  await page.getByRole("button", { name: "Release and edit" }).click();
+  await page.getByRole("button", { name: "Release reservation" }).click();
   await expect(page.getByRole("spinbutton", { name: /Workshop duration/ })).toBeEnabled();
   await expect.poll(() => capacityReads).toBeGreaterThan(readsBeforeRelease);
   expect(drafts[0].hold).toBeNull();
