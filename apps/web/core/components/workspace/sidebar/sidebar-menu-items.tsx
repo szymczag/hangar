@@ -6,7 +6,8 @@
 
 import React, { useMemo } from "react";
 import { observer } from "mobx-react";
-import { Ellipsis } from "lucide-react";
+import { useParams } from "next/navigation";
+import { CalendarClock, CalendarSearch, Ellipsis, Users } from "lucide-react";
 import { Disclosure, Transition } from "@headlessui/react";
 // plane imports
 import {
@@ -18,9 +19,11 @@ import {
 import { useTranslation } from "@plane/i18n";
 import { ChevronRightIcon } from "@plane/propel/icons";
 import { cn } from "@plane/utils";
+import { EUserWorkspaceRoles } from "@plane/types";
 // components
 import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 // store hooks
+import { useInstance } from "@/hooks/store/use-instance";
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import useLocalStorage from "@/hooks/use-local-storage";
 import {
@@ -28,9 +31,12 @@ import {
   useWorkspaceNavigationPreferences,
 } from "@/hooks/use-navigation-preferences";
 import { SidebarItemBase } from "./sidebar-item";
+import { SidebarWorkspaceMenuItem } from "./workspace-menu-item";
 
 export const SidebarMenuItems = observer(function SidebarMenuItems() {
   // routers
+  const { workspaceSlug } = useParams();
+  const { config } = useInstance();
   const { setValue: toggleWorkspaceMenu, storedValue: isWorkspaceMenuOpen } = useLocalStorage<boolean>(
     "is_workspace_menu_open",
     true
@@ -94,6 +100,33 @@ export const SidebarMenuItems = observer(function SidebarMenuItems() {
     [workspacePreferences]
   );
 
+  const capacityNavigationItems = [
+    {
+      key: "capacity-personal",
+      label: "My capacity",
+      labelTranslationKey: "",
+      href: `/${workspaceSlug}/capacity/`,
+      access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+      Icon: CalendarClock,
+    },
+    {
+      key: "capacity-team",
+      label: "Team capacity",
+      labelTranslationKey: "",
+      href: `/${workspaceSlug}/capacity/team/`,
+      access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+      Icon: Users,
+    },
+    {
+      key: "capacity-planner",
+      label: "Workshop planner",
+      labelTranslationKey: "",
+      href: `/${workspaceSlug}/capacity/planner/`,
+      access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+      Icon: CalendarSearch,
+    },
+  ];
+
   return (
     <>
       <div className="flex flex-col gap-0.5">
@@ -156,6 +189,8 @@ export const SidebarMenuItems = observer(function SidebarMenuItems() {
                 // oxlint-disable-next-line react/no-array-index-key
                 <SidebarItemBase key={`dynamic_${_index}`} item={item} />
               ))}
+              {config?.is_google_calendar_capacity_enabled === true &&
+                capacityNavigationItems.map((item) => <SidebarWorkspaceMenuItem key={item.key} item={item} />)}
               <SidebarNavItem>
                 <button
                   type="button"
