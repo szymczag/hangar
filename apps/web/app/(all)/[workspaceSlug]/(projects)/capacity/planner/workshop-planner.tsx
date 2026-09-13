@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { TZDate } from "@date-fns/tz";
 import { useViewerTimezone } from "../shared/viewer-timezone";
 import { v4 as uuidv4 } from "uuid";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -227,7 +228,7 @@ export function WorkshopPlanner({
     const controller = new AbortController();
     searchController.current = controller;
     const notBefore = nextBookingMinute(new Date());
-    const from = new Date(Math.max(weekStart.getTime(), startOfWeek(notBefore).getTime()));
+    const from = new TZDate(Math.max(weekStart.getTime(), startOfWeek(notBefore, timeZone).getTime()), timeZone);
     setSearch({ state: "running", from, key: searchKey });
     try {
       const result = await findFirstAvailable(
@@ -732,9 +733,9 @@ export function WorkshopPlanner({
                   <h3 className="text-body-sm-medium text-primary">Time held for {hold.trainer_name}</h3>
                   <p className="mt-1 text-body-xs-regular text-secondary">
                     {dateTimeLabel(hold.workshop_starts_at, undefined, timeZone)} –{" "}
-                    {new Date(hold.workshop_ends_at).toLocaleTimeString(undefined, { timeStyle: "short" })}. Expires{" "}
-                    {dateTimeLabel(hold.expires_at, undefined, timeZone)}. This is a temporary reservation, not a
-                    scheduled workshop.
+                    {new Date(hold.workshop_ends_at).toLocaleTimeString(undefined, { timeStyle: "short", timeZone })}.
+                    Expires {dateTimeLabel(hold.expires_at, undefined, timeZone)}. This is a temporary reservation, not
+                    a scheduled workshop.
                   </p>
                   <p className="mt-1 text-11 text-placeholder">
                     {issue
@@ -824,7 +825,7 @@ export function WorkshopPlanner({
                             setTrainerIds((current) =>
                               current.includes(candidate.trainerId) ? current : [...current, candidate.trainerId]
                             );
-                            onViewWeek(startOfWeek(new Date(candidate.workshopStartsAt)));
+                            onViewWeek(startOfWeek(new Date(candidate.workshopStartsAt), timeZone));
                           }
                         }}
                       >
