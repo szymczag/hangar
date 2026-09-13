@@ -11,12 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.54",
+  version: "0.1.0-rc.55",
   highlights: [
-    "Capacity navigation now appears in the active workspace menu.",
-    "The planner explains the time it needs and lets you keep planning.",
-    "A held slot can become a session on the work item it was planned for.",
-    'The "about this build" dialog names the build it is in.',
+    "Planning now supports both temporary reservations and direct scheduling.",
+    "Saved plans and booking hours are easier to manage.",
+    "Capacity uses automatic timezones and shows trainer workload.",
+    "Private calendar rules recognize training invitations.",
+    "Explicit links prevent duplicate training workload.",
   ],
   upstream: {
     version: "1.4.0",

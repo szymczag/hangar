@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.54`. It is qualified for evaluation on
+The current release is `0.1.0-rc.55`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.54` qualification boundary is:
+The `0.1.0-rc.55` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -116,10 +116,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.54`                               |
-| Helm chart version | `0.1.0-rc.54`                                |
-| Git tag            | `hangar-v0.1.0-rc.54`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.54` |
+| Product version    | `v0.1.0-rc.55`                               |
+| Helm chart version | `0.1.0-rc.55`                                |
+| Git tag            | `hangar-v0.1.0-rc.55`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.55` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, and `rc.33` were consumed by
 incomplete publication attempts. Releases `rc.31` through `rc.38` are retired
@@ -135,7 +135,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.54` notes](../releases/hangar-v0.1.0-rc.54.md) — review
+- [Release `v0.1.0-rc.55` notes](../releases/hangar-v0.1.0-rc.55.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -162,16 +162,21 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-Release rc.54 adds migrations ext.0025 and ext.0026 for workshop planning:
-drafts no longer persist the displayed date window, and may reference a Workshop
-work item. Apply migrations with the release migration Job and update the API,
-workers and frontends together. Existing Calendar OAuth and encryption-key
-configuration remains valid. Capacity links now appear in the active workspace
-sidebar; the planner explains required continuous time and allows separate held
-plans without releasing earlier reservations.
+Release rc.55 adds migrations ext.0027–ext.0029 for idempotent confirmation,
+session origins, automatic calendar timezones, encrypted training rules and
+explicit invitation/session links. Apply migrations before admitting traffic and
+update the API, workers and frontends together. Existing weekly clock-hour values
+remain; their timezone now follows the primary Google calendar or Hangar profile.
+The previous release is `0.1.0-rc.54`, tag `hangar-v0.1.0-rc.54`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.0-rc.54`.
 
-Hangar consumes anonymous free/busy ranges and never imports event details; the
-full operator contract and key-rotation rules are in the configuration reference.
+Basic calendar access continues to consume free/busy ranges. Optional invitation
+recognition requires `calendar.events.readonly`, a separate trainer consent, and
+workspace administrator rules configured in Team capacity. It reads times and
+participation without requesting event titles or descriptions. Missing access or
+unverified configured calendars block new bookings. See the
+[configuration reference](configuration.md#google-calendar-trainer-capacity) and
+[planner setup](../capacity-planner.md) before enabling those rules.
 
 ## Support boundary
 
@@ -180,9 +185,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The release workflow verifies anonymous access to the rc.54 chart archive, OCI
+The release workflow verifies anonymous access to the rc.55 chart archive, OCI
 chart and digest-pinned images, and creates provenance attestations and keyless
-Cosign signatures. No new live-cluster qualification is claimed for rc.54.
+Cosign signatures. No new live-cluster qualification is claimed for rc.55.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure
