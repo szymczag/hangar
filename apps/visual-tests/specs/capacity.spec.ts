@@ -95,6 +95,16 @@ test("planner explains a short opening and keeps earlier holds while planning mo
   const page = await asUser("admin");
   const seed = fixtures();
   const trainerId = "10000000-0000-4000-8000-000000000001";
+  const workshop = {
+    id: "20000000-0000-4000-8000-000000000001",
+    name: "Browser workshop",
+    project_id: seed.project.id,
+    project_identifier: "VR",
+    sequence_id: 99,
+    assignee_ids: [trainerId],
+  };
+  let schedules = 0;
+  let releases = 0;
   const drafts: Array<{
     id: string;
     revision: number;
@@ -104,8 +114,8 @@ test("planner explains a short opening and keeps earlier holds while planning mo
     travel_before_minutes: number;
     travel_after_minutes: number;
     trainer_ids: string[];
-    issue_id: null;
-    issue: null;
+    issue_id: string | null;
+    issue: typeof workshop | null;
     hold: null | {
       id: string;
       trainer_id: string;
@@ -170,6 +180,8 @@ test("planner explains a short opening and keeps earlier holds while planning mo
           ],
         },
       });
+    } else if (path === "workshops/") {
+      await route.fulfill({ json: { results: [workshop] } });
     } else if (path === "plans/") {
       if (request.method() === "GET") await route.fulfill({ json: { results: drafts } });
       else {
@@ -177,7 +189,7 @@ test("planner explains a short opening and keeps earlier holds while planning mo
           ...request.postDataJSON(),
           id: `plan-${drafts.length + 1}`,
           revision: 1,
-          issue: null,
+          issue: request.postDataJSON().issue_id ? workshop : null,
           hold: null,
         };
         drafts.push(draft);
@@ -204,9 +216,28 @@ test("planner explains a short opening and keeps earlier holds while planning mo
             blocked_ends_at: new Date(end + draft.travel_after_minutes * 60_000).toISOString(),
             expires_at: new Date(new Date(seed.clock).getTime() + 72 * 3_600_000).toISOString(),
           };
-        } else draft.hold = null;
+        } else {
+          draft.hold = null;
+          releases++;
+        }
         draft.revision++;
         await route.fulfill({ json: { revision: draft.revision, hold: draft.hold } });
+      } else if (path.endsWith("/schedule/")) {
+        const input = request.postDataJSON();
+        expect(input.idempotency_key).toMatch(/^[0-9a-f-]{36}$/);
+        expect(draft.issue_id).toBe(workshop.id);
+        if (draft.hold) expect(input.trainer_id).toBeUndefined();
+        else expect(input.trainer_id).toBe(trainerId);
+        draft.hold = null;
+        draft.revision++;
+        schedules++;
+        await route.fulfill({
+          status: 201,
+          json: { revision: draft.revision, issue: workshop, session: { id: `session-${schedules}` } },
+        });
+      } else if (request.method() === "PATCH" || request.method() === "PUT") {
+        Object.assign(draft, request.postDataJSON(), { issue: workshop, revision: draft.revision + 1 });
+        await route.fulfill({ json: draft });
       } else {
         throw new Error(`Unexpected plan operation: ${request.method()} ${path}`);
       }
@@ -251,6 +282,30 @@ test("planner explains a short opening and keeps earlier holds while planning mo
   await expect.poll(() => capacityReads).toBeGreaterThan(readsBeforeRelease);
   expect(drafts[0].hold).toBeNull();
   expect(drafts[1].hold).not.toBeNull();
+  // Attach a Workshop while the other reservation stays active, then confirm it.
+  await page.getByRole("button", { name: "Saved plans", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Saved plans" })
+    .getByRole("button")
+    .filter({ hasText: drafts[1].title })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Schedule workshop", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Confirm session" })).toBeDisabled();
+  await page.getByRole("button", { name: "Choose a Workshop work item", exact: true }).last().click();
+  await page.getByRole("button", { name: "VR-99 · Browser workshop", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm session" }).click();
+  await expect.poll(() => schedules).toBe(1);
+  expect(releases).toBe(1);
+  // Direct confirmation uses the same chooser without first creating a hold.
+  await page.getByRole("button", { name: "New plan", exact: true }).click();
+  await page.getByRole("spinbutton", { name: /Workshop duration/ }).fill("30");
+  await page.getByRole("button", { name: "Schedule workshop", exact: true }).first().click();
+  await page.getByRole("button", { name: "Choose a Workshop work item", exact: true }).last().click();
+  await page.getByRole("button", { name: "VR-99 · Browser workshop", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm session" }).click();
+  await expect.poll(() => schedules).toBe(2);
+  expect(releases).toBe(1);
 });
 
 test("booking hours keep focus while typing and copy to active days", async ({ asUser }) => {
