@@ -1,23 +1,24 @@
 ## Security and privacy
 
-**The workshop planner no longer finds a slot it cannot let you take.** A plan
-stored the fortnight the coordinator happened to have on screen when they saved
-it, and a hold had to fall inside that window -- so stepping the week marked the
-plan unsaved, every candidate fell back to "save this version of the plan
-first", and saving is refused outright while a hold is active. The planner could
-report the first opening six weeks out and then offer no way to reserve it. The
-week was never plan data; it is what you are looking at, and it already lives in
-the page's own `week` parameter.
+**Capacity navigation now appears in the active workspace menu.** Members and
+administrators can reach My capacity, Team capacity and Workshop planner when
+the Calendar capacity feature is enabled. The links previously existed only in
+an unused menu component.
 
-**The planner offers a choice of times, not one.** It used to take the first
-moment each free opening began and stop there, so a trainer free from nine to
-five produced a single card at nine, and "could she do it after lunch?" could not
-be asked at all. Starts now step through each opening on the half hour, up to
-four per trainer per day, spread across the day rather than bunched at its start,
-with a control to narrow to mornings or afternoons. An opening that begins at an
-odd minute -- where a calendar block closed -- still offers that exact moment
-first, because it is the genuine earliest fit and "find first available" reads
-it.
+**The planner explains the time it needs and lets you keep planning.** The
+required continuous block includes delivery, preparation and both travel buffers.
+For example, the default four-hour workshop needs six and a half free hours.
+An empty result explains that requirement and the longest free block found;
+loading and request failures are shown separately. Searching excludes elapsed
+time, offers starts throughout free openings, supports morning or afternoon
+filters, and lets the coordinator open the week containing a search result.
+Changing the inputs clears obsolete results and cancels obsolete searches.
+
+Holding a candidate saves a new or edited plan automatically. One plan still
+holds one time, but Start another plan preserves the existing reservation and
+opens a separate draft. The saved-plan picker stays available during a hold, and
+Release and edit returns to the current plan. Capacity refreshes after hold,
+release, scheduling and expiry.
 
 **A held slot can become a session on the work item it was planned for.** The
 planner could answer who and when, and then had nowhere to put the answer: the
@@ -88,12 +89,16 @@ Two limitations recorded against `rc.51` are resolved beyond those `rc.53`
 closed: the planner can look past the week on screen and act on what it finds,
 and its result is no longer a dead end.
 
-The planner's newer surfaces are not photographed. The visual suite covers the
-planner as it first opens, but not a plan with a hold on it, and so not the
-scheduling step either -- that needs a held plan in the visual fixtures. Nothing
-on a work item says which plan a session came from; the audit trail records it
-and the interface does not. A hold still expires silently at seventy-two hours,
-with no warning that a slot is about to be given back.
+Browser coverage now exercises automatic save-and-hold, two independent held
+plans, switching between them and releasing a hold. Scheduling a held plan still
+has no dedicated screenshot fixture. Nothing on a work item identifies which plan
+a session came from; the audit trail records it. Expired holds are cleared from
+the planner and capacity is refreshed, but there is no advance expiry warning.
+
+A four-hour workshop still requires one continuous free block including all
+buffers; the planner does not split it across separate openings. Search remains
+bounded to eight fourteen-day windows and capacity responses to 25 trainers.
+No new security or privacy changes are introduced by the frontend corrections.
 
 The peek panel's workshop-session baseline compares exactly, with no pixel
 tolerance, and varies between runs on some local machines through antialiasing on
