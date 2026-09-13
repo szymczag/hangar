@@ -308,7 +308,7 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
                   <span className="border-danger-primary bg-danger-secondary size-2.5 rounded-sm border" />
                   Conflict
                 </span>
-                <span className="ml-auto">Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+                <span className="ml-auto">Times shown in {timeZone}</span>
               </div>
             </div>
           </div>
