@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TTrainerCapacity } from "@/services/capacity.service";
 import {
   dateTimeLabel,
@@ -11,8 +11,12 @@ import {
   findWorkshopCandidates,
   groupByDay,
   MAX_SLOTS_PER_TRAINER_PER_DAY,
+  workshopAvailability,
+  noWorkshopFitReason,
+  nextBookingMinute,
   timeLabel,
 } from "./workshop-planner.utils";
+import { formatMinutes } from "../shared/capacity-format.utils";
 import { planSignature } from "./workshop-planner";
 
 const trainer = {
@@ -369,4 +373,92 @@ describe("planSignature", () => {
     // hold button turns on it, so it has to count as unsaved.
     expect(planSignature(plan)).not.toBe(planSignature({ ...plan, issue_id: "issue-1" }));
   });
+});
+
+describe("planner fit explanations and search boundaries", () => {
+  const spec = {
+    trainerIds: [trainer.trainer_id],
+    durationMinutes: 240,
+    preparationMinutes: 30,
+    travelBeforeMinutes: 60,
+    travelAfterMinutes: 60,
+  };
+
+  it("explains why shortening 240 minutes to 30 minutes reveals slots", () => {
+    const open = [freeBetween([at(7, 9), at(7, 12)], [at(7, 13), at(7, 17)])];
+    const availability = workshopAvailability(open, at(7, 0), at(8, 0), spec);
+    expect(availability.requiredMinutes).toBe(390);
+    expect(availability.longestFreeMinutes).toBe(240);
+    expect(findWorkshopCandidates(open, at(7, 0), at(8, 0), spec)).toEqual([]);
+    expect(noWorkshopFitReason(availability, spec, formatMinutes)).toContain("6h 30m");
+    expect(noWorkshopFitReason(availability, spec, formatMinutes)).toContain("longest free opening is 4h");
+    expect(findWorkshopCandidates(open, at(7, 0), at(8, 0), { ...spec, durationMinutes: 30 }).length).toBeGreaterThan(
+      0
+    );
+  });
+
+  it("distinguishes no selection from no free booking hours", () => {
+    const empty = workshopAvailability([], at(7, 0), at(8, 0), spec);
+    expect(noWorkshopFitReason(empty, { ...spec, trainerIds: [] }, formatMinutes)).toContain(
+      "Select at least one trainer"
+    );
+    const busy = workshopAvailability([{ ...trainer, intervals: [] }], at(7, 0), at(8, 0), spec);
+    expect(noWorkshopFitReason(busy, spec, formatMinutes)).toContain("No free booking hours");
+  });
+
+  it("finds a noon workshop when preparation starts on a quarter hour", () => {
+    const result = findWorkshopCandidates([freeBetween([at(7, 10), at(7, 13)])], at(7, 0), at(8, 0), {
+      ...spec,
+      durationMinutes: 60,
+      preparationMinutes: 15,
+      travelBeforeMinutes: 0,
+      travelAfterMinutes: 0,
+      startWindow: "afternoon",
+    });
+    expect(startTimes(result)).toEqual(["12:00"]);
+    expect(timeLabel(result[0].blockedStartsAt, "en-GB")).toBe("11:45");
+  });
+
+  it("requires preparation and travel to start after the earliest allowed time", () => {
+    const result = findWorkshopCandidates([freeBetween([at(7, 9), at(7, 17)])], at(7, 0), at(8, 0), {
+      ...spec,
+      durationMinutes: 60,
+      notBefore: at(7, 11),
+    });
+    expect(result[0].blockedStartsAt).toBe(at(7, 11).toISOString());
+    expect(result[0].workshopStartsAt).toBe(at(7, 12, 30).toISOString());
+  });
+
+  it("reports the largest actual opening over the whole lookahead, not the last window", async () => {
+    let call = 0;
+    const result = await findFirstAvailable(
+      at(7, 0),
+      spec,
+      async (start) => {
+        call++;
+        const end = new Date(start.getTime() + (call === 1 ? 240 : 60) * 60_000);
+        return [freeBetween([start, end])];
+      },
+      { maxWindows: 2 }
+    );
+    expect(result.found).toBe(false);
+    if (!result.found) expect(result.availability.longestFreeMinutes).toBe(240);
+  });
+
+  it("stops a superseded search before fetching another window", async () => {
+    const controller = new AbortController();
+    const fetchWindow = vi.fn(async () => {
+      controller.abort();
+      return [{ ...trainer, intervals: [] }];
+    });
+    await expect(findFirstAvailable(at(7, 0), spec, fetchWindow, { signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(fetchWindow).toHaveBeenCalledTimes(1);
+  });
+});
+
+it("offers a future minute even when the clock is exactly on a minute boundary", () => {
+  expect(nextBookingMinute(at(7, 12))).toEqual(at(7, 12, 1));
+  expect(nextBookingMinute(new Date(at(7, 12).getTime() + 40_000))).toEqual(at(7, 12, 1));
 });

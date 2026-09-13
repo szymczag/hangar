@@ -5,6 +5,8 @@
  */
 
 import { Spinner } from "@plane/ui";
+import { Button } from "@plane/propel/button";
+import { errorMessage } from "../shared/capacity-format.utils";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
 import { useInstance } from "@/hooks/store/use-instance";
@@ -30,10 +32,28 @@ export default function WorkshopPlannerPage({ params }: Route.ComponentProps) {
   const workspaceSlug = params.workspaceSlug;
   const { config } = useInstance();
   const featureEnabled = config?.is_google_calendar_capacity_enabled === true;
-  const { capacity, capacityLoading, weekStart, weekEnd, setWeekStart } = useCapacityData(
-    workspaceSlug,
-    featureEnabled
-  );
+  const {
+    capacity,
+    capacityLoading,
+    capacityError,
+    trainersLoading,
+    trainersError,
+    mutateTrainers,
+    refreshCapacity,
+    weekStart,
+    weekEnd,
+    setWeekStart,
+  } = useCapacityData(workspaceSlug, featureEnabled);
+
+  const dataError = capacityError || trainersError;
+  const currentRange =
+    capacity &&
+    new Date(capacity.from).getTime() === weekStart.getTime() &&
+    new Date(capacity.to).getTime() === weekEnd.getTime();
+  const capacityState = dataError ? "error" : !currentRange || capacityLoading || trainersLoading ? "loading" : "ready";
+  const retry = () => {
+    void Promise.allSettled([mutateTrainers(), refreshCapacity()]);
+  };
 
   if (config && !featureEnabled) return <NotAuthorizedView section="settings" className="h-auto" />;
 
@@ -50,8 +70,20 @@ export default function WorkshopPlannerPage({ params }: Route.ComponentProps) {
             trainers={capacity.trainers}
             weekStart={weekStart}
             weekEnd={weekEnd}
+            onViewWeek={setWeekStart}
+            capacityState={capacityState}
+            capacityError={dataError ? errorMessage(dataError, "Try loading this week again.") : undefined}
+            onRetry={retry}
           />
-        ) : capacityLoading ? (
+        ) : dataError ? (
+          <section role="alert" className="rounded-xl border border-subtle bg-surface-1 p-6">
+            <h1 className="text-body-sm-medium">Availability could not be loaded</h1>
+            <p className="mt-1 text-body-xs-regular text-secondary">{errorMessage(dataError, "Try again.")}</p>
+            <Button variant="secondary" size="sm" className="mt-3" onClick={retry}>
+              Retry
+            </Button>
+          </section>
+        ) : capacityLoading || trainersLoading || !config ? (
           <div className="flex items-center justify-center py-16">
             <Spinner />
           </div>

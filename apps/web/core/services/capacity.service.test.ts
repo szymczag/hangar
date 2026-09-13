@@ -243,3 +243,16 @@ describe("CapacityService CSRF requests", () => {
     });
   });
 });
+
+describe("CapacityService search cancellation", () => {
+  it("passes the search signal to the HTTP request", async () => {
+    const service = new CapacityService();
+    const controller = new AbortController();
+    const get = vi.spyOn(service, "get").mockResolvedValue({ data: { trainers: [] } } as never);
+    await service.getCapacity("workspace", "from", "to", ["trainer"], controller.signal);
+    expect(get).toHaveBeenCalledWith("/api/workspaces/workspace/capacity/", {
+      params: { from: "from", to: "to", trainer_ids: "trainer" },
+      signal: controller.signal,
+    });
+  });
+});
