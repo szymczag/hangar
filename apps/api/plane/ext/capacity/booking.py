@@ -7,6 +7,7 @@ from uuid import UUID
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from plane.ext.capacity.timezones import trainer_timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework.response import Response
 
@@ -68,8 +69,6 @@ def booking_preflight(*, scheduling=False):
                 return Response({"error": "The trainer block has already started."}, status=400)
             if str(trainer_id) not in draft.trainer_ids:
                 return Response({"error": "The trainer is not eligible for this plan."}, status=400)
-            if _subtract([(blocked_start, blocked_end)], _working_intervals(trainer, blocked_start, blocked_end)):
-                return Response({"error": "The complete block must fit inside booking hours."}, status=409)
             busy, connection, freshness = _google_busy(trainer, blocked_start, blocked_end, force=True)
             if selection_revision(trainer) and freshness != "fresh":
                 return Response(
@@ -79,13 +78,15 @@ def booking_preflight(*, scheduling=False):
                     },
                     status=503,
                 )
+            if _subtract([(blocked_start, blocked_end)], _working_intervals(trainer, blocked_start, blocked_end)):
+                return Response({"error": "The complete block must fit inside booking hours."}, status=409)
             if _intersections([(blocked_start, blocked_end)], busy):
                 return Response({"error": "The trainer is busy in Google during this block."}, status=409)
             request.capacity_booking_snapshot = {
                 "trainer": str(trainer_id),
                 "draft_revision": draft.revision,
                 "schedule_revision": trainer.schedule_revision,
-                "timezone": trainer.timezone,
+                "timezone": trainer_timezone(trainer)[0],
                 "selection_revision": selection_revision(trainer),
                 "start": start,
                 "end": end,
@@ -105,7 +106,7 @@ def snapshot_error(request, draft, trainer):
         snapshot["draft_revision"] != draft.revision
         or snapshot["trainer"] != str(trainer.user_id)
         or snapshot["schedule_revision"] != trainer.schedule_revision
-        or snapshot["timezone"] != trainer.timezone
+        or snapshot["timezone"] != trainer_timezone(trainer)[0]
         or snapshot["selection_revision"] != selection_revision(trainer)
     ):
         return Response({"error": "Availability changed while checking. Refresh and try again."}, status=409)

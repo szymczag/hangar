@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { TZDate } from "@date-fns/tz";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { shiftWeek } from "./capacity-format.utils";
@@ -38,11 +39,14 @@ export function WeekStepper({ weekStart, weekEnd, onChange }: Props) {
       </Button>
       <div className="min-w-44 text-center text-body-xs-medium">
         {weekStart.toLocaleDateString(undefined, { day: "numeric", month: "short" })} –{" "}
-        {new Date(weekEnd.getTime() - 1).toLocaleDateString(undefined, {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })}
+        {new TZDate(weekEnd.getTime() - 1, weekEnd instanceof TZDate ? weekEnd.timeZone : undefined).toLocaleDateString(
+          undefined,
+          {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          }
+        )}
       </div>
       <Button
         variant="secondary"

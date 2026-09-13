@@ -116,6 +116,8 @@ class GoogleCalendarCredential(BaseModel):
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.CONNECTED)
     last_successful_at = models.DateTimeField(null=True, blank=True)
     last_error_code = models.CharField(max_length=64, blank=True)
+    primary_calendar_timezone = models.CharField(max_length=64, blank=True)
+    timezone_checked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "ext_google_calendar_credentials"

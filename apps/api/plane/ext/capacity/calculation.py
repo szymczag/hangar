@@ -14,6 +14,8 @@ from django.db import close_old_connections
 
 from plane.db.models import ProjectMember
 from plane.ext.capacity.crypto import decrypt_value
+from plane.ext.capacity.workload import session_workload
+from plane.ext.capacity.timezones import trainer_timezone
 from plane.ext.capacity.cache import (
     BUSY_CACHE_TTL_SECONDS,
     STALE_BUSY_CACHE_TTL_SECONDS,
@@ -72,7 +74,7 @@ def _subtract(intervals, blockers):
 
 
 def _working_intervals(trainer, start, end):
-    zone = ZoneInfo(trainer.timezone)
+    zone = ZoneInfo(trainer_timezone(trainer)[0])
     local_date = start.astimezone(zone).date()
     last_date = (end - timedelta(microseconds=1)).astimezone(zone).date()
     result = []
@@ -135,7 +137,12 @@ def _google_busy(trainer, start, end, *, force=False):
         ]
         if not calendar_ids:
             return [], "no_calendars_selected", "not_connected"
-        payload = _google_client().freebusy(
+        client = _google_client()
+        if not credential.timezone_checked_at or credential.timezone_checked_at < datetime.now(
+            dt_timezone.utc
+        ) - timedelta(hours=24):
+            client.list_calendars(credential)
+        payload = client.freebusy(
             credential,
             calendar_ids,
             time_min=normalized_start.isoformat().replace("+00:00", "Z"),
@@ -268,6 +275,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         trainers = trainers.filter(user_id__in=trainer_ids)
     trainers = list(trainers[:25])
     workshop_map = _workshops(workspace.id, [trainer.user_id for trainer in trainers], start, end)
+    workload_map = session_workload(workspace.id, [trainer.user_id for trainer in trainers], start, end)
     hold_map = _holds(workspace.id, [trainer.user_id for trainer in trainers], start, end)
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(trainers)))) as executor:
         google_results = {
@@ -329,9 +337,15 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
             {
                 "trainer_id": str(trainer.user_id),
                 "display_name": trainer.user.display_name,
-                "timezone": trainer.timezone,
+                "timezone": trainer_timezone(trainer)[0],
+                "timezone_source": trainer_timezone(trainer)[1],
                 "connection_status": connection_status,
                 "availability_status": availability_status,
+                "workload": {
+                    **workload_map[trainer.user_id],
+                    "hold_count": len(hold_intervals),
+                    "hold_minutes": _minutes(hold_intervals),
+                },
                 "working_minutes": working_minutes,
                 "google_busy_minutes": _minutes(_intersections(working, google_busy)),
                 "workshop_minutes": _minutes(_intersections(working, workshop_intervals)),

@@ -7,6 +7,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import useSWR from "swr";
+import { useViewerTimezone } from "./viewer-timezone";
 import { CapacityRequestError, CapacityService } from "@/services/capacity.service";
 import { formatWeekParam, parseWeekParam, shiftWeek } from "./capacity-format.utils";
 
@@ -40,10 +41,14 @@ const capacityService = new CapacityService();
  * instead of hammering.
  */
 export function useCapacityData(workspaceSlug: string, enabled: boolean) {
+  const timeZone = useViewerTimezone();
   const [trainerCursor, setTrainerCursor] = useState<string | undefined>();
   const [cursorHistory, setCursorHistory] = useState<Array<string | undefined>>([]);
   const [searchParams, setSearchParams] = useSearchParams();
-  const weekStart = useMemo(() => parseWeekParam(searchParams.get("week"), new Date()), [searchParams]);
+  const weekStart = useMemo(
+    () => parseWeekParam(searchParams.get("week"), new Date(), timeZone),
+    [searchParams, timeZone]
+  );
 
   /**
    * Accepts an updater as well as a value, because the callers step relative to
@@ -58,7 +63,7 @@ export function useCapacityData(workspaceSlug: string, enabled: boolean) {
     (next: Date | ((current: Date) => Date)) => {
       setSearchParams(
         (previous) => {
-          const current = parseWeekParam(previous.get("week"), new Date());
+          const current = parseWeekParam(previous.get("week"), new Date(), timeZone);
           const resolved = typeof next === "function" ? next(current) : next;
           const params = new URLSearchParams(previous);
           params.set("week", formatWeekParam(resolved));
@@ -67,7 +72,7 @@ export function useCapacityData(workspaceSlug: string, enabled: boolean) {
         { replace: true, preventScrollReset: true }
       );
     },
-    [setSearchParams]
+    [setSearchParams, timeZone]
   );
   const capacityRefreshRef = useRef<Promise<unknown> | null>(null);
 

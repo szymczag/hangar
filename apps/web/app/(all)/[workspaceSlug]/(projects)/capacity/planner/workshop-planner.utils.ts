@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { TZDate } from "@date-fns/tz";
 import type { TTrainerCapacity } from "@/services/capacity.service";
 import { availableRanges } from "../shared/capacity-timeline.utils";
 
@@ -28,6 +29,7 @@ export type TWorkshopSpec = {
   travelBeforeMinutes: number;
   travelAfterMinutes: number;
   startWindow?: TStartWindow;
+  timeZone?: string;
   /** Earliest allowed start of preparation/travel, not just the workshop. */
   notBefore?: Date;
 };
@@ -84,7 +86,13 @@ function spread<T>(items: T[], max: number): T[] {
  * different question than the one it is asked. Everything after it sits on the
  * half hour.
  */
-function startsInRange(rangeStart: Date, rangeEnd: Date, totalMinutes: number, beforeMinutes: number): Date[] {
+function startsInRange(
+  rangeStart: Date,
+  rangeEnd: Date,
+  totalMinutes: number,
+  beforeMinutes: number,
+  timeZone?: string
+): Date[] {
   const totalMs = totalMinutes * 60_000;
   const stepMs = SLOT_STEP_MINUTES * 60_000;
   const latest = rangeEnd.getTime() - totalMs;
@@ -93,7 +101,7 @@ function startsInRange(rangeStart: Date, rangeEnd: Date, totalMinutes: number, b
   const starts = [new Date(rangeStart)];
   // Align the workshop start: a 15-minute preparation must not hide a noon workshop.
   const beforeMs = beforeMinutes * 60_000;
-  const aligned = new Date(rangeStart.getTime() + beforeMs);
+  const aligned = new TZDate(rangeStart.getTime() + beforeMs, timeZone);
   aligned.setSeconds(0, 0);
   aligned.setMinutes(Math.ceil(aligned.getMinutes() / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES);
   for (let time = aligned.getTime() - beforeMs; time <= latest; time += stepMs) {
@@ -128,9 +136,10 @@ export function findWorkshopCandidates(
         new Date(range.start),
         new Date(range.end),
         totalMinutes,
-        beforeMinutes
+        beforeMinutes,
+        spec.timeZone
       )) {
-        const workshopStart = new Date(blockedStart.getTime() + beforeMinutes * 60_000);
+        const workshopStart = new TZDate(blockedStart.getTime() + beforeMinutes * 60_000, spec.timeZone);
         if (!startsInWindow(workshopStart, startWindow)) continue;
         const day = byDay.get(dayKey(workshopStart)) ?? [];
         day.push({
@@ -138,7 +147,7 @@ export function findWorkshopCandidates(
           trainerName: trainer.display_name,
           timezone: trainer.timezone,
           availabilityStatus: trainer.availability_status,
-          workshopStartsAt: workshopStart.toISOString(),
+          workshopStartsAt: new Date(workshopStart.getTime()).toISOString(),
           workshopEndsAt: new Date(workshopStart.getTime() + durationMinutes * 60_000).toISOString(),
           blockedStartsAt: blockedStart.toISOString(),
           blockedEndsAt: new Date(blockedStart.getTime() + totalMinutes * 60_000).toISOString(),
@@ -212,10 +221,13 @@ export function noWorkshopFitReason(
 }
 
 /** Candidates split into the days they start on, in order. */
-export function groupByDay(candidates: TWorkshopCandidate[]): Array<{ day: string; candidates: TWorkshopCandidate[] }> {
+export function groupByDay(
+  candidates: TWorkshopCandidate[],
+  timeZone?: string
+): Array<{ day: string; candidates: TWorkshopCandidate[] }> {
   const days: Array<{ day: string; candidates: TWorkshopCandidate[] }> = [];
   for (const candidate of candidates) {
-    const day = dayKey(new Date(candidate.workshopStartsAt));
+    const day = dayKey(new TZDate(candidate.workshopStartsAt, timeZone));
     const last = days.at(-1);
     if (last && last.day === day) last.candidates.push(candidate);
     else days.push({ day, candidates: [candidate] });
@@ -224,15 +236,16 @@ export function groupByDay(candidates: TWorkshopCandidate[]): Array<{ day: strin
 }
 
 /** A time of day, with no date. The day heading above the card carries that. */
-export const timeLabel = (value: string, locales?: Intl.LocalesArgument) =>
-  new Date(value).toLocaleTimeString(locales, { hour: "2-digit", minute: "2-digit" });
+export const timeLabel = (value: string, locales?: Intl.LocalesArgument, timeZone?: string) =>
+  new Date(value).toLocaleTimeString(locales, { hour: "2-digit", minute: "2-digit", timeZone });
 
 /** Whether two instants fall on the same local day. */
-export const sameLocalDay = (left: string, right: string) => dayKey(new Date(left)) === dayKey(new Date(right));
+export const sameLocalDay = (left: string, right: string, timeZone?: string) =>
+  dayKey(new TZDate(left, timeZone)) === dayKey(new TZDate(right, timeZone));
 
 /** A day heading: the weekday and the date, without a time. */
-export const dayLabel = (value: string, locales?: Intl.LocalesArgument) =>
-  new Date(value).toLocaleDateString(locales, { weekday: "long", day: "numeric", month: "long" });
+export const dayLabel = (value: string, locales?: Intl.LocalesArgument, timeZone?: string) =>
+  new Date(value).toLocaleDateString(locales, { weekday: "long", day: "numeric", month: "long", timeZone });
 
 /**
  * A hold's start or expiry, as a short weekday-date-time label.
@@ -242,8 +255,9 @@ export const dayLabel = (value: string, locales?: Intl.LocalesArgument) =>
  * individual field options, and rejects the combination with a TypeError rather
  * than merging them -- which is what this threw on every render showing a hold.
  */
-export const dateTimeLabel = (value: string, locales?: Intl.LocalesArgument) =>
+export const dateTimeLabel = (value: string, locales?: Intl.LocalesArgument, timeZone?: string) =>
   new Date(value).toLocaleString(locales, {
+    timeZone,
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -266,8 +280,15 @@ export type TFirstAvailable =
     };
 
 export function windowAfter(start: Date, index: number): { windowStart: Date; windowEnd: Date } {
-  const windowStart = new Date(start.getTime() + index * CAPACITY_WINDOW_DAYS * 86_400_000);
-  return { windowStart, windowEnd: new Date(windowStart.getTime() + CAPACITY_WINDOW_DAYS * 86_400_000) };
+  if (!(start instanceof TZDate)) {
+    const windowStart = new Date(start.getTime() + index * CAPACITY_WINDOW_DAYS * 86_400_000);
+    return { windowStart, windowEnd: new Date(windowStart.getTime() + CAPACITY_WINDOW_DAYS * 86_400_000) };
+  }
+  const windowStart = new TZDate(start.getTime(), start.timeZone);
+  windowStart.setDate(windowStart.getDate() + index * CAPACITY_WINDOW_DAYS);
+  const windowEnd = new TZDate(windowStart.getTime(), windowStart.timeZone);
+  windowEnd.setDate(windowEnd.getDate() + CAPACITY_WINDOW_DAYS);
+  return { windowStart, windowEnd };
 }
 
 /**

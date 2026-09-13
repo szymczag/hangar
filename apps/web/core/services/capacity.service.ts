@@ -14,6 +14,7 @@ export type TTrainerProfile = {
   display_name: string;
   status: "active" | "suspended";
   timezone: string;
+  timezone_source?: "google_calendar" | "profile";
   weekly_schedule: Record<string, TScheduleInterval[]>;
   schedule_revision: number;
   connection_status: string;
@@ -28,6 +29,7 @@ export type TTrainerCapacity = {
   trainer_id: string;
   display_name: string;
   timezone: string;
+  timezone_source?: "google_calendar" | "profile";
   connection_status: string;
   availability_status:
     | "fresh"
@@ -37,6 +39,14 @@ export type TTrainerCapacity = {
     | "rate_limited"
     | "provider_unavailable"
     | string;
+  workload?: {
+    workshop_count: number;
+    session_count: number;
+    delivery_minutes: number;
+    buffer_minutes: number;
+    hold_count: number;
+    hold_minutes: number;
+  };
   working_minutes: number;
   google_busy_minutes: number;
   workshop_minutes: number;

@@ -161,6 +161,7 @@ def test_google_busy_normalizes_provider_window_and_clips_result(monkeypatch):
         status=GoogleCalendarCredential.Status.CONNECTED,
         Status=GoogleCalendarCredential.Status,
         encryption_key_id="key",
+        timezone_checked_at=start,
     )
     selection = SimpleNamespace(
         id="selection-id",
@@ -208,3 +209,26 @@ def test_google_disconnect_revocation_treats_invalid_token_as_already_revoked(mo
     )
 
     client.revoke(credential)
+
+
+def test_booking_hours_follow_profile_and_keep_last_google_timezone():
+    from plane.ext.capacity.timezones import trainer_timezone
+
+    trainer = SimpleNamespace(user=SimpleNamespace(user_timezone="Europe/Warsaw"), timezone="UTC")
+    assert trainer_timezone(trainer) == ("Europe/Warsaw", "profile")
+    trainer.calendar_selection = SimpleNamespace(
+        credential=SimpleNamespace(primary_calendar_timezone="America/New_York", status="reauthorization_required")
+    )
+    assert trainer_timezone(trainer) == ("America/New_York", "google_calendar")
+    del trainer.calendar_selection
+    assert trainer_timezone(trainer) == ("Europe/Warsaw", "profile")
+
+
+@pytest.mark.parametrize("day, expected_minutes", [("2026-03-29", 180), ("2026-10-25", 300)])
+def test_booking_hours_account_for_daylight_saving(day, expected_minutes):
+    trainer = SimpleNamespace(
+        user=SimpleNamespace(user_timezone="Europe/Warsaw"),
+        weekly_schedule={"sun": [{"start": "00:00", "end": "04:00"}]},
+    )
+    start = datetime.fromisoformat(day).replace(tzinfo=timezone.utc) - timedelta(hours=3)
+    assert _minutes(calculation._working_intervals(trainer, start, start + timedelta(days=2))) == expected_minutes

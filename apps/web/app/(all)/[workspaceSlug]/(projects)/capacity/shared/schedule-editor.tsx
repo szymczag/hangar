@@ -30,7 +30,6 @@ export function ScheduleEditor({
   onSaved: () => void;
 }) {
   const [schedule, setSchedule] = useState(() => editWeek(profile.weekly_schedule));
-  const [trainerTimezone, setTrainerTimezone] = useState(profile.timezone);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -52,7 +51,6 @@ export function ScheduleEditor({
     try {
       await capacityService.updateSchedule(workspaceSlug, profile.user_id, profile.schedule_revision, {
         weekly_schedule: validation.schedule,
-        timezone: trainerTimezone,
       });
       setToast({
         type: TOAST_TYPE.SUCCESS,
@@ -85,15 +83,10 @@ export function ScheduleEditor({
         </Button>
       </div>
       <fieldset disabled={saving} className="min-w-0">
-        <label className="mb-4 block max-w-sm text-body-xs-medium">
-          Trainer timezone
-          <input
-            aria-label="Trainer timezone"
-            value={trainerTimezone}
-            onChange={(event) => setTrainerTimezone(event.target.value)}
-            className="mt-1 w-full rounded border border-subtle bg-surface-2 px-2 py-1.5 text-body-xs-regular"
-          />
-        </label>
+        <p className="mb-4 text-body-xs-regular text-secondary">
+          Times in {profile.timezone} · From{" "}
+          {profile.timezone_source === "google_calendar" ? "your primary Google calendar" : "your Hangar profile"}.
+        </p>
         <div className="mb-4 flex flex-wrap items-end gap-3 rounded-md bg-surface-2 p-3">
           <label className="text-body-xs-medium">
             Copy hours from

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useViewerTimezone } from "../shared/viewer-timezone";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { ModalCore } from "@plane/ui";
@@ -150,6 +151,7 @@ export function WorkshopPlanner({
     | { state: "done"; result: TFirstAvailable; forTrainer: string | null; key: string }
   >({ state: "idle" });
 
+  const timeZone = useViewerTimezone();
   const spec = useMemo(
     () => ({
       trainerIds,
@@ -158,9 +160,19 @@ export function WorkshopPlanner({
       travelBeforeMinutes,
       travelAfterMinutes,
       startWindow,
+      timeZone,
       notBefore: nextBookingMinute(now),
     }),
-    [trainerIds, durationMinutes, preparationMinutes, travelBeforeMinutes, travelAfterMinutes, startWindow, now]
+    [
+      trainerIds,
+      durationMinutes,
+      preparationMinutes,
+      travelBeforeMinutes,
+      travelAfterMinutes,
+      startWindow,
+      now,
+      timeZone,
+    ]
   );
   // A result belongs to the requirements that produced it, including the viewed week.
   const searchKey = JSON.stringify({
@@ -254,7 +266,7 @@ export function WorkshopPlanner({
     () => workshopAvailability(trainers, weekStart, weekEnd, spec),
     [trainers, weekStart, weekEnd, spec]
   );
-  const candidateDays = useMemo(() => groupByDay(candidates), [candidates]);
+  const candidateDays = useMemo(() => groupByDay(candidates, timeZone), [candidates, timeZone]);
 
   /**
    * A held plan is frozen, because the server freezes it: `PUT /capacity/plans/`
@@ -384,7 +396,7 @@ export function WorkshopPlanner({
       // Hold against the revision returned by this save.
       const saved =
         planNeedsSaving || !draftId || revision.current === null
-          ? await persistDraft(`Workshop · ${dateTimeLabel(candidate.workshopStartsAt)}`)
+          ? await persistDraft(`Workshop · ${dateTimeLabel(candidate.workshopStartsAt, undefined, timeZone)}`)
           : { id: draftId, revision: revision.current };
       const result = await capacityService.holdWorkshopPlan(
         workspaceSlug,
@@ -710,9 +722,10 @@ export function WorkshopPlanner({
                 <div>
                   <h3 className="text-body-sm-medium text-primary">Time held for {hold.trainer_name}</h3>
                   <p className="mt-1 text-body-xs-regular text-secondary">
-                    {dateTimeLabel(hold.workshop_starts_at)} –{" "}
+                    {dateTimeLabel(hold.workshop_starts_at, undefined, timeZone)} –{" "}
                     {new Date(hold.workshop_ends_at).toLocaleTimeString(undefined, { timeStyle: "short" })}. Expires{" "}
-                    {dateTimeLabel(hold.expires_at)}. This is a temporary reservation, not a scheduled workshop.
+                    {dateTimeLabel(hold.expires_at, undefined, timeZone)}. This is a temporary reservation, not a
+                    scheduled workshop.
                   </p>
                   <p className="mt-1 text-11 text-placeholder">
                     {issue
@@ -757,8 +770,7 @@ export function WorkshopPlanner({
                 <div>
                   <h3 className="text-body-sm-medium text-primary">Matching slots</h3>
                   <p className="mt-1 text-11 text-secondary">
-                    Up to {MAX_SLOTS_PER_TRAINER_PER_DAY} starts per trainer per day. Times shown in{" "}
-                    {Intl.DateTimeFormat().resolvedOptions().timeZone}.
+                    Up to {MAX_SLOTS_PER_TRAINER_PER_DAY} starts per trainer per day. Times shown in {timeZone}.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -780,7 +792,7 @@ export function WorkshopPlanner({
               {search.state === "running" ? (
                 <p className="mb-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 text-11 text-secondary">
                   Looking for a complete {formatMinutes(availability.requiredMinutes)} opening — checking from{" "}
-                  {dateTimeLabel(search.from.toISOString())}.
+                  {dateTimeLabel(search.from.toISOString(), undefined, timeZone)}.
                 </p>
               ) : null}
 
@@ -790,8 +802,8 @@ export function WorkshopPlanner({
                     <>
                       <p className="text-primary">
                         <span className="font-medium">{search.result.candidate.trainerName}</span> is the first who can:{" "}
-                        {dateTimeLabel(search.result.candidate.workshopStartsAt)} –{" "}
-                        {dateTimeLabel(search.result.candidate.workshopEndsAt)}.
+                        {dateTimeLabel(search.result.candidate.workshopStartsAt, undefined, timeZone)} –{" "}
+                        {dateTimeLabel(search.result.candidate.workshopEndsAt, undefined, timeZone)}.
                       </p>
                       <Button
                         variant="secondary"
@@ -813,7 +825,10 @@ export function WorkshopPlanner({
                     </>
                   ) : (
                     <div className="text-secondary">
-                      <p>No matching time found up to {dateTimeLabel(search.result.searchedUntil.toISOString())}.</p>
+                      <p>
+                        No matching time found up to{" "}
+                        {dateTimeLabel(search.result.searchedUntil.toISOString(), undefined, timeZone)}.
+                      </p>
                       <p className="mt-1">{noWorkshopFitReason(search.result.availability, spec, formatMinutes)}</p>
                     </div>
                   )}
@@ -834,9 +849,12 @@ export function WorkshopPlanner({
               ) : candidateDays.length ? (
                 <div className="space-y-6">
                   {candidateDays.map((group) => (
-                    <section key={group.day} aria-label={dayLabel(group.candidates[0].workshopStartsAt)}>
+                    <section
+                      key={group.day}
+                      aria-label={dayLabel(group.candidates[0].workshopStartsAt, undefined, timeZone)}
+                    >
                       <h4 className="mb-2 text-11 font-semibold tracking-[0.12em] text-placeholder uppercase">
-                        {dayLabel(group.candidates[0].workshopStartsAt)}
+                        {dayLabel(group.candidates[0].workshopStartsAt, undefined, timeZone)}
                       </h4>
                       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                         {group.candidates.map((candidate) => (
@@ -859,7 +877,8 @@ export function WorkshopPlanner({
                                 <div>
                                   <span className="block text-11 text-placeholder">Workshop</span>
                                   <span className="text-primary">
-                                    {timeLabel(candidate.workshopStartsAt)} – {timeLabel(candidate.workshopEndsAt)}
+                                    {timeLabel(candidate.workshopStartsAt, undefined, timeZone)} –{" "}
+                                    {timeLabel(candidate.workshopEndsAt, undefined, timeZone)}
                                   </span>
                                 </div>
                               </div>
@@ -871,13 +890,13 @@ export function WorkshopPlanner({
                                     {/* Spelled out in full when travel pushes the block onto
                               another day, which the heading above would otherwise
                               contradict. */}
-                                    {sameLocalDay(candidate.blockedStartsAt, candidate.workshopStartsAt)
-                                      ? timeLabel(candidate.blockedStartsAt)
-                                      : dateTimeLabel(candidate.blockedStartsAt)}{" "}
+                                    {sameLocalDay(candidate.blockedStartsAt, candidate.workshopStartsAt, timeZone)
+                                      ? timeLabel(candidate.blockedStartsAt, undefined, timeZone)
+                                      : dateTimeLabel(candidate.blockedStartsAt, undefined, timeZone)}{" "}
                                     –{" "}
-                                    {sameLocalDay(candidate.blockedEndsAt, candidate.workshopStartsAt)
-                                      ? timeLabel(candidate.blockedEndsAt)
-                                      : dateTimeLabel(candidate.blockedEndsAt)}
+                                    {sameLocalDay(candidate.blockedEndsAt, candidate.workshopStartsAt, timeZone)
+                                      ? timeLabel(candidate.blockedEndsAt, undefined, timeZone)
+                                      : dateTimeLabel(candidate.blockedEndsAt, undefined, timeZone)}
                                   </span>
                                 </div>
                               </div>
