@@ -273,7 +273,13 @@ def test_workshop_session_rejects_a_trainer_who_is_not_an_assignee(settings, wor
     issue = Issue.objects.create(
         name="NetSec", project=project, workspace=workspace, state=state, type=workshop_type, created_by=create_user
     )
-    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     TrainerProfile.objects.create(workspace=workspace, user=outsider)
     IssueAssignee.objects.create(issue=issue, assignee=create_user, project=project, workspace=workspace)
     client = APIClient(enforce_csrf_checks=True)
@@ -318,7 +324,13 @@ def _future_monday():
 @pytest.mark.django_db
 def test_workshop_plan_drafts_are_private_and_revision_protected(settings, workspace, create_user):
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
-    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     payload = {
         "title": "NetSec workshop",
         "duration_minutes": 240,
@@ -361,7 +373,13 @@ def test_workshop_plan_drafts_are_private_and_revision_protected(settings, works
 @pytest.mark.django_db
 def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings, workspace, create_user):
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
-    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     client = APIClient(enforce_csrf_checks=True)
     client.force_login(create_user)
     csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
@@ -404,7 +422,7 @@ def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings
     )
     assert capacity.status_code == status.HTTP_200_OK
     trainer_capacity = capacity.data["trainers"][0]
-    assert trainer_capacity["hold_minutes"] == 270
+    assert trainer_capacity["hold_minutes"] == 390
     assert any(interval["kind"] == "workshop_hold" for interval in trainer_capacity["intervals"])
 
     conflict = client.post(
@@ -437,7 +455,13 @@ def test_workshop_plan_hold_is_bound_to_availability_not_to_a_planning_window(se
     is frozen until the hold is released -- plus a floor at the present.
     """
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
-    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     client = APIClient(enforce_csrf_checks=True)
     client.force_login(create_user)
     csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
@@ -532,7 +556,13 @@ def test_a_held_slot_becomes_a_session_on_the_work_item_it_was_planned_for(setti
     trainer booked exactly once.
     """
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
-    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     issue = _workshop_issue(workspace, create_user)
     client = APIClient(enforce_csrf_checks=True)
     client.force_login(create_user)
@@ -610,7 +640,13 @@ def test_scheduling_re_checks_availability_and_keeps_the_hold_when_it_refuses(se
     were still entitled to argue for.
     """
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
-    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     issue = _workshop_issue(workspace, create_user)
     rival = _workshop_issue(workspace, create_user, name="Rival workshop")
     client = APIClient(enforce_csrf_checks=True)
@@ -720,7 +756,13 @@ def test_the_workshop_picker_only_offers_workshops_the_viewer_is_in_a_project_fo
 @pytest.mark.django_db
 def test_a_plan_can_only_be_scheduled_onto_a_workshop_it_is_attached_to(settings, workspace, create_user):
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
-    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     client = APIClient(enforce_csrf_checks=True)
     client.force_login(create_user)
     csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
@@ -793,7 +835,13 @@ def test_google_calendar_callback_accepts_email_scope_aliases(
     settings, workspace, create_user, monkeypatch, email_scope
 ):
     settings.CALENDAR_TOKEN_ENCRYPTION_KEYS = (Fernet.generate_key().decode(),)
-    trainer = TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    trainer = TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     granted = REQUIRED_CALENDAR_SCOPES | {email_scope}
     google_client = _mock_google_calendar_callback(
         monkeypatch,
@@ -833,7 +881,13 @@ def test_google_calendar_callback_rejects_missing_email_scope_without_logging_se
     settings, workspace, create_user, monkeypatch, caplog
 ):
     settings.CALENDAR_TOKEN_ENCRYPTION_KEYS = (Fernet.generate_key().decode(),)
-    trainer = TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    trainer = TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     google_client = _mock_google_calendar_callback(
         monkeypatch,
         trainer,
@@ -867,7 +921,13 @@ def test_google_calendar_callback_rejects_missing_email_scope_without_logging_se
 @pytest.mark.django_db
 def test_google_calendar_callback_logs_malformed_token_response(settings, workspace, create_user, monkeypatch, caplog):
     settings.CALENDAR_TOKEN_ENCRYPTION_KEYS = (Fernet.generate_key().decode(),)
-    trainer = TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    trainer = TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     _mock_google_calendar_callback(
         monkeypatch,
         trainer,
@@ -894,7 +954,13 @@ def test_google_calendar_callback_logs_malformed_token_response(settings, worksp
 @pytest.mark.django_db
 def test_google_calendar_callback_preserves_existing_calendar_selection(settings, workspace, create_user, monkeypatch):
     settings.CALENDAR_TOKEN_ENCRYPTION_KEYS = (Fernet.generate_key().decode(),)
-    trainer = TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    trainer = TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     encrypted_refresh, key_id = encrypt_value("existing-refresh-token")
     credential = GoogleCalendarCredential.objects.create(
         user=create_user,
@@ -937,7 +1003,13 @@ def test_google_calendar_callback_keeps_connection_when_primary_autoselect_fails
     settings, workspace, create_user, monkeypatch, caplog
 ):
     settings.CALENDAR_TOKEN_ENCRYPTION_KEYS = (Fernet.generate_key().decode(),)
-    trainer = TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    trainer = TrainerProfile.objects.create(
+        workspace=workspace,
+        user=create_user,
+        weekly_schedule={
+            day: [{"start": "00:00", "end": "23:59"}] for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        },
+    )
     google_client = _mock_google_calendar_callback(
         monkeypatch,
         trainer,
@@ -991,3 +1063,130 @@ def test_workspace_capacity_lists_trainers_in_a_stable_order(settings, workspace
 
     assert names[0] == names[1] == names[2]
     assert names[0] == ["Adam Trainer", "Mia Trainer", "Zoe Trainer"]
+
+
+def _booking_client(settings, workspace, user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    profile = TrainerProfile.objects.create(
+        workspace=workspace,
+        user=user,
+        weekly_schedule={day: [{"start": "09:00", "end": "18:00"}] for day in ("mon", "tue", "wed", "thu", "fri")},
+    )
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+    url = f"/api/workspaces/{workspace.slug}/capacity/plans/"
+    draft = client.post(
+        url,
+        {
+            "title": "Training",
+            "duration_minutes": 60,
+            "preparation_minutes": 0,
+            "travel_before_minutes": 0,
+            "travel_after_minutes": 0,
+            "trainer_ids": [str(user.id)],
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    ).data
+    return profile, client, csrf, f"{url}{draft['id']}/", draft
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_attach_workshop_to_reserved_plan_without_releasing(settings, workspace, create_user):
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    held = client.post(
+        url + "hold/",
+        {
+            "revision": draft["revision"],
+            "trainer_id": str(create_user.id),
+            "workshop_starts_at": f"{_future_monday().isoformat()}T10:00:00Z",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert held.status_code == 201, held.data
+    issue = _workshop_issue(workspace, create_user)
+    attached = client.patch(
+        url,
+        {
+            "revision": held.data["revision"],
+            "issue_id": str(issue.id),
+            "title": "Confirmed training",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert attached.status_code == 200, attached.data
+    assert attached.data["hold"]["id"] == held.data["hold"]["id"]
+    assert attached.data["issue"]["id"] == str(issue.id)
+    assert attached.data["created_at"]
+    rejected = client.patch(
+        url,
+        {
+            "revision": attached.data["revision"],
+            "duration_minutes": 120,
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert rejected.status_code == 400
+    assert WorkshopPlanHold.objects.get(id=held.data["hold"]["id"]).status == "active"
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_direct_booking_is_idempotent_and_records_origin(settings, workspace, create_user):
+    from uuid import uuid4
+
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    issue = _workshop_issue(workspace, create_user)
+    attached = client.patch(
+        url, {"revision": draft["revision"], "issue_id": str(issue.id)}, format="json", HTTP_X_CSRFTOKEN=csrf
+    )
+    payload = {
+        "revision": attached.data["revision"],
+        "trainer_id": str(create_user.id),
+        "workshop_starts_at": f"{_future_monday().isoformat()}T10:00:00Z",
+        "idempotency_key": str(uuid4()),
+    }
+    first = client.post(url + "schedule/", payload, format="json", HTTP_X_CSRFTOKEN=csrf)
+    assert first.status_code == 201, first.data
+    retry = client.post(url + "schedule/", payload, format="json", HTTP_X_CSRFTOKEN=csrf)
+    assert retry.status_code == 200, retry.data
+    assert first.data == retry.data
+    assert WorkshopSession.objects.filter(source_plan_id=draft["id"]).count() == 1
+    assert not WorkshopPlanHold.objects.filter(draft_id=draft["id"], status="active").exists()
+    changed = client.post(
+        url + "schedule/",
+        {**payload, "workshop_starts_at": f"{_future_monday().isoformat()}T12:00:00Z"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert changed.status_code == 409
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_booking_rejects_outside_hours_and_unverified_google(settings, workspace, create_user, monkeypatch):
+    from plane.ext.capacity import booking
+
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    payload = {
+        "revision": draft["revision"],
+        "trainer_id": str(create_user.id),
+        "workshop_starts_at": f"{_future_monday().isoformat()}T08:00:00Z",
+    }
+    outside = client.post(url + "hold/", payload, format="json", HTTP_X_CSRFTOKEN=csrf)
+    assert outside.status_code == 409
+    monkeypatch.setattr(booking, "selection_revision", lambda trainer: ("connected", 1, "credential"))
+    monkeypatch.setattr(booking, "_google_busy", lambda *args, **kwargs: ([], "connected", "stale"))
+    unverified = client.post(
+        url + "hold/",
+        {**payload, "workshop_starts_at": f"{_future_monday().isoformat()}T10:00:00Z"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert unverified.status_code == 503
+    assert not WorkshopPlanHold.objects.filter(draft_id=draft["id"]).exists()

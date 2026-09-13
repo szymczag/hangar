@@ -3,11 +3,15 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { v4 as uuidv4 } from "uuid";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
+import { ModalCore } from "@plane/ui";
+import { PlanToolbar } from "./plan-toolbar";
+import { CreateWorkshop } from "./create-workshop";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { CalendarCheck, CalendarSearch, Clock3, Save, ShieldCheck, Trash2, Users } from "lucide-react";
+import { CalendarCheck, CalendarSearch, Clock3, ShieldCheck, Users } from "lucide-react";
 import { errorMessage, formatMinutes, startOfWeek } from "../shared/capacity-format.utils";
 import {
   CapacityService,
@@ -19,6 +23,7 @@ import {
 } from "@/services/capacity.service";
 import { WorkshopPicker, workshopLabel } from "./workshop-picker";
 import {
+  planSignature,
   dateTimeLabel,
   dayLabel,
   findFirstAvailable,
@@ -46,13 +51,6 @@ const capacityService = new CapacityService();
  * you act. A plan is what has to happen and who could deliver it; when you are
  * looking is the planner's `?week=`, not the plan's.
  */
-export const planSignature = (plan: TWorkshopPlanDraftInput) =>
-  JSON.stringify({
-    ...plan,
-    // ES2022 is the web app's current target; the copied array keeps sort() mutation local.
-    // oxlint-disable-next-line unicorn/no-array-sort
-    trainer_ids: [...plan.trainer_ids].sort(),
-  });
 
 function NumberField({
   label,
@@ -113,6 +111,9 @@ export function WorkshopPlanner({
   const { data: draftPage, mutate: mutateDrafts } = useSWR(["workshop-plan-drafts", workspaceSlug], () =>
     capacityService.listWorkshopPlanDrafts(workspaceSlug)
   );
+  const [switchTarget, setSwitchTarget] = useState<{ draft: TWorkshopPlanDraft | null } | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<{ candidate: TWorkshopCandidate | null } | null>(null);
+  const operation = useRef<{ signature: string; key: string } | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const revision = useRef<number | null>(null);
   const [title, setTitle] = useState("");
@@ -127,9 +128,9 @@ export function WorkshopPlanner({
   const [issue, setIssue] = useState<TPlanIssue | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(240);
-  const [preparationMinutes, setPreparationMinutes] = useState(30);
-  const [travelBeforeMinutes, setTravelBeforeMinutes] = useState(60);
-  const [travelAfterMinutes, setTravelAfterMinutes] = useState(60);
+  const [preparationMinutes, setPreparationMinutes] = useState(0);
+  const [travelBeforeMinutes, setTravelBeforeMinutes] = useState(0);
+  const [travelAfterMinutes, setTravelAfterMinutes] = useState(0);
   const [trainerIds, setTrainerIds] = useState(() => trainers.map((trainer) => trainer.trainer_id));
   /**
    * Which half of the day to look in.
@@ -150,6 +151,7 @@ export function WorkshopPlanner({
     | { state: "done"; result: TFirstAvailable; forTrainer: string | null; key: string }
   >({ state: "idle" });
 
+  const selectedTrainerIds = useMemo(() => new Set(trainerIds), [trainerIds]);
   const spec = useMemo(
     () => ({
       trainerIds,
@@ -317,9 +319,9 @@ export function WorkshopPlanner({
     setTitle("");
     setIssue(null);
     setDurationMinutes(240);
-    setPreparationMinutes(30);
-    setTravelBeforeMinutes(60);
-    setTravelAfterMinutes(60);
+    setPreparationMinutes(0);
+    setTravelBeforeMinutes(0);
+    setTravelAfterMinutes(0);
     setTrainerIds(trainers.map((trainer) => trainer.trainer_id));
     setHold(null);
     setSavedSignature(null);
@@ -329,14 +331,19 @@ export function WorkshopPlanner({
     const input = { ...payload(), title: title.trim() || fallbackTitle || "Workshop plan" };
     const saved =
       draftId && revision.current !== null
-        ? await capacityService.updateWorkshopPlanDraft(workspaceSlug, draftId, revision.current, input)
+        ? hold
+          ? await capacityService.updatePlanMetadata(workspaceSlug, draftId, revision.current, {
+              title: input.title,
+              issue_id: input.issue_id,
+            })
+          : await capacityService.updateWorkshopPlanDraft(workspaceSlug, draftId, revision.current, input)
         : await capacityService.createWorkshopPlanDraft(workspaceSlug, input);
     loadDraft(saved);
     return saved;
   };
 
   const saveDraft = async () => {
-    if (!trainerIds.length || !validPlan || formLocked) return;
+    if (!trainerIds.length || !validPlan || busy) return;
     setSaving(true);
     try {
       await persistDraft();
@@ -416,10 +423,22 @@ export function WorkshopPlanner({
    * here if it refuses -- and on a refusal the hold is deliberately left alone.
    */
   const scheduleHold = async () => {
-    if (!draftId || revision.current === null || !issue) return;
+    if (!issue || busy) return;
     setScheduling(true);
     try {
-      const result = await capacityService.scheduleWorkshopPlan(workspaceSlug, draftId, revision.current);
+      const saved =
+        planNeedsSaving || !draftId || revision.current === null
+          ? await persistDraft()
+          : { id: draftId, revision: revision.current };
+      const candidate = scheduleTarget?.candidate;
+      const signature = JSON.stringify([saved.id, saved.revision, candidate?.trainerId, candidate?.workshopStartsAt]);
+      if (operation.current?.signature !== signature) operation.current = { signature, key: uuidv4() };
+      const result = await capacityService.scheduleWorkshopPlan(workspaceSlug, saved.id, saved.revision, {
+        idempotency_key: operation.current.key,
+        ...(candidate ? { trainer_id: candidate.trainerId, workshop_starts_at: candidate.workshopStartsAt } : {}),
+      });
+      operation.current = null;
+      setScheduleTarget(null);
       revision.current = result.revision;
       setHold(null);
       await refreshPlanningData();
@@ -454,66 +473,103 @@ export function WorkshopPlanner({
     }
   };
 
+  const dirty =
+    savedSignature !== null
+      ? planNeedsSaving
+      : Boolean(
+          title ||
+          issue ||
+          durationMinutes !== 240 ||
+          preparationMinutes ||
+          travelBeforeMinutes ||
+          travelAfterMinutes ||
+          trainerIds.length !== trainers.length ||
+          trainers.some((trainer) => !selectedTrainerIds.has(trainer.trainer_id))
+        );
+  const selectPlan = (draft: TWorkshopPlanDraft | null) => {
+    if (dirty) setSwitchTarget({ draft });
+    else if (draft) loadDraft(draft);
+    else reset();
+  };
+  const finishSwitch = () => {
+    const next = switchTarget?.draft;
+    if (next) loadDraft(next);
+    else reset();
+    setSwitchTarget(null);
+  };
+
   return (
     <section className="overflow-hidden rounded-xl border border-subtle bg-surface-1">
-      <div className="flex flex-col gap-2 border-b border-subtle px-5 py-5 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-11 font-semibold tracking-[0.16em] text-placeholder uppercase">
-            <CalendarSearch className="size-3.5" /> Workshop planner
-          </div>
-          <h2 className="text-lg font-semibold text-primary">What needs to happen, who can deliver it, and when?</h2>
-          <p className="mt-1 text-body-xs-regular text-secondary">
-            The entire trainer block—preparation, outbound travel, delivery, and return travel—must fit in live
-            availability.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <select
-            aria-label="Saved planning drafts"
-            value={draftId ?? ""}
-            onChange={(event) => {
-              const draft = draftPage?.results.find((item) => item.id === event.target.value);
-              if (draft) loadDraft(draft);
-              else reset();
-            }}
-            disabled={busy}
-            className="h-8 rounded-md border border-subtle bg-surface-2 px-2 text-body-xs-regular disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <option value="">New plan</option>
-            {draftPage?.results.map((draft) => (
-              <option key={draft.id} value={draft.id}>
-                {draft.title}
-                {draft.hold ? " · Time held" : ""}
-              </option>
-            ))}
-          </select>
-          <Button
-            variant="primary"
-            size="sm"
-            loading={saving}
-            disabled={formLocked || !trainerIds.length || !validPlan}
-            title={isHeld ? "Release the hold before changing this plan" : undefined}
-            onClick={saveDraft}
-          >
-            <Save className="size-3.5" /> Save plan
-          </Button>
-          <Button variant="secondary" size="sm" disabled={busy} onClick={reset}>
-            Start another plan
-          </Button>
-          {draftId ? (
-            <Button variant="secondary" size="sm" disabled={busy} onClick={deleteDraft}>
-              <Trash2 className="size-3.5" /> Delete
+      <PlanToolbar
+        drafts={draftPage?.results ?? []}
+        currentId={draftId}
+        dirty={dirty}
+        busy={busy}
+        canSave={validPlan && trainerIds.length > 0}
+        onSave={saveDraft}
+        onSelect={selectPlan}
+        onDelete={deleteDraft}
+      />
+      <ModalCore isOpen={switchTarget !== null} handleClose={() => !busy && setSwitchTarget(null)}>
+        <div className="space-y-4 p-6">
+          <h2 className="text-lg font-semibold">Save changes before switching plans?</h2>
+          <p className="text-body-sm-regular">Existing reservations stay active when you switch plans.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={busy || !validPlan}
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await persistDraft();
+                  await mutateDrafts();
+                  finishSwitch();
+                } catch (error) {
+                  setToast({
+                    type: TOAST_TYPE.ERROR,
+                    title: "Plan not saved",
+                    message: errorMessage(error, "Try again."),
+                  });
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              Save and switch
             </Button>
-          ) : null}
+            <Button variant="secondary" disabled={busy} onClick={finishSwitch}>
+              Discard changes
+            </Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setSwitchTarget(null)}>
+              Cancel
+            </Button>
+          </div>
         </div>
-      </div>
+      </ModalCore>
+      <ModalCore isOpen={scheduleTarget !== null} handleClose={() => !busy && setScheduleTarget(null)}>
+        <div className="space-y-4 p-6">
+          <h2 className="text-lg font-semibold">Schedule workshop</h2>
+          <p className="text-body-xs-regular text-secondary">
+            Choose or create the workshop that will receive this session. Any reservation stays in place.
+          </p>
+          <WorkshopPicker workspaceSlug={workspaceSlug} value={issue} onChange={setIssue} disabled={busy} />
+          <CreateWorkshop workspaceSlug={workspaceSlug} title={title} disabled={busy} onCreated={setIssue} />
+          <div className="flex gap-2">
+            <Button disabled={!issue || busy} loading={scheduling} onClick={scheduleHold}>
+              Confirm session
+            </Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setScheduleTarget(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </ModalCore>
 
       <div className="grid gap-0 xl:grid-cols-[380px_1fr]">
         <div className="space-y-5 border-b border-subtle p-5 xl:border-r xl:border-b-0">
           <WorkshopPicker
             workspaceSlug={workspaceSlug}
             value={issue}
-            disabled={formLocked}
+            disabled={busy}
             onChange={(next) => {
               setIssue(next);
               // Adopt the work item's name unless the coordinator has already
@@ -528,7 +584,7 @@ export function WorkshopPlanner({
               onChange={(event) => setTitle(event.target.value)}
               placeholder="e.g. NetSec workshop"
               maxLength={255}
-              disabled={formLocked}
+              disabled={busy}
               className="mt-1 h-9 w-full rounded-md border border-subtle bg-surface-1 px-3 text-body-sm-regular text-primary disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
@@ -623,7 +679,7 @@ export function WorkshopPlanner({
                 >
                   <input
                     type="checkbox"
-                    checked={trainerIds.includes(trainer.trainer_id)}
+                    checked={selectedTrainerIds.has(trainer.trainer_id)}
                     disabled={formLocked}
                     onChange={() =>
                       setTrainerIds((current) =>
@@ -670,33 +726,42 @@ export function WorkshopPlanner({
                   <p className="mt-1 text-11 text-placeholder">
                     {issue
                       ? `Schedule this session on ${workshopLabel(issue)}, or release this time to change the plan. You can add another session after scheduling.`
-                      : "To schedule this session, release the hold and choose a Workshop work item. You can also leave this time held and start another plan."}
+                      : "Choose or create a workshop to confirm this session. Your reservation stays active while you do this."}
                   </p>
                 </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <Button variant="secondary" size="sm" disabled={saving || scheduling} onClick={releaseHold}>
-                  Release and edit
+                  Release reservation
                 </Button>
                 <Button
                   variant="primary"
                   size="sm"
                   loading={scheduling}
-                  disabled={!issue || saving || scheduling}
-                  title={issue ? undefined : "Attach a Workshop work item to schedule this"}
-                  onClick={scheduleHold}
+                  disabled={saving || scheduling}
+                  onClick={() => setScheduleTarget({ candidate: null })}
                 >
                   <CalendarCheck className="size-3.5" /> Schedule workshop
                 </Button>
               </div>
               <p className="text-11 text-secondary sm:basis-full">
-                One plan holds one time. Use “Start another plan” to keep this reservation and plan more. Return to it
-                from Saved planning drafts.
+                One plan reserves one time. Use “New plan” to plan another workshop and return here through Saved plans.
               </p>
             </div>
           ) : null}
           {!isHeld ? (
             <>
+              {trainers.some(
+                (trainer) =>
+                  selectedTrainerIds.has(trainer.trainer_id) &&
+                  trainer.availability_status !== "fresh" &&
+                  trainer.connection_status !== "not_connected"
+              ) && (
+                <p role="alert" className="mb-3 rounded border border-subtle p-3 text-body-xs-regular text-secondary">
+                  Some connected calendars could not be verified. Those trainers are excluded until availability
+                  refreshes.
+                </p>
+              )}
               <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
                 <div>
                   <h3 className="text-body-sm-medium text-primary">Matching slots</h3>
@@ -833,8 +898,16 @@ export function WorkshopPlanner({
                               disabled={!validPlan || busy}
                               onClick={() => holdCandidate(candidate)}
                             >
-                              <ShieldCheck className="size-3.5" />{" "}
-                              {planNeedsSaving ? "Save plan & hold for 72h" : "Hold for 72h"}
+                              <ShieldCheck className="size-3.5" /> Reserve for 72 hours
+                            </Button>
+                            <Button
+                              className="mt-2 w-full"
+                              variant="primary"
+                              size="sm"
+                              disabled={!validPlan || busy}
+                              onClick={() => setScheduleTarget({ candidate })}
+                            >
+                              Schedule workshop
                             </Button>
                             {planNeedsSaving ? (
                               <p className="mt-2 text-center text-11 text-placeholder">

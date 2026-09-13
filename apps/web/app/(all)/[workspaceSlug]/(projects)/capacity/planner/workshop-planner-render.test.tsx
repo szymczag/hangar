@@ -15,7 +15,8 @@ vi.mock("@/hooks/store/use-instance", () => ({
 }));
 vi.mock("../shared/use-capacity-data", () => ({ useCapacityData: () => state.data }));
 vi.mock("../shared/week-stepper", () => ({ WeekStepper: () => null }));
-vi.mock("@plane/ui", () => ({ Spinner: () => <p>Loading</p> }));
+vi.mock("@plane/ui", () => ({ Spinner: () => <p>Loading</p>, ModalCore: () => null }));
+vi.mock("./create-workshop", () => ({ CreateWorkshop: () => null }));
 vi.mock("@/components/core/page-title", () => ({ PageHead: () => null }));
 vi.mock("@/components/auth-screens/not-authorized-view", () => ({ NotAuthorizedView: () => null }));
 vi.mock("@plane/propel/button", () => ({
@@ -60,9 +61,9 @@ beforeEach(() => {
 describe("planner availability states", () => {
   it("shows the required complete block and the longest actual opening", () => {
     const html = render();
-    expect(html).toContain("6h 30m");
+    expect(html).toContain("4h");
     expect(html).toContain("longest free opening is 3h");
-    expect(html).toContain("Start another plan");
+    expect(html).toContain("New plan");
   });
 
   it("does not report no slots while previous-week data is retained", () => {

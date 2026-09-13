@@ -46,7 +46,7 @@ export function WorkshopPicker({
 
   return (
     <div className="relative">
-      <span className="text-body-xs-medium text-secondary">What</span>
+      <span className="text-body-xs-medium text-secondary">Workshop (optional while searching)</span>
       {/* The clear control is a sibling rather than nested inside the opener:
           a button inside a button is not focusable on its own, and screen
           readers flatten the pair into one confusing control. */}

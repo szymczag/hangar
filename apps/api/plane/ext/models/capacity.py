@@ -178,6 +178,12 @@ class WorkshopSchedule(BaseModel):
 
 
 class WorkshopSession(BaseModel):
+    source_plan = models.ForeignKey(
+        "ext.WorkshopPlanDraft", null=True, blank=True, on_delete=models.SET_NULL, related_name="scheduled_sessions"
+    )
+    source_hold = models.OneToOneField(
+        "ext.WorkshopPlanHold", null=True, blank=True, on_delete=models.SET_NULL, related_name="scheduled_session"
+    )
     schedule = models.ForeignKey(WorkshopSchedule, on_delete=models.CASCADE, related_name="sessions")
     position = models.PositiveIntegerField(default=0)
     starts_at = models.DateTimeField()
@@ -275,3 +281,14 @@ class WorkshopPlanHold(BaseModel):
                 name="ext_plan_hold_blocked_range",
             ),
         ]
+
+
+class WorkshopBookingOperation(BaseModel):
+    draft = models.ForeignKey(WorkshopPlanDraft, on_delete=models.CASCADE, related_name="booking_operations")
+    key = models.UUIDField()
+    request_fingerprint = models.CharField(max_length=64)
+    result = models.JSONField()
+
+    class Meta:
+        db_table = "ext_workshop_booking_operations"
+        constraints = [models.UniqueConstraint(fields=["draft", "key"], name="ext_booking_draft_key")]

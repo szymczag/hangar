@@ -17,7 +17,7 @@ import {
   timeLabel,
 } from "./workshop-planner.utils";
 import { formatMinutes } from "../shared/capacity-format.utils";
-import { planSignature } from "./workshop-planner";
+import { planSignature } from "./workshop-planner.utils";
 
 const trainer = {
   trainer_id: "trainer-1",

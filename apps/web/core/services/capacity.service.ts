@@ -103,6 +103,8 @@ export type TWorkshopPlanDraftInput = {
 export type TWorkshopPlanDraft = TWorkshopPlanDraftInput & {
   id: string;
   revision: number;
+  created_at?: string;
+  last_session?: { id: string; starts_at: string; ends_at: string } | null;
   updated_at: string;
   hold: TWorkshopPlanHold | null;
   issue: TPlanIssue | null;
@@ -268,6 +270,22 @@ export class CapacityService extends APIService {
     return this.data<{ results: TWorkshopPlanDraft[] }>(this.get(`/api/workspaces/${workspaceSlug}/capacity/plans/`));
   }
 
+  async updatePlanMetadata(
+    workspaceSlug: string,
+    draftId: string,
+    revision: number,
+    data: { title: string; issue_id: string | null }
+  ) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopPlanDraft>(
+      this.patch(
+        `/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/`,
+        { revision, ...data },
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
+    );
+  }
+
   async createWorkshopPlanDraft(workspaceSlug: string, payload: TWorkshopPlanDraftInput) {
     const csrfToken = await this.csrfToken();
     return this.data<TWorkshopPlanDraft>(
@@ -320,12 +338,17 @@ export class CapacityService extends APIService {
   }
 
   /** Spend the hold: it becomes a session on the work item the plan is for. */
-  async scheduleWorkshopPlan(workspaceSlug: string, draftId: string, revision: number) {
+  async scheduleWorkshopPlan(
+    workspaceSlug: string,
+    draftId: string,
+    revision: number,
+    options?: { idempotency_key: string; trainer_id?: string; workshop_starts_at?: string }
+  ) {
     const csrfToken = await this.csrfToken();
     return this.data<TScheduledPlan>(
       this.post(
         `/api/workspaces/${workspaceSlug}/capacity/plans/${draftId}/schedule/`,
-        { revision },
+        { revision, ...options },
         { headers: { "X-CSRFTOKEN": csrfToken } }
       )
     );
