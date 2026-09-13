@@ -172,7 +172,8 @@ export function workshopAvailability(
 ) {
   const bufferMinutes = spec.preparationMinutes + spec.travelBeforeMinutes + spec.travelAfterMinutes;
   const earliest = new Date(Math.max(windowStart.getTime(), spec.notBefore?.getTime() ?? windowStart.getTime()));
-  const selected = trainers.filter((trainer) => spec.trainerIds.includes(trainer.trainer_id));
+  const selectedIds = new Set(spec.trainerIds);
+  const selected = trainers.filter((trainer) => selectedIds.has(trainer.trainer_id));
   let longestFreeMinutes = 0;
   for (const trainer of selected) {
     for (const range of availableRanges(trainer.intervals, earliest, windowEnd)) {

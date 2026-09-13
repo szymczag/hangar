@@ -223,7 +223,6 @@ test("planner explains a short opening and keeps earlier holds while planning mo
   await expect(page.getByText(/No matching time found up to/)).toHaveCount(0);
   await page.getByRole("button", { name: "Save plan & hold for 72h" }).first().click();
   await expect(page.getByText("Time held for Planning trainer")).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("planner-held.png"), fullPage: true });
   expect(drafts).toHaveLength(1);
   expect(drafts[0].duration_minutes).toBe(30);
   expect(drafts[0].title).not.toBe("");

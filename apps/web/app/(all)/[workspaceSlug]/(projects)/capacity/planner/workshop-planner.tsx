@@ -114,7 +114,7 @@ export function WorkshopPlanner({
     capacityService.listWorkshopPlanDrafts(workspaceSlug)
   );
   const [draftId, setDraftId] = useState<string | null>(null);
-  const [revision, setRevision] = useState<number | null>(null);
+  const revision = useRef<number | null>(null);
   const [title, setTitle] = useState("");
   /**
    * The Workshop work item this plan is for.
@@ -286,7 +286,7 @@ export function WorkshopPlanner({
     searchController.current?.abort();
     setSearch({ state: "idle" });
     setDraftId(draft.id);
-    setRevision(draft.revision);
+    revision.current = draft.revision;
     setTitle(draft.title);
     setIssue(draft.issue);
     setDurationMinutes(draft.duration_minutes);
@@ -313,7 +313,7 @@ export function WorkshopPlanner({
     setSearch({ state: "idle" });
     setStartWindow("any");
     setDraftId(null);
-    setRevision(null);
+    revision.current = null;
     setTitle("");
     setIssue(null);
     setDurationMinutes(240);
@@ -328,8 +328,8 @@ export function WorkshopPlanner({
   const persistDraft = async (fallbackTitle?: string) => {
     const input = { ...payload(), title: title.trim() || fallbackTitle || "Workshop plan" };
     const saved =
-      draftId && revision !== null
-        ? await capacityService.updateWorkshopPlanDraft(workspaceSlug, draftId, revision, input)
+      draftId && revision.current !== null
+        ? await capacityService.updateWorkshopPlanDraft(workspaceSlug, draftId, revision.current, input)
         : await capacityService.createWorkshopPlanDraft(workspaceSlug, input);
     loadDraft(saved);
     return saved;
@@ -376,11 +376,11 @@ export function WorkshopPlanner({
     }
     setSaving(true);
     try {
-      // Use the returned revision, not React state from before this save.
+      // Hold against the revision returned by this save.
       const saved =
-        planNeedsSaving || !draftId || revision === null
+        planNeedsSaving || !draftId || revision.current === null
           ? await persistDraft(`Workshop · ${dateTimeLabel(candidate.workshopStartsAt)}`)
-          : { id: draftId, revision };
+          : { id: draftId, revision: revision.current };
       const result = await capacityService.holdWorkshopPlan(
         workspaceSlug,
         saved.id,
@@ -389,7 +389,7 @@ export function WorkshopPlanner({
         candidate.workshopStartsAt
       );
       setHold(result.hold);
-      setRevision(result.revision);
+      revision.current = result.revision;
       setSearch({ state: "idle" });
       searchController.current?.abort();
       await refreshPlanningData();
@@ -416,11 +416,11 @@ export function WorkshopPlanner({
    * here if it refuses -- and on a refusal the hold is deliberately left alone.
    */
   const scheduleHold = async () => {
-    if (!draftId || revision === null || !issue) return;
+    if (!draftId || revision.current === null || !issue) return;
     setScheduling(true);
     try {
-      const result = await capacityService.scheduleWorkshopPlan(workspaceSlug, draftId, revision);
-      setRevision(result.revision);
+      const result = await capacityService.scheduleWorkshopPlan(workspaceSlug, draftId, revision.current);
+      revision.current = result.revision;
       setHold(null);
       await refreshPlanningData();
       setToast({
@@ -445,7 +445,7 @@ export function WorkshopPlanner({
     try {
       const result = await capacityService.releaseWorkshopPlanHold(workspaceSlug, draftId);
       setHold(null);
-      setRevision(result.revision);
+      revision.current = result.revision;
       await refreshPlanningData();
     } catch (error: unknown) {
       setToast({ type: TOAST_TYPE.ERROR, title: "Hold not released", message: errorMessage(error, "Try again.") });
