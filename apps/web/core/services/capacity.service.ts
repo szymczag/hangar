@@ -99,7 +99,7 @@ export type TWorkshopSchedule = {
   sessions: TWorkshopSession[];
 };
 export type TWorkshopScheduleInput = {
-  sessions: Array<Omit<TWorkshopSession, "id">>;
+  sessions: Array<Omit<TWorkshopSession, "id"> & { id?: string | null }>;
 };
 /** The Workshop work item a plan is for, as much of it as a picker needs. */
 export type TPlanIssue = {

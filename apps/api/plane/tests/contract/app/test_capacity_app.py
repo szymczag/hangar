@@ -1332,6 +1332,30 @@ def test_training_import_stale_cache_and_explicit_deduplication(settings, worksp
         workspace=workspace, trainer=create_user, event_key=rows[0]["key"], session=session
     )
     assert training_workload(trainer, rows, start, end)["confirmed_minutes"] == 0
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    ProjectMember.objects.get_or_create(project=project, workspace=workspace, member=create_user, defaults={"role": 20})
+    IssueAssignee.objects.create(issue=issue, assignee=create_user, project=project, workspace=workspace)
+    api = APIClient()
+    api.force_authenticate(user=create_user)
+    updated = api.put(
+        f"/api/workspaces/{workspace.slug}/projects/{project.id}/work-items/{issue.id}/workshop-schedule/",
+        {
+            "sessions": [
+                {
+                    "id": str(session.id),
+                    "starts_at": start.isoformat(),
+                    "ends_at": end.isoformat(),
+                    "trainer_ids": [str(create_user.id)],
+                    "preparation_minutes": 15,
+                }
+            ]
+        },
+        format="json",
+    )
+    assert updated.status_code == 200, updated.data
+    assert updated.data["sessions"][0]["id"] == str(session.id)
+    assert GoogleTrainingEventLink.objects.filter(session=session).exists()
+    assert training_workload(trainer, rows, start, end)["confirmed_minutes"] == 0
     session.trainers.remove(create_user)
     assert training_workload(trainer, rows, start, end)["confirmed_minutes"] == 240
     selection.training_events_enabled = False

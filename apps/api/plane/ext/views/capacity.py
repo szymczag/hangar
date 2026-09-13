@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
+from django.db.models import F
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -1306,8 +1307,25 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                     {"error": f"Every trainer in session {position + 1} must be an active Workshop assignee."},
                     status=400,
                 )
-            parsed_sessions.append({"starts_at": starts_at, "ends_at": ends_at, "trainer_ids": trainer_ids, **values})
+            try:
+                session_id = str(UUID(str(item["id"]))) if item.get("id") else None
+            except (ValueError, TypeError):
+                return Response({"error": "A session ID must be a UUID."}, status=400)
+            parsed_sessions.append(
+                {"id": session_id, "starts_at": starts_at, "ends_at": ends_at, "trainer_ids": trainer_ids, **values}
+            )
 
+        # Use the planner's lock order: trainer profiles, then the parent issue.
+        list(
+            TrainerProfile.objects.select_for_update()
+            .filter(workspace=issue.workspace, user_id__in=active_trainers)
+            .order_by("id")
+        )
+        Issue.objects.select_for_update().get(pk=issue.pk)
+        existing = {str(session.id): session for session in WorkshopSession.objects.filter(schedule__issue=issue)}
+        retained = [item["id"] for item in parsed_sessions if item["id"]]
+        if len(retained) != len(set(retained)) or any(session_id not in existing for session_id in retained):
+            return Response({"error": "Session IDs must be unique and belong to this Workshop."}, status=400)
         first = parsed_sessions[0]
         schedule, _ = WorkshopSchedule.objects.update_or_create(
             issue=issue,
@@ -1319,11 +1337,21 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                 "travel_after_minutes": first["travel_after_minutes"],
             },
         )
-        schedule.sessions.all().delete(soft=False)
+        schedule.sessions.exclude(id__in=retained).delete(soft=False)
+        # Move retained positions aside before reordering under the unique constraint.
+        schedule.sessions.update(position=F("position") + 1000)
         for position, values in enumerate(parsed_sessions):
             trainer_ids = values.pop("trainer_ids")
-            session = WorkshopSession.objects.create(schedule=schedule, position=position, **values)
-            session.trainers.add(*trainer_ids)
+            session_id = values.pop("id")
+            if session_id:
+                session = existing[session_id]
+                for field, value in values.items():
+                    setattr(session, field, value)
+                session.position = position
+                session.save(update_fields=[*values, "position", "updated_at"])
+            else:
+                session = WorkshopSession.objects.create(schedule=schedule, position=position, **values)
+            session.trainers.set(trainer_ids)
         _audit(
             request,
             workspace_id=issue.workspace_id,

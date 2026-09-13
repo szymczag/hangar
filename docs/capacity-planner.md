@@ -98,3 +98,8 @@ Migration `0029_google_training_rules` adds encrypted identity/configuration fie
 per-connection opt-in, and explicit invitation/session links. Deploy the API and
 apply migrations before enabling rules in the frontend. Existing workspaces without
 rules retain free/busy-only behavior.
+
+Session updates accept each existing session's `id` and preserve that row, its plan
+origin and invitation links, including when sessions are reordered. IDs must be
+unique and belong to the edited Workshop. Removing a session removes its links;
+legacy clients that omit IDs retain the replace-all behavior.
