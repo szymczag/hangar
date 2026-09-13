@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.53`. It is qualified for evaluation on
+The current release is `0.1.0-rc.54`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.53` qualification boundary is:
+The `0.1.0-rc.54` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -116,25 +116,26 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.53`                               |
-| Helm chart version | `0.1.0-rc.53`                                |
-| Git tag            | `hangar-v0.1.0-rc.53`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.53` |
+| Product version    | `v0.1.0-rc.54`                               |
+| Helm chart version | `0.1.0-rc.54`                                |
+| Git tag            | `hangar-v0.1.0-rc.54`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.54` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, and `rc.33` were consumed by
 incomplete publication attempts. Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
-installation, upgrade, or rollback targets. `rc.47` is the immediately previous
+installation, upgrade, or rollback targets. `rc.53` is the immediately previous
 retained GitHub release.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-There is no security-equivalent rollback target among the earlier release
-candidates. Published versions are immutable and are never repaired in place. In
+Rollback to rc.53 requires reversing migrations ext.0026 and ext.0025 as
+described in the release notes; preserve a database backup before upgrading.
+Published versions are immutable and are never repaired in place. In
 particular, `rc.24`, `rc.25`, and `rc.28` each published only a subset of their
 container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.53` notes](../releases/hangar-v0.1.0-rc.53.md) — review
+- [Release `v0.1.0-rc.54` notes](../releases/hangar-v0.1.0-rc.54.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -161,6 +162,14 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
+Release rc.54 adds migrations ext.0025 and ext.0026 for workshop planning:
+drafts no longer persist the displayed date window, and may reference a Workshop
+work item. Apply migrations with the release migration Job and update the API,
+workers and frontends together. Existing Calendar OAuth and encryption-key
+configuration remains valid. Capacity links now appear in the active workspace
+sidebar; the planner explains required continuous time and allows separate held
+plans without releasing earlier reservations.
+
 Hangar consumes anonymous free/busy ranges and never imports event details; the
 full operator contract and key-rotation rules are in the configuration reference.
 
@@ -171,9 +180,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The public `rc.53` chart archive, OCI chart, and digest-pinned Hangar images are
-anonymously downloadable. The release workflow also created provenance
-attestations and keyless Cosign signatures.
+The release workflow verifies anonymous access to the rc.54 chart archive, OCI
+chart and digest-pinned images, and creates provenance attestations and keyless
+Cosign signatures. No new live-cluster qualification is claimed for rc.54.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure

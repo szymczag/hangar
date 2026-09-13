@@ -13,8 +13,8 @@ export type TBuildIdentity = {
 export const RELEASE_NOTES: TBuildIdentity = {
   version: "0.1.0-rc.54",
   highlights: [
-    "The workshop planner no longer finds a slot it cannot let you take.",
-    "The planner offers a choice of times, not one.",
+    "Capacity navigation now appears in the active workspace menu.",
+    "The planner explains the time it needs and lets you keep planning.",
     "A held slot can become a session on the work item it was planned for.",
     'The "about this build" dialog names the build it is in.',
   ],
