@@ -4,10 +4,11 @@
  * See the LICENSE file for details.
  */
 
+import { v4 as uuidv4 } from "uuid";
 import type { TWorkshopSchedule, TWorkshopSession } from "@/services/capacity.service";
 
 /** A session being edited, before it has an id from the server. */
-export type TEditableSession = Omit<TWorkshopSession, "id"> & { localId: string };
+export type TEditableSession = Omit<TWorkshopSession, "id"> & { id?: string | null; localId: string };
 
 /** The id the sessions section is anchored on, so the summary can scroll to it. */
 export const WORKSHOP_SESSIONS_ANCHOR = "workshop-sessions";
@@ -26,7 +27,7 @@ export const localValue = (value?: string | null): string => {
 };
 
 export const newSession = (trainerIds: string[]): TEditableSession => ({
-  localId: crypto.randomUUID(),
+  localId: uuidv4(),
   starts_at: "",
   ends_at: "",
   preparation_minutes: 0,
@@ -64,7 +65,8 @@ export function toEditableSessions(
       : [];
 
   return source.map((session) => ({
-    localId: session.id ?? crypto.randomUUID(),
+    id: session.id,
+    localId: session.id ?? uuidv4(),
     starts_at: localValue(session.starts_at),
     ends_at: localValue(session.ends_at),
     preparation_minutes: session.preparation_minutes,
