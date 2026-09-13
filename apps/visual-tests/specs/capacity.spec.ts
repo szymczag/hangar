@@ -84,7 +84,7 @@ test("the workshop planner", async ({ asUser }) => {
   // Candidates are computed from the capacity response, so waiting on one waits
   // on the fetch, the maths and the render together. "Matching slots" is just
   // the heading and renders with an empty list.
-  const candidate = main.getByRole("button", { name: /hold for 72h/i }).first();
+  const candidate = main.getByRole("button", { name: /Reserve for 72 hours/i }).first();
   await expect(candidate).toBeVisible();
   await expect(main.getByRole("button", { name: /Find first available/i })).toBeVisible();
 
