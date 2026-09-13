@@ -46,6 +46,7 @@ export function intervalPosition(interval: { start: string; end: string }, daySt
 
 export function intervalLabel(interval: TCapacityInterval) {
   if (interval.kind === "working") return "Working hours";
+  if (interval.kind === "google_training") return "Training invitation";
   if (interval.kind === "google_busy") return "Busy — Google Calendar";
   if (interval.kind === "workshop_hold") return "Workshop planning hold";
   return interval.work_item?.name ? `Workshop: ${interval.work_item.name}` : "Workshop (details restricted)";
@@ -131,6 +132,7 @@ export function formatRange(range: TTimelineRange, timeZone?: string) {
 export const CAPACITY_INTERVAL_LAYERS: TCapacityInterval["kind"][] = [
   "working",
   "google_busy",
+  "google_training",
   "workshop_hold",
   "workshop",
 ];

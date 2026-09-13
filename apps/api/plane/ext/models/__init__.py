@@ -78,3 +78,5 @@ __all__ = [
     "WorkshopSchedule",
     "WorkshopSession",
 ]
+
+from .capacity import GoogleTrainingRule, GoogleTrainingEventLink

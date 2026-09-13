@@ -40,6 +40,7 @@ from plane.ext.capacity import (
     encrypt_value,
     validate_weekly_schedule,
 )
+from plane.ext.capacity.training_events import EVENTS_SCOPE
 from plane.ext.capacity.booking import booking_preflight, snapshot_error
 from plane.ext.capacity.timezones import trainer_timezone
 from plane.ext.capacity.cache import clear_credential_cache, clear_selection_cache
@@ -150,6 +151,7 @@ def _profile_payload(profile):
         "weekly_schedule": profile.weekly_schedule,
         "schedule_revision": profile.schedule_revision,
         "connection_status": connection_status,
+        "training_events_enabled": bool(connection_status != "not_connected" and selection.training_events_enabled),
     }
 
 
@@ -324,13 +326,20 @@ class GoogleCalendarStartEndpoint(BaseAPIView):
             request, OAUTH_SESSION_KEY, host=request.get_host(), next_path=f"/{slug}/capacity"
         )
         request.session[OAUTH_SESSION_KEY].update(
-            {"trainer_id": str(trainer.id), "workspace_slug": slug, "code_verifier": verifier}
+            {
+                "trainer_id": str(trainer.id),
+                "workspace_slug": slug,
+                "code_verifier": verifier,
+                "training_events": request.data.get("training_events") is True,
+            }
         )
         params = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "scope": " ".join(sorted(CALENDAR_SCOPES)),
+            "scope": " ".join(
+                sorted(CALENDAR_SCOPES | ({EVENTS_SCOPE} if request.data.get("training_events") is True else set()))
+            ),
             "state": state,
             "access_type": "offline",
             "include_granted_scopes": "true",
@@ -363,6 +372,8 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
             granted = _parse_granted_scopes(token.get("scope"))
             if not _has_required_calendar_scopes(granted):
                 raise GoogleCalendarError("missing_scopes")
+            if transaction_data.get("training_events") and EVENTS_SCOPE not in granted:
+                raise GoogleCalendarError("missing_scopes")
             userinfo = client.userinfo(token["access_token"])
             existing = GoogleCalendarCredential.objects.filter(user=request.user, google_subject=userinfo["id"]).first()
             refresh_token = token.get("refresh_token") or (
@@ -375,6 +386,7 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                 user=request.user,
                 google_subject=userinfo["id"],
                 defaults={
+                    "encrypted_google_email": encrypt_value(userinfo["email"].casefold())[0],
                     "encrypted_refresh_token": encrypted,
                     "encryption_key_id": key_id,
                     "granted_scopes": sorted(granted),
@@ -385,6 +397,10 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
             selection, created = TrainerCalendarSelection.objects.update_or_create(
                 trainer=trainer, defaults={"credential": credential}
             )
+            if transaction_data.get("training_events"):
+                selection.training_events_enabled = True
+                selection.revision += 1
+                selection.save(update_fields=["training_events_enabled", "revision", "updated_at"])
             _select_primary_calendar(client, selection, created=created)
             _audit(
                 request,

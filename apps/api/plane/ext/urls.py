@@ -72,11 +72,17 @@ from plane.ext.views.capacity import (
     WorkshopSearchEndpoint,
 )
 
+from plane.ext.views.capacity_training import GoogleTrainingRulesEndpoint, GoogleTrainingLinkEndpoint
+
 PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
 
 EPIC_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>/epics"
 
 urlpatterns = [
+    path("workspaces/<str:slug>/capacity/google/training-rules/", GoogleTrainingRulesEndpoint.as_view()),
+    path("workspaces/<str:slug>/capacity/google/training-rules/<uuid:rule_id>/", GoogleTrainingRulesEndpoint.as_view()),
+    path("workspaces/<str:slug>/capacity/google/training-links/", GoogleTrainingLinkEndpoint.as_view()),
+    path("workspaces/<str:slug>/capacity/google/training-links/<str:event_key>/", GoogleTrainingLinkEndpoint.as_view()),
     path("workspaces/<str:slug>/capacity/trainers/me/", TrainerSelfEndpoint.as_view(), name="capacity-trainer-self"),
     path("workspaces/<str:slug>/capacity/trainers/", TrainerListEndpoint.as_view(), name="capacity-trainers"),
     path(

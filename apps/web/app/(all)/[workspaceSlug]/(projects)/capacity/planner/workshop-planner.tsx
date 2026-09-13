@@ -767,8 +767,8 @@ export function WorkshopPlanner({
               {trainers.some(
                 (trainer) =>
                   selectedTrainerIds.has(trainer.trainer_id) &&
-                  trainer.availability_status !== "fresh" &&
-                  trainer.connection_status !== "not_connected"
+                  (trainer.availability_status.startsWith("training_") ||
+                    (trainer.availability_status !== "fresh" && trainer.connection_status !== "not_connected"))
               ) && (
                 <p role="alert" className="mb-3 rounded border border-subtle p-3 text-body-xs-regular text-secondary">
                   Some connected calendars could not be verified. Those trainers are excluded until availability

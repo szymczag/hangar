@@ -15,6 +15,7 @@ from django.db import close_old_connections
 from plane.db.models import ProjectMember
 from plane.ext.capacity.crypto import decrypt_value
 from plane.ext.capacity.workload import session_workload
+from plane.ext.capacity.training_events import training_events, training_workload
 from plane.ext.capacity.timezones import trainer_timezone
 from plane.ext.capacity.cache import (
     BUSY_CACHE_TTL_SECONDS,
@@ -186,6 +187,14 @@ def _load_google_busy(trainer, start, end):
         close_old_connections()
 
 
+def _load_training_events(trainer, start, end):
+    close_old_connections()
+    try:
+        return training_events(trainer, start, end)
+    finally:
+        close_old_connections()
+
+
 def _workshops(workspace_id, trainer_ids, start, end):
     sessions = (
         WorkshopSession.objects.filter(
@@ -285,6 +294,12 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
                 executor.map(lambda trainer: _load_google_busy(trainer, start, end), trainers),
             )
         }
+        training_results = {
+            trainer.id: result
+            for trainer, result in zip(
+                trainers, executor.map(lambda trainer: _load_training_events(trainer, start, end), trainers)
+            )
+        }
     visible_projects = set(
         ProjectMember.objects.filter(member=viewer, is_active=True).values_list("project_id", flat=True)
     )
@@ -295,10 +310,15 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         workshop_records = workshop_map.get(trainer.user_id, [])
         workshop_intervals = [(a, b) for a, b, _ in workshop_records]
         hold_intervals = hold_map.get(trainer.user_id, [])
-        combined_busy = _merge([*google_busy, *workshop_intervals, *hold_intervals])
+        events, training_status = training_results[trainer.id]
+        event_intervals = [
+            (datetime.fromisoformat(item["start"]), datetime.fromisoformat(item["end"])) for item in events
+        ]
+        combined_busy = _merge([*google_busy, *workshop_intervals, *hold_intervals, *event_intervals])
         unavailable = _intersections(working, combined_busy)
         intervals = [_serialize_interval(a, b, "working") for a, b in working]
         intervals.extend(_serialize_interval(a, b, "google_busy") for a, b in google_busy)
+        intervals.extend(_serialize_interval(a, b, "google_training") for a, b in event_intervals)
         for block_start, block_end, schedule in workshop_records:
             work_item = None
             if schedule.project_id in visible_projects:
@@ -340,7 +360,11 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
                 "timezone": trainer_timezone(trainer)[0],
                 "timezone_source": trainer_timezone(trainer)[1],
                 "connection_status": connection_status,
-                "availability_status": availability_status,
+                "availability_status": availability_status
+                if training_status in ("fresh", "not_configured")
+                else "training_" + training_status,
+                "training_status": training_status,
+                "training_workload": training_workload(trainer, events, start, end),
                 "workload": {
                     **workload_map[trainer.user_id],
                     "hold_count": len(hold_intervals),

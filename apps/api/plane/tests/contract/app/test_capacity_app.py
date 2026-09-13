@@ -1224,3 +1224,117 @@ def test_workload_counts_sessions_once_and_clips_delivery_and_buffers(workspace,
     assert row == {"workshop_count": 1, "session_count": 2, "delivery_minutes": 120, "buffer_minutes": 75}
     # The first preparation is before the requested period; the last return is after it.
     assert "Private workshop" not in str(row)
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_training_rules_are_admin_only_and_encrypted(settings, workspace, create_user):
+    from plane.ext.models import GoogleTrainingRule
+
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    settings.CALENDAR_TOKEN_ENCRYPTION_KEYS = (Fernet.generate_key().decode(),)
+    client = APIClient()
+    client.force_login(create_user)
+    url = f"/api/workspaces/{workspace.slug}/capacity/google/training-rules/"
+    rule = {"label": "Company workshops", "calendar_id": "shared@example.test", "organizer": "organizer@example.test"}
+    WorkspaceMember.objects.filter(workspace=workspace, member=create_user).update(role=15)
+    assert client.get(url).status_code == 403
+    assert client.post(url, rule, format="json").status_code == 403
+    WorkspaceMember.objects.filter(workspace=workspace, member=create_user).update(role=20)
+    result = client.post(url, rule, format="json")
+    assert result.status_code == 201
+    stored = GoogleTrainingRule.objects.get(id=result.data["id"])
+    assert stored.encrypted_calendar_id != rule["calendar_id"]
+    assert stored.encrypted_organizer != rule["organizer"]
+    assert client.get(url).data["results"][0]["calendar_id"] == rule["calendar_id"]
+    assert client.delete(f"{url}{stored.id}/").status_code == 204
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_training_event_access_requires_explicit_oauth_opt_in(settings, workspace, create_user, monkeypatch):
+    from urllib.parse import urlparse, parse_qs
+    from plane.ext.capacity.training_events import EVENTS_SCOPE
+
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    monkeypatch.setattr(capacity_views, "_google_client", lambda: (MagicMock(), "client-id"))
+    client = APIClient()
+    client.force_login(create_user)
+    url = f"/api/workspaces/{workspace.slug}/capacity/google/start/"
+    basic = client.post(url, {}, format="json")
+    assert EVENTS_SCOPE not in parse_qs(urlparse(basic.data["authorization_url"]).query)["scope"][0]
+    extended = client.post(url, {"training_events": True}, format="json")
+    assert EVENTS_SCOPE in parse_qs(urlparse(extended.data["authorization_url"]).query)["scope"][0]
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_training_import_stale_cache_and_explicit_deduplication(settings, workspace, create_user, monkeypatch):
+    from plane.ext.models import GoogleTrainingRule, GoogleTrainingEventLink
+    from plane.ext.capacity.training_events import EVENTS_SCOPE, training_events, training_workload
+    from plane.ext.capacity import calculation
+    from plane.ext.capacity.google import GoogleCalendarError
+
+    settings.CALENDAR_TOKEN_ENCRYPTION_KEYS = (Fernet.generate_key().decode(),)
+    trainer = TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    encrypted, key_id = encrypt_value("trainer@example.test")
+    credential = GoogleCalendarCredential.objects.create(
+        user=create_user,
+        google_subject="training-test",
+        encrypted_refresh_token=encrypted,
+        encrypted_google_email=encrypted,
+        encryption_key_id=key_id,
+        granted_scopes=[EVENTS_SCOPE],
+    )
+    selection = TrainerCalendarSelection.objects.create(
+        trainer=trainer, credential=credential, training_events_enabled=True
+    )
+    GoogleTrainingRule.objects.create(
+        workspace=workspace,
+        label="Training",
+        encrypted_calendar_id=encrypt_value("shared@example.test")[0],
+        encrypted_organizer=encrypt_value("organizer@example.test")[0],
+        encryption_key_id=key_id,
+    )
+    start = parse_datetime("2026-09-14T07:00:00Z")
+    end = start + timedelta(hours=4)
+    event = {
+        "id": "one",
+        "iCalUID": "one@example.test",
+        "organizer": {"email": "organizer@example.test"},
+        "attendees": [{"email": "trainer@example.test", "responseStatus": "accepted"}],
+        "start": {"dateTime": start.isoformat()},
+        "end": {"dateTime": end.isoformat()},
+    }
+    client = MagicMock()
+    client.list_events.return_value = [event]
+    monkeypatch.setattr(calculation, "_google_client", lambda: client)
+    rows, freshness = training_events(trainer, start, end, force=True)
+    assert freshness == "fresh"
+    assert training_workload(trainer, rows, start, end)["confirmed_minutes"] == 240
+    client.list_events.side_effect = GoogleCalendarError("provider_unavailable")
+    assert training_events(trainer, start, end, force=True) == (rows, "stale")
+    project = Project.objects.create(name="Training", identifier="LINK", workspace=workspace, created_by=create_user)
+    state = State.objects.create(name="Backlog", color="#000000", group="backlog", project=project, workspace=workspace)
+    issue = Issue.objects.create(
+        name="Training",
+        project=project,
+        workspace=workspace,
+        state=state,
+        type=ensure_project_workshop_type(project),
+        created_by=create_user,
+    )
+    schedule = WorkshopSchedule.objects.create(issue=issue, starts_at=start, ends_at=end)
+    session = WorkshopSession.objects.create(schedule=schedule, starts_at=start, ends_at=end)
+    session.trainers.add(create_user)
+    GoogleTrainingEventLink.objects.create(
+        workspace=workspace, trainer=create_user, event_key=rows[0]["key"], session=session
+    )
+    assert training_workload(trainer, rows, start, end)["confirmed_minutes"] == 0
+    session.trainers.remove(create_user)
+    assert training_workload(trainer, rows, start, end)["confirmed_minutes"] == 240
+    selection.training_events_enabled = False
+    selection.save()
+    trainer.refresh_from_db()
+    assert training_events(trainer, start, end, force=True) == ([], "consent_required")

@@ -15,6 +15,7 @@ export type TTrainerProfile = {
   status: "active" | "suspended";
   timezone: string;
   timezone_source?: "google_calendar" | "profile";
+  training_events_enabled?: boolean;
   weekly_schedule: Record<string, TScheduleInterval[]>;
   schedule_revision: number;
   connection_status: string;
@@ -22,7 +23,7 @@ export type TTrainerProfile = {
 export type TCapacityInterval = {
   start: string;
   end: string;
-  kind: "working" | "google_busy" | "workshop" | "workshop_hold";
+  kind: "working" | "google_busy" | "google_training" | "workshop" | "workshop_hold";
   work_item?: { id: string; name: string; project_id: string } | null;
 };
 export type TTrainerCapacity = {
@@ -39,6 +40,14 @@ export type TTrainerCapacity = {
     | "rate_limited"
     | "provider_unavailable"
     | string;
+  training_status?: string;
+  training_workload?: {
+    confirmed_sessions: number;
+    confirmed_minutes: number;
+    pending_sessions: number;
+    pending_minutes: number;
+    events: Array<{ key: string; start: string; end: string; status: string; linked: boolean }>;
+  };
   workload?: {
     workshop_count: number;
     session_count: number;
@@ -213,11 +222,55 @@ export class CapacityService extends APIService {
     );
   }
 
-  async startGoogle(workspaceSlug: string) {
+  async startGoogle(workspaceSlug: string, trainingEvents = false) {
     const csrfToken = await this.csrfToken();
     return this.data<{ authorization_url: string }>(
-      this.post(`/api/workspaces/${workspaceSlug}/capacity/google/start/`, undefined, {
-        headers: { "X-CSRFTOKEN": csrfToken },
+      this.post(
+        `/api/workspaces/${workspaceSlug}/capacity/google/start/`,
+        trainingEvents ? { training_events: true } : undefined,
+        {
+          headers: { "X-CSRFTOKEN": csrfToken },
+        }
+      )
+    );
+  }
+
+  listTrainingRules(workspaceSlug: string) {
+    return this.data<{ results: Array<{ id: string; label: string; calendar_id: string; organizer: string }> }>(
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/google/training-rules/`)
+    );
+  }
+  async addTrainingRule(workspaceSlug: string, rule: { label: string; calendar_id: string; organizer: string }) {
+    const token = await this.csrfToken();
+    return this.data(
+      this.post(`/api/workspaces/${workspaceSlug}/capacity/google/training-rules/`, rule, {
+        headers: { "X-CSRFTOKEN": token },
+      })
+    );
+  }
+  async deleteTrainingRule(workspaceSlug: string, id: string) {
+    const token = await this.csrfToken();
+    return this.data(
+      this.delete(`/api/workspaces/${workspaceSlug}/capacity/google/training-rules/${id}/`, {
+        headers: { "X-CSRFTOKEN": token },
+      })
+    );
+  }
+  async linkTrainingEvent(workspaceSlug: string, eventKey: string, sessionId: string) {
+    const token = await this.csrfToken();
+    return this.data(
+      this.post(
+        `/api/workspaces/${workspaceSlug}/capacity/google/training-links/`,
+        { event_key: eventKey, session_id: sessionId },
+        { headers: { "X-CSRFTOKEN": token } }
+      )
+    );
+  }
+  async unlinkTrainingEvent(workspaceSlug: string, eventKey: string) {
+    const token = await this.csrfToken();
+    return this.data(
+      this.delete(`/api/workspaces/${workspaceSlug}/capacity/google/training-links/${eventKey}/`, {
+        headers: { "X-CSRFTOKEN": token },
       })
     );
   }

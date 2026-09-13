@@ -127,7 +127,11 @@ export function findWorkshopCandidates(
 
   for (const trainer of trainers) {
     if (!selected.has(trainer.trainer_id)) continue;
-    if (trainer.availability_status !== "fresh" && trainer.connection_status !== "not_connected") continue;
+    if (
+      trainer.availability_status.startsWith("training_") ||
+      (trainer.availability_status !== "fresh" && trainer.connection_status !== "not_connected")
+    )
+      continue;
     // Per trainer per day, because the cap is about how much choice one person
     // is offered for one date -- not about the size of the grid.
     const byDay = new Map<string, TWorkshopCandidate[]>();
