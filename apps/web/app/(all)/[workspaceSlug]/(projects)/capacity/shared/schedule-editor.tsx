@@ -10,18 +10,16 @@ import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { CapacityService, type TTrainerProfile } from "@/services/capacity.service";
 import { DAY_KEYS, DAY_LABELS, errorMessage } from "./capacity-format.utils";
+import {
+  copyBookingDay,
+  editableInterval,
+  editWeek,
+  normalizeBookingTime,
+  validateBookingWeek,
+} from "./schedule-editor.utils";
 
 const capacityService = new CapacityService();
 
-/**
- * A trainer's weekly booking hours and timezone.
- *
- * Presentational on purpose: it does not decide who may edit whom. The server
- * does that -- `_may_edit()` requires the requester to be the trainer or a
- * workspace admin -- so the only job left on the client is deciding where the
- * trigger appears. `/capacity` offers it for yourself, `/capacity/team` offers
- * it to admins for anyone.
- */
 export function ScheduleEditor({
   profile,
   workspaceSlug,
@@ -31,39 +29,29 @@ export function ScheduleEditor({
   workspaceSlug: string;
   onSaved: () => void;
 }) {
-  const [schedule, setSchedule] = useState(profile.weekly_schedule);
+  const [schedule, setSchedule] = useState(() => editWeek(profile.weekly_schedule));
   const [trainerTimezone, setTrainerTimezone] = useState(profile.timezone);
   const [saving, setSaving] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [copySource, setCopySource] = useState<string>("mon");
+  const [copyAll, setCopyAll] = useState(false);
+  const [copyNotice, setCopyNotice] = useState("");
+  const validation = validateBookingWeek(schedule);
 
-  const setTime = (day: string, intervalIndex: number, field: "start" | "end", value: string) => {
-    setSchedule((current) => {
-      const intervals = [...(current[day] ?? [])];
-      intervals[intervalIndex] = { ...intervals[intervalIndex], [field]: value };
-      return { ...current, [day]: intervals };
-    });
-  };
-
-  const addInterval = (day: string) =>
-    setSchedule((current) => ({ ...current, [day]: [...(current[day] ?? []), { start: "13:00", end: "17:00" }] }));
-
-  const removeInterval = (day: string, intervalIndex: number) =>
+  const setTime = (day: string, id: string, field: "start" | "end", value: string) =>
     setSchedule((current) => ({
       ...current,
-      [day]: (current[day] ?? []).filter((_, index) => index !== intervalIndex),
+      [day]: current[day].map((interval) => (interval.id === id ? { ...interval, [field]: value } : interval)),
     }));
-
-  const toggleDay = (day: string) => {
-    setSchedule((current) => ({
-      ...current,
-      [day]: current[day]?.length ? [] : [{ start: "09:00", end: "22:00" }],
-    }));
-  };
 
   const save = async () => {
+    setSubmitted(true);
+    if (!validation.valid || saving) return;
     setSaving(true);
     try {
       await capacityService.updateSchedule(workspaceSlug, profile.user_id, profile.schedule_revision, {
-        weekly_schedule: schedule,
+        weekly_schedule: validation.schedule,
         timezone: trainerTimezone,
       });
       setToast({
@@ -85,81 +73,156 @@ export function ScheduleEditor({
 
   return (
     <section className="rounded-lg border border-subtle bg-surface-1 p-4">
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-body-sm-medium">Booking hours · {profile.display_name}</h2>
           <p className="mt-1 text-body-xs-regular text-secondary">
-            Set the weekly windows in which this trainer may be booked. Google busy time and scheduled workshops are
-            subtracted inside them.
+            Set the hours when this trainer can be booked. Changes apply after saving.
           </p>
         </div>
         <Button variant="primary" size="sm" loading={saving} onClick={save}>
           Save hours
         </Button>
       </div>
-      <label className="mb-4 block max-w-sm text-body-xs-medium">
-        Trainer timezone
-        <input
-          aria-label="Trainer timezone"
-          value={trainerTimezone}
-          onChange={(event) => setTrainerTimezone(event.target.value)}
-          placeholder="Europe/Warsaw"
-          className="mt-1 w-full rounded border border-subtle bg-surface-2 px-2 py-1.5 text-body-xs-regular"
-        />
-      </label>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {DAY_KEYS.map((day, index) => {
-          const intervals = schedule[day] ?? [];
-          return (
-            <div key={day} className="flex min-h-12 items-center gap-2 rounded-md border border-subtle px-3 py-2">
-              <label className="flex w-10 cursor-pointer items-center gap-2 self-start pt-1 text-body-xs-medium">
-                <input type="checkbox" checked={intervals.length > 0} onChange={() => toggleDay(day)} />
+      <fieldset disabled={saving} className="min-w-0">
+        <label className="mb-4 block max-w-sm text-body-xs-medium">
+          Trainer timezone
+          <input
+            aria-label="Trainer timezone"
+            value={trainerTimezone}
+            onChange={(event) => setTrainerTimezone(event.target.value)}
+            className="mt-1 w-full rounded border border-subtle bg-surface-2 px-2 py-1.5 text-body-xs-regular"
+          />
+        </label>
+        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-md bg-surface-2 p-3">
+          <label className="text-body-xs-medium">
+            Copy hours from
+            <select
+              aria-label="Copy hours from"
+              value={copySource}
+              onChange={(event) => setCopySource(event.target.value)}
+              className="ml-2 rounded border border-subtle bg-surface-1 p-2"
+            >
+              {DAY_KEYS.map((day, index) => (
+                <option key={day} value={day}>
+                  {DAY_LABELS[index]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-body-xs-regular">
+            <input type="checkbox" checked={copyAll} onChange={(event) => setCopyAll(event.target.checked)} />
+            Include days off
+          </label>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={
+              !schedule[copySource]?.length ||
+              !validateBookingWeek({ ...editWeek({}), [copySource]: schedule[copySource] }).valid
+            }
+            onClick={() => {
+              setSchedule((current) => copyBookingDay(current, copySource, copyAll));
+              setCopyNotice(
+                copyAll
+                  ? "Hours copied to all seven days. Save hours to apply."
+                  : "Hours copied to the other active days. Save hours to apply."
+              );
+            }}
+          >
+            {copyAll ? "Set the same for all days" : "Copy to active days"}
+          </Button>
+          <p role="status" className="w-full text-body-xs-regular text-secondary">
+            {copyNotice}
+          </p>
+        </div>
+        <div className="divide-y divide-subtle">
+          {DAY_KEYS.map((day, index) => (
+            <div key={day} className="grid gap-3 py-3 sm:grid-cols-[7rem_1fr]">
+              <label className="flex h-9 items-center gap-2 text-body-xs-medium">
+                <input
+                  type="checkbox"
+                  checked={schedule[day].length > 0}
+                  onChange={() =>
+                    setSchedule((current) => ({
+                      ...current,
+                      [day]: current[day].length ? [] : [editableInterval()],
+                    }))
+                  }
+                />
                 {DAY_LABELS[index]}
               </label>
-              {intervals.length ? (
-                <div className="flex min-w-0 flex-1 flex-col gap-1 text-11 text-secondary">
-                  {intervals.map((interval, intervalIndex) => (
-                    <div key={`${interval.start}-${interval.end}`} className="flex items-center gap-1">
-                      <input
-                        aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} start`}
-                        type="time"
-                        value={interval.start}
-                        onChange={(event) => setTime(day, intervalIndex, "start", event.target.value)}
-                        className="min-w-0 rounded border border-subtle bg-surface-2 px-1 py-1"
-                      />
-                      <span>–</span>
-                      <input
-                        aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} end`}
-                        type="time"
-                        value={interval.end}
-                        onChange={(event) => setTime(day, intervalIndex, "end", event.target.value)}
-                        className="min-w-0 rounded border border-subtle bg-surface-2 px-1 py-1"
-                      />
-                      <button
-                        type="button"
-                        aria-label={`Remove ${DAY_LABELS[index]} interval ${intervalIndex + 1}`}
-                        onClick={() => removeInterval(day, intervalIndex)}
-                        className="rounded p-1 hover:text-danger-primary"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                    </div>
-                  ))}
+              <div className="min-w-0 space-y-2">
+                {schedule[day].map((interval, intervalIndex) => (
+                  <div key={interval.id} className="flex items-start gap-2">
+                    {(["start", "end"] as const).map((field) => {
+                      const key = `${interval.id}:${field}`;
+                      const error = submitted || touched[key] ? validation.errors[key] : undefined;
+                      return (
+                        <label key={field} className="block w-28 text-body-xs-regular text-secondary">
+                          {field === "start" ? "From" : "Until"}
+                          <input
+                            aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} ${field}`}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="HH:mm"
+                            autoComplete="off"
+                            value={interval[field]}
+                            aria-invalid={Boolean(error)}
+                            aria-describedby={error ? key : undefined}
+                            onChange={(event) => setTime(day, interval.id, field, event.target.value)}
+                            onBlur={() => {
+                              setTouched((current) => ({ ...current, [key]: true }));
+                              const value = normalizeBookingTime(interval[field]);
+                              if (value) setTime(day, interval.id, field, value);
+                            }}
+                            className="mt-1 h-9 w-full rounded border border-subtle bg-surface-2 px-3 text-body-sm-regular text-primary tabular-nums"
+                          />
+                          {error && (
+                            <span id={key} className="mt-1 block text-danger-primary">
+                              {error}
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${DAY_LABELS[index]} interval ${intervalIndex + 1}`}
+                      onClick={() =>
+                        setSchedule((current) => ({
+                          ...current,
+                          [day]: current[day].filter((value) => value.id !== interval.id),
+                        }))
+                      }
+                      className="mt-6 rounded p-2 text-secondary hover:text-danger-primary"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                ))}
+                {schedule[day].length ? (
                   <button
                     type="button"
-                    onClick={() => addInterval(day)}
-                    className="self-start text-11 text-accent-primary"
+                    disabled={schedule[day].length >= 8}
+                    onClick={() =>
+                      setSchedule((current) => ({
+                        ...current,
+                        [day]: [...current[day], editableInterval("13:00", "17:00")],
+                      }))
+                    }
+                    className="text-body-xs-medium text-accent-primary disabled:opacity-50"
                   >
-                    + Add interval
+                    Add interval
                   </button>
-                </div>
-              ) : (
-                <span className="text-11 text-placeholder">Off</span>
-              )}
+                ) : (
+                  <p className="py-2 text-body-xs-regular text-placeholder">Day off</p>
+                )}
+              </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      </fieldset>
     </section>
   );
 }
