@@ -100,8 +100,15 @@ function CalendarPicker({
                 })
               }
             />
-            <span className="truncate">{calendar.summary}</span>
-            {calendar.primary ? <span className="ml-auto text-11 text-placeholder">Primary</span> : null}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">{calendar.summary}</span>
+              {calendar.id === calendar.summary ? null : (
+                <span className="block truncate text-11 text-placeholder" title={calendar.id}>
+                  {calendar.id}
+                </span>
+              )}
+            </span>
+            {calendar.primary ? <span className="shrink-0 text-11 text-placeholder">Primary</span> : null}
           </label>
         ))}
       </div>
