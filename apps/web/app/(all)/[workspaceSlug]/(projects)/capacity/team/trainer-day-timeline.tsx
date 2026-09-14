@@ -26,6 +26,13 @@ export function TrainerDayTimeline({
 }) {
   const timeZone = useViewerTimezone();
   const free = availableRanges(trainer.intervals, dayStart, dayEnd);
+  // Same trap as `parseWeekParam`: a trailing `undefined` is not read as a zone, it lands on
+  // the milliseconds argument and yields an Invalid Date -- here a `NaN%` offset. The hook
+  // always returns a string today, so this only guards the contract, not a live failure.
+  const hourMark = (hour: number) =>
+    timeZone
+      ? new TZDate(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), hour, 0, 0, timeZone)
+      : new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), hour, 0, 0);
   return (
     <div>
       <div className="relative h-20 min-w-[680px] overflow-hidden rounded-md border border-subtle bg-surface-2">
@@ -43,7 +50,7 @@ export function TrainerDayTimeline({
               hour === 24
                 ? { right: 0 }
                 : {
-                    left: `${((new TZDate(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), hour, 0, 0, timeZone).getTime() - dayStart.getTime()) / (dayEnd.getTime() - dayStart.getTime())) * 100}%`,
+                    left: `${((hourMark(hour).getTime() - dayStart.getTime()) / (dayEnd.getTime() - dayStart.getTime())) * 100}%`,
                   }
             }
           >

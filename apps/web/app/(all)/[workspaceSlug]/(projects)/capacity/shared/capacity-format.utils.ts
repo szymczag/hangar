@@ -59,7 +59,13 @@ export function parseWeekParam(value: string | null | undefined, fallback: Date,
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
   if (!match) return startOfWeek(fallback, timeZone);
   const [, year, month, day] = match;
-  const parsed = new TZDate(Number(year), Number(month) - 1, Number(day), timeZone);
+  // `TZDate` only reads a trailing argument as a zone when it is a string. Handing it
+  // `undefined` leaves it as a positional date component -- the hours here -- and the result
+  // is an Invalid Date, which the guard below then quietly turns into the fallback week. An
+  // omitted zone has to mean local time, so build a plain `Date` for that case.
+  const parsed = timeZone
+    ? new TZDate(Number(year), Number(month) - 1, Number(day), timeZone)
+    : new Date(Number(year), Number(month) - 1, Number(day));
   if (Number.isNaN(parsed.getTime())) return startOfWeek(fallback, timeZone);
   // `new Date(2026, 12, 40)` rolls over silently; reject what did not round-trip.
   if (parsed.getMonth() !== Number(month) - 1 || parsed.getDate() !== Number(day))

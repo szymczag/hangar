@@ -11,7 +11,10 @@ describe("the ?week= parameter", () => {
   it("round-trips the week it was given", () => {
     const monday = startOfWeek(new Date(2026, 8, 9)); // Wednesday 9 September 2026
     expect(formatWeekParam(monday)).toBe("2026-09-07");
-    expect(parseWeekParam("2026-09-07", new Date()).getTime()).toBe(monday.getTime());
+    // The fallback is deliberately a fixed date, not `new Date()`. These cases supply a valid
+    // `week=`, so the fallback should never be consulted -- but when it silently was, the wall
+    // clock happened to sit inside this same week and the assertion passed anyway.
+    expect(parseWeekParam("2026-09-07", new Date(2026, 8, 9)).getTime()).toBe(monday.getTime());
   });
 
   it("writes the local calendar date, not the UTC one", () => {
@@ -28,10 +31,21 @@ describe("the ?week= parameter", () => {
   it("snaps any day inside a week to that week's Monday", () => {
     // Two links naming the same week have to compose the same SWR key, or each
     // pays for its own request.
-    const fromSunday = parseWeekParam("2026-09-13", new Date());
-    const fromMonday = parseWeekParam("2026-09-07", new Date());
+    const fromSunday = parseWeekParam("2026-09-13", new Date(2026, 8, 9));
+    const fromMonday = parseWeekParam("2026-09-07", new Date(2026, 8, 9));
     expect(fromSunday.getTime()).toBe(fromMonday.getTime());
     expect(formatWeekParam(fromSunday)).toBe("2026-09-07");
+  });
+
+  it("reads a week without a timezone as a local date", () => {
+    // `new TZDate(y, m, d, undefined)` is an Invalid Date: the zone argument is only read as
+    // one when it is a string, so `undefined` becomes the hours. The guard for that turned
+    // every zone-less call into the fallback week, which is how this file came to depend on
+    // what week it was run in.
+    const parsed = parseWeekParam("2026-09-07", new Date(2026, 8, 9));
+    expect(Number.isNaN(parsed.getTime())).toBe(false);
+    expect(formatWeekParam(parsed)).toBe("2026-09-07");
+    expect(formatWeekParam(parseWeekParam("2026-09-07", new Date(2027, 0, 4)))).toBe("2026-09-07");
   });
 
   it("falls back to the fallback week when the value is missing or malformed", () => {
