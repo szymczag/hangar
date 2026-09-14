@@ -75,7 +75,6 @@ describe("findWorkshopCandidates", () => {
       trainerId: "trainer-1",
       trainerName: "A Trainer",
       timezone: "Europe/Warsaw",
-      availabilityStatus: "fresh",
       blockedStartsAt: "2026-09-07T10:00:00.000Z",
       workshopStartsAt: "2026-09-07T11:30:00.000Z",
       workshopEndsAt: "2026-09-07T13:30:00.000Z",
@@ -99,6 +98,34 @@ describe("findWorkshopCandidates", () => {
         travelAfterMinutes: 0,
       })
     ).toEqual([]);
+  });
+
+  it.each([
+    "not_connected",
+    "no_calendars_selected",
+    "reauthentication_required",
+    "stale",
+    "rate_limited",
+    "provider_unavailable",
+    "training_unavailable",
+  ])("offers nothing for a trainer whose calendar reads %s", (availability_status) => {
+    // A trainer with no connected calendar arrives with no busy intervals, which
+    // renders as a wide open week. Offering it proposed people who were already
+    // booked -- and for `not_connected` the server takes the booking, because
+    // `booking_preflight` only demands a fresh read from a trainer who has a
+    // calendar selection. So this filter is what stands between a coordinator
+    // and a double-booked trainer.
+    const open = freeBetween([at(7, 9), at(7, 17)]);
+    const hour = {
+      trainerIds: [trainer.trainer_id],
+      durationMinutes: 60,
+      preparationMinutes: 0,
+      travelBeforeMinutes: 0,
+      travelAfterMinutes: 0,
+    };
+
+    expect(findWorkshopCandidates([open], at(7, 0), at(8, 0), hour).length).toBeGreaterThan(0);
+    expect(findWorkshopCandidates([{ ...open, availability_status }], at(7, 0), at(8, 0), hour)).toEqual([]);
   });
 
   it("offers more than the first fit in an opening, so an afternoon can be asked for", () => {
@@ -404,6 +431,22 @@ describe("planner fit explanations and search boundaries", () => {
     );
     const busy = workshopAvailability([{ ...trainer, intervals: [] }], at(7, 0), at(8, 0), spec);
     expect(noWorkshopFitReason(busy, spec, formatMinutes)).toContain("No free booking hours");
+  });
+
+  it("blames the missing calendar rather than the trainer's hours", () => {
+    // The trainer is active, ticked and has a whole free day of booking hours --
+    // "choose an active trainer" or "no free booking hours remain" would both
+    // send a coordinator looking in the wrong place for a connection nobody but
+    // that trainer can make.
+    const unreadable = { ...freeBetween([at(7, 9), at(7, 17)]), availability_status: "not_connected" };
+    const availability = workshopAvailability([unreadable], at(7, 0), at(8, 0), spec);
+
+    expect(availability.selectedTrainerCount).toBe(0);
+    expect(availability.unverifiedTrainerCount).toBe(1);
+    expect(availability.longestFreeMinutes).toBe(0);
+    expect(noWorkshopFitReason(availability, spec, formatMinutes)).toContain(
+      "No selected trainer has a calendar Hangar can read"
+    );
   });
 
   it("finds a noon workshop when preparation starts on a quarter hour", () => {

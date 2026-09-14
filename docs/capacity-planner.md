@@ -21,8 +21,25 @@ The key cannot be reused for a different request. No Google invitations are sent
 
 Booking checks fresh Google availability, working hours, existing workshops and
 holds. A connected calendar that cannot be verified prevents new bookings.
-Without a connected calendar, only Hangar availability can be checked.
 Google can change after verification; Hangar does not lock external calendars.
+
+The planner offers times only for trainers whose calendar it can read right now.
+A trainer who has connected none returns no busy time at all, which is not a free
+week but an unreadable one, so their booking hours are never offered as candidate
+slots; the planner names them and says why instead. The same applies while a
+connected calendar is stale, rate limited or unverifiable.
+
+Booking enforces the same rule rather than trusting the client. A hold or a
+direct schedule for a trainer with no connected calendar, or with a connection
+but no calendars selected, is refused with `409 calendar_not_connected`: retrying
+cannot help and only that trainer can resolve it. A connected calendar that
+cannot be verified right now stays `503 availability_unverified`, which a retry
+can clear.
+
+Each trainer connects their own Google account, and availability is read with
+that trainer's credential. Sharing a calendar with a coordinator in Google
+therefore changes nothing here: Hangar never reads one person's calendar through
+another person's connection, and nobody can connect on a colleague's behalf.
 
 Migration ext.0027 adds nullable session origins and booking-operation records.
 Existing plans and sessions remain valid. Old clients retain the hold/schedule

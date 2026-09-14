@@ -66,6 +66,19 @@ describe("planner availability states", () => {
     expect(html).toContain("New plan");
   });
 
+  it("names an unreadable calendar instead of offering its booking hours", () => {
+    state.data.capacity = {
+      ...capacity,
+      trainers: [{ ...capacity.trainers[0], availability_status: "not_connected" }],
+    };
+    const html = render();
+
+    expect(html).toContain("Trainer (Calendar not connected)");
+    expect(html).toContain("No selected trainer has a calendar Hangar can read");
+    // The free 09:00-12:00 morning in the fixture must not become a card.
+    expect(html).not.toContain("longest free opening");
+  });
+
   it("does not report no slots while previous-week data is retained", () => {
     state.data.weekStart = new Date(2099, 8, 14);
     state.data.weekEnd = new Date(2099, 8, 21);

@@ -79,6 +79,25 @@ test("the workshop planner", async ({ asUser }) => {
   const seed = fixtures();
   const main = page.getByRole("main").last();
 
+  /**
+   * Nothing in this stack talks to Google, so every seeded trainer reads back
+   * `not_connected` -- and the planner offers no times for a calendar it cannot
+   * read, because an empty busy list from an unconnected account is "we cannot
+   * see this week", not "this week is free". Only that verdict is patched, on
+   * the real response: the trainers, their booking hours and the maths over
+   * them stay the seeded round trip, and the story keeps photographing the
+   * candidate cards rather than the explanation that stands in for them.
+   */
+  await page.route(
+    (url) => url.pathname.endsWith("/capacity/"),
+    async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      for (const trainer of body.trainers ?? []) trainer.availability_status = "fresh";
+      await route.fulfill({ response, json: body });
+    }
+  );
+
   await page.goto(`/${seed.workspace.slug}/capacity/planner`);
 
   // Candidates are computed from the capacity response, so waiting on one waits
