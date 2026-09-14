@@ -28,6 +28,7 @@ from plane.app.serializers import (
     WorkSpaceMemberSerializer,
 )
 from plane.app.views.base import BaseAPIView
+from plane.authentication.utils.sso_domain_policy import invitation_rejection_reason
 from plane.bgtasks.event_tracking_task import track_event
 from plane.bgtasks.workspace_invitation_task import workspace_invitation
 from plane.db.models import Profile, Workspace, WorkspaceMember, WorkspaceMemberInvite
@@ -92,6 +93,12 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         for email in emails:
             try:
                 validate_email(email.get("email"))
+                # The domain policy is enforced at sign-in, so without this an
+                # address it will refuse can still be invited: the row is
+                # written and an outsider is emailed the workspace name.
+                rejection = invitation_rejection_reason(email.get("email"))
+                if rejection:
+                    return Response({"error": rejection}, status=status.HTTP_400_BAD_REQUEST)
                 workspace_invitations.append(
                     WorkspaceMemberInvite(
                         email=email.get("email").strip().lower(),

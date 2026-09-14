@@ -90,7 +90,8 @@ export type TInstanceSAMLAuthenticationConfigurationKeys =
 export type TInstanceSSODomainPolicyConfigurationKeys =
   | "SSO_ENFORCED_DOMAINS"
   | "SSO_AUTO_JOIN_WORKSPACES"
-  | "SSO_AUTO_JOIN_PROJECTS";
+  | "SSO_AUTO_JOIN_PROJECTS"
+  | "RESTRICT_INVITES_TO_SSO_DOMAINS";
 
 export type TInstanceAuthenticationConfigurationKeys =
   | TInstanceGoogleAuthenticationConfigurationKeys

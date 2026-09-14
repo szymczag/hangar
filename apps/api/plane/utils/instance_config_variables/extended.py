@@ -130,6 +130,15 @@ sso_policy_config_variables = [
         "category": "SSO",
         "is_encrypted": False,
     },
+    # "1" confines workspace and project invitations to the domains pinned
+    # above. Off by default: an instance that deliberately invites contractors
+    # on other domains must keep working after an upgrade.
+    {
+        "key": "RESTRICT_INVITES_TO_SSO_DOMAINS",
+        "value": os.environ.get("RESTRICT_INVITES_TO_SSO_DOMAINS", "0"),
+        "category": "SSO",
+        "is_encrypted": False,
+    },
     # Projects a federated user joins on sign-in, as
     # "domain=workspace-slug/IDENTIFIER:role" entries. Requires the matching
     # workspace membership, so it is normally paired with the setting above.

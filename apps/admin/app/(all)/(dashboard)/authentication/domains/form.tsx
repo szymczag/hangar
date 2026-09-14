@@ -23,7 +23,15 @@ import { useInstance, useWorkspace } from "@/hooks/store";
 import { useConfigurationEditable } from "@/hooks/use-configuration-editable";
 // local
 import type { TDomainRow, TProvider, TRoleName, TWorkspaceGrant } from "./policy";
-import { ALL_PROVIDERS, ROLE_NAMES, emptyGrant, emptyRow, parsePolicy, serializePolicy } from "./policy";
+import {
+  ALL_PROVIDERS,
+  ROLE_NAMES,
+  emptyGrant,
+  emptyRow,
+  parsePolicy,
+  parseRestrictInvites,
+  serializePolicy,
+} from "./policy";
 
 type Props = {
   config: IFormattedInstanceConfiguration;
@@ -45,6 +53,9 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
       config.SSO_AUTO_JOIN_PROJECTS ?? ""
     )
   );
+  const [restrictInvites, setRestrictInvites] = useState(() =>
+    parseRestrictInvites(config.RESTRICT_INVITES_TO_SSO_DOMAINS)
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
@@ -63,6 +74,9 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
   const isLoadingWorkspaces = loader === "init-loader" || Boolean(paginationInfo?.next_page_results);
 
   const markDirty = () => setIsDirty(true);
+
+  // A row with no domain typed is not pinned to anything once serialized.
+  const hasNoDomains = rows.every((row) => !row.domain.trim());
 
   const updateRow = (rowId: string, patch: Partial<TDomainRow>) => {
     setRows((previous) => previous.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
@@ -90,7 +104,10 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
   const onSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await updateInstanceConfigurations(serializePolicy(rows));
+      await updateInstanceConfigurations({
+        ...serializePolicy(rows),
+        RESTRICT_INVITES_TO_SSO_DOMAINS: restrictInvites ? "1" : "0",
+      });
       setToast({
         type: TOAST_TYPE.SUCCESS,
         title: "Done!",
@@ -276,6 +293,40 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
         >
           <Plus className="size-4" /> Add a domain
         </Button>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-md border border-subtle p-4">
+        <label className="flex items-start gap-2 text-13">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={restrictInvites}
+            onChange={() => {
+              setRestrictInvites((previous) => !previous);
+              markDirty();
+            }}
+            disabled={!isConfigurationEditable || hasNoDomains}
+          />
+          <span>
+            <span className="text-secondary">Only invite addresses on these domains</span>
+            <span className="mt-1 block text-11 text-tertiary">
+              Workspace and project invitations are refused for every other domain, in the app and in the API. Without
+              this an admin can invite an address that the policy will refuse at sign-in — the invitation is sent, and
+              only the invitee finds out.
+            </span>
+            {hasNoDomains && (
+              <span className="mt-1 block text-11 text-tertiary">
+                Add a domain above first. With nothing pinned there is nothing to confine invitations to, so this has no
+                effect.
+              </span>
+            )}
+          </span>
+        </label>
+        <span className="text-11 text-tertiary">
+          A plus tag such as <CodeBlock darkerShade>name+team@corp.com</CodeBlock> is always refused on a domain pinned
+          to an identity provider, whether or not you tick this. Directories issue no account carrying the tag, so the
+          invitation could never be accepted. A domain that also allows magic codes keeps them.
+        </span>
       </div>
 
       <div className="flex flex-col gap-2 rounded-md border border-subtle p-4 text-11 text-tertiary">
