@@ -61,7 +61,10 @@
           "placeholder": "meno@spoločnosť.sk",
           "errors": {
             "required": "Vyžaduje sa e-mailová adresa.",
-            "invalid": "E-mail je neplatný"
+            "invalid": "E-mail je neplatný",
+            "outside_domain": "Pozvať možno iba adresy na {domains}.",
+            "plus_tag": "Na doméne {domain} nemožno použiť značku s plusom.",
+            "blocked_domain": "Doména {domain} nemá povolený žiadny spôsob prihlásenia."
           }
         }
       },

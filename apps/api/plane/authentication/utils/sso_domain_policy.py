@@ -178,3 +178,26 @@ def invitation_rejection_reason(email, *, raw_setting=None, restrict_setting=Non
         )
 
     return None
+
+
+def invitation_policy_snapshot(raw_setting=None, restrict_setting=None):
+    """The policy in the shape a client needs to apply the same three rules.
+
+    The admin panel holds the settings, and only an instance admin may read
+    them. An invite dialog needs no more than which domains are pinned and
+    whether each accepts a plus tag, so that is all this returns — to callers
+    who can already invite. The server stays authoritative: this only moves the
+    refusal earlier, so an admin is not told after the round trip.
+    """
+    raw_setting = _enforced_domains_setting(raw_setting)
+    policy = parse_enforced_domains(raw_setting)
+    return {
+        "restrict_to_domains": bool(_restrict_invites_enabled(restrict_setting) and policy),
+        "domains": {
+            domain: {
+                "allows_sign_in": bool(providers),
+                "allows_plus_tags": bool(providers & CREDENTIAL_PROVIDERS),
+            }
+            for domain, providers in policy.items()
+        },
+    }

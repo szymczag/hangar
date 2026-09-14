@@ -61,7 +61,10 @@
           "placeholder": "name@unternehmen.de",
           "errors": {
             "required": "Eine E-Mail-Adresse ist erforderlich.",
-            "invalid": "E-Mail ist ungültig"
+            "invalid": "E-Mail ist ungültig",
+            "outside_domain": "Nur Adressen auf {domains} können eingeladen werden.",
+            "plus_tag": "Auf {domain} kann kein Plus-Tag verwendet werden.",
+            "blocked_domain": "Für {domain} ist keine Anmeldemethode aktiviert."
           }
         }
       },

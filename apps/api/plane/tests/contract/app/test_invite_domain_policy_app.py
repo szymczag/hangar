@@ -15,7 +15,18 @@ API, which would otherwise be a way around the restriction.
 import pytest
 from rest_framework import status
 
-from plane.db.models import Project, ProjectMember, ProjectMemberInvite, WorkspaceMemberInvite
+from uuid import uuid4
+
+from rest_framework.test import APIClient
+
+from plane.db.models import (
+    Project,
+    ProjectMember,
+    ProjectMemberInvite,
+    User,
+    WorkspaceMember,
+    WorkspaceMemberInvite,
+)
 from plane.license.models import InstanceConfiguration
 
 
@@ -46,6 +57,19 @@ def project(db, workspace, create_user):
     )
     ProjectMember.objects.create(project=project, member=create_user, workspace=workspace, role=20, is_active=True)
     return project
+
+
+def _workspace_user(workspace, role):
+    uid = uuid4().hex[:8]
+    user = User.objects.create(email=f"person-{uid}@plane.so", username=f"person_{uid}")
+    WorkspaceMember.objects.create(workspace=workspace, member=user, role=role, is_active=True)
+    return user
+
+
+def _client_for(user):
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return client
 
 
 def _workspace_invite_url(slug):
@@ -191,5 +215,67 @@ class TestApiInviteDomainPolicy:
             format="json",
         )
         assert response.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED), (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestInvitationPolicyEndpoint:
+    """What the invite dialog reads to refuse an address before submitting."""
+
+    def test_admin_reads_the_policy(self, session_client, workspace, confined_instance):
+        response = session_client.get(_workspace_invite_url(workspace.slug) + "policy/")
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+        assert response.json() == {
+            "restrict_to_domains": True,
+            "domains": {"corp.com": {"allows_sign_in": True, "allows_plus_tags": False}},
+        }
+
+    def test_a_domain_allowing_magic_codes_keeps_its_plus_tags(self, session_client, workspace, db):
+        _store("SSO_ENFORCED_DOMAINS", "corp.com=oidc;magic-code")
+        _store("RESTRICT_INVITES_TO_SSO_DOMAINS", "1")
+        response = session_client.get(_workspace_invite_url(workspace.slug) + "policy/")
+        assert response.json()["domains"]["corp.com"]["allows_plus_tags"] is True
+
+    def test_restriction_reads_false_while_no_domain_is_pinned(self, session_client, workspace, db):
+        # Confining invitations to an empty list would refuse every address, so
+        # the flag is reported off until a domain exists to confine them to.
+        _store("SSO_ENFORCED_DOMAINS", "")
+        _store("RESTRICT_INVITES_TO_SSO_DOMAINS", "1")
+        response = session_client.get(_workspace_invite_url(workspace.slug) + "policy/")
+        assert response.json() == {"restrict_to_domains": False, "domains": {}}
+
+    def test_a_member_reads_it_because_the_create_endpoint_admits_members_too(self, workspace, confined_instance):
+        """WorkSpaceAdminPermission admits members despite its name, and this
+        endpoint must not be narrower than the one that writes invitations."""
+        client = _client_for(_workspace_user(workspace, role=15))
+
+        response = client.get(_workspace_invite_url(workspace.slug) + "policy/")
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+
+    def test_a_guest_cannot_read_the_policy(self, workspace, confined_instance):
+        client = _client_for(_workspace_user(workspace, role=5))
+
+        response = client.get(_workspace_invite_url(workspace.slug) + "policy/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+
+    def test_someone_outside_the_workspace_cannot_read_the_policy(self, workspace, confined_instance):
+        outsider = User.objects.create(email=f"outsider-{uuid4().hex[:8]}@plane.so", username=uuid4().hex[:8])
+
+        response = _client_for(outsider).get(_workspace_invite_url(workspace.slug) + "policy/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+
+    def test_an_anonymous_caller_cannot_read_the_policy(self, workspace, confined_instance):
+        response = APIClient().get(_workspace_invite_url(workspace.slug) + "policy/")
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN), (
             f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
         )

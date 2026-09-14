@@ -28,7 +28,10 @@ from plane.app.serializers import (
     WorkSpaceMemberSerializer,
 )
 from plane.app.views.base import BaseAPIView
-from plane.authentication.utils.sso_domain_policy import invitation_rejection_reason
+from plane.authentication.utils.sso_domain_policy import (
+    invitation_policy_snapshot,
+    invitation_rejection_reason,
+)
 from plane.bgtasks.event_tracking_task import track_event
 from plane.bgtasks.workspace_invitation_task import workspace_invitation
 from plane.db.models import Profile, Workspace, WorkspaceMember, WorkspaceMemberInvite
@@ -36,6 +39,22 @@ from plane.utils.cache import invalidate_cache, invalidate_cache_directly
 from plane.utils.host import base_host
 from plane.utils.analytics_events import USER_JOINED_WORKSPACE, USER_INVITED_TO_WORKSPACE
 from .. import BaseViewSet
+
+
+class WorkspaceInvitationPolicyEndpoint(BaseAPIView):
+    """What the invite dialog needs to refuse an address before submitting.
+
+    Carries the permission the create endpoint carries, so exactly those who
+    can write an invitation can read the rules it will be judged by — note that
+    WorkSpaceAdminPermission admits members as well as admins, despite the
+    name. Nobody learns a pinned domain here who could not read it off a
+    rejected invitation.
+    """
+
+    permission_classes = [WorkSpaceAdminPermission]
+
+    def get(self, request, slug):
+        return Response(invitation_policy_snapshot(), status=status.HTTP_200_OK)
 
 
 class WorkspaceInvitationsViewset(BaseViewSet):
