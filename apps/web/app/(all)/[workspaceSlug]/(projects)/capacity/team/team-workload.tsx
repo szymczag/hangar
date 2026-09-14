@@ -20,7 +20,16 @@ export function TeamWorkload({ trainers }: { trainers: TTrainerCapacity[] }) {
         <table className="w-full text-left text-body-xs-regular">
           <thead className="text-secondary">
             <tr>
-              {["Trainer", "Workshops", "Sessions", "Delivery", "Preparation & travel", "Reservations"].map((label) => (
+              {[
+                "Trainer",
+                "Workshops",
+                "Sessions",
+                "Delivery",
+                "Preparation & travel",
+                "Reservations",
+                "Google training",
+                "Pending invitations",
+              ].map((label) => (
                 <th key={label} className="px-3 py-2 font-medium">
                   {label}
                 </th>
@@ -41,6 +50,23 @@ export function TeamWorkload({ trainers }: { trainers: TTrainerCapacity[] }) {
                   <td className="px-3 py-3">{workload ? duration(workload.buffer_minutes) : "—"}</td>
                   <td className="px-3 py-3">
                     {workload ? `${workload.hold_count} · ${duration(workload.hold_minutes)}` : "—"}
+                  </td>
+                  <td className="px-3 py-3">
+                    {trainer.training_status === "not_configured" || !trainer.training_workload
+                      ? "—"
+                      : `${trainer.training_workload.confirmed_sessions} · ${duration(trainer.training_workload.confirmed_minutes)}`}
+                    {trainer.training_status && !["fresh", "not_configured"].includes(trainer.training_status) && (
+                      <p className="text-danger-primary">
+                        {trainer.training_status === "consent_required"
+                          ? "Calendar access required"
+                          : "Unverified calendar data"}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-3 py-3">
+                    {trainer.training_workload
+                      ? `${trainer.training_workload.pending_sessions} · ${duration(trainer.training_workload.pending_minutes)}`
+                      : "—"}
                   </td>
                 </tr>
               );

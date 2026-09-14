@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import logging
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 
 import requests
 from django.core.cache import cache
@@ -192,6 +192,43 @@ class GoogleCalendarClient:
 
                 remember_primary_timezone(credential, calendars)
                 return calendars
+
+    def list_events(self, credential, calendar_id, *, time_min, time_max):
+        events, page_token = [], None
+        while True:
+            query = {
+                "timeMin": time_min,
+                "timeMax": time_max,
+                "singleEvents": "true",
+                "showDeleted": "false",
+                "maxResults": 250,
+                "fields": (
+                    "nextPageToken,timeZone,items(id,iCalUID,status,organizer(email),"
+                    "attendees(email,responseStatus),attendeesOmitted,start,end,originalStartTime)"
+                ),
+            }
+            if page_token:
+                query["pageToken"] = page_token
+            payload = self._authorized_json(
+                credential,
+                "GET",
+                (
+                    f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}/events"
+                    f"?{urlencode(query)}"
+                ),
+            )
+            if not isinstance(payload, dict) or not isinstance(payload.get("items", []), list):
+                raise GoogleCalendarError("invalid_events_response")
+            items = payload.get("items", [])
+            if len(events) + len(items) > 2000:
+                raise GoogleCalendarError("events_window_too_large")
+            for item in items:
+                if not isinstance(item, dict):
+                    raise GoogleCalendarError("invalid_events_response")
+                events.append({**item, "calendar_timezone": payload.get("timeZone", "UTC")})
+            page_token = payload.get("nextPageToken")
+            if not page_token:
+                return events
 
     def freebusy(self, credential, calendar_ids: list[str], *, time_min: str, time_max: str) -> list[dict]:
         busy = []

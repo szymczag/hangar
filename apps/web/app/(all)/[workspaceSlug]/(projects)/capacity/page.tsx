@@ -153,10 +153,10 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
       setOptingIn(false);
     }
   };
-  const connect = async () => {
+  const connect = async (trainingEvents = false) => {
     setConnecting(true);
     try {
-      const { authorization_url } = await capacityService.startGoogle(workspaceSlug);
+      const { authorization_url } = await capacityService.startGoogle(workspaceSlug, trainingEvents);
       window.location.assign(authorization_url);
     } catch (error: unknown) {
       setToast({
@@ -268,12 +268,28 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                 <div>
                   <h2 className="text-body-sm-medium">Google Calendar</h2>
                   <p className="mt-1 text-body-xs-regular text-secondary">
-                    Connect read-only free/busy access. Event names and details never enter Hangar.
+                    Connect read-only free/busy access. This connection reads busy times without event names.
                   </p>
                 </div>
-                <Button variant="primary" loading={connecting} onClick={connect}>
+                <Button variant="primary" loading={connecting} onClick={() => void connect()}>
                   <Link2 className="mr-2 size-4" />
                   Connect Google Calendar
+                </Button>
+              </section>
+            )}
+            {isConnected && (
+              <section className="rounded-lg border border-subtle bg-surface-1 p-4">
+                <h2 className="text-body-sm-medium">Training invitation recognition</h2>
+                <p className="my-2 text-body-xs-regular text-secondary">
+                  Optional additional Google permission reads event times, organizer and attendee responses from
+                  calendars configured by your workspace administrator. Only invitations addressed to your Google
+                  account count. Titles and descriptions are not requested. Hangar will not create events or send
+                  invitations.
+                </p>
+                <Button variant="secondary" loading={connecting} onClick={() => void connect(true)}>
+                  {ownProfile.training_events_enabled
+                    ? "Renew training calendar access"
+                    : "Allow training calendar access"}
                 </Button>
               </section>
             )}

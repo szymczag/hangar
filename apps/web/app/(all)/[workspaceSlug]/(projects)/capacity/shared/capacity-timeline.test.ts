@@ -46,7 +46,13 @@ describe("capacity timeline", () => {
   });
 
   it("renders working time below busy time and workshops", () => {
-    expect(CAPACITY_INTERVAL_LAYERS).toEqual(["working", "google_busy", "workshop_hold", "workshop"]);
+    expect(CAPACITY_INTERVAL_LAYERS).toEqual([
+      "working",
+      "google_busy",
+      "google_training",
+      "workshop_hold",
+      "workshop",
+    ]);
   });
 
   it("labels internal workshop holds without leaking draft details", () => {

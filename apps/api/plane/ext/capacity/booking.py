@@ -7,6 +7,7 @@ from uuid import UUID
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from plane.ext.capacity.training_events import training_events, rules_revision
 from plane.ext.capacity.timezones import trainer_timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework.response import Response
@@ -69,6 +70,19 @@ def booking_preflight(*, scheduling=False):
                 return Response({"error": "The trainer block has already started."}, status=400)
             if str(trainer_id) not in draft.trainer_ids:
                 return Response({"error": "The trainer is not eligible for this plan."}, status=400)
+            training_revision = rules_revision(trainer.workspace_id)
+            events, training_status = training_events(trainer, blocked_start, blocked_end, force=True)
+            if training_status not in ("fresh", "not_configured"):
+                return Response(
+                    {
+                        "error": (
+                            "Training calendar availability could not be verified. "
+                            "Connect the required calendar access or retry."
+                        ),
+                        "code": "availability_unverified",
+                    },
+                    status=503,
+                )
             busy, connection, freshness = _google_busy(trainer, blocked_start, blocked_end, force=True)
             if selection_revision(trainer) and freshness != "fresh":
                 return Response(
@@ -80,9 +94,10 @@ def booking_preflight(*, scheduling=False):
                 )
             if _subtract([(blocked_start, blocked_end)], _working_intervals(trainer, blocked_start, blocked_end)):
                 return Response({"error": "The complete block must fit inside booking hours."}, status=409)
-            if _intersections([(blocked_start, blocked_end)], busy):
+            if events or _intersections([(blocked_start, blocked_end)], busy):
                 return Response({"error": "The trainer is busy in Google during this block."}, status=409)
             request.capacity_booking_snapshot = {
+                "training_revision": training_revision,
                 "trainer": str(trainer_id),
                 "draft_revision": draft.revision,
                 "schedule_revision": trainer.schedule_revision,
@@ -106,6 +121,7 @@ def snapshot_error(request, draft, trainer):
         snapshot["draft_revision"] != draft.revision
         or snapshot["trainer"] != str(trainer.user_id)
         or snapshot["schedule_revision"] != trainer.schedule_revision
+        or snapshot["training_revision"] != rules_revision(trainer.workspace_id)
         or snapshot["timezone"] != trainer_timezone(trainer)[0]
         or snapshot["selection_revision"] != selection_revision(trainer)
     ):

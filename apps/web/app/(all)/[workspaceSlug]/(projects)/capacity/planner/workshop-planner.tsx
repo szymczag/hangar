@@ -768,8 +768,8 @@ export function WorkshopPlanner({
               {trainers.some(
                 (trainer) =>
                   selectedTrainerIds.has(trainer.trainer_id) &&
-                  trainer.availability_status !== "fresh" &&
-                  trainer.connection_status !== "not_connected"
+                  (trainer.availability_status.startsWith("training_") ||
+                    (trainer.availability_status !== "fresh" && trainer.connection_status !== "not_connected"))
               ) && (
                 <p role="alert" className="mb-3 rounded border border-subtle p-3 text-body-xs-regular text-secondary">
                   Some connected calendars could not be verified. Those trainers are excluded until availability
@@ -878,7 +878,11 @@ export function WorkshopPlanner({
                                 <p className="mt-0.5 text-11 text-placeholder">{candidate.timezone}</p>
                               </div>
                               {candidate.availabilityStatus !== "fresh" ? (
-                                <span className="text-11 text-warning-primary">Verify calendar</span>
+                                <span className="text-11 text-warning-primary">
+                                  {candidate.availabilityStatus === "not_connected"
+                                    ? "No Google calendar"
+                                    : "Verify calendar"}
+                                </span>
                               ) : null}
                             </div>
                             <div className="mt-4 space-y-2 text-body-xs-regular">
@@ -931,7 +935,7 @@ export function WorkshopPlanner({
                             </Button>
                             {planNeedsSaving ? (
                               <p className="mt-2 text-center text-11 text-placeholder">
-                                Saves this plan and temporarily reserves the full trainer block.
+                                Reserve this time temporarily, or confirm a Workshop session.
                               </p>
                             ) : null}
                           </article>

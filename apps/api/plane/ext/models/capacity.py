@@ -116,6 +116,7 @@ class GoogleCalendarCredential(BaseModel):
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.CONNECTED)
     last_successful_at = models.DateTimeField(null=True, blank=True)
     last_error_code = models.CharField(max_length=64, blank=True)
+    encrypted_google_email = models.TextField(blank=True)
     primary_calendar_timezone = models.CharField(max_length=64, blank=True)
     timezone_checked_at = models.DateTimeField(null=True, blank=True)
 
@@ -135,6 +136,7 @@ class TrainerCalendarSelection(BaseModel):
     credential = models.ForeignKey(
         GoogleCalendarCredential, on_delete=models.CASCADE, related_name="trainer_selections"
     )
+    training_events_enabled = models.BooleanField(default=False)
     encrypted_calendar_ids = models.JSONField(default=list)
     calendar_id_hashes = models.JSONField(default=list)
     revision = models.PositiveBigIntegerField(default=1)
@@ -294,3 +296,27 @@ class WorkshopBookingOperation(BaseModel):
     class Meta:
         db_table = "ext_workshop_booking_operations"
         constraints = [models.UniqueConstraint(fields=["draft", "key"], name="ext_booking_draft_key")]
+
+
+class GoogleTrainingRule(BaseModel):
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="google_training_rules")
+    label = models.CharField(max_length=100)
+    encrypted_calendar_id = models.TextField()
+    encrypted_organizer = models.TextField()
+    encryption_key_id = models.CharField(max_length=64)
+
+    class Meta:
+        db_table = "ext_google_training_rules"
+
+
+class GoogleTrainingEventLink(BaseModel):
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE)
+    trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    event_key = models.CharField(max_length=64)
+    session = models.ForeignKey(WorkshopSession, on_delete=models.CASCADE, related_name="google_event_links")
+
+    class Meta:
+        db_table = "ext_google_training_event_links"
+        constraints = [
+            models.UniqueConstraint(fields=["workspace", "trainer", "event_key"], name="ext_training_event_link_unique")
+        ]

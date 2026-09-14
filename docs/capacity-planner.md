@@ -53,3 +53,53 @@ backwards compatibility and continue to measure overlapping booking hours.
 Migration `0028_calendar_primary_timezone` adds nullable refresh metadata and an
 initially empty Google timezone. Existing connections populate it on their next
 uncached calendar read.
+
+## Recognizing training invitations
+
+Workspace administrators configure **Team capacity → Training calendar rules**.
+Each rule matches both a calendar ID and the exact organizer email. The event
+creator does not affect matching. Calendar IDs and organizer emails are encrypted
+using the existing calendar encryption key; only workspace administrators can read
+or change rules. No organization-specific identifiers belong in repository files.
+
+Each trainer then opens **My capacity → Allow training calendar access**. This
+separate consent adds `https://www.googleapis.com/auth/calendar.events.readonly` to
+the existing read-only connection. Configure that optional scope on the Google OAuth
+consent screen before using this feature. Existing connections keep their original
+permissions until the trainer opts in. The trainer's Google account must itself be
+able to read the configured shared calendar; an administrator's rule grants no
+Google permissions. Disconnecting Google removes the connection and indexed caches.
+
+Hangar matches the trainer through the verified Google account email, not the
+calendar copy's `self` flag. Accepted invitations count as confirmed external
+training; tentative and unanswered invitations count separately as pending. Both
+block booking. Declined and cancelled invitations are ignored. Recurring instances
+are expanded, and all-day end dates are exclusive in the source calendar timezone.
+The importer requests times, organizer and participant responses; it requests no
+titles or descriptions and exposes no attendee lists or organizer addresses in the
+team workload response.
+
+Successful reads are cached for five minutes. Last-known results can be displayed
+for up to one hour with an unverified status. New holds and scheduling always require
+a fresh read of all configured sources. Missing consent, inaccessible calendars and
+provider errors therefore block new bookings until resolved; they are never treated
+as free time. Remove an obsolete rule in Team capacity when that source no longer
+applies to this workspace.
+
+**Your recognized training invitations** in Team capacity lets a trainer explicitly
+link an invitation to an overlapping Workshop session they deliver and can access.
+The linked invitation continues to block time but no longer adds external delivery
+minutes. Unlinking restores its external workload. No fuzzy title matching or automatic
+Workshop creation is performed. If a linked session no longer assigns that trainer
+or no longer overlaps the period, the invitation counts again. No Google events or
+invitations are created or modified.
+
+Migration `0029_google_training_rules` adds encrypted identity/configuration fields,
+per-connection opt-in, and explicit invitation/session links. Deploy the API and
+apply migrations before enabling rules in the frontend. Existing workspaces without
+rules retain free/busy-only behavior.
+
+Session updates accept each existing session's `id` and preserve that row, its plan
+origin and invitation links, including when sessions are reordered. IDs must be
+unique and belong to the edited Workshop. Removing a session removes its links;
+legacy clients that omit IDs retain the replace-all behavior.

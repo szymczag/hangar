@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
+from django.db.models import F
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -40,6 +41,7 @@ from plane.ext.capacity import (
     encrypt_value,
     validate_weekly_schedule,
 )
+from plane.ext.capacity.training_events import EVENTS_SCOPE
 from plane.ext.capacity.booking import booking_preflight, snapshot_error
 from plane.ext.capacity.timezones import trainer_timezone
 from plane.ext.capacity.cache import clear_credential_cache, clear_selection_cache
@@ -150,6 +152,7 @@ def _profile_payload(profile):
         "weekly_schedule": profile.weekly_schedule,
         "schedule_revision": profile.schedule_revision,
         "connection_status": connection_status,
+        "training_events_enabled": bool(connection_status != "not_connected" and selection.training_events_enabled),
     }
 
 
@@ -324,13 +327,20 @@ class GoogleCalendarStartEndpoint(BaseAPIView):
             request, OAUTH_SESSION_KEY, host=request.get_host(), next_path=f"/{slug}/capacity"
         )
         request.session[OAUTH_SESSION_KEY].update(
-            {"trainer_id": str(trainer.id), "workspace_slug": slug, "code_verifier": verifier}
+            {
+                "trainer_id": str(trainer.id),
+                "workspace_slug": slug,
+                "code_verifier": verifier,
+                "training_events": request.data.get("training_events") is True,
+            }
         )
         params = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "scope": " ".join(sorted(CALENDAR_SCOPES)),
+            "scope": " ".join(
+                sorted(CALENDAR_SCOPES | ({EVENTS_SCOPE} if request.data.get("training_events") is True else set()))
+            ),
             "state": state,
             "access_type": "offline",
             "include_granted_scopes": "true",
@@ -363,6 +373,8 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
             granted = _parse_granted_scopes(token.get("scope"))
             if not _has_required_calendar_scopes(granted):
                 raise GoogleCalendarError("missing_scopes")
+            if transaction_data.get("training_events") and EVENTS_SCOPE not in granted:
+                raise GoogleCalendarError("missing_scopes")
             userinfo = client.userinfo(token["access_token"])
             existing = GoogleCalendarCredential.objects.filter(user=request.user, google_subject=userinfo["id"]).first()
             refresh_token = token.get("refresh_token") or (
@@ -375,6 +387,7 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                 user=request.user,
                 google_subject=userinfo["id"],
                 defaults={
+                    "encrypted_google_email": encrypt_value(userinfo["email"].casefold())[0],
                     "encrypted_refresh_token": encrypted,
                     "encryption_key_id": key_id,
                     "granted_scopes": sorted(granted),
@@ -385,6 +398,10 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
             selection, created = TrainerCalendarSelection.objects.update_or_create(
                 trainer=trainer, defaults={"credential": credential}
             )
+            if transaction_data.get("training_events"):
+                selection.training_events_enabled = True
+                selection.revision += 1
+                selection.save(update_fields=["training_events_enabled", "revision", "updated_at"])
             _select_primary_calendar(client, selection, created=created)
             _audit(
                 request,
@@ -1290,8 +1307,25 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                     {"error": f"Every trainer in session {position + 1} must be an active Workshop assignee."},
                     status=400,
                 )
-            parsed_sessions.append({"starts_at": starts_at, "ends_at": ends_at, "trainer_ids": trainer_ids, **values})
+            try:
+                session_id = str(UUID(str(item["id"]))) if item.get("id") else None
+            except (ValueError, TypeError):
+                return Response({"error": "A session ID must be a UUID."}, status=400)
+            parsed_sessions.append(
+                {"id": session_id, "starts_at": starts_at, "ends_at": ends_at, "trainer_ids": trainer_ids, **values}
+            )
 
+        # Use the planner's lock order: trainer profiles, then the parent issue.
+        list(
+            TrainerProfile.objects.select_for_update()
+            .filter(workspace=issue.workspace, user_id__in=active_trainers)
+            .order_by("id")
+        )
+        Issue.objects.select_for_update().get(pk=issue.pk)
+        existing = {str(session.id): session for session in WorkshopSession.objects.filter(schedule__issue=issue)}
+        retained = [item["id"] for item in parsed_sessions if item["id"]]
+        if len(retained) != len(set(retained)) or any(session_id not in existing for session_id in retained):
+            return Response({"error": "Session IDs must be unique and belong to this Workshop."}, status=400)
         first = parsed_sessions[0]
         schedule, _ = WorkshopSchedule.objects.update_or_create(
             issue=issue,
@@ -1303,11 +1337,21 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                 "travel_after_minutes": first["travel_after_minutes"],
             },
         )
-        schedule.sessions.all().delete(soft=False)
+        schedule.sessions.exclude(id__in=retained).delete(soft=False)
+        # Move retained positions aside before reordering under the unique constraint.
+        schedule.sessions.update(position=F("position") + 1000)
         for position, values in enumerate(parsed_sessions):
             trainer_ids = values.pop("trainer_ids")
-            session = WorkshopSession.objects.create(schedule=schedule, position=position, **values)
-            session.trainers.add(*trainer_ids)
+            session_id = values.pop("id")
+            if session_id:
+                session = existing[session_id]
+                for field, value in values.items():
+                    setattr(session, field, value)
+                session.position = position
+                session.save(update_fields=[*values, "position", "updated_at"])
+            else:
+                session = WorkshopSession.objects.create(schedule=schedule, position=position, **values)
+            session.trainers.set(trainer_ids)
         _audit(
             request,
             workspace_id=issue.workspace_id,

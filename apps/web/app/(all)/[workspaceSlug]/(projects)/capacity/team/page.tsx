@@ -16,6 +16,8 @@ import { CapacityService } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
 import { ScheduleEditor } from "../shared/schedule-editor";
 import { useCapacityData } from "../shared/use-capacity-data";
+import { TrainingEventLinks } from "./training-event-links";
+import { TrainingRules } from "./training-rules";
 import { TeamWorkload } from "./team-workload";
 import { CapacityLedger } from "./capacity-ledger";
 
@@ -69,6 +71,12 @@ export default function TeamCapacityPage({ params }: Route.ComponentProps) {
         />
 
         <TeamWorkload trainers={data.capacity?.trainers ?? []} />
+        <TrainingEventLinks
+          workspaceSlug={workspaceSlug}
+          trainer={data.capacity?.trainers.find((trainer) => trainer.trainer_id === ownProfile?.user_id)}
+          onChanged={data.refreshCapacity}
+        />
+        {isAdmin && <TrainingRules workspaceSlug={workspaceSlug} onChanged={data.refreshCapacity} />}
 
         {isAdmin && editingProfile ? (
           <section
