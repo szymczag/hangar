@@ -1190,3 +1190,37 @@ def test_booking_rejects_outside_hours_and_unverified_google(settings, workspace
     )
     assert unverified.status_code == 503
     assert not WorkshopPlanHold.objects.filter(draft_id=draft["id"]).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_workload_counts_sessions_once_and_clips_delivery_and_buffers(workspace, create_user):
+    from plane.ext.capacity.workload import session_workload
+
+    project = Project.objects.create(name="Training", identifier="LOAD", workspace=workspace, created_by=create_user)
+    state = State.objects.create(name="Backlog", color="#000000", group="backlog", project=project, workspace=workspace)
+    issue = Issue.objects.create(
+        name="Private workshop",
+        project=project,
+        workspace=workspace,
+        state=state,
+        type=ensure_project_workshop_type(project),
+        created_by=create_user,
+    )
+    start = parse_datetime("2026-09-07T00:00:00Z")
+    schedule = WorkshopSchedule.objects.create(issue=issue, starts_at=start, ends_at=start + timedelta(hours=1))
+    for offset in (0, 3):
+        session = WorkshopSession.objects.create(
+            schedule=schedule,
+            position=offset,
+            starts_at=start + timedelta(hours=offset),
+            ends_at=start + timedelta(hours=offset + 1),
+            preparation_minutes=30,
+            travel_before_minutes=30,
+            travel_after_minutes=15,
+        )
+        session.trainers.add(create_user)
+    row = session_workload(workspace.id, [create_user.id], start, start + timedelta(hours=4))[create_user.id]
+    assert row == {"workshop_count": 1, "session_count": 2, "delivery_minutes": 120, "buffer_minutes": 75}
+    # The first preparation is before the requested period; the last return is after it.
+    assert "Private workshop" not in str(row)

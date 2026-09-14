@@ -16,6 +16,7 @@ import { CapacityService } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
 import { ScheduleEditor } from "../shared/schedule-editor";
 import { useCapacityData } from "../shared/use-capacity-data";
+import { TeamWorkload } from "./team-workload";
 import { CapacityLedger } from "./capacity-ledger";
 
 const capacityService = new CapacityService();
@@ -66,6 +67,8 @@ export default function TeamCapacityPage({ params }: Route.ComponentProps) {
           onManageSchedule={(trainerId) => isAdmin && setEditingTrainerId(trainerId)}
           becomeTrainer={null}
         />
+
+        <TeamWorkload trainers={data.capacity?.trainers ?? []} />
 
         {isAdmin && editingProfile ? (
           <section

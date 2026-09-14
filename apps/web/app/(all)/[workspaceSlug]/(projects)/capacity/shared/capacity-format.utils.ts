@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { TZDate } from "@date-fns/tz";
 import type { TTrainerProfile } from "@/services/capacity.service";
 
 export const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
@@ -17,8 +18,8 @@ export function errorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function startOfWeek(value: Date) {
-  const result = new Date(value);
+export function startOfWeek(value: Date, timeZone?: string) {
+  const result = new TZDate(value.getTime(), timeZone ?? (value instanceof TZDate ? value.timeZone : undefined));
   const day = result.getDay() || 7;
   result.setDate(result.getDate() - day + 1);
   result.setHours(0, 0, 0, 0);
@@ -26,7 +27,7 @@ export function startOfWeek(value: Date) {
 }
 
 export function shiftWeek(value: Date, weeks: number) {
-  const result = new Date(value);
+  const result = new TZDate(value.getTime(), value instanceof TZDate ? value.timeZone : undefined);
   result.setDate(result.getDate() + weeks * 7);
   return result;
 }
@@ -54,14 +55,15 @@ export function formatWeekParam(value: Date) {
  * composes the same cache key as one naming the Monday -- without that, two
  * links to the same week would each pay for their own request.
  */
-export function parseWeekParam(value: string | null | undefined, fallback: Date) {
+export function parseWeekParam(value: string | null | undefined, fallback: Date, timeZone?: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
-  if (!match) return startOfWeek(fallback);
+  if (!match) return startOfWeek(fallback, timeZone);
   const [, year, month, day] = match;
-  const parsed = new Date(Number(year), Number(month) - 1, Number(day));
-  if (Number.isNaN(parsed.getTime())) return startOfWeek(fallback);
+  const parsed = new TZDate(Number(year), Number(month) - 1, Number(day), timeZone);
+  if (Number.isNaN(parsed.getTime())) return startOfWeek(fallback, timeZone);
   // `new Date(2026, 12, 40)` rolls over silently; reject what did not round-trip.
-  if (parsed.getMonth() !== Number(month) - 1 || parsed.getDate() !== Number(day)) return startOfWeek(fallback);
+  if (parsed.getMonth() !== Number(month) - 1 || parsed.getDate() !== Number(day))
+    return startOfWeek(fallback, timeZone);
   return startOfWeek(parsed);
 }
 

@@ -4,6 +4,8 @@
  * See the LICENSE file for details.
  */
 
+import { TZDate } from "@date-fns/tz";
+import { useViewerTimezone } from "../shared/viewer-timezone";
 import { useMemo, useState } from "react";
 import { CalendarClock, CircleAlert } from "lucide-react";
 import { Button } from "@plane/propel/button";
@@ -80,8 +82,9 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
     refreshCapacity,
     weekEnd,
   } = data;
+  const timeZone = useViewerTimezone();
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
-    const day = new Date().getDay();
+    const day = new TZDate(Date.now(), timeZone).getDay();
     return day === 0 || day === 6 ? 0 : day - 1;
   });
   const selectedDay = useMemo(() => dayBounds(weekStart, selectedDayIndex), [selectedDayIndex, weekStart]);
@@ -186,7 +189,9 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
                   <div className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-body-xs-regular whitespace-normal">
                     <span className="font-medium text-primary">Available:</span>{" "}
                     <span className="text-secondary">
-                      {metrics.free.length ? metrics.free.map(formatRange).join(", ") : "No free time in booking hours"}
+                      {metrics.free.length
+                        ? metrics.free.map((range) => formatRange(range, timeZone)).join(", ")
+                        : "No free time in booking hours"}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-11 text-secondary">
@@ -303,7 +308,7 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
                   <span className="border-danger-primary bg-danger-secondary size-2.5 rounded-sm border" />
                   Conflict
                 </span>
-                <span className="ml-auto">Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+                <span className="ml-auto">Times shown in {timeZone}</span>
               </div>
             </div>
           </div>

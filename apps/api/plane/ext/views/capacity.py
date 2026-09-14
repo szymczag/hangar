@@ -41,7 +41,7 @@ from plane.ext.capacity import (
     validate_weekly_schedule,
 )
 from plane.ext.capacity.booking import booking_preflight, snapshot_error
-from plane.ext.capacity.schedules import validate_timezone
+from plane.ext.capacity.timezones import trainer_timezone
 from plane.ext.capacity.cache import clear_credential_cache, clear_selection_cache
 from plane.ext.capacity.throttles import CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle
 from plane.ext.models import (
@@ -145,7 +145,8 @@ def _profile_payload(profile):
         "user_id": str(profile.user_id),
         "display_name": profile.user.display_name,
         "status": profile.status,
-        "timezone": profile.timezone,
+        "timezone": trainer_timezone(profile)[0],
+        "timezone_source": trainer_timezone(profile)[1],
         "weekly_schedule": profile.weekly_schedule,
         "schedule_revision": profile.schedule_revision,
         "connection_status": connection_status,
@@ -280,8 +281,8 @@ class TrainerScheduleEndpoint(BaseAPIView):
                 status=status.HTTP_409_CONFLICT,
             )
         profile = locked_profile
-        if "timezone" in request.data:
-            profile.timezone = validate_timezone(request.data["timezone"])
+        # Older clients may still submit timezone; booking hours now follow the
+        # connected primary calendar, with the user profile as fallback.
         if "weekly_schedule" in request.data:
             profile.weekly_schedule = validate_weekly_schedule(request.data["weekly_schedule"])
         if "status" in request.data:

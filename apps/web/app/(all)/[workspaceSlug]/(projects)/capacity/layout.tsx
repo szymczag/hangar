@@ -5,6 +5,7 @@ import { Outlet, useLocation } from "react-router";
  * See the LICENSE file for details.
  */
 
+import { ViewerTimezoneProvider } from "./shared/viewer-timezone";
 import { CalendarClock } from "lucide-react";
 import { Breadcrumbs, Header } from "@plane/ui";
 import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
@@ -40,11 +41,11 @@ function CapacityHeader() {
 
 export default function CapacityLayout() {
   return (
-    <>
+    <ViewerTimezoneProvider>
       <AppHeader header={<CapacityHeader />} />
       <ContentWrapper>
         <Outlet />
       </ContentWrapper>
-    </>
+    </ViewerTimezoneProvider>
   );
 }

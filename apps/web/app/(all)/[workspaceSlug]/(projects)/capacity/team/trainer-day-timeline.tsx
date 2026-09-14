@@ -4,6 +4,8 @@
  * See the LICENSE file for details.
  */
 
+import { TZDate } from "@date-fns/tz";
+import { useViewerTimezone } from "../shared/viewer-timezone";
 import type { TTrainerCapacity } from "@/services/capacity.service";
 import {
   CAPACITY_INTERVAL_LAYERS,
@@ -22,6 +24,7 @@ export function TrainerDayTimeline({
   dayStart: Date;
   dayEnd: Date;
 }) {
+  const timeZone = useViewerTimezone();
   const free = availableRanges(trainer.intervals, dayStart, dayEnd);
   return (
     <div>
@@ -36,7 +39,13 @@ export function TrainerDayTimeline({
             key={hour}
             aria-hidden="true"
             className="absolute top-0 bottom-0 z-0 border-l border-subtle text-[9px] text-placeholder"
-            style={hour === 24 ? { right: 0 } : { left: `${(hour / 24) * 100}%` }}
+            style={
+              hour === 24
+                ? { right: 0 }
+                : {
+                    left: `${((new TZDate(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), hour, 0, 0, timeZone).getTime() - dayStart.getTime()) / (dayEnd.getTime() - dayStart.getTime())) * 100}%`,
+                  }
+            }
           >
             <span className={hour === 24 ? "pr-1" : "px-1"}>{String(hour).padStart(2, "0")}:00</span>
           </span>
@@ -44,7 +53,7 @@ export function TrainerDayTimeline({
         {free.map((range) => {
           const position = intervalPosition(range, dayStart, dayEnd);
           if (!position) return null;
-          const label = `Available ${formatRange(range)}`;
+          const label = `Available ${formatRange(range, timeZone)}`;
           return (
             <span
               key={`available-${range.start}-${range.end}`}
@@ -73,8 +82,8 @@ export function TrainerDayTimeline({
                 <button
                   key={`${interval.kind}-${interval.start}-${interval.end}-${interval.work_item?.id ?? "anonymous"}`}
                   type="button"
-                  aria-label={`${label}, ${formatRange(interval)}`}
-                  title={`${label} · ${formatRange(interval)}`}
+                  aria-label={`${label}, ${formatRange(interval, timeZone)}`}
+                  title={`${label} · ${formatRange(interval, timeZone)}`}
                   className={`absolute top-6 bottom-2 z-20 min-w-1 rounded-sm ${className}`}
                   style={position}
                 />
@@ -102,7 +111,7 @@ export function TrainerDayTimeline({
       </div>
       <p className="mt-2 text-11 whitespace-normal text-secondary">
         <span className="font-medium text-primary">Available:</span>{" "}
-        {free.length ? free.map(formatRange).join(", ") : "No free time in booking hours"}
+        {free.length ? free.map((range) => formatRange(range, timeZone)).join(", ") : "No free time in booking hours"}
       </p>
     </div>
   );

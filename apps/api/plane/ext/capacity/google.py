@@ -181,12 +181,16 @@ class GoogleCalendarClient:
                     "summary": str(item.get("summary") or "Calendar")[:255],
                     "primary": bool(item.get("primary")),
                     "access_role": item.get("accessRole"),
+                    "timezone": item.get("timeZone"),
                 }
                 for item in items
                 if isinstance(item, dict) and item.get("id")
             )
             page_token = payload.get("nextPageToken")
             if not page_token:
+                from plane.ext.capacity.timezones import remember_primary_timezone
+
+                remember_primary_timezone(credential, calendars)
                 return calendars
 
     def freebusy(self, credential, calendar_ids: list[str], *, time_min: str, time_max: str) -> list[dict]:

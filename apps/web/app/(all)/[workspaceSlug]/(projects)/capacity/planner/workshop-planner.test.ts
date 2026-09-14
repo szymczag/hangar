@@ -462,3 +462,22 @@ it("offers a future minute even when the clock is exactly on a minute boundary",
   expect(nextBookingMinute(at(7, 12))).toEqual(at(7, 12, 1));
   expect(nextBookingMinute(new Date(at(7, 12).getTime() + 40_000))).toEqual(at(7, 12, 1));
 });
+
+it("filters morning using the viewer's profile timezone", () => {
+  const from = new Date("2026-09-07T14:00:00Z");
+  const to = new Date("2026-09-07T16:00:00Z");
+  const spec = {
+    trainerIds: [trainer.trainer_id],
+    durationMinutes: 60,
+    preparationMinutes: 0,
+    travelBeforeMinutes: 0,
+    travelAfterMinutes: 0,
+    startWindow: "morning" as const,
+  };
+  expect(
+    findWorkshopCandidates([freeBetween([from, to])], from, to, { ...spec, timeZone: "Europe/Warsaw" })
+  ).toHaveLength(0);
+  expect(
+    findWorkshopCandidates([freeBetween([from, to])], from, to, { ...spec, timeZone: "America/New_York" }).length
+  ).toBeGreaterThan(0);
+});

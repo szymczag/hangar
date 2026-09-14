@@ -4,13 +4,32 @@
  * See the LICENSE file for details.
  */
 
+import { TZDate } from "@date-fns/tz";
 import type { TCapacityInterval } from "@/services/capacity.service";
 
 export type TTimelineRange = { start: string; end: string };
 
 export function dayBounds(weekStart: Date, dayIndex: number) {
-  const start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayIndex, 0, 0, 0, 0);
-  const end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayIndex + 1, 0, 0, 0, 0);
+  const start = new TZDate(
+    weekStart.getFullYear(),
+    weekStart.getMonth(),
+    weekStart.getDate() + dayIndex,
+    0,
+    0,
+    0,
+    0,
+    weekStart instanceof TZDate ? weekStart.timeZone : undefined
+  );
+  const end = new TZDate(
+    weekStart.getFullYear(),
+    weekStart.getMonth(),
+    weekStart.getDate() + dayIndex + 1,
+    0,
+    0,
+    0,
+    0,
+    weekStart instanceof TZDate ? weekStart.timeZone : undefined
+  );
   return { start, end };
 }
 
@@ -101,12 +120,12 @@ export function rangeMinutes(ranges: TTimelineRange[]) {
   );
 }
 
-function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+function formatTime(value: string, timeZone?: string) {
+  return new Date(value).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone });
 }
 
-export function formatRange(range: TTimelineRange) {
-  return `${formatTime(range.start)}–${formatTime(range.end)}`;
+export function formatRange(range: TTimelineRange, timeZone?: string) {
+  return `${formatTime(range.start, timeZone)}–${formatTime(range.end, timeZone)}`;
 }
 
 export const CAPACITY_INTERVAL_LAYERS: TCapacityInterval["kind"][] = [
