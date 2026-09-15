@@ -11,13 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.56",
+  version: "0.1.0-rc.57",
   highlights: [
-    "Work item notifications are sent at all, for the first time.",
-    "Encrypted notification email is delivered instead of being held indefinitely.",
-    "Invitations are confined to the domains an instance actually signs in with.",
-    "Project invitations can be created again.",
-    "Notification settings say when an unverified key is silencing email.",
+    "Activity notifications are no longer discarded in silence.",
+    "A notification that cannot be built now gives up and says why.",
+    "A trainer whose calendar cannot be read is no longer offered or booked.",
+    "Encrypted notifications can describe themselves in the Subject, if an operator asks.",
   ],
   upstream: {
     version: "1.4.0",
