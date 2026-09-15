@@ -26,6 +26,19 @@
 #   baseline: the instance default theme is configurable at runtime, so a stray
 #   change to it would silently reshoot every authenticated surface.
 
+# Pinned rather than derived from the directory name, which is what both this
+# file and its sibling used to get. Sharing a project name means sharing a pod
+# and a network, so the two stacks tore down each other's containers: a suite
+# left running made the other fail while it was starting, and the errors named
+# neither file. A worktree made it worse by giving every checkout the same
+# derived name.
+#
+# Only the ephemeral stacks are pinned. docker-compose.yml, its local sibling
+# and the community deployment carry pgdata and uploads, and renaming a project
+# orphans its volumes -- the stack returns empty and the data sits under the old
+# name -- so those keep the name they have.
+name: hangar-vr
+
 services:
   vr-db:
     image: docker.io/library/postgres:15.7-alpine
