@@ -84,7 +84,27 @@ def booking_preflight(*, scheduling=False):
                     status=503,
                 )
             busy, connection, freshness = _google_busy(trainer, blocked_start, blocked_end, force=True)
-            if selection_revision(trainer) and freshness != "fresh":
+            # A trainer with no calendar to read returns an empty busy list, which
+            # used to pass this guard because it only ran for trainers who had a
+            # selection -- so the one trainer whose week nobody can see was the
+            # one who could always be booked. Absence of evidence is not a free
+            # afternoon, and the booking is the irreversible half: a hold is
+            # taken, a session is assigned, and the person finds out afterwards.
+            if freshness == "not_connected":
+                return Response(
+                    {
+                        # Retrying cannot fix this and only that trainer can, so
+                        # it is a conflict with the current state rather than a
+                        # transient outage.
+                        "error": (
+                            "This trainer has no readable Google calendar, so their availability cannot be "
+                            "checked. They connect one themselves on their own capacity page."
+                        ),
+                        "code": "calendar_not_connected",
+                    },
+                    status=409,
+                )
+            if freshness != "fresh":
                 return Response(
                     {
                         "error": "Google availability could not be verified. Retry before booking.",

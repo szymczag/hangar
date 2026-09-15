@@ -11,12 +11,30 @@ export type TWorkshopCandidate = {
   trainerId: string;
   trainerName: string;
   timezone: string;
-  availabilityStatus: string;
   workshopStartsAt: string;
   workshopEndsAt: string;
   blockedStartsAt: string;
   blockedEndsAt: string;
 };
+
+/**
+ * Whether the planner may offer this trainer's time.
+ *
+ * Only a fresh read of a connected calendar counts. Hangar reads each trainer's
+ * Google calendar with that trainer's own credential, so a trainer who never
+ * connected one comes back with no busy intervals at all -- which is not "this
+ * week is free", it is "we cannot see this week". Offering their booking hours
+ * as candidates is how the planner ends up proposing someone who is already
+ * booked all Tuesday, and a coordinator cannot tell the two apart from a card.
+ *
+ * `stale`, `rate_limited`, `provider_unavailable` and the `training_*` statuses
+ * are held out for the same reason: what we have is not what the calendar
+ * currently says. Those the server also refuses at booking time, so offering
+ * them was offering a card whose hold comes back 503. `not_connected` it does
+ * not refuse -- `booking_preflight` only demands a fresh read from a trainer who
+ * has a calendar selection -- so for that one this filter is the whole check.
+ */
+export const canOfferTrainer = (trainer: TTrainerCapacity) => trainer.availability_status === "fresh";
 
 /** Which half of the day a workshop may start in. */
 export type TStartWindow = "any" | "morning" | "afternoon";
@@ -127,11 +145,7 @@ export function findWorkshopCandidates(
 
   for (const trainer of trainers) {
     if (!selected.has(trainer.trainer_id)) continue;
-    if (
-      trainer.availability_status.startsWith("training_") ||
-      (trainer.availability_status !== "fresh" && trainer.connection_status !== "not_connected")
-    )
-      continue;
+    if (!canOfferTrainer(trainer)) continue;
     // Per trainer per day, because the cap is about how much choice one person
     // is offered for one date -- not about the size of the grid.
     const byDay = new Map<string, TWorkshopCandidate[]>();
@@ -150,7 +164,6 @@ export function findWorkshopCandidates(
           trainerId: trainer.trainer_id,
           trainerName: trainer.display_name,
           timezone: trainer.timezone,
-          availabilityStatus: trainer.availability_status,
           workshopStartsAt: new Date(workshopStart.getTime()).toISOString(),
           workshopEndsAt: new Date(workshopStart.getTime() + durationMinutes * 60_000).toISOString(),
           blockedStartsAt: blockedStart.toISOString(),
@@ -187,7 +200,11 @@ export function workshopAvailability(
   const bufferMinutes = spec.preparationMinutes + spec.travelBeforeMinutes + spec.travelAfterMinutes;
   const earliest = new Date(Math.max(windowStart.getTime(), spec.notBefore?.getTime() ?? windowStart.getTime()));
   const selectedIds = new Set(spec.trainerIds);
-  const selected = trainers.filter((trainer) => selectedIds.has(trainer.trainer_id));
+  // Measured over the trainers the search actually walks. Counting an
+  // unconnected trainer's booking hours here would answer "the longest opening
+  // is seven hours" about time no card was ever offered for.
+  const ticked = trainers.filter((trainer) => selectedIds.has(trainer.trainer_id));
+  const selected = ticked.filter(canOfferTrainer);
   let longestFreeMinutes = 0;
   for (const trainer of selected) {
     for (const range of availableRanges(trainer.intervals, earliest, windowEnd)) {
@@ -202,6 +219,8 @@ export function workshopAvailability(
     requiredMinutes: spec.durationMinutes + bufferMinutes,
     longestFreeMinutes,
     selectedTrainerCount: selected.length,
+    /** Ticked, but with no calendar the planner can read. */
+    unverifiedTrainerCount: ticked.length - selected.length,
   };
 }
 
@@ -213,8 +232,14 @@ export function noWorkshopFitReason(
 ): string {
   if (!spec.trainerIds.length) return "Select at least one trainer to see available times.";
   if (spec.durationMinutes < 15) return "Enter a workshop duration of at least 15 minutes.";
-  if (!availability.selectedTrainerCount)
+  if (!availability.selectedTrainerCount) {
+    // Two different dead ends, and telling someone to "choose an active trainer"
+    // when the trainer is active and simply has no calendar connected sends
+    // them looking in the wrong place.
+    if (availability.unverifiedTrainerCount)
+      return "No selected trainer has a calendar Hangar can read, so there is no availability to offer. Ask them to connect Google on their own capacity page, or select someone who already has.";
     return "The selected trainers are no longer available. Choose an active trainer.";
+  }
   if (!availability.longestFreeMinutes) {
     return "No free booking hours remain in this range. Check the trainers’ booking hours and calendar blocks, or look further ahead.";
   }

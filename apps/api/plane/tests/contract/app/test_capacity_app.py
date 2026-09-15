@@ -320,6 +320,20 @@ def _future_monday():
     return today + timedelta(days=(7 - today.weekday()) or 7)
 
 
+def _readable_calendar(monkeypatch):
+    """Let booking see a clear week for the trainer.
+
+    Booking refuses a trainer whose availability cannot be read at all: an empty
+    busy list from an account nobody connected is "we cannot see this week", not
+    "this week is free". Tests about holds, scheduling and concurrency are not
+    about Google, so they say what the calendar shows -- nothing booked -- while
+    the tests about the refusal itself leave this out.
+    """
+    from plane.ext.capacity import booking
+
+    monkeypatch.setattr(booking, "_google_busy", lambda *args, **kwargs: ([], "connected", "fresh"))
+
+
 @pytest.mark.contract
 @pytest.mark.django_db
 def test_workshop_plan_drafts_are_private_and_revision_protected(settings, workspace, create_user):
@@ -371,7 +385,8 @@ def test_workshop_plan_drafts_are_private_and_revision_protected(settings, works
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings, workspace, create_user):
+def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings, workspace, create_user, monkeypatch):
+    _readable_calendar(monkeypatch)
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
     TrainerProfile.objects.create(
         workspace=workspace,
@@ -443,7 +458,9 @@ def test_workshop_plan_hold_reserves_complete_block_and_rejects_overlap(settings
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_workshop_plan_hold_is_bound_to_availability_not_to_a_planning_window(settings, workspace, create_user):
+def test_workshop_plan_hold_is_bound_to_availability_not_to_a_planning_window(
+    settings, workspace, create_user, monkeypatch
+):
     """
     A plan is the same plan whichever week you are looking at.
 
@@ -454,6 +471,7 @@ def test_workshop_plan_hold_is_bound_to_availability_not_to_a_planning_window(se
     all. What remains is the rule that actually protects anyone -- a held plan
     is frozen until the hold is released -- plus a floor at the present.
     """
+    _readable_calendar(monkeypatch)
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
     TrainerProfile.objects.create(
         workspace=workspace,
@@ -545,7 +563,9 @@ def _workshop_issue(workspace, owner, *, name="NetSec workshop"):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_a_held_slot_becomes_a_session_on_the_work_item_it_was_planned_for(settings, workspace, create_user):
+def test_a_held_slot_becomes_a_session_on_the_work_item_it_was_planned_for(
+    settings, workspace, create_user, monkeypatch
+):
     """
     The step the planner never had.
 
@@ -555,6 +575,7 @@ def test_a_held_slot_becomes_a_session_on_the_work_item_it_was_planned_for(setti
     just been used to create. Spending the hold is one call, and it leaves the
     trainer booked exactly once.
     """
+    _readable_calendar(monkeypatch)
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
     TrainerProfile.objects.create(
         workspace=workspace,
@@ -629,7 +650,9 @@ def test_a_held_slot_becomes_a_session_on_the_work_item_it_was_planned_for(setti
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_scheduling_re_checks_availability_and_keeps_the_hold_when_it_refuses(settings, workspace, create_user):
+def test_scheduling_re_checks_availability_and_keeps_the_hold_when_it_refuses(
+    settings, workspace, create_user, monkeypatch
+):
     """
     Seventy-two hours is long enough for the answer to change.
 
@@ -639,6 +662,7 @@ def test_scheduling_re_checks_availability_and_keeps_the_hold_when_it_refuses(se
     the hold alone, because losing it would cost the coordinator the slot they
     were still entitled to argue for.
     """
+    _readable_calendar(monkeypatch)
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
     TrainerProfile.objects.create(
         workspace=workspace,
@@ -754,7 +778,8 @@ def test_the_workshop_picker_only_offers_workshops_the_viewer_is_in_a_project_fo
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_a_plan_can_only_be_scheduled_onto_a_workshop_it_is_attached_to(settings, workspace, create_user):
+def test_a_plan_can_only_be_scheduled_onto_a_workshop_it_is_attached_to(settings, workspace, create_user, monkeypatch):
+    _readable_calendar(monkeypatch)
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
     TrainerProfile.objects.create(
         workspace=workspace,
@@ -1065,7 +1090,17 @@ def test_workspace_capacity_lists_trainers_in_a_stable_order(settings, workspace
     assert names[0] == ["Adam Trainer", "Mia Trainer", "Zoe Trainer"]
 
 
-def _booking_client(settings, workspace, user):
+def _booking_client(settings, workspace, user, monkeypatch=None):
+    """A trainer, a plan, and a calendar the booking guard can read.
+
+    `monkeypatch` is how the calendar arrives. Booking now refuses a trainer
+    whose availability cannot be read at all -- an empty busy list from an
+    unconnected account is not a free week -- so a test about holds, idempotency
+    or scheduling has to supply a readable one or it is testing the refusal
+    instead. Tests about the refusal itself leave it out.
+    """
+    if monkeypatch is not None:
+        _readable_calendar(monkeypatch)
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
     profile = TrainerProfile.objects.create(
         workspace=workspace,
@@ -1094,8 +1129,8 @@ def _booking_client(settings, workspace, user):
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_attach_workshop_to_reserved_plan_without_releasing(settings, workspace, create_user):
-    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+def test_attach_workshop_to_reserved_plan_without_releasing(settings, workspace, create_user, monkeypatch):
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user, monkeypatch)
     held = client.post(
         url + "hold/",
         {
@@ -1137,10 +1172,10 @@ def test_attach_workshop_to_reserved_plan_without_releasing(settings, workspace,
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_direct_booking_is_idempotent_and_records_origin(settings, workspace, create_user):
+def test_direct_booking_is_idempotent_and_records_origin(settings, workspace, create_user, monkeypatch):
     from uuid import uuid4
 
-    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user, monkeypatch)
     issue = _workshop_issue(workspace, create_user)
     attached = client.patch(
         url, {"revision": draft["revision"], "issue_id": str(issue.id)}, format="json", HTTP_X_CSRFTOKEN=csrf
@@ -1172,7 +1207,7 @@ def test_direct_booking_is_idempotent_and_records_origin(settings, workspace, cr
 def test_booking_rejects_outside_hours_and_unverified_google(settings, workspace, create_user, monkeypatch):
     from plane.ext.capacity import booking
 
-    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user, monkeypatch)
     payload = {
         "revision": draft["revision"],
         "trainer_id": str(create_user.id),
@@ -1189,6 +1224,66 @@ def test_booking_rejects_outside_hours_and_unverified_google(settings, workspace
         HTTP_X_CSRFTOKEN=csrf,
     )
     assert unverified.status_code == 503
+    assert not WorkshopPlanHold.objects.filter(draft_id=draft["id"]).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_booking_refuses_a_trainer_whose_calendar_cannot_be_read(settings, workspace, create_user):
+    """No calendar connected is not an empty diary.
+
+    This trainer has booking hours, no workshops and no holds, so every check
+    below this one passes and the block would be taken. What nobody has is any
+    way to see what is already in their week, and a hold is not a proposal --
+    it reserves the time and a session lands on it. Retrying will not help, and
+    only that trainer can fix it, so this answers 409 rather than 503.
+    """
+    from uuid import uuid4
+
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    payload = {
+        "revision": draft["revision"],
+        "trainer_id": str(create_user.id),
+        "workshop_starts_at": f"{_future_monday().isoformat()}T10:00:00Z",
+    }
+
+    held = client.post(url + "hold/", payload, format="json", HTTP_X_CSRFTOKEN=csrf)
+    scheduled = client.post(
+        url + "schedule/", {**payload, "idempotency_key": str(uuid4())}, format="json", HTTP_X_CSRFTOKEN=csrf
+    )
+
+    assert held.status_code == 409, held.data
+    assert held.data["code"] == "calendar_not_connected"
+    # Scheduling shares the preflight, so it refuses on the same ground rather
+    # than writing the session the hold was denied.
+    assert scheduled.status_code == 409, scheduled.data
+    assert scheduled.data["code"] == "calendar_not_connected"
+    assert not WorkshopPlanHold.objects.filter(draft_id=draft["id"]).exists()
+    assert not WorkshopSession.objects.filter(source_plan_id=draft["id"]).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_booking_refuses_a_connected_trainer_with_no_calendars_selected(settings, workspace, create_user, monkeypatch):
+    """Connected, but nothing ticked to read: the same blind spot, same answer."""
+    from plane.ext.capacity import booking
+
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    monkeypatch.setattr(booking, "_google_busy", lambda *args, **kwargs: ([], "no_calendars_selected", "not_connected"))
+
+    response = client.post(
+        url + "hold/",
+        {
+            "revision": draft["revision"],
+            "trainer_id": str(create_user.id),
+            "workshop_starts_at": f"{_future_monday().isoformat()}T10:00:00Z",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert response.status_code == 409, response.data
+    assert response.data["code"] == "calendar_not_connected"
     assert not WorkshopPlanHold.objects.filter(draft_id=draft["id"]).exists()
 
 
@@ -1371,7 +1466,7 @@ def test_unverified_training_calendar_blocks_hold_even_when_freebusy_is_clear(
 ):
     from plane.ext.capacity import booking
 
-    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user, monkeypatch)
     reader = MagicMock(return_value=([], "stale"))
     monkeypatch.setattr(booking, "training_events", reader)
     response = client.post(
@@ -1398,7 +1493,7 @@ def test_concurrent_plans_cannot_hold_the_same_trainer_time(settings, workspace,
     from django.db import close_old_connections
     from plane.ext.capacity import booking
 
-    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user)
+    profile, client, csrf, url, draft = _booking_client(settings, workspace, create_user, monkeypatch)
     second = WorkshopPlanDraft.objects.create(
         workspace=workspace,
         owner=create_user,
@@ -1413,7 +1508,7 @@ def test_concurrent_plans_cannot_hold_the_same_trainer_time(settings, workspace,
 
     def clear_google(*args, **kwargs):
         barrier.wait(timeout=10)
-        return [], "not_connected", "not_connected"
+        return [], "connected", "fresh"
 
     monkeypatch.setattr(booking, "_google_busy", clear_google)
 

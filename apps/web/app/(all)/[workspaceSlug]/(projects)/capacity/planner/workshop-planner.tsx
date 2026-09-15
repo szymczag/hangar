@@ -14,7 +14,7 @@ import { CreateWorkshop } from "./create-workshop";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { CalendarCheck, CalendarSearch, Clock3, ShieldCheck, Users } from "lucide-react";
-import { errorMessage, formatMinutes, startOfWeek } from "../shared/capacity-format.utils";
+import { availabilityCopy, errorMessage, formatMinutes, startOfWeek } from "../shared/capacity-format.utils";
 import {
   CapacityService,
   type TPlanIssue,
@@ -26,6 +26,7 @@ import {
 import { WorkshopPicker, workshopLabel } from "./workshop-picker";
 import {
   planSignature,
+  canOfferTrainer,
   dateTimeLabel,
   dayLabel,
   findFirstAvailable,
@@ -270,6 +271,14 @@ export function WorkshopPlanner({
     [trainers, weekStart, weekEnd, spec]
   );
   const candidateDays = useMemo(() => groupByDay(candidates, timeZone), [candidates, timeZone]);
+  /**
+   * Ticked trainers the search skips, so the empty space under their name is
+   * explained rather than read as a full week.
+   */
+  const unofferedTrainers = useMemo(
+    () => trainers.filter((trainer) => selectedTrainerIds.has(trainer.trainer_id) && !canOfferTrainer(trainer)),
+    [trainers, selectedTrainerIds]
+  );
 
   /**
    * A held plan is frozen, because the server freezes it: `PUT /capacity/plans/`
@@ -703,11 +712,21 @@ export function WorkshopPlanner({
                     }
                   />
                   <span className="min-w-0 flex-1 truncate text-primary">{trainer.display_name}</span>
-                  <span className="text-11 text-placeholder">{trainer.timezone}</span>
+                  {canOfferTrainer(trainer) ? (
+                    <span className="text-11 text-placeholder">{trainer.timezone}</span>
+                  ) : (
+                    <span className="text-11 text-warning-primary">
+                      {availabilityCopy(trainer.availability_status)}
+                    </span>
+                  )}
                   <button
                     type="button"
-                    title={`Find the first time ${trainer.display_name} could do this`}
-                    disabled={busy || isHeld || !validPlan || search.state === "running"}
+                    title={
+                      canOfferTrainer(trainer)
+                        ? `Find the first time ${trainer.display_name} could do this`
+                        : `${trainer.display_name} has no calendar Hangar can read, so there is no time to find`
+                    }
+                    disabled={busy || isHeld || !validPlan || search.state === "running" || !canOfferTrainer(trainer)}
                     onClick={(event) => {
                       // The row is a label, so a click here would otherwise toggle
                       // the checkbox it wraps.
@@ -765,15 +784,14 @@ export function WorkshopPlanner({
           ) : null}
           {!isHeld ? (
             <>
-              {trainers.some(
-                (trainer) =>
-                  selectedTrainerIds.has(trainer.trainer_id) &&
-                  (trainer.availability_status.startsWith("training_") ||
-                    (trainer.availability_status !== "fresh" && trainer.connection_status !== "not_connected"))
-              ) && (
+              {unofferedTrainers.length > 0 && (
                 <p role="alert" className="mb-3 rounded border border-subtle p-3 text-body-xs-regular text-secondary">
-                  Some connected calendars could not be verified. Those trainers are excluded until availability
-                  refreshes.
+                  No times offered for{" "}
+                  {unofferedTrainers
+                    .map((trainer) => `${trainer.display_name} (${availabilityCopy(trainer.availability_status)})`)
+                    .join(", ")}
+                  . The planner only offers time it can check against a calendar, and a trainer connects their own —
+                  nobody can do it for them.
                 </p>
               )}
               <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
@@ -872,18 +890,9 @@ export function WorkshopPlanner({
                             key={`${candidate.trainerId}-${candidate.blockedStartsAt}`}
                             className="rounded-lg border border-subtle bg-surface-2 p-4"
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <h4 className="text-body-sm-medium text-primary">{candidate.trainerName}</h4>
-                                <p className="mt-0.5 text-11 text-placeholder">{candidate.timezone}</p>
-                              </div>
-                              {candidate.availabilityStatus !== "fresh" ? (
-                                <span className="text-11 text-warning-primary">
-                                  {candidate.availabilityStatus === "not_connected"
-                                    ? "No Google calendar"
-                                    : "Verify calendar"}
-                                </span>
-                              ) : null}
+                            <div>
+                              <h4 className="text-body-sm-medium text-primary">{candidate.trainerName}</h4>
+                              <p className="mt-0.5 text-11 text-placeholder">{candidate.timezone}</p>
                             </div>
                             <div className="mt-4 space-y-2 text-body-xs-regular">
                               <div className="flex items-start gap-2">
