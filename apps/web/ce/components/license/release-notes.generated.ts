@@ -11,12 +11,10 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.57",
+  version: "0.1.0-rc.58",
   highlights: [
-    "Activity notifications are no longer discarded in silence.",
-    "A notification that cannot be built now gives up and says why.",
-    "A trainer whose calendar cannot be read is no longer offered or booked.",
-    "Encrypted notifications can describe themselves in the Subject, if an operator asks.",
+    "A work item with five or more updates at once now notifies its watchers.",
+    "A release can no longer be tagged with documentation naming the previous one.",
   ],
   upstream: {
     version: "1.4.0",
