@@ -28,7 +28,22 @@ SETTINGS_PATH = REPOSITORY_ROOT / "apps" / "api" / "plane" / "settings" / "commo
 # deployment that cannot set these cannot be recovered from the outside.
 CONSOLE_PREFIXES = ("WEBAUTHN_", "ADMIN_2FA_", "ADMIN_WEBAUTHN_")
 
-_ENV_READ = re.compile(r"os\.environ\.get\(\s*\"([A-Z0-9_]+)\"")
+# Outbound mail settings an operator owns. `EMAIL_DELIVERY_V2_ENABLED` shipped
+# unreachable the same way `ADMIN_WEBAUTHN_REQUIRED` had: set in variables.env,
+# forwarded by nothing, and silently ignored -- which left encrypted notification
+# mail impossible to switch on and gave no indication why.
+MAIL_PREFIXES = ("EMAIL_", "SMTP_")
+
+# Amazon SES delivery is the chart's path. This deployment does not offer it, so
+# its settings are deliberately absent rather than forgotten, and requiring them
+# here would mean forwarding credentials the Compose stack has no use for.
+MAIL_PREFIXES_NOT_OFFERED_HERE = ("EMAIL_SES_", "EMAIL_EVENTS_")
+
+# Not every setting is read through os.environ.get: the retention windows go
+# through a helper, and a name this pattern cannot see is a name the checks below
+# cannot protect. EMAIL_LOG_RETENTION_DAYS was unreachable on Compose for exactly
+# that reason.
+_ENV_READ = re.compile(r"(?:os\.environ\.get|_retention_days)\(\s*\"([A-Z0-9_]+)\"")
 
 
 class ComposeEnvironmentTests(unittest.TestCase):
@@ -55,6 +70,37 @@ class ComposeEnvironmentTests(unittest.TestCase):
             [],
             "docker-compose.yml does not forward these to the API containers, so setting "
             f"them has no effect: {missing}",
+        )
+
+    def mail_settings(self):
+        return sorted(
+            {
+                name
+                for name in _ENV_READ.findall(self.settings)
+                if name.startswith(MAIL_PREFIXES) and not name.startswith(MAIL_PREFIXES_NOT_OFFERED_HERE)
+            }
+        )
+
+    def test_the_mail_settings_an_operator_owns_are_forwarded(self):
+        missing = [name for name in self.mail_settings() if f"  {name}:" not in self.compose]
+
+        self.assertEqual(
+            missing,
+            [],
+            "docker-compose.yml does not forward these to the API containers, so an operator "
+            f"setting them in variables.env would be silently ignored: {missing}",
+        )
+
+    def test_the_mail_settings_this_deployment_omits_are_omitted_on_purpose(self):
+        """If SES ever works here, this fails and the exclusion gets revisited."""
+        offered = [name for name in _ENV_READ.findall(self.settings) if name.startswith(MAIL_PREFIXES_NOT_OFFERED_HERE)]
+        forwarded = sorted({name for name in offered if f"  {name}:" in self.compose})
+
+        self.assertEqual(
+            forwarded,
+            [],
+            "These SES settings are now forwarded by the Compose deployment. That may be "
+            f"correct, but MAIL_PREFIXES_NOT_OFFERED_HERE still calls them unsupported: {forwarded}",
         )
 
     def test_the_recovery_switch_is_documented_where_an_operator_looks(self):
