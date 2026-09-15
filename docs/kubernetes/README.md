@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.56`. It is qualified for evaluation on
+The current release is `0.1.0-rc.57`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.56` qualification boundary is:
+The `0.1.0-rc.57` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -116,29 +116,30 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.56`                               |
-| Helm chart version | `0.1.0-rc.56`                                |
-| Git tag            | `hangar-v0.1.0-rc.56`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.56` |
+| Product version    | `v0.1.0-rc.57`                               |
+| Helm chart version | `0.1.0-rc.57`                                |
+| Git tag            | `hangar-v0.1.0-rc.57`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.57` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, and `rc.33` were consumed by
 incomplete publication attempts. Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
-installation, upgrade, or rollback targets. `rc.55` is the immediately previous
+installation, upgrade, or rollback targets. `rc.56` is the immediately previous
 retained GitHub release.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-Rollback to rc.55 should normally retain the additive database schema. Reversing
-`db.0132` and `license.0022` discards notification delivery attempt counters and
-the invitation domain restriction setting, so an instance that had confined
-invitations must re-enable that after rolling forward again. Preserve a database
-backup before upgrading and review the rollback limits in the release notes.
+Rollback to rc.56 should normally retain the additive database schema. Reversing
+`db.0133` and `license.0023` discards the recorded outer subjects and the
+descriptive-subject setting, so an instance that had enabled descriptive subjects
+must enable it again after rolling forward. Reverse them only after the outbox has
+drained, since queued encrypted messages keep their stored subject. Preserve a
+database backup before upgrading and review the rollback limits in the release notes.
 Published versions are immutable and are never repaired in place. In
 particular, `rc.24`, `rc.25`, and `rc.28` each published only a subset of their
 container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.56` notes](../releases/hangar-v0.1.0-rc.56.md) — review
+- [Release `v0.1.0-rc.57` notes](../releases/hangar-v0.1.0-rc.57.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -165,15 +166,15 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.0-rc.55`, tag `hangar-v0.1.0-rc.55`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.0-rc.55`.
+The previous release is `0.1.0-rc.56`, tag `hangar-v0.1.0-rc.56`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.0-rc.56`.
 
-Release rc.56 adds migrations `db.0132` and `license.0022`. Both are additive:
-the first records delivery attempts and the last error on an email notification
-so one that cannot be built stops being retried in silence, and the second adds
-the instance setting that confines invitations to the pinned sign-in domains,
-off unless an operator enables it. Apply migrations before admitting traffic and
-update the API, workers and frontends together.
+Release rc.57 adds migrations `db.0133` and `license.0023`. Both are additive: the
+first records the outer subject as sent on each outbox row, so the integrity check
+before delivery has something to verify against, and the second adds the setting
+that lets an encrypted notification describe itself in that subject, off unless an
+operator enables it. Apply migrations before admitting traffic and update the API,
+workers and frontends together.
 
 Basic calendar access continues to consume free/busy ranges. Optional invitation
 recognition requires `calendar.events.readonly`, a separate trainer consent, and
@@ -190,9 +191,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The release workflow verifies anonymous access to the rc.56 chart archive, OCI
+The release workflow verifies anonymous access to the rc.57 chart archive, OCI
 chart and digest-pinned images, and creates provenance attestations and keyless
-Cosign signatures. No new live-cluster qualification is claimed for rc.56.
+Cosign signatures. No new live-cluster qualification is claimed for rc.57.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure
