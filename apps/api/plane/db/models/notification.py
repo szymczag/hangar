@@ -148,6 +148,11 @@ class EmailNotificationLog(BaseModel):
     entity = models.CharField(max_length=200)
     old_value = models.CharField(max_length=300, blank=True, null=True)
     new_value = models.CharField(max_length=300, blank=True, null=True)
+    # A row is retried until it is processed, so a permanently failing render or
+    # enqueue would otherwise be retried forever in silence. Counting the attempts
+    # lets the task give up, and leaves the reason visible afterwards.
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, default="")
 
     class Meta:
         verbose_name = "Email Notification Log"

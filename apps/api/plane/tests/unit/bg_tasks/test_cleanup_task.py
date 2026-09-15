@@ -23,6 +23,7 @@ from plane.bgtasks.cleanup_task import (
     delete_webhook_logs,
     process_cleanup_task,
 )
+from plane.bgtasks.email_notification_task import MAX_NOTIFICATION_ATTEMPTS
 from plane.db.models import APIActivityLog, EmailNotificationLog, WebhookLog
 from plane.tests.factories import UserFactory, WorkspaceFactory
 
@@ -124,6 +125,35 @@ class TestDeleteEmailLogs:
         delete_email_notification_logs()
 
         assert EmailNotificationLog.all_objects.filter(pk=recent.pk).exists()
+
+    def test_a_notification_still_waiting_to_send_is_never_deleted(self):
+        """However old it is. Deleting it would silently drop the notification."""
+        user = UserFactory()
+        retention_days = settings.EMAIL_LOG_RETENTION_DAYS
+        pending = _make_email_log(user, None)
+        EmailNotificationLog.all_objects.filter(pk=pending.pk).update(
+            created_at=timezone.now() - timedelta(days=retention_days + 30)
+        )
+
+        delete_email_notification_logs()
+
+        assert EmailNotificationLog.all_objects.filter(pk=pending.pk).exists()
+
+    def test_a_notification_that_gave_up_is_reaped(self):
+        """Terminally failed rows used to be immortal: `sent_at` stays NULL and
+        SQL `NULL <= cutoff` never matches, so nothing ever collected them."""
+        user = UserFactory()
+        retention_days = settings.EMAIL_LOG_RETENTION_DAYS
+        failed = _make_email_log(user, None)
+        EmailNotificationLog.all_objects.filter(pk=failed.pk).update(
+            processed_at=timezone.now() - timedelta(days=retention_days + 1),
+            attempts=MAX_NOTIFICATION_ATTEMPTS,
+            last_error="TemplateSyntaxError: Invalid block tag",
+        )
+
+        delete_email_notification_logs()
+
+        assert not EmailNotificationLog.all_objects.filter(pk=failed.pk).exists()
 
 
 @pytest.mark.unit
