@@ -64,7 +64,53 @@ function bundledVersion() {
   return match[1];
 }
 
-const env = { ...process.env, ...SAME_ORIGIN_ENV, APP_VERSION: bundledVersion() };
+/**
+ * Values the compose file declares defaults for, supplied anyway.
+ *
+ * `docker-compose-visual.yml` writes them as `${POSTGRES_USER:-plane}` and so
+ * on, which reads as "this works out of the box". It does under `docker
+ * compose`. Under `podman-compose` a variable that is not set is left in place
+ * verbatim, so Postgres was handed a user named `${POSTGRES_USER:-plane}` and
+ * refused to initialise -- `invalid character in extension owner`, from a
+ * container that then sat there while the run waited for a stack that was never
+ * coming up.
+ *
+ * It only ever worked because the root `.env` that `setup.sh` writes happens to
+ * define these, and that file is gitignored: the stack came up on a machine
+ * that had run setup and nowhere else. Passing them here removes the dependency
+ * on which compose implementation is installed, and on a file the repository
+ * does not carry. A real environment value still wins.
+ */
+const STACK_DEFAULTS = {
+  POSTGRES_USER: "plane",
+  POSTGRES_PASSWORD: "plane",
+  POSTGRES_DB: "plane",
+  AWS_ACCESS_KEY_ID: "access-key",
+  AWS_SECRET_ACCESS_KEY: "secret-key",
+  MACHINE_SIGNATURE: "visual-regression",
+};
+
+/**
+ * Fail now, with the command that fixes it, rather than in twelve minutes.
+ *
+ * The compose file reads `apps/api/.env` for the API and its dependencies.
+ * Without it `podman-compose` raises a `ValueError` from inside its own
+ * traceback, several hundred lines after a successful build, and the run looks
+ * like a stack problem rather than a missing prerequisite.
+ */
+function requireEnvironmentFiles() {
+  const required = ["apps/api/.env"];
+  const missing = required.filter((relative) => !existsSync(path.join(ROOT, relative)));
+  if (missing.length === 0) return;
+  throw new Error(
+    `The visual stack needs ${missing.join(", ")}, which the repository does not carry.\n` +
+      "Run ./setup.sh once to create the environment files from their examples."
+  );
+}
+
+requireEnvironmentFiles();
+
+const env = { ...STACK_DEFAULTS, ...process.env, ...SAME_ORIGIN_ENV, APP_VERSION: bundledVersion() };
 
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { cwd: ROOT, env, stdio: "inherit", ...opts });
 
