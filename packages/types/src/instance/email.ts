@@ -16,4 +16,7 @@ export type TInstanceEmailConfigurationKeys =
   | "EMAIL_USE_TLS"
   | "EMAIL_USE_SSL"
   | "EMAIL_FROM"
-  | "ENABLE_SMTP";
+  | "ENABLE_SMTP"
+  // Fork (see FORK.md): whether an encrypted notification may describe the work
+  // item in its outer Subject, the one header OpenPGP cannot cover.
+  | "OPENPGP_SUBJECT_DETAIL";
