@@ -14,6 +14,20 @@ from rest_framework.request import Request
 from plane.utils.ip_address import get_client_ip
 
 
+def app_base_url() -> str:
+    """The origin the web app is served from, without needing a request.
+
+    Nothing about this value comes from the caller: `base_host` derives the app
+    origin purely from settings, so a background task can read it directly
+    rather than having a request-handling process hand it one. A notification
+    that is rendered minutes after the activity has no request to ask.
+    """
+    base_url = settings.APP_BASE_URL or settings.WEB_URL
+    if not base_url:
+        raise ImproperlyConfigured("APP_BASE_URL or WEB_URL is not set")
+    return base_url
+
+
 def base_host(
     request: Request | HttpRequest,
     is_admin: bool = False,

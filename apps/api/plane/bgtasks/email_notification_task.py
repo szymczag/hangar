@@ -21,6 +21,7 @@ from plane.db.models import EmailNotificationLog, Issue, User
 from plane.mailer.enums import OutboxStatus
 from plane.mailer.service import enqueue_rendered_email
 from plane.settings.redis import redis_instance
+from plane.utils.host import app_base_url
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 
@@ -157,6 +158,18 @@ def process_html_content(content):
 MAX_NOTIFICATION_ATTEMPTS = 5
 
 
+def abandon_notifications(email_notification_ids, error):
+    """Mark rows terminal immediately, for a failure no retry can clear."""
+
+    try:
+        detail = f"{type(error).__name__}: {error}"[:2000]
+        EmailNotificationLog.objects.filter(pk__in=email_notification_ids, processed_at__isnull=True).update(
+            processed_at=timezone.now(), attempts=F("attempts") + 1, last_error=detail
+        )
+    except Exception as bookkeeping_error:
+        log_exception(bookkeeping_error)
+
+
 def record_failed_attempt(email_notification_ids, error):
     """Count an attempt, and stop retrying once the ceiling is reached."""
 
@@ -185,14 +198,13 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
     # acquire the lock for sending emails
     try:
         if acquire_lock(lock_id=lock_id):
-            # get the redis instance
-            ri = redis_instance()
-            base_api = ri.get(str(issue_id)).decode() if ri.get(str(issue_id)) else None
-
-            # Skip if base api is not present
-            if not base_api:
-                release_lock(lock_id=lock_id)
-                return
+            # The app origin used to arrive through a per-issue Redis key written
+            # by the activity task. `base_host` derives it from settings and
+            # ignores the request, so the key only ever held a constant -- while
+            # its 600 second expiry, and Valkey being a cache with no persistence
+            # guarantee, turned any restart or slow run into notifications that
+            # were dropped without a row, a log line or an exception.
+            base_api = app_base_url()
 
             data = create_payload(notification_data=notification_data)
 
@@ -307,10 +319,19 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
         else:
             logging.getLogger("plane.worker").info("Duplicate email received skipping")
             return
-    except (Issue.DoesNotExist, User.DoesNotExist):
+    except (Issue.DoesNotExist, User.DoesNotExist) as e:
+        # The work item or the recipient is gone. No later run can render this
+        # notification, so retrying it every five minutes forever only keeps a
+        # row alive that nothing will ever send.
+        log_exception(e)
+        abandon_notifications(email_notification_ids, e)
         release_lock(lock_id=lock_id)
         return
     except Exception as e:
+        # Anything unexpected -- a misconfigured base URL among them -- is
+        # counted rather than swallowed, so a permanent failure reaches a
+        # terminal state instead of retrying in silence.
         log_exception(e)
+        record_failed_attempt(email_notification_ids, e)
         release_lock(lock_id=lock_id)
         return
