@@ -20,6 +20,7 @@ from django.utils import timezone
 from plane.db.models import EmailNotificationLog, Issue, User
 from plane.mailer.configuration import openpgp_subject_detail_enabled
 from plane.mailer.enums import OutboxStatus
+from plane.mailer.tokens import email_idempotency_token
 from plane.mailer.service import enqueue_rendered_email
 from plane.settings.redis import redis_instance
 from plane.utils.host import app_base_url
@@ -138,6 +139,23 @@ def process_mention(mention_component):
         highlighted_name = f"@{user_name}"
         mention.replace_with(highlighted_name)
     return str(soup)
+
+
+def notification_idempotency_key(issue_id, receiver_id, sorted_ids):
+    """A key of fixed length, whatever the batch size.
+
+    Joining the notification ids produced a key of 92 + 37N characters, and the
+    outbox column -- like the check in front of it -- stops at 255. A batch of
+    five updates to one work item for one recipient therefore reached 277 and was
+    refused, permanently: the same batch is rebuilt from the same rows on every
+    run, so it failed identically every five minutes. Four updates fit and five
+    did not, which made it look like a problem with busy work items rather than
+    with the key.
+
+    The digest is over the same inputs in the same order, so a batch keeps the
+    identity it had: re-running one cannot send a second copy.
+    """
+    return f"issue-notification:{email_idempotency_token('issue-notification', issue_id, receiver_id, *sorted_ids)}"
 
 
 # An outer subject long enough to be cut off by a mail client says no more than
@@ -336,7 +354,7 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
                     subject=subject,
                     text_body=text_content,
                     html_body=html_content,
-                    idempotency_key=f"issue-notification:{issue_id}:{receiver_id}:{ids_str}",
+                    idempotency_key=notification_idempotency_key(issue_id, receiver_id, sorted_ids),
                     outer_subject=outer_subject,
                 )
                 updates = {"processed_at": timezone.now()}
