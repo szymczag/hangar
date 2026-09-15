@@ -32,7 +32,6 @@ from plane.db.models import (
     User,
     EstimatePoint,
 )
-from plane.settings.redis import redis_instance
 from plane.utils.exception_logger import log_exception
 from plane.utils.issue_relation_mapper import get_inverse_relation
 from plane.utils.uuid import is_valid_uuid
@@ -1660,10 +1659,11 @@ def issue_activity(
         workspace_id = project.workspace_id
 
         if issue_id is not None:
-            if origin:
-                ri = redis_instance()
-                # set the request origin in redis
-                ri.set(str(issue_id), origin, ex=600)
+            # `origin` is accepted for signature compatibility with upstream and
+            # with the 81 call sites that pass it. It used to be cached here for
+            # the notification mailer, which now reads the same value from
+            # settings; writing a per-issue key that nothing reads only filled
+            # the cache and gave that mailer a dependency it could lose.
             issue = Issue.objects.filter(pk=issue_id).first()
             if issue:
                 try:
