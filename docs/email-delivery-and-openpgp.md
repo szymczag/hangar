@@ -89,11 +89,24 @@ A hard bounce, complaint, or active notification preference can also suppress se
 
 ## OpenPGP message format
 
-Hangar uses PGP/MIME (`multipart/encrypted` as defined by RFC 3156), not inline armored text. The outer subject is always:
+Hangar uses PGP/MIME (`multipart/encrypted` as defined by RFC 3156), not inline armored text. The outer subject is, by default:
 
 ```text
 Encrypted Hangar notification
 ```
+
+The outer subject is the one header encryption cannot cover. It reaches the mail provider, its logs and its backups
+in the clear, and anyone who can see the mailbox list can read it. An instance administrator may trade that
+confidentiality for an inbox people can triage, in God Mode under Email delivery, which makes an activity
+notification describe itself instead:
+
+```text
+INFRA-3 updates: Broken login flow - new comment from Ada L
+```
+
+That reveals the work item reference, its title and the first commenter to everyone handling the message. The
+protected subject, body, comments, receipt and attachments remain inside the encrypted entity either way. The
+setting is off unless an administrator turns it on, so an upgrade never widens what an existing instance discloses.
 
 The real subject, text/HTML alternatives, receipt, and attachments are encrypted together before the outbox row is inserted. Remote images, trackers, embedded objects, forms, scripts, and CSS network loads are removed before encryption.
 
@@ -174,7 +187,7 @@ Administrators can search the instance delivery ledger by exact receipt or recip
 
 Hangar encrypts protected notifications to the user's OpenPGP key before inserting them into the durable outbox. The database contains the complete PGP/MIME ciphertext and observable routing headers, never the protected subject, body, receipt, or attachments in plaintext. Clear account messages are submitted directly to the provider and only their routing and receipt metadata is retained.
 
-SES tags contain only an opaque outbox UUID and a low-cardinality policy class. Outer encrypted subjects are generic. Open/click tracking and message archiving must remain disabled. Raw SNS/SQS events must not be copied to logs; Hangar persists only bounded delivery metadata.
+SES tags contain only an opaque outbox UUID and a low-cardinality policy class. Outer encrypted subjects are generic unless an administrator has enabled descriptive subjects, which is recorded on the outbox row as sent. Open/click tracking and message archiving must remain disabled. Raw SNS/SQS events must not be copied to logs; Hangar persists only bounded delivery metadata.
 
 Public certificates are stored as validated public material. Access remains limited to the owner-facing lifecycle and the code path that encrypts a selected message. Private keys remain solely with users and their mail clients.
 

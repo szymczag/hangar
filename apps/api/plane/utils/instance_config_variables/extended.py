@@ -139,6 +139,17 @@ sso_policy_config_variables = [
         "category": "SSO",
         "is_encrypted": False,
     },
+    # "1" puts the work item, its title and the actor in the outer Subject of an
+    # encrypted notification. That header is the one part PGP/MIME cannot cover:
+    # it reaches the mail provider, its logs and its backups in the clear. Off by
+    # default, because a generic subject is what the encrypted delivery
+    # documentation promises and an upgrade must not quietly change it.
+    {
+        "key": "OPENPGP_SUBJECT_DETAIL",
+        "value": os.environ.get("OPENPGP_SUBJECT_DETAIL", "0"),
+        "category": "SMTP",
+        "is_encrypted": False,
+    },
     # Projects a federated user joins on sign-in, as
     # "domain=workspace-slug/IDENTIFIER:role" entries. Requires the matching
     # workspace membership, so it is normally paired with the setting above.

@@ -24,7 +24,7 @@ from plane.license.utils.instance_value import get_email_configuration
 
 from .enums import DeliveryMode, MailDecision, OpenPGPKeyStatus, OutboxStatus, SuppressionReason
 from .exceptions import MailAcceptanceUnknownError, MailPolicyError, MailerError
-from .mime import build_clear_message, build_encrypted_message, sanitize_email_html
+from .mime import GENERIC_ENCRYPTED_SUBJECT, build_clear_message, build_encrypted_message, sanitize_email_html
 from .policy import resolve_mail_policy
 from .registry import MailTemplateDefinition, get_template_definition
 from .tokens import email_receipt_code
@@ -108,7 +108,7 @@ def _render_message(outbox: EmailOutbox):
         message.defects
         or message.get_content_type() != "multipart/encrypted"
         or message.get_param("protocol") != "application/pgp-encrypted"
-        or str(message.get("Subject", "")) != "Encrypted Hangar notification"
+        or str(message.get("Subject", "")) != (outbox.outer_subject or GENERIC_ENCRYPTED_SUBJECT)
         or str(message.get("From", "")) != outbox.sender
         or str(message.get("To", "")).lower() != outbox.recipient_email
         or str(message.get("Message-ID", "")) != outbox.message_id
@@ -194,6 +194,7 @@ def enqueue_rendered_email(
     expires_in: timedelta | None = None,
     reply_to: str = "",
     encryption_key: UserOpenPGPKey | None = None,
+    outer_subject: str = "",
     attachments: list[tuple[str, bytes, str]] | None = None,
 ) -> EnqueueResult:
     """Apply mail policy and persist only encrypted notification content."""
@@ -212,6 +213,8 @@ def enqueue_rendered_email(
         raise MailPolicyError("A producer cannot override the encryption key for this template")
     if not isinstance(subject, str) or not subject or len(subject) > 998 or any(c in subject for c in "\r\n"):
         raise MailPolicyError("The email subject is invalid")
+    if not isinstance(outer_subject, str) or len(outer_subject) > 998 or any(c in outer_subject for c in "\r\n"):
+        raise MailPolicyError("The outer email subject is invalid")
     if not isinstance(text_body, str) or not isinstance(html_body, str):
         raise MailPolicyError("Email bodies must be text")
     reply_to = reply_to or settings.EMAIL_REPLY_TO
@@ -314,6 +317,9 @@ def enqueue_rendered_email(
             raise MailPolicyError("The idempotency key was already used for a different email intent")
         return EnqueueResult(existing.id, existing.status)
 
+    # A descriptive outer subject leaks the work item to the provider, so it is
+    # only ever what the producer asked for -- never derived here.
+    resolved_outer_subject = outer_subject or GENERIC_ENCRYPTED_SUBJECT
     outbox_id = uuid.uuid4()
     now = timezone.now()
     sender = _configured_sender()
@@ -326,6 +332,7 @@ def enqueue_rendered_email(
             raise MailPolicyError("The selected OpenPGP key is unavailable")
         message = build_encrypted_message(
             inner_subject=subject,
+            outer_subject=resolved_outer_subject,
             text_body=text_body,
             html_body=html_body,
             sender=sender,
@@ -365,6 +372,7 @@ def enqueue_rendered_email(
         "delivery_mode": delivery_mode,
         "encrypted_message": encrypted_message,
         "message_id": message_id,
+        "outer_subject": resolved_outer_subject if delivery_mode == DeliveryMode.OPENPGP else "",
         "receipt_code": receipt_code,
         "openpgp_key": active_key if policy.decision == MailDecision.ENCRYPT else None,
         "openpgp_fingerprint": active_key.encryption_subkey_fingerprint

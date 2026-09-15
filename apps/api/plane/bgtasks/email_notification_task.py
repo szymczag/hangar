@@ -18,6 +18,7 @@ from django.utils import timezone
 
 # Module imports
 from plane.db.models import EmailNotificationLog, Issue, User
+from plane.mailer.configuration import openpgp_subject_detail_enabled
 from plane.mailer.enums import OutboxStatus
 from plane.mailer.service import enqueue_rendered_email
 from plane.settings.redis import redis_instance
@@ -137,6 +138,31 @@ def process_mention(mention_component):
         highlighted_name = f"@{user_name}"
         mention.replace_with(highlighted_name)
     return str(soup)
+
+
+# An outer subject long enough to be cut off by a mail client says no more than
+# a short one, and the header has a hard limit of its own.
+MAX_OUTER_SUBJECT_TITLE = 120
+
+
+def describe_notification(identifier, title, comment_actors):
+    """A subject that says which work item changed, and how.
+
+    Only ever used when an administrator has switched OPENPGP_SUBJECT_DETAIL on:
+    this text travels in the clear, so it is a deliberate trade of confidentiality
+    for an inbox someone can actually triage.
+    """
+    title = remove_unwanted_characters(str(title or "")).strip()
+    if len(title) > MAX_OUTER_SUBJECT_TITLE:
+        title = title[: MAX_OUTER_SUBJECT_TITLE - 1].rstrip() + "\u2026"
+    described = f"{identifier} updates"
+    if title:
+        described = f"{described}: {title}"
+    names = [name for name in (remove_unwanted_characters(str(a or "")).strip() for a in comment_actors) if name]
+    if names:
+        who = names[0] if len(names) == 1 else f"{names[0]} and {len(names) - 1} more"
+        described = f"{described} - new comment from {who}"
+    return described
 
 
 def process_html_content(content):
@@ -268,7 +294,19 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
             summary = "Updates were made to the issue by"
 
             # Send the mail
-            subject = f"{issue.project.identifier}-{issue.sequence_id} {remove_unwanted_characters(issue.name)}"
+            identifier = f"{issue.project.identifier}-{issue.sequence_id}"
+            subject = f"{identifier} {remove_unwanted_characters(issue.name)}"
+            # The outer subject is generic unless an administrator opted in.
+            outer_subject = ""
+            if openpgp_subject_detail_enabled():
+                outer_subject = describe_notification(
+                    identifier,
+                    issue.name,
+                    [
+                        f"{c['actor_detail']['first_name']} {c['actor_detail']['last_name']}".strip()
+                        for c in comments
+                    ],
+                )
             context = {
                 "data": template_data,
                 "summary": summary,
@@ -299,6 +337,7 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
                     text_body=text_content,
                     html_body=html_content,
                     idempotency_key=f"issue-notification:{issue_id}:{receiver_id}:{ids_str}",
+                    outer_subject=outer_subject,
                 )
                 updates = {"processed_at": timezone.now()}
                 if result.outbox_id:

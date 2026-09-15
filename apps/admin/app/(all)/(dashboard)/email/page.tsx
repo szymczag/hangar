@@ -18,6 +18,7 @@ import type { Route } from "./+types/page";
 // local
 import { InstanceEmailForm } from "./email-config-form";
 import { EmailDeliveryLog } from "./email-delivery-log";
+import { SubjectDetailToggle } from "./subject-detail-toggle";
 
 const InstanceEmailPage = observer(function InstanceEmailPage(_props: Route.ComponentProps) {
   // store
@@ -187,6 +188,7 @@ const InstanceEmailPage = observer(function InstanceEmailPage(_props: Route.Comp
             )}
           </>
         )}
+        {emailDeliveryConfiguration?.openpgp_enabled && !isLoading && <SubjectDetailToggle />}
         <EmailDeliveryLog />
       </>
     </PageWrapper>

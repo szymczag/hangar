@@ -88,6 +88,9 @@ class EmailOutbox(BaseModel):
     encrypted_message = models.BinaryField(blank=True)
     idempotency_key = models.CharField(max_length=255, unique=True)
     message_id = models.CharField(max_length=255, unique=True)
+    # The outer subject as sent. Stored so the integrity check before delivery
+    # has something to compare against once it is no longer a constant.
+    outer_subject = models.CharField(max_length=998, blank=True, default="")
     receipt_code = models.CharField(max_length=24, unique=True)
     openpgp_key = models.ForeignKey(
         UserOpenPGPKey,

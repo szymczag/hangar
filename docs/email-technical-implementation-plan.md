@@ -39,36 +39,36 @@ The selected production transport is `ses_api`. It uses the SES v2 `SendEmail` o
 
 ## Code map
 
-| Area | Location |
-| --- | --- |
-| Public enqueue API and rendering | `apps/api/plane/mailer/service.py` |
-| Policy classes and decisions | `apps/api/plane/mailer/policy.py`, `enums.py` |
-| Allowlisted templates | `apps/api/plane/mailer/registry.py` |
-| Random receipt codes | `apps/api/plane/mailer/tokens.py` |
-| Clear and PGP/MIME construction | `apps/api/plane/mailer/mime.py` |
-| Constrained GnuPG adapter | `apps/api/plane/mailer/openpgp.py` |
-| SES API and SMTP transports | `apps/api/plane/mailer/transports/` |
-| Delivery, recovery, feedback, retention | `apps/api/plane/bgtasks/email_delivery_task.py` |
-| Durable models | `apps/api/plane/db/models/email.py` |
-| User key and receipt API | `apps/api/plane/app/views/user/email_security.py` |
-| Admin log and suppression API | `apps/api/plane/license/api/views/email_delivery.py` |
-| User UI | `apps/web/core/components/settings/profile/content/pages/` |
-| Admin UI | `apps/admin/app/(all)/(dashboard)/email/` |
-| Kubernetes deployment | `charts/hangar/` |
+| Area                                    | Location                                                   |
+| --------------------------------------- | ---------------------------------------------------------- |
+| Public enqueue API and rendering        | `apps/api/plane/mailer/service.py`                         |
+| Policy classes and decisions            | `apps/api/plane/mailer/policy.py`, `enums.py`              |
+| Allowlisted templates                   | `apps/api/plane/mailer/registry.py`                        |
+| Random receipt codes                    | `apps/api/plane/mailer/tokens.py`                          |
+| Clear and PGP/MIME construction         | `apps/api/plane/mailer/mime.py`                            |
+| Constrained GnuPG adapter               | `apps/api/plane/mailer/openpgp.py`                         |
+| SES API and SMTP transports             | `apps/api/plane/mailer/transports/`                        |
+| Delivery, recovery, feedback, retention | `apps/api/plane/bgtasks/email_delivery_task.py`            |
+| Durable models                          | `apps/api/plane/db/models/email.py`                        |
+| User key and receipt API                | `apps/api/plane/app/views/user/email_security.py`          |
+| Admin log and suppression API           | `apps/api/plane/license/api/views/email_delivery.py`       |
+| User UI                                 | `apps/web/core/components/settings/profile/content/pages/` |
+| Admin UI                                | `apps/admin/app/(all)/(dashboard)/email/`                  |
+| Kubernetes deployment                   | `charts/hangar/`                                           |
 
 ## Policy invariants
 
 Every producer supplies an allowlisted `template_key`. The registry fixes the policy class, configuration-set class, receipt label, and cleartext security-notice behavior. A producer cannot ask for an insecure fallback.
 
-| Policy class | No verified key | Verified, unexpired key |
-| --- | --- | --- |
-| Account access | Minimal cleartext | Minimal cleartext |
-| Account security | Minimal cleartext | Minimal cleartext |
-| Invitation to an unknown address | Minimal cleartext | Not applicable |
-| Invitation to a known user | Suppressed | PGP/MIME |
-| Project/activity notification | Suppressed | PGP/MIME |
-| Export | Suppressed | PGP/MIME |
-| Operational detail | Suppressed | PGP/MIME |
+| Policy class                     | No verified key   | Verified, unexpired key |
+| -------------------------------- | ----------------- | ----------------------- |
+| Account access                   | Minimal cleartext | Minimal cleartext       |
+| Account security                 | Minimal cleartext | Minimal cleartext       |
+| Invitation to an unknown address | Minimal cleartext | Not applicable          |
+| Invitation to a known user       | Suppressed        | PGP/MIME                |
+| Project/activity notification    | Suppressed        | PGP/MIME                |
+| Export                           | Suppressed        | PGP/MIME                |
+| Operational detail               | Suppressed        | PGP/MIME                |
 
 Suppression is a successful policy outcome, not a delivery failure. The outbox stores a payload-free audit receipt and the source in-app notification is retained.
 
@@ -140,7 +140,7 @@ There can be only one active and one pending, non-deleted key per user. In-fligh
 
 ## MIME and content handling
 
-Encrypted mail uses `multipart/encrypted; protocol="application/pgp-encrypted"`. The outer subject is always `Encrypted Hangar notification`; the real subject, text/HTML alternatives, receipt, and attachments are inside the encrypted MIME entity.
+Encrypted mail uses `multipart/encrypted; protocol="application/pgp-encrypted"`. The outer subject is `Encrypted Hangar notification` unless the instance setting `OPENPGP_SUBJECT_DETAIL` is on, in which case an activity notification carries its work item, title and first commenter there instead; the value as sent is stored on `EmailOutbox.outer_subject`, which the pre-delivery integrity check verifies against. The real subject, text/HTML alternatives, receipt, and attachments are inside the encrypted MIME entity either way.
 
 HTML is sanitized before encryption. Remote images, embedded objects, scripts, forms, SVG, remote stylesheets, event handlers, dangerous URL schemes, and CSS network loads are removed. Subjects, reply addresses, sender configuration, attachment names, MIME types, counts, and total sizes are validated before encryption. Each recipient receives an independent message.
 Safe HTML structure and inline presentation styles remain available inside the encrypted MIME entity. Every message also contains a plain-text alternative.
@@ -164,7 +164,6 @@ Instance email-log and suppression endpoints use the existing instance-administr
 - privacy-minimized receipts remain through `EMAIL_AUDIT_RETENTION_DAYS`;
 - minimized provider events remain through `EMAIL_EVENT_RETENTION_DAYS`; and
 - expired challenges are removed after their short cleanup grace period.
-
 
 ## Adding a template
 
