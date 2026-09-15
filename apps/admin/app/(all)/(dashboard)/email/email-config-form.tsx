@@ -78,10 +78,15 @@ export function InstanceEmailForm(props: IInstanceEmailForm) {
     {
       key: "EMAIL_FROM",
       type: "text",
-      label: "Sender's email address",
+      // The address alone is accepted and was all this field ever suggested, so
+      // instances ended up sending as a bare mailbox. A display name has always
+      // worked -- it is passed through to the From header unchanged -- but
+      // nothing here said so.
+      label: "Sender",
       description:
-        "This is the email address your users will see when getting emails from this instance. You will need to verify this address.",
-      placeholder: "no-reply@example.com",
+        "What your users see in the From line. Give a name and an address to be recognisable in an inbox, " +
+        "like Hangar Notifications <no-reply@example.com>, or just the address. You will need to verify the address.",
+      placeholder: "Hangar Notifications <no-reply@example.com>",
       error: Boolean(errors.EMAIL_FROM),
       required: true,
     },
