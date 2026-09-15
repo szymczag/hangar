@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 import { Controller, useForm } from "react-hook-form";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 // plane imports
 import { E_PASSWORD_STRENGTH } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
@@ -133,6 +133,29 @@ export const SecurityProfileSettings = observer(function SecurityProfileSettings
   );
 
   const renderPasswordMatchError = !isRetryPasswordInputFocused || confirmPassword.length >= password.length;
+
+  // An account that signs in through a provider has no Hangar password. The
+  // server refuses the change, so offering the form only produces a failure it
+  // could have predicted -- and leaves the impression the account has a password
+  // that could be changed here, which is the part worth correcting.
+  if (currentUser?.is_federated) {
+    return (
+      <div className="size-full">
+        <ProfileSettingsHeading title={t("auth.common.password.change_password.label.default")} />
+        <div className="mt-7 flex max-w-2xl gap-3 rounded-md border border-subtle-1 bg-layer-2 p-4 text-13">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-secondary" />
+          <div>
+            <p className="font-medium text-primary">This account signs in through an identity provider</p>
+            <p className="mt-1 leading-5 text-secondary">
+              It has no Hangar password, so there is nothing to change here. Your password, and anything else guarding
+              the account such as a second factor, are managed where you sign in.
+            </p>
+          </div>
+        </div>
+        <EmailSecuritySettings />
+      </div>
+    );
+  }
 
   return (
     <div className="size-full">
