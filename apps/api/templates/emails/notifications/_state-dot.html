@@ -1,0 +1,13 @@
+{% comment %}
+Status dot for a work-item state, as a styled span rather than an image.
+
+sanitize_email_html decomposes every <img> before a message is built, so an icon
+referenced by URL never reaches a recipient. A span with an inline background
+colour survives, needs no attachment, and renders in clients that block remote
+content.
+
+Colours mirror DEFAULT_STATES in plane/db/models/state.py. States are per-project
+and can be renamed, so an unrecognised name falls back to the neutral colour
+instead of rendering nothing.
+{% endcomment %}
+<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: {% if state_name == 'Todo' %}#60646c{% elif state_name == 'In Progress' %}#f59e0b{% elif state_name == 'Done' %}#46a758{% elif state_name == 'Cancelled' %}#9aa4bc{% elif state_name == 'Triage' %}#4e5355{% else %}#60646c{% endif %}"></span>

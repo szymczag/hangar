@@ -10,7 +10,7 @@ from typing import Callable, Iterable
 # Django imports
 from django.conf import settings
 from django.utils import timezone
-from django.db.models import F, Window, Subquery
+from django.db.models import F, Q, Window, Subquery
 from django.db.models.functions import RowNumber
 
 # Third party imports
@@ -94,11 +94,24 @@ def get_api_logs_queryset():
 
 
 def get_email_logs_queryset():
-    """Get email logs older than the email retention window."""
+    """Get email logs past the retention window that will not be sent again.
+
+    Filtering on `sent_at` alone never matches a row that was never sent, because
+    SQL `NULL <= x` is not true. That is deliberate for a row still waiting for
+    its turn -- a pending notification must not be deleted before it is sent --
+    but it also made terminally failed rows immortal, and a permanently failing
+    render produces them at a steady rate.
+
+    A row that gave up has `processed_at` set and `sent_at` still NULL. Once it is
+    past the window it is reaped like any other. A row that is merely waiting
+    still has `processed_at` NULL and is never selected.
+    """
     cutoff_time = timezone.now() - timedelta(days=settings.EMAIL_LOG_RETENTION_DAYS)
     logger.info(f"Email logs cutoff time: {cutoff_time}")
     return (
-        EmailNotificationLog.all_objects.filter(sent_at__lte=cutoff_time)
+        EmailNotificationLog.all_objects.filter(
+            Q(sent_at__lte=cutoff_time) | Q(sent_at__isnull=True, processed_at__lte=cutoff_time)
+        )
         .values_list("id", flat=True)
         .iterator(chunk_size=BATCH_SIZE)
     )

@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 # Third party imports
 from celery import shared_task
+from django.db.models import F
 from django.template.loader import render_to_string
 
 # Django imports
@@ -147,6 +148,33 @@ def process_html_content(content):
     return processed_content_list
 
 
+# A row stays unprocessed until it is sent, and stack_email_notification re-picks
+# every unprocessed row every five minutes. Without a ceiling, a permanently
+# failing render -- an unparsable template, say -- is retried forever and reports
+# nothing: the task swallows the exception and still returns success, so no
+# task-failure alerting fires. Giving up after a few attempts stops the loop and
+# leaves the reason on the row.
+MAX_NOTIFICATION_ATTEMPTS = 5
+
+
+def record_failed_attempt(email_notification_ids, error):
+    """Count an attempt, and stop retrying once the ceiling is reached."""
+
+    try:
+        detail = f"{type(error).__name__}: {error}"[:2000]
+        EmailNotificationLog.objects.filter(pk__in=email_notification_ids).update(
+            attempts=F("attempts") + 1, last_error=detail
+        )
+        EmailNotificationLog.objects.filter(
+            pk__in=email_notification_ids,
+            processed_at__isnull=True,
+            attempts__gte=MAX_NOTIFICATION_ATTEMPTS,
+        ).update(processed_at=timezone.now())
+    except Exception as bookkeeping_error:
+        # Never let the bookkeeping mask the original failure.
+        log_exception(bookkeeping_error)
+
+
 @shared_task
 def send_email_notification(issue_id, notification_data, receiver_id, email_notification_ids):
     # Convert UUIDs to a sorted, concatenated string
@@ -247,10 +275,10 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
                 "comments": comments,
                 "entity_type": "issue",
             }
-            html_content = render_to_string("emails/notifications/issue-updates.html", context)
-            text_content = generate_plain_text_from_html(html_content)
-
             try:
+                html_content = render_to_string("emails/notifications/issue-updates.html", context)
+                text_content = generate_plain_text_from_html(html_content)
+
                 result = enqueue_rendered_email(
                     recipient_email=receiver.email,
                     recipient_user=receiver,
@@ -272,6 +300,7 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
                 return
             except Exception as e:
                 log_exception(e)
+                record_failed_attempt(email_notification_ids, e)
                 # release the lock
                 release_lock(lock_id=lock_id)
                 return
