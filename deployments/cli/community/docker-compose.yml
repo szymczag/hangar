@@ -47,6 +47,38 @@ x-live-env: &live-env
   API_BASE_URL: ${API_BASE_URL:-http://api:8000}
   LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY}
 
+x-mail-env: &mail-env
+  # Like the God Mode block below, this list is the whole environment the API
+  # containers receive, so an EMAIL_* value set only in variables.env never
+  # reaches them.
+  #
+  # EMAIL_DELIVERY_V2_ENABLED is the switch that makes the mail worker matter:
+  # with it off, every message takes the legacy direct-send path and nothing is
+  # ever queued. EMAIL_OPENPGP_ENABLED then requires each recipient to have
+  # verified an OpenPGP key in Profile -> Security; project notifications to an
+  # account without one are held in Hangar rather than sent in the clear, which
+  # is deliberate and silent. Enable it only once people have enrolled keys.
+  #
+  # SMTP host, credentials, and the From address stay in the God Mode email
+  # configuration, not here.
+  EMAIL_DELIVERY_V2_ENABLED: ${EMAIL_DELIVERY_V2_ENABLED:-0}
+  EMAIL_OPENPGP_ENABLED: ${EMAIL_OPENPGP_ENABLED:-0}
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+  EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+  EMAIL_MESSAGE_ID_DOMAIN: ${EMAIL_MESSAGE_ID_DOMAIN:-hangar.invalid}
+  EMAIL_GPG_BINARY: ${EMAIL_GPG_BINARY:-gpg}
+  EMAIL_SMTP_TIMEOUT_SECONDS: ${EMAIL_SMTP_TIMEOUT_SECONDS:-30}
+  EMAIL_MAX_STORED_PAYLOAD_BYTES: ${EMAIL_MAX_STORED_PAYLOAD_BYTES:-8388608}
+  EMAIL_MAX_ATTACHMENT_BYTES: ${EMAIL_MAX_ATTACHMENT_BYTES:-5242880}
+  EMAIL_OUTBOX_RETENTION_DAYS: ${EMAIL_OUTBOX_RETENTION_DAYS:-7}
+  EMAIL_EVENT_RETENTION_DAYS: ${EMAIL_EVENT_RETENTION_DAYS:-4}
+  EMAIL_AUDIT_RETENTION_DAYS: ${EMAIL_AUDIT_RETENTION_DAYS:-90}
+  # SMTP destinations are public-only by default. Name an internal relay
+  # explicitly to use one; the God Mode configuration cannot widen this.
+  SMTP_ALLOWED_HOSTS: ${SMTP_ALLOWED_HOSTS:-}
+  SMTP_ALLOWED_IPS: ${SMTP_ALLOWED_IPS:-}
+  SMTP_ALLOWED_PORTS: ${SMTP_ALLOWED_PORTS:-25,465,587,2525}
+
 x-app-env: &app-env
   WEB_URL: ${WEB_URL:-http://localhost}
   DEBUG: ${DEBUG:-0}
@@ -153,7 +185,7 @@ services:
     volumes:
       - logs_api:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env, *mail-env]
     depends_on:
       - plane-db
       - plane-redis
@@ -169,7 +201,7 @@ services:
     volumes:
       - logs_worker:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env, *mail-env]
     depends_on:
       - api
       - plane-db
@@ -186,8 +218,29 @@ services:
     volumes:
       - logs_import-worker:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env, *mail-env]
       HANGAR_WORKER_QUEUE: imports
+    depends_on:
+      - api
+      - plane-db
+      - plane-redis
+      - plane-mq
+
+  mail-worker:
+    image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-api:${APP_RELEASE:-stable}
+    command: ./bin/docker-entrypoint-worker.sh
+    deploy:
+      replicas: ${MAIL_WORKER_REPLICAS:-1}
+      restart_policy:
+        condition: any
+    volumes:
+      - logs_mail-worker:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env, *mail-env]
+      # celery.py routes every email_delivery_task to its own queue, which the
+      # default worker deliberately does not consume. Without this service an
+      # encrypted notification is written to the outbox and never sent.
+      HANGAR_WORKER_QUEUE: email
     depends_on:
       - api
       - plane-db
@@ -204,7 +257,7 @@ services:
     volumes:
       - logs_beat-worker:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env, *mail-env]
     depends_on:
       - api
       - plane-db
@@ -221,7 +274,7 @@ services:
     volumes:
       - logs_migrator:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env, *mail-env]
     depends_on:
       - plane-db
       - plane-redis
@@ -307,6 +360,7 @@ volumes:
   logs_api:
   logs_worker:
   logs_import-worker:
+  logs_mail-worker:
   logs_beat-worker:
   logs_migrator:
   rabbitmq_data:

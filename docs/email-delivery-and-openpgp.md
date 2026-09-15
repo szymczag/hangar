@@ -190,6 +190,29 @@ Public certificates are stored as validated public material. Access remains limi
 - A missing, revoked, or expired key never causes a cleartext fallback.
 - A malformed or corrupt stored PGP/MIME row fails closed and purges no unrelated data.
 
+## Delivery workers
+
+Durable delivery needs two Celery consumers, and a deployment missing either fails silently rather than loudly.
+
+| Task                                                                        | Queue    | Consumer                           |
+| --------------------------------------------------------------------------- | -------- | ---------------------------------- |
+| `email_notification_task.stack_email_notification` (every 5 minutes)        | `celery` | the default worker, driven by beat |
+| `email_delivery_task.*` (dispatch, retry, recovery, key expiry, SES events) | `email`  | the dedicated mail worker          |
+
+`celery.py` routes every `email_delivery_task` to the `email` queue, and the default worker consumes only `celery`, so
+production can attach a narrowly scoped AWS identity to the mail worker alone. The consequence is that without a mail
+worker an encrypted message is built, stored, and left at `queued` forever: the admin ledger shows the row, the sender
+sees no error, and the recipient never hears anything. The due-row dispatcher does not rescue it, because that task
+routes to the same unconsumed queue.
+
+Every deployment in this repository runs one. The chart creates a `mail-worker` Deployment when `mail.enabled` is true;
+both Compose files run a `mail-worker` service. All of them are the ordinary API image with `HANGAR_WORKER_QUEUE=email`,
+which is the only thing that switches `docker-entrypoint-worker.sh` onto that queue.
+
+Cleartext account mail is submitted inline by whichever process enqueued it, so magic links, password resets, and the
+God Mode test message keep working with no mail worker at all. That asymmetry is worth remembering when diagnosing:
+a successful test email says nothing about whether notifications can be delivered.
+
 ## Remaining deployment responsibilities
 
 The code cannot provision or approve external controls. Before production, the operator must:
