@@ -242,6 +242,13 @@ Before pushing a tag, the maintainer runs the release preflight against the exac
 `preview` commit. The preflight does not publish, create refs, or request an OIDC
 signing certificate.
 
+One of the publication gates is checked earlier than that. The workflow requires
+`docs/kubernetes/README.md` to name the release being tagged, and that step runs after
+the tag is pushed, where a failure has already consumed the version. The release version
+is the highest `docs/releases/hangar-v*.md` present, which needs no tag to determine, so
+the same assertions run on every pull request that touches either file. A guide left
+naming the previous release fails at review, where the cost is an edit.
+
 ## Release qualification
 
 A release candidate is complete only when recorded test evidence demonstrates:
