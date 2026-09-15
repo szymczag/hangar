@@ -35,20 +35,30 @@ SECURITY_NOTICE_HTML = (
 )
 
 
+# The receipt reads as the last line of the footer rather than as a block of its
+# own: small, muted, and set below whatever the template already ends with. The
+# templates do not agree on a footer size -- 12px, 13px and 0.8rem all appear --
+# so this picks the quietest of them rather than matching one and clashing with
+# the rest. `clear` matters because the notification footer floats its icons
+# right, and without it the receipt sits alongside them instead of underneath.
+RECEIPT_STYLE = (
+    "clear:both;margin:24px 20px 0;font-size:12px;line-height:1.6;color:#5f5e5e;font-weight:400"
+)
+
+
 def _append_receipt(text_body: str, html_body: str, receipt_code: str) -> tuple[str, str]:
     if not receipt_code:
         return text_body, html_body
     text_body = f"{text_body}\n\nHangar email receipt: {receipt_code}"
     if html_body:
         soup = BeautifulSoup(html_body, "html.parser")
-        footer = BeautifulSoup(
-            '<p style="border-top:1px solid #d1d5db;margin-top:20px;padding-top:12px">'
-            f"Hangar email receipt: <strong>{receipt_code}</strong></p>",
+        receipt = BeautifulSoup(
+            f'<div style="{RECEIPT_STYLE}">Hangar email receipt: {receipt_code}</div>',
             "html.parser",
-        ).find("p")
+        ).find("div")
         target = soup.body or soup
-        if footer is not None:
-            target.append(footer)
+        if receipt is not None:
+            target.append(receipt)
         html_body = str(soup)
     return text_body, html_body
 
