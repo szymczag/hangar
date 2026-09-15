@@ -16,6 +16,11 @@ from bs4 import BeautifulSoup
 
 from .openpgp import encrypt_for_certificate
 
+# The outer subject of a PGP/MIME message. It is the one header encryption
+# cannot cover, so it says nothing by default. An operator can opt into a
+# descriptive one; see GENERIC_ENCRYPTED_SUBJECT's callers.
+GENERIC_ENCRYPTED_SUBJECT = "Encrypted Hangar notification"
+
 SECURITY_NOTICE_TEXT = (
     "Security notice: This message is unencrypted because it is required to access or secure your Hangar account. "
     "To receive project and activity notifications by email, add and verify an OpenPGP public key in Profile > "
@@ -178,6 +183,7 @@ def build_clear_message(
 def build_encrypted_message(
     *,
     inner_subject: str,
+    outer_subject: str = GENERIC_ENCRYPTED_SUBJECT,
     text_body: str,
     html_body: str,
     sender: str,
@@ -205,7 +211,7 @@ def build_encrypted_message(
     outer = MIMEMultipart(_subtype="encrypted", protocol="application/pgp-encrypted")
     _set_common_headers(
         outer,
-        subject="Encrypted Hangar notification",
+        subject=outer_subject or GENERIC_ENCRYPTED_SUBJECT,
         sender=sender,
         recipient=recipient,
         message_id=message_id,
