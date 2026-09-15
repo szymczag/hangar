@@ -61,7 +61,10 @@
           "placeholder": "name@company.com",
           "errors": {
             "required": "Chúng tôi cần một địa chỉ email để mời họ.",
-            "invalid": "Email không hợp lệ"
+            "invalid": "Email không hợp lệ",
+            "outside_domain": "Chỉ có thể mời các địa chỉ trên {domains}.",
+            "plus_tag": "Không thể dùng thẻ dấu cộng trên {domain}.",
+            "blocked_domain": "{domain} không có phương thức đăng nhập nào được bật."
           }
         }
       },

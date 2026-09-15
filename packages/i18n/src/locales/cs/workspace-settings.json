@@ -61,7 +61,10 @@
           "placeholder": "jmeno@spolecnost.cz",
           "errors": {
             "required": "Vyžaduje se e-mailová adresa.",
-            "invalid": "E-mail je neplatný"
+            "invalid": "E-mail je neplatný",
+            "outside_domain": "Pozvat lze pouze adresy na {domains}.",
+            "plus_tag": "Na doméně {domain} nelze použít značku s plusem.",
+            "blocked_domain": "Doména {domain} nemá povolený žádný způsob přihlášení."
           }
         }
       },

@@ -29,6 +29,7 @@ import type {
 } from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
+import type { TInvitePolicy } from "@/components/workspace/invite-modal/invite-policy";
 
 export class WorkspaceService extends APIService {
   constructor() {
@@ -77,6 +78,18 @@ export class WorkspaceService extends APIService {
 
   async inviteWorkspace(workspaceSlug: string, data: IWorkspaceBulkInviteFormData): Promise<any> {
     return this.post(`/api/workspaces/${workspaceSlug}/invitations/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /**
+   * The domain rules the invite dialog applies before submitting. Workspace
+   * admins only, the same people who may create an invitation.
+   */
+  async workspaceInvitationPolicy(workspaceSlug: string): Promise<TInvitePolicy> {
+    return this.get(`/api/workspaces/${workspaceSlug}/invitations/policy/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

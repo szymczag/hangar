@@ -61,7 +61,10 @@
           "placeholder": "name@company.com",
           "errors": {
             "required": "We need an email address to invite them.",
-            "invalid": "Email is invalid"
+            "invalid": "Email is invalid",
+            "outside_domain": "Only addresses on {domains} can be invited.",
+            "plus_tag": "A plus tag cannot be used on {domain}.",
+            "blocked_domain": "{domain} has no sign-in method enabled."
           }
         }
       },

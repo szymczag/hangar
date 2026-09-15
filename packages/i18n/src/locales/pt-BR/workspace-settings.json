@@ -61,7 +61,10 @@
           "placeholder": "nome@empresa.com",
           "errors": {
             "required": "Precisamos de um endereço de e-mail para convidá-los.",
-            "invalid": "E-mail inválido"
+            "invalid": "E-mail inválido",
+            "outside_domain": "Somente endereços em {domains} podem ser convidados.",
+            "plus_tag": "Não é possível usar uma tag com sinal de mais em {domain}.",
+            "blocked_domain": "{domain} não tem nenhum método de login habilitado."
           }
         }
       },

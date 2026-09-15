@@ -8,3 +8,9 @@ node_modules/
 out/
 pnpm-lock.yaml
 storybook-static/
+
+# Django templates. A formatter reflowing a long line will split a {% %} tag or a
+# quoted string across newlines, which Django's lexer stops recognising as a tag
+# at all -- silently disabling whatever the template renders. Nothing in CI or
+# pre-commit formats .html today; this guards an editor's format-on-save.
+templates/

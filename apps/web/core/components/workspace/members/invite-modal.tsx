@@ -7,6 +7,7 @@
 import React from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
+import useSWR from "swr";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import type { IWorkspaceBulkInviteFormData } from "@plane/types";
@@ -17,6 +18,10 @@ import { InvitationFields } from "@/components/workspace/invite-modal/fields";
 import { InvitationForm } from "@/components/workspace/invite-modal/form";
 // hooks
 import { useWorkspaceInvitationActions } from "@/hooks/use-workspace-invitation";
+// services
+import { WorkspaceService } from "@/services/workspace.service";
+
+const workspaceService = new WorkspaceService();
 
 export type TSendWorkspaceInvitationModalProps = {
   isOpen: boolean;
@@ -37,6 +42,16 @@ export const SendWorkspaceInvitationModal = observer(function SendWorkspaceInvit
     onSubmit,
     onClose,
   });
+  /**
+   * Fetched only while the dialog is open, and left undefined on failure: the
+   * server enforces the same rules, so a policy that cannot be read costs the
+   * early warning rather than the ability to invite anyone.
+   */
+  const { data: invitePolicy } = useSWR(
+    isOpen && workspaceSlug ? ["workspace-invite-policy", workspaceSlug.toString()] : null,
+    () => workspaceService.workspaceInvitationPolicy(workspaceSlug.toString()),
+    { shouldRetryOnError: false, revalidateOnFocus: false }
+  );
 
   return (
     <ModalCore isOpen={isOpen} position={EModalPosition.TOP} width={EModalWidth.XXL}>
@@ -59,6 +74,7 @@ export const SendWorkspaceInvitationModal = observer(function SendWorkspaceInvit
           control={control}
           formState={formState}
           remove={remove}
+          invitePolicy={invitePolicy}
         />
       </InvitationForm>
     </ModalCore>

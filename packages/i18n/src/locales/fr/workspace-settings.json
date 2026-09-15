@@ -61,7 +61,10 @@
           "placeholder": "nom@entreprise.com",
           "errors": {
             "required": "Nous avons besoin d’une adresse e-mail pour les inviter.",
-            "invalid": "L’e-mail est invalide"
+            "invalid": "L’e-mail est invalide",
+            "outside_domain": "Seules les adresses sur {domains} peuvent être invitées.",
+            "plus_tag": "Une étiquette avec un plus ne peut pas être utilisée sur {domain}.",
+            "blocked_domain": "Aucune méthode de connexion n’est activée pour {domain}."
           }
         }
       },

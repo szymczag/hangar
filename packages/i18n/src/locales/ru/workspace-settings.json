@@ -61,7 +61,10 @@
           "placeholder": "name@company.com",
           "errors": {
             "required": "Введите email адрес, чтобы пригласить участников",
-            "invalid": "Неверный email"
+            "invalid": "Неверный email",
+            "outside_domain": "Пригласить можно только адреса на {domains}.",
+            "plus_tag": "На {domain} нельзя использовать метку с плюсом.",
+            "blocked_domain": "Для {domain} не включён ни один способ входа."
           }
         }
       },

@@ -61,7 +61,10 @@
           "placeholder": "name@company.com",
           "errors": {
             "required": "Kami perlu alamat email untuk mengundang mereka.",
-            "invalid": "Email tidak valid"
+            "invalid": "Email tidak valid",
+            "outside_domain": "Hanya alamat pada {domains} yang dapat diundang.",
+            "plus_tag": "Tag plus tidak dapat digunakan pada {domain}.",
+            "blocked_domain": "{domain} tidak memiliki metode masuk yang aktif."
           }
         }
       },

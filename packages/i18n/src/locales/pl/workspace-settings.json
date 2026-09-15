@@ -61,7 +61,10 @@
           "placeholder": "imię@firma.pl",
           "errors": {
             "required": "Wymagany jest adres e-mail.",
-            "invalid": "E-mail jest nieprawidłowy"
+            "invalid": "E-mail jest nieprawidłowy",
+            "outside_domain": "Zaprosić można wyłącznie adresy w domenie {domains}.",
+            "plus_tag": "W domenie {domain} nie można użyć znacznika z plusem.",
+            "blocked_domain": "Domena {domain} nie ma włączonej żadnej metody logowania."
           }
         }
       },

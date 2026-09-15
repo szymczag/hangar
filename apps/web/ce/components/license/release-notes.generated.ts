@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.55",
+  version: "0.1.0-rc.56",
   highlights: [
-    "Planning now supports both temporary reservations and direct scheduling.",
-    "Saved plans and booking hours are easier to manage.",
-    "Capacity uses automatic timezones and shows trainer workload.",
-    "Private calendar rules recognize training invitations.",
-    "Explicit links prevent duplicate training workload.",
+    "Work item notifications are sent at all, for the first time.",
+    "Encrypted notification email is delivered instead of being held indefinitely.",
+    "Invitations are confined to the domains an instance actually signs in with.",
+    "Project invitations can be created again.",
+    "Notification settings say when an unverified key is silencing email.",
   ],
   upstream: {
     version: "1.4.0",

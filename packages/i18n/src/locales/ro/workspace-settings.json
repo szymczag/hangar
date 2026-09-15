@@ -61,7 +61,10 @@
           "placeholder": "nume@companie.ro",
           "errors": {
             "required": "Avem nevoie de o adresă de email pentru a trimite invitația.",
-            "invalid": "Adresa de email este invalidă"
+            "invalid": "Adresa de email este invalidă",
+            "outside_domain": "Pot fi invitate doar adresele de pe {domains}.",
+            "plus_tag": "Pe {domain} nu se poate folosi o etichetă cu plus.",
+            "blocked_domain": "Pentru {domain} nu este activată nicio metodă de autentificare."
           }
         }
       },

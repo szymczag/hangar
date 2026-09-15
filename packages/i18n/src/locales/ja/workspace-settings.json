@@ -61,7 +61,10 @@
           "placeholder": "name@company.com",
           "errors": {
             "required": "招待するにはメールアドレスが必要です。",
-            "invalid": "メールアドレスが無効です"
+            "invalid": "メールアドレスが無効です",
+            "outside_domain": "{domains} のアドレスのみ招待できます。",
+            "plus_tag": "{domain} ではプラス付きのアドレスは使用できません。",
+            "blocked_domain": "{domain} では有効なサインイン方法がありません。"
           }
         }
       },

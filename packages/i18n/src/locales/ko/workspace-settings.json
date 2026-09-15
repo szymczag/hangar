@@ -61,7 +61,10 @@
           "placeholder": "name@company.com",
           "errors": {
             "required": "초대하려면 이메일 주소가 필요합니다.",
-            "invalid": "이메일이 유효하지 않습니다"
+            "invalid": "이메일이 유효하지 않습니다",
+            "outside_domain": "{domains}의 주소만 초대할 수 있습니다.",
+            "plus_tag": "{domain}에서는 플러스 태그를 사용할 수 없습니다.",
+            "blocked_domain": "{domain}에는 사용 가능한 로그인 방법이 없습니다."
           }
         }
       },

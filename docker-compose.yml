@@ -65,6 +65,27 @@ services:
       - plane-db
       - plane-redis
 
+  mail-worker:
+    container_name: mailworker
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.api
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: always
+    command: ./bin/docker-entrypoint-worker.sh
+    env_file:
+      - ./apps/api/.env
+    # celery.py routes every email_delivery_task to its own queue, which the
+    # default worker deliberately does not consume. Without this service an
+    # encrypted notification is written to the outbox and never sent.
+    environment:
+      HANGAR_WORKER_QUEUE: email
+    depends_on:
+      - api
+      - plane-db
+      - plane-redis
+
   beat-worker:
     container_name: beatworker
     build:

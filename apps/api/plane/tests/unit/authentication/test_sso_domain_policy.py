@@ -7,6 +7,7 @@ import pytest
 from plane.authentication.utils.sso_domain_policy import (
     FEDERATED_PROVIDERS,
     allowed_providers_for_email,
+    invitation_rejection_reason,
     parse_enforced_domains,
 )
 
@@ -69,3 +70,65 @@ def test_address_with_empty_local_part_still_resolves_to_its_domain():
     # sanitize_email rejects this shape before the policy runs; resolving it to
     # the pinned domain anyway keeps the failure on the restrictive side.
     assert allowed_providers_for_email("@corp.com", raw_setting="corp.com=google") == {"google"}
+
+
+class TestInvitationRejectionReason:
+    """Which addresses may be invited, given the pinned domains."""
+
+    PINNED = "corp.com=oidc"
+
+    def test_pinned_domain_is_invitable(self):
+        assert invitation_rejection_reason("person@corp.com", raw_setting=self.PINNED, restrict_setting="1") is None
+
+    def test_outside_domain_is_refused_when_invites_are_confined(self):
+        reason = invitation_rejection_reason("person@gmail.com", raw_setting=self.PINNED, restrict_setting="1")
+        assert reason and "outside the domains" in reason
+
+    def test_outside_domain_is_allowed_when_invites_are_not_confined(self):
+        # The default. An instance that invites contractors keeps working.
+        assert invitation_rejection_reason("person@gmail.com", raw_setting=self.PINNED, restrict_setting="0") is None
+
+    def test_plus_tag_is_refused_on_a_directory_backed_domain(self):
+        # The IdP issues no account carrying the tag, so the assertion at
+        # sign-in would never match this invitation.
+        reason = invitation_rejection_reason("person+team@corp.com", raw_setting=self.PINNED, restrict_setting="0")
+        assert reason and "plus tag" in reason
+
+    def test_plus_tag_is_refused_even_when_invites_are_not_confined(self):
+        reason = invitation_rejection_reason("person+team@corp.com", raw_setting="corp.com", restrict_setting="0")
+        assert reason and "plus tag" in reason
+
+    def test_plus_tag_is_allowed_where_a_credential_provider_is_pinned(self):
+        # magic-code proves the tagged mailbox, so the address is reachable.
+        assert (
+            invitation_rejection_reason(
+                "person+team@corp.com", raw_setting="corp.com=oidc;magic-code", restrict_setting="1"
+            )
+            is None
+        )
+
+    def test_plus_tag_is_allowed_on_an_unpinned_domain(self):
+        assert (
+            invitation_rejection_reason("person+team@other.com", raw_setting=self.PINNED, restrict_setting="0") is None
+        )
+
+    def test_domain_denying_every_provider_is_refused_regardless_of_the_setting(self):
+        # Pinned to an unknown provider name, which parses to an empty set.
+        # Nobody can sign in, so no invitation there can be accepted.
+        for restrict in ("0", "1"):
+            reason = invitation_rejection_reason(
+                "person@corp.com", raw_setting="corp.com=nope", restrict_setting=restrict
+            )
+            assert reason and "no sign-in method" in reason
+
+    def test_no_policy_at_all_leaves_every_address_invitable(self):
+        assert invitation_rejection_reason("person+tag@anywhere.com", raw_setting="", restrict_setting="1") is None
+
+    def test_matching_is_case_insensitive(self):
+        assert invitation_rejection_reason("PERSON@CORP.COM", raw_setting=self.PINNED, restrict_setting="1") is None
+        reason = invitation_rejection_reason("PERSON+X@CORP.COM", raw_setting=self.PINNED, restrict_setting="1")
+        assert reason and "plus tag" in reason
+
+    def test_a_plus_in_the_domain_is_not_a_plus_in_the_local_part(self):
+        # rpartition on "@" keeps the tag check to the mailbox name.
+        assert invitation_rejection_reason("person@corp.com", raw_setting="corp.com", restrict_setting="1") is None
