@@ -61,7 +61,10 @@
           "placeholder": "name@company.com",
           "errors": {
             "required": "我們需要電子郵件地址才能邀請他們。",
-            "invalid": "電子郵件無效"
+            "invalid": "電子郵件無效",
+            "outside_domain": "只能邀請 {domains} 上的位址。",
+            "plus_tag": "{domain} 上不能使用帶加號的位址。",
+            "blocked_domain": "{domain} 未啟用任何登入方式。"
           }
         }
       },

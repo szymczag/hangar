@@ -16,6 +16,9 @@ import { cn } from "@plane/utils";
 // hooks
 import { useUserPermissions } from "@/hooks/store/user";
 import type { InvitationFormValues } from "@/hooks/use-workspace-invitation";
+// local
+import type { TInvitePolicy } from "./invite-policy";
+import { inviteRejection } from "./invite-policy";
 
 type TInvitationFieldsProps = {
   workspaceSlug: string;
@@ -24,6 +27,8 @@ type TInvitationFieldsProps = {
   formState: FormState<InvitationFormValues>;
   remove: (index: number) => void;
   className?: string;
+  /** Undefined until loaded, or when the caller could not read it. */
+  invitePolicy?: TInvitePolicy;
 };
 
 export const InvitationFields = observer(function InvitationFields(props: TInvitationFieldsProps) {
@@ -34,6 +39,7 @@ export const InvitationFields = observer(function InvitationFields(props: TInvit
     formState: { errors },
     remove,
     className,
+    invitePolicy,
   } = props;
   // plane hooks
   const { t } = useTranslation();
@@ -41,6 +47,24 @@ export const InvitationFields = observer(function InvitationFields(props: TInvit
   const { workspaceInfoBySlug } = useUserPermissions();
   // derived values
   const currentWorkspaceRole = workspaceInfoBySlug(workspaceSlug.toString())?.role;
+
+  /**
+   * The server refuses these addresses either way. Applying the rules here
+   * moves the refusal to the field being typed in, rather than a toast after
+   * submitting a batch — and a batch is refused whole, so one bad address
+   * would otherwise discard the rest.
+   */
+  const validateAgainstPolicy = (value: string) => {
+    const rejection = inviteRejection(value, invitePolicy);
+    if (!rejection) return true;
+    if (rejection.rule === "outside_domain")
+      return t("workspace_settings.settings.members.modal.errors.outside_domain", {
+        domains: rejection.domains.join(", "),
+      });
+    if (rejection.rule === "plus_tag")
+      return t("workspace_settings.settings.members.modal.errors.plus_tag", { domain: rejection.domain });
+    return t("workspace_settings.settings.members.modal.errors.blocked_domain", { domain: rejection.domain });
+  };
 
   return (
     <div className={cn("mb-3 space-y-4", className)}>
@@ -59,6 +83,7 @@ export const InvitationFields = observer(function InvitationFields(props: TInvit
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
                   message: t("workspace_settings.settings.members.modal.errors.invalid"),
                 },
+                validate: validateAgainstPolicy,
               }}
               render={({ field: { value, onChange, ref } }) => (
                 <>
@@ -96,11 +121,11 @@ export const InvitationFields = observer(function InvitationFields(props: TInvit
                     className="w-24 flex-grow"
                     input
                   >
-                    {Object.entries(ROLE).map(([key, value]) => {
+                    {Object.entries(ROLE).map(([key, roleLabel]) => {
                       if (currentWorkspaceRole && currentWorkspaceRole >= parseInt(key))
                         return (
                           <CustomSelect.Option key={key} value={parseInt(key)}>
-                            {value}
+                            {roleLabel}
                           </CustomSelect.Option>
                         );
                     })}

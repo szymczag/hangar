@@ -61,7 +61,10 @@
           "placeholder": "name@company.com",
           "errors": {
             "required": "我们需要一个电子邮件地址来邀请他们。",
-            "invalid": "电子邮件无效"
+            "invalid": "电子邮件无效",
+            "outside_domain": "只能邀请 {domains} 上的地址。",
+            "plus_tag": "{domain} 上不能使用带加号的地址。",
+            "blocked_domain": "{domain} 未启用任何登录方式。"
           }
         }
       },

@@ -11,6 +11,7 @@ from plane.app.views import (
     WorkspaceJoinEndpoint,
     WorkSpaceMemberViewSet,
     WorkspaceInvitationsViewset,
+    WorkspaceInvitationPolicyEndpoint,
     WorkspaceMemberUserEndpoint,
     WorkspaceMemberUserViewsEndpoint,
     WorkSpaceAvailabilityCheckEndpoint,
@@ -66,6 +67,11 @@ urlpatterns = [
         "workspaces/<str:slug>/invitations/",
         WorkspaceInvitationsViewset.as_view({"get": "list", "post": "create"}),
         name="workspace-invitations",
+    ),
+    path(
+        "workspaces/<str:slug>/invitations/policy/",
+        WorkspaceInvitationPolicyEndpoint.as_view(),
+        name="workspace-invitation-policy",
     ),
     path(
         "workspaces/<str:slug>/invitations/<uuid:pk>/",

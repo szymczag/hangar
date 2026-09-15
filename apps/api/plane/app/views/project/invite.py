@@ -33,6 +33,7 @@ from plane.db.models import (
     ProjectUserProperty,
 )
 from plane.db.models.project import ProjectNetwork
+from plane.authentication.utils.sso_domain_policy import invitation_rejection_reason
 from plane.bgtasks.project_invitation_task import project_invitation
 from plane.utils.host import base_host
 
@@ -110,6 +111,9 @@ class ProjectInvitationsViewset(BaseViewSet):
         for email in emails:
             try:
                 validate_email(email.get("email"))
+                rejection = invitation_rejection_reason(email.get("email"))
+                if rejection:
+                    return Response({"error": rejection}, status=status.HTTP_400_BAD_REQUEST)
                 project_invitations.append(
                     ProjectMemberInvite(
                         email=email.get("email").strip().lower(),

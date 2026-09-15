@@ -61,7 +61,10 @@
           "placeholder": "nombre@empresa.com",
           "errors": {
             "required": "Necesitamos una dirección de correo electrónico para invitarlos.",
-            "invalid": "El correo electrónico no es válido"
+            "invalid": "El correo electrónico no es válido",
+            "outside_domain": "Solo se pueden invitar direcciones de {domains}.",
+            "plus_tag": "No se puede usar una etiqueta con signo más en {domain}.",
+            "blocked_domain": "{domain} no tiene ningún método de inicio de sesión habilitado."
           }
         }
       },

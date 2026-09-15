@@ -61,7 +61,10 @@
           "placeholder": "isim@firma.com",
           "errors": {
             "required": "Davet etmek için bir e-posta adresine ihtiyacımız var.",
-            "invalid": "E-posta geçersiz"
+            "invalid": "E-posta geçersiz",
+            "outside_domain": "Yalnızca {domains} adresleri davet edilebilir.",
+            "plus_tag": "{domain} üzerinde artı etiketi kullanılamaz.",
+            "blocked_domain": "{domain} için etkin bir oturum açma yöntemi yok."
           }
         }
       },

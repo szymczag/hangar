@@ -152,6 +152,11 @@ export function parsePolicy(enforced: string, workspaces: string, projects: stri
   return Array.from(rows.values());
 }
 
+/** Read the invitation restriction, which is stored as "1" or "0". */
+export function parseRestrictInvites(raw: string | undefined): boolean {
+  return (raw ?? "").trim() === "1";
+}
+
 /** Render the rows back into the three stored strings. */
 export function serializePolicy(rows: TDomainRow[]): {
   SSO_ENFORCED_DOMAINS: string;
