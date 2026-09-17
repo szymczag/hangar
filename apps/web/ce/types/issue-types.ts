@@ -4,6 +4,8 @@
  * See the LICENSE file for details.
  */
 
+import type { TLogoProps } from "@plane/types";
+
 export type TIssuePropertyType = "text" | "number" | "date" | "boolean" | "select" | "multi_select" | "member";
 
 export type TIssuePropertyOptionExt = {
@@ -36,7 +38,7 @@ export type TIssueTypeExt = {
   id: string;
   name: string;
   description: string;
-  logo_props: Record<string, unknown>;
+  logo_props: Partial<TLogoProps>;
   is_epic: boolean;
   is_default: boolean;
   is_active: boolean;

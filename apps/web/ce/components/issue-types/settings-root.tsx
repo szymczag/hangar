@@ -9,11 +9,16 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 // icons
-import { Plus, Shapes } from "lucide-react";
+import { Plus } from "lucide-react";
 // plane imports
 import { Button } from "@plane/propel/button";
+import { EmojiIconPickerTypes, EmojiPicker } from "@plane/propel/emoji-icon-picker";
+import type { TChangeHandlerProps } from "@plane/propel/emoji-icon-picker";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import type { TLogoProps } from "@plane/types";
 import { CustomSelect, Input, ToggleSwitch } from "@plane/ui";
+// components
+import { IssueTypeIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // plane web
 import { issueTypeService } from "@/plane-web/services/issue-type.service";
 import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
@@ -97,6 +102,50 @@ const PropertyRow = observer(function PropertyRow(props: {
   );
 });
 
+const toLogoProps = (value: TChangeHandlerProps): TLogoProps =>
+  value.type === EmojiIconPickerTypes.EMOJI
+    ? { in_use: "emoji", emoji: { value: value.value } }
+    : { in_use: "icon", icon: { name: value.value.name, color: value.value.color } };
+
+const TypeLogo = observer(function TypeLogo(props: {
+  issueType: TIssueTypeExt;
+  workspaceSlug: string;
+  projectId: string;
+  isAdmin: boolean;
+  onChanged: () => void;
+}) {
+  const { issueType, workspaceSlug, projectId, isAdmin, onChanged } = props;
+  const [isOpen, setIsOpen] = useState(false);
+  const mark = <IssueTypeIdentifier issueTypeId={issueType.id} projectId={projectId} size="lg" />;
+
+  if (!isAdmin) return mark;
+
+  const updateLogo = async (value: TChangeHandlerProps) => {
+    setIsOpen(false);
+    try {
+      await issueTypeService.updateIssueType(workspaceSlug, projectId, issueType.id, {
+        logo_props: toLogoProps(value),
+      });
+      onChanged();
+    } catch {
+      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to update the work item type icon." });
+    }
+  };
+
+  return (
+    <EmojiPicker
+      iconType="material"
+      isOpen={isOpen}
+      handleToggle={setIsOpen}
+      buttonClassName="grid size-7 place-items-center rounded-md border border-subtle hover:bg-layer-1"
+      label={mark}
+      onChange={(value) => void updateLogo(value)}
+      defaultIconColor={issueType.logo_props?.in_use === "icon" ? issueType.logo_props.icon?.color : undefined}
+      defaultOpen={issueType.logo_props?.in_use === "emoji" ? EmojiIconPickerTypes.EMOJI : EmojiIconPickerTypes.ICON}
+    />
+  );
+});
+
 const TypeCard = observer(function TypeCard(props: {
   issueType: TIssueTypeExt;
   workspaceSlug: string;
@@ -134,7 +183,13 @@ const TypeCard = observer(function TypeCard(props: {
     <div className="flex flex-col gap-3 rounded-lg border border-subtle p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Shapes className="h-5 w-5 text-tertiary" />
+          <TypeLogo
+            issueType={issueType}
+            workspaceSlug={workspaceSlug}
+            projectId={projectId}
+            isAdmin={isAdmin}
+            onChanged={onChanged}
+          />
           <span className="text-16 font-medium">{issueType.name}</span>
           {issueType.is_default && <span className="text-11 text-tertiary">default</span>}
           {issueType.system_key && (
