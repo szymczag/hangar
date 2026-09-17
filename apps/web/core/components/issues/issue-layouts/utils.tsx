@@ -27,6 +27,7 @@ import {
   DueDatePropertyIcon,
   EstimatePropertyIcon,
   LabelPropertyIcon,
+  ParentPropertyIcon,
   PriorityPropertyIcon,
   StartDatePropertyIcon,
 } from "@plane/propel/icons";
@@ -65,6 +66,7 @@ import {
   SpreadsheetLabelColumn,
   SpreadsheetModuleColumn,
   SpreadsheetCycleColumn,
+  SpreadsheetParentColumn,
   SpreadsheetLinkColumn,
   SpreadsheetPriorityColumn,
   SpreadsheetStartDateColumn,
@@ -844,6 +846,7 @@ export const SpreadSheetPropertyIconMap: Record<string, FC<ISvgIcons>> = {
   Link2: LinkIcon,
   Paperclip: Paperclip,
   LayersIcon: LayersIcon,
+  ParentPropertyIcon: ParentPropertyIcon,
 };
 
 export const SPREADSHEET_COLUMNS: { [key in keyof IIssueDisplayProperties]: TSpreadsheetColumn } = {
@@ -861,6 +864,7 @@ export const SPREADSHEET_COLUMNS: { [key in keyof IIssueDisplayProperties]: TSpr
   sub_issue_count: SpreadsheetSubIssueColumn,
   updated_on: SpreadsheetUpdatedOnColumn,
   attachment_count: SpreadsheetAttachmentColumn,
+  parent: SpreadsheetParentColumn,
 };
 
 export const useGroupByOptions = (

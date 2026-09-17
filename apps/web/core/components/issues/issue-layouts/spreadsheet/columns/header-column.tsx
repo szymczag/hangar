@@ -47,6 +47,16 @@ export function HeaderColumn(props: Props) {
 
   if (!propertyDetails) return null;
 
+  const title = (
+    <div className="flex items-center gap-1.5">
+      {<SpreadSheetPropertyIcon iconKey={propertyDetails.icon} className="h-4 w-4 text-placeholder" />}
+      {property === "sub_issue_count" && isEpic ? t("issue.label", { count: 2 }) : t(propertyDetails.i18n_title)}
+    </div>
+  );
+
+  if (propertyDetails.ascendingOrderKey === undefined)
+    return <Row className="flex w-full items-center gap-1.5 py-2 text-13 text-secondary">{title}</Row>;
+
   return (
     <CustomMenu
       customButtonClassName="clickable !w-full"
@@ -54,10 +64,7 @@ export function HeaderColumn(props: Props) {
       className="!w-full"
       customButton={
         <Row className="flex w-full cursor-pointer items-center justify-between gap-1.5 py-2 text-13 text-secondary hover:text-primary">
-          <div className="flex items-center gap-1.5">
-            {<SpreadSheetPropertyIcon iconKey={propertyDetails.icon} className="h-4 w-4 text-placeholder" />}
-            {property === "sub_issue_count" && isEpic ? t("issue.label", { count: 2 }) : t(propertyDetails.i18n_title)}
-          </div>
+          {title}
           <div className="ml-3 flex">
             {activeSortingProperty === property && (
               <div className="flex h-3.5 w-3.5 items-center justify-center rounded-full">

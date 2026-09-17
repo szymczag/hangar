@@ -156,6 +156,7 @@ export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = 
   "modules",
   "cycle",
   "issue_type",
+  "parent",
 ];
 
 export const SUB_ISSUES_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = [
@@ -210,9 +211,11 @@ export const ISSUE_DISPLAY_PROPERTIES: {
   { key: "cycle", titleTranslationKey: "common.cycle" },
   // Fork (see FORK.md): work item type mark next to the identifier.
   { key: "issue_type", titleTranslationKey: "issue.display.properties.issue_type" },
+  { key: "parent", titleTranslationKey: "common.parent" },
 ];
 
 export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
+  "parent",
   "state",
   "priority",
   "assignee",
@@ -229,16 +232,29 @@ export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
   "sub_issue_count",
 ];
 
+export type TSpreadsheetPropertyDetails = { i18n_title: string; icon: string } & (
+  | {
+      ascendingOrderKey: TIssueOrderByOptions;
+      ascendingOrderTitle: string;
+      descendingOrderKey: TIssueOrderByOptions;
+      descendingOrderTitle: string;
+    }
+  // Fork (see FORK.md): a column may be display-only.
+  | {
+      ascendingOrderKey?: undefined;
+      ascendingOrderTitle?: undefined;
+      descendingOrderKey?: undefined;
+      descendingOrderTitle?: undefined;
+    }
+);
+
 export const SPREADSHEET_PROPERTY_DETAILS: {
-  [key in keyof IIssueDisplayProperties]: {
-    i18n_title: string;
-    ascendingOrderKey: TIssueOrderByOptions;
-    ascendingOrderTitle: string;
-    descendingOrderKey: TIssueOrderByOptions;
-    descendingOrderTitle: string;
-    icon: string;
-  };
+  [key in keyof IIssueDisplayProperties]: TSpreadsheetPropertyDetails;
 } = {
+  parent: {
+    i18n_title: "common.parent",
+    icon: "ParentPropertyIcon",
+  },
   assignee: {
     i18n_title: "common.assignees",
     ascendingOrderKey: "assignees__first_name",
