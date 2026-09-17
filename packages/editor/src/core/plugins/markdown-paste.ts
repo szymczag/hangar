@@ -86,11 +86,17 @@ export const htmlAddsNoFormatting = (htmlText: string, plainText: string): boole
 
 export const isPlainishHtml = (html: string, plainText: string): boolean => {
   if (!html.trim()) return true;
-  const container = document.createElement("div");
-  container.innerHTML = html;
-  const tagNames = Array.from(container.querySelectorAll("*")).map((element) => element.tagName);
+
+  // DOMParser, not `innerHTML` on a detached element. Assigning clipboard HTML
+  // to `innerHTML` does not run <script>, but it does create elements that
+  // fetch: `<img src=x onerror=...>` loads and fires its handler even when the
+  // element was never inserted into the page, which would make inspecting the
+  // paste the very thing that executes it. A document from DOMParser has no
+  // browsing context, so nothing loads and no handler runs.
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  const tagNames = Array.from(parsed.body.querySelectorAll("*")).map((element) => element.tagName);
   if (!hasOnlyPlainWrappers(tagNames)) return false;
-  return htmlAddsNoFormatting(container.textContent ?? "", plainText);
+  return htmlAddsNoFormatting(parsed.body.textContent ?? "", plainText);
 };
 
 type Props = {
