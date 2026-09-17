@@ -5,6 +5,7 @@
  */
 
 import type {
+  IIssueDisplayFilterOptions,
   TIssueGroupByOptions,
   TIssueOrderByOptions,
   IIssueDisplayProperties,
@@ -139,10 +140,18 @@ export const ISSUE_GROUP_BY_OPTIONS: {
 // response, so these groupings always request sub-work items.
 export const HIERARCHY_GROUP_BY_OPTIONS: TIssueGroupByOptions[] = ["parent", "epic"];
 
+// Group by is stored per view and kept when the layout changes, so only the
+// groupings the current layout applies count.
 export const isHierarchyGrouping = (
-  groupBy: TIssueGroupByOptions | undefined,
-  subGroupBy: TIssueGroupByOptions | undefined
-) => HIERARCHY_GROUP_BY_OPTIONS.includes(groupBy ?? null) || HIERARCHY_GROUP_BY_OPTIONS.includes(subGroupBy ?? null);
+  displayFilters: Pick<IIssueDisplayFilterOptions, "layout" | "group_by" | "sub_group_by"> | undefined
+) => {
+  const layout = displayFilters?.layout;
+  const groupBy = layout === "list" || layout === "kanban" ? displayFilters?.group_by : undefined;
+  const subGroupBy = layout === "kanban" ? displayFilters?.sub_group_by : undefined;
+  return (
+    HIERARCHY_GROUP_BY_OPTIONS.includes(groupBy ?? null) || HIERARCHY_GROUP_BY_OPTIONS.includes(subGroupBy ?? null)
+  );
+};
 
 export const ISSUE_ORDER_BY_OPTIONS: {
   key: TIssueOrderByOptions;

@@ -172,7 +172,9 @@ export const getGroupByColumns = ({
 const getWorkItemGroupColumns = (
   groupIds: string[] | undefined,
   payloadFor: (workItemId: string | null) => Partial<TIssue>,
-  noneIcon: React.ReactElement
+  noneIcon: React.ReactElement,
+  // Shown while the work item loads, or when the viewer cannot open it.
+  unresolvedName: string
 ): IGroupByColumn[] => {
   const { getIssueById } = store.issue.issues;
   const { getProjectIdentifierById } = store.projectRoot.project;
@@ -184,7 +186,7 @@ const getWorkItemGroupColumns = (
       id: workItemId,
       name: workItem
         ? `${projectIdentifier ? `${projectIdentifier}-${workItem.sequence_id} ` : ""}${workItem.name}`
-        : "…",
+        : unresolvedName,
       icon: <WorkItemGroupIcon workItemId={workItemId} />,
       payload: payloadFor(workItemId),
     };
@@ -197,14 +199,16 @@ const getParentColumns = ({ groupIds }: TGetColumns): IGroupByColumn[] =>
   getWorkItemGroupColumns(
     groupIds,
     (parentId) => ({ parent_id: parentId }),
-    <ParentPropertyIcon className="h-3.5 w-3.5" />
+    <ParentPropertyIcon className="h-3.5 w-3.5" />,
+    "Parent"
   );
 
 const getEpicColumns = ({ groupIds }: TGetColumns): IGroupByColumn[] =>
   getWorkItemGroupColumns(
     groupIds,
     (epicId) => ({ parent_id: epicId, epic_id: epicId }),
-    <EpicIcon className="h-3.5 w-3.5" />
+    <EpicIcon className="h-3.5 w-3.5" />,
+    "Epic"
   );
 
 const getProjectColumns = (): IGroupByColumn[] | undefined => {

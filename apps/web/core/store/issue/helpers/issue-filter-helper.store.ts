@@ -101,9 +101,7 @@ export class IssueFilterHelperStore implements IIssueFilterHelperStore {
         ? EIssueGroupByToServerOptions[displayFilters.sub_group_by]
         : undefined,
       order_by: displayFilters?.order_by || undefined,
-      sub_issue: isHierarchyGrouping(displayFilters?.group_by, displayFilters?.sub_group_by)
-        ? true
-        : (displayFilters?.sub_issue ?? true),
+      sub_issue: isHierarchyGrouping(displayFilters) ? true : (displayFilters?.sub_issue ?? true),
     };
 
     const issueFiltersParams: Partial<Record<TIssueParams, boolean | string>> = {};

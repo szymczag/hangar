@@ -37,3 +37,16 @@ export const orderWorkItemGroups = (
         (first.workItem?.sequence_id ?? Number.MAX_SAFE_INTEGER) -
         (second.workItem?.sequence_id ?? Number.MAX_SAFE_INTEGER)
     );
+
+/**
+ * Quick add values for a parent or Epic group: the new work item becomes a child
+ * of the group's work item. Returns undefined for any other grouping.
+ */
+export const getHierarchyGroupQuickAddData = (
+  groupByKey: string | null | undefined,
+  groupValue: string
+): Partial<TIssue> | undefined => {
+  if (groupByKey !== "parent" && groupByKey !== "epic") return undefined;
+  const workItemId = groupValue === "None" ? null : groupValue;
+  return groupByKey === "epic" ? { parent_id: workItemId, epic_id: workItemId } : { parent_id: workItemId };
+};

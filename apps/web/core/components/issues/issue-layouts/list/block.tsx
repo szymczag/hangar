@@ -10,6 +10,7 @@ import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
+import { isHierarchyGrouping } from "@plane/constants";
 import { ChevronRightIcon } from "@plane/propel/icons";
 // types
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
@@ -25,6 +26,7 @@ import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifi
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
+import { useIssuesStore } from "@/hooks/use-issue-layout-store";
 import { useProject } from "@/hooks/store/use-project";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import { usePlatformOS } from "@/hooks/use-platform-os";
@@ -79,6 +81,10 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
   const { sidebarCollapsed: isSidebarCollapsed } = useAppTheme();
   const { getProjectIdentifierById, currentProjectNextSequenceId } = useProject();
   const { getIsIssuePeeked, peekIssue, setPeekIssue, subIssues: subIssuesStore } = useIssueDetail();
+  const { issuesFilter } = useIssuesStore();
+  // Fork (see FORK.md): parent and Epic groups already list the children, so
+  // expanding a row would repeat them.
+  const canExpandSubIssues = !isHierarchyGrouping(issuesFilter?.issueFilters?.displayFilters);
 
   const handleIssuePeekOverview = (issue: TIssue) =>
     workspaceSlug &&
@@ -243,7 +249,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
 
               {/* sub-issues chevron */}
               <div className="grid size-4 flex-shrink-0 place-items-center">
-                {subIssuesCount > 0 && !isEpic && (
+                {subIssuesCount > 0 && !isEpic && canExpandSubIssues && (
                   <button
                     type="button"
                     className="grid size-4 place-items-center rounded-xs text-placeholder hover:text-tertiary"

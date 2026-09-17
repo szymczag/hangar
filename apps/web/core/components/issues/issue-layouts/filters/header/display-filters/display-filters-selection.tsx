@@ -139,7 +139,7 @@ export const DisplayFiltersSelection = observer(function DisplayFiltersSelection
             }
             enabledExtraOptions={
               // Fork (see FORK.md): hierarchy groupings always include sub-work items.
-              isHierarchyGrouping(displayFilters?.group_by, displayFilters?.sub_group_by)
+              isHierarchyGrouping(displayFilters)
                 ? layoutDisplayFiltersOptions?.extra_options.values.filter((option) => option !== "sub_issue")
                 : layoutDisplayFiltersOptions?.extra_options.values
             }

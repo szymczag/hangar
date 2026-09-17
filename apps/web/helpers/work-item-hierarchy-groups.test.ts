@@ -7,7 +7,8 @@
 import { describe, expect, it } from "vitest";
 import { ALL_ISSUES, isHierarchyGrouping } from "@plane/constants";
 import type { TIssue } from "@plane/types";
-import { getResponseGroupIds, orderWorkItemGroups } from "./work-item-hierarchy-groups";
+import { EIssueLayoutTypes } from "@plane/types";
+import { getHierarchyGroupQuickAddData, getResponseGroupIds, orderWorkItemGroups } from "./work-item-hierarchy-groups";
 
 describe("getResponseGroupIds", () => {
   it("returns group ids of a grouped response", () => {
@@ -43,9 +44,37 @@ describe("orderWorkItemGroups", () => {
 
 describe("isHierarchyGrouping", () => {
   it("is set by either grouping level", () => {
-    expect(isHierarchyGrouping("epic", undefined)).toBe(true);
-    expect(isHierarchyGrouping("state", "parent")).toBe(true);
-    expect(isHierarchyGrouping("state", null)).toBe(false);
-    expect(isHierarchyGrouping(undefined, undefined)).toBe(false);
+    expect(isHierarchyGrouping({ layout: EIssueLayoutTypes.LIST, group_by: "epic" })).toBe(true);
+    expect(isHierarchyGrouping({ layout: EIssueLayoutTypes.KANBAN, group_by: "state", sub_group_by: "parent" })).toBe(
+      true
+    );
+    expect(isHierarchyGrouping({ layout: EIssueLayoutTypes.KANBAN, group_by: "state", sub_group_by: null })).toBe(
+      false
+    );
+    expect(isHierarchyGrouping(undefined)).toBe(false);
+  });
+
+  it("ignores groupings the current layout does not apply", () => {
+    expect(isHierarchyGrouping({ layout: EIssueLayoutTypes.LIST, group_by: "state", sub_group_by: "epic" })).toBe(
+      false
+    );
+    expect(isHierarchyGrouping({ layout: EIssueLayoutTypes.SPREADSHEET, group_by: "epic" })).toBe(false);
+  });
+});
+
+describe("getHierarchyGroupQuickAddData", () => {
+  it("creates the work item under the group's parent or Epic", () => {
+    expect(getHierarchyGroupQuickAddData("parent", "task-1")).toEqual({ parent_id: "task-1" });
+    expect(getHierarchyGroupQuickAddData("epic", "epic-1")).toEqual({ parent_id: "epic-1", epic_id: "epic-1" });
+  });
+
+  it("creates a top-level work item in the None group", () => {
+    expect(getHierarchyGroupQuickAddData("epic", "None")).toEqual({ parent_id: null, epic_id: null });
+    expect(getHierarchyGroupQuickAddData("parent", "None")).toEqual({ parent_id: null });
+  });
+
+  it("leaves other groupings alone", () => {
+    expect(getHierarchyGroupQuickAddData("state", "state-1")).toBeUndefined();
+    expect(getHierarchyGroupQuickAddData(null, "None")).toBeUndefined();
   });
 });

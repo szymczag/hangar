@@ -46,6 +46,7 @@ import { GroupDragOverlay } from "../group-drag-overlay";
 import type { TRenderQuickActions } from "../list/list-view-types";
 import { KanbanQuickAddIssueButton, QuickAddIssueRoot } from "../quick-add";
 import { KanbanIssueBlocksList } from "./blocks-list";
+import { getHierarchyGroupQuickAddData } from "@/helpers/work-item-hierarchy-groups";
 
 interface IKanbanGroup {
   groupId: string;
@@ -220,6 +221,8 @@ export const KanbanGroup = observer(function KanbanGroup(props: IKanbanGroup) {
         preloadedData = { ...preloadedData, assignee_ids: [groupValue] };
       } else if (groupByKey === "created_by") {
         preloadedData = { ...preloadedData };
+      } else if (getHierarchyGroupQuickAddData(groupByKey, groupValue)) {
+        preloadedData = { ...preloadedData, ...getHierarchyGroupQuickAddData(groupByKey, groupValue) };
       } else {
         preloadedData = { ...preloadedData, [groupByKey]: groupValue };
       }
@@ -240,6 +243,8 @@ export const KanbanGroup = observer(function KanbanGroup(props: IKanbanGroup) {
         preloadedData = { ...preloadedData, assignee_ids: [subGroupValue] };
       } else if (subGroupByKey === "created_by") {
         preloadedData = { ...preloadedData };
+      } else if (getHierarchyGroupQuickAddData(subGroupByKey, subGroupValue)) {
+        preloadedData = { ...preloadedData, ...getHierarchyGroupQuickAddData(subGroupByKey, subGroupValue) };
       } else {
         preloadedData = { ...preloadedData, [subGroupByKey]: subGroupValue };
       }

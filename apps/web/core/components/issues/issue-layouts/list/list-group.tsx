@@ -46,6 +46,7 @@ import {
 import { IssueBlocksList } from "./blocks-list";
 import { HeaderGroupByCard } from "./headers/group-by-card";
 import type { TRenderQuickActions } from "./list-view-types";
+import { getHierarchyGroupQuickAddData } from "@/helpers/work-item-hierarchy-groups";
 
 interface Props {
   groupIssueIds: string[] | undefined;
@@ -168,6 +169,8 @@ export const ListGroup = observer(function ListGroup(props: Props) {
         preloadedData = { ...preloadedData, module_ids: [value] };
       } else if (groupByKey === "created_by") {
         preloadedData = { ...preloadedData };
+      } else if (getHierarchyGroupQuickAddData(groupByKey, value)) {
+        preloadedData = { ...preloadedData, ...getHierarchyGroupQuickAddData(groupByKey, value) };
       } else {
         preloadedData = { ...preloadedData, [groupByKey]: value };
       }
