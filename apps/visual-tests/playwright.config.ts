@@ -54,6 +54,21 @@ export default defineConfig({
   reporter: process.env.CI ? [["html", { open: "never" }], ["list"]] : [["list"]],
 
   use: {
+    // Rasterization has to be deterministic, not merely correct. Two stories
+    // chose between two stable renderings of the same pixels -- rounded corners
+    // whose curve lands mid-pixel -- with geometry identical on every run. The
+    // first of those was cured by photographing targets on whole pixels; this
+    // set of flags removes the remaining source, which is Skia deciding how to
+    // tile and raster the layer rather than anything the page does.
+    launchOptions: {
+      args: [
+        "--disable-partial-raster",
+        "--disable-skia-runtime-opts",
+        "--run-all-compositor-stages-before-draw",
+        "--disable-new-content-rendering-timeout",
+        "--force-color-profile=srgb",
+      ],
+    },
     baseURL: process.env.VR_BASE_URL ?? "http://vr-edge",
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
