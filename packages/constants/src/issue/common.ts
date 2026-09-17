@@ -5,6 +5,7 @@
  */
 
 import type {
+  IIssueDisplayFilterOptions,
   TIssueGroupByOptions,
   TIssueOrderByOptions,
   IIssueDisplayProperties,
@@ -33,10 +34,12 @@ export enum EIssueGroupByToServerOptions {
   "cycle" = "cycle_id",
   "module" = "issue_module__module_id",
   "target_date" = "target_date",
+  // oxlint-disable-next-line typescript/no-duplicate-enum-values -- team_project groups by project too
   "project" = "project_id",
   "created_by" = "created_by",
-  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   "team_project" = "project_id",
+  "parent" = "parent_id",
+  "epic" = "epic_id",
 }
 
 export enum EIssueGroupBYServerToProperty {
@@ -50,6 +53,8 @@ export enum EIssueGroupBYServerToProperty {
   "target_date" = "target_date",
   "project_id" = "project_id",
   "created_by" = "created_by",
+  "parent_id" = "parent_id",
+  "epic_id" = "epic_id",
 }
 
 export enum EIssueCommentAccessSpecifier {
@@ -97,6 +102,8 @@ export const DRAG_ALLOWED_GROUPS: TIssueGroupByOptions[] = [
   "labels",
   "module",
   "cycle",
+  "parent",
+  "epic",
 ];
 
 export type TCreateModalStoreTypes =
@@ -124,8 +131,35 @@ export const ISSUE_GROUP_BY_OPTIONS: {
   { key: "labels", titleTranslationKey: "common.labels" },
   { key: "assignees", titleTranslationKey: "common.assignees" },
   { key: "created_by", titleTranslationKey: "common.created_by" },
+  { key: "parent", titleTranslationKey: "common.parent" },
+  { key: "epic", titleTranslationKey: "common.epic" },
   { key: null, titleTranslationKey: "common.none" },
 ];
+
+// Fork (see FORK.md): grouping by hierarchy needs every work item in the
+// response, so these groupings always request sub-work items.
+export const HIERARCHY_GROUP_BY_OPTIONS: TIssueGroupByOptions[] = ["parent", "epic"];
+
+// Group by is stored per view and kept when the layout changes, so only the
+// groupings the current layout applies count.
+/**
+ * Fork (see FORK.md): the list opens as a hierarchy -- Epics and work items
+ * without a parent, each expandable -- so what belongs to what is visible
+ * before anyone touches a filter. Other layouts keep every work item.
+ */
+export const getDefaultSubIssueVisibility = (layout: IIssueDisplayFilterOptions["layout"] | undefined) =>
+  layout !== "list";
+
+export const isHierarchyGrouping = (
+  displayFilters: Pick<IIssueDisplayFilterOptions, "layout" | "group_by" | "sub_group_by"> | undefined
+) => {
+  const layout = displayFilters?.layout;
+  const groupBy = layout === "list" || layout === "kanban" ? displayFilters?.group_by : undefined;
+  const subGroupBy = layout === "kanban" ? displayFilters?.sub_group_by : undefined;
+  return (
+    HIERARCHY_GROUP_BY_OPTIONS.includes(groupBy ?? null) || HIERARCHY_GROUP_BY_OPTIONS.includes(subGroupBy ?? null)
+  );
+};
 
 export const ISSUE_ORDER_BY_OPTIONS: {
   key: TIssueOrderByOptions;
@@ -156,6 +190,7 @@ export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = 
   "modules",
   "cycle",
   "issue_type",
+  "parent",
 ];
 
 export const SUB_ISSUES_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = [
@@ -208,9 +243,13 @@ export const ISSUE_DISPLAY_PROPERTIES: {
   },
   { key: "modules", titleTranslationKey: "common.module" },
   { key: "cycle", titleTranslationKey: "common.cycle" },
+  // Fork (see FORK.md): work item type mark next to the identifier.
+  { key: "issue_type", titleTranslationKey: "issue.display.properties.issue_type" },
+  { key: "parent", titleTranslationKey: "common.parent" },
 ];
 
 export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
+  "parent",
   "state",
   "priority",
   "assignee",
@@ -227,16 +266,29 @@ export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
   "sub_issue_count",
 ];
 
+export type TSpreadsheetPropertyDetails = { i18n_title: string; icon: string } & (
+  | {
+      ascendingOrderKey: TIssueOrderByOptions;
+      ascendingOrderTitle: string;
+      descendingOrderKey: TIssueOrderByOptions;
+      descendingOrderTitle: string;
+    }
+  // Fork (see FORK.md): a column may be display-only.
+  | {
+      ascendingOrderKey?: undefined;
+      ascendingOrderTitle?: undefined;
+      descendingOrderKey?: undefined;
+      descendingOrderTitle?: undefined;
+    }
+);
+
 export const SPREADSHEET_PROPERTY_DETAILS: {
-  [key in keyof IIssueDisplayProperties]: {
-    i18n_title: string;
-    ascendingOrderKey: TIssueOrderByOptions;
-    ascendingOrderTitle: string;
-    descendingOrderKey: TIssueOrderByOptions;
-    descendingOrderTitle: string;
-    icon: string;
-  };
+  [key in keyof IIssueDisplayProperties]: TSpreadsheetPropertyDetails;
 } = {
+  parent: {
+    i18n_title: "common.parent",
+    icon: "ParentPropertyIcon",
+  },
   assignee: {
     i18n_title: "common.assignees",
     ascendingOrderKey: "assignees__first_name",

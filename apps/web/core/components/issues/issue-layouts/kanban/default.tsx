@@ -35,6 +35,7 @@ import { getGroupByColumns, isWorkspaceLevel, getApproximateCardHeight } from ".
 // components
 import { HeaderGroupByCard } from "./headers/group-by-card";
 import { KanbanGroup } from "./kanban-group";
+import { getResponseGroupIds } from "@/helpers/work-item-hierarchy-groups";
 
 export interface IKanBan {
   issuesMap: IIssueMap;
@@ -111,6 +112,7 @@ export const KanBan = observer(function KanBan(props: IKanBan) {
     includeNone: true,
     isWorkspaceLevel: isWorkspaceLevel(storeType),
     isEpic: isEpic,
+    groupIds: getResponseGroupIds(groupedIssueIds),
   });
 
   if (!list) return null;

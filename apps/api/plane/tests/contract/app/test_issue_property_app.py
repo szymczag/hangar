@@ -143,6 +143,53 @@ class TestIssueTypeCRUD:
         assert epic_type.level == 1
 
     @pytest.mark.django_db
+    def test_system_type_logo_is_editable(self, session_client, workspace, project):
+        session_client.post(f"{base_url(workspace, project)}/issue-types/enable/", {}, format="json")
+        epic_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.EPIC)
+        detail_url = f"{base_url(workspace, project)}/issue-types/{epic_type.id}/"
+
+        icon = session_client.patch(
+            detail_url,
+            {"logo_props": {"in_use": "icon", "icon": {"name": "rocket", "color": "#6d28d9"}}},
+            format="json",
+        )
+        assert icon.status_code == status.HTTP_200_OK
+        epic_type.refresh_from_db()
+        assert epic_type.logo_props == {"in_use": "icon", "icon": {"name": "rocket", "color": "#6d28d9"}}
+
+        emoji = session_client.patch(
+            detail_url, {"logo_props": {"in_use": "emoji", "emoji": {"value": "128640"}}}, format="json"
+        )
+        assert emoji.status_code == status.HTTP_200_OK
+        epic_type.refresh_from_db()
+        assert epic_type.logo_props == {"in_use": "emoji", "emoji": {"value": "128640"}}
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "logo_props",
+        [
+            {"in_use": "svg", "svg": {"value": "<svg/>"}},
+            {"in_use": "icon"},
+            {"in_use": "icon", "icon": {"name": ""}},
+            {"in_use": "icon", "icon": {"name": "rocket", "onload": "x"}},
+            {"in_use": "emoji", "emoji": {"value": "x" * 65}},
+            {"in_use": "emoji", "emoji": {"value": "1"}, "extra": True},
+            ["emoji"],
+        ],
+    )
+    def test_malformed_type_logo_rejected(self, session_client, workspace, project, logo_props):
+        session_client.post(f"{base_url(workspace, project)}/issue-types/enable/", {}, format="json")
+        task_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.TASK)
+
+        response = session_client.patch(
+            f"{base_url(workspace, project)}/issue-types/{task_type.id}/", {"logo_props": logo_props}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        task_type.refresh_from_db()
+        assert task_type.logo_props == {}
+
+    @pytest.mark.django_db
     def test_system_type_cannot_be_deactivated_or_deleted(self, session_client, workspace, project):
         session_client.post(f"{base_url(workspace, project)}/issue-types/enable/", {}, format="json")
         task_type = IssueType.objects.get(workspace=workspace, system_key=IssueType.SystemKey.TASK)

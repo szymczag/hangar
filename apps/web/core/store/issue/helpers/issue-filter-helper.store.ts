@@ -11,6 +11,8 @@ import {
   EIssueGroupByToServerOptions,
   EServerGroupByToFilterOptions,
   ENABLE_ISSUE_DEPENDENCIES,
+  getDefaultSubIssueVisibility,
+  isHierarchyGrouping,
 } from "@plane/constants";
 import type {
   EIssuesStoreType,
@@ -100,7 +102,9 @@ export class IssueFilterHelperStore implements IIssueFilterHelperStore {
         ? EIssueGroupByToServerOptions[displayFilters.sub_group_by]
         : undefined,
       order_by: displayFilters?.order_by || undefined,
-      sub_issue: displayFilters?.sub_issue ?? true,
+      sub_issue: isHierarchyGrouping(displayFilters)
+        ? true
+        : (displayFilters?.sub_issue ?? getDefaultSubIssueVisibility(displayFilters?.layout)),
     };
 
     const issueFiltersParams: Partial<Record<TIssueParams, boolean | string>> = {};

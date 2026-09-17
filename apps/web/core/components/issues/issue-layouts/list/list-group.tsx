@@ -46,6 +46,7 @@ import {
 import { IssueBlocksList } from "./blocks-list";
 import { HeaderGroupByCard } from "./headers/group-by-card";
 import type { TRenderQuickActions } from "./list-view-types";
+import { getListGroupQuickAddData } from "@/helpers/quick-add-group-data";
 
 interface Props {
   groupIssueIds: string[] | undefined;
@@ -147,34 +148,10 @@ export const ListGroup = observer(function ListGroup(props: Props) {
     return true;
   };
 
-  const prePopulateQuickAddData = (groupByKey: string | null, value: any) => {
-    const defaultState = projectState.projectStates?.find((state) => state.default);
-    let preloadedData: object = { state_id: defaultState?.id };
-
-    if (groupByKey === null) {
-      preloadedData = { ...preloadedData };
-    } else {
-      if (groupByKey === "state") {
-        preloadedData = { ...preloadedData, state_id: value };
-      } else if (groupByKey === "priority") {
-        preloadedData = { ...preloadedData, priority: value };
-      } else if (groupByKey === "labels" && value != "None") {
-        preloadedData = { ...preloadedData, label_ids: [value] };
-      } else if (groupByKey === "assignees" && value != "None") {
-        preloadedData = { ...preloadedData, assignee_ids: [value] };
-      } else if (groupByKey === "cycle" && value != "None") {
-        preloadedData = { ...preloadedData, cycle_id: value };
-      } else if (groupByKey === "module" && value != "None") {
-        preloadedData = { ...preloadedData, module_ids: [value] };
-      } else if (groupByKey === "created_by") {
-        preloadedData = { ...preloadedData };
-      } else {
-        preloadedData = { ...preloadedData, [groupByKey]: value };
-      }
-    }
-
-    return preloadedData;
-  };
+  const prePopulateQuickAddData = (groupByKey: string | null, value: string) => ({
+    state_id: projectState.projectStates?.find((state) => state.default)?.id,
+    ...getListGroupQuickAddData(groupByKey, value),
+  });
 
   useEffect(() => {
     const element = groupRef.current;

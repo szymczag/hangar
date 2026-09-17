@@ -31,6 +31,7 @@ import { getGroupByColumns, isWorkspaceLevel } from "../utils";
 import { KanBan } from "./default";
 import { HeaderGroupByCard } from "./headers/group-by-card";
 import { HeaderSubGroupByCard } from "./headers/sub-group-by-card";
+import { getResponseGroupIds } from "@/helpers/work-item-hierarchy-groups";
 
 interface ISubGroupSwimlaneHeader {
   collapsedGroups: TIssueKanbanFilters;
@@ -295,12 +296,14 @@ export const KanBanSwimLanes = observer(function KanBanSwimLanes(props: IKanBanS
     includeNone: true,
     isWorkspaceLevel: isWorkspaceLevel(storeType),
     isEpic: isEpic,
+    groupIds: getResponseGroupIds(groupedIssueIds),
   });
   const subGroupByList = getGroupByColumns({
     groupBy: sub_group_by as GroupByColumnTypes,
     includeNone: true,
     isWorkspaceLevel: isWorkspaceLevel(storeType),
     isEpic: isEpic,
+    groupIds: getResponseGroupIds(groupedIssueIds, "sub_group"),
   });
 
   if (!groupByList || !subGroupByList) return null;

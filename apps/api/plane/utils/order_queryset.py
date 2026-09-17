@@ -103,6 +103,10 @@ ISSUE_GROUP_BY_ALLOWLIST = frozenset({
     "created_by",
     "target_date",
     "start_date",
+    # Fork (see FORK.md): work item hierarchy. epic_id is an annotation added
+    # by issue_queryset_grouper; the paginator rejects it where it is absent.
+    "parent_id",
+    "epic_id",
 })
 
 # Cycle list queryset.

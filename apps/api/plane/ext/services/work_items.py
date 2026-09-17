@@ -2,11 +2,45 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from django.db import connection
+from django.db.models import F, Func, UUIDField
 
 from plane.db.models import Issue
 from plane.db.models.issue_type import ProjectIssueType
 
 MAX_HIERARCHY_DEPTH = 100
+
+
+class EpicAncestor(Func):
+    """The nearest Epic in a work item's parent chain, the work item itself included.
+
+    A correlated scalar subquery, so the ORM resolves the outer work item column
+    and the expression can group, partition, and count like a model field. The
+    walk follows live (not soft-deleted) rows and stops at the hierarchy depth
+    cap, which also bounds it on damaged cyclic data.
+    """
+
+    template = (
+        "(WITH RECURSIVE hangar_epic_ancestry(id, parent_id, type_id, depth) AS ("
+        " SELECT node.id, node.parent_id, node.type_id, 1"
+        " FROM issues AS node"
+        " WHERE node.id = %(expressions)s AND node.deleted_at IS NULL"
+        " UNION ALL"
+        " SELECT parent.id, parent.parent_id, parent.type_id, hangar_epic_ancestry.depth + 1"
+        " FROM issues AS parent"
+        " INNER JOIN hangar_epic_ancestry ON parent.id = hangar_epic_ancestry.parent_id"
+        " WHERE parent.deleted_at IS NULL AND hangar_epic_ancestry.depth < " + str(MAX_HIERARCHY_DEPTH) + ""
+        ")"
+        " SELECT hangar_epic_ancestry.id"
+        " FROM hangar_epic_ancestry"
+        " INNER JOIN issue_types ON issue_types.id = hangar_epic_ancestry.type_id"
+        " WHERE issue_types.is_epic"
+        " ORDER BY hangar_epic_ancestry.depth"
+        " LIMIT 1)"
+    )
+    output_field = UUIDField()
+
+    def __init__(self, expression=None, **extra):
+        super().__init__(expression if expression is not None else F("id"), **extra)
 
 
 class WorkItemInvariantError(Exception):

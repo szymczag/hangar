@@ -27,6 +27,8 @@ import {
   DueDatePropertyIcon,
   EstimatePropertyIcon,
   LabelPropertyIcon,
+  EpicIcon,
+  ParentPropertyIcon,
   PriorityPropertyIcon,
   StartDatePropertyIcon,
 } from "@plane/propel/icons";
@@ -65,6 +67,7 @@ import {
   SpreadsheetLabelColumn,
   SpreadsheetModuleColumn,
   SpreadsheetCycleColumn,
+  SpreadsheetParentColumn,
   SpreadsheetLinkColumn,
   SpreadsheetPriorityColumn,
   SpreadsheetStartDateColumn,
@@ -72,6 +75,8 @@ import {
   SpreadsheetSubIssueColumn,
   SpreadsheetUpdatedOnColumn,
 } from "@/components/issues/issue-layouts/spreadsheet/columns";
+import { WorkItemGroupIcon } from "@/components/issues/issue-layouts/work-item-group-icon";
+import { orderWorkItemGroups } from "@/helpers/work-item-hierarchy-groups";
 
 export const HIGHLIGHT_CLASS = "highlight";
 export const HIGHLIGHT_WITH_LINE = "highlight-with-line";
@@ -110,6 +115,7 @@ type TGetGroupByColumns = {
   isWorkspaceLevel: boolean;
   isEpic?: boolean;
   projectId?: string;
+  groupIds?: string[];
 };
 
 // NOTE: Type of groupBy is different compared to what's being passed from the components.
@@ -121,6 +127,7 @@ export const getGroupByColumns = ({
   isWorkspaceLevel,
   isEpic = false,
   projectId,
+  groupIds,
 }: TGetGroupByColumns): IGroupByColumn[] | undefined => {
   // If no groupBy is specified and includeNone is true, return "All Issues" group
   if (!groupBy && includeNone) {
@@ -140,7 +147,7 @@ export const getGroupByColumns = ({
   // Map of group by options to their corresponding column getter functions
   const groupByColumnMap: Record<
     GroupByColumnTypes,
-    ({ isWorkspaceLevel, projectId }: TGetColumns) => IGroupByColumn[] | undefined
+    ({ isWorkspaceLevel, projectId, groupIds }: TGetColumns) => IGroupByColumn[] | undefined
   > = {
     project: getProjectColumns,
     cycle: getCycleColumns,
@@ -152,11 +159,55 @@ export const getGroupByColumns = ({
     assignees: getAssigneeColumns,
     created_by: getCreatedByColumns,
     team_project: getTeamProjectColumns,
+    parent: getParentColumns,
+    epic: getEpicColumns,
   };
 
   // Get and return the columns for the specified group by option
-  return groupByColumnMap[groupBy]?.({ isWorkspaceLevel, projectId });
+  return groupByColumnMap[groupBy]?.({ isWorkspaceLevel, projectId, groupIds });
 };
+
+const getWorkItemGroupColumns = (
+  groupIds: string[] | undefined,
+  payloadFor: (workItemId: string | null) => Partial<TIssue>,
+  noneIcon: React.ReactElement,
+  // Shown while the work item loads, or when the viewer cannot open it.
+  unresolvedName: string
+): IGroupByColumn[] => {
+  const { getIssueById } = store.issue.issues;
+  const { getProjectIdentifierById } = store.projectRoot.project;
+  const workItems = orderWorkItemGroups(groupIds, getIssueById);
+
+  const columns: IGroupByColumn[] = workItems.map(({ workItemId, workItem }) => {
+    const projectIdentifier = workItem?.project_id ? getProjectIdentifierById(workItem.project_id) : undefined;
+    return {
+      id: workItemId,
+      name: workItem
+        ? `${projectIdentifier ? `${projectIdentifier}-${workItem.sequence_id} ` : ""}${workItem.name}`
+        : unresolvedName,
+      icon: <WorkItemGroupIcon workItemId={workItemId} />,
+      payload: payloadFor(workItemId),
+    };
+  });
+  columns.push({ id: "None", name: "None", icon: noneIcon, payload: payloadFor(null) });
+  return columns;
+};
+
+const getParentColumns = ({ groupIds }: TGetColumns): IGroupByColumn[] =>
+  getWorkItemGroupColumns(
+    groupIds,
+    (parentId) => ({ parent_id: parentId }),
+    <ParentPropertyIcon className="h-3.5 w-3.5" />,
+    "Parent"
+  );
+
+const getEpicColumns = ({ groupIds }: TGetColumns): IGroupByColumn[] =>
+  getWorkItemGroupColumns(
+    groupIds,
+    (epicId) => ({ parent_id: epicId, epic_id: epicId }),
+    <EpicIcon className="h-3.5 w-3.5" />,
+    "Epic"
+  );
 
 const getProjectColumns = (): IGroupByColumn[] | undefined => {
   const { joinedProjectIds: projectIds, projectMap } = store.projectRoot.project;
@@ -611,6 +662,9 @@ export const handleGroupDragDrop = async (
     updatedIssue = { ...updatedIssue, [subGroupKey]: subGroupValue };
   }
 
+  // Fork (see FORK.md): moving a work item to an Epic group places it directly under that Epic.
+  if ("epic_id" in updatedIssue) updatedIssue = { ...updatedIssue, parent_id: updatedIssue.epic_id ?? null };
+
   if (updatedIssue && sourceIssue?.project_id) {
     return await updateIssueOnDrop(sourceIssue?.project_id, sourceIssue.id, updatedIssue, issueUpdates);
   }
@@ -844,6 +898,7 @@ export const SpreadSheetPropertyIconMap: Record<string, FC<ISvgIcons>> = {
   Link2: LinkIcon,
   Paperclip: Paperclip,
   LayersIcon: LayersIcon,
+  ParentPropertyIcon: ParentPropertyIcon,
 };
 
 export const SPREADSHEET_COLUMNS: { [key in keyof IIssueDisplayProperties]: TSpreadsheetColumn } = {
@@ -861,6 +916,7 @@ export const SPREADSHEET_COLUMNS: { [key in keyof IIssueDisplayProperties]: TSpr
   sub_issue_count: SpreadsheetSubIssueColumn,
   updated_on: SpreadsheetUpdatedOnColumn,
   attachment_count: SpreadsheetAttachmentColumn,
+  parent: SpreadsheetParentColumn,
 };
 
 export const useGroupByOptions = (

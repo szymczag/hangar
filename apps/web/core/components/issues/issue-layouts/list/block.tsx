@@ -10,6 +10,7 @@ import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
+import { isHierarchyGrouping } from "@plane/constants";
 import { ChevronRightIcon } from "@plane/propel/icons";
 // types
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
@@ -25,6 +26,7 @@ import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifi
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
+import { useIssuesStore } from "@/hooks/use-issue-layout-store";
 import { useProject } from "@/hooks/store/use-project";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import { usePlatformOS } from "@/hooks/use-platform-os";
@@ -79,6 +81,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
   const { sidebarCollapsed: isSidebarCollapsed } = useAppTheme();
   const { getProjectIdentifierById, currentProjectNextSequenceId } = useProject();
   const { getIsIssuePeeked, peekIssue, setPeekIssue, subIssues: subIssuesStore } = useIssueDetail();
+  const { issuesFilter } = useIssuesStore();
 
   const handleIssuePeekOverview = (issue: TIssue) =>
     workspaceSlug &&
@@ -96,7 +99,10 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
 
   // derived values
   const issue = issuesMap[issueId];
-  const subIssuesCount = issue?.sub_issues_count ?? 0;
+  // Fork (see FORK.md): parent and Epic groups already list the children, so
+  // there is nothing left to expand a row into.
+  const canExpandSubIssues = !isHierarchyGrouping(issuesFilter?.issueFilters?.displayFilters);
+  const subIssuesCount = canExpandSubIssues ? (issue?.sub_issues_count ?? 0) : 0;
   const canEditIssueProperties = canEditProperties(issue?.project_id ?? undefined);
   const isDraggingAllowed = canDrag && canEditIssueProperties;
 

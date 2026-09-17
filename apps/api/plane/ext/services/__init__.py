@@ -5,6 +5,7 @@ from .issue_types import ensure_project_system_types, ensure_project_workshop_ty
 from .project_copy import ProjectCopyError, duplicate_project
 from .work_items import (
     MAX_HIERARCHY_DEPTH,
+    EpicAncestor,
     WorkItemInvariantError,
     parent_ancestry_ids,
     project_default_issue_type,
@@ -13,6 +14,7 @@ from .work_items import (
 
 __all__ = [
     "MAX_HIERARCHY_DEPTH",
+    "EpicAncestor",
     "ProjectCopyError",
     "WorkItemInvariantError",
     "duplicate_project",

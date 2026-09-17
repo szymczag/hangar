@@ -345,6 +345,29 @@ def filter_cycle(params, issue_filter, method, prefix=""):
     return issue_filter
 
 
+# Fork (see FORK.md): the filter behind "load more" in an Epic group. The
+# parent group uses the upstream parent filter.
+def filter_epic(params, issue_filter, method, prefix=""):
+    from django.db.models import Q
+
+    from plane.db.models import Issue
+    from plane.ext.services.work_items import EpicAncestor
+
+    if method != "GET":
+        return issue_filter
+    values = [item for item in str(params.get("epic", "")).split(",") if item not in ("", "null")]
+    include_none, epics = "None" in values, filter_valid_uuids(values)
+    if not include_none and not epics:
+        return issue_filter
+    condition = Q()
+    if include_none:
+        condition |= Q(epic_id__isnull=True)
+    if epics:
+        condition |= Q(epic_id__in=epics)
+    issue_filter[f"{prefix}id__in"] = Issue.all_objects.annotate(epic_id=EpicAncestor()).filter(condition).values("id")
+    return issue_filter
+
+
 def filter_module(params, issue_filter, method, prefix=""):
     if method == "GET":
         modules = [item for item in params.get("module").split(",") if item != "null"]
@@ -467,6 +490,8 @@ def issue_filters(query_params, method, prefix=""):
         "intake_status": filter_intake_status,
         "inbox_status": filter_inbox_status,
         "sub_issue": filter_sub_issue_toggle,
+        # Fork (see FORK.md)
+        "epic": filter_epic,
         "subscriber": filter_subscribed_issues,
         "start_target_date": filter_start_target_date_issues,
     }
