@@ -24,6 +24,11 @@ from plane.db.models import (
 )
 from typing import Optional, Dict, Any, Union, List
 
+# Fork (see FORK.md): grouping by the nearest Epic ancestor.
+from plane.ext.services.work_items import EpicAncestor
+
+EPIC_GROUP_FIELD = "epic_id"
+
 
 def issue_queryset_grouper(
     queryset: QuerySet[Issue],
@@ -45,6 +50,10 @@ def issue_queryset_grouper(
     for group_key in [group_by, sub_group_by]:
         if group_key in GROUP_FILTER_MAPPER:
             queryset = queryset.filter(GROUP_FILTER_MAPPER[group_key])
+
+    # The ancestry walk runs per row, so it is only annotated when requested.
+    if EPIC_GROUP_FIELD in {group_by, sub_group_by}:
+        queryset = queryset.annotate(epic_id=EpicAncestor())
 
     issue_assignee_subquery = Subquery(
         IssueAssignee.objects.filter(
@@ -141,6 +150,9 @@ def issue_on_results(
         original_list.remove(FIELD_MAPPER[sub_group_by])
         original_list.append(sub_group_by)
 
+    if EPIC_GROUP_FIELD in {group_by, sub_group_by}:
+        required_fields.append(EPIC_GROUP_FIELD)
+
     required_fields.extend(original_list)
     return list(issues.values(*required_fields))
 
@@ -217,5 +229,28 @@ def issue_group_values(
             return list(queryset.filter(project_id=project_id))
         else:
             return list(queryset)
+
+    # Fork (see FORK.md): hierarchy groups are the parents and Epics that the
+    # filtered work items actually reference, so no group names an item the
+    # viewer cannot list.
+    if field == "parent_id":
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return [
+            *queryset.filter(parent_id__isnull=False).order_by().values_list("parent_id", flat=True).distinct(),
+            "None",
+        ]
+
+    if field == EPIC_GROUP_FIELD:
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        epic_ids = (
+            queryset.annotate(epic_id=EpicAncestor())
+            .filter(epic_id__isnull=False)
+            .order_by()
+            .values_list("epic_id", flat=True)
+            .distinct()
+        )
+        return [*epic_ids, "None"]
 
     return []

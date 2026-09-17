@@ -76,6 +76,38 @@ the atomic multi-item checks. Together they prevent clients from bypassing the
 hierarchy through a direct request or by reusing a work-item identifier from
 another project.
 
+## See the hierarchy on the Work Items page
+
+Each work item shows its type icon next to its identifier. A project administrator
+can change a type's icon from **Project settings → Work item types** by selecting the
+icon beside the type name. Types without a configured icon use a built-in icon.
+
+To see which Epic or parent a work item belongs to, use one of these views:
+
+- **Parent property.** Open **Display** and turn on **Parent**. List and board rows
+  show the parent's identifier and name. The spreadsheet has a **Parent** column.
+  Select the parent to open it.
+- **Group by Parent.** In the list or board layout, set **Group by** to **Parent**.
+  Each group is one parent. Work items without a parent are in **None**.
+- **Group by Epic.** Set **Group by** to **Epic**. Each group holds an Epic and every
+  work item below it, including sub-work items of its Tasks. Work items outside any
+  Epic are in **None**. In the board layout, choose **Epic** as the sub-group to get
+  one row per Epic.
+- **Nested list.** Turn off **Show sub-work items** in the list layout. Only
+  top-level work items remain, and you can expand an Epic to show its work items.
+
+Grouping by Parent or Epic always includes sub-work items, so **Show sub-work items**
+is not available with these groupings.
+
+Dragging a work item to another Parent or Epic group changes its parent. Dropping a
+work item on an Epic group makes it a direct child of that Epic, even if it was
+nested deeper before. The server rejects moves that break the hierarchy rules, such
+as giving an Epic a parent, and the item returns to its previous group.
+
+A guest who can see only their own work items sees groups only for the parents and
+Epics of those work items. A parent that the guest cannot open appears without a
+name.
+
 ## API reference
 
 Use the standard project work-item endpoints for new integrations. Set `type_id` to
@@ -88,6 +120,14 @@ Project type management is available under:
 GET  /api/workspaces/{workspace_slug}/projects/{project_id}/issue-types/
 POST /api/workspaces/{workspace_slug}/projects/{project_id}/issue-types/enable/
 ```
+
+The work-item list endpoint accepts `group_by` and `sub_group_by` values of
+`parent_id` and `epic_id`. With `epic_id`, each returned work item includes the
+`epic_id` of its nearest Epic ancestor; for an Epic, that is its own id. The filters
+`parent=<id>` and `epic=<id>` load the next page of one group, and the value `None`
+selects work items without a parent or an Epic. The `logo_props` field of a work
+item type accepts `{"in_use": "icon", "icon": {"name", "color"}}` or
+`{"in_use": "emoji", "emoji": {"value"}}`.
 
 The enable endpoint requires project-administrator permission. Type assignment is
 accepted only when the type is active and linked to the target project.

@@ -125,6 +125,8 @@ export const ISSUE_GROUP_BY_KEY: Record<TIssueDisplayFilterOptions, keyof TIssue
   cycle: "cycle_id",
   module: "module_ids",
   team_project: "project_id",
+  parent: "parent_id",
+  epic: "epic_id",
 };
 
 export const ISSUE_FILTER_DEFAULT_DATA: Record<TIssueDisplayFilterOptions, keyof TIssue> = {
@@ -139,6 +141,8 @@ export const ISSUE_FILTER_DEFAULT_DATA: Record<TIssueDisplayFilterOptions, keyof
   assignees: "assignee_ids",
   target_date: "target_date",
   team_project: "project_id",
+  parent: "parent_id",
+  epic: "epic_id",
 };
 
 // This constant maps the order by keys to the respective issue property that the key relies on
@@ -265,6 +269,9 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
 
   // Abstract class to be implemented to fetch parent stats such as project, module or cycle details
   abstract fetchParentStats: (workspaceSlug: string, projectId?: string, id?: string) => void;
+
+  // Fork (see FORK.md): reload groups that the server derives from the hierarchy.
+  refreshHierarchyGroups(_workspaceSlug: string, _projectId: string): void {}
 
   abstract updateParentStats: (prevIssueState?: TIssue, nextIssueState?: TIssue, id?: string) => void;
 
@@ -533,8 +540,11 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
     id?: string,
     shouldUpdateList = true
   ) {
-    // perform an API call
-    const response = await this.issueService.createIssue(workspaceSlug, projectId, data);
+    // perform an API call; epic_id is derived on the server
+    const { epic_id: epicId, ...payload } = data;
+    const created = await this.issueService.createIssue(workspaceSlug, projectId, payload);
+    // Fork (see FORK.md): a work item created in an Epic group stays in it.
+    const response = epicId !== undefined ? { ...created, epic_id: epicId } : created;
 
     // add Issue to Store
     this.addIssue(response, shouldUpdateList);
@@ -578,11 +588,17 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
         ...data,
       } as TIssue);
 
-      // call API to update the issue
-      await this.issueService.patchIssue(workspaceSlug, projectId, issueId, data);
+      // call API to update the issue; epic_id is derived on the server
+      const { epic_id: _epicId, ...payload } = data;
+      await this.issueService.patchIssue(workspaceSlug, projectId, issueId, payload);
 
       // call fetch Parent Stats
       this.fetchParentStats(workspaceSlug, projectId);
+
+      // Fork (see FORK.md): a parent change moves the whole subtree to another
+      // Epic, which only the server can resolve.
+      if ("parent_id" in data && (this.groupBy === "epic" || this.subGroupBy === "epic"))
+        this.refreshHierarchyGroups(workspaceSlug, projectId);
     } catch (error) {
       // If errored out update store again to revert the change
       this.rootIssueStore.issues.updateIssue(issueId, issueBeforeUpdate ?? {});

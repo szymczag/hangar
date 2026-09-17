@@ -7,6 +7,7 @@
 import React from "react";
 import { isEmpty } from "lodash-es";
 import { observer } from "mobx-react";
+import { isHierarchyGrouping } from "@plane/constants";
 import type {
   IIssueDisplayFilterOptions,
   IIssueDisplayProperties,
@@ -136,7 +137,12 @@ export const DisplayFiltersSelection = observer(function DisplayFiltersSelection
                 [key]: val,
               })
             }
-            enabledExtraOptions={layoutDisplayFiltersOptions?.extra_options.values}
+            enabledExtraOptions={
+              // Fork (see FORK.md): hierarchy groupings always include sub-work items.
+              isHierarchyGrouping(displayFilters?.group_by, displayFilters?.sub_group_by)
+                ? layoutDisplayFiltersOptions?.extra_options.values.filter((option) => option !== "sub_issue")
+                : layoutDisplayFiltersOptions?.extra_options.values
+            }
           />
         </div>
       )}

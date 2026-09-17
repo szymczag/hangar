@@ -89,7 +89,7 @@ export class ProjectIssues extends BaseIssuesStore implements IProjectIssues {
    * @param projectId
    */
   fetchParentStats = async (workspaceSlug: string, projectId?: string) => {
-    projectId && this.rootIssueStore.rootStore.projectRoot.project.fetchProjectDetails(workspaceSlug, projectId);
+    if (projectId) void this.rootIssueStore.rootStore.projectRoot.project.fetchProjectDetails(workspaceSlug, projectId);
   };
 
   /** */
@@ -196,6 +196,10 @@ export class ProjectIssues extends BaseIssuesStore implements IProjectIssues {
    * @param loadType
    * @returns
    */
+  override refreshHierarchyGroups(workspaceSlug: string, projectId: string) {
+    void this.fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation");
+  }
+
   fetchIssuesWithExistingPagination = async (
     workspaceSlug: string,
     projectId: string,

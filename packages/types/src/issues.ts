@@ -126,11 +126,16 @@ export type GroupByColumnTypes =
   | "labels"
   | "assignees"
   | "created_by"
-  | "team_project";
+  | "team_project"
+  | "parent"
+  | "epic";
 
 export type TGetColumns = {
   isWorkspaceLevel?: boolean;
   projectId?: string;
+  // Fork (see FORK.md): group ids from the grouped response, for groups that
+  // cannot be enumerated up front (parents, Epics).
+  groupIds?: string[];
 };
 
 export interface IGroupByColumn {

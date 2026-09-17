@@ -23,6 +23,8 @@ export type TIssueGroupByOptions =
   | "module"
   | "target_date"
   | "team_project"
+  | "parent"
+  | "epic"
   | null;
 
 export type TIssueOrderByOptions =
@@ -86,6 +88,8 @@ export type TIssueParams =
   | "issue_type"
   | "layout"
   | "expand"
+  | "parent"
+  | "epic"
   | "filters";
 
 export type TCalendarLayouts = "month" | "week";

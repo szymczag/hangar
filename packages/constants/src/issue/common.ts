@@ -37,6 +37,8 @@ export enum EIssueGroupByToServerOptions {
   "project" = "project_id",
   "created_by" = "created_by",
   "team_project" = "project_id",
+  "parent" = "parent_id",
+  "epic" = "epic_id",
 }
 
 export enum EIssueGroupBYServerToProperty {
@@ -50,6 +52,8 @@ export enum EIssueGroupBYServerToProperty {
   "target_date" = "target_date",
   "project_id" = "project_id",
   "created_by" = "created_by",
+  "parent_id" = "parent_id",
+  "epic_id" = "epic_id",
 }
 
 export enum EIssueCommentAccessSpecifier {
@@ -97,6 +101,8 @@ export const DRAG_ALLOWED_GROUPS: TIssueGroupByOptions[] = [
   "labels",
   "module",
   "cycle",
+  "parent",
+  "epic",
 ];
 
 export type TCreateModalStoreTypes =
@@ -124,8 +130,19 @@ export const ISSUE_GROUP_BY_OPTIONS: {
   { key: "labels", titleTranslationKey: "common.labels" },
   { key: "assignees", titleTranslationKey: "common.assignees" },
   { key: "created_by", titleTranslationKey: "common.created_by" },
+  { key: "parent", titleTranslationKey: "common.parent" },
+  { key: "epic", titleTranslationKey: "common.epic" },
   { key: null, titleTranslationKey: "common.none" },
 ];
+
+// Fork (see FORK.md): grouping by hierarchy needs every work item in the
+// response, so these groupings always request sub-work items.
+export const HIERARCHY_GROUP_BY_OPTIONS: TIssueGroupByOptions[] = ["parent", "epic"];
+
+export const isHierarchyGrouping = (
+  groupBy: TIssueGroupByOptions | undefined,
+  subGroupBy: TIssueGroupByOptions | undefined
+) => HIERARCHY_GROUP_BY_OPTIONS.includes(groupBy ?? null) || HIERARCHY_GROUP_BY_OPTIONS.includes(subGroupBy ?? null);
 
 export const ISSUE_ORDER_BY_OPTIONS: {
   key: TIssueOrderByOptions;

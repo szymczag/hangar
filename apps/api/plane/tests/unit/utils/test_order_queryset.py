@@ -31,6 +31,8 @@ class TestIssueGroupByAllowlist:
             "created_by",
             "target_date",
             "start_date",
+            "parent_id",
+            "epic_id",
         }
         assert ISSUE_GROUP_BY_ALLOWLIST == frozenset(expected)
 
