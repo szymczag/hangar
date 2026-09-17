@@ -73,6 +73,48 @@ export async function capture(
   });
 
   const subject = options.target ?? page;
+
+  // Land the target on whole pixels before the shot.
+  //
+  // The peek panel's session editor sits at y = 398.59: the text above it has
+  // fractional line heights, and Playwright scrolls an element into view before
+  // photographing it, which carries that fraction into the clip rect. Rounded
+  // corners rasterized across a half pixel have two stable outcomes, and this
+  // story picked one or the other -- four runs in ten -- with the geometry
+  // identical every time, which is why retries and readiness waits never
+  // touched it. Whole-pixel geometry has exactly one rasterization.
+  //
+  // scrollTop takes fractions, so the snap is the fraction itself rather than a
+  // rounded scroll offset, and it runs after Playwright's own scroll so nothing
+  // undoes it. A target that already sits on a pixel boundary is left alone.
+  if (options.target) {
+    await options.target.scrollIntoViewIfNeeded();
+    const snapped = await options.target.evaluate((element) => {
+      const straddle = () => element.getBoundingClientRect().top % 1;
+      // Every scrollable ancestor in turn, then the window: the nearest one can
+      // already sit at its maximum offset, where adding the fraction moves
+      // nothing and the element would still straddle a pixel.
+      const scrollers: { scrollBy: (amount: number) => void }[] = [];
+      for (let node = element.parentElement; node; node = node.parentElement) {
+        if (node.scrollHeight > node.clientHeight) {
+          const scroller = node;
+          scrollers.push({ scrollBy: (amount) => void (scroller.scrollTop += amount) });
+        }
+      }
+      scrollers.push({ scrollBy: (amount) => globalThis.scrollBy(0, amount) });
+
+      for (const scroller of scrollers) {
+        const remaining = straddle();
+        if (remaining === 0) return true;
+        scroller.scrollBy(remaining);
+      }
+      return straddle() === 0;
+    });
+    // Not an assertion: a target nothing can move off a half pixel is still
+    // worth photographing, and this story is the one that would regress.
+    if (!snapped) console.warn(`${name}: target could not be snapped to whole pixels`);
+  }
+
   await expect(subject).toHaveScreenshot(`${name}.png`);
 }
 
