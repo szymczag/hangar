@@ -34,9 +34,13 @@ export const orderWorkItemGroups = (
     if (groupId === "None" || groupId === ALL_ISSUES) continue;
     groups.push({ workItemId: groupId, workItem: getWorkItem(groupId) });
   }
-  return groups.toSorted(
+  // `toSorted` needs a newer lib target than this app compiles against, and the
+  // array is local, so sorting it in place is safe.
+  // oxlint-disable-next-line no-array-sort
+  groups.sort(
     (first, second) =>
       (first.workItem?.sequence_id ?? Number.MAX_SAFE_INTEGER) -
       (second.workItem?.sequence_id ?? Number.MAX_SAFE_INTEGER)
   );
+  return groups;
 };
