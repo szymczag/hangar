@@ -28,6 +28,7 @@ from plane.db.models import (
     EstimatePoint,
 )
 from plane.ext.services import WorkItemInvariantError, project_default_issue_type, validate_work_item_assignment
+from plane.ext.services.markdown import resolve_markdown_input
 from plane.ext.models import TrainerProfile, WorkshopSchedule
 from plane.utils.content_validator import (
     validate_html_content,
@@ -75,6 +76,15 @@ class IssueSerializer(BaseSerializer):
         source="type", queryset=IssueType.objects.all(), required=False, allow_null=False
     )
     is_epic = serializers.SerializerMethodField()
+    # Fork (see FORK.md): a script files work items in markdown; it is rendered
+    # in validate() below, so the HTML sanitizer stays the only gate.
+    description_markdown = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Work item description written in markdown. Rendered to description_html; send one or the other.",
+    )
 
     def get_is_epic(self, obj):
         return bool(obj.type_id and obj.type.is_epic)
@@ -95,6 +105,10 @@ class IssueSerializer(BaseSerializer):
         exclude = ["description_json", "description_stripped"]
 
     def validate(self, data):
+        # Fork (see FORK.md): markdown becomes description_html here, so the
+        # sanitizer below is the only gate either input passes through.
+        data = resolve_markdown_input(data, html_field="description_html", markdown_field="description_markdown")
+
         if (
             data.get("start_date", None) is not None
             and data.get("target_date", None) is not None
@@ -769,11 +783,38 @@ class IssueCommentCreateSerializer(BaseSerializer):
     access control, and external integration tracking.
     """
 
+    # Fork (see FORK.md): same markdown input as the work item description.
+    comment_markdown = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Comment written in markdown. Rendered to comment_html; send one or the other.",
+    )
+
+    def validate(self, data):
+        # Fork (see FORK.md): this serializer carried no validate() at all, so
+        # comment_html posted to the create endpoint reached the database with
+        # its script tags intact -- the update path next door has sanitized
+        # since GHSA-hh2r-3hwp-mvq3. Markdown is rendered first so both inputs
+        # leave through the same nh3 gate.
+        data = resolve_markdown_input(data, html_field="comment_html", markdown_field="comment_markdown")
+
+        if data.get("comment_html"):
+            is_valid, error_msg, sanitized_html = validate_html_content(data["comment_html"])
+            if not is_valid:
+                raise serializers.ValidationError({"comment_html": "HTML content is not valid"})
+            if sanitized_html is not None:
+                data["comment_html"] = sanitized_html
+        return data
+
     class Meta:
         model = IssueComment
         fields = [
             "comment_json",
             "comment_html",
+            # Fork (see FORK.md)
+            "comment_markdown",
             "access",
             "external_source",
             "external_id",
@@ -803,6 +844,14 @@ class IssueCommentSerializer(BaseSerializer):
     """
 
     is_member = serializers.BooleanField(read_only=True)
+    # Fork (see FORK.md): same markdown input as the work item description.
+    comment_markdown = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Comment written in markdown. Rendered to comment_html; send one or the other.",
+    )
 
     class Meta:
         model = IssueComment
@@ -819,6 +868,9 @@ class IssueCommentSerializer(BaseSerializer):
         exclude = ["comment_stripped", "comment_json"]
 
     def validate(self, data):
+        # Fork (see FORK.md)
+        data = resolve_markdown_input(data, html_field="comment_html", markdown_field="comment_markdown")
+
         if "comment_html" in data and data["comment_html"]:
             is_valid, error_msg, sanitized_html = validate_html_content(data["comment_html"])
             if not is_valid:

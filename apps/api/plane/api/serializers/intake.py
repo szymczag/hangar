@@ -167,4 +167,12 @@ class IssueDataSerializer(serializers.Serializer):
 
     name = serializers.CharField(max_length=255, help_text="Issue name")
     description_html = serializers.CharField(required=False, allow_null=True, help_text="Issue description HTML")
+    # Fork (see FORK.md): intake is the other way a script files work, so it
+    # takes markdown on the same terms as the work item endpoints.
+    description_markdown = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text="Issue description written in markdown. Rendered to description_html; send one or the other.",
+    )
     priority = serializers.ChoiceField(choices=Issue.PRIORITY_CHOICES, default="none", help_text="Issue priority")
