@@ -82,6 +82,12 @@ Each work item shows its type icon next to its identifier. A project administrat
 can change a type's icon from **Project settings → Work item types** by selecting the
 icon beside the type name. Types without a configured icon use a built-in icon.
 
+The list opens as a hierarchy: it shows Epics and work items without a parent, and
+an Epic expands to the work items below it. A work item that belongs to no Epic is
+therefore visible as such. To see every work item at once instead, open **Display**
+and turn on **Show sub-work items**. The board, calendar, spreadsheet, and timeline
+layouts always show every work item.
+
 To see which Epic or parent a work item belongs to, use one of these views:
 
 - **Parent property.** Open **Display** and turn on **Parent**. List and board rows
@@ -93,16 +99,16 @@ To see which Epic or parent a work item belongs to, use one of these views:
   work item below it, including sub-work items of its Tasks. Work items outside any
   Epic are in **None**. In the board layout, choose **Epic** as the sub-group to get
   one row per Epic.
-- **Nested list.** Turn off **Show sub-work items** in the list layout. Only
-  top-level work items remain, and you can expand an Epic to show its work items.
 
-Grouping by Parent or Epic always includes sub-work items, so **Show sub-work items**
-is not available with these groupings.
+Grouping by Parent or Epic always includes sub-work items, so **Show sub-work items** is
+not available with these groupings, and rows cannot be expanded there: the group already
+lists the work items below each parent.
 
 Dragging a work item to another Parent or Epic group changes its parent. Dropping a
 work item on an Epic group makes it a direct child of that Epic, even if it was
 nested deeper before. The server rejects moves that break the hierarchy rules, such
-as giving an Epic a parent, and the item returns to its previous group.
+as giving an Epic a parent. The item returns to its previous group and the message
+explains why.
 
 A guest who can see only their own work items sees groups only for the parents and
 Epics of those work items. A parent that the guest cannot open appears without a
