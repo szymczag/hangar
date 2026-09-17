@@ -198,13 +198,7 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
   return (
     <div className={className}>
       {/* Fork (see FORK.md): parent work item */}
-      <WithDisplayPropertiesHOC
-        displayProperties={displayProperties}
-        displayPropertyKey="parent"
-        shouldRenderProperty={(properties) => !!properties.parent && !!issue.parent_id}
-      >
-        <WorkItemParentProperty issue={issue} />
-      </WithDisplayPropertiesHOC>
+      <WorkItemParentProperty issue={issue} displayProperties={displayProperties} />
 
       {/* basic properties */}
       {/* state */}

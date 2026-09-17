@@ -31,10 +31,11 @@ import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
 import { useWorkFlowFDragNDrop } from "@/components/workflow";
 import type { TRenderQuickActions } from "../list/list-view-types";
 import type { GroupDropLocation } from "../utils";
-import { getGroupByColumns, getResponseGroupIds, isWorkspaceLevel, getApproximateCardHeight } from "../utils";
+import { getGroupByColumns, isWorkspaceLevel, getApproximateCardHeight } from "../utils";
 // components
 import { HeaderGroupByCard } from "./headers/group-by-card";
 import { KanbanGroup } from "./kanban-group";
+import { getResponseGroupIds } from "@/helpers/work-item-hierarchy-groups";
 
 export interface IKanBan {
   issuesMap: IIssueMap;

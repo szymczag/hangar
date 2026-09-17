@@ -82,9 +82,6 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
   const { getProjectIdentifierById, currentProjectNextSequenceId } = useProject();
   const { getIsIssuePeeked, peekIssue, setPeekIssue, subIssues: subIssuesStore } = useIssueDetail();
   const { issuesFilter } = useIssuesStore();
-  // Fork (see FORK.md): parent and Epic groups already list the children, so
-  // expanding a row would repeat them.
-  const canExpandSubIssues = !isHierarchyGrouping(issuesFilter?.issueFilters?.displayFilters);
 
   const handleIssuePeekOverview = (issue: TIssue) =>
     workspaceSlug &&
@@ -102,7 +99,10 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
 
   // derived values
   const issue = issuesMap[issueId];
-  const subIssuesCount = issue?.sub_issues_count ?? 0;
+  // Fork (see FORK.md): parent and Epic groups already list the children, so
+  // there is nothing left to expand a row into.
+  const canExpandSubIssues = !isHierarchyGrouping(issuesFilter?.issueFilters?.displayFilters);
+  const subIssuesCount = canExpandSubIssues ? (issue?.sub_issues_count ?? 0) : 0;
   const canEditIssueProperties = canEditProperties(issue?.project_id ?? undefined);
   const isDraggingAllowed = canDrag && canEditIssueProperties;
 
@@ -249,7 +249,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
 
               {/* sub-issues chevron */}
               <div className="grid size-4 flex-shrink-0 place-items-center">
-                {subIssuesCount > 0 && !isEpic && canExpandSubIssues && (
+                {subIssuesCount > 0 && !isEpic && (
                   <button
                     type="button"
                     className="grid size-4 place-items-center rounded-xs text-placeholder hover:text-tertiary"

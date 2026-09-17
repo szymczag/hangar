@@ -7,7 +7,7 @@
 import React from "react";
 import { isEmpty } from "lodash-es";
 import { observer } from "mobx-react";
-import { isHierarchyGrouping } from "@plane/constants";
+import { getDefaultSubIssueVisibility, isHierarchyGrouping } from "@plane/constants";
 import type {
   IIssueDisplayFilterOptions,
   IIssueDisplayProperties,
@@ -58,6 +58,12 @@ export const DisplayFiltersSelection = observer(function DisplayFiltersSelection
   if (moduleViewDisabled) {
     ignoreGroupedFilters.push("module");
   }
+
+  // Fork (see FORK.md): hierarchy groupings always include sub-work items.
+  const extraOptions = layoutDisplayFiltersOptions?.extra_options.values ?? [];
+  const enabledExtraOptions = isHierarchyGrouping(displayFilters)
+    ? extraOptions.filter((option) => option !== "sub_issue")
+    : extraOptions;
 
   return (
     <div className="vertical-scrollbar relative scrollbar-sm h-full w-full divide-y divide-subtle-1 overflow-hidden overflow-y-auto px-2.5">
@@ -130,19 +136,14 @@ export const DisplayFiltersSelection = observer(function DisplayFiltersSelection
           <FilterExtraOptions
             selectedExtraOptions={{
               show_empty_groups: displayFilters?.show_empty_groups ?? true,
-              sub_issue: displayFilters?.sub_issue ?? true,
+              sub_issue: displayFilters?.sub_issue ?? getDefaultSubIssueVisibility(displayFilters?.layout),
             }}
             handleUpdate={(key, val) =>
               handleDisplayFiltersUpdate({
                 [key]: val,
               })
             }
-            enabledExtraOptions={
-              // Fork (see FORK.md): hierarchy groupings always include sub-work items.
-              isHierarchyGrouping(displayFilters)
-                ? layoutDisplayFiltersOptions?.extra_options.values.filter((option) => option !== "sub_issue")
-                : layoutDisplayFiltersOptions?.extra_options.values
-            }
+            enabledExtraOptions={enabledExtraOptions}
           />
         </div>
       )}

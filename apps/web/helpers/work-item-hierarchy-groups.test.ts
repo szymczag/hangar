@@ -5,10 +5,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ALL_ISSUES, isHierarchyGrouping } from "@plane/constants";
+import { ALL_ISSUES, getDefaultSubIssueVisibility, isHierarchyGrouping } from "@plane/constants";
 import type { TIssue } from "@plane/types";
 import { EIssueLayoutTypes } from "@plane/types";
-import { getHierarchyGroupQuickAddData, getResponseGroupIds, orderWorkItemGroups } from "./work-item-hierarchy-groups";
+import { getResponseGroupIds, orderWorkItemGroups } from "./work-item-hierarchy-groups";
 
 describe("getResponseGroupIds", () => {
   it("returns group ids of a grouped response", () => {
@@ -61,20 +61,14 @@ describe("isHierarchyGrouping", () => {
     expect(isHierarchyGrouping({ layout: EIssueLayoutTypes.SPREADSHEET, group_by: "epic" })).toBe(false);
   });
 });
-
-describe("getHierarchyGroupQuickAddData", () => {
-  it("creates the work item under the group's parent or Epic", () => {
-    expect(getHierarchyGroupQuickAddData("parent", "task-1")).toEqual({ parent_id: "task-1" });
-    expect(getHierarchyGroupQuickAddData("epic", "epic-1")).toEqual({ parent_id: "epic-1", epic_id: "epic-1" });
+describe("getDefaultSubIssueVisibility", () => {
+  it("opens the list as a hierarchy", () => {
+    expect(getDefaultSubIssueVisibility(EIssueLayoutTypes.LIST)).toBe(false);
   });
 
-  it("creates a top-level work item in the None group", () => {
-    expect(getHierarchyGroupQuickAddData("epic", "None")).toEqual({ parent_id: null, epic_id: null });
-    expect(getHierarchyGroupQuickAddData("parent", "None")).toEqual({ parent_id: null });
-  });
-
-  it("leaves other groupings alone", () => {
-    expect(getHierarchyGroupQuickAddData("state", "state-1")).toBeUndefined();
-    expect(getHierarchyGroupQuickAddData(null, "None")).toBeUndefined();
+  it("keeps every work item in the other layouts", () => {
+    expect(getDefaultSubIssueVisibility(EIssueLayoutTypes.KANBAN)).toBe(true);
+    expect(getDefaultSubIssueVisibility(EIssueLayoutTypes.SPREADSHEET)).toBe(true);
+    expect(getDefaultSubIssueVisibility(undefined)).toBe(true);
   });
 });

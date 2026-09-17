@@ -142,6 +142,14 @@ export const HIERARCHY_GROUP_BY_OPTIONS: TIssueGroupByOptions[] = ["parent", "ep
 
 // Group by is stored per view and kept when the layout changes, so only the
 // groupings the current layout applies count.
+/**
+ * Fork (see FORK.md): the list opens as a hierarchy -- Epics and work items
+ * without a parent, each expandable -- so what belongs to what is visible
+ * before anyone touches a filter. Other layouts keep every work item.
+ */
+export const getDefaultSubIssueVisibility = (layout: IIssueDisplayFilterOptions["layout"] | undefined) =>
+  layout !== "list";
+
 export const isHierarchyGrouping = (
   displayFilters: Pick<IIssueDisplayFilterOptions, "layout" | "group_by" | "sub_group_by"> | undefined
 ) => {

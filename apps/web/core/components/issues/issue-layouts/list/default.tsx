@@ -32,9 +32,10 @@ import { IssueBulkOperationsRoot } from "@/components/issues/bulk-operations";
 import { useBulkOperationStatus } from "@/hooks/use-bulk-operation-status";
 // utils
 import type { GroupDropLocation } from "../utils";
-import { getGroupByColumns, getResponseGroupIds, isWorkspaceLevel, isSubGrouped } from "../utils";
+import { getGroupByColumns, isWorkspaceLevel, isSubGrouped } from "../utils";
 import { ListGroup } from "./list-group";
 import type { TRenderQuickActions } from "./list-view-types";
+import { getResponseGroupIds } from "@/helpers/work-item-hierarchy-groups";
 
 export interface IList {
   groupedIssueIds: TGroupedIssues;

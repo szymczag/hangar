@@ -46,7 +46,7 @@ import { GroupDragOverlay } from "../group-drag-overlay";
 import type { TRenderQuickActions } from "../list/list-view-types";
 import { KanbanQuickAddIssueButton, QuickAddIssueRoot } from "../quick-add";
 import { KanbanIssueBlocksList } from "./blocks-list";
-import { getHierarchyGroupQuickAddData } from "@/helpers/work-item-hierarchy-groups";
+import { getBoardGroupQuickAddData } from "@/helpers/quick-add-group-data";
 
 interface IKanbanGroup {
   groupId: string;
@@ -202,56 +202,11 @@ export const KanbanGroup = observer(function KanbanGroup(props: IKanbanGroup) {
     subGroupByKey: string | undefined | null,
     groupValue: string,
     subGroupValue: string
-  ) => {
-    const defaultState = projectState.projectStates?.find((state) => state.default);
-    let preloadedData: object = { state_id: defaultState?.id };
-
-    if (groupByKey) {
-      if (groupByKey === "state") {
-        preloadedData = { ...preloadedData, state_id: groupValue };
-      } else if (groupByKey === "priority") {
-        preloadedData = { ...preloadedData, priority: groupValue };
-      } else if (groupByKey === "cycle") {
-        preloadedData = { ...preloadedData, cycle_id: groupValue };
-      } else if (groupByKey === "module") {
-        preloadedData = { ...preloadedData, module_ids: [groupValue] };
-      } else if (groupByKey === "labels" && groupValue != "None") {
-        preloadedData = { ...preloadedData, label_ids: [groupValue] };
-      } else if (groupByKey === "assignees" && groupValue != "None") {
-        preloadedData = { ...preloadedData, assignee_ids: [groupValue] };
-      } else if (groupByKey === "created_by") {
-        preloadedData = { ...preloadedData };
-      } else if (getHierarchyGroupQuickAddData(groupByKey, groupValue)) {
-        preloadedData = { ...preloadedData, ...getHierarchyGroupQuickAddData(groupByKey, groupValue) };
-      } else {
-        preloadedData = { ...preloadedData, [groupByKey]: groupValue };
-      }
-    }
-
-    if (subGroupByKey) {
-      if (subGroupByKey === "state") {
-        preloadedData = { ...preloadedData, state_id: subGroupValue };
-      } else if (subGroupByKey === "priority") {
-        preloadedData = { ...preloadedData, priority: subGroupValue };
-      } else if (subGroupByKey === "cycle") {
-        preloadedData = { ...preloadedData, cycle_id: subGroupValue };
-      } else if (subGroupByKey === "module") {
-        preloadedData = { ...preloadedData, module_ids: [subGroupValue] };
-      } else if (subGroupByKey === "labels" && subGroupValue != "None") {
-        preloadedData = { ...preloadedData, label_ids: [subGroupValue] };
-      } else if (subGroupByKey === "assignees" && subGroupValue != "None") {
-        preloadedData = { ...preloadedData, assignee_ids: [subGroupValue] };
-      } else if (subGroupByKey === "created_by") {
-        preloadedData = { ...preloadedData };
-      } else if (getHierarchyGroupQuickAddData(subGroupByKey, subGroupValue)) {
-        preloadedData = { ...preloadedData, ...getHierarchyGroupQuickAddData(subGroupByKey, subGroupValue) };
-      } else {
-        preloadedData = { ...preloadedData, [subGroupByKey]: subGroupValue };
-      }
-    }
-
-    return preloadedData;
-  };
+  ) => ({
+    state_id: projectState.projectStates?.find((state) => state.default)?.id,
+    ...getBoardGroupQuickAddData(groupByKey, groupValue),
+    ...getBoardGroupQuickAddData(subGroupByKey, subGroupValue),
+  });
 
   const isSubGroup = !!sub_group_id && sub_group_id !== "null";
 

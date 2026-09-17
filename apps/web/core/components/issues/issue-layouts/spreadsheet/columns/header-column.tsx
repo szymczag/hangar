@@ -5,6 +5,7 @@
  */
 
 //ui
+import type React from "react";
 import { ArrowDownWideNarrow, ArrowUpNarrowWide, CheckIcon, ChevronDownIcon, Eraser, MoveRight } from "lucide-react";
 // constants
 import { SPREADSHEET_PROPERTY_DETAILS } from "@plane/constants";
@@ -22,6 +23,10 @@ interface Props {
   handleDisplayFilterUpdate: (data: Partial<IIssueDisplayFilterOptions>) => void;
   onClose: () => void;
   isEpic?: boolean;
+}
+
+function PlainHeaderColumn({ title }: { title: React.ReactNode }) {
+  return <Row className="flex w-full items-center gap-1.5 py-2 text-13 text-secondary">{title}</Row>;
 }
 
 export function HeaderColumn(props: Props) {
@@ -54,8 +59,7 @@ export function HeaderColumn(props: Props) {
     </div>
   );
 
-  if (propertyDetails.ascendingOrderKey === undefined)
-    return <Row className="flex w-full items-center gap-1.5 py-2 text-13 text-secondary">{title}</Row>;
+  if (propertyDetails.ascendingOrderKey === undefined) return <PlainHeaderColumn title={title} />;
 
   return (
     <CustomMenu

@@ -10,7 +10,7 @@ import { useParams } from "next/navigation";
 import { useTranslation } from "@plane/i18n";
 import { ParentPropertyIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";
-import type { TIssue } from "@plane/types";
+import type { IIssueDisplayProperties, TIssue } from "@plane/types";
 import { cn } from "@plane/utils";
 // components
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
@@ -22,18 +22,20 @@ import { useWorkItemReference } from "@/hooks/use-work-item-reference";
 type Props = {
   issue: TIssue;
   className?: string;
+  /** When given, the chip renders only while the Parent display property is on. */
+  displayProperties?: IIssueDisplayProperties;
 };
 
 /** The parent of a work item, shown as its identifier and name. Opens the parent in peek view. */
 export const WorkItemParentProperty = observer(function WorkItemParentProperty(props: Props) {
-  const { issue, className } = props;
+  const { issue, className, displayProperties } = props;
   const { t } = useTranslation();
   const { workspaceSlug } = useParams();
   const { isMobile } = usePlatformOS();
   const { handleRedirection } = useIssuePeekOverviewRedirection();
   const parent = useWorkItemReference(workspaceSlug?.toString(), issue.project_id, issue.parent_id);
 
-  if (!issue.parent_id) return null;
+  if (!issue.parent_id || (displayProperties && !displayProperties.parent)) return null;
 
   const openParent = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();

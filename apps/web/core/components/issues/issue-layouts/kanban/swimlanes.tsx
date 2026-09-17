@@ -27,10 +27,11 @@ import { useWorkFlowFDragNDrop } from "@/components/workflow";
 // local imports
 import type { TRenderQuickActions } from "../list/list-view-types";
 import type { GroupDropLocation } from "../utils";
-import { getGroupByColumns, getResponseGroupIds, isWorkspaceLevel } from "../utils";
+import { getGroupByColumns, isWorkspaceLevel } from "../utils";
 import { KanBan } from "./default";
 import { HeaderGroupByCard } from "./headers/group-by-card";
 import { HeaderSubGroupByCard } from "./headers/sub-group-by-card";
+import { getResponseGroupIds } from "@/helpers/work-item-hierarchy-groups";
 
 interface ISubGroupSwimlaneHeader {
   collapsedGroups: TIssueKanbanFilters;

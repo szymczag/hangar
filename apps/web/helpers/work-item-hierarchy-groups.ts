@@ -28,25 +28,15 @@ export const getResponseGroupIds = (
 export const orderWorkItemGroups = (
   groupIds: string[] | undefined,
   getWorkItem: (workItemId: string) => TIssue | undefined
-): { workItemId: string; workItem: TIssue | undefined }[] =>
-  (groupIds ?? [])
-    .filter((groupId) => groupId !== "None" && groupId !== ALL_ISSUES)
-    .map((workItemId) => ({ workItemId, workItem: getWorkItem(workItemId) }))
-    .sort(
-      (first, second) =>
-        (first.workItem?.sequence_id ?? Number.MAX_SAFE_INTEGER) -
-        (second.workItem?.sequence_id ?? Number.MAX_SAFE_INTEGER)
-    );
-
-/**
- * Quick add values for a parent or Epic group: the new work item becomes a child
- * of the group's work item. Returns undefined for any other grouping.
- */
-export const getHierarchyGroupQuickAddData = (
-  groupByKey: string | null | undefined,
-  groupValue: string
-): Partial<TIssue> | undefined => {
-  if (groupByKey !== "parent" && groupByKey !== "epic") return undefined;
-  const workItemId = groupValue === "None" ? null : groupValue;
-  return groupByKey === "epic" ? { parent_id: workItemId, epic_id: workItemId } : { parent_id: workItemId };
+): { workItemId: string; workItem: TIssue | undefined }[] => {
+  const groups: { workItemId: string; workItem: TIssue | undefined }[] = [];
+  for (const groupId of groupIds ?? []) {
+    if (groupId === "None" || groupId === ALL_ISSUES) continue;
+    groups.push({ workItemId: groupId, workItem: getWorkItem(groupId) });
+  }
+  return groups.toSorted(
+    (first, second) =>
+      (first.workItem?.sequence_id ?? Number.MAX_SAFE_INTEGER) -
+      (second.workItem?.sequence_id ?? Number.MAX_SAFE_INTEGER)
+  );
 };

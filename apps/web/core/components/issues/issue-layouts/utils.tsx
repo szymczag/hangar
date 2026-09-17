@@ -76,9 +76,7 @@ import {
   SpreadsheetUpdatedOnColumn,
 } from "@/components/issues/issue-layouts/spreadsheet/columns";
 import { WorkItemGroupIcon } from "@/components/issues/issue-layouts/work-item-group-icon";
-import { getResponseGroupIds, orderWorkItemGroups } from "@/helpers/work-item-hierarchy-groups";
-
-export { getResponseGroupIds };
+import { orderWorkItemGroups } from "@/helpers/work-item-hierarchy-groups";
 
 export const HIGHLIGHT_CLASS = "highlight";
 export const HIGHLIGHT_WITH_LINE = "highlight-with-line";

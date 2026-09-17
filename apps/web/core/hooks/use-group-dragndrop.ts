@@ -9,6 +9,7 @@ import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { EIssuesStoreType, TIssue, TIssueGroupByOptions, TIssueOrderByOptions } from "@plane/types";
 import type { GroupDropLocation } from "@/components/issues/issue-layouts/utils";
 import { handleGroupDragDrop } from "@/components/issues/issue-layouts/utils";
+import { getWorkItemErrorMessage } from "@/helpers/work-item-error-message";
 import { ISSUE_FILTER_DEFAULT_DATA } from "@/store/issue/helpers/base-issues.store";
 import { useIssueDetail } from "./store/use-issue-detail";
 import { useIssues } from "./store/use-issues";
@@ -61,11 +62,13 @@ export const useGroupIssuesDragNDrop = (
       };
     }
   ) => {
-    const errorToastProps = {
+    // Fork (see FORK.md): the server explains a refused move, for example an
+    // Epic that cannot take a parent. Say that instead of a generic failure.
+    const errorToast = (error: unknown) => ({
       type: TOAST_TYPE.ERROR,
       title: "Error!",
-      message: "Error while updating work item",
-    };
+      message: getWorkItemErrorMessage(error, "Error while updating work item"),
+    });
     const moduleKey = ISSUE_FILTER_DEFAULT_DATA["module"];
     const cycleKey = ISSUE_FILTER_DEFAULT_DATA["cycle"];
 
@@ -74,11 +77,13 @@ export const useGroupIssuesDragNDrop = (
 
     if (isCycleChanged && workspaceSlug) {
       if (data[cycleKey]) {
-        addCycleToIssue(workspaceSlug.toString(), projectId, data[cycleKey]?.toString() ?? "", issueId).catch(() =>
-          setToast(errorToastProps)
+        addCycleToIssue(workspaceSlug.toString(), projectId, data[cycleKey]?.toString() ?? "", issueId).catch((error) =>
+          setToast(errorToast(error))
         );
       } else {
-        removeCycleFromIssue(workspaceSlug.toString(), projectId, issueId).catch(() => setToast(errorToastProps));
+        removeCycleFromIssue(workspaceSlug.toString(), projectId, issueId).catch((error) =>
+          setToast(errorToast(error))
+        );
       }
       delete data[cycleKey];
     }
@@ -90,11 +95,11 @@ export const useGroupIssuesDragNDrop = (
         issueId,
         issueUpdates[moduleKey].ADD,
         issueUpdates[moduleKey].REMOVE
-      ).catch(() => setToast(errorToastProps));
+      ).catch((error) => setToast(errorToast(error)));
       delete data[moduleKey];
     }
 
-    updateIssue && updateIssue(projectId, issueId, data).catch(() => setToast(errorToastProps));
+    if (updateIssue) void updateIssue(projectId, issueId, data).catch((error) => setToast(errorToast(error)));
   };
 
   const handleOnDrop = async (source: GroupDropLocation, destination: GroupDropLocation) => {
@@ -119,7 +124,7 @@ export const useGroupIssuesDragNDrop = (
       setToast({
         title: "Error!",
         type: TOAST_TYPE.ERROR,
-        message: err?.detail ?? "Failed to perform this action",
+        message: getWorkItemErrorMessage(err, "Failed to perform this action"),
       });
     });
   };
