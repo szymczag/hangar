@@ -92,6 +92,18 @@ exporting wins over the file. All of these are in turbo's `globalEnv`, so the
 build cache key accounts for them and a differently-built bundle is never
 restored from cache.
 
+### Whole-pixel capture
+
+`capture()` snaps its target onto a pixel boundary before photographing it, and
+that is not cosmetic. The peek panel's session editor sits at y = 398.59 -- the
+text above it has fractional line heights -- and Playwright scrolls an element
+into view before it photographs it, so that fraction reaches the clip rect.
+Rounded corners rasterized across half a pixel have two stable outcomes, and the
+peek story picked one or the other in four runs out of ten, with the element's
+geometry byte-identical every time. Retries did not help, because each outcome is
+stable once chosen; nor did any readiness wait, because nothing was still
+loading. Whole-pixel geometry has one rasterization, and the soak is clean on it.
+
 ## Reviewing a baseline change
 
 A changed baseline is a changed file in the diff. That is the whole point of
