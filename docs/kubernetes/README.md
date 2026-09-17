@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.59`. It is qualified for evaluation on
+The current release is `0.1.0-rc.60`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.59` qualification boundary is:
+The `0.1.0-rc.60` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -116,18 +116,19 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.59`                               |
-| Helm chart version | `0.1.0-rc.59`                                |
-| Git tag            | `hangar-v0.1.0-rc.59`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.59` |
+| Product version    | `v0.1.0-rc.60`                               |
+| Helm chart version | `0.1.0-rc.60`                                |
+| Git tag            | `hangar-v0.1.0-rc.60`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.60` |
 
-`rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, and `rc.33` were consumed by
-incomplete publication attempts. Releases `rc.31` through `rc.38` are retired
+`rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
+by incomplete publication attempts. `rc.59` carried the same changes as this release and
+refused publication on an unsigned tag, so nothing was published under it. Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
 installation, upgrade, or rollback targets. `rc.58` is the immediately previous
 retained GitHub release.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-Rollback to rc.58 carries no schema consequence, because rc.59 introduces no
+Rollback to rc.58 carries no schema consequence, because rc.60 introduces no
 migration. It does return the Work Items list to showing every work item, and
 removes the Parent property, the work item type icon and the Parent and Epic
 groupings; API clients that adopted the markdown write fields must send HTML
@@ -139,7 +140,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.59` notes](../releases/hangar-v0.1.0-rc.59.md) — review
+- [Release `v0.1.0-rc.60` notes](../releases/hangar-v0.1.0-rc.60.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -169,7 +170,7 @@ response when either limit is reached.
 The previous release is `0.1.0-rc.58`, tag `hangar-v0.1.0-rc.58`, and chart
 `ghcr.io/szymczag/charts/hangar:0.1.0-rc.58`.
 
-Release rc.59 adds no migrations. Update the API, workers and frontends together as
+Release rc.60 adds no migrations. Update the API, workers and frontends together as
 usual; the ordinary release Job is all that is required.
 
 Basic calendar access continues to consume free/busy ranges. Optional invitation
@@ -187,9 +188,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The release workflow verifies anonymous access to the rc.59 chart archive, OCI
+The release workflow verifies anonymous access to the rc.60 chart archive, OCI
 chart and digest-pinned images, and creates provenance attestations and keyless
-Cosign signatures. No new live-cluster qualification is claimed for rc.59.
+Cosign signatures. No new live-cluster qualification is claimed for rc.60.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure
