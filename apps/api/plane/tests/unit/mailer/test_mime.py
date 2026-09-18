@@ -96,3 +96,29 @@ def test_email_html_cannot_load_remote_resources():
     assert "<script" not in sanitized
     assert 'style="padding:16px;color:#123456"' in sanitized
     assert "https://hangar.example.com/project" in sanitized
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "<!--><img src=x onerror=alert(1)>-->",
+        "<!---><img src=x onerror=alert(1)>-->",
+        "<!--a--!><img src=x onerror=alert(1)>-->",
+    ],
+)
+def test_email_html_comment_parser_differential(payload):
+    """html.parser reads these as one comment; a browser ends the comment
+    early and renders the image. Neither the image nor its handler may reach
+    the message."""
+    sanitized = sanitize_email_html(f"<p>Update</p>{payload}")
+
+    assert "<img" not in sanitized
+    assert "onerror=" not in sanitized
+
+
+@pytest.mark.unit
+def test_email_html_keeps_outlook_conditional_comments():
+    conditional = "<!--[if mso]><table><tr><td>x</td></tr></table><![endif]-->"
+
+    assert conditional in sanitize_email_html(f"<div>{conditional}</div>")

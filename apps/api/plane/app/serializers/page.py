@@ -23,6 +23,17 @@ from plane.db.models import (
 )
 
 
+def _sanitize_page_description_html(value):
+    """Run page HTML through the shared allowlist, as every other rich-text
+    write path does. Raises a ValidationError when the content is rejected."""
+    if not value:
+        return value
+    is_valid, error_message, sanitized_html = validate_html_content(value)
+    if not is_valid:
+        raise serializers.ValidationError({"description_html": error_message})
+    return sanitized_html if sanitized_html is not None else value
+
+
 class PageSerializer(BaseSerializer):
     is_favorite = serializers.BooleanField(read_only=True)
     labels = serializers.ListField(
@@ -74,7 +85,9 @@ class PageSerializer(BaseSerializer):
         owned_by_id = self.context["owned_by_id"]
         description_json = self.context["description_json"]
         description_binary = self.context["description_binary"]
-        description_html = self.context["description_html"]
+        # The view passes the raw request value through the context; it has
+        # not been through field validation, so sanitize it here.
+        description_html = _sanitize_page_description_html(self.context["description_html"])
 
         # Get the workspace id from the project
         project = Project.objects.get(pk=project_id)
@@ -138,6 +151,9 @@ class PageSerializer(BaseSerializer):
 
 class PageDetailSerializer(PageSerializer):
     description_html = serializers.CharField()
+
+    def validate_description_html(self, value):
+        return _sanitize_page_description_html(value)
 
     class Meta(PageSerializer.Meta):
         fields = PageSerializer.Meta.fields + ["description_html"]

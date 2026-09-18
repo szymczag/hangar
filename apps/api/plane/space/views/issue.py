@@ -242,6 +242,17 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
             )
 
 
+# A published board lets anyone signed in comment, through the app's comment
+# serializer. That serializer also accepts fields a project member may set
+# (access, external_source, external_id, parent, ...); from a public board
+# only the comment body is taken, and the view sets the rest.
+PUBLIC_COMMENT_FIELDS = ("comment_html", "comment_json")
+
+
+def _public_comment_data(data):
+    return {key: data[key] for key in PUBLIC_COMMENT_FIELDS if key in data}
+
+
 class IssueCommentPublicViewSet(BaseViewSet):
     serializer_class = IssueCommentSerializer
     model = IssueComment
@@ -303,7 +314,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
         if not _issue_in_board_scope(issue_id, project_deploy_board):
             return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = IssueCommentSerializer(data=request.data)
+        serializer = IssueCommentSerializer(data=_public_comment_data(request.data))
         if serializer.is_valid():
             serializer.save(
                 project_id=project_deploy_board.project_id,
@@ -341,13 +352,19 @@ class IssueCommentPublicViewSet(BaseViewSet):
                 {"error": "Comments are not enabled for this project"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        comment = IssueComment.objects.get(pk=pk, actor=request.user)
-        serializer = IssueCommentSerializer(comment, data=request.data, partial=True)
+        # Scoped to this board's project and issue, not only to the author.
+        comment = IssueComment.objects.get(
+            pk=pk,
+            actor=request.user,
+            issue_id=issue_id,
+            project_id=project_deploy_board.project_id,
+        )
+        serializer = IssueCommentSerializer(comment, data=_public_comment_data(request.data), partial=True)
         if serializer.is_valid():
             serializer.save()
             issue_activity.delay(
                 type="comment.activity.updated",
-                requested_data=json.dumps(request.data, cls=DjangoJSONEncoder),
+                requested_data=json.dumps(_public_comment_data(request.data), cls=DjangoJSONEncoder),
                 actor_id=str(request.user.id),
                 issue_id=str(issue_id),
                 project_id=str(project_deploy_board.project_id),
@@ -365,7 +382,12 @@ class IssueCommentPublicViewSet(BaseViewSet):
                 {"error": "Comments are not enabled for this project"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        comment = IssueComment.objects.get(pk=pk, actor=request.user)
+        comment = IssueComment.objects.get(
+            pk=pk,
+            actor=request.user,
+            issue_id=issue_id,
+            project_id=project_deploy_board.project_id,
+        )
         issue_activity.delay(
             type="comment.activity.deleted",
             requested_data=json.dumps({"comment_id": str(pk)}),

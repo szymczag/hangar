@@ -32,6 +32,7 @@ from plane.db.models import (
     User,
     EstimatePoint,
 )
+from plane.utils.content_validator import validate_html_content
 from plane.utils.exception_logger import log_exception
 from plane.utils.issue_relation_mapper import get_inverse_relation
 from plane.utils.uuid import is_valid_uuid
@@ -1633,6 +1634,37 @@ def create_intake_activity(
         )
 
 
+# Rich-text keys copied from the request into IssueActivity.old_value/new_value.
+# Those values reach notification e-mails, which render them as HTML.
+RICH_TEXT_ACTIVITY_KEYS = ("description_html", "comment_html")
+
+
+def sanitize_rich_text_payload(payload):
+    """Run the rich-text fields of an activity payload (a JSON string, as the
+    views pass it) through the shared HTML allowlist.
+
+    Views pass the raw request body, not the serializer's cleaned data, so the
+    stored content is sanitized but the copy recorded as activity was not.
+    Doing it here covers every call site at once.
+    """
+    if not payload:
+        return payload
+    try:
+        data = json.loads(payload)
+    except (TypeError, ValueError):
+        return payload
+    if not isinstance(data, dict):
+        return payload
+    changed = False
+    for key in RICH_TEXT_ACTIVITY_KEYS:
+        value = data.get(key)
+        if isinstance(value, str) and value:
+            is_valid, _, sanitized_html = validate_html_content(value)
+            data[key] = sanitized_html if is_valid and sanitized_html is not None else ""
+            changed = True
+    return json.dumps(data, cls=DjangoJSONEncoder) if changed else payload
+
+
 # Receive message from room group
 @shared_task
 def issue_activity(
@@ -1650,6 +1682,9 @@ def issue_activity(
 ):
     try:
         issue_activities = []
+
+        requested_data = sanitize_rich_text_payload(requested_data)
+        current_instance = sanitize_rich_text_payload(current_instance)
 
         # check if project_id is valid
         if not is_valid_uuid(str(project_id)):
