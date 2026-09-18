@@ -38,6 +38,9 @@ from .capacity import (
     WorkshopBookingOperation,
     WorkshopPlanDraft,
     WorkshopPlanHold,
+    TrainerTrainingSyncState,
+    TrainingCalendarSyncState,
+    TrainingEventOccurrence,
     WorkshopSchedule,
     WorkshopSession,
 )
@@ -75,6 +78,9 @@ __all__ = [
     "WorkshopBookingOperation",
     "WorkshopPlanDraft",
     "WorkshopPlanHold",
+    "TrainerTrainingSyncState",
+    "TrainingCalendarSyncState",
+    "TrainingEventOccurrence",
     "WorkshopSchedule",
     "WorkshopSession",
 ]
