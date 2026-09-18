@@ -46,6 +46,37 @@ Existing plans and sessions remain valid. Old clients retain the hold/schedule
 API; new clients can PATCH title/issue_id during a hold and schedule a candidate
 directly using an idempotency key. Apply migrations before deploying the new API.
 
+## Workshop checklists
+
+A workspace administrator defines checklist templates in **Settings → Workshop checklists**.
+Each template is a named, ordered list of subtasks; a workspace may keep up to twenty
+templates of up to thirty items each. One template may be marked as the default.
+
+Each item carries a title, an optional description, an assignment rule and a day offset.
+The assignment rule is one of: nobody, a specific person, or the workshop's own trainer —
+the last resolves when the template is applied, against the Workshop's active trainer
+assignees, so one template serves every trainer. A person who is not an active project
+member able to hold work is skipped rather than assigned, and the response names them.
+
+Applying a template creates the subtasks under the Workshop work item, each as an ordinary
+child work item with its own history entry. Application is idempotent by subtask name:
+applying the same template twice adds nothing, and applying it again after the template
+gained an item adds only that item. Only Workshop work items accept a checklist.
+
+The day offset is counted from the workshop's first session, negative for before it. A
+Workshop exists before it has a date, so subtasks created at that point have no due date;
+scheduling the workshop fills them in, counting calendar days in the trainer's timezone so
+that offsets spanning a daylight-saving change land on the day people expect. A due date
+already set by hand is never overwritten. Editing or deleting a template leaves the
+subtasks it has already created untouched.
+
+The planner applies the default template to a Workshop it creates. That call is best
+effort: a workspace with no default template, or an unavailable checklist endpoint, does
+not prevent the workshop from being created.
+
+Migration `ext.0030` adds the template, item and origin tables and two audit actions.
+Existing workshops are unaffected; a workspace with no templates behaves exactly as before.
+
 ## Timezones and workload
 
 Booking hours follow the connected primary Google calendar's IANA timezone. Without

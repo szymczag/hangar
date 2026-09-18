@@ -51,6 +51,9 @@ class CapacityAuditEvent(models.Model):
         PLAN_HOLD_CREATED = "plan_hold.created", "Plan hold created"
         PLAN_HOLD_RELEASED = "plan_hold.released", "Plan hold released"
         PLAN_SCHEDULED = "plan.scheduled", "Plan scheduled"
+        CHECKLIST_TEMPLATE_UPDATED = "checklist_template.updated", "Checklist template updated"
+        CHECKLIST_TEMPLATE_REMOVED = "checklist_template.removed", "Checklist template removed"
+        CHECKLIST_APPLIED = "checklist.applied", "Checklist applied"
 
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)

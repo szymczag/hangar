@@ -27,6 +27,11 @@ from .workspace_defaults import (
     WorkspaceSharedLink,
     WorkspaceSharedLinkHide,
 )
+from .workshop_template import (
+    WorkshopChecklistItem,
+    WorkshopChecklistOrigin,
+    WorkshopChecklistTemplate,
+)
 from .webauthn import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCredential
 from plane.ext.runner.models import RunnerAuditEvent, RunnerInstallation
 from .worklog import IssueWorkLog
@@ -73,6 +78,9 @@ __all__ = [
     "TrainerCalendarSelection",
     "TrainerProfile",
     "WorkshopBookingOperation",
+    "WorkshopChecklistItem",
+    "WorkshopChecklistOrigin",
+    "WorkshopChecklistTemplate",
     "WorkshopPlanDraft",
     "WorkshopPlanHold",
     "WorkshopSchedule",

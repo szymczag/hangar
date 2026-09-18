@@ -81,6 +81,9 @@
         "hide": "Gizle",
         "show_hidden": "Gizlenenleri göster"
       },
+      "workshop_templates": {
+        "title": "Atölye kontrol listeleri"
+      },
       "exports": {
         "heading": "Dışa Aktarımlar",
         "description": "Proje verilerinizi çeşitli formatlarda dışa aktarın ve indirme bağlantılarıyla dışa aktarma geçmişinize erişin.",

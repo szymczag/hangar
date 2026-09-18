@@ -81,6 +81,9 @@
         "hide": "隐藏",
         "show_hidden": "显示已隐藏项"
       },
+      "workshop_templates": {
+        "title": "工作坊检查清单"
+      },
       "exports": {
         "heading": "导出",
         "description": "以多种格式导出项目数据，并通过下载链接访问导出历史记录。",

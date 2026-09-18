@@ -81,6 +81,9 @@
         "hide": "隱藏",
         "show_hidden": "顯示已隱藏項目"
       },
+      "workshop_templates": {
+        "title": "工作坊檢查清單"
+      },
       "exports": {
         "heading": "匯出",
         "description": "以各種格式匯出您的專案資料，並透過下載連結存取您的匯出歷史記錄。",

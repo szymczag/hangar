@@ -81,6 +81,9 @@
         "hide": "Ukryj",
         "show_hidden": "Pokaż ukryte"
       },
+      "workshop_templates": {
+        "title": "Listy kontrolne warsztatów"
+      },
       "exports": {
         "heading": "Eksporty",
         "description": "Eksportuj dane projektu w różnych formatach i uzyskaj dostęp do historii eksportów z linkami do pobrania.",

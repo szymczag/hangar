@@ -5,10 +5,38 @@ import { useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 import { Button } from "@plane/propel/button";
+import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { CreateUpdateIssueModal } from "@/components/issues/issue-modal/modal";
 import { useProject } from "@/hooks/store/use-project";
 import { issueTypeService } from "@/plane-web/services/issue-type.service";
+import { CapacityService } from "@/services/capacity.service";
 import type { TPlanIssue } from "@/services/capacity.service";
+
+const capacityService = new CapacityService();
+
+/**
+ * Give a brand-new workshop the subtasks its workspace always wants.
+ *
+ * Best effort on purpose. A workspace with no default template answers 404, and
+ * a workshop without a checklist is a perfectly good workshop -- neither is a
+ * reason to fail the creation the person actually asked for. Only a partial
+ * result is worth interrupting them about, because an assignee the template
+ * names but the project cannot hold is something only they can fix.
+ */
+async function applyDefaultChecklist(workspaceSlug: string, projectId: string, issueId: string) {
+  try {
+    const result = await capacityService.applyChecklist(workspaceSlug, projectId, issueId);
+    if (result.skipped_assignees.length > 0) {
+      setToast({
+        type: TOAST_TYPE.WARNING,
+        title: "Checklist added, some assignees skipped",
+        message: "Some people named by the template cannot be assigned work in this project.",
+      });
+    }
+  } catch {
+    // No default template, or the feature is off. Nothing to say.
+  }
+}
 
 export const CreateWorkshop = observer(function CreateWorkshop({
   workspaceSlug,
@@ -67,6 +95,7 @@ export const CreateWorkshop = observer(function CreateWorkshop({
           modalTitle="Create workshop"
           data={{ name: title, project_id: projectId, type_id: workshop.id }}
           onSubmit={async (issue) => {
+            await applyDefaultChecklist(workspaceSlug, projectId, issue.id);
             onCreated({
               id: issue.id,
               name: issue.name,

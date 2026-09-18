@@ -244,6 +244,65 @@ describe("CapacityService CSRF requests", () => {
   });
 });
 
+describe("CapacityService workshop checklists", () => {
+  let service: CapacityService;
+
+  beforeEach(() => {
+    service = new CapacityService();
+    vi.spyOn(service, "get").mockResolvedValue({ data: { csrf_token: csrfToken } } as never);
+  });
+
+  it("sends the token when saving a template", async () => {
+    const put = vi.spyOn(service, "put").mockResolvedValue({ data: { id: "template-id" } } as never);
+    const template = {
+      name: "Standard workshop",
+      is_default: true,
+      items: [
+        {
+          position: 0,
+          title: "Prepare materials",
+          description: "",
+          assignee_id: null,
+          assignee_mode: "workshop_trainer" as const,
+          offset_days: -7,
+        },
+      ],
+    };
+
+    await service.updateChecklistTemplate("workspace", "template-id", template);
+
+    expect(put).toHaveBeenCalledWith(
+      "/api/workspaces/workspace/capacity/checklist-templates/template-id/",
+      template,
+      csrfHeaders
+    );
+  });
+
+  it("omits the template so the server picks the workspace default", async () => {
+    const post = vi.spyOn(service, "post").mockResolvedValue({ data: { created: [], skipped_assignees: [] } } as never);
+
+    await service.applyChecklist("workspace", "project-id", "issue-id");
+
+    expect(post).toHaveBeenCalledWith(
+      "/api/workspaces/workspace/projects/project-id/work-items/issue-id/apply-checklist/",
+      undefined,
+      csrfHeaders
+    );
+  });
+
+  it("names the template when one was chosen", async () => {
+    const post = vi.spyOn(service, "post").mockResolvedValue({ data: { created: [], skipped_assignees: [] } } as never);
+
+    await service.applyChecklist("workspace", "project-id", "issue-id", "template-id");
+
+    expect(post).toHaveBeenCalledWith(
+      "/api/workspaces/workspace/projects/project-id/work-items/issue-id/apply-checklist/",
+      { template_id: "template-id" },
+      csrfHeaders
+    );
+  });
+});
+
 describe("CapacityService search cancellation", () => {
   it("passes the search signal to the HTTP request", async () => {
     const service = new CapacityService();

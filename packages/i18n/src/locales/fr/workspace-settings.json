@@ -81,6 +81,9 @@
         "hide": "Masquer",
         "show_hidden": "Afficher les éléments masqués"
       },
+      "workshop_templates": {
+        "title": "Listes de contrôle des ateliers"
+      },
       "exports": {
         "heading": "Exportations",
         "description": "Exportez les données de votre projet dans différents formats et accédez à votre historique d’exportations avec les liens de téléchargement.",

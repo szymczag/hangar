@@ -58,6 +58,7 @@ from plane.ext.models import (
     WorkshopSession,
 )
 from plane.ext.services import ensure_workspace_workshop_type
+from plane.ext.services.workshop_checklist import backfill_target_dates
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.permissions import ROLE, allow_permission
 
@@ -1189,6 +1190,10 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
                 )
             )
 
+        # The workshop now has a date, so any checklist subtask that was created
+        # before it had one can finally be dated. Only the undated ones move.
+        backfill_target_dates(issue)
+
         hold.status = WorkshopPlanHold.Status.SCHEDULED
         hold.updated_by = request.user
         hold.save(update_fields=["status", "updated_by", "updated_at"])
@@ -1352,6 +1357,7 @@ class WorkshopScheduleEndpoint(BaseAPIView):
             else:
                 session = WorkshopSession.objects.create(schedule=schedule, position=position, **values)
             session.trainers.set(trainer_ids)
+        backfill_target_dates(issue)
         _audit(
             request,
             workspace_id=issue.workspace_id,

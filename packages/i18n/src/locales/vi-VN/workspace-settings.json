@@ -81,6 +81,9 @@
         "hide": "Ẩn",
         "show_hidden": "Hiện mục đã ẩn"
       },
+      "workshop_templates": {
+        "title": "Danh sách kiểm tra workshop"
+      },
       "exports": {
         "heading": "Xuất",
         "description": "Xuất dữ liệu dự án của bạn dưới nhiều định dạng và truy cập lịch sử xuất với các liên kết tải xuống.",
