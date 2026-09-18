@@ -376,6 +376,21 @@ class TrainingEventOccurrence(BaseModel):
     # ever written for events that matched a rule.
     encrypted_summary = models.TextField(blank=True)
     encryption_key_id = models.CharField(max_length=64, blank=True)
+    # What this training became in Hangar, if anybody imported it.
+    #
+    # Not derivable from `GoogleTrainingEventLink`, which is what the import
+    # creates: that link is member-level self-service to delete, so using its
+    # absence as "not imported yet" lets one unlink turn a single training into
+    # two Workshops. This records the decision itself, which nothing but another
+    # import changes. SET_NULL because deleting the work item should leave the
+    # occurrence importable again rather than deleting the calendar's record.
+    imported_issue = models.ForeignKey(
+        "db.Issue",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="imported_training_occurrences",
+    )
     first_seen_at = models.DateTimeField()
     last_seen_at = models.DateTimeField()
 

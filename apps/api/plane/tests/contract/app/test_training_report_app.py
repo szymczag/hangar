@@ -48,7 +48,11 @@ def _client(user):
 def _profile(workspace, user, *, consent="ok", synced=True):
     profile = TrainerProfile.objects.create(workspace=workspace, user=user)
     if synced:
-        TrainerTrainingSyncState.objects.create(trainer_profile=profile, consent_state=consent)
+        TrainerTrainingSyncState.objects.create(
+            trainer_profile=profile,
+            consent_state=consent,
+            last_materialized_at=datetime.now(timezone.utc),
+        )
     return profile
 
 
@@ -269,3 +273,64 @@ def test_the_report_is_invisible_while_capacity_is_off(keys, workspace, create_u
     response = _client(create_user).get(URL.format(slug=workspace.slug), OCTOBER)
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_trainer_whose_sweep_has_frozen_is_not_reported_as_fully_counted(keys, workspace, create_user):
+    """Consent alone does not mean the numbers are current.
+
+    A calendar stuffed past the event ceiling fails every pass and the backoff
+    retries into the same wall. Reading only `consent_state` reported those
+    trainers as counted, which is the one thing a staffing document must not do.
+    """
+    profile = _profile(workspace, create_user)
+    TrainerTrainingSyncState.objects.filter(trainer_profile=profile).update(
+        last_materialized_at=datetime.now(timezone.utc) - timedelta(hours=9)
+    )
+    _rule_with_state(workspace, last_success_at=datetime.now(timezone.utc) - timedelta(hours=9))
+
+    [row] = _client(create_user).get(URL.format(slug=workspace.slug), OCTOBER).data["trainers"]
+
+    assert row["sync_status"] == "stale"
+    assert row["counts_towards_totals"] is False
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_recently_swept_trainer_counts(keys, workspace, create_user):
+    profile = _profile(workspace, create_user)
+    TrainerTrainingSyncState.objects.filter(trainer_profile=profile).update(
+        last_materialized_at=datetime.now(timezone.utc) - timedelta(minutes=10)
+    )
+    _rule_with_state(workspace, last_success_at=datetime.now(timezone.utc))
+
+    [row] = _client(create_user).get(URL.format(slug=workspace.slug), OCTOBER).data["trainers"]
+
+    assert row["sync_status"] == "ok"
+    assert row["counts_towards_totals"] is True
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_removing_a_rule_retires_its_occurrences_instead_of_orphaning_them(keys, workspace, create_user):
+    """Deleting is soft and nulls the rule, and both retirement paths select on
+    it -- so without this nothing could ever reach these rows again."""
+    from rest_framework.test import APIClient
+
+    profile = _profile(workspace, create_user)
+    rule = _rule_with_state(workspace, last_success_at=datetime.now(timezone.utc))
+    occurrence = _occurrence(workspace, create_user, profile, rule)
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(create_user)
+    csrf = client.get("/auth/get-csrf-token/").data["csrf_token"]
+
+    response = client.delete(
+        f"/api/workspaces/{workspace.slug}/capacity/google/training-rules/{rule.id}/", HTTP_X_CSRFTOKEN=csrf
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    occurrence.refresh_from_db()
+    assert occurrence.state == TrainingEventOccurrence.State.DISAPPEARED
+    [row] = _client(create_user).get(URL.format(slug=workspace.slug), OCTOBER).data["trainers"]
+    assert row["external_confirmed_sessions"] == 0

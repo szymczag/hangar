@@ -24,7 +24,7 @@ import json
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -42,6 +42,10 @@ from plane.utils.host import base_host
 
 # Matching IssueCreateSerializer: below this a project member cannot hold work.
 ASSIGNABLE_ROLE = 15
+
+
+class AlreadyImported(Exception):
+    """Raised when a concurrent import won the race for the same training."""
 
 
 def occurrence_title(occurrence, *, zone="UTC"):
@@ -81,6 +85,7 @@ def pending_occurrences(workspace_id, *, start, end, trainer_ids=None):
         TrainingEventOccurrence.objects.filter(
             workspace_id=workspace_id,
             state=TrainingEventOccurrence.State.ACTIVE,
+            imported_issue__isnull=True,
             starts_at__lt=end,
             ends_at__gt=start,
         )
@@ -103,13 +108,28 @@ def import_occurrence(occurrence, *, project, actor, request=None):
     project, which is a decision for a person rather than something to paper
     over by assigning nobody.
     """
-    already_linked = GoogleTrainingEventLink.objects.filter(
+    # Re-read under a row lock. The listing filtered on these, but a concurrent
+    # import of the same row, or a sweep retiring it in between, must not be
+    # decided by what the client last saw.
+    occurrence = (
+        TrainingEventOccurrence.objects.select_for_update()
+        .select_related("trainer", "trainer_profile")
+        .get(pk=occurrence.pk)
+    )
+
+    if occurrence.imported_issue_id is not None:
+        return None, "already_imported"
+    if occurrence.state != TrainingEventOccurrence.State.ACTIVE:
+        # A cancelled or vanished invitation still sits in the table for its
+        # retention period, so an id harvested from an earlier listing stays
+        # usable unless the state is checked here rather than only in the query.
+        return None, "no_longer_active"
+    if GoogleTrainingEventLink.objects.filter(
         workspace_id=occurrence.workspace_id,
         trainer_id=occurrence.trainer_id,
         event_key=occurrence.event_key,
-    ).exists()
-    if already_linked:
-        return None, "already_imported"
+    ).exists():
+        return None, "already_linked"
 
     if not ProjectMember.objects.filter(
         project=project, member_id=occurrence.trainer_id, role__gte=ASSIGNABLE_ROLE, is_active=True
@@ -160,14 +180,23 @@ def import_occurrence(occurrence, *, project, actor, request=None):
     # The link is what stops the same training being counted as Hangar delivery
     # and as external training at once, so it is created here rather than left
     # to the trainer to do by hand afterwards.
-    GoogleTrainingEventLink.objects.create(
-        workspace_id=occurrence.workspace_id,
-        trainer_id=occurrence.trainer_id,
-        event_key=occurrence.event_key,
-        session=session,
-        created_by=actor,
-        updated_by=actor,
-    )
+    try:
+        GoogleTrainingEventLink.objects.create(
+            workspace_id=occurrence.workspace_id,
+            trainer_id=occurrence.trainer_id,
+            event_key=occurrence.event_key,
+            session=session,
+            created_by=actor,
+            updated_by=actor,
+        )
+    except IntegrityError:
+        # Another import won the unique index between the check above and here.
+        # That is the correct outcome, not a server error: the training already
+        # exists in Hangar, and this transaction rolls back the duplicate.
+        raise AlreadyImported from None
+
+    occurrence.imported_issue = issue
+    occurrence.save(update_fields=["imported_issue", "updated_at"])
 
     epoch = int(timezone.now().timestamp())
     origin = base_host(request=request, is_app=True) if request is not None else None
@@ -201,7 +230,10 @@ def import_occurrences(occurrences, *, project, actor, request=None):
     """Import several, reporting per row rather than failing the whole batch."""
     created, skipped = [], []
     for occurrence in occurrences:
-        issue, reason = import_occurrence(occurrence, project=project, actor=actor, request=request)
+        try:
+            issue, reason = import_occurrence(occurrence, project=project, actor=actor, request=request)
+        except AlreadyImported:
+            issue, reason = None, "already_imported"
         if issue is None:
             skipped.append({"occurrence_id": str(occurrence.id), "reason": reason})
         else:

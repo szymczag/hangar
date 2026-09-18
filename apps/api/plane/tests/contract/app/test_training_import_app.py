@@ -269,3 +269,93 @@ def test_the_endpoint_is_invisible_while_capacity_is_off(keys, workspace, create
     response = client.get(f"/api/workspaces/{workspace.slug}/capacity/training-imports/", WINDOW)
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_retired_training_cannot_be_imported_from_a_stale_listing(keys, workspace, create_user):
+    """An id harvested before the sweep retired it stays usable for the whole
+    retention window unless the state is re-checked at import time."""
+    rule = _rule(workspace)
+    occurrence = _occurrence(workspace, create_user, rule)
+    project = _project(workspace, create_user)
+    client, csrf = _client(create_user)
+    TrainingEventOccurrence.objects.filter(pk=occurrence.pk).update(
+        state=TrainingEventOccurrence.State.CANCELLED
+    )
+
+    response = client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/training-imports/",
+        {"project_id": str(project.id), "occurrence_ids": [str(occurrence.id)]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert response.data["created"] == []
+    assert response.data["skipped"][0]["reason"] == "no_longer_active"
+    assert Issue.objects.filter(project=project).count() == 0
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_unlinking_the_invitation_does_not_make_a_training_importable_again(keys, workspace, create_user):
+    """Otherwise one unlink turns a single training into two Workshops.
+
+    Unlinking is member-level self-service, so the link's absence cannot be what
+    "not imported yet" means.
+    """
+    rule = _rule(workspace)
+    occurrence = _occurrence(workspace, create_user, rule)
+    project = _project(workspace, create_user)
+    client, csrf = _client(create_user)
+    url = f"/api/workspaces/{workspace.slug}/capacity/training-imports/"
+    payload = {"project_id": str(project.id), "occurrence_ids": [str(occurrence.id)]}
+    client.post(url, payload, format="json", HTTP_X_CSRFTOKEN=csrf)
+
+    GoogleTrainingEventLink.objects.filter(event_key=occurrence.event_key).delete(soft=False)
+    second = client.post(url, payload, format="json", HTTP_X_CSRFTOKEN=csrf)
+
+    assert second.data["skipped"][0]["reason"] == "already_imported"
+    assert Issue.objects.filter(project=project).count() == 1
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_an_imported_training_records_what_it_became(keys, workspace, create_user):
+    rule = _rule(workspace)
+    occurrence = _occurrence(workspace, create_user, rule)
+    project = _project(workspace, create_user)
+    client, csrf = _client(create_user)
+
+    client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/training-imports/",
+        {"project_id": str(project.id), "occurrence_ids": [str(occurrence.id)]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    occurrence.refresh_from_db()
+    assert occurrence.imported_issue_id == Issue.objects.get(project=project).id
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_deleting_the_work_item_offers_the_training_for_import_again(keys, workspace, create_user):
+    """The marker records a decision, not a permanent ban."""
+    rule = _rule(workspace)
+    occurrence = _occurrence(workspace, create_user, rule)
+    project = _project(workspace, create_user)
+    client, csrf = _client(create_user)
+    url = f"/api/workspaces/{workspace.slug}/capacity/training-imports/"
+    client.post(
+        url,
+        {"project_id": str(project.id), "occurrence_ids": [str(occurrence.id)]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    Issue.objects.filter(project=project).delete(soft=False)
+    occurrence.refresh_from_db()
+
+    assert occurrence.imported_issue_id is None
+    assert [row["id"] for row in client.get(url, WINDOW).data["results"]] == [str(occurrence.id)]

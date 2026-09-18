@@ -32,7 +32,12 @@ from plane.db.models import Workspace
 from plane.ext.capacity.throttles import CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle
 from plane.ext.capacity.training_workload import empty_counts, external_counts, linked_sessions
 from plane.ext.capacity.workload import session_workload
-from plane.ext.models import TrainerProfile, TrainingCalendarSyncState, TrainingEventOccurrence
+from plane.ext.models import (
+    TrainerProfile,
+    TrainerTrainingSyncState,
+    TrainingCalendarSyncState,
+    TrainingEventOccurrence,
+)
 from plane.ext.services.training_import import parse_range
 from plane.ext.views.capacity import _disabled
 from plane.utils.csv_utils import sanitize_csv_row
@@ -65,11 +70,25 @@ def _hours(minutes):
     return round(minutes / 60, 2)
 
 
-def _sync_status(profile):
+def _sync_status(profile, now):
+    """Whether this trainer's numbers can be trusted, and why not when they cannot.
+
+    Consent alone is not enough to answer. A trainer can have consented
+    perfectly and still have no current data, because the sweep of the calendar
+    they appear on has been failing -- a calendar stuffed past the event ceiling
+    does exactly that, and the backoff then retries into the same wall. Reading
+    only `consent_state` reported those trainers as fully counted, which is the
+    one thing this report must never do: it is read by somebody planning who can
+    take the next workshop.
+    """
     state = getattr(profile, "training_sync_state", None)
-    if state is None:
+    if state is None or state.last_materialized_at is None:
         return "never_synced"
-    return state.consent_state if state.consent_state != "ok" else "ok"
+    if state.consent_state != TrainerTrainingSyncState.ConsentState.OK:
+        return state.consent_state
+    if now - state.last_materialized_at > STALE_AFTER:
+        return "stale"
+    return "ok"
 
 
 def _coverage(workspace_id, start, end):
@@ -140,7 +159,7 @@ class TrainingReportEndpoint(BaseAPIView):
             profiles = profiles.filter(user_id__in=trainer_ids)
         profiles = list(profiles)
 
-        rows = self._rows(workspace, profiles, start, end)
+        rows = self._rows(workspace, profiles, start, end, timezone.now())
         coverage, data_as_of = _coverage(workspace.id, start, end)
 
         # Deliberately not `format`: DRF reserves that query parameter for
@@ -160,7 +179,7 @@ class TrainingReportEndpoint(BaseAPIView):
         )
 
     @staticmethod
-    def _rows(workspace, profiles, start, end):
+    def _rows(workspace, profiles, start, end, now):
         user_ids = [profile.user_id for profile in profiles]
         delivered = session_workload(workspace.id, user_ids, start, end)
         occurrences = TrainingEventOccurrence.objects.filter(
@@ -177,7 +196,7 @@ class TrainingReportEndpoint(BaseAPIView):
 
         rows = []
         for profile in profiles:
-            sync_status = _sync_status(profile)
+            sync_status = _sync_status(profile, now)
             mine = by_trainer.get(profile.user_id, [])
             if sync_status == "ok":
                 linked = linked_sessions(
