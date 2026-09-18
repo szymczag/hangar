@@ -230,6 +230,60 @@ class GoogleCalendarClient:
             if not page_token:
                 return events
 
+    def list_training_events(
+        self, credential, calendar_id, *, time_min, time_max, updated_min=None
+    ) -> list[dict]:
+        """Read a rule calendar for the sweep, titles included.
+
+        Deliberately separate from `list_events` rather than a flag on it. The
+        live path -- the ledger and every booking check -- must keep running
+        without titles, so that no event summary can reach its five-minute Redis
+        cache or any API response. One field mask serving both would put them
+        there the first time anybody widened it.
+
+        `updated_min` turns the read incremental. It has to come with
+        `showDeleted`, because a cancellation is precisely an event whose only
+        recent change is that it stopped existing, and the sweep has to see it.
+        """
+        events, page_token = [], None
+        while True:
+            query = {
+                "timeMin": time_min,
+                "timeMax": time_max,
+                "singleEvents": "true",
+                "showDeleted": "true" if updated_min else "false",
+                "maxResults": 250,
+                "fields": (
+                    "nextPageToken,timeZone,items(id,iCalUID,status,summary,updated,organizer(email),"
+                    "attendees(email,responseStatus),attendeesOmitted,start,end,originalStartTime,"
+                    "extendedProperties/private)"
+                ),
+            }
+            if updated_min:
+                query["updatedMin"] = updated_min
+            if page_token:
+                query["pageToken"] = page_token
+            payload = self._authorized_json(
+                credential,
+                "GET",
+                (
+                    f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}/events"
+                    f"?{urlencode(query)}"
+                ),
+            )
+            if not isinstance(payload, dict) or not isinstance(payload.get("items", []), list):
+                raise GoogleCalendarError("invalid_events_response")
+            items = payload.get("items", [])
+            if len(events) + len(items) > 2000:
+                raise GoogleCalendarError("events_window_too_large")
+            for item in items:
+                if not isinstance(item, dict):
+                    raise GoogleCalendarError("invalid_events_response")
+                events.append({**item, "calendar_timezone": payload.get("timeZone", "UTC")})
+            page_token = payload.get("nextPageToken")
+            if not page_token:
+                return events
+
     def freebusy(self, credential, calendar_ids: list[str], *, time_min: str, time_max: str) -> list[dict]:
         busy = []
         for offset in range(0, len(calendar_ids), 50):

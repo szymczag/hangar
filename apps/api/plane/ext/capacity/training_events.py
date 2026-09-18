@@ -64,15 +64,32 @@ def recognized_event(event, *, organizer, participant, calendar_id):
     end = event_time(event.get("end"), event.get("calendar_timezone", "UTC"))
     if start >= end:
         raise GoogleCalendarError("invalid_event_time")
-    # iCalUID plus original occurrence distinguishes recurrence while deduplicating
-    # the same invitation seen through multiple configured calendars.
+    return {
+        "key": event_key(event, calendar_id=calendar_id),
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "status": status,
+    }
+
+
+def event_key(event, *, calendar_id):
+    """The stable identity of one occurrence, independent of who was invited.
+
+    iCalUID plus the original occurrence distinguishes recurrence while
+    deduplicating the same invitation seen through several configured calendars.
+
+    Separate from `recognized_event` because the sweep needs it for an event
+    that will never be recognized: a cancellation carries no usable attendee
+    list, but it still has to be matched against the occurrence it cancels.
+    Sharing the computation is the point -- two implementations that drifted
+    would silently break every link between an invitation and its session.
+    """
     occurrence = event.get("originalStartTime") or event.get("start")
     origin = event_time(occurrence, event.get("calendar_timezone", "UTC")).astimezone(timezone.utc).isoformat()
     if not event.get("iCalUID") and not event.get("id"):
         raise GoogleCalendarError("invalid_event_identity")
     identity = event.get("iCalUID") or f"{calendar_id}:{event.get('id', '')}"
-    key = hmac.new(settings.SECRET_KEY.encode(), f"{identity}:{origin}".encode(), hashlib.sha256).hexdigest()
-    return {"key": key, "start": start.isoformat(), "end": end.isoformat(), "status": status}
+    return hmac.new(settings.SECRET_KEY.encode(), f"{identity}:{origin}".encode(), hashlib.sha256).hexdigest()
 
 
 def training_events(trainer, start, end, *, force=False):
