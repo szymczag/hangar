@@ -7,6 +7,43 @@ which origins they talk to), so it is kept in `packages/csp` next to them and
 changes in the same commit as the code it describes. Every installation built
 from this repository gets it.
 
+## Current status: report-only
+
+The policy ships **report-only** (`Content-Security-Policy-Report-Only`). Browsers
+evaluate it and report what it would block to `/api/csp-report/`, but block
+nothing. Until it is switched to enforcing, it is a measuring instrument, not a
+second line of defence: an injection that got past the sanitizer would still run.
+
+What has been verified against it:
+
+- the web and admin shells and the space shell load with the policy enforced and
+  produce no violations (headless Chromium, built images, read-only root
+  filesystem for the nginx images);
+- the rich-text editor, with the policy enforced: centred and right-aligned
+  paragraphs, palette text and background colours, coloured table headers and
+  cells (including a cell stored in the old CSS-variable form), links, and a
+  paste carrying the editor's own clipboard format. No violations; every
+  construct renders from the stylesheet; a hostile colour value is dropped and
+  a pasted `<img onerror>` does not run.
+
+What has not been exercised yet, and is the reason for the report-only period:
+the collaborative page editor (live), published boards with real content,
+file upload and preview flows, the admin console beyond its shell, and the
+remaining screens of the web app.
+
+**Before enforcing**, on a deployment running report-only:
+
+1. Use the application normally for a release cycle, including pages, uploads,
+   published boards and the admin console.
+2. Read the API log for `Content-Security-Policy violation`. Each entry names
+   the directive and the blocked resource.
+3. A blocked origin that the deployment legitimately uses goes into the
+   variables below; blocked inline code or style is a frontend change.
+4. With no unexplained reports left, set `HANGAR_CSP_REPORT_ONLY=false`
+   (`contentSecurityPolicy.reportOnly: false` in Helm). The next release makes
+   enforcing the default and keeps the switch for an operator who needs to step
+   back.
+
 ## What the policy allows
 
 No directive contains `'unsafe-inline'`, `'unsafe-eval'` or `'wasm-unsafe-eval'`.

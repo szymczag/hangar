@@ -4,6 +4,7 @@
 
 # Python import
 import os
+from html import escape
 from typing import List, Dict, Tuple
 
 # Third party import
@@ -22,6 +23,12 @@ from plane.utils.exception_logger import log_exception
 from plane.utils.url_security import pinned_fetch
 
 from ..base import BaseAPIView
+
+
+def _llm_text_as_html(text: str) -> str:
+    """Model output is untrusted text: a prompt can make it return markup. It is
+    escaped, and only its line breaks become HTML."""
+    return escape(text or "").replace("\n", "<br/>")
 
 
 class LLMProvider:
@@ -174,7 +181,7 @@ class GPTIntegrationEndpoint(BaseAPIView):
         return Response(
             {
                 "response": text,
-                "response_html": text.replace("\n", "<br/>"),
+                "response_html": _llm_text_as_html(text),
                 "project_detail": ProjectLiteSerializer(project).data,
                 "workspace_detail": WorkspaceLiteSerializer(workspace).data,
             },
@@ -207,7 +214,7 @@ class WorkspaceGPTIntegrationEndpoint(BaseAPIView):
         return Response(
             {
                 "response": text,
-                "response_html": text.replace("\n", "<br/>"),
+                "response_html": _llm_text_as_html(text),
             },
             status=status.HTTP_200_OK,
         )

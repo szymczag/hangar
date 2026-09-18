@@ -159,3 +159,22 @@ class TestActivityPayload:
         assert sanitize_rich_text_payload("") == ""
         assert sanitize_rich_text_payload("not json") == "not json"
         assert sanitize_rich_text_payload("[1, 2]") == "[1, 2]"
+
+
+@pytest.mark.unit
+class TestOtherRichTextSources:
+    def test_llm_output_is_text(self):
+        from plane.app.views.external.base import _llm_text_as_html
+
+        html = _llm_text_as_html('line one\n<img src=x onerror=alert(1)><span style="position:fixed">x</span>')
+        assert "<img" not in html and "<span" not in html
+        assert html.startswith("line one<br/>&lt;img")
+
+    def test_module_description_html_is_sanitized(self):
+        from plane.app.serializers.module import ModuleWriteSerializer
+
+        serializer = ModuleWriteSerializer()
+        cleaned = serializer.validate_description_html(f'<p style="{OVERLAY}">x</p><script>alert(1)</script>')
+        assert "style" not in cleaned and "<script" not in cleaned
+        with pytest.raises(Exception):
+            serializer.validate_description_html({"html": "<p>x</p>"})
