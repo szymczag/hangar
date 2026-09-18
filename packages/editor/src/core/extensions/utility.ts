@@ -14,6 +14,7 @@ import type { TAdditionalActiveDropbarExtensions } from "@/plane-editor/types/ut
 import { DropHandlerPlugin } from "@/plugins/drop";
 import { FilePlugins } from "@/plugins/file/root";
 import { MarkdownClipboardPlugin } from "@/plugins/markdown-clipboard";
+import { MarkdownPastePlugin } from "@/plugins/markdown-paste";
 import type { IEditorProps, TEditorAsset, TFileHandler } from "@/types";
 
 type TActiveDropbarExtensions =
@@ -81,6 +82,9 @@ export const UtilityExtension = (props: Props) => {
           editor: this.editor,
           getEditorMetaData,
         }),
+        // Fork (see FORK.md): pasted markdown from an application that also
+        // writes HTML to the clipboard.
+        MarkdownPastePlugin({ editor: this.editor }),
         DropHandlerPlugin({
           disabledExtensions,
           flaggedExtensions,
@@ -116,9 +120,9 @@ export const UtilityExtension = (props: Props) => {
               uniqueAssets.add(args.asset);
             }
           } else if ("idToRemove" in args) {
-            const asset = this.storage.assetsList.find((asset) => asset.id === args.idToRemove);
-            if (asset) {
-              uniqueAssets.delete(asset);
+            const removed = this.storage.assetsList.find((asset) => asset.id === args.idToRemove);
+            if (removed) {
+              uniqueAssets.delete(removed);
             }
           }
           this.storage.assetsList = Array.from(uniqueAssets);

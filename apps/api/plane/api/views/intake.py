@@ -32,6 +32,7 @@ from plane.db.models import Intake, IntakeIssue, Issue, Project, ProjectMember, 
 from plane.utils.host import base_host
 from plane.ext.services import project_default_issue_type
 from plane.utils.content_validator import validate_html_content
+from plane.ext.services.markdown import resolve_markdown_input
 from .base import BaseAPIView
 from plane.db.models.intake import SourceType
 from plane.utils.openapi import (
@@ -188,6 +189,11 @@ class IntakeIssueListCreateAPIEndpoint(BaseAPIView):
 
         # create an issue
         issue_data = request.data.get("issue", {})
+        # Fork (see FORK.md): markdown becomes description_html before the
+        # sanitizer below, which stays the only gate on either input.
+        issue_data = resolve_markdown_input(
+            dict(issue_data), html_field="description_html", markdown_field="description_markdown"
+        )
         # Accept both "description" and "description_json" keys for the description_json field
         description_json = issue_data.get("description") or issue_data.get("description_json") or {}
         # Sanitize description_html before saving to prevent stored XSS (GHSA-hh2r-3hwp-mvq3)
@@ -378,6 +384,12 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
             ).get(pk=issue_id, workspace__slug=slug, project_id=project_id)
+
+            # Fork (see FORK.md): markdown reaches the serializer as HTML, and
+            # does so before the guest allowlist below drops unknown keys.
+            issue_data = resolve_markdown_input(
+                dict(issue_data), html_field="description_html", markdown_field="description_markdown"
+            )
 
             # Only allow guests to edit name and description
             if project_member.role <= 5:

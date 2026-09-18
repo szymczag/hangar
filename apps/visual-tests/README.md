@@ -104,6 +104,20 @@ geometry byte-identical every time. Retries did not help, because each outcome i
 stable once chosen; nor did any readiness wait, because nothing was still
 loading. Whole-pixel geometry has one rasterization, and the soak is clean on it.
 
+### Deterministic rasterization
+
+Chromium is launched with `--disable-partial-raster`, `--disable-skia-runtime-opts`,
+`--run-all-compositor-stages-before-draw`, `--disable-new-content-rendering-timeout`
+and `--force-color-profile=srgb`. Without them two stories chose between two
+stable renderings of the same pixels: a rounded corner whose curve lands
+mid-pixel can be tiled and rastered two ways, and which one appeared varied per
+run while the element's geometry was identical every time. Whole-pixel capture
+fixed the stories whose target could be moved onto a pixel boundary; these flags
+fix the rest, including the one where nothing can be scrolled and `capture()`
+warns that it could not snap. After the flags, a five-run soak is clean and each
+affected baseline moved by tens of pixels at a maximum channel delta of 1 to 14
+-- anti-aliasing, not content.
+
 ## Reviewing a baseline change
 
 A changed baseline is a changed file in the diff. That is the whole point of

@@ -48,6 +48,26 @@ class ChangePasswordEndpoint(APIView):
     def post(self, request):
         user = User.objects.get(pk=request.user.id)
 
+        # Fork (see FORK.md): an account that signs in through a provider has no
+        # password to change, and `is_password_autoset` is true for it -- which
+        # skipped the old-password check below and let the account *set* one.
+        # That is a way out from under the provider: the instance may then accept
+        # a password for an identity the administrator pinned to SSO, and the
+        # provider's own controls -- its second factor, its lockout, its
+        # deprovisioning -- stop being the only way in. The address check in
+        # `user/base.py` refuses an email change for the same accounts and for
+        # the same underlying reason.
+        if user.federated_identities.exists():
+            return Response(
+                {
+                    "error": (
+                        "This account signs in through an identity provider and has no Hangar "
+                        "password. Change it with your provider instead."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # If the user password is not autoset then we need to check the old passwords
         if not user.is_password_autoset:
             old_password = request.data.get("old_password", False)
