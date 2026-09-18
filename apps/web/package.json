@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev --port 3000",
-    "build": "react-router build",
+    "build": "react-router build && hangar-csp-nginx --html build/client/index.html --out build/csp/security-headers.conf.template",
     "preview": "react-router build && serve -s build/client -l 3000",
     "start": "serve -s build/client -l 3000",
     "clean": "rm -rf .turbo && rm -rf .next && rm -rf .react-router && rm -rf node_modules && rm -rf dist && rm -rf build",
@@ -38,7 +38,6 @@
     "@plane/ui": "workspace:*",
     "@plane/utils": "workspace:*",
     "@popperjs/core": "catalog:",
-    "@react-pdf/renderer": "catalog:",
     "@react-router/node": "catalog:",
     "@tanstack/react-table": "catalog:",
     "axios": "catalog:",
@@ -64,7 +63,6 @@
     "react-is": "catalog:",
     "react-markdown": "catalog:",
     "react-masonry-component": "catalog:",
-    "react-pdf-html": "catalog:",
     "react-popper": "catalog:",
     "react-router": "catalog:",
     "recharts": "catalog:",
@@ -75,6 +73,7 @@
     "uuid": "catalog:"
   },
   "devDependencies": {
+    "@plane/csp": "workspace:*",
     "@plane/tailwind-config": "workspace:*",
     "@plane/typescript-config": "workspace:*",
     "@react-router/dev": "catalog:",

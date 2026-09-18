@@ -54,12 +54,14 @@ export const useTitleEditor = (props: TUseTitleEditorProps) => {
 
   const editor = useEditor(
     {
-      onUpdate: ({ editor }) => {
-        updatePageProperties?.(id, "property_updated", { name: editor?.getText() });
+      onUpdate: ({ editor: updatedEditor }) => {
+        updatePageProperties?.(id, "property_updated", { name: updatedEditor?.getText() });
       },
       editable,
       immediatelyRender: false,
       shouldRerenderOnTransaction: false,
+      // Base CSS ships in styles/prosemirror.css; see use-editor.ts.
+      injectCSS: false,
       extensions: [
         ...TitleExtensions,
         ...(extensions ?? []),

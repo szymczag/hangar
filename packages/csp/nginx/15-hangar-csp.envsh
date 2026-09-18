@@ -1,0 +1,35 @@
+#!/bin/sh
+# Copyright (c) 2026-present Maciej Szymczak and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+#
+# Sourced by the nginx image's entrypoint before 20-envsubst-on-templates.sh.
+# It gives every Content-Security-Policy variable in
+# /etc/nginx/templates/security-headers.conf.template a value (envsubst leaves
+# an unset variable in place, which would corrupt the header) and points the
+# rendered file at /tmp, the one writable path on a read-only root filesystem.
+
+export HANGAR_CSP_IMG_SRC="${HANGAR_CSP_IMG_SRC-}"
+export HANGAR_CSP_CONNECT_SRC="${HANGAR_CSP_CONNECT_SRC-}"
+export HANGAR_CSP_MEDIA_SRC="${HANGAR_CSP_MEDIA_SRC-}"
+export HANGAR_CSP_FRAME_SRC="${HANGAR_CSP_FRAME_SRC:-'none'}"
+export HANGAR_CSP_FORM_ACTION="${HANGAR_CSP_FORM_ACTION-}"
+
+# Defaults match @plane/csp (DEFAULT_REPORT_ONLY, DEFAULT_REPORT_URI): this
+# release reports violations without enforcing. HANGAR_CSP_REPORT_ONLY=false
+# enforces; an empty HANGAR_CSP_REPORT_URI sends no reports.
+HANGAR_CSP_REPORT_URI="${HANGAR_CSP_REPORT_URI-/api/csp-report/}"
+if [ -n "${HANGAR_CSP_REPORT_URI}" ]; then
+  export HANGAR_CSP_REPORT="; report-uri ${HANGAR_CSP_REPORT_URI}"
+else
+  export HANGAR_CSP_REPORT=""
+fi
+
+if [ "${HANGAR_CSP_REPORT_ONLY:-true}" = "true" ]; then
+  export HANGAR_CSP_HEADER="Content-Security-Policy-Report-Only"
+else
+  export HANGAR_CSP_HEADER="Content-Security-Policy"
+fi
+
+export NGINX_ENVSUBST_OUTPUT_DIR="/tmp/nginx-conf.d"
+mkdir -p "$NGINX_ENVSUBST_OUTPUT_DIR"

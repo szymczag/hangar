@@ -53,6 +53,26 @@ spec:
               value: {{ include "hangar.publicOrigin" $root | quote }}
             - name: VITE_API_BASE_URL
               value: {{ include "hangar.publicOrigin" $root | quote }}
+            {{- $csp := $root.Values.contentSecurityPolicy }}
+            {{- $storageOrigin := include "hangar.objectStoragePublicOrigin" $root }}
+            # Content-Security-Policy runtime origins; the policy itself ships
+            # with the image (see packages/csp).
+            - name: HANGAR_CSP_REPORT_ONLY
+              value: {{ $csp.reportOnly | toString | quote }}
+            - name: HANGAR_CSP_REPORT_URI
+              value: {{ $csp.reportUri | quote }}
+            - name: HANGAR_CSP_IMG_SRC
+              value: {{ trim (printf "%s %s" $storageOrigin $csp.imgSrc) | quote }}
+            - name: HANGAR_CSP_CONNECT_SRC
+              value: {{ trim (printf "%s %s" $storageOrigin $csp.connectSrc) | quote }}
+            - name: HANGAR_CSP_MEDIA_SRC
+              value: {{ $storageOrigin | quote }}
+            - name: HANGAR_CSP_FRAME_SRC
+              value: {{ default "'none'" $csp.frameSrc | quote }}
+            {{- if eq $component.name "space" }}
+            - name: HANGAR_SPACE_FRAME_ANCESTORS
+              value: {{ $csp.spaceFrameAncestors | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 3000

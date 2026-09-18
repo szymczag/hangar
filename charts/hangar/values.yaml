@@ -189,6 +189,23 @@ podDefaults:
                 app.kubernetes.io/part-of: hangar
   topologySpreadConstraints: []
 
+# Content-Security-Policy of the web, admin and space frontends. The policy
+# is built into each image; these are the origins only the deployment knows.
+# The object storage origin is added automatically.
+contentSecurityPolicy:
+  # This release reports violations to the API instead of enforcing, so a
+  # breakage shows in the API log before users meet it. Set false to enforce.
+  reportOnly: true
+  reportUri: /api/csp-report/
+  # Extra image origins, space separated (e.g. a self-hosted GitLab's avatars).
+  imgSrc: ""
+  # Extra origins the browser connects to (e.g. a separate API or live origin).
+  connectSrc: ""
+  # Origins that may be framed inside the application (e.g. a changelog page).
+  frameSrc: ""
+  # Who may embed a published Spaces board; "'self'" allows only this instance.
+  spaceFrameAncestors: "'self'"
+
 web:
   replicas: 2
   image:

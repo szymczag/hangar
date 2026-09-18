@@ -4,3 +4,5 @@
 @import "./github-dark.css";
 @import "./drag-drop.css";
 @import "./title-editor.css";
+/* Last, as TipTap's injected <style> used to be: it overrides equal-specificity rules above. */
+@import "./prosemirror.css";

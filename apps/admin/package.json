@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev --port 3001",
-    "build": "react-router build",
+    "build": "react-router build && hangar-csp-nginx --html build/client/index.html --out build/csp/security-headers.conf.template",
     "preview": "react-router build && serve -s build/client -l 3001",
     "start": "serve -s build/client -l 3001",
     "clean": "rm -rf .turbo && rm -rf .next && rm -rf node_modules && rm -rf dist && rm -rf build",
@@ -47,6 +47,7 @@
     "uuid": "catalog:"
   },
   "devDependencies": {
+    "@plane/csp": "workspace:*",
     "@plane/tailwind-config": "workspace:*",
     "@plane/typescript-config": "workspace:*",
     "@react-router/dev": "catalog:",
