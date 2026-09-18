@@ -386,3 +386,82 @@ def reclaim_stalled_project_copies() -> int:
         copy_project_work_items.apply_async(args=[str(job_id)])
         dispatched += 1
     return dispatched
+
+
+def training_materialization_enabled() -> bool:
+    from django.conf import settings
+
+    return bool(getattr(settings, "GOOGLE_TRAINING_MATERIALIZATION_ENABLED", False))
+
+
+@shared_task
+def dispatch_training_calendar_sweeps() -> int:
+    """Hand every calendar that is due to a worker.
+
+    Leases rather than a queue, so two dispatchers divide the work instead of
+    handing the same calendar to two workers -- a doubled sweep is wasted Google
+    quota at best and two writers racing on the same rows at worst.
+    """
+    if not training_materialization_enabled():
+        return 0
+
+    from plane.ext.capacity.training_sync import claim_sweeps, ensure_sync_states
+
+    now = timezone.now()
+    ensure_sync_states(now)
+    claimed = claim_sweeps(now)
+    for rule_id, lease_token, full in claimed:
+        sweep_training_calendar.apply_async(args=[rule_id, str(lease_token), full])
+    return len(claimed)
+
+
+@shared_task(bind=True, acks_late=True, reject_on_worker_lost=True)
+def sweep_training_calendar(self, rule_id: str, lease_token: str, full: bool = False) -> None:
+    """Read one rule's calendar into the occurrence table.
+
+    Google failures are recorded by the sweep itself and are not raised here: a
+    rate-limited calendar should back off on its own row, not retry through
+    Celery and multiply the very requests that caused the limit.
+    """
+    if not training_materialization_enabled():
+        logger.warning("Training sweep ignored because materialization is disabled")
+        return
+
+    from plane.ext.capacity.calculation import _google_client
+    from plane.ext.capacity.google import GoogleCalendarError
+    from plane.ext.capacity.training_sync import release_sweep, sweep_rule
+    from plane.ext.models import GoogleTrainingRule
+
+    rule = GoogleTrainingRule.objects.filter(pk=rule_id).first()
+    if rule is None:
+        # Removed between dispatch and delivery. Nothing to release: deleting a
+        # rule takes its sync state with it.
+        return
+    try:
+        client = _google_client()
+    except GoogleCalendarError:
+        logger.warning("Training sweep skipped: Google is not configured")
+        release_sweep(rule_id, lease_token)
+        return
+    try:
+        result = sweep_rule(client, rule, full=full)
+        logger.info("Training calendar swept", extra={"rule_id": rule_id, **result})
+    finally:
+        # Always hand the calendar back, including after an unexpected error --
+        # otherwise one bad pass parks it until the lease expires.
+        release_sweep(rule_id, lease_token)
+
+
+@shared_task
+def prune_training_event_occurrences() -> int:
+    """Drop occurrences the sweep retired, once they are old enough.
+
+    Deliberately not a history cleanup: past training is the reporting product
+    and is never pruned. This removes only rows already concluded to be gone.
+    """
+    if not training_materialization_enabled():
+        return 0
+
+    from plane.ext.capacity.training_sync import prune_retired_occurrences
+
+    return prune_retired_occurrences(timezone.now())

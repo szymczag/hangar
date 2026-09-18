@@ -20,9 +20,12 @@ The decisions about windows, slicing and what a pass may conclude live in
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from uuid import uuid4
 
+from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone as django_timezone
 
 from plane.ext.capacity.crypto import decrypt_value, encrypt_value
@@ -38,6 +41,7 @@ from plane.ext.capacity.training_sweep import (
 )
 from plane.ext.models import (
     GoogleCalendarCredential,
+    GoogleTrainingRule,
     TrainerProfile,
     TrainerTrainingSyncState,
     TrainingCalendarSyncState,
@@ -90,16 +94,97 @@ def _remember_consent(profile, state, *, error_code=""):
 
 def sync_state_for(rule, now):
     """The bookkeeping row for this rule, created on first sight."""
-    start, end = sweep_window(now)
+    start, end = _window(now)
     state, _ = TrainingCalendarSyncState.objects.get_or_create(
         rule=rule,
         defaults={
             "workspace_id": rule.workspace_id,
             "window_starts_at": start,
             "window_ends_at": end,
+            # Pinned to the caller's instant rather than left to the column
+            # default. The dispatcher captures `now` first and then creates any
+            # missing rows, so a default evaluated at INSERT lands a hair after
+            # it -- and a brand new calendar would sit out the very pass that
+            # created it, every time, until something else moved the clock.
+            "available_at": now,
         },
     )
     return state
+
+
+def _window(now):
+    return sweep_window(
+        now,
+        past_days=settings.GOOGLE_TRAINING_SWEEP_WINDOW_PAST_DAYS,
+        future_days=settings.GOOGLE_TRAINING_SWEEP_WINDOW_FUTURE_DAYS,
+    )
+
+
+def ensure_sync_states(now):
+    """Give every configured rule a bookkeeping row so it can be claimed."""
+    created = 0
+    for rule in GoogleTrainingRule.objects.filter(sync_state__isnull=True).only("id", "workspace_id"):
+        sync_state_for(rule, now)
+        created += 1
+    return created
+
+
+def claim_sweeps(now, *, limit=None, lease_seconds=None):
+    """Take a lease on the calendars due for a pass.
+
+    `skip_locked` rather than a queue: two dispatchers running at once should
+    divide the work between them, never queue behind each other, and never hand
+    the same calendar to two workers -- a doubled sweep is wasted Google quota
+    at best and two writers racing on the same rows at worst.
+
+    An expired lease is reclaimable, which is what makes a worker dying
+    mid-sweep self-healing rather than permanently parking a calendar.
+    """
+    limit = limit or settings.GOOGLE_TRAINING_SWEEP_BATCH
+    lease_seconds = lease_seconds or settings.GOOGLE_TRAINING_SWEEP_LEASE_SECONDS
+    expires_at = now + timedelta(seconds=lease_seconds)
+    claimed = []
+    with transaction.atomic():
+        rows = list(
+            TrainingCalendarSyncState.objects.select_for_update(skip_locked=True)
+            .filter(available_at__lte=now)
+            .filter(Q(lease_expires_at__isnull=True) | Q(lease_expires_at__lt=now))
+            .order_by("available_at", "id")[:limit]
+        )
+        for row in rows:
+            row.lease_token = uuid4()
+            row.lease_expires_at = expires_at
+            claimed.append((str(row.rule_id), row.lease_token, wants_full_scan(row.last_full_scan_at, now)))
+        if rows:
+            TrainingCalendarSyncState.objects.bulk_update(rows, ["lease_token", "lease_expires_at", "updated_at"])
+    return claimed
+
+
+def release_sweep(rule_id, lease_token):
+    """Hand the calendar back, but only if this worker still holds it.
+
+    Matching on the token matters: a worker that overran its lease must not
+    clear the lease of whoever legitimately picked the calendar up afterwards.
+    """
+    return TrainingCalendarSyncState.objects.filter(rule_id=rule_id, lease_token=lease_token).update(
+        lease_token=None, lease_expires_at=None
+    )
+
+
+def prune_retired_occurrences(now, *, retention_days=None):
+    """Delete only what the sweep retired, and only after a grace period.
+
+    Real history is never pruned: a report about last year is exactly what this
+    table exists to answer. What goes is rows the sweep already concluded are
+    gone, kept a while in case a calendar came back.
+    """
+    retention_days = retention_days or settings.GOOGLE_TRAINING_RETIRED_RETENTION_DAYS
+    cutoff = now - timedelta(days=retention_days)
+    deleted, _ = TrainingEventOccurrence.objects.filter(
+        state__in=(TrainingEventOccurrence.State.CANCELLED, TrainingEventOccurrence.State.DISAPPEARED),
+        last_seen_at__lt=cutoff,
+    ).delete(soft=False)
+    return deleted
 
 
 def _reader(readers, offset):
@@ -181,7 +266,7 @@ def sweep_rule(client, rule, *, now=None, full=False):
         state.save(update_fields=["last_success_at", "last_error_code", "failure_count", "updated_at"])
         return {"matched": 0, "cancelled": 0, "disappeared": 0, "readers": 0}
 
-    window_start, window_end = sweep_window(now)
+    window_start, window_end = _window(now)
     full = full or wants_full_scan(state.last_full_scan_at, now)
     updated_min = None if full else _incremental_floor(state)
     profile, _ = _reader(readers, state.failure_count)
