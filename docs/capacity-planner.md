@@ -120,3 +120,92 @@ Session updates accept each existing session's `id` and preserve that row, its p
 origin and invitation links, including when sessions are reordered. IDs must be
 unique and belong to the edited Workshop. Removing a session removes its links;
 legacy clients that omit IDs retain the replace-all behavior.
+
+## Materializing recognized training
+
+The ledger reads Google on every request, which is right for a week and
+impossible for a quarter: Google will not serve a roster's month in one request,
+and an event listing refuses a window holding more than two thousand events. A
+background sweep therefore records what it recognizes, and reporting reads only
+that record.
+
+Enable it with `ENABLE_GOOGLE_TRAINING_MATERIALIZATION=1`, which has no effect
+unless Google Calendar capacity is enabled as well. The sweep covers a rolling
+window — ninety days back and one hundred and eighty forward by default,
+configurable — snapped outwards to whole months so its boundary does not shift
+daily. The window is how far back the sweep re-reads, not how much history is
+kept: older occurrences are left alone, because a report about last year is what
+the record exists to answer.
+
+Sweeping is keyed on the rule's calendar rather than on each trainer. A rule
+names a shared calendar, so every consenting trainer would read an identical
+event list from it; one read per calendar is fanned out in memory against each
+consenting trainer's own verified address. Consent is unchanged by this: an
+occurrence is still only recorded for a trainer who has granted the training
+scope themselves.
+
+A pass every quarter hour asks Google only for what changed since the last
+success, with a short overlap so an event updated mid-pass is not missed. Such a
+pass may never conclude that an invitation disappeared: an event moved outside
+the window no longer matches the time filter, so an empty answer means "nothing
+changed", not "everything is gone". A full rescan runs daily and is the only
+pass permitted to retire an occurrence by absence. Cancellations do not wait for
+it — a cancelled invitation is matched by its own occurrence key and retired
+immediately, because a cancelled training that goes on blocking a trainer is
+what somebody plans staffing around.
+
+Calendars are handed to workers by lease, so two dispatchers divide the work
+rather than sweeping the same calendar twice. A lease that expires is
+reclaimable, which is what makes a worker dying mid-sweep self-healing. A Google
+failure is recorded on the calendar's own row and backs off there; it never
+discards what was already known, because stale rows with an honest freshness
+marker beat an empty table. Retired occurrences are deleted after a grace
+period; nothing else is ever pruned.
+
+Event titles are requested on this path only, through a separate client method.
+The live availability path keeps running without them, so no event summary
+reaches its cache or any of its responses. A title is kept only for an event
+that already matched a rule — organizer and attendee both — and is stored
+encrypted with the same key material as the rest of the calendar configuration.
+
+## Importing calendar training as Workshops
+
+Training planned in the calendar blocks time and counts in the report, but it is
+not a work item, so nothing can be attached to it: no checklist, no status, no
+client contact. **Team capacity → Import from calendar** lists recognized
+trainings that have no linked session, and creates a Workshop work item for the
+ones an administrator selects.
+
+Importing creates the work item, its schedule and one session, assigns the
+trainer, and links the invitation to that session in one transaction. The link
+is what stops the training being counted as delivery and as external training at
+the same time. "Not yet imported" means the invitation has no link — never a
+work item with a similar name; no title matching is performed.
+
+The calendar title becomes the work item's name. Without one, the rule's label
+and the date are used. A trainer who is not an assignable member of the chosen
+project is reported rather than imported unassigned, and one such row does not
+stop the rest of the batch. Importing is administrator-only, and still requires
+a seat in the target project.
+
+## Training report
+
+**Capacity → Reports** answers how much training a trainer ran over any period
+up to four hundred days. It reads the materialized record and the workshop
+sessions, and makes no call to Google — which is the whole reason the record
+exists.
+
+Per trainer it reports distinct Workshops, sessions, delivery minutes and
+preparation/travel minutes, and separately confirmed and pending external
+training. An invitation linked to a session counts as delivery only, exactly as
+in the weekly ledger. `export=csv` returns the same figures as a download.
+
+Because the figures come from a record rather than a live read, the response
+says how fresh it is: when each calendar was last swept successfully and last
+fully rescanned, what window has been collected, and whether the requested range
+falls inside it. A trainer whose consent lapsed, or who has never been swept,
+is marked and excluded from totals rather than reported as having run nothing.
+
+Migration `0030_training_event_materialization` adds the occurrence record and
+the sweep bookkeeping. It is additive and backfills nothing; a workspace that
+never enables materialization behaves exactly as before.
