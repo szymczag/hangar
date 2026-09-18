@@ -54,6 +54,8 @@ class CapacityAuditEvent(models.Model):
         CHECKLIST_TEMPLATE_UPDATED = "checklist_template.updated", "Checklist template updated"
         CHECKLIST_TEMPLATE_REMOVED = "checklist_template.removed", "Checklist template removed"
         CHECKLIST_APPLIED = "checklist.applied", "Checklist applied"
+        WORKSHOP_ROLE_UPDATED = "workshop_role.updated", "Workshop role updated"
+        WORKSHOP_ROLE_REMOVED = "workshop_role.removed", "Workshop role removed"
 
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)

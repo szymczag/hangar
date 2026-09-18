@@ -145,7 +145,7 @@ export type TWorkshopPlanHold = {
   status: "active" | "released" | "confirmed";
 };
 
-export type TChecklistAssigneeMode = "unassigned" | "fixed" | "workshop_trainer";
+export type TChecklistAssigneeMode = "unassigned" | "fixed" | "workshop_trainer" | "role";
 export type TWorkshopChecklistItem = {
   id?: string;
   position: number;
@@ -153,8 +153,20 @@ export type TWorkshopChecklistItem = {
   description: string;
   assignee_id: string | null;
   assignee_mode: TChecklistAssigneeMode;
+  /** Set only in "role" mode; everyone holding the role is assigned. */
+  role_id: string | null;
   /** Days from the workshop's first session. Negative is before it. */
   offset_days: number;
+};
+/** A standing job in running a workshop, and who currently does it. */
+export type TWorkshopRole = {
+  id: string;
+  name: string;
+  member_ids: string[];
+};
+export type TWorkshopRoleInput = {
+  name: string;
+  member_ids: string[];
 };
 export type TWorkshopChecklistTemplate = {
   id: string;
@@ -487,6 +499,37 @@ export class CapacityService extends APIService {
       undefined,
       { headers: { "X-CSRFTOKEN": csrfToken } }
     );
+  }
+
+  listWorkshopRoles(workspaceSlug: string) {
+    return this.data<{ results: TWorkshopRole[] }>(
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/workshop-roles/`)
+    );
+  }
+
+  async createWorkshopRole(workspaceSlug: string, role: TWorkshopRoleInput) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopRole>(
+      this.post(`/api/workspaces/${workspaceSlug}/capacity/workshop-roles/`, role, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
+  }
+
+  async updateWorkshopRole(workspaceSlug: string, roleId: string, role: TWorkshopRoleInput) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopRole>(
+      this.put(`/api/workspaces/${workspaceSlug}/capacity/workshop-roles/${roleId}/`, role, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
+  }
+
+  async deleteWorkshopRole(workspaceSlug: string, roleId: string) {
+    const csrfToken = await this.csrfToken();
+    return this.delete(`/api/workspaces/${workspaceSlug}/capacity/workshop-roles/${roleId}/`, undefined, {
+      headers: { "X-CSRFTOKEN": csrfToken },
+    });
   }
 
   listChecklistTemplates(workspaceSlug: string) {

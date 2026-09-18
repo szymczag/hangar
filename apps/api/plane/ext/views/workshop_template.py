@@ -15,10 +15,14 @@ from plane.ext.models import (
     CapacityAuditEvent,
     WorkshopChecklistItem,
     WorkshopChecklistTemplate,
+    WorkshopRole,
+    WorkshopRoleMember,
 )
 from plane.ext.models.workshop_template import (
     MAX_ITEMS_PER_TEMPLATE,
+    MAX_MEMBERS_PER_ROLE,
     MAX_OFFSET_DAYS,
+    MAX_ROLES_PER_WORKSPACE,
     MAX_TEMPLATES_PER_WORKSPACE,
 )
 from plane.ext.services.workshop_checklist import apply_checklist_template
@@ -36,6 +40,7 @@ def _item_payload(item):
         "description": item.description,
         "assignee_id": str(item.assignee_id) if item.assignee_id else None,
         "assignee_mode": item.assignee_mode,
+        "role_id": str(item.role_id) if item.role_id else None,
         "offset_days": item.offset_days,
     }
 
@@ -100,6 +105,19 @@ def _parse_items(raw, *, workspace):
         else:
             assignee_id = None
 
+        role_id = entry.get("role_id")
+        if mode == WorkshopChecklistItem.AssigneeMode.ROLE:
+            try:
+                role_id = UUID(str(role_id))
+            except (TypeError, ValueError):
+                return None, Response({"error": f"Item {position + 1} requires a valid role."}, status=400)
+            if not WorkshopRole.objects.filter(workspace=workspace, id=role_id).exists():
+                return None, Response(
+                    {"error": f"Item {position + 1}: that role does not exist in this workspace."}, status=400
+                )
+        else:
+            role_id = None
+
         try:
             offset_days = int(entry.get("offset_days", 0))
         except (TypeError, ValueError):
@@ -117,6 +135,7 @@ def _parse_items(raw, *, workspace):
                 "description": description,
                 "assignee_id": assignee_id,
                 "assignee_mode": mode,
+                "role_id": role_id,
                 "offset_days": offset_days,
             }
         )
@@ -139,6 +158,157 @@ def _write_items(template, items, actor):
             for values in items
         ]
     )
+
+
+def _role_payload(role):
+    return {
+        "id": str(role.id),
+        "name": role.name,
+        "member_ids": [str(seat.member_id) for seat in role.memberships.all()],
+    }
+
+
+def _parse_members(raw, *, workspace):
+    """Validate the whole roster before writing any of it."""
+    if not isinstance(raw, list):
+        return None, Response({"error": "Send `member_ids` as a list."}, status=400)
+    if len(raw) > MAX_MEMBERS_PER_ROLE:
+        return None, Response({"error": f"A role holds at most {MAX_MEMBERS_PER_ROLE} people."}, status=400)
+    member_ids = []
+    for value in raw:
+        try:
+            member_id = UUID(str(value))
+        except (TypeError, ValueError):
+            return None, Response({"error": "A role member must be a valid person."}, status=400)
+        if member_id not in member_ids:
+            member_ids.append(member_id)
+    if member_ids and (
+        WorkspaceMember.objects.filter(workspace=workspace, member_id__in=member_ids, is_active=True).count()
+        != len(member_ids)
+    ):
+        return None, Response({"error": "Every role member must be an active member of this workspace."}, status=400)
+    return member_ids, None
+
+
+def _write_members(role, member_ids, actor):
+    # Hard deletion for the same reason the items use it: `(role, member)` is
+    # unique among live rows, so a soft-deleted seat would block re-adding the
+    # person who just came back to the role.
+    role.memberships.all().delete(soft=False)
+    WorkshopRoleMember.objects.bulk_create(
+        [
+            WorkshopRoleMember(role=role, member_id=member_id, created_by=actor, updated_by=actor)
+            for member_id in member_ids
+        ]
+    )
+
+
+class WorkshopRoleListEndpoint(BaseAPIView):
+    """Standing jobs in running a workshop, and who currently does them."""
+
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def get(self, request, slug):
+        if response := _disabled():
+            return response
+        roles = (
+            WorkshopRole.objects.filter(workspace__slug=slug)
+            .prefetch_related("memberships")
+            .order_by("name", "id")
+        )
+        return Response({"results": [_role_payload(role) for role in roles]})
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @transaction.atomic
+    def post(self, request, slug):
+        if response := _disabled():
+            return response
+        workspace = get_object_or_404(Workspace.objects.select_for_update(), slug=slug)
+        name = request.data.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name) > 80:
+            return Response({"error": "A role needs a name of up to 80 characters."}, status=400)
+        name = name.strip()
+        if WorkshopRole.objects.filter(workspace=workspace).count() >= MAX_ROLES_PER_WORKSPACE:
+            return Response({"error": f"Use at most {MAX_ROLES_PER_WORKSPACE} roles."}, status=400)
+        if WorkshopRole.objects.filter(workspace=workspace, name=name).exists():
+            return Response({"error": "A role with that name already exists."}, status=400)
+
+        member_ids, error = _parse_members(request.data.get("member_ids", []), workspace=workspace)
+        if error:
+            return error
+
+        role = WorkshopRole.objects.create(
+            workspace=workspace, name=name, created_by=request.user, updated_by=request.user
+        )
+        _write_members(role, member_ids, request.user)
+        _audit(
+            request,
+            workspace_id=workspace.id,
+            action=CapacityAuditEvent.Action.WORKSHOP_ROLE_UPDATED,
+            metadata={"role_id": str(role.id), "member_count": len(member_ids)},
+        )
+        return Response(_role_payload(role), status=201)
+
+
+class WorkshopRoleDetailEndpoint(BaseAPIView):
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @transaction.atomic
+    def put(self, request, slug, role_id):
+        if response := _disabled():
+            return response
+        role = get_object_or_404(
+            WorkshopRole.objects.select_for_update().select_related("workspace"), workspace__slug=slug, pk=role_id
+        )
+        name = request.data.get("name", role.name)
+        if not isinstance(name, str) or not name.strip() or len(name) > 80:
+            return Response({"error": "A role needs a name of up to 80 characters."}, status=400)
+        name = name.strip()
+        if WorkshopRole.objects.filter(workspace=role.workspace, name=name).exclude(pk=role.pk).exists():
+            return Response({"error": "A role with that name already exists."}, status=400)
+
+        member_ids, error = _parse_members(request.data.get("member_ids", []), workspace=role.workspace)
+        if error:
+            return error
+
+        role.name = name
+        role.updated_by = request.user
+        role.save(update_fields=["name", "updated_by", "updated_at"])
+        _write_members(role, member_ids, request.user)
+        _audit(
+            request,
+            workspace_id=role.workspace_id,
+            action=CapacityAuditEvent.Action.WORKSHOP_ROLE_UPDATED,
+            metadata={"role_id": str(role.id), "member_count": len(member_ids)},
+        )
+        return Response(_role_payload(role))
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @transaction.atomic
+    def delete(self, request, slug, role_id):
+        if response := _disabled():
+            return response
+        role = get_object_or_404(WorkshopRole, workspace__slug=slug, pk=role_id)
+        workspace_id = role.workspace_id
+        # Release the checklist items first, explicitly. The FK is SET_NULL, but
+        # `role.delete()` is a soft delete -- the row stays -- so the database
+        # never fires it and the items would go on naming a role nobody can see
+        # or fill. Falling back to unassigned keeps the subtask, and its absence
+        # of an owner, in plain view. The mode has to move with the role because
+        # `ext_workshop_checklist_item_role_needs_role` forbids the halfway state.
+        released = WorkshopChecklistItem.objects.filter(role=role).update(
+            role=None, assignee_mode=WorkshopChecklistItem.AssigneeMode.UNASSIGNED
+        )
+        role.delete()
+        _audit(
+            request,
+            workspace_id=workspace_id,
+            action=CapacityAuditEvent.Action.WORKSHOP_ROLE_REMOVED,
+            metadata={"role_id": str(role_id), "released_items": released},
+        )
+        return Response(status=204)
 
 
 class WorkshopChecklistTemplateListEndpoint(BaseAPIView):

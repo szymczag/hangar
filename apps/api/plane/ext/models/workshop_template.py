@@ -12,6 +12,70 @@ from plane.db.models.base import BaseModel
 MAX_TEMPLATES_PER_WORKSPACE = 20
 MAX_ITEMS_PER_TEMPLATE = 30
 MAX_OFFSET_DAYS = 365
+MAX_ROLES_PER_WORKSPACE = 30
+MAX_MEMBERS_PER_ROLE = 25
+
+
+class WorkshopRole(BaseModel):
+    """A standing job in running a workshop, and whoever currently does it.
+
+    A checklist item that names a person goes stale the moment that person
+    changes team, and fixing it means editing every template that mentions them.
+    A role is named after the work -- streaming, feedback, materials -- so the
+    template says what has to happen and this says who does it today. Rotation
+    is then one edit here, and no template changes at all.
+
+    Deliberately not the dormant upstream `db.Team`: that table has no
+    membership model, no endpoints and no screen, so there is nothing to reuse
+    and reviving it would tie this to a shape upstream may yet define.
+    """
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workshop_roles")
+    name = models.CharField(max_length=80)
+    # `through_fields` is required, not decorative: `BaseModel` gives the through
+    # model its own `created_by`/`updated_by` links to the user, so without this
+    # Django cannot tell which foreign key carries the membership.
+    members = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        through="ext.WorkshopRoleMember",
+        through_fields=("role", "member"),
+        related_name="workshop_roles",
+    )
+
+    class Meta:
+        db_table = "ext_workshop_roles"
+        verbose_name = "Workshop role"
+        ordering = ("name", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "name"],
+                condition=Q(deleted_at__isnull=True),
+                name="ext_workshop_role_unique_name",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.workspace_id} {self.name}"
+
+
+class WorkshopRoleMember(BaseModel):
+    role = models.ForeignKey(WorkshopRole, on_delete=models.CASCADE, related_name="memberships")
+    member = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="workshop_role_seats")
+
+    class Meta:
+        db_table = "ext_workshop_role_members"
+        verbose_name = "Workshop role member"
+        ordering = ("id",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["role", "member"],
+                condition=Q(deleted_at__isnull=True),
+                name="ext_workshop_role_member_unique",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.role_id} {self.member_id}"
 
 
 class WorkshopChecklistTemplate(BaseModel):
@@ -59,6 +123,9 @@ class WorkshopChecklistItem(BaseModel):
         # trainers -- which is what "materials, assigned to the trainer" means
         # when the trainer differs from workshop to workshop.
         WORKSHOP_TRAINER = "workshop_trainer", "The workshop's trainer"
+        # Resolved against a WorkshopRole's current members, so the template
+        # survives the people in it changing.
+        ROLE = "role", "Whoever holds a role"
 
     template = models.ForeignKey(WorkshopChecklistTemplate, on_delete=models.CASCADE, related_name="items")
     position = models.PositiveIntegerField()
@@ -72,6 +139,17 @@ class WorkshopChecklistItem(BaseModel):
         related_name="workshop_checklist_items",
     )
     assignee_mode = models.CharField(max_length=20, choices=AssigneeMode.choices, default=AssigneeMode.UNASSIGNED)
+    # SET_NULL rather than CASCADE: losing a role must never take the checklist
+    # items that named it down as well. In practice the endpoint releases them
+    # itself, because deleting a role is a soft delete and the database therefore
+    # never fires this; it stands as the backstop for a hard delete.
+    role = models.ForeignKey(
+        WorkshopRole,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="checklist_items",
+    )
     # Relative to the workshop's first session. Negative is before it, which is
     # where preparation work belongs; positive is after, for follow-up.
     offset_days = models.IntegerField(
@@ -92,6 +170,10 @@ class WorkshopChecklistItem(BaseModel):
             models.CheckConstraint(
                 condition=~Q(assignee_mode="fixed") | Q(assignee__isnull=False),
                 name="ext_workshop_checklist_item_fixed_needs_assignee",
+            ),
+            models.CheckConstraint(
+                condition=~Q(assignee_mode="role") | Q(role__isnull=False),
+                name="ext_workshop_checklist_item_role_needs_role",
             ),
         ]
 

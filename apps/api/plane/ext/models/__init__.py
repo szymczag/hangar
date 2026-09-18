@@ -31,6 +31,8 @@ from .workshop_template import (
     WorkshopChecklistItem,
     WorkshopChecklistOrigin,
     WorkshopChecklistTemplate,
+    WorkshopRole,
+    WorkshopRoleMember,
 )
 from .webauthn import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCredential
 from plane.ext.runner.models import RunnerAuditEvent, RunnerInstallation
@@ -82,6 +84,8 @@ __all__ = [
     "WorkshopChecklistOrigin",
     "WorkshopChecklistTemplate",
     "WorkshopPlanDraft",
+    "WorkshopRole",
+    "WorkshopRoleMember",
     "WorkshopPlanHold",
     "WorkshopSchedule",
     "WorkshopSession",

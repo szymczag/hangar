@@ -25,6 +25,7 @@ from plane.db.models import Issue, IssueAssignee, ProjectMember, State
 from plane.ext.models import (
     TrainerProfile,
     WorkshopChecklistOrigin,
+    WorkshopRoleMember,
     WorkshopSchedule,
 )
 from plane.ext.services.work_items import project_default_issue_type, validate_work_item_assignment
@@ -80,12 +81,33 @@ def target_date_for(anchor, offset_days, zone):
     return (anchor.astimezone(zone) + timedelta(days=offset_days)).date()
 
 
-def _assignee_ids(item, *, issue, workshop_trainer_ids):
+def _assignee_ids(item, *, workshop_trainer_ids, role_members):
     if item.assignee_mode == item.AssigneeMode.FIXED:
         return [item.assignee_id] if item.assignee_id else []
     if item.assignee_mode == item.AssigneeMode.WORKSHOP_TRAINER:
         return list(workshop_trainer_ids)
+    if item.assignee_mode == item.AssigneeMode.ROLE:
+        # Everyone currently holding the role. A role nobody holds yet leaves the
+        # subtask unassigned rather than failing: an empty rota is a staffing
+        # question, not a reason to refuse the whole checklist.
+        return list(role_members.get(item.role_id, ()))
     return []
+
+
+def _role_members(items):
+    """Current holders of every role the template names, in a single query."""
+    role_ids = {item.role_id for item in items if item.role_id}
+    if not role_ids:
+        return {}
+    members = {role_id: [] for role_id in role_ids}
+    rows = (
+        WorkshopRoleMember.objects.filter(role_id__in=role_ids, deleted_at__isnull=True)
+        .order_by("id")
+        .values_list("role_id", "member_id")
+    )
+    for role_id, member_id in rows:
+        members[role_id].append(member_id)
+    return members
 
 
 def _assignable(project_id, candidate_ids):
@@ -114,7 +136,7 @@ def apply_checklist_template(*, template, issue, actor, request=None):
     cannot hold work in this project, so the caller can say so rather than
     silently losing an assignment.
     """
-    items = list(template.items.select_related("assignee").order_by("position", "id"))
+    items = list(template.items.select_related("assignee", "role").order_by("position", "id"))
     if not items:
         return {"created": [], "skipped_assignees": []}
 
@@ -131,9 +153,12 @@ def apply_checklist_template(*, template, issue, actor, request=None):
         .values_list("user_id", flat=True)
     )
 
+    role_members = _role_members(items)
     requested = set()
     for item in items:
-        requested.update(_assignee_ids(item, issue=issue, workshop_trainer_ids=workshop_trainer_ids))
+        requested.update(
+            _assignee_ids(item, workshop_trainer_ids=workshop_trainer_ids, role_members=role_members)
+        )
     allowed = _assignable(issue.project_id, requested)
     skipped_assignees = sorted(str(value) for value in requested - allowed)
 
@@ -166,7 +191,11 @@ def apply_checklist_template(*, template, issue, actor, request=None):
             created_by=actor,
             updated_by=actor,
         )
-        assignee_ids = [value for value in _assignee_ids(item, issue=issue, workshop_trainer_ids=workshop_trainer_ids) if value in allowed]
+        assignee_ids = [
+            value
+            for value in _assignee_ids(item, workshop_trainer_ids=workshop_trainer_ids, role_members=role_members)
+            if value in allowed
+        ]
         if assignee_ids:
             try:
                 IssueAssignee.objects.bulk_create(

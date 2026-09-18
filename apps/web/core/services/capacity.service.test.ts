@@ -264,6 +264,7 @@ describe("CapacityService workshop checklists", () => {
           description: "",
           assignee_id: null,
           assignee_mode: "workshop_trainer" as const,
+          role_id: null,
           offset_days: -7,
         },
       ],
@@ -274,6 +275,21 @@ describe("CapacityService workshop checklists", () => {
     expect(put).toHaveBeenCalledWith(
       "/api/workspaces/workspace/capacity/checklist-templates/template-id/",
       template,
+      csrfHeaders
+    );
+  });
+
+  it("sends the token when saving a role's current holders", async () => {
+    const put = vi.spyOn(service, "put").mockResolvedValue({ data: { id: "role-id" } } as never);
+
+    await service.updateWorkshopRole("workspace", "role-id", {
+      name: "Streaming",
+      member_ids: ["user-a", "user-b"],
+    });
+
+    expect(put).toHaveBeenCalledWith(
+      "/api/workspaces/workspace/capacity/workshop-roles/role-id/",
+      { name: "Streaming", member_ids: ["user-a", "user-b"] },
       csrfHeaders
     );
   });

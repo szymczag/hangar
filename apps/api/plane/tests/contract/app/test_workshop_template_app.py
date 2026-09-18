@@ -265,6 +265,178 @@ def test_an_assignee_who_cannot_hold_work_here_is_reported_rather_than_silently_
 
 @pytest.mark.contract
 @pytest.mark.django_db
+def test_a_role_assigns_everyone_who_currently_holds_it(settings, workspace, create_user):
+    """The point of a role: the template names the job, not the people."""
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    project = _project(workspace, create_user)
+    issue = _workshop(project, create_user)
+    second = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=second, role=15)
+    ProjectMember.objects.create(project=project, member=second, workspace=workspace, role=15)
+    client, csrf = _client(create_user)
+    roles_url = f"/api/workspaces/{workspace.slug}/capacity/workshop-roles/"
+
+    role_id = client.post(
+        roles_url,
+        {"name": "Streaming", "member_ids": [str(create_user.id), str(second.id)]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    ).data["id"]
+    template_id = client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/checklist-templates/",
+        _template_payload(
+            items=[{"title": "Publish stream link", "assignee_mode": "role", "role_id": role_id, "offset_days": -1}]
+        ),
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    ).data["id"]
+
+    response = client.post(
+        f"/api/workspaces/{workspace.slug}/projects/{project.id}/work-items/{issue.id}/apply-checklist/",
+        {"template_id": template_id},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    child = Issue.objects.get(parent=issue, name="Publish stream link")
+    assert set(child.issue_assignee.values_list("assignee_id", flat=True)) == {create_user.id, second.id}
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_changing_who_holds_a_role_changes_the_next_workshop_without_touching_the_template(
+    settings, workspace, create_user
+):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    project = _project(workspace, create_user)
+    successor = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=successor, role=15)
+    ProjectMember.objects.create(project=project, member=successor, workspace=workspace, role=15)
+    client, csrf = _client(create_user)
+    roles_url = f"/api/workspaces/{workspace.slug}/capacity/workshop-roles/"
+    role_id = client.post(
+        roles_url, {"name": "Streaming", "member_ids": [str(create_user.id)]}, format="json", HTTP_X_CSRFTOKEN=csrf
+    ).data["id"]
+    template_id = client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/checklist-templates/",
+        _template_payload(items=[{"title": "Publish stream link", "assignee_mode": "role", "role_id": role_id}]),
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    ).data["id"]
+
+    # The rota changes. The template is not touched.
+    client.put(
+        f"{roles_url}{role_id}/",
+        {"name": "Streaming", "member_ids": [str(successor.id)]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    issue = _workshop(project, create_user)
+    client.post(
+        f"/api/workspaces/{workspace.slug}/projects/{project.id}/work-items/{issue.id}/apply-checklist/",
+        {"template_id": template_id},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    child = Issue.objects.get(parent=issue, name="Publish stream link")
+    assert list(child.issue_assignee.values_list("assignee_id", flat=True)) == [successor.id]
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_role_nobody_holds_leaves_the_subtask_unassigned_rather_than_failing(settings, workspace, create_user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    project = _project(workspace, create_user)
+    issue = _workshop(project, create_user)
+    client, csrf = _client(create_user)
+    role_id = client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/workshop-roles/",
+        {"name": "Feedback", "member_ids": []},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    ).data["id"]
+    template_id = client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/checklist-templates/",
+        _template_payload(items=[{"title": "Collect feedback", "assignee_mode": "role", "role_id": role_id}]),
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    ).data["id"]
+
+    response = client.post(
+        f"/api/workspaces/{workspace.slug}/projects/{project.id}/work-items/{issue.id}/apply-checklist/",
+        {"template_id": template_id},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert Issue.objects.get(parent=issue, name="Collect feedback").issue_assignee.count() == 0
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_checklist_item_in_role_mode_requires_a_role_that_exists_here(settings, workspace, create_user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    client, csrf = _client(create_user)
+
+    response = client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/checklist-templates/",
+        _template_payload(items=[{"title": "Publish stream link", "assignee_mode": "role"}]),
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_deleting_a_role_leaves_the_template_standing(settings, workspace, create_user):
+    """A deleted role must not take checklist items down with it."""
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    client, csrf = _client(create_user)
+    roles_url = f"/api/workspaces/{workspace.slug}/capacity/workshop-roles/"
+    role_id = client.post(
+        roles_url, {"name": "Streaming", "member_ids": []}, format="json", HTTP_X_CSRFTOKEN=csrf
+    ).data["id"]
+    templates_url = f"/api/workspaces/{workspace.slug}/capacity/checklist-templates/"
+    template_id = client.post(
+        templates_url,
+        _template_payload(items=[{"title": "Publish stream link", "assignee_mode": "role", "role_id": role_id}]),
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    ).data["id"]
+
+    assert client.delete(f"{roles_url}{role_id}/", HTTP_X_CSRFTOKEN=csrf).status_code == status.HTTP_204_NO_CONTENT
+
+    template = next(row for row in client.get(templates_url).data["results"] if row["id"] == template_id)
+    assert [item["title"] for item in template["items"]] == ["Publish stream link"]
+    assert template["items"][0]["role_id"] is None
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_member_cannot_change_the_rota(settings, workspace, create_user):
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    member = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=member, role=15)
+    client, csrf = _client(member)
+
+    response = client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/workshop-roles/",
+        {"name": "Streaming", "member_ids": []},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
 def test_scheduling_the_workshop_dates_a_checklist_that_had_no_date_yet(settings, workspace, create_user):
     """The whole reason the offset is stored rather than resolved on creation.
 

@@ -53,10 +53,23 @@ Each template is a named, ordered list of subtasks; a workspace may keep up to t
 templates of up to thirty items each. One template may be marked as the default.
 
 Each item carries a title, an optional description, an assignment rule and a day offset.
-The assignment rule is one of: nobody, a specific person, or the workshop's own trainer —
-the last resolves when the template is applied, against the Workshop's active trainer
-assignees, so one template serves every trainer. A person who is not an active project
-member able to hold work is skipped rather than assigned, and the response names them.
+The assignment rule is one of: nobody, a specific person, the workshop's own trainer, or
+whoever holds a **workshop role**. The trainer rule resolves when the template is applied,
+against the Workshop's active trainer assignees, so one template serves every trainer. A
+person who is not an active project member able to hold work is skipped rather than
+assigned, and the response names them.
+
+**Workshop roles** are defined in the same screen: a role is a standing job in running a
+workshop — streaming, feedback, materials — and the people who currently do it. A template
+names the role, so when the rota changes an administrator edits the role once instead of
+every template that mentioned the departing person. A role holds up to 25 people and a
+workspace up to 30 roles; only workspace administrators change them.
+
+Applying an item in role mode assigns everyone who currently holds that role, so
+responsibility is visible and the holders settle it between themselves. A role nobody holds
+yet leaves the subtask unassigned rather than failing — an empty rota is a staffing
+question, not a reason to refuse the whole checklist. Deleting a role releases every
+checklist item that named it back to unassigned; the items themselves are never deleted.
 
 Applying a template creates the subtasks under the Workshop work item, each as an ordinary
 child work item with its own history entry. Application is idempotent by subtask name:
@@ -74,8 +87,9 @@ The planner applies the default template to a Workshop it creates. That call is 
 effort: a workspace with no default template, or an unavailable checklist endpoint, does
 not prevent the workshop from being created.
 
-Migration `ext.0030` adds the template, item and origin tables and two audit actions.
-Existing workshops are unaffected; a workspace with no templates behaves exactly as before.
+Migrations `ext.0030` and `ext.0031` add the template, item, origin and role tables and
+their audit actions. Existing workshops are unaffected; a workspace with no templates
+behaves exactly as before.
 
 ## Timezones and workload
 
