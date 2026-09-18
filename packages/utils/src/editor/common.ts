@@ -46,9 +46,12 @@ export const getEditorAssetDownloadSrc = (args: TEditorSrcArgs): string | undefi
 export const getTextContent = (jsx: React.ReactNode | null | undefined): string => {
   if (!jsx) return "";
 
-  const div = document.createElement("div");
-  div.innerHTML = jsx.toString();
-  return div.textContent?.trim() ?? "";
+  // `DOMParser`, not `innerHTML` on a detached element: a detached element still
+  // fetches, so `<img src=x onerror=…>` fires its handler without ever being
+  // inserted. A parsed document has no browsing context and nothing runs. This
+  // helper is exported, so the caller's input cannot be assumed to be trusted.
+  const parsed = new DOMParser().parseFromString(jsx.toString(), "text/html");
+  return parsed.body.textContent?.trim() ?? "";
 };
 
 export const isEditorEmpty = (description: string | undefined): boolean =>
