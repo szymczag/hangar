@@ -19,7 +19,7 @@ export function ImageDownloadAction(props: Props) {
     <Tooltip tooltipContent="Download">
       <button
         type="button"
-        onClick={() => window.open(src, "_blank")}
+        onClick={() => window.open(src, "_blank", "noopener,noreferrer")}
         className="grid h-full flex-shrink-0 place-items-center text-white/60 transition-colors hover:text-white"
         aria-label="Download image"
       >

@@ -16,8 +16,26 @@ const BLOCKED_LINK_PROTOCOLS = ["javascript:", "data:", "vbscript:"];
 export function isDangerousHref(rawHref: string): boolean {
   const normalized = rawHref
     .replace(/[\t\n\r]/g, "")
+    // oxlint-disable-next-line no-control-regex -- stripping C0 controls is the point: browsers ignore them before a scheme
     .replace(/^(?:[\u0000-\u001f]|\s)+/, "")
     .toLowerCase();
 
   return BLOCKED_LINK_PROTOCOLS.some((protocol) => normalized.startsWith(protocol));
+}
+
+// Schemes a click on an editor link may open. Anything else is ignored.
+const NAVIGABLE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+
+/**
+ * Returns true only for an href the editor may open on click: it must parse as
+ * a URL and use an allowlisted scheme. An allowlist, unlike the blocklist
+ * above, does not depend on knowing every executable scheme.
+ */
+export function isNavigableHref(rawHref: string): boolean {
+  if (!rawHref || isDangerousHref(rawHref)) return false;
+  try {
+    return NAVIGABLE_LINK_PROTOCOLS.has(new URL(rawHref).protocol);
+  } catch {
+    return false;
+  }
 }

@@ -7,7 +7,7 @@
 import { useCallback } from "react";
 // plane imports
 import type { TFileHandler } from "@plane/editor";
-import { getEditorAssetDownloadSrc, getEditorAssetSrc } from "@plane/utils";
+import { getEditorAssetDownloadSrc, getEditorAssetSrc, isAssetId } from "@plane/utils";
 // hooks
 import { useEditorAsset } from "@/hooks/store/use-editor-asset";
 // plane web hooks
@@ -47,13 +47,15 @@ export const useEditorConfig = () => {
           if (src?.startsWith("http")) {
             await fileService.deleteOldWorkspaceAsset(workspaceId, src);
           } else {
-            await fileService.deleteNewAsset(
-              getEditorAssetSrc({
-                assetId: src,
-                projectId,
-                workspaceSlug,
-              }) ?? ""
-            );
+            // undefined unless src is an API-issued asset id, so user content
+            // cannot point this DELETE at another endpoint
+            const assetPath = getEditorAssetSrc({
+              assetId: src,
+              projectId,
+              workspaceSlug,
+            });
+            if (!assetPath) return;
+            await fileService.deleteNewAsset(assetPath);
           }
         },
         getAssetDownloadSrc: async (path) => {
@@ -88,6 +90,7 @@ export const useEditorConfig = () => {
           if (src?.startsWith("http")) {
             await fileService.restoreOldEditorAsset(workspaceId, src);
           } else {
+            if (!isAssetId(src)) return;
             await fileService.restoreNewAsset(workspaceSlug, src);
           }
         },

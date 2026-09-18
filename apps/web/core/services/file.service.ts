@@ -9,7 +9,7 @@ import type { AxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "@plane/constants";
 import { getFileMetaDataForUpload, generateFileUploadPayload } from "@plane/services";
 import type { EFileAssetType, TFileEntityInfo, TFileSignedURLResponse } from "@plane/types";
-import { getAssetIdFromUrl } from "@plane/utils";
+import { getAssetIdFromUrl, isAssetId } from "@plane/utils";
 // helpers
 // services
 import { APIService } from "@/services/api.service";
@@ -236,6 +236,7 @@ export class FileService extends APIService {
   async restoreNewAsset(workspaceSlug: string, src: string): Promise<void> {
     // remove the last slash and get the asset id
     const assetId = getAssetIdFromUrl(src);
+    if (!isAssetId(assetId)) throw new Error("Invalid asset id");
     return this.post(`/api/assets/v2/workspaces/${workspaceSlug}/restore/${assetId}/`)
       .then((response) => response?.data)
       .catch((error) => {
@@ -290,6 +291,8 @@ export class FileService extends APIService {
       project_id?: string;
     }
   ): Promise<{ asset_id: string }> {
+    // assetId comes from an image src in user content
+    if (!isAssetId(assetId)) throw new Error("Invalid asset id");
     return this.post(`/api/assets/v2/workspaces/${workspaceSlug}/duplicate-assets/${assetId}/`, data)
       .then((response) => response?.data)
       .catch((error) => {

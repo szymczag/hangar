@@ -8,7 +8,7 @@
 import { MAX_FILE_SIZE } from "@plane/constants";
 import type { TFileHandler } from "@plane/editor";
 import { SitesFileService } from "@plane/services";
-import { getFileURL } from "@plane/utils";
+import { getFileURL, isAssetId } from "@plane/utils";
 // services
 const sitesFileService = new SitesFileService();
 
@@ -17,6 +17,8 @@ const sitesFileService = new SitesFileService();
  * @param {string} anchor
  */
 export const getEditorAssetSrc = (anchor: string, assetId: string): string | undefined => {
+  // The src comes from user content; only an API-issued asset id may become a path.
+  if (!isAssetId(assetId)) return undefined;
   const url = getFileURL(`/api/public/assets/v2/anchor/${anchor}/${assetId}/`);
   return url;
 };
@@ -53,7 +55,9 @@ export const getEditorFileHandlers = (args: TArgs): TFileHandler => {
       if (src?.startsWith("http")) {
         await sitesFileService.deleteOldEditorAsset(workspaceId, src);
       } else {
-        await sitesFileService.deleteNewAsset(getEditorAssetSrc(anchor, src) ?? "");
+        const assetPath = getEditorAssetSrc(anchor, src);
+        if (!assetPath) return;
+        await sitesFileService.deleteNewAsset(assetPath);
       }
     },
     cancel: sitesFileService.cancelUpload,
@@ -61,6 +65,7 @@ export const getEditorFileHandlers = (args: TArgs): TFileHandler => {
       if (src?.startsWith("http")) {
         await sitesFileService.restoreOldEditorAsset(workspaceId, src);
       } else {
+        if (!isAssetId(src)) return;
         await sitesFileService.restoreNewAsset(anchor, src);
       }
     },

@@ -7,6 +7,7 @@
 import type { Editor } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
+import { ySyncPluginKey } from "y-prosemirror";
 // constants
 import { CORE_EDITOR_META } from "@/constants/meta";
 // plane editor imports
@@ -28,6 +29,19 @@ export const TrackFileDeletionPlugin = (editor: Editor, deleteHandler: TFileHand
       } = {};
       if (!transactions.some((tr) => tr.docChanged)) return null;
       if (transactions.some((tr) => tr.getMeta(CORE_EDITOR_META.SKIP_FILE_DELETION))) return null;
+      // A change that arrived from another collaborator is deleted by that
+      // collaborator's own editor. Acting on it here would let a crafted
+      // remote update drive this user's session into delete requests. Local
+      // undo/redo also arrives through Yjs but is flagged as such.
+      if (
+        transactions.some((tr) => {
+          const ySyncMeta = tr.getMeta(ySyncPluginKey) as
+            | { isChangeOrigin?: boolean; isUndoRedoOperation?: boolean }
+            | undefined;
+          return ySyncMeta?.isChangeOrigin && !ySyncMeta.isUndoRedoOperation;
+        })
+      )
+        return null;
 
       newState.doc.descendants((node) => {
         const nodeType = node.type.name as keyof NodeFileMapType;

@@ -6,16 +6,23 @@
 
 import { assetDuplicationHandlers } from "@/plane-editor/helpers/asset-duplication";
 
+// Clipboard HTML is parsed into a DOMParser document, never assigned to
+// `innerHTML` of an element created with `document.createElement`. Such an
+// element belongs to the live document even while detached, so
+// `<img src=x onerror=...>` would load and run its handler before the schema
+// ever filters the paste. A DOMParser document has no browsing context:
+// nothing loads and no handler runs.
+const parseInertBody = (html: string): HTMLElement => new DOMParser().parseFromString(html, "text/html").body;
+
 // Utility function to process HTML content with all registered handlers
 export const processAssetDuplication = (htmlContent: string): { processedHtml: string } => {
-  const tempDiv = document.createElement("div");
-  tempDiv.innerHTML = htmlContent;
+  let inertBody = parseInertBody(htmlContent);
 
   let processedHtml = htmlContent;
 
   // Process each registered component type
   for (const [componentName, handler] of Object.entries(assetDuplicationHandlers)) {
-    const elements = tempDiv.querySelectorAll(componentName);
+    const elements = inertBody.querySelectorAll(componentName);
 
     if (elements.length > 0) {
       elements.forEach((element) => {
@@ -25,8 +32,8 @@ export const processAssetDuplication = (htmlContent: string): { processedHtml: s
         }
       });
 
-      // Update tempDiv with processed HTML for next iteration
-      tempDiv.innerHTML = processedHtml;
+      // Re-parse the processed HTML for the next iteration
+      inertBody = parseInertBody(processedHtml);
     }
   }
 

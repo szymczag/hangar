@@ -82,7 +82,7 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
         targetZoom = ZOOM_STEPS.find((step) => step > prev) ?? MAX_ZOOM;
       } else {
         // Reverse the array to find the next lower step
-        targetZoom = [...ZOOM_STEPS].reverse().find((step) => step < prev) ?? MIN_ZOOM;
+        targetZoom = ZOOM_STEPS.toReversed().find((step) => step < prev) ?? MIN_ZOOM;
       }
 
       // Reset position when zoom matches initial magnification
@@ -210,6 +210,7 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
     >
       <div
         ref={modalRef}
+        role="presentation"
         onMouseDown={(e) => e.target === modalRef.current && handleClose()}
         className="relative grid size-full place-items-center overflow-hidden"
       >
@@ -224,6 +225,7 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
         <img
           ref={setImageRef}
           src={src}
+          alt=""
           className="read-only-image rounded-lg"
           style={{
             width: `${widthInNumber * initialMagnification}px`,
@@ -274,7 +276,7 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
           {!isTouchDevice && (
             <button
               type="button"
-              onClick={() => window.open(downloadSrc, "_blank")}
+              onClick={() => window.open(downloadSrc, "_blank", "noopener,noreferrer")}
               className="grid size-8 flex-shrink-0 place-items-center text-white/60 transition-colors duration-200 hover:text-white"
               aria-label="Download image"
             >
@@ -284,7 +286,7 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
           {!isTouchDevice && (
             <button
               type="button"
-              onClick={() => window.open(src, "_blank")}
+              onClick={() => window.open(src, "_blank", "noopener,noreferrer")}
               className="grid size-8 flex-shrink-0 place-items-center text-white/60 transition-colors duration-200 hover:text-white"
               aria-label="Open image in new tab"
             >

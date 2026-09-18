@@ -142,14 +142,25 @@ export const CustomLinkExtension = Mark.create<LinkOptions, CustomLinkStorage>({
       href: {
         default: null,
       },
+      // target, rel and class are fixed by the editor. They are neither read
+      // from pasted/stored HTML nor rendered from the mark, because a value
+      // arriving through a collaborative update never passes parseHTML: a
+      // `target="_self"`, `rel="opener"` or a full-page overlay class would
+      // otherwise reach the DOM. renderHTML takes them from options instead.
       target: {
         default: this.options.HTMLAttributes.target,
+        parseHTML: () => this.options.HTMLAttributes.target,
+        rendered: false,
       },
       rel: {
         default: this.options.HTMLAttributes.rel,
+        parseHTML: () => this.options.HTMLAttributes.rel,
+        rendered: false,
       },
       class: {
         default: this.options.HTMLAttributes.class,
+        parseHTML: () => this.options.HTMLAttributes.class,
+        rendered: false,
       },
     };
   },

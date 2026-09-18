@@ -5,6 +5,7 @@
  */
 
 // local imports
+import { isAssetId } from "../asset-id";
 import { getFileURL } from "../file";
 
 type TEditorSrcArgs = {
@@ -19,6 +20,7 @@ type TEditorSrcArgs = {
  */
 export const getEditorAssetSrc = (args: TEditorSrcArgs): string | undefined => {
   const { assetId, projectId, workspaceSlug } = args;
+  if (!isAssetId(assetId)) return undefined;
   let url: string | undefined = "";
   if (projectId) {
     url = getFileURL(`/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}/${assetId}/`);
@@ -34,6 +36,7 @@ export const getEditorAssetSrc = (args: TEditorSrcArgs): string | undefined => {
  */
 export const getEditorAssetDownloadSrc = (args: TEditorSrcArgs): string | undefined => {
   const { assetId, projectId, workspaceSlug } = args;
+  if (!isAssetId(assetId)) return undefined;
   let url: string | undefined = "";
   if (projectId) {
     url = getFileURL(`/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}/download/${assetId}/`);
@@ -46,9 +49,10 @@ export const getEditorAssetDownloadSrc = (args: TEditorSrcArgs): string | undefi
 export const getTextContent = (jsx: React.ReactNode | null | undefined): string => {
   if (!jsx) return "";
 
-  const div = document.createElement("div");
-  div.innerHTML = jsx.toString();
-  return div.textContent?.trim() ?? "";
+  // DOMParser, not innerHTML on a live-document element: the latter loads
+  // `<img onerror>` and runs its handler even while detached.
+  const body = new DOMParser().parseFromString(jsx.toString(), "text/html").body;
+  return body.textContent?.trim() ?? "";
 };
 
 export const isEditorEmpty = (description: string | undefined): boolean =>

@@ -437,6 +437,18 @@ p.editor-paragraph-block + p.editor-paragraph-block {
 }
 /* end tailwind typography */
 
+/* text alignment, set by the text-align extension as a data attribute */
+[data-text-align="left"] {
+  text-align: left;
+}
+[data-text-align="center"] {
+  text-align: center;
+}
+[data-text-align="right"] {
+  text-align: right;
+}
+/* end text alignment */
+
 /* text colors */
 [data-text-color="gray"] {
   color: var(--editor-colors-gray-text);

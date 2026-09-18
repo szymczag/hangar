@@ -17,6 +17,7 @@ import {
   DocumentEditorExtensionsWithoutProps,
 } from "@/extensions/core-without-props";
 import { TitleExtensions } from "@/extensions/title-extension";
+import { normalizeDocumentJSON } from "@/helpers/attribute-guards";
 import { sanitizeHTML } from "@plane/utils";
 
 // editor extension configs
@@ -141,7 +142,7 @@ export const getAllDocumentFormatsFromRichTextEditorBinaryData = (
   Y.applyUpdate(yDoc, description);
   // convert to JSON
   const type = yDoc.getXmlFragment("default");
-  const contentJSON = yXmlFragmentToProseMirrorRootNode(type, richTextEditorSchema).toJSON();
+  const contentJSON = normalizeDocumentJSON(yXmlFragmentToProseMirrorRootNode(type, richTextEditorSchema).toJSON());
   // convert to HTML
   const contentHTML = generateHTML(contentJSON, RICH_TEXT_EDITOR_EXTENSIONS);
 
@@ -172,7 +173,7 @@ export const getAllDocumentFormatsFromDocumentEditorBinaryData = (
   Y.applyUpdate(yDoc, description);
   // convert to JSON
   const type = yDoc.getXmlFragment("default");
-  const contentJSON = yXmlFragmentToProseMirrorRootNode(type, documentEditorSchema).toJSON();
+  const contentJSON = normalizeDocumentJSON(yXmlFragmentToProseMirrorRootNode(type, documentEditorSchema).toJSON());
   // convert to HTML
   const contentHTML = generateHTML(contentJSON, DOCUMENT_EDITOR_EXTENSIONS);
 

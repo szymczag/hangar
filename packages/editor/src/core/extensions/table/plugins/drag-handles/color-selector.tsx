@@ -101,8 +101,10 @@ export function TableDragHandleDropdownColorSelector(props: Props) {
                   backgroundColor: color.backgroundColor,
                 }}
                 onClick={() => {
-                  handleBackgroundColorChange(editor, color.backgroundColor);
-                  onSelect(color.backgroundColor);
+                  // The palette key, not the CSS variable: the cell renders it
+                  // as a data attribute that editor.css colours.
+                  handleBackgroundColorChange(editor, color.key);
+                  onSelect(color.key);
                 }}
               />
             ))}
