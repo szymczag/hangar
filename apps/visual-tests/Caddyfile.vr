@@ -30,6 +30,14 @@
 		reverse_proxy vr-minio:9000
 	}
 
+	redir /spaces /spaces/ permanent
+	handle /spaces/* {
+		reverse_proxy vr-space:3000
+	}
+	handle /live/* {
+		reverse_proxy vr-live:3000
+	}
+
 	redir /god-mode /god-mode/ permanent
 	handle_path /god-mode/* {
 		root * /srv/admin

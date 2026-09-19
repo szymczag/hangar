@@ -36,9 +36,12 @@ const COMPOSE_FILE = "docker-compose-visual.yml";
 const BUILDS = [
   ["web", path.join(ROOT, "apps/web/build/client/assets")],
   ["admin", path.join(ROOT, "apps/admin/build/client/assets")],
+  ["space", path.join(ROOT, "apps/space/build/client/assets")],
 ];
 
-// Same origin for everything: the edge routes /api, /god-mode and / itself.
+// Same origin for everything: the edge routes /api, /god-mode, /spaces, /live
+// and / itself. The two paths are pinned because their defaults differ between
+// packages (space's is empty in @plane/constants).
 const SAME_ORIGIN_ENV = {
   VITE_API_BASE_URL: "",
   VITE_WEB_BASE_URL: "",
@@ -46,6 +49,8 @@ const SAME_ORIGIN_ENV = {
   VITE_SPACE_BASE_URL: "",
   VITE_LIVE_BASE_URL: "",
   VITE_ADMIN_BASE_PATH: "/god-mode",
+  VITE_SPACE_BASE_PATH: "/spaces",
+  VITE_LIVE_BASE_PATH: "/live",
 };
 
 /**
@@ -193,8 +198,10 @@ const compose = (...rest) => run(composeBin, [...composeArgs, "-f", COMPOSE_FILE
 // correct. Restoring from cache into an empty directory costs about a second.
 rmSync(path.join(ROOT, "apps/web/build"), { recursive: true, force: true });
 rmSync(path.join(ROOT, "apps/admin/build"), { recursive: true, force: true });
+rmSync(path.join(ROOT, "apps/space/build"), { recursive: true, force: true });
+rmSync(path.join(ROOT, "apps/live/dist"), { recursive: true, force: true });
 
-run("pnpm", ["turbo", "run", "build", "--filter=web", "--filter=admin"]);
+run("pnpm", ["turbo", "run", "build", "--filter=web", "--filter=admin", "--filter=space", "--filter=live"]);
 assertBundleIsSameOrigin();
 
 const EDGE = process.env.VR_HOST_URL ?? "http://localhost:8100";
@@ -371,7 +378,8 @@ try {
     // The security suite (apps/visual-tests/security): the application with its
     // Content-Security-Policy and Trusted Types enforced. After the visual suite
     // and only once, never in a soak: it writes (work items, comments,
-    // stickies), which would change what the visual suite photographs.
+    // stickies, pages, a published board), which would change what the visual
+    // suite photographs.
     run(composeBin, [
       ...composeArgs,
       "-f",
