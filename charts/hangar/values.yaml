@@ -126,6 +126,20 @@ googleCalendarCapacity:
   limits:
     userRate: 20/minute
     workspaceRate: 60/minute
+  # Recording recognized training so it can be reported on and imported as work
+  # items. A second switch on top of `enabled`, and inert without it: the sweep
+  # reads event titles, which plain capacity never does, so it is opted into
+  # separately rather than arriving with a feature somebody already turned on.
+  materialization:
+    enabled: false
+    # How far the sweep re-reads, snapped outwards to whole months. Not how much
+    # history is kept -- older records are left alone, because a report about
+    # last year is what they exist to answer. Training planned further ahead
+    # than this window is simply not collected, and nothing says so.
+    windowPastDays: 90
+    windowFutureDays: 180
+    # How long a record the sweep marked gone is kept before deletion.
+    retiredRetentionDays: 30
 
 externalServices:
   objectStorage:
