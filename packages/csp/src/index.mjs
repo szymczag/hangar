@@ -33,16 +33,19 @@ export const RUNTIME_STYLE_ELEMENTS = [
  *
  * - connect-src cdn.jsdelivr.net: the emoji picker (frimousse) loads its
  *   emoji data (JSON, not scripts) from there.
- * - img-src: profile pictures stay on the identity provider's host until the
- *   background copy to object storage has run, and Unsplash cover images are
- *   shown from Unsplash.
+ *
+ * Images are only ever this instance's own: its bundle, uploads in object
+ * storage, and blob:/data: URLs made in the page. No image is loaded from
+ * another host -- not a profile picture from an identity provider (those are
+ * copied to object storage), not a cover from Unsplash, not an image a
+ * description points at.
  *
  * Origins that depend on the deployment (object storage, a separate API or
  * live origin, a self-hosted GitLab's avatars) come from the environment.
  */
 export const APP_SOURCES = {
   connectSrc: ["https://cdn.jsdelivr.net"],
-  imgSrc: ["https://*.googleusercontent.com", "https://avatars.githubusercontent.com", "https://images.unsplash.com"],
+  imgSrc: [],
 };
 
 /** `'sha256-…'` source expression for an exact inline script or style body. */

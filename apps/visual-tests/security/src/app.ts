@@ -25,6 +25,11 @@ export const RICH_DESCRIPTION = [
   '<blockquote><p>quoted</p></blockquote><pre><code class="language-ts">const x = 1;</code></pre><hr>',
   '<table><tbody><tr><th data-background-color="green"><p>head</p></th><th><p>plain</p></th></tr>',
   '<tr><td background="var(--editor-colors-purple-background)"><p>legacy cell</p></td><td><p>cell</p></td></tr></tbody></table>',
+  // A callout as the editor stores it: its emoji is drawn from the Unicode
+  // value, and the URL beside it must never be loaded as an image.
+  '<div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="128161" ',
+  'data-emoji-url="https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4a1.png" data-background="green">',
+  "<p>callout</p></div>",
   "<p>last paragraph</p>",
 ].join("");
 

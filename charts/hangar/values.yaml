@@ -197,7 +197,9 @@ contentSecurityPolicy:
   # breakage shows in the API log before users meet it. Set false to enforce.
   reportOnly: true
   reportUri: /api/csp-report/
-  # Extra image origins, space separated (e.g. a self-hosted GitLab's avatars).
+  # Extra image origins, space separated. Images are this instance's own: the
+  # chart adds the object-storage origin itself, and nothing else belongs here
+  # unless storage is served from a further origin of yours.
   imgSrc: ""
   # Extra origins the browser connects to (e.g. a separate API or live origin).
   connectSrc: ""

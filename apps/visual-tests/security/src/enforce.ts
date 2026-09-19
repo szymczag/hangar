@@ -88,7 +88,7 @@ export async function enforceContentSecurityPolicy(context: BrowserContext) {
 
 const isPolicyError = (text: string) => /Trusted ?Type|TrustedHTML|TrustedScript|Content Security Policy/i.test(text);
 
-const readViolations = (page: Page) =>
+export const readViolations = (page: Page) =>
   page.evaluate(() => (window as unknown as { __cspViolations?: TViolation[] }).__cspViolations ?? []);
 
 // What the page reported so far, attached to a failed test: a page that never

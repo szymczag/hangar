@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { test } from "node:test";
 
 import {
+  APP_SOURCES,
   TRUSTED_TYPES_MEASUREMENT,
   buildContentSecurityPolicy,
   hashSource,
@@ -39,11 +40,13 @@ test("the policy never relaxes to unsafe sources", () => {
   assert.equal(directive(policy, "object-src"), "'none'");
   assert.equal(directive(policy, "frame-ancestors"), "'none'");
   assert.equal(directive(policy, "frame-src"), "'none'");
-  assert.equal(
-    directive(policy, "img-src"),
-    "'self' blob: data: https://*.googleusercontent.com https://avatars.githubusercontent.com https://images.unsplash.com https://images.example"
-  );
+  assert.equal(directive(policy, "img-src"), "'self' blob: data: https://images.example");
   assert.equal(directive(policy, "connect-src"), "'self' https://cdn.jsdelivr.net https://storage.example");
+});
+
+test("images come only from this instance unless the deployment adds its storage", () => {
+  assert.deepEqual(APP_SOURCES.imgSrc, []);
+  assert.equal(directive(buildContentSecurityPolicy(), "img-src"), "'self' blob: data:");
 });
 
 test("inline scripts are hashed exactly, external ones are skipped", () => {
