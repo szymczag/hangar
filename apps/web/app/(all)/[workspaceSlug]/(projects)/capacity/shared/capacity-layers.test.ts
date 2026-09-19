@@ -44,7 +44,7 @@ describe("parseLayerParam", () => {
   it("keeps only the layers named", () => {
     const layers = parseLayerParam("google_training");
 
-    expect([...layers].toSorted()).toEqual(["google_training", "working"]);
+    expect(layers).toEqual(new Set(["google_training", "working"]));
   });
 });
 
@@ -56,9 +56,7 @@ describe("formatLayerParam", () => {
   it("round-trips a narrowed selection", () => {
     const narrowed = new Set<TCapacityInterval["kind"]>(["working", "google_training", "workshop"]);
 
-    expect([...parseLayerParam(formatLayerParam(narrowed))].toSorted()).toEqual(
-      ["google_training", "working", "workshop"].toSorted()
-    );
+    expect(parseLayerParam(formatLayerParam(narrowed))).toEqual(new Set(["google_training", "working", "workshop"]));
   });
 });
 
