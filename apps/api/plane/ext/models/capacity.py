@@ -351,9 +351,7 @@ class TrainingEventOccurrence(BaseModel):
         # filter, so the incremental pass never sees it and must not guess.
         DISAPPEARED = "disappeared", "Disappeared"
 
-    workspace = models.ForeignKey(
-        "db.Workspace", on_delete=models.CASCADE, related_name="training_event_occurrences"
-    )
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="training_event_occurrences")
     trainer = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_event_occurrences"
     )
@@ -466,12 +464,8 @@ class TrainerTrainingSyncState(BaseModel):
         NOT_CONNECTED = "not_connected", "Not connected"
         ACCESS_LOST = "access_lost", "Access lost"
 
-    trainer_profile = models.OneToOneField(
-        TrainerProfile, on_delete=models.CASCADE, related_name="training_sync_state"
-    )
-    consent_state = models.CharField(
-        max_length=32, choices=ConsentState.choices, default=ConsentState.NOT_CONNECTED
-    )
+    trainer_profile = models.OneToOneField(TrainerProfile, on_delete=models.CASCADE, related_name="training_sync_state")
+    consent_state = models.CharField(max_length=32, choices=ConsentState.choices, default=ConsentState.NOT_CONNECTED)
     last_materialized_at = models.DateTimeField(null=True, blank=True)
     last_probed_at = models.DateTimeField(null=True, blank=True)
     last_error_code = models.CharField(max_length=64, blank=True)

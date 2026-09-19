@@ -154,9 +154,7 @@ def training_workload(trainer, events, start, end):
     the report answers the same question over the materialized table, and the two
     have to agree on what a linked invitation costs.
     """
-    linked = linked_sessions(
-        trainer.workspace_id, trainer.user_id, [item["key"] for item in events], start, end
-    )
+    linked = linked_sessions(trainer.workspace_id, trainer.user_id, [item["key"] for item in events], start, end)
     rows = [{**event, "linked": event["key"] in linked} for event in events]
     counts = external_counts(occurrence_tuples(events), linked=linked, start=start, end=end)
     return {**counts, "events": rows}

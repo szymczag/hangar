@@ -92,9 +92,9 @@ class TrainingImportEndpoint(BaseAPIView):
             return Response({"error": "occurrence_ids must be UUIDs."}, status=400)
 
         occurrences = list(
-            TrainingEventOccurrence.objects.filter(
-                workspace=project.workspace, id__in=occurrence_ids
-            ).select_related("trainer", "trainer_profile")
+            TrainingEventOccurrence.objects.filter(workspace=project.workspace, id__in=occurrence_ids).select_related(
+                "trainer", "trainer_profile"
+            )
         )
         if len(occurrences) != len(set(occurrence_ids)):
             return Response({"error": "Some selected trainings no longer exist."}, status=404)

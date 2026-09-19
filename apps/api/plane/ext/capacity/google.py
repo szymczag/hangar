@@ -243,9 +243,7 @@ class GoogleCalendarClient:
             if not page_token:
                 return events
 
-    def list_training_events(
-        self, credential, calendar_id, *, time_min, time_max, updated_min=None
-    ) -> list[dict]:
+    def list_training_events(self, credential, calendar_id, *, time_min, time_max, updated_min=None) -> list[dict]:
         """Read a rule calendar for the sweep, titles included.
 
         Deliberately separate from `list_events` rather than a flag on it. The
