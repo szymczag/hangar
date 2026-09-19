@@ -1300,9 +1300,6 @@ importers:
         specifier: 'catalog:'
         version: 3.4.15
     devDependencies:
-      '@plane/propel':
-        specifier: workspace:*
-        version: link:../propel
       '@types/node':
         specifier: 'catalog:'
         version: 22.12.0
@@ -1912,6 +1909,9 @@ importers:
       '@plane/constants':
         specifier: workspace:*
         version: link:../constants
+      '@plane/csp':
+        specifier: workspace:*
+        version: link:../csp
       '@plane/types':
         specifier: workspace:*
         version: link:../types

@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@plane/constants": "workspace:*",
+    "@plane/csp": "workspace:*",
     "@plane/types": "workspace:*",
     "@zxcvbn-ts/core": "catalog:",
     "@zxcvbn-ts/language-common": "catalog:",

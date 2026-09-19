@@ -32,7 +32,6 @@
     "dompurify": "catalog:"
   },
   "devDependencies": {
-    "@plane/propel": "workspace:*",
     "@types/node": "catalog:"
   }
 }
