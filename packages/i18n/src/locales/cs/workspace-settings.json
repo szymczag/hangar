@@ -81,6 +81,9 @@
         "hide": "Skrýt",
         "show_hidden": "Zobrazit skryté"
       },
+      "workshop_templates": {
+        "title": "Kontrolní seznamy workshopů"
+      },
       "exports": {
         "heading": "Exporty",
         "description": "Exportujte data projektu v různých formátech a přistupujte k historii exportů s odkazy ke stažení.",

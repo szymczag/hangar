@@ -81,6 +81,9 @@
         "hide": "Ocultar",
         "show_hidden": "Mostrar ocultos"
       },
+      "workshop_templates": {
+        "title": "Listas de comprobación de talleres"
+      },
       "exports": {
         "heading": "Exportaciones",
         "description": "Exporta los datos de tu proyecto en varios formatos y accede a tu historial de exportaciones con enlaces de descarga.",

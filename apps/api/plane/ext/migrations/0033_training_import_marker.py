@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('db', '0133_email_outbox_outer_subject'),
-        ('ext', '0030_training_event_materialization'),
+        ('ext', '0032_training_event_materialization'),
     ]
 
     operations = [

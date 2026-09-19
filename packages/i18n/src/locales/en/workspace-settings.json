@@ -81,6 +81,9 @@
         "hide": "Hide",
         "show_hidden": "Show hidden"
       },
+      "workshop_templates": {
+        "title": "Workshop checklists"
+      },
       "exports": {
         "heading": "Exports",
         "description": "Export your project data in various formats and access your export history with download links.",

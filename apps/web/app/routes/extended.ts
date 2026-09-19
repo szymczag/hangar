@@ -36,6 +36,11 @@ export const extendedRoutes: RouteConfigEntry[] = [
             ":workspaceSlug/settings/home-defaults",
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/home-defaults/page.tsx"
           ),
+          // The subtasks a Workshop starts with.
+          route(
+            ":workspaceSlug/settings/workshop-templates",
+            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/workshop-templates/page.tsx"
+          ),
         ]),
         layout("./(all)/[workspaceSlug]/(settings)/settings/projects/layout.tsx", [
           layout("./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/layout.tsx", [

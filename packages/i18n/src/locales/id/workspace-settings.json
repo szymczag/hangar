@@ -81,6 +81,9 @@
         "hide": "Sembunyikan",
         "show_hidden": "Tampilkan yang disembunyikan"
       },
+      "workshop_templates": {
+        "title": "Daftar periksa workshop"
+      },
       "exports": {
         "heading": "Ekspor",
         "description": "Ekspor data proyek Anda dalam berbagai format dan akses riwayat ekspor Anda dengan tautan unduhan.",

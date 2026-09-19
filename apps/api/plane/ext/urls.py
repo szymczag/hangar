@@ -75,6 +75,13 @@ from plane.ext.views.capacity import (
 from plane.ext.views.capacity_import import TrainingImportEndpoint
 from plane.ext.views.capacity_report import TrainingReportEndpoint
 from plane.ext.views.capacity_training import GoogleTrainingRulesEndpoint, GoogleTrainingLinkEndpoint
+from plane.ext.views.workshop_template import (
+    WorkshopApplyChecklistEndpoint,
+    WorkshopChecklistTemplateDetailEndpoint,
+    WorkshopChecklistTemplateListEndpoint,
+    WorkshopRoleDetailEndpoint,
+    WorkshopRoleListEndpoint,
+)
 
 PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
 
@@ -142,6 +149,31 @@ urlpatterns = [
         f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/",
         WorkshopScheduleEndpoint.as_view(),
         name="workshop-schedule",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/workshop-roles/",
+        WorkshopRoleListEndpoint.as_view(),
+        name="workshop-roles",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/workshop-roles/<uuid:role_id>/",
+        WorkshopRoleDetailEndpoint.as_view(),
+        name="workshop-role",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/checklist-templates/",
+        WorkshopChecklistTemplateListEndpoint.as_view(),
+        name="workshop-checklist-templates",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/checklist-templates/<uuid:template_id>/",
+        WorkshopChecklistTemplateDetailEndpoint.as_view(),
+        name="workshop-checklist-template",
+    ),
+    path(
+        f"{PROJECT_BASE}/work-items/<uuid:issue_id>/apply-checklist/",
+        WorkshopApplyChecklistEndpoint.as_view(),
+        name="workshop-apply-checklist",
     ),
     # Read-only, anonymous, and deliberately NOT under /api/instances/: the
     # session middleware switches to the admin cookie on any path containing
