@@ -16,6 +16,13 @@ from plane.ext.capacity.crypto import decrypt_value
 from plane.ext.models import GoogleCalendarCredential
 
 logger = logging.getLogger(__name__)
+# Every listing below already caps the items it will accept. That bounds the
+# work but not the conversation: a page carrying no items and a next-page
+# token would be followed forever, because neither counter moves. The peer is
+# the pinned Google origin rather than anything hostile, so this is a
+# liveness bound, not a security control -- but a worker wedged in a loop that
+# holds a calendar's lease is indistinguishable from one that has crashed.
+MAX_PAGES = 64
 GOOGLE_API_ORIGIN = ("https", "www.googleapis.com", 443)
 GOOGLE_TOKEN_ORIGIN = ("https", "oauth2.googleapis.com", 443)
 
@@ -162,8 +169,11 @@ class GoogleCalendarClient:
         return payload
 
     def list_calendars(self, credential: GoogleCalendarCredential) -> list[dict]:
-        calendars, page_token = [], None
+        calendars, page_token, pages = [], None, 0
         while True:
+            pages += 1
+            if pages > MAX_PAGES:
+                raise GoogleCalendarError("calendar_list_too_large")
             query = {"maxResults": 250, "minAccessRole": "freeBusyReader"}
             if page_token:
                 query["pageToken"] = page_token
@@ -194,8 +204,11 @@ class GoogleCalendarClient:
                 return calendars
 
     def list_events(self, credential, calendar_id, *, time_min, time_max):
-        events, page_token = [], None
+        events, page_token, pages = [], None, 0
         while True:
+            pages += 1
+            if pages > MAX_PAGES:
+                raise GoogleCalendarError("events_window_too_large")
             query = {
                 "timeMin": time_min,
                 "timeMax": time_max,
@@ -245,8 +258,11 @@ class GoogleCalendarClient:
         `showDeleted`, because a cancellation is precisely an event whose only
         recent change is that it stopped existing, and the sweep has to see it.
         """
-        events, page_token = [], None
+        events, page_token, pages = [], None, 0
         while True:
+            pages += 1
+            if pages > MAX_PAGES:
+                raise GoogleCalendarError("events_window_too_large")
             query = {
                 "timeMin": time_min,
                 "timeMax": time_max,
