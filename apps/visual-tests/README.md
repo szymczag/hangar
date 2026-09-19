@@ -255,9 +255,10 @@ every document with the Content-Security-Policy its build generated (space
 keeps the one its server sends, enforced on `vr-space`) plus
 `require-trusted-types-for 'script'`, both enforced, and fails on any
 violation, any Trusted Types error in the page, and any report from the default
-policy that it does not expect (docs/trusted-types-plan.md). It covers the
-editor and its pastes, comments, stickies, a page edited through live, the PDF
-export, a published board and the instance console, each twice: with the
+policy that it does not expect (docs/trusted-types-plan.md). It covers signing
+in through the real forms (web, console, published board), the editor and its
+pastes, comments, stickies, a page edited through live, the PDF export, a
+published board and the instance console, each twice: with the
 default policy observing (`HANGAR_CSP_TRUSTED_TYPES=report`) and sanitizing
 (`=enforce`).
 

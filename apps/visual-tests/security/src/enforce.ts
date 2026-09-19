@@ -45,7 +45,10 @@ export async function enforceContentSecurityPolicy(context: BrowserContext) {
     const request = route.request();
     if (request.resourceType() !== "document") return route.fallback();
     const path = new URL(request.url()).pathname;
-    const response = await route.fetch();
+    // The browser follows redirects itself, as it would without the suite: a
+    // form post's redirect is what form-action is checked against, and the
+    // document it leads to must get the policy of the app it belongs to.
+    const response = await route.fetch({ maxRedirects: 0 });
     const headers = response.headers();
     let policy: string;
     if (path.startsWith("/spaces")) {
@@ -58,7 +61,14 @@ export async function enforceContentSecurityPolicy(context: BrowserContext) {
     await route.fulfill({
       response,
       body,
-      headers: { ...headers, "content-security-policy": `${policy}, ${TRUSTED_TYPES_MEASUREMENT}` },
+      headers: {
+        // The edge's report-only Trusted Types header is replaced by the
+        // enforced one, in the same header as the policy.
+        ...Object.fromEntries(
+          Object.entries(headers).filter(([name]) => name !== "content-security-policy-report-only")
+        ),
+        "content-security-policy": `${policy}, ${TRUSTED_TYPES_MEASUREMENT}`,
+      },
     });
   });
   await context.addInitScript(() => {
@@ -125,10 +135,14 @@ export function watch(page: Page) {
   return {
     observations,
     /** No violation, enforced or reported, and no Trusted Types error. */
-    async expectClean() {
+    async expectNoViolations() {
       const violations = await readViolations(page);
       expect(violations, "Content-Security-Policy / Trusted Types violations").toEqual([]);
       expect(policyErrors, "Trusted Types or CSP errors in the page").toEqual([]);
+    },
+    /** The above, on a page the suite served: its policies and mode in place. */
+    async expectClean() {
+      await this.expectNoViolations();
       expect(
         await page.evaluate(
           () =>

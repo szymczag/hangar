@@ -162,6 +162,45 @@ instance console.
 3. Set `HANGAR_CSP_REPORT_ONLY=false` (`contentSecurityPolicy.reportOnly: false`)
    to enforce.
 
+### What enforcing can break, and what to set
+
+Each of these was checked in a browser with the policy enforced (see
+"Verification" below); the ones that depend on the deployment cannot be checked
+for you:
+
+- **Signing in with a password or a code.** Those forms post to the API, which
+  answers with a redirect, and Chrome applies `form-action` to the redirect as
+  well. The API must redirect to the origin the page is on: `WEB_URL` (or
+  `APP_BASE_URL`), `ADMIN_BASE_URL` and `SPACE_BASE_URL` must match the
+  origins users open. Otherwise the form is refused and the sign-in does
+  nothing. An API on its own origin also needs `HANGAR_CSP_FORM_ACTION`.
+  Signing in with Google, GitHub, GitLab, Gitea or OIDC starts with a
+  navigation, which `form-action` does not govern.
+- **Images from other hosts.** `img-src` allows this instance, object storage,
+  Google and GitHub avatars and Unsplash covers. An avatar from GitLab, Gitea
+  or an OIDC provider is shown from the provider until it is copied to object
+  storage; a self-hosted provider's avatar host belongs in
+  `HANGAR_CSP_IMG_SRC`. An image in a description that points at another host
+  is not loaded.
+- **A separate API, live or storage origin** belongs in
+  `HANGAR_CSP_CONNECT_SRC` (and storage in `HANGAR_CSP_IMG_SRC` and
+  `HANGAR_CSP_MEDIA_SRC`). The Helm chart does this for object storage.
+- **Framing.** The web app and the console cannot be framed; a published
+  board only by the instance itself unless `HANGAR_SPACE_FRAME_ANCESTORS` says
+  otherwise.
+- **A proxy that adds its own policy** narrows this one; remove it.
+
+### Verification
+
+`pnpm vr` serves the visual stack with each frontend's generated policy,
+enforced, and fails any story in which a page reports a violation
+(`apps/visual-tests/src/fixtures.ts`), so all of its screens are checked under
+the policy production sends. The security suite in
+`apps/visual-tests/security` adds what the stories do not reach: signing in
+through the real forms of the web app, the console and a published board, the
+editor and its pastes, pages through live, the PDF export and a published
+board.
+
 ## Related server-side measures
 
 - The API sends `default-src 'none'; frame-ancestors 'none'` on its own
