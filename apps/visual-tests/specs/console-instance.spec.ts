@@ -25,7 +25,6 @@ const PAGES = [
   ["workspace-create", "workspace/create", "Name your workspace"],
   ["users", "users", "vr-admin@hangar.test"],
   ["ai", "ai", "LLM Model"],
-  ["image", "image", "Access key from your Unsplash account"],
 ] as const;
 
 for (const [name, path, readyText] of PAGES) {

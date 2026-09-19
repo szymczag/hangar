@@ -51,9 +51,6 @@ INTENTIONALLY_UNSCOPED = {
     # Reports whether a slug is already taken, so it must answer for slugs the
     # caller cannot see. Returns a boolean and no workspace content.
     "WorkSpaceAvailabilityCheckEndpoint",
-    # Authenticated proxy to Unsplash's public image search for cover images.
-    # Takes no workspace and returns no Hangar data.
-    "UnsplashEndpoint",
 }
 
 

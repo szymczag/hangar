@@ -36,7 +36,6 @@ export default [
     // Fork (see FORK.md)
     route("maintenance", "./(all)/(dashboard)/maintenance/page.tsx"),
     route("ai", "./(all)/(dashboard)/ai/page.tsx"),
-    route("image", "./(all)/(dashboard)/image/page.tsx"),
   ]),
   // Catch-all route for 404 handling - must be last
   route("*", "./components/404.tsx"),
