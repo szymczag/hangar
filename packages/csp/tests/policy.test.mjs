@@ -73,10 +73,13 @@ test("runtime sources come from the environment and default to self", () => {
 test("Trusted Types is measured in a policy of its own and can be switched off", () => {
   // Kept out of the main policy: enforcing that must not start enforcing this.
   assert.doesNotMatch(buildContentSecurityPolicy(), /trusted-types/);
-  assert.equal(TRUSTED_TYPES_MEASUREMENT, "require-trusted-types-for 'script'; trusted-types 'none'");
+  assert.equal(
+    TRUSTED_TYPES_MEASUREMENT,
+    "require-trusted-types-for 'script'; trusted-types hangar-inert default dompurify"
+  );
   assert.equal(
     trustedTypesReportPolicy({ reportUri: "/api/csp-report/" }),
-    "require-trusted-types-for 'script'; trusted-types 'none'; report-uri /api/csp-report/"
+    `${TRUSTED_TYPES_MEASUREMENT}; report-uri /api/csp-report/`
   );
   assert.equal(trustedTypesReportPolicy({ mode: "off", reportUri: "/api/csp-report/" }), "");
   assert.equal(trustedTypesModeFromEnv({}), "report");

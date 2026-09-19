@@ -7,6 +7,8 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 
+import { TRUSTED_TYPES_MEASUREMENT } from "../src/index.mjs";
+
 import {
   OBSERVE_MAX_LENGTH,
   TRUSTED_TYPES_POLICY_NAMES,
@@ -57,6 +59,7 @@ const withBrowser = () => {
 
 test("the header allows exactly the policies this module creates, plus DOMPurify's own", () => {
   assert.deepEqual(TRUSTED_TYPES_POLICY_NAMES, ["hangar-inert", "default", "dompurify"]);
+  assert.ok(TRUSTED_TYPES_MEASUREMENT.endsWith(`trusted-types ${TRUSTED_TYPES_POLICY_NAMES.join(" ")}`));
 });
 
 test("without Trusted Types nothing is created and strings pass through", () => {

@@ -142,10 +142,13 @@ export const policyHeaderName = (env = process.env) => {
 //
 // Sent as its own Content-Security-Policy-Report-Only header, separate from
 // the policy above, so it stays report-only when that policy is enforced.
-// `trusted-types 'none'` makes the browser report policy creation as well as
+// The browser reports policy creation as well as
 // every sink that receives a plain string, which is the inventory the later
-// phases need. HANGAR_CSP_TRUSTED_TYPES=off removes the header.
-export const TRUSTED_TYPES_MEASUREMENT = "require-trusted-types-for 'script'; trusted-types 'none'";
+// phases need. `trusted-types` names the policies @plane/csp/trusted-types
+// creates (and DOMPurify's own), so any other policy a library creates is
+// reported. HANGAR_CSP_TRUSTED_TYPES=off removes the header.
+export const TRUSTED_TYPES_MEASUREMENT =
+  "require-trusted-types-for 'script'; trusted-types hangar-inert default dompurify";
 
 export const trustedTypesModeFromEnv = (env = process.env) =>
   env.HANGAR_CSP_TRUSTED_TYPES === "off" ? "off" : "report";

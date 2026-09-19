@@ -111,13 +111,13 @@ Next to the policy above, every document response carries a second policy that
 is **always** report-only, whatever `HANGAR_CSP_REPORT_ONLY` says:
 
 ```
-Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types 'none'; report-uri /api/csp-report/
+Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types hangar-inert default dompurify; report-uri /api/csp-report/
 ```
 
 It is phase 0 of [trusted-types-plan.md](trusted-types-plan.md). The browser
 reports each place where a plain string reaches a DOM sink that Trusted Types
 would guard (`innerHTML`, `DOMParser`, script text …), and each attempt to
-create a policy, but blocks nothing and changes no behaviour. The API logs the
+create a policy other than the three named, but blocks nothing and changes no behaviour. The API logs the
 reports with the sink in `script-sample` (for example
 `Element innerHTML|<svg xmlns=…`) and the location in `source-file`,
 `line-number` and `column-number`. Together they are the inventory that the
