@@ -156,6 +156,11 @@ services:
       # the console; the default points at localhost:3001, which does not exist
       # inside this network.
       WEB_URL: ""
+      # Where the API redirects after a form sign-in (base_host falls back to it
+      # when WEB_URL is empty). apps/api/.env points it at a dev server; a
+      # redirect off the page's origin is refused by form-action, which Chrome
+      # applies to redirects too, so it has to be the edge.
+      APP_BASE_URL: http://vr-edge
       ADMIN_BASE_URL: ""
       SPACE_BASE_URL: ""
       LIVE_BASE_URL: ""
@@ -257,6 +262,12 @@ services:
     networks: [vr_env]
     ports:
       - "8100:80"
+    # The frontends' Content-Security-Policy, rendered from their builds by
+    # scripts/vr.mjs as the nginx images would render it, but enforced.
+    environment:
+      VR_CSP_WEB: "${VR_CSP_WEB}"
+      VR_CSP_ADMIN: "${VR_CSP_ADMIN}"
+      VR_CSP_TRUSTED_TYPES: "${VR_CSP_TRUSTED_TYPES}"
     volumes:
       - ./apps/visual-tests/Caddyfile.vr:/etc/caddy/Caddyfile:ro
       - ./apps/web/build/client:/srv/web:ro

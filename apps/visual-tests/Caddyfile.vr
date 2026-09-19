@@ -8,9 +8,13 @@
 # entirely: no COOKIE_DOMAIN, no CORS configuration, and no SameSite reasoning,
 # because the browser never leaves the origin it was given the session on.
 #
-# Published boards and the live collaboration server are deliberately not routed.
-# They are out of scope for this suite; wiring them up would mean seeding and
-# stabilising two more surfaces nobody has asked to screenshot.
+# Published boards (space) and the live collaboration server are routed for the
+# security suite; the visual suite photographs neither.
+#
+# Web and admin are served with the Content-Security-Policy their builds
+# generated, enforced, and the default report-only Trusted Types policy
+# (scripts/vr.mjs renders both); space sends its own. Violations are reported to
+# the API, and `pnpm vr` fails on any.
 
 :80 {
 	# Every route is a `handle` block, deliberately. Caddy orders `handle`
@@ -40,12 +44,16 @@
 
 	redir /god-mode /god-mode/ permanent
 	handle_path /god-mode/* {
+		header Content-Security-Policy "{$VR_CSP_ADMIN}"
+		header Content-Security-Policy-Report-Only "{$VR_CSP_TRUSTED_TYPES}"
 		root * /srv/admin
 		try_files {path} /index.html
 		file_server
 	}
 
 	handle {
+		header Content-Security-Policy "{$VR_CSP_WEB}"
+		header Content-Security-Policy-Report-Only "{$VR_CSP_TRUSTED_TYPES}"
 		root * /srv/web
 		try_files {path} /index.html
 		file_server

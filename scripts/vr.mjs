@@ -26,6 +26,7 @@ import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { DEFAULT_REPORT_URI, TRUSTED_TYPES_MEASUREMENT, hashSource } from "../packages/csp/src/index.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const COMPOSE_FILE = "docker-compose-visual.yml";
@@ -203,6 +204,33 @@ rmSync(path.join(ROOT, "apps/live/dist"), { recursive: true, force: true });
 
 run("pnpm", ["turbo", "run", "build", "--filter=web", "--filter=admin", "--filter=space", "--filter=live"]);
 assertBundleIsSameOrigin();
+
+/**
+ * The Content-Security-Policy a frontend image sends, from the template its
+ * build generated, with every deployment variable at its default -- enforced,
+ * reporting to the API. The edge sends it (and the default report-only Trusted
+ * Types policy) on everything it serves, so every story is photographed under
+ * the policy production runs; src/fixtures.ts fails a test on any violation.
+ * space sends its own (enforced on vr-space).
+ *
+ * One addition, for the suite rather than the application: Playwright applies
+ * screenshot.css as an inline <style> (its text, trimmed), which style-src-elem
+ * refuses. That exact text is allowed by hash; anything else still is not.
+ */
+const SCREENSHOT_STYLE = hashSource(readFileSync(path.join(ROOT, "apps/visual-tests/screenshot.css"), "utf8").trim());
+function edgePolicy(app) {
+  const template = readFileSync(path.join(ROOT, `apps/${app}/build/csp/security-headers.conf.template`), "utf8");
+  const policy = /add_header \$\{HANGAR_CSP_HEADER\} "([^"]+)"/.exec(template)?.[1];
+  if (!policy) throw new Error(`No Content-Security-Policy in the ${app} build's header template.`);
+  return policy
+    .replace("style-src-elem 'self'", `style-src-elem 'self' ${SCREENSHOT_STYLE}`)
+    .replace("${HANGAR_CSP_FRAME_SRC}", "'none'")
+    .replace("${HANGAR_CSP_REPORT}", `; report-uri ${DEFAULT_REPORT_URI}`)
+    .replace(/\$\{HANGAR_CSP_[A-Z_]+\}/g, "");
+}
+env.VR_CSP_WEB = edgePolicy("web");
+env.VR_CSP_ADMIN = edgePolicy("admin");
+env.VR_CSP_TRUSTED_TYPES = `${TRUSTED_TYPES_MEASUREMENT}; report-uri ${DEFAULT_REPORT_URI}`;
 
 const EDGE = process.env.VR_HOST_URL ?? "http://localhost:8100";
 

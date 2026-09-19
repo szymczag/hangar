@@ -57,7 +57,71 @@ async function guardWrites(context: BrowserContext, writes: Write[]): Promise<vo
   });
 }
 
-export const test = base.extend<Personas & { writeGuard: void }>({
+/** A Content-Security-Policy or Trusted Types violation, as the page saw it. */
+type Violation = { directive: string; disposition: string; blocked: string; sample: string; source: string };
+
+/**
+ * Record every policy violation in every page of the context.
+ *
+ * The edge serves the policy production runs (scripts/vr.mjs), enforced, so a
+ * story whose screenshot still matches can nevertheless have had a script,
+ * style, image or connection refused -- or a Trusted Types sink reported. The
+ * browser's own reports go out asynchronously and are lost when the context
+ * closes right after the screenshot, so the page collects them itself.
+ */
+async function collectViolations(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    const store: Violation[] = [];
+    (window as unknown as { __policyViolations: Violation[] }).__policyViolations = store;
+    document.addEventListener("securitypolicyviolation", (event) => {
+      store.push({
+        directive: event.effectiveDirective,
+        disposition: event.disposition,
+        blocked: event.blockedURI,
+        sample: event.sample,
+        source: `${event.sourceFile}:${event.lineNumber}:${event.columnNumber}`,
+      });
+    });
+  });
+}
+
+async function violationsIn(context: BrowserContext): Promise<string[]> {
+  const found: string[] = [];
+  for (const page of context.pages()) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- one page at a time; there are one or two
+    const violations = await page
+      .evaluate(() => (window as unknown as { __policyViolations?: Violation[] }).__policyViolations ?? [])
+      .catch(() => [] as Violation[]);
+    for (const violation of violations) found.push(`${page.url()}: ${JSON.stringify(violation)}`);
+  }
+  return found;
+}
+
+export const test = base.extend<Personas & { writeGuard: void; policyGuard: void }>({
+  /**
+   * Automatic: fail a test in which any page reported a Content-Security-Policy
+   * violation (enforced or report-only, Trusted Types included).
+   */
+  policyGuard: [
+    async ({ context }, use) => {
+      await collectViolations(context);
+      await use();
+      const violations = await violationsIn(context);
+      if (violations.length === 0) return;
+      throw new Error(
+        [
+          `This test's pages reported ${violations.length} policy violation(s):`,
+          "",
+          ...violations.map((violation) => `  ${violation}`),
+          "",
+          "The edge enforces the frontends' Content-Security-Policy, so this is",
+          "something production would block or report (docs/content-security-policy.md).",
+        ].join("\n")
+      );
+    },
+    { auto: true },
+  ],
+
   /** Automatic, so a spec that never asks for a persona is still covered. */
   writeGuard: [
     async ({ context }, use) => {
