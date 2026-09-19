@@ -266,7 +266,6 @@ def _serialize_interval(start, end, kind, **extra):
     return {"start": start.isoformat(), "end": end.isoformat(), "kind": kind, **extra}
 
 
-
 def _recorded_titles(workspace_id, trainer_ids, start, end):
     """Titles for recognized training, read from the record rather than Google.
 
@@ -282,13 +281,17 @@ def _recorded_titles(workspace_id, trainer_ids, start, end):
     from plane.ext.capacity.crypto import decrypt_value
     from plane.ext.models import TrainingEventOccurrence
 
-    rows = TrainingEventOccurrence.objects.filter(
-        workspace_id=workspace_id,
-        trainer_id__in=trainer_ids,
-        state=TrainingEventOccurrence.State.ACTIVE,
-        starts_at__lt=end,
-        ends_at__gt=start,
-    ).exclude(encrypted_summary="").values_list("trainer_id", "event_key", "encrypted_summary", "encryption_key_id")
+    rows = (
+        TrainingEventOccurrence.objects.filter(
+            workspace_id=workspace_id,
+            trainer_id__in=trainer_ids,
+            state=TrainingEventOccurrence.State.ACTIVE,
+            starts_at__lt=end,
+            ends_at__gt=start,
+        )
+        .exclude(encrypted_summary="")
+        .values_list("trainer_id", "event_key", "encrypted_summary", "encryption_key_id")
+    )
 
     titles = {}
     for trainer_id, event_key, encrypted, key_id in rows:
@@ -337,11 +340,7 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         ProjectMember.objects.filter(member=viewer, is_active=True).values_list("project_id", flat=True)
     )
     viewer_id = getattr(viewer, "id", None)
-    titles = (
-        _recorded_titles(workspace.id, [trainer.user_id for trainer in trainers], start, end)
-        if trainers
-        else {}
-    )
+    titles = _recorded_titles(workspace.id, [trainer.user_id for trainer in trainers], start, end) if trainers else {}
     output = []
     for trainer in trainers:
         working = _working_intervals(trainer, start, end)
@@ -360,7 +359,8 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         for event in events:
             # The title is shown only to somebody already entitled to it: a
             # workspace administrator, or the trainer looking at their own week.
-            title = titles.get((trainer.user_id, event["key"])) if may_read_titles or viewer_id == trainer.user_id else None
+            entitled = may_read_titles or viewer_id == trainer.user_id
+            title = titles.get((trainer.user_id, event["key"])) if entitled else None
             intervals.append(
                 _serialize_interval(
                     datetime.fromisoformat(event["start"]),
