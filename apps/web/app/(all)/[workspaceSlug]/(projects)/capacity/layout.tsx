@@ -21,6 +21,8 @@ function useCapacityCrumb() {
   const { pathname } = useLocation();
   if (pathname.includes("/capacity/team")) return "Team capacity";
   if (pathname.includes("/capacity/planner")) return "Workshop planner";
+  if (pathname.includes("/capacity/reports")) return "Training report";
+  if (pathname.includes("/capacity/imports")) return "Import from calendar";
   return "My capacity";
 }
 

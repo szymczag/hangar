@@ -145,6 +145,64 @@ export type TWorkshopPlanHold = {
   status: "active" | "released" | "confirmed";
 };
 
+/** Why a trainer's row may not be trustworthy; `ok` is the only one that counts. */
+export type TTrainingSyncStatus =
+  | "ok"
+  | "stale"
+  | "never_synced"
+  | "consent_missing"
+  | "reauth_required"
+  | "not_connected"
+  | "access_lost";
+export type TTrainingReportRow = {
+  trainer_id: string;
+  display_name: string;
+  sync_status: TTrainingSyncStatus;
+  counts_towards_totals: boolean;
+  workshop_count: number;
+  session_count: number;
+  delivery_minutes: number;
+  buffer_minutes: number;
+  external_confirmed_sessions: number;
+  external_confirmed_minutes: number;
+  external_pending_sessions: number;
+  external_pending_minutes: number;
+};
+export type TTrainingReport = {
+  from: string;
+  to: string;
+  /** Oldest successful sweep behind these figures; null when nothing has swept. */
+  data_as_of: string | null;
+  coverage: {
+    window_starts_at: string | null;
+    window_ends_at: string | null;
+    requested_range_covered: boolean;
+    calendars: Array<{
+      rule_label: string;
+      last_success_at: string | null;
+      last_full_scan_at: string | null;
+      status: "ok" | "stale" | "unavailable";
+    }>;
+  };
+  trainers: TTrainingReportRow[];
+};
+/** A training that exists in the calendar but not yet as a work item. */
+export type TPendingTrainingImport = {
+  id: string;
+  trainer_id: string;
+  display_name: string;
+  starts_at: string;
+  ends_at: string;
+  minutes: number;
+  status: "confirmed" | "pending";
+  rule_label: string;
+  title: string | null;
+};
+export type TTrainingImportResult = {
+  created: Array<{ occurrence_id: string; issue_id: string; name: string }>;
+  skipped: Array<{ occurrence_id: string; reason: string }>;
+};
+
 export class CapacityRequestError extends Error {
   constructor(
     message: string,
@@ -323,6 +381,41 @@ export class CapacityService extends APIService {
   }
 
   /** Workshop work items the viewer can plan, for the planner's picker. */
+  getTrainingReport(workspaceSlug: string, from: string, to: string) {
+    return this.data<TTrainingReport>(
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/training-report/`, { params: { from, to } })
+    );
+  }
+
+  /**
+   * The CSV lives behind the same endpoint, so the browser downloads it directly
+   * rather than this service buffering it only to hand it back.
+   *
+   * `export`, not `format`: DRF reserves the latter for renderer negotiation and
+   * answers 404 for a value it does not know.
+   */
+  trainingReportCsvUrl(workspaceSlug: string, from: string, to: string) {
+    const params = new URLSearchParams({ from, to, export: "csv" });
+    return `${API_BASE_URL}/api/workspaces/${workspaceSlug}/capacity/training-report/?${params}`;
+  }
+
+  listPendingTrainingImports(workspaceSlug: string, from: string, to: string) {
+    return this.data<{ from: string; to: string; results: TPendingTrainingImport[] }>(
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/training-imports/`, { params: { from, to } })
+    );
+  }
+
+  async importTrainings(workspaceSlug: string, projectId: string, occurrenceIds: string[]) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TTrainingImportResult>(
+      this.post(
+        `/api/workspaces/${workspaceSlug}/capacity/training-imports/`,
+        { project_id: projectId, occurrence_ids: occurrenceIds },
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
+    );
+  }
+
   searchWorkshops(workspaceSlug: string, query: string) {
     return this.data<{ results: TPlanIssue[] }>(
       this.get(`/api/workspaces/${workspaceSlug}/capacity/workshops/`, { params: { query } })
