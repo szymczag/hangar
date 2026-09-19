@@ -7,42 +7,31 @@ which origins they talk to), so it is kept in `packages/csp` next to them and
 changes in the same commit as the code it describes. Every installation built
 from this repository gets it.
 
-## Current status: report-only
+## Current status: enforced
 
-The policy ships **report-only** (`Content-Security-Policy-Report-Only`). Browsers
-evaluate it and report what it would block to `/api/csp-report/`, but block
-nothing. Until it is switched to enforcing, it is a measuring instrument, not a
-second line of defence: an injection that got past the sanitizer would still run.
+The policy is **enforced** (`Content-Security-Policy`) and violations are
+reported to `/api/csp-report/`, logged by the API as
+`Content-Security-Policy violation`. `HANGAR_CSP_REPORT_ONLY=true`
+(`contentSecurityPolicy.reportOnly: true`) sends it report-only instead, for a
+deployment that wants to watch its reports before it blocks anything, for
+example after adding an origin.
 
-What has been verified against it:
+What it has been verified against, in Chromium with the policy enforced (see
+"Verification" below): every screen of the visual suite, web and console;
+signing in with a password on the web app, the console and a published board;
+the rich-text editor with every formatting feature, markdown and hostile
+pastes; comments; stickies; pages edited through live; the PDF export; a
+published board read without an account; a screenshot pasted into a
+description and one attached to a work item, both stored and shown from this
+instance. The nginx images were checked with a read-only root filesystem.
 
-- the web and admin shells and the space shell load with the policy enforced and
-  produce no violations (headless Chromium, built images, read-only root
-  filesystem for the nginx images);
-- the rich-text editor, with the policy enforced: centred and right-aligned
-  paragraphs, palette text and background colours, coloured table headers and
-  cells (including a cell stored in the old CSS-variable form), links, and a
-  paste carrying the editor's own clipboard format. No violations; every
-  construct renders from the stylesheet; a hostile colour value is dropped and
-  a pasted `<img onerror>` does not run.
-
-What has not been exercised yet, and is the reason for the report-only period:
-the collaborative page editor (live), published boards with real content,
-file upload and preview flows, the admin console beyond its shell, and the
-remaining screens of the web app.
-
-**Before enforcing**, on a deployment running report-only:
-
-1. Use the application normally for a release cycle, including pages, uploads,
-   published boards and the admin console.
-2. Read the API log for `Content-Security-Policy violation`. Each entry names
-   the directive and the blocked resource.
-3. A blocked origin that the deployment legitimately uses goes into the
-   variables below; blocked inline code or style is a frontend change.
-4. With no unexplained reports left, set `HANGAR_CSP_REPORT_ONLY=false`
-   (`contentSecurityPolicy.reportOnly: false` in Helm). The next release makes
-   enforcing the default and keeps the switch for an operator who needs to step
-   back.
+**Images are only this instance's own**: its bundle, uploads in object
+storage, and `blob:`/`data:` URLs made in the page. An image a description
+points at on another host is not loaded, profile pictures from identity
+providers are copied to object storage, and covers are chosen from the bundled
+set or uploaded. `python manage.py localize_external_images` (report first,
+then `--apply`) copies or clears profile pictures, covers and logos stored as
+URLs on other hosts before this rule existed.
 
 ## What the policy allows
 
@@ -87,9 +76,9 @@ All variables are optional.
 
 | Variable                       | Default            | Meaning                                                                                                                                          |
 | ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `HANGAR_CSP_REPORT_ONLY`       | `true`             | Send `Content-Security-Policy-Report-Only` instead of enforcing. This release reports first; the next one enforces by default.                   |
+| `HANGAR_CSP_REPORT_ONLY`       | `false`            | Send `Content-Security-Policy-Report-Only` instead of enforcing.                                                                                 |
 | `HANGAR_CSP_REPORT_URI`        | `/api/csp-report/` | Where browsers send violation reports. The API logs them under `plane.security.csp`, rate-limited per client. Empty disables reporting.          |
-| `HANGAR_CSP_IMG_SRC`           | –                  | Extra image origins, space separated: object storage on another origin, a self-hosted GitLab's avatars.                                          |
+| `HANGAR_CSP_IMG_SRC`           | –                  | Extra image origins, space separated: object storage on another origin. Images are this instance's own; nothing else belongs here.               |
 | `HANGAR_CSP_CONNECT_SRC`       | –                  | Extra origins the browser connects to: object storage on another origin, a separate API or live origin.                                          |
 | `HANGAR_CSP_MEDIA_SRC`         | –                  | Extra media origins, normally object storage.                                                                                                    |
 | `HANGAR_CSP_FRAME_SRC`         | `'none'`           | Origins that may be framed inside the application, such as a changelog page.                                                                     |
@@ -155,12 +144,14 @@ instance console.
 
 ## Rolling out
 
-1. Deploy with the defaults. The policy is report-only and violations appear in
-   the API log as `Content-Security-Policy violation`.
-2. If a report names a legitimate origin, add it through the variables above.
-   If it names inline code, the fix belongs in the frontend.
-3. Set `HANGAR_CSP_REPORT_ONLY=false` (`contentSecurityPolicy.reportOnly: false`)
-   to enforce.
+1. Deploy with the defaults. The policy is enforced; violations appear in the
+   API log as `Content-Security-Policy violation`.
+2. If a report names a legitimate origin (object storage, a separate API or
+   live origin), add it through the variables above. If it names inline code,
+   the fix belongs in the frontend.
+3. To watch reports without blocking, set `HANGAR_CSP_REPORT_ONLY=true`
+   (`contentSecurityPolicy.reportOnly: true`) and remove it again once the
+   reports are explained.
 
 ### What enforcing can break, and what to set
 
@@ -176,12 +167,13 @@ for you:
   nothing. An API on its own origin also needs `HANGAR_CSP_FORM_ACTION`.
   Signing in with Google, GitHub, GitLab, Gitea or OIDC starts with a
   navigation, which `form-action` does not govern.
-- **Images from other hosts.** `img-src` allows this instance, object storage,
-  Google and GitHub avatars and Unsplash covers. An avatar from GitLab, Gitea
-  or an OIDC provider is shown from the provider until it is copied to object
-  storage; a self-hosted provider's avatar host belongs in
-  `HANGAR_CSP_IMG_SRC`. An image in a description that points at another host
-  is not loaded.
+- **Images from other hosts** are not loaded: `img-src` allows this instance
+  and its object storage only. A profile picture from an identity provider is
+  copied to object storage at sign-in and shows the initials until then; run
+  `localize_external_images` once for pictures, covers and logos stored before.
+  Uploads go through a presigned URL on the storage origin, which must be the
+  page's own (Caddy) or in `HANGAR_CSP_CONNECT_SRC`/`HANGAR_CSP_IMG_SRC`
+  (the Helm chart adds it).
 - **A separate API, live or storage origin** belongs in
   `HANGAR_CSP_CONNECT_SRC` (and storage in `HANGAR_CSP_IMG_SRC` and
   `HANGAR_CSP_MEDIA_SRC`). The Helm chart does this for object storage.
@@ -198,8 +190,8 @@ enforced, and fails any story in which a page reports a violation
 the policy production sends. The security suite in
 `apps/visual-tests/security` adds what the stories do not reach: signing in
 through the real forms of the web app, the console and a published board, the
-editor and its pastes, pages through live, the PDF export and a published
-board.
+editor and its pastes, pages through live, the PDF export, a published board,
+uploading a screenshot, and an image on another host being refused.
 
 ## Related server-side measures
 

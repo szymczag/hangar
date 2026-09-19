@@ -68,8 +68,8 @@ test("runtime sources come from the environment and default to self", () => {
     formAction: "",
     reportUri: "/api/csp-report/",
   });
-  // This release observes before it enforces; see DEFAULT_REPORT_ONLY.
-  assert.equal(policyHeaderName({}), "Content-Security-Policy-Report-Only");
+  // Enforced unless a deployment asks to only report; see DEFAULT_REPORT_ONLY.
+  assert.equal(policyHeaderName({}), "Content-Security-Policy");
   assert.equal(policyHeaderName({ HANGAR_CSP_REPORT_ONLY: "false" }), "Content-Security-Policy");
   assert.equal(policyHeaderName({ HANGAR_CSP_REPORT_ONLY: "true" }), "Content-Security-Policy-Report-Only");
 });

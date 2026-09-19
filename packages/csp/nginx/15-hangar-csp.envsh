@@ -15,9 +15,10 @@ export HANGAR_CSP_MEDIA_SRC="${HANGAR_CSP_MEDIA_SRC-}"
 export HANGAR_CSP_FRAME_SRC="${HANGAR_CSP_FRAME_SRC:-'none'}"
 export HANGAR_CSP_FORM_ACTION="${HANGAR_CSP_FORM_ACTION-}"
 
-# Defaults match @plane/csp (DEFAULT_REPORT_ONLY, DEFAULT_REPORT_URI): this
-# release reports violations without enforcing. HANGAR_CSP_REPORT_ONLY=false
-# enforces; an empty HANGAR_CSP_REPORT_URI sends no reports.
+# Defaults match @plane/csp (DEFAULT_REPORT_ONLY, DEFAULT_REPORT_URI): the
+# policy is enforced and violations are reported to the API.
+# HANGAR_CSP_REPORT_ONLY=true sends it report-only instead; an empty
+# HANGAR_CSP_REPORT_URI sends no reports.
 HANGAR_CSP_REPORT_URI="${HANGAR_CSP_REPORT_URI-/api/csp-report/}"
 if [ -n "${HANGAR_CSP_REPORT_URI}" ]; then
   export HANGAR_CSP_REPORT="; report-uri ${HANGAR_CSP_REPORT_URI}"
@@ -25,7 +26,7 @@ else
   export HANGAR_CSP_REPORT=""
 fi
 
-if [ "${HANGAR_CSP_REPORT_ONLY:-true}" = "true" ]; then
+if [ "${HANGAR_CSP_REPORT_ONLY:-false}" = "true" ]; then
   export HANGAR_CSP_HEADER="Content-Security-Policy-Report-Only"
 else
   export HANGAR_CSP_HEADER="Content-Security-Policy"

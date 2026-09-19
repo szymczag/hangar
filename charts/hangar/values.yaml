@@ -193,9 +193,9 @@ podDefaults:
 # is built into each image; these are the origins only the deployment knows.
 # The object storage origin is added automatically.
 contentSecurityPolicy:
-  # This release reports violations to the API instead of enforcing, so a
-  # breakage shows in the API log before users meet it. Set false to enforce.
-  reportOnly: true
+  # Enforced. Set true to only report violations to the API (logged as
+  # "Content-Security-Policy violation"), e.g. while checking a new origin.
+  reportOnly: false
   reportUri: /api/csp-report/
   # Extra image origins, space separated. Images are this instance's own: the
   # chart adds the object-storage origin itself, and nothing else belongs here

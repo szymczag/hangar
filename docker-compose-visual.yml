@@ -222,9 +222,9 @@ services:
     networks: [vr_env]
     environment:
       PORT: "3000"
-      # Enforced here, so the suite tests the header space actually sends;
-      # Trusted Types are added by the suite, as for the other frontends.
-      HANGAR_CSP_REPORT_ONLY: "false"
+      # The policy at its default (enforced), so the suite tests the header
+      # space actually sends; Trusted Types are added by the suite, as for the
+      # other frontends.
       HANGAR_CSP_TRUSTED_TYPES: "off"
     volumes:
       - .:/work:ro

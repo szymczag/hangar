@@ -36,6 +36,14 @@ test("the hook's Trusted Types value follows HANGAR_CSP_TRUSTED_TYPES", () => {
   assert.equal(value({ HANGAR_CSP_REPORT_ONLY: "false" }), `${TRUSTED_TYPES_MEASUREMENT}; report-uri /api/csp-report/`);
 });
 
+test("the hook enforces the policy unless HANGAR_CSP_REPORT_ONLY=true", () => {
+  const header = (env) => hookValue("HANGAR_CSP_HEADER", env);
+  assert.equal(header({}), "Content-Security-Policy");
+  assert.equal(header({ HANGAR_CSP_REPORT_ONLY: "false" }), "Content-Security-Policy");
+  assert.equal(header({ HANGAR_CSP_REPORT_ONLY: "true" }), "Content-Security-Policy-Report-Only");
+  assert.equal(hookValue("HANGAR_CSP_REPORT", {}), "; report-uri /api/csp-report/");
+});
+
 test("the hook's Trusted Types header and page mode follow HANGAR_CSP_TRUSTED_TYPES only", () => {
   const header = (env) => hookValue("HANGAR_CSP_TRUSTED_TYPES_HEADER", env);
   const mode = (env) => hookValue("HANGAR_CSP_TRUSTED_TYPES_MODE", env);

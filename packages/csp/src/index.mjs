@@ -114,12 +114,12 @@ export const buildContentSecurityPolicy = ({
   return directives.map(([name, value]) => `${name} ${value}`).join("; ");
 };
 
-// Rollout: the release that introduces the policy sends it report-only, with
-// violations reported to the API, so anything it would break shows up in the
-// logs before it breaks for users. Set HANGAR_CSP_REPORT_ONLY=false to enforce;
-// the following release makes enforcing the default. The nginx images take the
-// same defaults from nginx/15-hangar-csp.envsh.
-export const DEFAULT_REPORT_ONLY = true;
+// Enforced by default. Every screen of the visual suite and the security
+// suite's flows run under this policy enforced (docs/content-security-policy.md,
+// "Verification"). HANGAR_CSP_REPORT_ONLY=true sends it report-only instead,
+// for a deployment that wants to watch its reports first. The nginx images take
+// the same defaults from nginx/15-hangar-csp.envsh.
+export const DEFAULT_REPORT_ONLY = false;
 export const DEFAULT_REPORT_URI = "/api/csp-report/";
 
 /**
