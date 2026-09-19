@@ -218,7 +218,12 @@ class UpstreamTransitionReviewTests(unittest.TestCase):
 class ReleaseNoteGenerationTests(unittest.TestCase):
     def git(self, repository: Path, *arguments: str) -> str:
         result = subprocess.run(
-            ["git", *arguments],
+            # These fixtures build throwaway history, and the ambient user config
+            # decides how. A maintainer who sets `tag.gpgsign` -- which the release
+            # policy wants set, because an unsigned tag consumes a version and
+            # cannot be moved -- would otherwise watch these tests fail on a
+            # missing signing key for a repository that exists for one assertion.
+            ["git", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", *arguments],
             cwd=repository,
             check=True,
             capture_output=True,

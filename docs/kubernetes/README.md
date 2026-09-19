@@ -180,11 +180,13 @@ Basic calendar access continues to consume free/busy ranges. Optional invitation
 recognition requires `calendar.events.readonly`, a separate trainer consent, and
 workspace administrator rules configured in Team capacity. It reads times and
 participation without requesting event titles or descriptions. Optional
-materialization (`ENABLE_GOOGLE_TRAINING_MATERIALIZATION`, off by default)
-additionally reads the title of events that already match a rule, for the training
-report and the calendar import; the availability path is unchanged and still
-requests none. Missing access or unverified configured calendars block new
-bookings. See the
+materialization (`googleCalendarCapacity.materialization.enabled`, off by
+default, and inert unless `googleCalendarCapacity.enabled` is also set)
+additionally reads the title of events that already match a rule, for the
+training report and the calendar import; the availability path is unchanged and
+still requests none. Leaving it off does not hide those two screens — they are
+reachable and empty, and every trainer is reported as never synced. Missing
+access or unverified configured calendars block new bookings. See the
 [configuration reference](configuration.md#google-calendar-trainer-capacity) and
 [planner setup](../capacity-planner.md) before enabling those rules.
 
