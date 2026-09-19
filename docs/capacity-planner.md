@@ -120,3 +120,21 @@ Session updates accept each existing session's `id` and preserve that row, its p
 origin and invitation links, including when sessions are reordered. IDs must be
 unique and belong to the edited Workshop. Removing a session removes its links;
 legacy clients that omit IDs retain the replace-all behavior.
+
+Editing a Workshop's sessions requires the same project role as editing the work
+item itself, and scheduling from the planner now requires it too: workspace
+membership alone was enough before, so a project guest could place sessions and
+assign a trainer through the planner while the work-item route refused them.
+
+Session edits are refused when they collide. Submitted sessions are checked
+against each other and against other workshops and live reservations for the
+same trainer; the Workshop's own stored sessions are ignored, since they are
+being replaced. This is the database question the planner already asks, not a
+Google read -- editing a Workshop has never contacted Google and does not start
+now. Google availability remains the planner's concern, at the point where time
+is actually taken. Consecutive sessions, the ordinary multi-day case, are
+unaffected.
+
+Importing a training from the calendar deliberately does not perform this check:
+it records what the calendar already says is happening, so refusing an overlap
+there would refuse to reflect reality.
