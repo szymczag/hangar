@@ -10,6 +10,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import { TRUSTED_TYPES_MEASUREMENT } from "../src/index.mjs";
 
 import {
+  KNOWN_LIBRARY_SCRIPTS,
   OBSERVE_MAX_LENGTH,
   TRUSTED_TYPES_POLICY_NAMES,
   inertHTML,
@@ -42,6 +43,7 @@ const clean = () => {
   delete globalThis.trustedTypes;
   delete globalThis.DOMParser;
   delete globalThis.location;
+  delete globalThis.document;
 };
 
 beforeEach(clean);
@@ -149,4 +151,47 @@ test("installing twice, or over an existing default policy, does not throw", () 
   withBrowser();
   fakeTrustedTypes.createPolicy("default", { createHTML: (value) => value });
   assert.equal(installTrustedTypesPolicies({ send: () => {} }), false);
+});
+
+test("a served inline script rendered again is recognised, not compared as HTML", () => {
+  withBrowser();
+  globalThis.document = {
+    scripts: [
+      { src: "", textContent: "((e)=>{if(a<b)x()})(1)" },
+      { src: "/config.js", textContent: "" },
+    ],
+  };
+  const sent = [];
+  installTrustedTypesPolicies({ sanitize: () => "", send: (url, body) => sent.push(JSON.parse(body)) });
+  const policy = policies.get("default");
+  policy.rules.createHTML("((e)=>{if(a<b)x()})(1)", "TrustedHTML", "Element innerHTML");
+  assert.deepEqual(sent, []);
+  // A direct call (ProseMirror passes no sink) is still observed, and named.
+  policy.rules.createHTML("<img src=x onerror=y>", "TrustedHTML");
+  assert.equal(sent[0]["csp-report"]["blocked-uri"], "direct call");
+});
+
+test("next-themes' script is recognised in the served and in the client-rendered minification", async () => {
+  const { readFileSync, existsSync } = await import("node:fs");
+  const nextThemes = KNOWN_LIBRARY_SCRIPTS.find((script) => script.name === "next-themes");
+  // The copy React renders on the client (minified by the app bundler).
+  const client =
+    "((e,t,n,r,i,a,o,s)=>{let c=document.documentElement,l=[`light`,`dark`];function u(t){c.setAttribute(e,t)}" +
+    "try{let e=localStorage.getItem(t)||n;u(e)}catch(e){}window.matchMedia(`(prefers-color-scheme: dark)`)})(1)";
+  assert.ok(nextThemes.matches(client));
+  // The copy served in the built index.html, when a build is present.
+  const index = new URL("../../../apps/web/build/client/index.html", import.meta.url);
+  if (existsSync(index)) {
+    const html = readFileSync(index, "utf8");
+    const served = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)]
+      .filter((match) => !/\bsrc=/.test(match[1]))
+      .map((match) => match[2])
+      .find((body) => body.includes("document.documentElement"));
+    assert.ok(served && nextThemes.matches(served));
+  }
+  // Markup is not mistaken for it.
+  assert.equal(
+    nextThemes.matches("<p>document.documentElement localStorage.getItem( prefers-color-scheme: dark</p>"),
+    false
+  );
 });

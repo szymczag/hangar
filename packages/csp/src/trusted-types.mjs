@@ -61,6 +61,29 @@ export const EDITOR_SANITIZE_CONFIG = Object.freeze({
   FORBID_ATTR: ["style"],
 });
 
+/**
+ * Library scripts that React renders again on the client through innerHTML.
+ * React creates such script elements so that they never execute; the copy
+ * that runs is the one served in the document, which the Content-Security-
+ * Policy allowed by hash or nonce. Their text is JavaScript, so comparing it
+ * with an HTML sanitizer only reports minified `<` comparisons as tags.
+ * Matched by shape rather than exact text: the served copy and the client
+ * copy are the same function minified differently.
+ */
+export const KNOWN_LIBRARY_SCRIPTS = Object.freeze([
+  {
+    // next-themes' anti-flash script: an IIFE over the root element that reads
+    // the stored theme and the colour-scheme media query.
+    name: "next-themes",
+    matches: (value) =>
+      /^\(\([\w$,]+\)=>\{let [\w$]+=document\.documentElement,[\w$]+=\[["'`]light["'`],["'`]dark["'`]\];/.test(value) &&
+      value.includes("localStorage.getItem(") &&
+      value.includes("prefers-color-scheme: dark"),
+  },
+]);
+
+const isKnownLibraryScript = (value) => KNOWN_LIBRARY_SCRIPTS.some((script) => script.matches(value));
+
 const trustedTypesApi = () => globalThis.trustedTypes;
 
 /**
@@ -116,6 +139,17 @@ export const installTrustedTypesPolicies = ({
   if (!api?.createPolicy || globalThis[INSTALLED]) return false;
   globalThis[INSTALLED] = true;
 
+  // Inline scripts the document was served with (the next-themes script, React
+  // Router's context). The Content-Security-Policy already authorized each by
+  // hash or nonce; when React renders the same text again through innerHTML,
+  // it is that script, not markup, and comparing it with an HTML sanitizer
+  // would report its minified `<` comparisons as tags.
+  const servedInlineScripts = new Set(
+    Array.from(globalThis.document?.scripts ?? [])
+      .filter((script) => !script.src)
+      .map((script) => script.textContent ?? "")
+  );
+
   const reported = new Set();
   const report = (finding, sink, sample) => {
     const key = `${finding}|${sink}|${sample.slice(0, 60)}`;
@@ -142,7 +176,8 @@ export const installTrustedTypesPolicies = ({
 
   let observing = false;
   const observeHTML = (value, sink) => {
-    if (observing || value.length > OBSERVE_MAX_LENGTH) return;
+    if (observing || value.length > OBSERVE_MAX_LENGTH || servedInlineScripts.has(value) || isKnownLibraryScript(value))
+      return;
     observing = true;
     try {
       const canonical = canonicalHTML(value);
@@ -161,7 +196,8 @@ export const installTrustedTypesPolicies = ({
   try {
     api.createPolicy("default", {
       createHTML: (value, _type, sink) => {
-        observeHTML(String(value), String(sink));
+        // ProseMirror calls the default policy directly, without a sink name.
+        observeHTML(String(value), sink ? String(sink) : "direct call");
         return value;
       },
       createScript: (value, _type, sink) => {

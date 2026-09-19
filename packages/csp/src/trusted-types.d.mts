@@ -22,3 +22,8 @@ export declare const installTrustedTypesPolicies: (options?: {
   sanitize?: (value: string) => string;
   send?: (url: string, body: string) => unknown;
 }) => boolean;
+
+export declare const KNOWN_LIBRARY_SCRIPTS: ReadonlyArray<{
+  readonly name: string;
+  readonly matches: (value: string) => boolean;
+}>;
