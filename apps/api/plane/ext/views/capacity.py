@@ -878,7 +878,6 @@ def _blocks_conflict(
     )
 
 
-
 def _schedule_conflict(*, issue, parsed_sessions, now):
     """The first collision in a proposed set of sessions, or None.
 
@@ -902,10 +901,7 @@ def _schedule_conflict(*, issue, parsed_sessions, now):
             )
             other_end = other["ends_at"] + timedelta(minutes=other["travel_after_minutes"])
             if other_start < end and other_end > start:
-                return (
-                    f"Sessions {other_position + 1} and {position + 1} put the same trainer "
-                    "in two places at once."
-                )
+                return f"Sessions {other_position + 1} and {position + 1} put the same trainer in two places at once."
 
     schedule = WorkshopSchedule.objects.filter(issue=issue).first()
     trainers = {
@@ -932,10 +928,7 @@ def _schedule_conflict(*, issue, parsed_sessions, now):
                 now=now,
                 excluding_schedule=schedule,
             ):
-                return (
-                    f"Session {position + 1} collides with something already booked for "
-                    f"{trainer.user.display_name}."
-                )
+                return f"Session {position + 1} collides with something already booked for {trainer.user.display_name}."
     return None
 
 
