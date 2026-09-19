@@ -1,7 +1,7 @@
 # Trusted Types: implementation plan
 
-Status: phases 0 (measurement), 1 (our own sinks) and 2 (policies, observing)
-done; phases 3 and 4 not started. See "Trusted Types measurement" in
+Status: phases 0 (measurement), 1 (our own sinks), 2 (policies, observing)
+and 3 (verification under enforcement) done; phase 4 not started. See "Trusted Types measurement" in
 content-security-policy.md.
 Measurements below come from the web build of
 `fix/rich-text-sanitizer-and-csp` (a bundle scan with source maps, and a
@@ -173,16 +173,30 @@ the sink. This also covers screens the probe did not visit.
   cycle. Each one is either a gap in `EDITOR_SANITIZE_CONFIG` (content that
   must survive) or the policy doing its job (content that must not).
 
-**Phase 3 — verify under enforcement (1 day).**
+**Phase 3 — verify under enforcement. Done.**
 
-- Turn the probe used for this plan into a committed Playwright spec (a
-  "security" project next to the visual suite, same stack, writes allowed)
-  that runs the editor, paste, markdown paste, tables, stickies, pages export,
-  published boards and the admin console with `require-trusted-types-for`
-  **enforced**, and fails on any violation.
-- A bundle contract test (the source-map scan used here) lists every sink in the
-  built bundles and fails when a new one appears that the inventory does not
-  name. The inventory is then a reviewed file, not a document that goes stale.
+- Bundle contract: `hangar-bundle-sinks` (`packages/csp/src/bundle-sinks.mjs`)
+  scans the built web, admin and space bundles through hidden source maps
+  (`HANGAR_BUNDLE_SOURCEMAPS=1`) and fails when a sink appears that
+  `packages/csp/bundle-sinks/<app>.json` does not name, or when a named one
+  disappears. Each entry carries a reviewed reason; `--update` rewrites the
+  file for review. It runs in the web-apps pull-request workflow.
+- Security suite: `apps/visual-tests/security/` runs on the visual suite's
+  stack, after it (`pnpm vr`), because it writes. Every document gets the
+  policy its build generated plus `require-trusted-types-for 'script'`,
+  both **enforced**. Covered: the rich-text editor (stored table, palette
+  colours, alignment, typing, a shortcut, markdown paste, two hostile pastes,
+  saving through the API), a comment, a sticky, the workspace home and the
+  instance console. A test fails on any violation, any Trusted Types error in
+  the page, a missing default policy, and any default-policy observation
+  except the hostile pastes' `onerror`/`onload`. A failed test attaches what
+  the page reported, so a page that never renders says whether the policy
+  stopped it.
+- Mutation check: removing `default` from the enforced `trusted-types` list
+  fails all five tests, with the refused policy in the diagnostics.
+- Not covered: published boards (space) and pages (`live`), which the visual
+  stack does not run, and the PDF export. They stay under the report-only
+  measurement until the stack grows them.
 
 **Phase 4 — enforce.** Move the two directives from the report-only header to
 the enforced policy once the CSP itself is enforced and a release cycle has
