@@ -1,7 +1,8 @@
 # Trusted Types: implementation plan
 
-Status: phase 0 (measurement) shipped; phases 1–4 not started. See
-"Trusted Types measurement" in content-security-policy.md. Measurements below come from the web build of
+Status: phase 0 (measurement) and phase 1 (our own sinks) done; phases 2–4
+not started. See "Trusted Types measurement" in content-security-policy.md.
+Measurements below come from the web build of
 `fix/rich-text-sanitizer-and-csp` (a bundle scan with source maps, and a
 Chromium session with `require-trusted-types-for 'script'` in report-only mode
 while editing a work item).
@@ -130,18 +131,22 @@ report-only policy, in both the nginx template and space. Ship with the current
 report-only rollout. Violations reach `/api/csp-report/` with a `sample` naming
 the sink. This also covers screens the probe did not visit.
 
-**Phase 1 — remove our own sinks (1–2 days).**
+**Phase 1 — remove our own sinks. Done.**
 
-- Replace the constant-SVG `innerHTML` (#1, #2) with a small `createIcon(name)`
-  helper that builds `<svg>` with `document.createElementNS`, generated from the
-  existing icon constants (or rendered as the lucide/propel components where
-  the node view is React).
-- Add `parseInertHTML()` to `packages/utils` and route every `DOMParser` use of
-  ours through it (#3). A lint rule (oxlint `no-restricted-syntax` on
-  `DOMParser`, `innerHTML` assignment, `insertAdjacentHTML`, `outerHTML`)
-  forbids new direct uses outside that helper.
-- Rewrite the export code-block conversion (#4) with `textContent` and `<br>`
-  elements.
+- The constant-SVG `innerHTML` (#1, #2) is gone: `createSvgIcon` in
+  `packages/editor/src/core/helpers/svg-icon.ts` builds the icons with
+  `createElementNS`. The drag handle and both table insert buttons were
+  compared against screenshots taken before the change: zero differing pixels.
+- Every `DOMParser` of ours goes through `parseInertHTML` in `@plane/utils`
+  (#3), now the only sink in our code.
+- The export code-block conversion (#4) was in a function nothing called any
+  more (the browser PDF renderer moved to the live server); the function was
+  removed rather than rewritten.
+- Instead of a lint rule (oxlint has none that matches an `innerHTML`
+  assignment), `packages/csp/tests/dom-sinks.test.mjs` scans the sources and
+  fails on any Trusted Types sink outside `parseInertHTML`.
+- After it, an editor session reports only library sinks and
+  `parseInertHTML`'s `DOMParser`.
 
 **Phase 2 — policies (1–2 days).**
 
