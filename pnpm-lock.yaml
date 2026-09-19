@@ -459,6 +459,9 @@ catalogs:
     smooth-scroll-into-view-if-needed:
       specifier: ^2.0.2
       version: 2.0.2
+    source-map-js:
+      specifier: 1.2.1
+      version: 1.2.1
     storybook:
       specifier: 10.4.6
       version: 10.4.6
@@ -1303,6 +1306,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.12.0
+      source-map-js:
+        specifier: 'catalog:'
+        version: 1.2.1
 
   packages/decorators:
     devDependencies:

@@ -124,6 +124,26 @@ jobs:
             pnpm turbo run build --affected
           fi
 
+      # Trusted Types bundle contract (docs/trusted-types-plan.md, phase 3).
+      # Every DOM sink Trusted Types guards, in each built frontend, is mapped
+      # through hidden source maps to the package or file it came from and
+      # compared with the reviewed inventory in packages/csp/bundle-sinks/. A
+      # dependency upgrade that brings a new sink fails here instead of in a
+      # browser once the policy is enforced. Always all three apps, not
+      # --affected: a lockfile change is exactly the case this exists for. The
+      # source-map build has its own cache key (HANGAR_BUNDLE_SOURCEMAPS is in
+      # turbo's globalEnv) and never reaches an image.
+      - name: Check Trusted Types sinks in the bundles
+        env:
+          HANGAR_BUNDLE_SOURCEMAPS: "1"
+        run: |
+          pnpm turbo run build --filter=web --filter=admin --filter=space
+          for app in web admin space; do
+            node packages/csp/bin/bundle-sinks.mjs \
+              --assets "apps/$app/build/client/assets" \
+              --inventory "packages/csp/bundle-sinks/$app.json"
+          done
+
       # Nothing had ever run either Storybook -- no workflow, no turbo task, no
       # chromatic -- which is why `packages/ui`'s could sit broken indefinitely,
       # importing a stylesheet that no longer existed. Repairing it without

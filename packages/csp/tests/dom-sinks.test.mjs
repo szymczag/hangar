@@ -27,6 +27,8 @@ const ALLOWED = new Map([
   // The policy module compares what DOMPurify would produce with the value's
   // own serialization, which needs one inert parse of its own.
   ["packages/csp/src/trusted-types.mjs", ["new DOMParser"]],
+  // The bundle scanner names the sink in its pattern list; it does not use it.
+  ["packages/csp/src/bundle-sinks.mjs", ["dangerouslySetInnerHTML"]],
 ]);
 
 const SINKS = [

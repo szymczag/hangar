@@ -5,6 +5,7 @@
   "description": "Content-Security-Policy owned by the frontends",
   "license": "AGPL-3.0",
   "bin": {
+    "hangar-bundle-sinks": "./bin/bundle-sinks.mjs",
     "hangar-csp-nginx": "./bin/nginx-headers.mjs"
   },
   "type": "module",
@@ -32,6 +33,7 @@
     "dompurify": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "source-map-js": "catalog:"
   }
 }
