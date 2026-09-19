@@ -50,6 +50,27 @@ class TestCspReportEndpoint:
         record = next(r for r in caplog.records if r.name == "plane.security.csp")
         assert record.csp_report["effective-directive"] == "style-src-attr"
 
+    def test_trusted_types_report_keeps_the_sink(self, caplog):
+        with caplog.at_level("WARNING", logger="plane.security.csp"):
+            APIClient().post(
+                REPORT_URL,
+                report(
+                    **{
+                        "effective-directive": "require-trusted-types-for",
+                        "blocked-uri": "trusted-types-sink",
+                        "disposition": "report",
+                        "script-sample": "Element innerHTML|<svg xmlns=",
+                        "column-number": 1793,
+                    }
+                ),
+                content_type="application/csp-report",
+            )
+
+        fields = next(r for r in caplog.records if r.name == "plane.security.csp").csp_report
+        assert fields["script-sample"] == "Element innerHTML|<svg xmlns="
+        assert fields["disposition"] == "report"
+        assert fields["column-number"] == "1793"
+
     def test_only_post(self):
         assert APIClient().get(REPORT_URL).status_code == 405
 

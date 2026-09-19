@@ -32,8 +32,13 @@ CSP_REPORT_FIELDS = (
     "effective-directive",
     "violated-directive",
     "blocked-uri",
+    "disposition",
     "source-file",
     "line-number",
+    "column-number",
+    # For Trusted Types the sample names the sink ("Element innerHTML|<p>…"),
+    # which is what docs/trusted-types-plan.md needs from these reports.
+    "script-sample",
 )
 
 csp_logger = logging.getLogger("plane.security.csp")
