@@ -4,7 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import useSWR from "swr";
 import { Button } from "@plane/propel/button";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
@@ -16,6 +17,8 @@ import { CapacityService } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
 import { ScheduleEditor } from "../shared/schedule-editor";
 import { useCapacityData } from "../shared/use-capacity-data";
+import { formatLayerParam, parseLayerParam } from "../shared/capacity-timeline.utils";
+import { LayerFilter } from "./layer-filter";
 import { TrainingEventLinks } from "./training-event-links";
 import { TrainingRules } from "./training-rules";
 import { TeamWorkload } from "./team-workload";
@@ -45,6 +48,22 @@ export default function TeamCapacityPage({ params }: Route.ComponentProps) {
 
   const data = useCapacityData(workspaceSlug, featureEnabled);
   const [editingTrainerId, setEditingTrainerId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // In the URL rather than in state, like the week beside it: "here is the
+  // week, showing only training" is a thing somebody pastes into a message.
+  const layers = useMemo(() => parseLayerParam(searchParams.get("layers")), [searchParams]);
+  const setLayers = (next: Parameters<typeof formatLayerParam>[0]) =>
+    setSearchParams(
+      (previous) => {
+        const updated = new URLSearchParams(previous);
+        const value = formatLayerParam(next);
+        if (value) updated.set("layers", value);
+        else updated.delete("layers");
+        return updated;
+      },
+      { replace: true, preventScrollReset: true }
+    );
 
   const { data: ownProfile, mutate: mutateOwnProfile } = useSWR(
     featureEnabled ? ["capacity-trainer-self", workspaceSlug] : null,
@@ -62,7 +81,10 @@ export default function TeamCapacityPage({ params }: Route.ComponentProps) {
     <div className="h-full overflow-y-auto bg-surface-2">
       <PageHead title="Team capacity" />
       <div className="mx-auto flex max-w-[1440px] flex-col gap-5 p-4 md:p-6">
+        <LayerFilter layers={layers} onChange={setLayers} />
+
         <CapacityLedger
+          layers={layers}
           data={data}
           isAdmin={isAdmin}
           ownProfile={ownProfile}
@@ -70,7 +92,7 @@ export default function TeamCapacityPage({ params }: Route.ComponentProps) {
           becomeTrainer={null}
         />
 
-        <TeamWorkload trainers={data.capacity?.trainers ?? []} />
+        <TeamWorkload trainers={data.capacity?.trainers ?? []} layers={layers} />
         <TrainingEventLinks
           workspaceSlug={workspaceSlug}
           trainer={data.capacity?.trainers.find((trainer) => trainer.trainer_id === ownProfile?.user_id)}

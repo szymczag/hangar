@@ -562,7 +562,17 @@ class WorkspaceCapacityEndpoint(BaseAPIView):
                 "from": start.isoformat(),
                 "to": end.isoformat(),
                 "trainers": calculate_workspace_capacity(
-                    workspace=workspace, viewer=request.user, start=start, end=end, trainer_ids=trainer_ids
+                    workspace=workspace,
+                    viewer=request.user,
+                    start=start,
+                    end=end,
+                    trainer_ids=trainer_ids,
+                    # Resolved here, where the request is, rather than inside the
+                    # calculation: a title belongs to the trainer's calendar, so
+                    # only an administrator or that trainer may read it.
+                    may_read_titles=WorkspaceMember.objects.filter(
+                        workspace=workspace, member=request.user, role=20, is_active=True
+                    ).exists(),
                 ),
             }
         )

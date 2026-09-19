@@ -266,7 +266,40 @@ def _serialize_interval(start, end, kind, **extra):
     return {"start": start.isoformat(), "end": end.isoformat(), "kind": kind, **extra}
 
 
-def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=None):
+
+def _recorded_titles(workspace_id, trainer_ids, start, end):
+    """Titles for recognized training, read from the record rather than Google.
+
+    The live path deliberately never asks Google for event summaries, so that no
+    title can reach its five-minute cache or any of its responses. The sweep
+    does ask, for events that already matched a rule, and stores them encrypted.
+
+    Joining on `event_key` is what lets the ledger name a training without
+    widening the live read: the key the live path computes and the key the sweep
+    stored are the same HMAC, by construction. A window the sweep has not
+    reached simply yields nothing, and the interval keeps its generic label.
+    """
+    from plane.ext.capacity.crypto import decrypt_value
+    from plane.ext.models import TrainingEventOccurrence
+
+    rows = TrainingEventOccurrence.objects.filter(
+        workspace_id=workspace_id,
+        trainer_id__in=trainer_ids,
+        state=TrainingEventOccurrence.State.ACTIVE,
+        starts_at__lt=end,
+        ends_at__gt=start,
+    ).exclude(encrypted_summary="").values_list("trainer_id", "event_key", "encrypted_summary", "encryption_key_id")
+
+    titles = {}
+    for trainer_id, event_key, encrypted, key_id in rows:
+        try:
+            titles[(trainer_id, event_key)] = decrypt_value(encrypted, key_id)
+        except Exception:  # noqa: BLE001 - an unreadable title is not worth failing a ledger over
+            continue
+    return titles
+
+
+def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=None, may_read_titles=False):
     trainers = (
         TrainerProfile.objects.filter(workspace=workspace, status=TrainerProfile.Status.ACTIVE)
         .select_related("user")
@@ -303,6 +336,12 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
     visible_projects = set(
         ProjectMember.objects.filter(member=viewer, is_active=True).values_list("project_id", flat=True)
     )
+    viewer_id = getattr(viewer, "id", None)
+    titles = (
+        _recorded_titles(workspace.id, [trainer.user_id for trainer in trainers], start, end)
+        if trainers
+        else {}
+    )
     output = []
     for trainer in trainers:
         working = _working_intervals(trainer, start, end)
@@ -318,7 +357,18 @@ def calculate_workspace_capacity(*, workspace, viewer, start, end, trainer_ids=N
         unavailable = _intersections(working, combined_busy)
         intervals = [_serialize_interval(a, b, "working") for a, b in working]
         intervals.extend(_serialize_interval(a, b, "google_busy") for a, b in google_busy)
-        intervals.extend(_serialize_interval(a, b, "google_training") for a, b in event_intervals)
+        for event in events:
+            # The title is shown only to somebody already entitled to it: a
+            # workspace administrator, or the trainer looking at their own week.
+            title = titles.get((trainer.user_id, event["key"])) if may_read_titles or viewer_id == trainer.user_id else None
+            intervals.append(
+                _serialize_interval(
+                    datetime.fromisoformat(event["start"]),
+                    datetime.fromisoformat(event["end"]),
+                    "google_training",
+                    summary=title,
+                )
+            )
         for block_start, block_end, schedule in workshop_records:
             work_item = None
             if schedule.project_id in visible_projects:

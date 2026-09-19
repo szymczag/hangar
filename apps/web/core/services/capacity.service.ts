@@ -25,6 +25,8 @@ export type TCapacityInterval = {
   end: string;
   kind: "working" | "google_busy" | "google_training" | "workshop" | "workshop_hold";
   work_item?: { id: string; name: string; project_id: string } | null;
+  /** Recorded training title, when the viewer is entitled to read it. */
+  summary?: string | null;
 };
 export type TTrainerCapacity = {
   trainer_id: string;
