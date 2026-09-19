@@ -1,7 +1,8 @@
 # Trusted Types: implementation plan
 
-Status: phase 0 (measurement) and phase 1 (our own sinks) done; phases 2–4
-not started. See "Trusted Types measurement" in content-security-policy.md.
+Status: phases 0 (measurement), 1 (our own sinks) and 2 (policies, observing)
+done; phases 3 and 4 not started. See "Trusted Types measurement" in
+content-security-policy.md.
 Measurements below come from the web build of
 `fix/rich-text-sanitizer-and-csp` (a bundle scan with source maps, and a
 Chromium session with `require-trusted-types-for 'script'` in report-only mode
@@ -148,15 +149,29 @@ the sink. This also covers screens the probe did not visit.
 - After it, an editor session reports only library sinks and
   `parseInertHTML`'s `DOMParser`.
 
-**Phase 2 — policies (1–2 days).**
+**Phase 2 — policies. Done, in observe mode.**
 
-- `packages/csp/src/trusted-types.ts` with the policies above; DOMPurify as a
-  dependency of `@plane/csp` (it is TT-aware and maintained).
-- Install from the three existing `entry.client.tsx` files, as their first
-  statement.
-- Unit tests: each allowlisted constant is matched against the installed
-  library (like the Base UI style test), DOMPurify config round-trips the
-  editor's HTML unchanged, unknown input is sanitized and reported.
+- `@plane/csp/trusted-types` creates `hangar-inert` (used by `parseInertHTML`)
+  and `default`; the three client entries install them before React renders.
+  The header names `hangar-inert default dompurify`.
+- The design above assumed the default policy could sanitize from the start.
+  It cannot, safely: the browser calls the default policy even while the
+  header is report-only, and what the policy returns is what reaches the DOM.
+  So in this phase it **observes**: it returns every value unchanged and
+  reports only when DOMPurify with `EDITOR_SANITIZE_CONFIG` would have changed
+  it (`effective-directive: trusted-types-default-policy`,
+  `violated-directive: html-would-change`). Script and cross-origin script-URL
+  sinks are reported as they come.
+- next-themes' script, which React re-renders on the client through
+  `innerHTML` without executing it, is recognised by shape instead of being
+  compared as HTML (`KNOWN_LIBRARY_SCRIPTS`).
+- Measured in Chromium with the production headers: no Trusted Types
+  violation remains (every library sink goes through the default policy), and
+  an editor session with ordinary content produces no observation; a hostile
+  paste produces one (`onerror` would be removed).
+- What phase 4 needs from production: observations collected over a release
+  cycle. Each one is either a gap in `EDITOR_SANITIZE_CONFIG` (content that
+  must survive) or the policy doing its job (content that must not).
 
 **Phase 3 — verify under enforcement (1 day).**
 

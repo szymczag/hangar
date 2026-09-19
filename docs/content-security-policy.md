@@ -123,6 +123,15 @@ reports with the sink in `script-sample` (for example
 `line-number` and `column-number`. Together they are the inventory that the
 next phases replace sink by sink.
 
+The frontends also install Trusted Types policies (`@plane/csp/trusted-types`).
+With them in place, library code no longer triggers the browser's reports;
+instead the `default` policy observes each HTML string passing through it,
+returns it unchanged, and reports only the ones DOMPurify would have changed.
+Those arrive in the same log with `effective-directive` set to
+`trusted-types-default-policy`, `violated-directive` to `html-would-change`,
+`script` or `script-url`, and the part that would change in `script-sample`.
+An ordinary editing session produces none.
+
 `HANGAR_CSP_TRUSTED_TYPES=off` (`contentSecurityPolicy.trustedTypes: off`)
 removes the header, for example if the report volume is unwelcome. Reports
 share the per-client rate limit of the report endpoint.
