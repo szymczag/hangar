@@ -120,3 +120,15 @@ Session updates accept each existing session's `id` and preserve that row, its p
 origin and invitation links, including when sessions are reordered. IDs must be
 unique and belong to the edited Workshop. Removing a session removes its links;
 legacy clients that omit IDs retain the replace-all behavior.
+
+Reservations and saved plans are capped per person per workspace
+(`CAPACITY_MAX_ACTIVE_HOLDS_PER_USER`, default ten; `CAPACITY_MAX_PLAN_DRAFTS_PER_USER`,
+default fifty). A reservation removes a trainer's time from circulation for
+seventy-two hours, so the number one person may hold at once is a direct limit
+on everybody else's ability to book, and nothing bounded it before. Expired
+reservations hold nothing and do not count.
+
+Taking or spending a reservation is throttled with the same limits as the
+capacity ledger, and shares its budget on purpose: both read Google before
+deciding anything, so a caller who only ever receives conflicts still spends the
+quota the ledger's throttle exists to protect.

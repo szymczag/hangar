@@ -699,6 +699,22 @@ class WorkshopPlanDraftListEndpoint(BaseAPIView):
         if response := _disabled():
             return response
         workspace = Workspace.objects.get(slug=slug)
+        # Each draft can carry a reservation, so an unbounded number of drafts is
+        # an unbounded number of ways to take a trainer's time out of
+        # circulation. The saved-plan list only ever showed fifty of them.
+        if (
+            WorkshopPlanDraft.objects.filter(workspace=workspace, owner=request.user).count()
+            >= settings.CAPACITY_MAX_PLAN_DRAFTS_PER_USER
+        ):
+            return Response(
+                {
+                    "error": (
+                        "You have as many saved plans as this workspace allows. "
+                        "Delete one you no longer need."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         values, error = _validate_draft(request, workspace)
         if error:
             return error
@@ -853,7 +869,17 @@ def _blocks_conflict(*, workspace, trainer, blocked_start, blocked_end, now, exc
 
 
 class WorkshopPlanHoldEndpoint(BaseAPIView):
+    """Reserving a trainer for seventy-two hours.
+
+    Throttled with the ledger's own classes, deliberately sharing its budget.
+    `booking_preflight` forces a fresh Google read *before* the conflict check,
+    so a caller who only ever gets 409s still spends the quota the ledger
+    throttle exists to protect -- leaving this endpoint unthrottled was a way
+    around it.
+    """
+
     authentication_classes = [CsrfEnforcedSessionAuthentication]
+    throttle_classes = [CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle]
 
     @staticmethod
     def _draft(request, slug, draft_id):
@@ -912,6 +938,30 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
             status=WorkshopPlanHold.Status.ACTIVE,
             expires_at__lte=now,
         ).update(status=WorkshopPlanHold.Status.RELEASED, updated_by=request.user)
+        # Count after the sweep above, so expired reservations do not count
+        # against anybody. A reservation removes a trainer's time for seventy-two
+        # hours, so how many one person may hold at once is a direct limit on
+        # everybody else's ability to book -- and nothing bounded it before.
+        held = (
+            WorkshopPlanHold.objects.filter(
+                workspace=draft.workspace,
+                draft__owner=request.user,
+                status=WorkshopPlanHold.Status.ACTIVE,
+                expires_at__gt=now,
+            )
+            .exclude(draft=draft)
+            .count()
+        )
+        if held >= settings.CAPACITY_MAX_ACTIVE_HOLDS_PER_USER:
+            return Response(
+                {
+                    "error": (
+                        "You are already holding as much trainer time as this workspace allows. "
+                        "Release a reservation before taking another."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         conflict = _blocks_conflict(
             workspace=draft.workspace,
             trainer=trainer,
@@ -1024,7 +1074,9 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
     slot rather than losing the one they had.
     """
 
+    # Same reasoning as the hold endpoint: its preflight reads Google first.
     authentication_classes = [CsrfEnforcedSessionAuthentication]
+    throttle_classes = [CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle]
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     @booking_preflight(scheduling=True)
