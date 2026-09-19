@@ -15,7 +15,11 @@
       "types": "./src/index.d.mts",
       "default": "./src/index.mjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./trusted-types": {
+      "types": "./src/trusted-types.d.mts",
+      "default": "./src/trusted-types.mjs"
+    }
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
@@ -23,6 +27,9 @@
     "check:format": "oxfmt --check .",
     "fix:lint": "oxlint --fix .",
     "fix:format": "oxfmt ."
+  },
+  "dependencies": {
+    "dompurify": "catalog:"
   },
   "devDependencies": {
     "@plane/propel": "workspace:*",

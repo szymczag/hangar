@@ -22,7 +22,12 @@ const SOURCE = /\.(ts|tsx|js|jsx|mjs)$/;
 
 // The one sink our code is allowed. Phase 2 gives it the only Trusted Types
 // policy our code needs.
-const ALLOWED = new Map([["packages/utils/src/inert-html.ts", ["new DOMParser"]]]);
+const ALLOWED = new Map([
+  ["packages/utils/src/inert-html.ts", ["new DOMParser"]],
+  // The policy module compares what DOMPurify would produce with the value's
+  // own serialization, which needs one inert parse of its own.
+  ["packages/csp/src/trusted-types.mjs", ["new DOMParser"]],
+]);
 
 const SINKS = [
   ["innerHTML assignment", /\.innerHTML\s*[+]?=(?!=)/],
@@ -73,5 +78,5 @@ test("DOM sinks that Trusted Types guards appear only in parseInertHTML", () => 
       `or parse through parseInertHTML from @plane/utils. See docs/trusted-types-plan.md.\n${found.join("\n")}`
   );
   // The allowance must still be needed; an unused one is a stale exception.
-  assert.deepEqual([...allowedSeen], [...ALLOWED.keys()]);
+  assert.deepEqual([...allowedSeen].toSorted(), [...ALLOWED.keys()].toSorted());
 });
