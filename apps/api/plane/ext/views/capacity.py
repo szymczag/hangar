@@ -707,12 +707,7 @@ class WorkshopPlanDraftListEndpoint(BaseAPIView):
             >= settings.CAPACITY_MAX_PLAN_DRAFTS_PER_USER
         ):
             return Response(
-                {
-                    "error": (
-                        "You have as many saved plans as this workspace allows. "
-                        "Delete one you no longer need."
-                    )
-                },
+                {"error": ("You have as many saved plans as this workspace allows. Delete one you no longer need.")},
                 status=status.HTTP_409_CONFLICT,
             )
         values, error = _validate_draft(request, workspace)

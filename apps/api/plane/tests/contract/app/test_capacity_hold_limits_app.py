@@ -82,7 +82,11 @@ def test_an_expired_reservation_does_not_count_against_the_allowance(capacity, w
     TrainerProfile.objects.create(workspace=workspace, user=create_user)
     now = datetime.now(timezone.utc)
     draft = WorkshopPlanDraft.objects.create(
-        workspace=workspace, owner=create_user, title="Old plan", duration_minutes=240, trainer_ids=[str(create_user.id)]
+        workspace=workspace,
+        owner=create_user,
+        title="Old plan",
+        duration_minutes=240,
+        trainer_ids=[str(create_user.id)],
     )
     WorkshopPlanHold.objects.create(
         draft=draft,
