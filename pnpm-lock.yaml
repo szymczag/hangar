@@ -621,6 +621,9 @@ importers:
       '@plane/constants':
         specifier: workspace:*
         version: link:../../packages/constants
+      '@plane/csp':
+        specifier: workspace:*
+        version: link:../../packages/csp
       '@plane/hooks':
         specifier: workspace:*
         version: link:../../packages/hooks
@@ -685,9 +688,6 @@ importers:
         specifier: 14.0.0
         version: 14.0.0
     devDependencies:
-      '@plane/csp':
-        specifier: workspace:*
-        version: link:../../packages/csp
       '@plane/tailwind-config':
         specifier: workspace:*
         version: link:../../packages/tailwind-config
@@ -1075,6 +1075,9 @@ importers:
       '@plane/constants':
         specifier: workspace:*
         version: link:../../packages/constants
+      '@plane/csp':
+        specifier: workspace:*
+        version: link:../../packages/csp
       '@plane/editor':
         specifier: workspace:*
         version: link:../../packages/editor
@@ -1205,9 +1208,6 @@ importers:
         specifier: 14.0.0
         version: 14.0.0
     devDependencies:
-      '@plane/csp':
-        specifier: workspace:*
-        version: link:../../packages/csp
       '@plane/tailwind-config':
         specifier: workspace:*
         version: link:../../packages/tailwind-config

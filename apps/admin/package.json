@@ -24,6 +24,7 @@
     "@fontsource/material-symbols-rounded": "catalog:",
     "@headlessui/react": "catalog:",
     "@plane/constants": "workspace:*",
+    "@plane/csp": "workspace:*",
     "@plane/hooks": "workspace:*",
     "@plane/propel": "workspace:*",
     "@plane/services": "workspace:*",
@@ -47,7 +48,6 @@
     "uuid": "catalog:"
   },
   "devDependencies": {
-    "@plane/csp": "workspace:*",
     "@plane/tailwind-config": "workspace:*",
     "@plane/typescript-config": "workspace:*",
     "@react-router/dev": "catalog:",
