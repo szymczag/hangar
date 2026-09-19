@@ -15,6 +15,7 @@
     "web": "workspace:*"
   },
   "devDependencies": {
+    "@plane/csp": "workspace:*",
     "@plane/typescript-config": "workspace:*",
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",

@@ -368,6 +368,24 @@ try {
     }
   } else {
     runSuite("run");
+    // The security suite (apps/visual-tests/security): the application with its
+    // Content-Security-Policy and Trusted Types enforced. After the visual suite
+    // and only once, never in a soak: it writes (work items, comments,
+    // stickies), which would change what the visual suite photographs.
+    run(composeBin, [
+      ...composeArgs,
+      "-f",
+      COMPOSE_FILE,
+      "run",
+      "--rm",
+      "--no-deps",
+      "vr-playwright",
+      "npx",
+      "playwright",
+      "test",
+      "-c",
+      "security/playwright.config.ts",
+    ]);
   }
 } finally {
   // Cleanup must not decide the outcome. podman is prone to a non-zero exit

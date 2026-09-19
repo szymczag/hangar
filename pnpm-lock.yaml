@@ -1033,6 +1033,9 @@ importers:
         specifier: workspace:*
         version: link:../web
     devDependencies:
+      '@plane/csp':
+        specifier: workspace:*
+        version: link:../../packages/csp
       '@plane/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config

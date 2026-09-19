@@ -1,0 +1,121 @@
+/**
+ * Copyright (c) 2026-present Maciej Szymczak and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
+import { readFileSync } from "node:fs";
+import { expect, type BrowserContext, type Page, type TestInfo } from "@playwright/test";
+import { TRUSTED_TYPES_MEASUREMENT } from "@plane/csp";
+
+type TViolation = { directive: string; disposition: string; blocked: string; sample: string; source: string };
+export type TObservation = Record<string, string>;
+
+/**
+ * The policy a frontend image sends, from the template its build produced,
+ * with the deployment variables at their same-origin defaults.
+ */
+const builtPolicy = (app: "web" | "admin") =>
+  /add_header \$\{HANGAR_CSP_HEADER\} "([^"]+)"/
+    .exec(
+      readFileSync(new URL(`../../../${app}/build/csp/security-headers.conf.template`, import.meta.url), "utf8")
+    )![1]
+    .replace("${HANGAR_CSP_FRAME_SRC}", "'none'")
+    .replace(/\$\{HANGAR_CSP_[A-Z_]+\}/g, "");
+
+/**
+ * Enforces, on every document the context loads, the application's policy and
+ * Trusted Types (the measurement policy's directives, enforced instead of
+ * reported). Both go in one header, as two comma-separated policies.
+ */
+export async function enforceContentSecurityPolicy(context: BrowserContext) {
+  const policies = { web: builtPolicy("web"), admin: builtPolicy("admin") };
+  await context.route("**/*", async (route) => {
+    const request = route.request();
+    if (request.resourceType() !== "document") return route.fallback();
+    const app = new URL(request.url()).pathname.startsWith("/god-mode") ? "admin" : "web";
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      headers: { ...response.headers(), "content-security-policy": `${policies[app]}, ${TRUSTED_TYPES_MEASUREMENT}` },
+    });
+  });
+  await context.addInitScript(() => {
+    const store: unknown[] = [];
+    (window as unknown as { __cspViolations: unknown[] }).__cspViolations = store;
+    document.addEventListener("securitypolicyviolation", (event) => {
+      store.push({
+        directive: event.effectiveDirective,
+        disposition: event.disposition,
+        blocked: event.blockedURI,
+        sample: event.sample,
+        source: `${event.sourceFile}:${event.lineNumber}:${event.columnNumber}`,
+      });
+    });
+  });
+}
+
+const isPolicyError = (text: string) => /Trusted ?Type|TrustedHTML|TrustedScript|Content Security Policy/i.test(text);
+
+const readViolations = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __cspViolations?: TViolation[] }).__cspViolations ?? []);
+
+// What the page reported so far, attached to a failed test: a page that never
+// renders has to say whether the policy stopped it or it was only slow.
+const diagnostics = new WeakMap<Page, () => Record<string, unknown>>();
+
+export async function attachDiagnostics(page: Page, testInfo: TestInfo) {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const collected = diagnostics.get(page)?.() ?? {};
+  const violations = await readViolations(page).catch((error: Error) => `unreadable: ${error.message}`);
+  await testInfo.attach("csp-diagnostics", {
+    body: JSON.stringify({ url: page.url(), violations, ...collected }, null, 2),
+    // Plain text, which the list reporter prints: CI logs show it inline.
+    contentType: "text/plain",
+  });
+}
+
+/** What a page reports while it is used. */
+export function watch(page: Page) {
+  const policyErrors: string[] = [];
+  const observations: TObservation[] = [];
+  const pageErrors: string[] = [];
+  const failedRequests: string[] = [];
+  diagnostics.set(page, () => ({ policyErrors, observations, pageErrors, failedRequests }));
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+    if (isPolicyError(error.message)) policyErrors.push(`pageerror: ${error.message}`);
+  });
+  page.on("requestfailed", (request) => {
+    failedRequests.push(`${request.failure()?.errorText ?? "failed"} ${request.url()}`);
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error" && isPolicyError(message.text())) policyErrors.push(message.text());
+  });
+  page.on("request", (request) => {
+    if (!request.url().includes("/api/csp-report/")) return;
+    try {
+      const report = JSON.parse(request.postData() ?? "{}")["csp-report"] ?? {};
+      if (report["effective-directive"] === "trusted-types-default-policy") observations.push(report);
+    } catch {
+      observations.push({ unparsed: request.postData() ?? "" });
+    }
+  });
+  return {
+    observations,
+    /** No violation, enforced or reported, and no Trusted Types error. */
+    async expectClean() {
+      const violations = await readViolations(page);
+      expect(violations, "Content-Security-Policy / Trusted Types violations").toEqual([]);
+      expect(policyErrors, "Trusted Types or CSP errors in the page").toEqual([]);
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as { trustedTypes?: { defaultPolicy?: { name: string } } }).trustedTypes?.defaultPolicy
+              ?.name
+        ),
+        "the default Trusted Types policy is installed"
+      ).toBe("default");
+    },
+  };
+}

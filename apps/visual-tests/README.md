@@ -233,6 +233,26 @@ the secret-field behaviour into the _shared_ console form components (FORK.md
 rows 27, 35, 51), so a regression there lands on an upstream page as readily as
 on OIDC or SAML.
 
+## The security suite
+
+`security/` is a second Playwright project on the same stack. It serves every
+document with the Content-Security-Policy its build generated plus
+`require-trusted-types-for 'script'`, both enforced, and fails on any
+violation, any Trusted Types error in the page, and any report from the
+observing default policy that it does not expect (docs/trusted-types-plan.md,
+phase 3). `pnpm vr` runs it once, after the visual suite, because it writes:
+work items, comments and stickies would otherwise appear in screenshots. It is
+not part of the soak. To iterate on it with the stack up:
+
+```bash
+podman-compose -f docker-compose-visual.yml run --rm --no-deps vr-playwright \
+  npx playwright test -c security/playwright.config.ts
+```
+
+A failed test prints `csp-diagnostics`: the violations, page errors and failed
+requests the page produced, so a page that never renders says whether the
+policy stopped it or it was only slow.
+
 ## Scope
 
 Light theme for everything; dark only where a story uses a semantic token no
