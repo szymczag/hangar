@@ -95,6 +95,7 @@ All variables are optional.
 | `HANGAR_CSP_FRAME_SRC`         | `'none'`           | Origins that may be framed inside the application, such as a changelog page.                                                            |
 | `HANGAR_CSP_FORM_ACTION`       | –                  | Extra form targets, for an API on another origin.                                                                                       |
 | `HANGAR_SPACE_FRAME_ANCESTORS` | `'self'`           | space only: who may embed a published board.                                                                                            |
+| `HANGAR_CSP_TRUSTED_TYPES`     | `report`           | `report` sends the Trusted Types measurement below; `off` removes it. There is no enforcing value.                                      |
 
 The Helm chart sets these from `contentSecurityPolicy.*` in `values.yaml` and adds
 the object-storage origin itself. With Caddy (`apps/proxy/Caddyfile.ce`)
@@ -103,6 +104,28 @@ everything, object storage included, is same-origin and nothing needs to be set.
 A reverse proxy in front of Hangar should not add a Content-Security-Policy of
 its own. A browser enforces every policy it receives, so a second one can only
 narrow this one or conflict with it.
+
+## Trusted Types measurement
+
+Next to the policy above, every document response carries a second policy that
+is **always** report-only, whatever `HANGAR_CSP_REPORT_ONLY` says:
+
+```
+Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types 'none'; report-uri /api/csp-report/
+```
+
+It is phase 0 of [trusted-types-plan.md](trusted-types-plan.md). The browser
+reports each place where a plain string reaches a DOM sink that Trusted Types
+would guard (`innerHTML`, `DOMParser`, script text …), and each attempt to
+create a policy, but blocks nothing and changes no behaviour. The API logs the
+reports with the sink in `script-sample` (for example
+`Element innerHTML|<svg xmlns=…`) and the location in `source-file`,
+`line-number` and `column-number`. Together they are the inventory that the
+next phases replace sink by sink.
+
+`HANGAR_CSP_TRUSTED_TYPES=off` (`contentSecurityPolicy.trustedTypes: off`)
+removes the header, for example if the report volume is unwelcome. Reports
+share the per-client rate limit of the report endpoint.
 
 ## Rolling out
 

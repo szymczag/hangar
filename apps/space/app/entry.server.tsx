@@ -24,6 +24,8 @@ import {
   hashSource,
   policyHeaderName,
   runtimeSourcesFromEnv,
+  trustedTypesModeFromEnv,
+  trustedTypesReportPolicy,
 } from "@plane/csp";
 
 export const streamTimeout = 5_000;
@@ -59,6 +61,13 @@ export default function handleRequest(
   const env = runtimeEnv();
   const nonce = randomBytes(16).toString("base64");
   responseHeaders.set(policyHeaderName(env), contentSecurityPolicy(nonce, env));
+  // Trusted Types measurement: its own policy, always report-only, appended so
+  // it sits beside a report-only main policy instead of replacing it.
+  const trustedTypes = trustedTypesReportPolicy({
+    reportUri: runtimeSourcesFromEnv(env).reportUri,
+    mode: trustedTypesModeFromEnv(env),
+  });
+  if (trustedTypes) responseHeaders.append("Content-Security-Policy-Report-Only", trustedTypes);
 
   // https://httpwg.org/specs/rfc9110.html#HEAD
   if (request.method.toUpperCase() === "HEAD") {

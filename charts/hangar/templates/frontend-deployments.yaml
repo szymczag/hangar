@@ -69,6 +69,8 @@ spec:
               value: {{ $storageOrigin | quote }}
             - name: HANGAR_CSP_FRAME_SRC
               value: {{ default "'none'" $csp.frameSrc | quote }}
+            - name: HANGAR_CSP_TRUSTED_TYPES
+              value: {{ $csp.trustedTypes | quote }}
             {{- if eq $component.name "space" }}
             - name: HANGAR_SPACE_FRAME_ANCESTORS
               value: {{ $csp.spaceFrameAncestors | quote }}

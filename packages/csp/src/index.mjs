@@ -137,3 +137,21 @@ export const policyHeaderName = (env = process.env) => {
   const reportOnly = env.HANGAR_CSP_REPORT_ONLY ? env.HANGAR_CSP_REPORT_ONLY === "true" : DEFAULT_REPORT_ONLY;
   return reportOnly ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 };
+
+// Trusted Types, phase 0 of docs/trusted-types-plan.md: measure, never enforce.
+//
+// Sent as its own Content-Security-Policy-Report-Only header, separate from
+// the policy above, so it stays report-only when that policy is enforced.
+// `trusted-types 'none'` makes the browser report policy creation as well as
+// every sink that receives a plain string, which is the inventory the later
+// phases need. HANGAR_CSP_TRUSTED_TYPES=off removes the header.
+export const TRUSTED_TYPES_MEASUREMENT = "require-trusted-types-for 'script'; trusted-types 'none'";
+
+export const trustedTypesModeFromEnv = (env = process.env) =>
+  env.HANGAR_CSP_TRUSTED_TYPES === "off" ? "off" : "report";
+
+/** The report-only Trusted Types policy, or "" when measurement is off. */
+export const trustedTypesReportPolicy = ({ reportUri = "", mode = "report" } = {}) =>
+  mode === "off"
+    ? ""
+    : [TRUSTED_TYPES_MEASUREMENT, reportUri ? `report-uri ${reportUri}` : ""].filter(Boolean).join("; ");

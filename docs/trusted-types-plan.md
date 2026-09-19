@@ -1,6 +1,7 @@
 # Trusted Types: implementation plan
 
-Status: plan, not implemented. Measurements below come from the web build of
+Status: phase 0 (measurement) shipped; phases 1–4 not started. See
+"Trusted Types measurement" in content-security-policy.md. Measurements below come from the web build of
 `fix/rich-text-sanitizer-and-csp` (a bundle scan with source maps, and a
 Chromium session with `require-trusted-types-for 'script'` in report-only mode
 while editing a work item).

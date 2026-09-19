@@ -38,3 +38,9 @@ export declare const runtimeSourcesFromEnv: (
 export declare const policyHeaderName: (
   env?: Record<string, string | undefined>
 ) => "Content-Security-Policy" | "Content-Security-Policy-Report-Only";
+
+export declare const TRUSTED_TYPES_MEASUREMENT: string;
+
+export declare const trustedTypesModeFromEnv: (env?: Record<string, string | undefined>) => "report" | "off";
+
+export declare const trustedTypesReportPolicy: (options?: { reportUri?: string; mode?: "report" | "off" }) => string;

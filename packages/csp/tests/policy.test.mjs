@@ -9,11 +9,14 @@ import { createHash } from "node:crypto";
 import { test } from "node:test";
 
 import {
+  TRUSTED_TYPES_MEASUREMENT,
   buildContentSecurityPolicy,
   hashSource,
   inlineScriptHashes,
   policyHeaderName,
   runtimeSourcesFromEnv,
+  trustedTypesModeFromEnv,
+  trustedTypesReportPolicy,
 } from "../src/index.mjs";
 
 const directive = (policy, name) =>
@@ -65,4 +68,18 @@ test("runtime sources come from the environment and default to self", () => {
   assert.equal(policyHeaderName({}), "Content-Security-Policy-Report-Only");
   assert.equal(policyHeaderName({ HANGAR_CSP_REPORT_ONLY: "false" }), "Content-Security-Policy");
   assert.equal(policyHeaderName({ HANGAR_CSP_REPORT_ONLY: "true" }), "Content-Security-Policy-Report-Only");
+});
+
+test("Trusted Types is measured in a policy of its own and can be switched off", () => {
+  // Kept out of the main policy: enforcing that must not start enforcing this.
+  assert.doesNotMatch(buildContentSecurityPolicy(), /trusted-types/);
+  assert.equal(TRUSTED_TYPES_MEASUREMENT, "require-trusted-types-for 'script'; trusted-types 'none'");
+  assert.equal(
+    trustedTypesReportPolicy({ reportUri: "/api/csp-report/" }),
+    "require-trusted-types-for 'script'; trusted-types 'none'; report-uri /api/csp-report/"
+  );
+  assert.equal(trustedTypesReportPolicy({ mode: "off", reportUri: "/api/csp-report/" }), "");
+  assert.equal(trustedTypesModeFromEnv({}), "report");
+  assert.equal(trustedTypesModeFromEnv({ HANGAR_CSP_TRUSTED_TYPES: "off" }), "off");
+  assert.equal(trustedTypesModeFromEnv({ HANGAR_CSP_TRUSTED_TYPES: "enforce" }), "report");
 });

@@ -59,6 +59,9 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header X-XSS-Protection "0" always;
 add_header \${HANGAR_CSP_HEADER} "${policy}\${HANGAR_CSP_REPORT}" always;
+# Trusted Types measurement, always report-only; empty (header omitted) when
+# HANGAR_CSP_TRUSTED_TYPES=off.
+add_header Content-Security-Policy-Report-Only "\${HANGAR_CSP_TRUSTED_TYPES_POLICY}" always;
 `;
 
 mkdirSync(dirname(values.out), { recursive: true });
