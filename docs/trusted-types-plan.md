@@ -1,7 +1,9 @@
 # Trusted Types: implementation plan
 
 Status: phases 0 (measurement), 1 (our own sinks), 2 (policies, observing)
-and 3 (verification under enforcement) done; phase 4 not started. See "Trusted Types measurement" in
+and 3 (verification under enforcement) done. Phase 4 is implemented as an
+opt-in (`HANGAR_CSP_TRUSTED_TYPES=enforce`) and verified; the default stays
+`report` until production observations justify changing it. See "Trusted Types measurement" in
 content-security-policy.md.
 Measurements below come from the web build of
 `fix/rich-text-sanitizer-and-csp` (a bundle scan with source maps, and a
@@ -183,24 +185,40 @@ the sink. This also covers screens the probe did not visit.
   file for review. It runs in the web-apps pull-request workflow.
 - Security suite: `apps/visual-tests/security/` runs on the visual suite's
   stack, after it (`pnpm vr`), because it writes. Every document gets the
-  policy its build generated plus `require-trusted-types-for 'script'`,
-  both **enforced**. Covered: the rich-text editor (stored table, palette
-  colours, alignment, typing, a shortcut, markdown paste, two hostile pastes,
-  saving through the API), a comment, a sticky, the workspace home and the
-  instance console. A test fails on any violation, any Trusted Types error in
-  the page, a missing default policy, and any default-policy observation
-  except the hostile pastes' `onerror`/`onload`. A failed test attaches what
-  the page reported, so a page that never renders says whether the policy
-  stopped it.
+  policy its build generated (space: the one its server sent, enforced) plus
+  `require-trusted-types-for 'script'`, both **enforced**. Covered: the
+  rich-text editor (stored table, palette colours, alignment, typing, a
+  shortcut, markdown paste, two hostile pastes, saving through the API), a
+  comment, a sticky, a page edited through live (stored by live, checked
+  through the API), the PDF export (a real `%PDF-` download), a published
+  board read without an account, the workspace home and the instance console.
+  A test fails on any violation, any Trusted Types error in the page, a missing
+  default policy, a page not told the mode under test, and any default-policy
+  report except the hostile pastes' `onerror`/`onload`. A failed test prints
+  what the page reported.
 - Mutation check: removing `default` from the enforced `trusted-types` list
-  fails all five tests, with the refused policy in the diagnostics.
-- Not covered: published boards (space) and pages (`live`), which the visual
-  stack does not run, and the PDF export. They stay under the report-only
-  measurement until the stack grows them.
+  fails every test, with the refused policy in the diagnostics.
 
-**Phase 4 — enforce.** Move the two directives from the report-only header to
-the enforced policy once the CSP itself is enforced and a release cycle has
-produced no Trusted Types reports.
+**Phase 4 — enforce. Implemented as an opt-in.**
+
+- `HANGAR_CSP_TRUSTED_TYPES=enforce` sends the Trusted Types policy as
+  `Content-Security-Policy` (web and admin through the nginx hook, space from
+  its server), independently of `HANGAR_CSP_REPORT_ONLY`.
+- The page is told the mode by `<meta name="hangar-trusted-types">` in its
+  head: nginx rewrites it with `sub_filter` (the template generator refuses a
+  build without it), space renders it per request. It is read from the head
+  only, so markup rendered later cannot change it; anything unknown is
+  `report`.
+- In `enforce` the default policy returns DOMPurify's result (reporting
+  `html-changed` when it differs), fails closed to an empty string if the
+  sanitizer throws, and refuses script text and cross-origin script URLs.
+  Scripts React renders again (`KNOWN_LIBRARY_SCRIPTS`, the served inline
+  scripts) pass, as before.
+- Verified: unit tests for every mode; the production nginx image with a
+  read-only root in each mode (headers and rewritten meta); the space server in
+  each mode; the security suite in both modes.
+- Before making it the default: a release cycle of `report` observations with
+  nothing legitimate in them, then `enforce` on a staging instance.
 
 ## Risks
 

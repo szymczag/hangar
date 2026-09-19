@@ -235,14 +235,20 @@ on OIDC or SAML.
 
 ## The security suite
 
-`security/` is a second Playwright project on the same stack. It serves every
-document with the Content-Security-Policy its build generated plus
+`security/` is a second Playwright configuration on the same stack. It serves
+every document with the Content-Security-Policy its build generated (space
+keeps the one its server sends, enforced on `vr-space`) plus
 `require-trusted-types-for 'script'`, both enforced, and fails on any
-violation, any Trusted Types error in the page, and any report from the
-observing default policy that it does not expect (docs/trusted-types-plan.md,
-phase 3). `pnpm vr` runs it once, after the visual suite, because it writes:
-work items, comments and stickies would otherwise appear in screenshots. It is
-not part of the soak. To iterate on it with the stack up:
+violation, any Trusted Types error in the page, and any report from the default
+policy that it does not expect (docs/trusted-types-plan.md). It covers the
+editor and its pastes, comments, stickies, a page edited through live, the PDF
+export, a published board and the instance console, each twice: with the
+default policy observing (`HANGAR_CSP_TRUSTED_TYPES=report`) and sanitizing
+(`=enforce`).
+
+`pnpm vr` runs it once, after the visual suite, because it writes: work items,
+comments, stickies, pages and a published board would otherwise appear in
+screenshots. It is not part of the soak. To iterate on it with the stack up:
 
 ```bash
 podman-compose -f docker-compose-visual.yml run --rm --no-deps vr-playwright \
@@ -251,7 +257,9 @@ podman-compose -f docker-compose-visual.yml run --rm --no-deps vr-playwright \
 
 A failed test prints `csp-diagnostics`: the violations, page errors and failed
 requests the page produced, so a page that never renders says whether the
-policy stopped it or it was only slow.
+policy stopped it or it was only slow. Before the first test the suite waits
+for the container's IPv6 address to leave duplicate address detection; when it
+settles Chromium fails requests in flight with `ERR_NETWORK_CHANGED`.
 
 ## Scope
 
@@ -260,7 +268,8 @@ existing dark story covers. Theme regressions are token regressions, so the
 twenty-eighth dark baseline carries almost no information at linear review cost.
 
 `light-contrast`, `dark-contrast` and `custom` are out of scope, as are
-`apps/space` and `apps/live` — `Caddyfile.vr` deliberately does not route them.
+`apps/space` and `apps/live`: the stack runs them for the security suite, but
+nothing here photographs them.
 
 ## Not part of `pnpm check`
 

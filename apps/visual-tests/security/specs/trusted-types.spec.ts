@@ -4,51 +4,16 @@
  * See the LICENSE file for details.
  */
 
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { fixtures } from "../../src/manifest.js";
+import { expect, test, type Page } from "@playwright/test";
+import { createWorkItem, expectOnlyHostileObservations, post, projectId, seed, signIn, slug } from "../src/app";
 import { attachDiagnostics, enforceContentSecurityPolicy, watch } from "../src/enforce";
 
 // The application under its own Content-Security-Policy with Trusted Types
-// enforced (docs/trusted-types-plan.md, phase 3). Every string that reaches a
-// guarded DOM sink must come through a policy, or the page throws. The
-// default policy observes in this phase, so what it may report is also
-// checked: ordinary content must pass DOMPurify unchanged, and only hostile
-// content may produce an observation.
-
-const seed = fixtures();
-const slug = seed.workspace.slug;
-const projectId = seed.project.id;
-
-const RICH_DESCRIPTION = [
-  '<h2>Heading</h2><p data-text-align="center">centred paragraph</p>',
-  '<p><strong>bold</strong> <em>italic</em> <span data-text-color="gray">gray</span> ',
-  '<span data-background-color="peach">peach</span> <a href="https://example.com/doc">a link</a></p>',
-  "<ul><li><p>bullet</p></li></ul><ol><li><p>numbered</p></li></ol>",
-  '<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked><span></span></label><div><p>task</p></div></li></ul>',
-  '<blockquote><p>quoted</p></blockquote><pre><code class="language-ts">const x = 1;</code></pre><hr>',
-  '<table><tbody><tr><th data-background-color="green"><p>head</p></th><th><p>plain</p></th></tr>',
-  '<tr><td background="var(--editor-colors-purple-background)"><p>legacy cell</p></td><td><p>cell</p></td></tr></tbody></table>',
-  "<p>last paragraph</p>",
-].join("");
-
-async function signIn(page: Page, baseURL: string) {
-  await page
-    .context()
-    .addCookies([
-      { name: "session-id", value: seed.users.light.sessionCookie!, url: baseURL, httpOnly: true, sameSite: "Lax" },
-    ]);
-}
-
-async function createWorkItem(request: APIRequestContext, baseURL: string, name: string) {
-  const csrf = await (await request.get("/auth/get-csrf-token/")).json();
-  const response = await request.post(`/api/workspaces/${slug}/projects/${projectId}/issues/`, {
-    headers: { "X-CSRFToken": csrf.csrf_token, Referer: `${baseURL}/` },
-    data: { name, description_html: RICH_DESCRIPTION },
-  });
-  expect(response.status(), await response.text()).toBe(201);
-  const workItem = await response.json();
-  return { workItem, csrf: csrf.csrf_token as string };
-}
+// enforced (docs/trusted-types-plan.md, phases 3 and 4). Every string that
+// reaches a guarded DOM sink must come through a policy, or the page throws.
+// What the default policy reports is checked too: ordinary content must pass
+// DOMPurify unchanged, and only hostile content may produce a report -- in the
+// report project as an observation, in the enforce project as a removal.
 
 /** A paste event carrying the given clipboard flavours, dispatched on the editor. */
 async function paste(page: Page, flavours: Record<string, string>) {
@@ -74,8 +39,8 @@ test("the rich-text editor renders, edits and pastes with Trusted Types enforced
   context,
   baseURL,
 }) => {
-  await signIn(page, baseURL!);
-  const { workItem, csrf } = await createWorkItem(context.request, baseURL!, "Trusted Types: editor");
+  await signIn(context, baseURL!);
+  const workItem = await createWorkItem(context.request, baseURL!, "Trusted Types: editor");
   const reports = watch(page);
 
   await page.goto(`/${slug}/browse/${seed.project.identifier}-${workItem.sequence_id}/`);
@@ -117,8 +82,7 @@ test("the rich-text editor renders, edits and pastes with Trusted Types enforced
   await expect
     .poll(async () => {
       const response = await context.request.get(
-        `/api/workspaces/${slug}/projects/${projectId}/issues/${workItem.id}/`,
-        { headers: { "X-CSRFToken": csrf } }
+        `/api/workspaces/${slug}/projects/${projectId}/issues/${workItem.id}/`
       );
       return (await response.json()).description_html as string;
     })
@@ -126,25 +90,22 @@ test("the rich-text editor renders, edits and pastes with Trusted Types enforced
 
   await reports.expectClean();
   // Ordinary content passed DOMPurify unchanged; the hostile pastes are what
-  // the observing default policy reported, and nothing else.
+  // the default policy reported, and nothing else.
   expect(reports.observations.length).toBeGreaterThan(0);
-  for (const observation of reports.observations) {
-    expect(observation["violated-directive"]).toBe("html-would-change");
-    expect(observation["script-sample"]).toMatch(/onerror|onload/);
-  }
+  expectOnlyHostileObservations(reports.observations);
 });
 
 test("a comment renders with Trusted Types enforced", async ({ page, context, baseURL }) => {
-  await signIn(page, baseURL!);
-  const { workItem, csrf } = await createWorkItem(context.request, baseURL!, "Trusted Types: comment");
-  const comment = await context.request.post(
+  await signIn(context, baseURL!);
+  const workItem = await createWorkItem(context.request, baseURL!, "Trusted Types: comment");
+  await post(
+    context.request,
+    baseURL!,
     `/api/workspaces/${slug}/projects/${projectId}/issues/${workItem.id}/comments/`,
     {
-      headers: { "X-CSRFToken": csrf, Referer: `${baseURL}/` },
-      data: { comment_html: '<p>a <strong>rich</strong> comment with <a href="https://example.com">a link</a></p>' },
+      comment_html: '<p>a <strong>rich</strong> comment with <a href="https://example.com">a link</a></p>',
     }
   );
-  expect(comment.status(), await comment.text()).toBe(201);
   const reports = watch(page);
 
   await page.goto(`/${slug}/browse/${seed.project.identifier}-${workItem.sequence_id}/`);
@@ -155,17 +116,12 @@ test("a comment renders with Trusted Types enforced", async ({ page, context, ba
 });
 
 test("a sticky renders and edits with Trusted Types enforced", async ({ page, context, baseURL }) => {
-  await signIn(page, baseURL!);
-  const csrf = await (await context.request.get("/auth/get-csrf-token/")).json();
-  const sticky = await context.request.post(`/api/workspaces/${slug}/stickies/`, {
-    headers: { "X-CSRFToken": csrf.csrf_token, Referer: `${baseURL}/` },
-    data: {
-      name: "Trusted Types: sticky",
-      description_html:
-        '<p>sticky <strong>note</strong> <span data-text-color="gray">gray</span></p><ul><li><p>item</p></li></ul>',
-    },
+  await signIn(context, baseURL!);
+  await post(context.request, baseURL!, `/api/workspaces/${slug}/stickies/`, {
+    name: "Trusted Types: sticky",
+    description_html:
+      '<p>sticky <strong>note</strong> <span data-text-color="gray">gray</span></p><ul><li><p>item</p></li></ul>',
   });
-  expect(sticky.status(), await sticky.text()).toBe(201);
   const reports = watch(page);
 
   await page.goto(`/${slug}/stickies/`);
@@ -180,8 +136,8 @@ test("a sticky renders and edits with Trusted Types enforced", async ({ page, co
   expect(reports.observations).toEqual([]);
 });
 
-test("the workspace home renders with Trusted Types enforced", async ({ page, baseURL }) => {
-  await signIn(page, baseURL!);
+test("the workspace home renders with Trusted Types enforced", async ({ page, context, baseURL }) => {
+  await signIn(context, baseURL!);
   const reports = watch(page);
 
   await page.goto(`/${slug}/`);

@@ -5,8 +5,9 @@
  */
 
 import { readFileSync } from "node:fs";
-import { expect, type BrowserContext, type Page, type TestInfo } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page, type TestInfo } from "@playwright/test";
 import { TRUSTED_TYPES_MEASUREMENT } from "@plane/csp";
+import { TRUSTED_TYPES_META_NAME, type TTrustedTypesMode } from "@plane/csp/trusted-types";
 
 type TViolation = { directive: string; disposition: string; blocked: string; sample: string; source: string };
 export type TObservation = Record<string, string>;
@@ -23,21 +24,41 @@ const builtPolicy = (app: "web" | "admin") =>
     .replace("${HANGAR_CSP_FRAME_SRC}", "'none'")
     .replace(/\$\{HANGAR_CSP_[A-Z_]+\}/g, "");
 
+/** The Trusted Types mode of the running project ("report" or "enforce"). */
+export const trustedTypesMode = (): TTrustedTypesMode =>
+  (test.info().project.metadata as { trustedTypes?: TTrustedTypesMode }).trustedTypes ?? "report";
+
+const META = new RegExp(`(<meta name="${TRUSTED_TYPES_META_NAME}" content=")[a-z]*(")`);
+
 /**
  * Enforces, on every document the context loads, the application's policy and
  * Trusted Types (the measurement policy's directives, enforced instead of
- * reported). Both go in one header, as two comma-separated policies.
+ * reported). Web and admin get the policy their build generated, as nginx
+ * would send it; space keeps the one its server sent (enforced on vr-space).
+ * The Trusted Types header is added as a second policy in the same header,
+ * and the page is told the mode through its meta tag, as nginx and space do.
  */
 export async function enforceContentSecurityPolicy(context: BrowserContext) {
   const policies = { web: builtPolicy("web"), admin: builtPolicy("admin") };
+  const mode = trustedTypesMode();
   await context.route("**/*", async (route) => {
     const request = route.request();
     if (request.resourceType() !== "document") return route.fallback();
-    const app = new URL(request.url()).pathname.startsWith("/god-mode") ? "admin" : "web";
+    const path = new URL(request.url()).pathname;
     const response = await route.fetch();
+    const headers = response.headers();
+    let policy: string;
+    if (path.startsWith("/spaces")) {
+      policy = headers["content-security-policy"];
+      expect(policy, "space sends an enforced policy of its own").toContain("'nonce-");
+    } else {
+      policy = policies[path.startsWith("/god-mode") ? "admin" : "web"];
+    }
+    const body = (await response.text()).replace(META, `$1${mode}$2`);
     await route.fulfill({
       response,
-      headers: { ...response.headers(), "content-security-policy": `${policies[app]}, ${TRUSTED_TYPES_MEASUREMENT}` },
+      body,
+      headers: { ...headers, "content-security-policy": `${policy}, ${TRUSTED_TYPES_MEASUREMENT}` },
     });
   });
   await context.addInitScript(() => {
@@ -116,6 +137,15 @@ export function watch(page: Page) {
         ),
         "the default Trusted Types policy is installed"
       ).toBe("default");
+      // Without this a page that lost its meta tag would run the enforce
+      // project in report mode, and pass.
+      expect(
+        await page.evaluate(
+          (name) => document.head.querySelector(`meta[name="${name}"]`)?.getAttribute("content"),
+          TRUSTED_TYPES_META_NAME
+        ),
+        "the page was told the Trusted Types mode under test"
+      ).toBe(trustedTypesMode());
     },
   };
 }
