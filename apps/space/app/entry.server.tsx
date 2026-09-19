@@ -28,16 +28,25 @@ import {
 
 export const streamTimeout = 5_000;
 
+// The environment the server was started with. `define` in vite.config.ts
+// replaces every `process.env` in the bundle, server code included, with the
+// VITE_* values known at build time, so the deployment's variables are only
+// visible through globalThis. Every @plane/csp call below is given this object
+// explicitly for the same reason: its default parameter is `process.env`.
+const runtimeEnv = (): Record<string, string | undefined> =>
+  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+
 // A public board can be embedded; by default only by the instance itself.
 // HANGAR_SPACE_FRAME_ANCESTORS lists the origins allowed to frame it.
-const frameAncestors = () => process.env.HANGAR_SPACE_FRAME_ANCESTORS?.trim() || "'self'";
+const frameAncestors = (env: Record<string, string | undefined>) =>
+  env.HANGAR_SPACE_FRAME_ANCESTORS?.trim() || "'self'";
 
-const contentSecurityPolicy = (nonce: string) =>
+const contentSecurityPolicy = (nonce: string, env: Record<string, string | undefined>) =>
   buildContentSecurityPolicy({
-    ...runtimeSourcesFromEnv(),
+    ...runtimeSourcesFromEnv(env),
     scriptSources: [`'nonce-${nonce}'`],
     styleElementSources: RUNTIME_STYLE_ELEMENTS.map(hashSource),
-    frameAncestors: frameAncestors(),
+    frameAncestors: frameAncestors(env),
   });
 
 export default function handleRequest(
@@ -47,8 +56,9 @@ export default function handleRequest(
   routerContext: EntryContext,
   _loadContext: RouterContextProvider
 ) {
+  const env = runtimeEnv();
   const nonce = randomBytes(16).toString("base64");
-  responseHeaders.set(policyHeaderName(), contentSecurityPolicy(nonce));
+  responseHeaders.set(policyHeaderName(env), contentSecurityPolicy(nonce, env));
 
   // https://httpwg.org/specs/rfc9110.html#HEAD
   if (request.method.toUpperCase() === "HEAD") {
