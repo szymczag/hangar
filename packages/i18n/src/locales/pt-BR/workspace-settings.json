@@ -81,6 +81,9 @@
         "hide": "Ocultar",
         "show_hidden": "Mostrar ocultos"
       },
+      "workshop_templates": {
+        "title": "Listas de verificação de workshops"
+      },
       "exports": {
         "heading": "Exportações",
         "description": "Exporte os dados do seu projeto em vários formatos e acesse seu histórico de exportações com links para download.",

@@ -81,6 +81,9 @@
         "hide": "Nascondi",
         "show_hidden": "Mostra nascosti"
       },
+      "workshop_templates": {
+        "title": "Liste di controllo dei workshop"
+      },
       "exports": {
         "heading": "Esportazioni",
         "description": "Esporta i dati del tuo progetto in vari formati e accedi alla cronologia delle esportazioni con i link per il download.",

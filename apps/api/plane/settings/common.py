@@ -86,6 +86,13 @@ CALENDAR_TOKEN_ENCRYPTION_KEYS = tuple(
 )
 if GOOGLE_CALENDAR_CAPACITY_ENABLED and not CALENDAR_TOKEN_ENCRYPTION_KEYS:
     raise ImproperlyConfigured("CALENDAR_TOKEN_ENCRYPTION_KEYS is required when Google Calendar capacity is enabled")
+# A reservation takes a trainer's time out of circulation for seventy-two hours,
+# so the number one person can hold at once is a real limit on everybody else's
+# ability to book. Per owner per workspace.
+CAPACITY_MAX_ACTIVE_HOLDS_PER_USER = _bounded_integer_setting("CAPACITY_MAX_ACTIVE_HOLDS_PER_USER", 10, 1, 500)
+# Drafts are cheap, but each one can carry a hold, so they bound the above.
+# The saved-plan list shows fifty, which is where this default comes from.
+CAPACITY_MAX_PLAN_DRAFTS_PER_USER = _bounded_integer_setting("CAPACITY_MAX_PLAN_DRAFTS_PER_USER", 50, 1, 1000)
 # Materializing recognized training invitations is a second switch on top of the
 # capacity flag, so an instance can run the live ledger without the background
 # sweep -- and so enabling the sweep can never accidentally enable capacity.
@@ -235,6 +242,19 @@ WEBHOOK_DISALLOWED_DOMAINS = [
 
 # Allowed Hosts
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
+# Left permissive by default so a first-run container works, but say so once at
+# boot when it is not a development instance. With `USE_X_FORWARDED_HOST` on, a
+# wildcard means the Host header decides what `request.build_absolute_uri`
+# produces -- which is how absolute links, OAuth redirect URIs and reset links
+# are built. Nothing in the fork is exploitable through that today (the OAuth
+# flow pins the host in the session and Google rejects unregistered redirect
+# URIs), but the protection is then somebody else's, which is a poor place to
+# keep it.
+if not DEBUG and "*" in ALLOWED_HOSTS:
+    _logger.warning(
+        "SECURITY: ALLOWED_HOSTS is a wildcard. Set ALLOWED_HOSTS to the hostnames this "
+        "instance actually serves so that Host-header values cannot influence generated URLs."
+    )
 
 # Application definition
 INSTALLED_APPS = [

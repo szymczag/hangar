@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('db', '0133_email_outbox_outer_subject'),
-        ('ext', '0029_google_training_rules'),
+        ('ext', '0031_workshop_roles'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

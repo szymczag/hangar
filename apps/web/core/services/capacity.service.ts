@@ -147,6 +147,47 @@ export type TWorkshopPlanHold = {
   status: "active" | "released" | "confirmed";
 };
 
+export type TChecklistAssigneeMode = "unassigned" | "fixed" | "workshop_trainer" | "role";
+export type TWorkshopChecklistItem = {
+  id?: string;
+  position: number;
+  title: string;
+  description: string;
+  assignee_id: string | null;
+  assignee_mode: TChecklistAssigneeMode;
+  /** Set only in "role" mode; everyone holding the role is assigned. */
+  role_id: string | null;
+  /** Days from the workshop's first session. Negative is before it. */
+  offset_days: number;
+};
+/** A standing job in running a workshop, and who currently does it. */
+export type TWorkshopRole = {
+  id: string;
+  name: string;
+  member_ids: string[];
+};
+export type TWorkshopRoleInput = {
+  name: string;
+  member_ids: string[];
+};
+export type TWorkshopChecklistTemplate = {
+  id: string;
+  name: string;
+  /** Applied to a new Workshop unless another template is chosen. */
+  is_default: boolean;
+  items: TWorkshopChecklistItem[];
+};
+export type TWorkshopChecklistTemplateInput = {
+  name: string;
+  is_default: boolean;
+  items: Array<Omit<TWorkshopChecklistItem, "id">>;
+};
+export type TAppliedChecklist = {
+  created: Array<{ id: string; name: string; target_date: string | null }>;
+  /** People the template names who cannot hold work in this project. */
+  skipped_assignees: string[];
+};
+
 /** Why a trainer's row may not be trustworthy; `ok` is the only one that counts. */
 export type TTrainingSyncStatus =
   | "ok"
@@ -552,6 +593,80 @@ export class CapacityService extends APIService {
       `/api/workspaces/${workspaceSlug}/projects/${projectId}/work-items/${issueId}/workshop-schedule/`,
       undefined,
       { headers: { "X-CSRFTOKEN": csrfToken } }
+    );
+  }
+
+  listWorkshopRoles(workspaceSlug: string) {
+    return this.data<{ results: TWorkshopRole[] }>(
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/workshop-roles/`)
+    );
+  }
+
+  async createWorkshopRole(workspaceSlug: string, role: TWorkshopRoleInput) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopRole>(
+      this.post(`/api/workspaces/${workspaceSlug}/capacity/workshop-roles/`, role, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
+  }
+
+  async updateWorkshopRole(workspaceSlug: string, roleId: string, role: TWorkshopRoleInput) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopRole>(
+      this.put(`/api/workspaces/${workspaceSlug}/capacity/workshop-roles/${roleId}/`, role, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
+  }
+
+  async deleteWorkshopRole(workspaceSlug: string, roleId: string) {
+    const csrfToken = await this.csrfToken();
+    return this.delete(`/api/workspaces/${workspaceSlug}/capacity/workshop-roles/${roleId}/`, undefined, {
+      headers: { "X-CSRFTOKEN": csrfToken },
+    });
+  }
+
+  listChecklistTemplates(workspaceSlug: string) {
+    return this.data<{ results: TWorkshopChecklistTemplate[] }>(
+      this.get(`/api/workspaces/${workspaceSlug}/capacity/checklist-templates/`)
+    );
+  }
+
+  async createChecklistTemplate(workspaceSlug: string, template: TWorkshopChecklistTemplateInput) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopChecklistTemplate>(
+      this.post(`/api/workspaces/${workspaceSlug}/capacity/checklist-templates/`, template, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
+  }
+
+  async updateChecklistTemplate(workspaceSlug: string, templateId: string, template: TWorkshopChecklistTemplateInput) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TWorkshopChecklistTemplate>(
+      this.put(`/api/workspaces/${workspaceSlug}/capacity/checklist-templates/${templateId}/`, template, {
+        headers: { "X-CSRFTOKEN": csrfToken },
+      })
+    );
+  }
+
+  async deleteChecklistTemplate(workspaceSlug: string, templateId: string) {
+    const csrfToken = await this.csrfToken();
+    return this.delete(`/api/workspaces/${workspaceSlug}/capacity/checklist-templates/${templateId}/`, undefined, {
+      headers: { "X-CSRFTOKEN": csrfToken },
+    });
+  }
+
+  /** Create the checklist subtasks on a Workshop. Omitting the template uses the default one. */
+  async applyChecklist(workspaceSlug: string, projectId: string, issueId: string, templateId?: string) {
+    const csrfToken = await this.csrfToken();
+    return this.data<TAppliedChecklist>(
+      this.post(
+        `/api/workspaces/${workspaceSlug}/projects/${projectId}/work-items/${issueId}/apply-checklist/`,
+        templateId ? { template_id: templateId } : undefined,
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
     );
   }
 }

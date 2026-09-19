@@ -46,6 +46,51 @@ Existing plans and sessions remain valid. Old clients retain the hold/schedule
 API; new clients can PATCH title/issue_id during a hold and schedule a candidate
 directly using an idempotency key. Apply migrations before deploying the new API.
 
+## Workshop checklists
+
+A workspace administrator defines checklist templates in **Settings → Workshop checklists**.
+Each template is a named, ordered list of subtasks; a workspace may keep up to twenty
+templates of up to thirty items each. One template may be marked as the default.
+
+Each item carries a title, an optional description, an assignment rule and a day offset.
+The assignment rule is one of: nobody, a specific person, the workshop's own trainer, or
+whoever holds a **workshop role**. The trainer rule resolves when the template is applied,
+against the Workshop's active trainer assignees, so one template serves every trainer. A
+person who is not an active project member able to hold work is skipped rather than
+assigned, and the response names them.
+
+**Workshop roles** are defined in the same screen: a role is a standing job in running a
+workshop — streaming, feedback, materials — and the people who currently do it. A template
+names the role, so when the rota changes an administrator edits the role once instead of
+every template that mentioned the departing person. A role holds up to 25 people and a
+workspace up to 30 roles; only workspace administrators change them.
+
+Applying an item in role mode assigns everyone who currently holds that role, so
+responsibility is visible and the holders settle it between themselves. A role nobody holds
+yet leaves the subtask unassigned rather than failing — an empty rota is a staffing
+question, not a reason to refuse the whole checklist. Deleting a role releases every
+checklist item that named it back to unassigned; the items themselves are never deleted.
+
+Applying a template creates the subtasks under the Workshop work item, each as an ordinary
+child work item with its own history entry. Application is idempotent by subtask name:
+applying the same template twice adds nothing, and applying it again after the template
+gained an item adds only that item. Only Workshop work items accept a checklist.
+
+The day offset is counted from the workshop's first session, negative for before it. A
+Workshop exists before it has a date, so subtasks created at that point have no due date;
+scheduling the workshop fills them in, counting calendar days in the trainer's timezone so
+that offsets spanning a daylight-saving change land on the day people expect. A due date
+already set by hand is never overwritten. Editing or deleting a template leaves the
+subtasks it has already created untouched.
+
+The planner applies the default template to a Workshop it creates. That call is best
+effort: a workspace with no default template, or an unavailable checklist endpoint, does
+not prevent the workshop from being created.
+
+Migrations `ext.0030` and `ext.0031` add the template, item, origin and role tables and
+their audit actions. Existing workshops are unaffected; a workspace with no templates
+behaves exactly as before.
+
 ## Timezones and workload
 
 Booking hours follow the connected primary Google calendar's IANA timezone. Without
@@ -120,6 +165,36 @@ Session updates accept each existing session's `id` and preserve that row, its p
 origin and invitation links, including when sessions are reordered. IDs must be
 unique and belong to the edited Workshop. Removing a session removes its links;
 legacy clients that omit IDs retain the replace-all behavior.
+
+Editing a Workshop's sessions requires the same project role as editing the work
+item itself, and scheduling from the planner now requires it too: workspace
+membership alone was enough before, so a project guest could place sessions and
+assign a trainer through the planner while the work-item route refused them.
+
+Session edits are refused when they collide. Submitted sessions are checked
+against each other and against other workshops and live reservations for the
+same trainer; the Workshop's own stored sessions are ignored, since they are
+being replaced. This is the database question the planner already asks, not a
+Google read -- editing a Workshop has never contacted Google and does not start
+now. Google availability remains the planner's concern, at the point where time
+is actually taken. Consecutive sessions, the ordinary multi-day case, are
+unaffected.
+
+Importing a training from the calendar deliberately does not perform this check:
+it records what the calendar already says is happening, so refusing an overlap
+there would refuse to reflect reality.
+
+Reservations and saved plans are capped per person per workspace
+(`CAPACITY_MAX_ACTIVE_HOLDS_PER_USER`, default ten; `CAPACITY_MAX_PLAN_DRAFTS_PER_USER`,
+default fifty). A reservation removes a trainer's time from circulation for
+seventy-two hours, so the number one person may hold at once is a direct limit
+on everybody else's ability to book, and nothing bounded it before. Expired
+reservations hold nothing and do not count.
+
+Taking or spending a reservation is throttled with the same limits as the
+capacity ledger, and shares its budget on purpose: both read Google before
+deciding anything, so a caller who only ever receives conflicts still spends the
+quota the ledger's throttle exists to protect.
 
 ## Materializing recognized training
 
@@ -223,6 +298,6 @@ fully rescanned, what window has been collected, and whether the requested range
 falls inside it. A trainer whose consent lapsed, or who has never been swept,
 is marked and excluded from totals rather than reported as having run nothing.
 
-Migration `0030_training_event_materialization` adds the occurrence record and
+Migration `0032_training_event_materialization` adds the occurrence record and
 the sweep bookkeeping. It is additive and backfills nothing; a workspace that
 never enables materialization behaves exactly as before.
