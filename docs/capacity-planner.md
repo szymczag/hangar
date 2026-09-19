@@ -263,6 +263,23 @@ project is reported rather than imported unassigned, and one such row does not
 stop the rest of the batch. Importing is administrator-only, and still requires
 a seat in the target project.
 
+## Filtering the team ledger
+
+Team capacity draws several kinds of commitment at once, and the question being
+asked is usually about one of them. **Only training** narrows the timeline to
+booking hours and recognized training in a click; the individual toggles are
+there because "why is this person unavailable" is usually answered by a
+different layer. Working hours are always drawn, since they are the canvas the
+rest sits on. The selection lives in `?layers=`, so a narrowed ledger can be
+pasted into a message like any other link.
+
+Where a training's title has been recorded, the timeline names it. The title
+comes from the sweep's record rather than from a live read -- the availability
+path still never asks Google for event summaries, so none reach its cache -- and
+is shown only to a workspace administrator or to the trainer looking at their
+own week. Everybody else, and any window the sweep has not yet reached, sees the
+generic label.
+
 ## Training report
 
 **Capacity → Reports** answers how much training a trainer ran over any period

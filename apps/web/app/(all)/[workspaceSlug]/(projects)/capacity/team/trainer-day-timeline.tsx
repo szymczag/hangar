@@ -6,7 +6,7 @@
 
 import { TZDate } from "@date-fns/tz";
 import { useViewerTimezone } from "../shared/viewer-timezone";
-import type { TTrainerCapacity } from "@/services/capacity.service";
+import type { TCapacityInterval, TTrainerCapacity } from "@/services/capacity.service";
 import {
   CAPACITY_INTERVAL_LAYERS,
   availableRanges,
@@ -19,10 +19,13 @@ export function TrainerDayTimeline({
   trainer,
   dayStart,
   dayEnd,
+  layers,
 }: {
   trainer: TTrainerCapacity;
   dayStart: Date;
   dayEnd: Date;
+  /** Which kinds to draw; omitted means all of them. */
+  layers?: Set<TCapacityInterval["kind"]>;
 }) {
   const timeZone = useViewerTimezone();
   const free = availableRanges(trainer.intervals, dayStart, dayEnd);
@@ -72,7 +75,7 @@ export function TrainerDayTimeline({
             />
           );
         })}
-        {CAPACITY_INTERVAL_LAYERS.filter((kind) => kind !== "working").flatMap((kind) =>
+        {CAPACITY_INTERVAL_LAYERS.filter((kind) => kind !== "working" && (layers?.has(kind) ?? true)).flatMap((kind) =>
           trainer.intervals
             .filter((interval) => interval.kind === kind)
             .map((interval) => {

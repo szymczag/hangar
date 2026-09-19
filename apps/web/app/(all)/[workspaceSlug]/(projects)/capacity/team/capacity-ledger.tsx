@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import { CalendarClock, CircleAlert } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { Spinner } from "@plane/ui";
-import type { TTrainerCapacity, TTrainerProfile } from "@/services/capacity.service";
+import type { TCapacityInterval, TTrainerCapacity, TTrainerProfile } from "@/services/capacity.service";
 import {
   availableRanges,
   clippedRanges,
@@ -53,6 +53,8 @@ type Props = {
   onManageSchedule: (trainerId: string) => void;
   /** Opting in is a personal action. `/capacity/team` passes null and links instead. */
   becomeTrainer: { onClick: () => void; busy: boolean } | null;
+  /** Which interval kinds to draw; omitted means all of them. */
+  layers?: Set<TCapacityInterval["kind"]>;
 };
 
 /**
@@ -66,7 +68,7 @@ type Props = {
  * nothing else has an opinion about it. The week is not: the planner reads the
  * same window, so it stays with the caller's hook.
  */
-export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, becomeTrainer }: Props) {
+export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, becomeTrainer, layers }: Props) {
   const {
     capacity,
     capacityError,
@@ -256,7 +258,12 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
                         </p>
                       </div>
                       <div>
-                        <TrainerDayTimeline trainer={trainer} dayStart={selectedDay.start} dayEnd={selectedDay.end} />
+                        <TrainerDayTimeline
+                          trainer={trainer}
+                          dayStart={selectedDay.start}
+                          dayEnd={selectedDay.end}
+                          layers={layers}
+                        />
                         <div className="mt-2 flex gap-4 text-11 text-secondary">
                           <span>Google {formatMinutes(metrics.googleBusyMinutes)}</span>
                           <span>Workshops {formatMinutes(metrics.workshopMinutes)}</span>

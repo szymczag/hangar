@@ -46,7 +46,11 @@ export function intervalPosition(interval: { start: string; end: string }, daySt
 
 export function intervalLabel(interval: TCapacityInterval) {
   if (interval.kind === "working") return "Working hours";
-  if (interval.kind === "google_training") return "Training invitation";
+  // The title comes from what the sweep recorded, and only for a viewer
+  // entitled to it. Everybody else gets the generic label, exactly as a
+  // restricted work item does below.
+  if (interval.kind === "google_training")
+    return interval.summary ? `Training: ${interval.summary}` : "Training invitation";
   if (interval.kind === "google_busy") return "Busy — Google Calendar";
   if (interval.kind === "workshop_hold") return "Workshop planning hold";
   return interval.work_item?.name ? `Workshop: ${interval.work_item.name}` : "Workshop (details restricted)";
@@ -136,3 +140,43 @@ export const CAPACITY_INTERVAL_LAYERS: TCapacityInterval["kind"][] = [
   "workshop_hold",
   "workshop",
 ];
+
+export const CAPACITY_LAYER_LABELS: Record<TCapacityInterval["kind"], string> = {
+  working: "Working hours",
+  google_busy: "Google busy",
+  google_training: "Training",
+  workshop_hold: "Reservations",
+  workshop: "Workshops",
+};
+
+/** Layers shown when nothing narrows them: all of them. */
+export const ALL_CAPACITY_LAYERS = new Set(CAPACITY_INTERVAL_LAYERS);
+
+/**
+ * The layers named by `?layers=`, or all of them.
+ *
+ * An empty or unrecognized parameter means "no filter" rather than "nothing":
+ * a URL somebody trimmed by hand should show the ledger, not a blank week.
+ * Working hours are always kept, because they are the canvas the rest is drawn
+ * on -- hiding them leaves bars floating over nothing.
+ */
+export function parseLayerParam(value: string | null | undefined): Set<TCapacityInterval["kind"]> {
+  const named = (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry): entry is TCapacityInterval["kind"] => (CAPACITY_INTERVAL_LAYERS as string[]).includes(entry));
+  if (named.length === 0) return new Set(ALL_CAPACITY_LAYERS);
+  return new Set<TCapacityInterval["kind"]>(["working", ...named]);
+}
+
+export function formatLayerParam(layers: Set<TCapacityInterval["kind"]>) {
+  const named = CAPACITY_INTERVAL_LAYERS.filter((kind) => layers.has(kind));
+  return named.length === CAPACITY_INTERVAL_LAYERS.length ? "" : named.join(",");
+}
+
+/** The shortcut the coordinator actually asked for. */
+export const ONLY_TRAINING_LAYERS = new Set<TCapacityInterval["kind"]>(["working", "google_training"]);
+
+export function isOnlyTraining(layers: Set<TCapacityInterval["kind"]>) {
+  return layers.size === ONLY_TRAINING_LAYERS.size && [...ONLY_TRAINING_LAYERS].every((kind) => layers.has(kind));
+}
