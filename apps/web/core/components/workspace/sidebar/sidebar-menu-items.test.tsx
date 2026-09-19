@@ -58,6 +58,7 @@ describe("capacity links in the active workspace menu", () => {
         ["", "My capacity"],
         ["team/", "Team capacity"],
         ["planner/", "Workshop planner"],
+        ["reports/", "Training report"],
       ]) {
         expect(html).toContain(`href="/test-workspace/capacity/${suffix}"`);
         expect(html).toContain(label);
@@ -65,6 +66,18 @@ describe("capacity links in the active workspace menu", () => {
       }
     }
   );
+
+  it("offers the calendar import to an administrator only", () => {
+    // The listing behind it carries calendar titles, which the rest of the
+    // product deliberately does not show.
+    state.enabled = true;
+
+    state.role = EUserWorkspaceRoles.ADMIN;
+    expect(renderToStaticMarkup(<SidebarMenuItems />)).toContain('href="/test-workspace/capacity/imports/"');
+
+    state.role = EUserWorkspaceRoles.MEMBER;
+    expect(renderToStaticMarkup(<SidebarMenuItems />)).not.toContain("/capacity/imports/");
+  });
 
   it.each([false, undefined])("hides capacity when the feature flag is %s", (enabled) => {
     state.enabled = enabled;

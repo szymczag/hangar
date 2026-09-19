@@ -93,6 +93,25 @@ CAPACITY_MAX_ACTIVE_HOLDS_PER_USER = _bounded_integer_setting("CAPACITY_MAX_ACTI
 # Drafts are cheap, but each one can carry a hold, so they bound the above.
 # The saved-plan list shows fifty, which is where this default comes from.
 CAPACITY_MAX_PLAN_DRAFTS_PER_USER = _bounded_integer_setting("CAPACITY_MAX_PLAN_DRAFTS_PER_USER", 50, 1, 1000)
+# Materializing recognized training invitations is a second switch on top of the
+# capacity flag, so an instance can run the live ledger without the background
+# sweep -- and so enabling the sweep can never accidentally enable capacity.
+GOOGLE_TRAINING_MATERIALIZATION_ENABLED = (
+    GOOGLE_CALENDAR_CAPACITY_ENABLED and os.environ.get("ENABLE_GOOGLE_TRAINING_MATERIALIZATION", "0") == "1"
+)
+GOOGLE_TRAINING_SWEEP_WINDOW_PAST_DAYS = _bounded_integer_setting(
+    "GOOGLE_TRAINING_SWEEP_WINDOW_PAST_DAYS", 90, 0, 730
+)
+GOOGLE_TRAINING_SWEEP_WINDOW_FUTURE_DAYS = _bounded_integer_setting(
+    "GOOGLE_TRAINING_SWEEP_WINDOW_FUTURE_DAYS", 180, 30, 730
+)
+GOOGLE_TRAINING_SWEEP_LEASE_SECONDS = _bounded_integer_setting("GOOGLE_TRAINING_SWEEP_LEASE_SECONDS", 600, 60, 3600)
+GOOGLE_TRAINING_SWEEP_BATCH = _bounded_integer_setting("GOOGLE_TRAINING_SWEEP_BATCH", 20, 1, 200)
+# How long a retired occurrence is kept before it is deleted. Only rows the
+# sweep marked gone: real history is the reporting product and is never pruned.
+GOOGLE_TRAINING_RETIRED_RETENTION_DAYS = _bounded_integer_setting(
+    "GOOGLE_TRAINING_RETIRED_RETENTION_DAYS", 30, 1, 365
+)
 TODOIST_IMPORT_LEASE_SECONDS = _bounded_integer_setting("TODOIST_IMPORT_LEASE_SECONDS", 120, 30, 900)
 TODOIST_IMPORT_RECOVERY_GRACE_SECONDS = _bounded_integer_setting("TODOIST_IMPORT_RECOVERY_GRACE_SECONDS", 30, 0, 300)
 TODOIST_IMPORT_SOURCE_RETENTION_HOURS = _bounded_integer_setting("TODOIST_IMPORT_SOURCE_RETENTION_HOURS", 24, 1, 168)

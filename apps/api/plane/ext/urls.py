@@ -72,6 +72,8 @@ from plane.ext.views.capacity import (
     WorkshopSearchEndpoint,
 )
 
+from plane.ext.views.capacity_import import TrainingImportEndpoint
+from plane.ext.views.capacity_report import TrainingReportEndpoint
 from plane.ext.views.capacity_training import GoogleTrainingRulesEndpoint, GoogleTrainingLinkEndpoint
 from plane.ext.views.workshop_template import (
     WorkshopApplyChecklistEndpoint,
@@ -86,6 +88,16 @@ PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
 EPIC_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>/epics"
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/capacity/training-imports/",
+        TrainingImportEndpoint.as_view(),
+        name="capacity-training-imports",
+    ),
+    path(
+        "workspaces/<str:slug>/capacity/training-report/",
+        TrainingReportEndpoint.as_view(),
+        name="capacity-training-report",
+    ),
     path("workspaces/<str:slug>/capacity/google/training-rules/", GoogleTrainingRulesEndpoint.as_view()),
     path("workspaces/<str:slug>/capacity/google/training-rules/<uuid:rule_id>/", GoogleTrainingRulesEndpoint.as_view()),
     path("workspaces/<str:slug>/capacity/google/training-links/", GoogleTrainingLinkEndpoint.as_view()),

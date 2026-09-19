@@ -150,6 +150,18 @@ app.conf.beat_schedule = {
         "task": "plane.ext.tasks.dispatch_pending_imports",
         "schedule": 30.0,
     },
+    # Recognized training invitations are materialized for reporting. Every
+    # quarter hour is an incremental read of what Google says changed; the daily
+    # full rescan is what may conclude that something disappeared, because an
+    # incremental pass cannot see an event that moved out of the window.
+    "dispatch-training-calendar-sweeps": {
+        "task": "plane.ext.tasks.dispatch_training_calendar_sweeps",
+        "schedule": crontab(minute="*/15"),
+    },
+    "prune-training-event-occurrences": {
+        "task": "plane.ext.tasks.prune_training_event_occurrences",
+        "schedule": crontab(hour=4, minute=10),
+    },
     "recover-expired-todoist-import-leases": {
         "task": "plane.ext.tasks.recover_expired_import_leases",
         "schedule": 30.0,

@@ -7,7 +7,7 @@
 import React, { useMemo } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { CalendarClock, CalendarSearch, Ellipsis, Users } from "lucide-react";
+import { CalendarClock, CalendarPlus, CalendarSearch, ChartColumn, Ellipsis, Users } from "lucide-react";
 import { Disclosure, Transition } from "@headlessui/react";
 // plane imports
 import {
@@ -124,6 +124,24 @@ export const SidebarMenuItems = observer(function SidebarMenuItems() {
       href: `/${workspaceSlug}/capacity/planner/`,
       access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
       Icon: CalendarSearch,
+    },
+    {
+      key: "capacity-reports",
+      label: "Training report",
+      labelTranslationKey: "",
+      href: `/${workspaceSlug}/capacity/reports/`,
+      access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+      Icon: ChartColumn,
+    },
+    {
+      // Administrator-only: the listing carries calendar titles, which the rest
+      // of the product deliberately does not show.
+      key: "capacity-imports",
+      label: "Import from calendar",
+      labelTranslationKey: "",
+      href: `/${workspaceSlug}/capacity/imports/`,
+      access: [EUserWorkspaceRoles.ADMIN],
+      Icon: CalendarPlus,
     },
   ];
 
