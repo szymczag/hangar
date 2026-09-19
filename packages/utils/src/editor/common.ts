@@ -7,6 +7,7 @@
 // local imports
 import { isAssetId } from "../asset-id";
 import { getFileURL } from "../file";
+import { parseInertHTML } from "../inert-html";
 
 type TEditorSrcArgs = {
   assetId: string;
@@ -49,10 +50,9 @@ export const getEditorAssetDownloadSrc = (args: TEditorSrcArgs): string | undefi
 export const getTextContent = (jsx: React.ReactNode | null | undefined): string => {
   if (!jsx) return "";
 
-  // DOMParser, not innerHTML on a live-document element: the latter loads
-  // `<img onerror>` and runs its handler even while detached.
-  const body = new DOMParser().parseFromString(jsx.toString(), "text/html").body;
-  return body.textContent?.trim() ?? "";
+  // Parsed inert, not through innerHTML on a live-document element: the latter
+  // loads `<img onerror>` and runs its handler even while detached.
+  return parseInertHTML(jsx.toString()).body.textContent?.trim() ?? "";
 };
 
 export const isEditorEmpty = (description: string | undefined): boolean =>

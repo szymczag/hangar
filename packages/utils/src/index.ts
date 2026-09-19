@@ -20,6 +20,7 @@ export * from "./estimates";
 export * from "./file";
 export * from "./filter";
 export * from "./get-icon-for-link";
+export * from "./inert-html";
 export * from "./intake";
 export * from "./loader";
 export * from "./math";

@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { parseInertHTML } from "@plane/utils";
 import { assetDuplicationHandlers } from "@/plane-editor/helpers/asset-duplication";
 
 // Clipboard HTML is parsed into a DOMParser document, never assigned to
@@ -12,7 +13,7 @@ import { assetDuplicationHandlers } from "@/plane-editor/helpers/asset-duplicati
 // `<img src=x onerror=...>` would load and run its handler before the schema
 // ever filters the paste. A DOMParser document has no browsing context:
 // nothing loads and no handler runs.
-const parseInertBody = (html: string): HTMLElement => new DOMParser().parseFromString(html, "text/html").body;
+const parseInertBody = (html: string): HTMLElement => parseInertHTML(html).body;
 
 // Utility function to process HTML content with all registered handlers
 export const processAssetDuplication = (htmlContent: string): { processedHtml: string } => {

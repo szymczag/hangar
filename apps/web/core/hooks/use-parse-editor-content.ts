@@ -8,7 +8,7 @@ import { useCallback } from "react";
 // plane types
 import type { TSearchEntities } from "@plane/types";
 // helpers
-import { getBase64Image, getEditorAssetSrc } from "@plane/utils";
+import { getBase64Image, getEditorAssetSrc, parseInertHTML } from "@plane/utils";
 import type { TCustomComponentsMetaData } from "@plane/utils";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
@@ -37,10 +37,8 @@ export const useParseEditorContent = (args: TArgs) => {
   const replaceCustomComponentsFromHTMLContent = useCallback(
     async (props: { htmlContent: string; noAssets?: boolean }): Promise<string> => {
       const { htmlContent, noAssets = false } = props;
-      // create a DOM parser
-      const parser = new DOMParser();
-      // parse the HTML string into a DOM document
-      const doc = parser.parseFromString(htmlContent, "text/html");
+      // parse the HTML string into an inert DOM document
+      const doc = parseInertHTML(htmlContent);
       // replace all mention-component elements
       const mentionComponents = doc.querySelectorAll("mention-component");
       mentionComponents.forEach((component) => {
@@ -219,8 +217,7 @@ export const useParseEditorContent = (args: TArgs) => {
 
   const getEditorMetaData = useCallback(
     (htmlContent: string): TCustomComponentsMetaData => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlContent, "text/html");
+      const doc = parseInertHTML(htmlContent);
       const filesMetaData: TCustomComponentsMetaData["file_assets"] = [];
       // process image components
       const imageComponents = doc.querySelectorAll("image-component");
