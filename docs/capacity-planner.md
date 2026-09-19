@@ -183,3 +183,15 @@ unaffected.
 Importing a training from the calendar deliberately does not perform this check:
 it records what the calendar already says is happening, so refusing an overlap
 there would refuse to reflect reality.
+
+Reservations and saved plans are capped per person per workspace
+(`CAPACITY_MAX_ACTIVE_HOLDS_PER_USER`, default ten; `CAPACITY_MAX_PLAN_DRAFTS_PER_USER`,
+default fifty). A reservation removes a trainer's time from circulation for
+seventy-two hours, so the number one person may hold at once is a direct limit
+on everybody else's ability to book, and nothing bounded it before. Expired
+reservations hold nothing and do not count.
+
+Taking or spending a reservation is throttled with the same limits as the
+capacity ledger, and shares its budget on purpose: both read Google before
+deciding anything, so a caller who only ever receives conflicts still spends the
+quota the ledger's throttle exists to protect.
