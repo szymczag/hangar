@@ -102,9 +102,9 @@ class GoogleTrainingRulesEndpoint(BaseAPIView):
         #
         # Re-adding the rule re-adopts them, because the occurrence key does not
         # depend on the rule.
-        retired = TrainingEventOccurrence.objects.filter(
-            rule=rule, state=TrainingEventOccurrence.State.ACTIVE
-        ).update(state=TrainingEventOccurrence.State.DISAPPEARED, updated_at=timezone.now())
+        retired = TrainingEventOccurrence.objects.filter(rule=rule, state=TrainingEventOccurrence.State.ACTIVE).update(
+            state=TrainingEventOccurrence.State.DISAPPEARED, updated_at=timezone.now()
+        )
         rule.delete()
         logger.info("Training rule removed", extra={"rule_id": str(rule_id), "retired_occurrences": retired})
         return Response(status=204)

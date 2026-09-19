@@ -92,9 +92,7 @@ def _sync_status(profile, now):
 
 
 def _coverage(workspace_id, start, end):
-    states = list(
-        TrainingCalendarSyncState.objects.filter(workspace_id=workspace_id).select_related("rule")
-    )
+    states = list(TrainingCalendarSyncState.objects.filter(workspace_id=workspace_id).select_related("rule"))
     now = timezone.now()
     calendars = []
     successes = []
@@ -199,9 +197,7 @@ class TrainingReportEndpoint(BaseAPIView):
             sync_status = _sync_status(profile, now)
             mine = by_trainer.get(profile.user_id, [])
             if sync_status == "ok":
-                linked = linked_sessions(
-                    workspace.id, profile.user_id, [item[0] for item in mine], start, end
-                )
+                linked = linked_sessions(workspace.id, profile.user_id, [item[0] for item in mine], start, end)
                 external = external_counts(mine, linked=linked, start=start, end=end)
             else:
                 # No usable data for this trainer. Reporting zeroes would read as

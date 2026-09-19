@@ -243,9 +243,11 @@ def _cancel(rule, cancelled_keys, now):
     """
     if not cancelled_keys:
         return 0
-    return TrainingEventOccurrence.objects.filter(rule=rule, event_key__in=list(cancelled_keys)).exclude(
-        state=TrainingEventOccurrence.State.CANCELLED
-    ).update(state=TrainingEventOccurrence.State.CANCELLED, last_seen_at=now, updated_at=now)
+    return (
+        TrainingEventOccurrence.objects.filter(rule=rule, event_key__in=list(cancelled_keys))
+        .exclude(state=TrainingEventOccurrence.State.CANCELLED)
+        .update(state=TrainingEventOccurrence.State.CANCELLED, last_seen_at=now, updated_at=now)
+    )
 
 
 def sweep_rule(client, rule, *, now=None, full=False):
@@ -342,9 +344,7 @@ def sweep_rule(client, rule, *, now=None, full=False):
         state.save()
         for reader_profile, _ in readers:
             _remember_consent(reader_profile, TrainerTrainingSyncState.ConsentState.OK)
-            TrainerTrainingSyncState.objects.filter(trainer_profile=reader_profile).update(
-                last_materialized_at=now
-            )
+            TrainerTrainingSyncState.objects.filter(trainer_profile=reader_profile).update(last_materialized_at=now)
 
     return {"matched": matched, "cancelled": cancelled, "disappeared": disappeared, "readers": len(readers)}
 
@@ -363,12 +363,10 @@ def _calendar_hash(calendar_id):
 
 def _mark_disappeared(rule, pass_started_at, window_start, window_end):
     """Only ever called for a full pass -- see `training_sweep.disappeared_after`."""
-    return (
-        TrainingEventOccurrence.objects.filter(
-            rule=rule,
-            starts_at__lt=window_end,
-            ends_at__gt=window_start,
-            last_seen_at__lt=pass_started_at,
-            state=TrainingEventOccurrence.State.ACTIVE,
-        ).update(state=TrainingEventOccurrence.State.DISAPPEARED, updated_at=django_timezone.now())
-    )
+    return TrainingEventOccurrence.objects.filter(
+        rule=rule,
+        starts_at__lt=window_end,
+        ends_at__gt=window_start,
+        last_seen_at__lt=pass_started_at,
+        state=TrainingEventOccurrence.State.ACTIVE,
+    ).update(state=TrainingEventOccurrence.State.DISAPPEARED, updated_at=django_timezone.now())
