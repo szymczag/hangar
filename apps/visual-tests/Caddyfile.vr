@@ -30,7 +30,10 @@
 	handle /static/* {
 		reverse_proxy vr-api:8000
 	}
-	handle /uploads/* {
+	# The bucket itself as well as its objects: a presigned upload posts to
+	# /uploads, without a trailing slash.
+	@uploads path /uploads /uploads/*
+	handle @uploads {
 		reverse_proxy vr-minio:9000
 	}
 

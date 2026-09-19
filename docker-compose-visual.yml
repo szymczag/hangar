@@ -115,6 +115,10 @@ services:
       # the counts the seed wrote instead of racing to completion.
       AMQP_URL: redis://vr-redis:6379/1
       AWS_S3_ENDPOINT_URL: http://vr-minio:9000
+      # Presigned upload and download URLs point at the edge, which proxies
+      # the bucket as apps/proxy/Caddyfile.ce does, so the browser stores a
+      # file on the page's own origin (connect-src and img-src allow no other).
+      AWS_S3_PUBLIC_ENDPOINT_URL: http://vr-edge
       CORS_ALLOWED_ORIGINS: http://vr-edge,http://localhost:8100
       # Fixed rather than random: a changing key changes what encrypted instance
       # configuration decrypts to, and with it what the interface renders.

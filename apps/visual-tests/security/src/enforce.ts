@@ -31,6 +31,15 @@ export const trustedTypesMode = (): TTrustedTypesMode =>
 const META = new RegExp(`(<meta name="${TRUSTED_TYPES_META_NAME}" content=")[a-z]*(")`);
 
 /**
+ * Which requests are routed at all: anything that can be a document. Routing
+ * every request made a page's many module requests wait on the suite, and
+ * Chromium failed some with ERR_INSUFFICIENT_RESOURCES.
+ */
+const mayBeDocument = (url: URL) =>
+  !/^\/(api|live|uploads)\//.test(url.pathname) &&
+  !/\.(js|mjs|css|map|json|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|txt|webmanifest)$/.test(url.pathname);
+
+/**
  * Enforces, on every document the context loads, the application's policy and
  * Trusted Types (the measurement policy's directives, enforced instead of
  * reported). Web and admin get the policy their build generated, as nginx
@@ -41,7 +50,7 @@ const META = new RegExp(`(<meta name="${TRUSTED_TYPES_META_NAME}" content=")[a-z
 export async function enforceContentSecurityPolicy(context: BrowserContext) {
   const policies = { web: builtPolicy("web"), admin: builtPolicy("admin") };
   const mode = trustedTypesMode();
-  await context.route("**/*", async (route) => {
+  await context.route(mayBeDocument, async (route) => {
     const request = route.request();
     if (request.resourceType() !== "document") return route.fallback();
     const path = new URL(request.url()).pathname;
