@@ -99,5 +99,13 @@ LOGGING = {
             "handlers": ["console"],
             "propagate": False,
         },
+        # Content-Security-Policy violation reports (plane/web/views.py). Without
+        # an entry here they reached only Python's last-resort handler, which
+        # prints the message and drops every field of the report.
+        "plane.security": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+        },
     },
 }

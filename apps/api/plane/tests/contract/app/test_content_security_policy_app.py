@@ -66,8 +66,11 @@ class TestCspReportEndpoint:
                 content_type="application/csp-report",
             )
 
-        fields = next(r for r in caplog.records if r.name == "plane.security.csp").csp_report
+        record = next(r for r in caplog.records if r.name == "plane.security.csp")
+        fields = record.csp_report
         assert fields["script-sample"] == "Element innerHTML|<svg xmlns="
+        # Readable whatever the formatter: the fields are in the message itself.
+        assert '"script-sample": "Element innerHTML|<svg xmlns="' in record.getMessage()
         assert fields["disposition"] == "report"
         assert fields["column-number"] == "1793"
 

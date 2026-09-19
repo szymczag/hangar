@@ -64,5 +64,12 @@ def csp_report(request):
         return HttpResponse(status=400)
 
     fields = {field: str(report.get(field, ""))[:512] for field in CSP_REPORT_FIELDS}
-    csp_logger.warning("Content-Security-Policy violation", extra={"csp_report": fields})
+    # The fields go into the message as well as `extra`: a formatter that does
+    # not print extras (plain text, or none configured) would otherwise log a
+    # violation with nothing that says what was violated.
+    csp_logger.warning(
+        "Content-Security-Policy violation %s",
+        json.dumps({key: value for key, value in fields.items() if value}, sort_keys=True),
+        extra={"csp_report": fields},
+    )
     return HttpResponse(status=204)
