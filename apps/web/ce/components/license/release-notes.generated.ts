@@ -11,10 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.58",
+  version: "0.1.0-rc.61",
   highlights: [
-    "A work item with five or more updates at once now notifies its watchers.",
-    "A release can no longer be tagged with documentation naming the previous one.",
+    "Pasted HTML is now inspected in a document that cannot run it.",
+    "Placing a workshop session requires the role that editing one requires.",
+    "Reservations are bounded, and the paths that spend calendar quota are throttled.",
+    "The background sweep reads calendar event titles. The availability path still does not.",
   ],
   upstream: {
     version: "1.4.0",
