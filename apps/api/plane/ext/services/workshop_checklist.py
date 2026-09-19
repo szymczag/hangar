@@ -156,9 +156,7 @@ def apply_checklist_template(*, template, issue, actor, request=None):
     role_members = _role_members(items)
     requested = set()
     for item in items:
-        requested.update(
-            _assignee_ids(item, workshop_trainer_ids=workshop_trainer_ids, role_members=role_members)
-        )
+        requested.update(_assignee_ids(item, workshop_trainer_ids=workshop_trainer_ids, role_members=role_members))
     allowed = _assignable(issue.project_id, requested)
     skipped_assignees = sorted(str(value) for value in requested - allowed)
 
@@ -239,9 +237,7 @@ def apply_checklist_template(*, template, issue, actor, request=None):
         payloads = [
             {
                 "issue_id": str(child.id),
-                "requested_data": json.dumps(
-                    {"name": child.name, "parent_id": str(issue.id)}, cls=DjangoJSONEncoder
-                ),
+                "requested_data": json.dumps({"name": child.name, "parent_id": str(issue.id)}, cls=DjangoJSONEncoder),
             }
             for child in created
         ]

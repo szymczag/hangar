@@ -14,8 +14,6 @@ from plane.ext.models import (
     TrainerProfile,
     WorkshopChecklistOrigin,
     WorkshopChecklistTemplate,
-    WorkshopSchedule,
-    WorkshopSession,
 )
 from plane.ext.services.issue_types import ensure_project_system_types, ensure_project_workshop_type
 from plane.tests.factories import UserFactory
@@ -445,7 +443,7 @@ def test_scheduling_the_workshop_dates_a_checklist_that_had_no_date_yet(settings
     """
     settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
     project = _project(workspace, create_user)
-    trainer = TrainerProfile.objects.create(workspace=workspace, user=create_user)
+    TrainerProfile.objects.create(workspace=workspace, user=create_user)
     issue = _workshop(project, create_user, assignees=[create_user])
     client, csrf = _client(create_user)
     template_id = client.post(

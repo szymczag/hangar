@@ -87,9 +87,7 @@ class WorkshopChecklistTemplate(BaseModel):
     project. `WorkspaceHomeDefault` is the same shape for the same reason.
     """
 
-    workspace = models.ForeignKey(
-        "db.Workspace", on_delete=models.CASCADE, related_name="workshop_checklist_templates"
-    )
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workshop_checklist_templates")
     name = models.CharField(max_length=120)
     # At most one per workspace is applied automatically to a new Workshop. The
     # uniqueness of that is enforced by the view, not the database: an operator

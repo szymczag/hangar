@@ -73,7 +73,10 @@ def _parse_items(raw, *, workspace):
             return None, Response({"error": f"Item {position + 1} must be an object."}, status=400)
         title = entry.get("title")
         if not isinstance(title, str) or not title.strip() or len(title) > 255:
-            return None, Response({"error": f"Item {position + 1} requires a title of up to 255 characters."}, status=400)
+            return None, Response(
+                {"error": f"Item {position + 1} requires a title of up to 255 characters."},
+                status=400,
+            )
         title = title.strip()
         # The checklist is applied by name, so two items sharing one would make
         # the second permanently unappliable.
@@ -83,7 +86,10 @@ def _parse_items(raw, *, workspace):
 
         description = entry.get("description", "")
         if not isinstance(description, str) or len(description) > 5000:
-            return None, Response({"error": f"Item {position + 1}: description must be text under 5000 characters."}, status=400)
+            return None, Response(
+                {"error": f"Item {position + 1}: description must be text under 5000 characters."},
+                status=400,
+            )
 
         mode = entry.get("assignee_mode", WorkshopChecklistItem.AssigneeMode.UNASSIGNED)
         if mode not in ASSIGNEE_MODES:
@@ -95,9 +101,7 @@ def _parse_items(raw, *, workspace):
                 assignee_id = UUID(str(assignee_id))
             except (TypeError, ValueError):
                 return None, Response({"error": f"Item {position + 1} requires a valid assignee."}, status=400)
-            if not WorkspaceMember.objects.filter(
-                workspace=workspace, member_id=assignee_id, is_active=True
-            ).exists():
+            if not WorkspaceMember.objects.filter(workspace=workspace, member_id=assignee_id, is_active=True).exists():
                 return None, Response(
                     {"error": f"Item {position + 1}: that person is not an active member of this workspace."},
                     status=400,
@@ -124,7 +128,11 @@ def _parse_items(raw, *, workspace):
             return None, Response({"error": f"Item {position + 1}: offset_days must be a whole number."}, status=400)
         if not -MAX_OFFSET_DAYS <= offset_days <= MAX_OFFSET_DAYS:
             return None, Response(
-                {"error": f"Item {position + 1}: offset_days must be between -{MAX_OFFSET_DAYS} and {MAX_OFFSET_DAYS}."},
+                {
+                    "error": (
+                        f"Item {position + 1}: offset_days must be between -{MAX_OFFSET_DAYS} and {MAX_OFFSET_DAYS}."
+                    )
+                },
                 status=400,
             )
 
@@ -212,11 +220,7 @@ class WorkshopRoleListEndpoint(BaseAPIView):
     def get(self, request, slug):
         if response := _disabled():
             return response
-        roles = (
-            WorkshopRole.objects.filter(workspace__slug=slug)
-            .prefetch_related("memberships")
-            .order_by("name", "id")
-        )
+        roles = WorkshopRole.objects.filter(workspace__slug=slug).prefetch_related("memberships").order_by("name", "id")
         return Response({"results": [_role_payload(role) for role in roles]})
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
@@ -456,9 +460,7 @@ class WorkshopApplyChecklistEndpoint(BaseAPIView):
             if template is None:
                 return Response({"error": "This workspace has no default checklist template."}, status=404)
 
-        result = apply_checklist_template(
-            template=template, issue=issue, actor=request.user, request=request
-        )
+        result = apply_checklist_template(template=template, issue=issue, actor=request.user, request=request)
         _audit(
             request,
             workspace_id=issue.workspace_id,
