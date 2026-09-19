@@ -15,6 +15,7 @@ import {
   TRUSTED_TYPES_POLICY_NAMES,
   inertHTML,
   installTrustedTypesPolicies,
+  trustedTypesModeFromDocument,
 } from "../src/trusted-types.mjs";
 
 // A stand-in for the browser: records the policies created, and a DOMParser
@@ -99,6 +100,77 @@ test("the default policy observes: it returns every value unchanged", () => {
   assert.equal(sent[0][0], "/api/csp-report/");
   assert.equal(sent[0][1]["csp-report"].disposition, "observe");
   assert.equal(sent[0][1]["csp-report"]["blocked-uri"], "Element innerHTML");
+});
+
+test("enforcing, the default policy returns what the sanitizer returns and reports the change", () => {
+  withBrowser();
+  const sent = [];
+  installTrustedTypesPolicies({
+    mode: "enforce",
+    sanitize: (value) => value.replace(" onclick=x", ""),
+    send: (url, body) => sent.push(JSON.parse(body)["csp-report"]),
+  });
+  const policy = policies.get("default");
+  assert.equal(policy.rules.createHTML("<p onclick=x>a</p>", "TrustedHTML", "Element innerHTML"), "<p>a</p>");
+  assert.equal(policy.rules.createHTML("<p>fine</p>", "TrustedHTML", "Element innerHTML"), "<p>fine</p>");
+  assert.deepEqual(
+    sent.map((report) => [report["violated-directive"], report.disposition]),
+    [["html-changed", "enforce"]]
+  );
+});
+
+test("enforcing, script text and cross-origin script URLs are refused", () => {
+  withBrowser();
+  const sent = [];
+  installTrustedTypesPolicies({ mode: "enforce", send: (url, body) => sent.push(JSON.parse(body)["csp-report"]) });
+  const policy = policies.get("default");
+  assert.equal(policy.rules.createScript("alert(1)", "TrustedScript", "HTMLScriptElement text"), undefined);
+  assert.equal(
+    policy.rules.createScriptURL("https://evil.example/x.js", "TrustedScriptURL", "HTMLScriptElement src"),
+    undefined
+  );
+  assert.equal(
+    policy.rules.createScriptURL("/assets/chunk.js", "TrustedScriptURL", "HTMLScriptElement src"),
+    "/assets/chunk.js"
+  );
+  assert.deepEqual(
+    sent.map((report) => report["violated-directive"]),
+    ["script", "script-url"]
+  );
+});
+
+test("enforcing, a failing sanitizer fails closed and a known library script passes", () => {
+  withBrowser();
+  installTrustedTypesPolicies({
+    mode: "enforce",
+    sanitize: () => {
+      throw new Error("boom");
+    },
+    send: () => {},
+  });
+  const policy = policies.get("default");
+  assert.equal(policy.rules.createHTML("<p>a</p>", "TrustedHTML", "Element innerHTML"), "");
+  const script =
+    '((e,t)=>{let n=document.documentElement,r=["light","dark"];try{localStorage.getItem(e)}catch{}' +
+    'matchMedia("(prefers-color-scheme: dark)")})("theme")';
+  assert.ok(KNOWN_LIBRARY_SCRIPTS.some((known) => known.matches(script)));
+  assert.equal(policy.rules.createHTML(script, "TrustedHTML", "Element innerHTML"), script);
+});
+
+/** A document whose meta tag (in the head or the body) says `content`. */
+const documentWith = (content, where = "head") => {
+  const meta = { getAttribute: () => content };
+  const scope = { querySelector: (selector) => (selector.includes("hangar-trusted-types") ? meta : null) };
+  return where === "head" ? { head: scope } : { head: { querySelector: () => null }, body: scope };
+};
+
+test("the mode comes from the document's head, and anything unknown means report", () => {
+  assert.equal(trustedTypesModeFromDocument(documentWith("enforce")), "enforce");
+  assert.equal(trustedTypesModeFromDocument(documentWith("off")), "off");
+  assert.equal(trustedTypesModeFromDocument(documentWith("sanitize")), "report");
+  // Markup in the body cannot choose the mode.
+  assert.equal(trustedTypesModeFromDocument(documentWith("off", "body")), "report");
+  assert.equal(trustedTypesModeFromDocument(undefined), "report");
 });
 
 test("nothing is reported when the sanitizer would not change the value", () => {

@@ -15,6 +15,7 @@ import {
   inlineScriptHashes,
   policyHeaderName,
   runtimeSourcesFromEnv,
+  trustedTypesHeaderName,
   trustedTypesModeFromEnv,
   trustedTypesReportPolicy,
 } from "../src/index.mjs";
@@ -84,5 +85,13 @@ test("Trusted Types is measured in a policy of its own and can be switched off",
   assert.equal(trustedTypesReportPolicy({ mode: "off", reportUri: "/api/csp-report/" }), "");
   assert.equal(trustedTypesModeFromEnv({}), "report");
   assert.equal(trustedTypesModeFromEnv({ HANGAR_CSP_TRUSTED_TYPES: "off" }), "off");
-  assert.equal(trustedTypesModeFromEnv({ HANGAR_CSP_TRUSTED_TYPES: "enforce" }), "report");
+  assert.equal(trustedTypesModeFromEnv({ HANGAR_CSP_TRUSTED_TYPES: "enforce" }), "enforce");
+  // A typo must not enforce, nor switch measuring off.
+  assert.equal(trustedTypesModeFromEnv({ HANGAR_CSP_TRUSTED_TYPES: "enforced" }), "report");
+  assert.equal(trustedTypesHeaderName("report"), "Content-Security-Policy-Report-Only");
+  assert.equal(trustedTypesHeaderName("enforce"), "Content-Security-Policy");
+  assert.equal(
+    trustedTypesReportPolicy({ mode: "enforce", reportUri: "/api/csp-report/" }),
+    `${TRUSTED_TYPES_MEASUREMENT}; report-uri /api/csp-report/`
+  );
 });

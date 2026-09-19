@@ -7,6 +7,7 @@
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts } from "react-router";
 import type { LinksFunction } from "react-router";
+import { DEFAULT_TRUSTED_TYPES_MODE, TRUSTED_TYPES_META_NAME } from "@plane/csp/trusted-types";
 import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
 import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
@@ -50,6 +51,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* The Trusted Types mode, which nginx rewrites to match the headers it
+            sends (@plane/csp); the entry reads it before React renders. */}
+        <meta name={TRUSTED_TYPES_META_NAME} content={DEFAULT_TRUSTED_TYPES_MODE} suppressHydrationWarning />
         <script src="/config.js" />
         <Meta />
         <Links />

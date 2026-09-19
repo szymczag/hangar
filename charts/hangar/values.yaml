@@ -205,9 +205,11 @@ contentSecurityPolicy:
   frameSrc: ""
   # Who may embed a published Spaces board; "'self'" allows only this instance.
   spaceFrameAncestors: "'self'"
-  # Trusted Types measurement: "report" sends a second, always report-only
-  # policy so the browser reports every DOM sink that still takes a plain
-  # string (docs/trusted-types-plan.md); "off" removes it. It never enforces.
+  # Trusted Types (docs/trusted-types-plan.md), a policy of its own that does
+  # not follow reportOnly. "report" reports every DOM sink that still takes a
+  # plain string while the pages' default policy only observes; "enforce"
+  # enforces it and the default policy sanitizes -- opt in only after a release
+  # cycle of reports shows nothing legitimate would change; "off" removes it.
   trustedTypes: report
 
 web:

@@ -138,22 +138,25 @@ export const policyHeaderName = (env = process.env) => {
   return reportOnly ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 };
 
-// Trusted Types, phase 0 of docs/trusted-types-plan.md: measure, never enforce.
+// Trusted Types (docs/trusted-types-plan.md).
 //
-// Sent as its own Content-Security-Policy-Report-Only header, separate from
-// the policy above, so it stays report-only when that policy is enforced.
-// The browser reports policy creation as well as
-// every sink that receives a plain string, which is the inventory the later
-// phases need. `trusted-types` names the policies @plane/csp/trusted-types
-// creates (and DOMPurify's own), so any other policy a library creates is
-// reported. HANGAR_CSP_TRUSTED_TYPES=off removes the header.
+// Sent as its own header, separate from the policy above, so its mode does not
+// follow HANGAR_CSP_REPORT_ONLY: enforcing the main policy does not start
+// enforcing Trusted Types, and HANGAR_CSP_TRUSTED_TYPES=enforce enforces them
+// even while the main policy only reports. The browser reports policy creation
+// as well as every sink that receives a plain string. `trusted-types` names
+// the policies @plane/csp/trusted-types creates (and DOMPurify's own), so any
+// other policy a library creates is reported, or refused when enforced.
 export const TRUSTED_TYPES_MEASUREMENT =
   "require-trusted-types-for 'script'; trusted-types hangar-inert default dompurify";
 
-export const trustedTypesModeFromEnv = (env = process.env) =>
-  env.HANGAR_CSP_TRUSTED_TYPES === "off" ? "off" : "report";
+export { trustedTypesModeFromEnv } from "./trusted-types-mode.mjs";
 
-/** The report-only Trusted Types policy, or "" when measurement is off. */
+/** The header that carries the Trusted Types policy in the given mode. */
+export const trustedTypesHeaderName = (mode = "report") =>
+  mode === "enforce" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only";
+
+/** The Trusted Types policy, or "" when it is off. */
 export const trustedTypesReportPolicy = ({ reportUri = "", mode = "report" } = {}) =>
   mode === "off"
     ? ""

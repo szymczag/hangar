@@ -18,6 +18,7 @@ import { dirname } from "node:path";
 import { parseArgs } from "node:util";
 
 import { RUNTIME_STYLE_ELEMENTS, buildContentSecurityPolicy, hashSource, inlineScriptHashes } from "../src/index.mjs";
+import { DEFAULT_TRUSTED_TYPES_MODE, trustedTypesMetaTag } from "../src/trusted-types-mode.mjs";
 
 const { values } = parseArgs({
   options: {
@@ -31,11 +32,21 @@ if (!values.html || !values.out) {
   process.exit(2);
 }
 
-const scriptSources = inlineScriptHashes(readFileSync(values.html, "utf8"));
+const html = readFileSync(values.html, "utf8");
+const scriptSources = inlineScriptHashes(html);
 if (scriptSources.length === 0) {
   // React Router always inlines its context and module loader; finding none
   // means the HTML is not the build output this was meant for.
   console.error(`hangar-csp-nginx: no inline scripts found in ${values.html}`);
+  process.exit(1);
+}
+
+// The client learns the Trusted Types mode from this tag, which nginx rewrites
+// below. Without it HANGAR_CSP_TRUSTED_TYPES=enforce would enforce the header
+// while the default policy kept passing every value through.
+const metaTag = trustedTypesMetaTag(DEFAULT_TRUSTED_TYPES_MODE);
+if (!html.includes(metaTag)) {
+  console.error(`hangar-csp-nginx: ${values.html} has no ${metaTag}> in its head (see TrustedTypesMeta).`);
   process.exit(1);
 }
 
@@ -59,9 +70,12 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header X-XSS-Protection "0" always;
 add_header \${HANGAR_CSP_HEADER} "${policy}\${HANGAR_CSP_REPORT}" always;
-# Trusted Types measurement, always report-only; empty (header omitted) when
-# HANGAR_CSP_TRUSTED_TYPES=off.
-add_header Content-Security-Policy-Report-Only "\${HANGAR_CSP_TRUSTED_TYPES_POLICY}" always;
+# Trusted Types, in its own header: report-only unless
+# HANGAR_CSP_TRUSTED_TYPES=enforce, omitted (empty) when it is off. The page is
+# told the same mode, so its default policy observes or sanitizes to match.
+add_header \${HANGAR_CSP_TRUSTED_TYPES_HEADER} "\${HANGAR_CSP_TRUSTED_TYPES_POLICY}" always;
+sub_filter '${metaTag}' '${trustedTypesMetaTag("${HANGAR_CSP_TRUSTED_TYPES_MODE}")}';
+sub_filter_once on;
 `;
 
 mkdirSync(dirname(values.out), { recursive: true });

@@ -85,17 +85,17 @@ output the generator was written for.
 
 All variables are optional.
 
-| Variable                       | Default            | Meaning                                                                                                                                 |
-| ------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `HANGAR_CSP_REPORT_ONLY`       | `true`             | Send `Content-Security-Policy-Report-Only` instead of enforcing. This release reports first; the next one enforces by default.          |
-| `HANGAR_CSP_REPORT_URI`        | `/api/csp-report/` | Where browsers send violation reports. The API logs them under `plane.security.csp`, rate-limited per client. Empty disables reporting. |
-| `HANGAR_CSP_IMG_SRC`           | –                  | Extra image origins, space separated: object storage on another origin, a self-hosted GitLab's avatars.                                 |
-| `HANGAR_CSP_CONNECT_SRC`       | –                  | Extra origins the browser connects to: object storage on another origin, a separate API or live origin.                                 |
-| `HANGAR_CSP_MEDIA_SRC`         | –                  | Extra media origins, normally object storage.                                                                                           |
-| `HANGAR_CSP_FRAME_SRC`         | `'none'`           | Origins that may be framed inside the application, such as a changelog page.                                                            |
-| `HANGAR_CSP_FORM_ACTION`       | –                  | Extra form targets, for an API on another origin.                                                                                       |
-| `HANGAR_SPACE_FRAME_ANCESTORS` | `'self'`           | space only: who may embed a published board.                                                                                            |
-| `HANGAR_CSP_TRUSTED_TYPES`     | `report`           | `report` sends the Trusted Types measurement below; `off` removes it. There is no enforcing value.                                      |
+| Variable                       | Default            | Meaning                                                                                                                                          |
+| ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `HANGAR_CSP_REPORT_ONLY`       | `true`             | Send `Content-Security-Policy-Report-Only` instead of enforcing. This release reports first; the next one enforces by default.                   |
+| `HANGAR_CSP_REPORT_URI`        | `/api/csp-report/` | Where browsers send violation reports. The API logs them under `plane.security.csp`, rate-limited per client. Empty disables reporting.          |
+| `HANGAR_CSP_IMG_SRC`           | –                  | Extra image origins, space separated: object storage on another origin, a self-hosted GitLab's avatars.                                          |
+| `HANGAR_CSP_CONNECT_SRC`       | –                  | Extra origins the browser connects to: object storage on another origin, a separate API or live origin.                                          |
+| `HANGAR_CSP_MEDIA_SRC`         | –                  | Extra media origins, normally object storage.                                                                                                    |
+| `HANGAR_CSP_FRAME_SRC`         | `'none'`           | Origins that may be framed inside the application, such as a changelog page.                                                                     |
+| `HANGAR_CSP_FORM_ACTION`       | –                  | Extra form targets, for an API on another origin.                                                                                                |
+| `HANGAR_SPACE_FRAME_ANCESTORS` | `'self'`           | space only: who may embed a published board.                                                                                                     |
+| `HANGAR_CSP_TRUSTED_TYPES`     | `report`           | `report` sends the Trusted Types policy below report-only; `enforce` enforces it and makes the pages' default policy sanitize; `off` removes it. |
 
 The Helm chart sets these from `contentSecurityPolicy.*` in `values.yaml` and adds
 the object-storage origin itself. With Caddy (`apps/proxy/Caddyfile.ce`)
@@ -107,8 +107,9 @@ narrow this one or conflict with it.
 
 ## Trusted Types measurement
 
-Next to the policy above, every document response carries a second policy that
-is **always** report-only, whatever `HANGAR_CSP_REPORT_ONLY` says:
+Next to the policy above, every document response carries a second policy whose
+mode is `HANGAR_CSP_TRUSTED_TYPES`, whatever `HANGAR_CSP_REPORT_ONLY` says. By
+default it is report-only:
 
 ```
 Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types hangar-inert default dompurify; report-uri /api/csp-report/
@@ -135,6 +136,22 @@ An ordinary editing session produces none.
 `HANGAR_CSP_TRUSTED_TYPES=off` (`contentSecurityPolicy.trustedTypes: off`)
 removes the header, for example if the report volume is unwelcome. Reports
 share the per-client rate limit of the report endpoint.
+
+`HANGAR_CSP_TRUSTED_TYPES=enforce` (`contentSecurityPolicy.trustedTypes:
+enforce`) sends the same policy as `Content-Security-Policy`, so a plain string
+reaching a DOM sink is refused. The page learns the mode from
+`<meta name="hangar-trusted-types">` in its head, which nginx rewrites for web
+and admin and space renders per request. The `default` policy then sanitizes
+instead of observing: HTML reaches the sink as DOMPurify returns it (reported as
+`html-changed` with `disposition: enforce` when that differs), and script text
+and cross-origin script URLs are refused. It is opt-in: turn it on after a
+release cycle in which the observations show nothing legitimate would change,
+first on a staging instance. An unrecognised value means `report`.
+
+Both modes are exercised with the policy enforced by the security suite in
+`apps/visual-tests/security` (`pnpm vr`): the editor, pastes, comments,
+stickies, pages edited through live, the PDF export, a published board and the
+instance console.
 
 ## Rolling out
 

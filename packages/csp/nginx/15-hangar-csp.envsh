@@ -31,14 +31,26 @@ else
   export HANGAR_CSP_HEADER="Content-Security-Policy"
 fi
 
-# Trusted Types measurement (docs/trusted-types-plan.md, phase 0): a second,
-# always report-only policy. An empty value makes nginx omit the header, which
-# is how HANGAR_CSP_TRUSTED_TYPES=off switches it off. The text must equal
+# Trusted Types (docs/trusted-types-plan.md): a policy of its own, whose mode
+# is HANGAR_CSP_TRUSTED_TYPES -- report (default), enforce or off -- and not
+# HANGAR_CSP_REPORT_ONLY. An unknown value means report, never enforce. An
+# empty policy makes nginx omit the header. The mode is also written into the
+# page (the sub_filter in the template), so the browser's default policy
+# sanitizes exactly when the header is enforced. The text must equal
 # TRUSTED_TYPES_MEASUREMENT in @plane/csp; tests/nginx.test.mjs checks it.
-if [ "${HANGAR_CSP_TRUSTED_TYPES:-report}" = "off" ]; then
+case "${HANGAR_CSP_TRUSTED_TYPES:-report}" in
+  off | enforce) export HANGAR_CSP_TRUSTED_TYPES_MODE="${HANGAR_CSP_TRUSTED_TYPES}" ;;
+  *) export HANGAR_CSP_TRUSTED_TYPES_MODE="report" ;;
+esac
+if [ "${HANGAR_CSP_TRUSTED_TYPES_MODE}" = "off" ]; then
   export HANGAR_CSP_TRUSTED_TYPES_POLICY=""
 else
   export HANGAR_CSP_TRUSTED_TYPES_POLICY="require-trusted-types-for 'script'; trusted-types hangar-inert default dompurify${HANGAR_CSP_REPORT}"
+fi
+if [ "${HANGAR_CSP_TRUSTED_TYPES_MODE}" = "enforce" ]; then
+  export HANGAR_CSP_TRUSTED_TYPES_HEADER="Content-Security-Policy"
+else
+  export HANGAR_CSP_TRUSTED_TYPES_HEADER="Content-Security-Policy-Report-Only"
 fi
 
 export NGINX_ENVSUBST_OUTPUT_DIR="/tmp/nginx-conf.d"

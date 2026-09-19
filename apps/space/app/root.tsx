@@ -5,6 +5,11 @@
  */
 
 import { Links, Meta, Outlet, Scripts } from "react-router";
+import {
+  TRUSTED_TYPES_META_NAME,
+  trustedTypesModeFromDocument,
+  trustedTypesModeFromEnv,
+} from "@plane/csp/trusted-types";
 // assets
 import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
@@ -26,6 +31,14 @@ import interVariableWoff2 from "@fontsource-variable/inter/files/inter-latin-wgh
 import "@fontsource/material-symbols-rounded";
 // oxlint-disable-next-line import/no-unassigned-import -- registers the bundled monospace font
 import "@fontsource/ibm-plex-mono";
+
+// On the server, the mode entry.server.tsx sends headers for (read through
+// globalThis: vite's `define` replaces `process.env`); in the browser, the value
+// the server rendered, so hydration never disagrees with it.
+const trustedTypesMode = () =>
+  typeof document === "undefined"
+    ? trustedTypesModeFromEnv((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env)
+    : trustedTypesModeFromDocument();
 
 const APP_TITLE = "Hangar Publish | Share project views with your team";
 const APP_DESCRIPTION = "Publish selected Hangar project views for read-only access.";
@@ -60,6 +73,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
+        {/* The Trusted Types mode entry.server sends headers for; the client
+            entry reads it before React renders, and hydration keeps it. */}
+        <meta name={TRUSTED_TYPES_META_NAME} content={trustedTypesMode()} suppressHydrationWarning />
         <script src="/config.js" />
         <Meta />
         <Links />

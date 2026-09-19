@@ -17,13 +17,26 @@
 // - "default" is what the browser calls when library code hands a plain
 //   string to a guarded sink (TipTap, tiptap-markdown, next-themes, the
 //   progress bar …). The browser calls it even while the header is
-//   report-only, and whatever it returns is what reaches the DOM. It therefore
-//   OBSERVES in this phase: it returns every value unchanged, checks whether
-//   DOMPurify with the editor's configuration would change it, and reports
-//   only when it would. Those reports are the evidence phase 4 needs before
-//   the policy is allowed to change anything.
+//   report-only, and whatever it returns is what reaches the DOM. So what it
+//   does follows the mode the document's headers are in (see
+//   trusted-types-mode.mjs):
+//   - report (default): it OBSERVES. It returns every value unchanged, checks
+//     whether DOMPurify with the editor's configuration would change it, and
+//     reports only when it would. Those reports are the evidence enforcing
+//     needs.
+//   - enforce: it SANITIZES. It returns what DOMPurify returns, refuses
+//     script text and cross-origin script URLs (the browser then blocks the
+//     sink), and reports each change.
 
 import DOMPurify from "dompurify";
+import { DEFAULT_TRUSTED_TYPES_MODE, TRUSTED_TYPES_META_NAME, TRUSTED_TYPES_MODES } from "./trusted-types-mode.mjs";
+
+export {
+  DEFAULT_TRUSTED_TYPES_MODE,
+  TRUSTED_TYPES_META_NAME,
+  TRUSTED_TYPES_MODES,
+  trustedTypesModeFromEnv,
+} from "./trusted-types-mode.mjs";
 
 /** Policy names the Content-Security-Policy `trusted-types` directive allows. */
 export const TRUSTED_TYPES_POLICY_NAMES = ["hangar-inert", "default", "dompurify"];
@@ -117,6 +130,15 @@ const firstDifference = (a, b) => {
   return index;
 };
 
+/**
+ * The mode the document says its headers are in. Read from <head> only, where
+ * the server put it: markup rendered into the body later cannot change it.
+ */
+export const trustedTypesModeFromDocument = (doc = globalThis.document) => {
+  const value = doc?.head?.querySelector?.(`meta[name="${TRUSTED_TYPES_META_NAME}"]`)?.getAttribute("content");
+  return TRUSTED_TYPES_MODES.includes(value) ? value : DEFAULT_TRUSTED_TYPES_MODE;
+};
+
 const isSameOrigin = (value) => {
   try {
     return new URL(String(value), globalThis.location?.href).origin === globalThis.location?.origin;
@@ -128,16 +150,20 @@ const isSameOrigin = (value) => {
 /**
  * Creates the default policy. Call once, first thing in the client entry,
  * before React renders. `reportUrl` receives one report per distinct finding
- * per page load. `sanitize` and `send` exist for tests.
+ * per page load. `mode` defaults to what the document says; `sanitize` and
+ * `send` exist for tests.
  */
 export const installTrustedTypesPolicies = ({
   reportUrl = "/api/csp-report/",
+  mode = trustedTypesModeFromDocument(),
   sanitize = (value) => DOMPurify.sanitize(value, EDITOR_SANITIZE_CONFIG),
   send = (url, body) => globalThis.navigator?.sendBeacon?.(url, new Blob([body], { type: "text/plain" })),
 } = {}) => {
   const api = trustedTypesApi();
   if (!api?.createPolicy || globalThis[INSTALLED]) return false;
   globalThis[INSTALLED] = true;
+  const enforcing = mode === "enforce";
+  const disposition = enforcing ? "enforce" : "observe";
 
   // Inline scripts the document was served with (the next-themes script, React
   // Router's context). The Content-Security-Policy already authorized each by
@@ -164,7 +190,7 @@ export const installTrustedTypesPolicies = ({
             "effective-directive": "trusted-types-default-policy",
             "violated-directive": finding,
             "blocked-uri": sink,
-            disposition: "observe",
+            disposition,
             "script-sample": sample.slice(0, 200),
           },
         })
@@ -174,10 +200,11 @@ export const installTrustedTypesPolicies = ({
     }
   };
 
+  const isKnownScript = (value) => servedInlineScripts.has(value) || isKnownLibraryScript(value);
+
   let observing = false;
   const observeHTML = (value, sink) => {
-    if (observing || value.length > OBSERVE_MAX_LENGTH || servedInlineScripts.has(value) || isKnownLibraryScript(value))
-      return;
+    if (observing || value.length > OBSERVE_MAX_LENGTH || isKnownScript(value)) return;
     observing = true;
     try {
       const canonical = canonicalHTML(value);
@@ -193,25 +220,58 @@ export const installTrustedTypesPolicies = ({
     }
   };
 
+  // Enforcing: what reaches the sink is what DOMPurify returns. Scripts React
+  // renders again (see KNOWN_LIBRARY_SCRIPTS) are the served copies, which the
+  // Content-Security-Policy allowed; they pass. A sanitizer failure fails
+  // closed, to an empty string.
+  const sanitizeHTML = (value, sink) => {
+    if (isKnownScript(value)) return value;
+    let sanitized;
+    try {
+      sanitized = String(sanitize(value));
+    } catch {
+      report("html-sanitizer-failed", sink, value);
+      return "";
+    }
+    if (value.length <= OBSERVE_MAX_LENGTH) {
+      try {
+        const canonical = canonicalHTML(value);
+        if (canonical !== sanitized) {
+          const at = firstDifference(canonical, sanitized);
+          report("html-changed", sink, canonical.slice(Math.max(0, at - 40), at + 160));
+        }
+      } catch {
+        // Reporting must never break the page.
+      }
+    }
+    return sanitized;
+  };
+
   try {
     api.createPolicy("default", {
       createHTML: (value, _type, sink) => {
         // ProseMirror calls the default policy directly, without a sink name.
-        observeHTML(String(value), sink ? String(sink) : "direct call");
+        const label = sink ? String(sink) : "direct call";
+        if (enforcing) return sanitizeHTML(String(value), label);
+        observeHTML(String(value), label);
         return value;
       },
+      // No code of ours or of our libraries builds script text; returning
+      // nothing makes the browser refuse the sink.
       createScript: (value, _type, sink) => {
         report("script", String(sink), String(value));
-        return value;
+        return enforcing ? undefined : value;
       },
       createScriptURL: (value, _type, sink) => {
-        if (!isSameOrigin(value)) report("script-url", String(sink), String(value));
-        return value;
+        if (isSameOrigin(value)) return value;
+        report("script-url", String(sink), String(value));
+        return enforcing ? undefined : value;
       },
     });
   } catch {
-    // Something already created a default policy. Starting the page matters
-    // more than observing it; the report-only header still reports sinks.
+    // Something already created a default policy (or, enforced, the header
+    // does not allow one). Starting the page matters more than observing it;
+    // the header still reports every sink, and refuses them when enforced.
     return false;
   }
   return true;

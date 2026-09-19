@@ -41,6 +41,12 @@ export declare const policyHeaderName: (
 
 export declare const TRUSTED_TYPES_MEASUREMENT: string;
 
-export declare const trustedTypesModeFromEnv: (env?: Record<string, string | undefined>) => "report" | "off";
+export type TTrustedTypesMode = "off" | "report" | "enforce";
 
-export declare const trustedTypesReportPolicy: (options?: { reportUri?: string; mode?: "report" | "off" }) => string;
+export declare const trustedTypesModeFromEnv: (env?: Record<string, string | undefined>) => TTrustedTypesMode;
+
+export declare const trustedTypesHeaderName: (
+  mode?: TTrustedTypesMode
+) => "Content-Security-Policy" | "Content-Security-Policy-Report-Only";
+
+export declare const trustedTypesReportPolicy: (options?: { reportUri?: string; mode?: TTrustedTypesMode }) => string;
