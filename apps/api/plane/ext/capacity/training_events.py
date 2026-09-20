@@ -14,7 +14,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from plane.ext.capacity.cache import register_busy_cache_key
 from plane.ext.capacity.crypto import decrypt_value
 from plane.ext.capacity.google import GoogleCalendarError
-from plane.ext.models import GoogleTrainingRule, GoogleTrainingEventLink
+from plane.ext.capacity.training_workload import external_counts, linked_sessions, occurrence_tuples
+from plane.ext.models import GoogleTrainingRule
 
 EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly"
 
@@ -63,15 +64,32 @@ def recognized_event(event, *, organizer, participant, calendar_id):
     end = event_time(event.get("end"), event.get("calendar_timezone", "UTC"))
     if start >= end:
         raise GoogleCalendarError("invalid_event_time")
-    # iCalUID plus original occurrence distinguishes recurrence while deduplicating
-    # the same invitation seen through multiple configured calendars.
+    return {
+        "key": event_key(event, calendar_id=calendar_id),
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "status": status,
+    }
+
+
+def event_key(event, *, calendar_id):
+    """The stable identity of one occurrence, independent of who was invited.
+
+    iCalUID plus the original occurrence distinguishes recurrence while
+    deduplicating the same invitation seen through several configured calendars.
+
+    Separate from `recognized_event` because the sweep needs it for an event
+    that will never be recognized: a cancellation carries no usable attendee
+    list, but it still has to be matched against the occurrence it cancels.
+    Sharing the computation is the point -- two implementations that drifted
+    would silently break every link between an invitation and its session.
+    """
     occurrence = event.get("originalStartTime") or event.get("start")
     origin = event_time(occurrence, event.get("calendar_timezone", "UTC")).astimezone(timezone.utc).isoformat()
     if not event.get("iCalUID") and not event.get("id"):
         raise GoogleCalendarError("invalid_event_identity")
     identity = event.get("iCalUID") or f"{calendar_id}:{event.get('id', '')}"
-    key = hmac.new(settings.SECRET_KEY.encode(), f"{identity}:{origin}".encode(), hashlib.sha256).hexdigest()
-    return {"key": key, "start": start.isoformat(), "end": end.isoformat(), "status": status}
+    return hmac.new(settings.SECRET_KEY.encode(), f"{identity}:{origin}".encode(), hashlib.sha256).hexdigest()
 
 
 def training_events(trainer, start, end, *, force=False):
@@ -130,32 +148,13 @@ def training_events(trainer, start, end, *, force=False):
 
 
 def training_workload(trainer, events, start, end):
-    linked = dict(
-        GoogleTrainingEventLink.objects.filter(
-            workspace_id=trainer.workspace_id,
-            trainer_id=trainer.user_id,
-            session__trainers=trainer.user_id,
-            session__starts_at__lt=end,
-            session__ends_at__gt=start,
-            event_key__in=[item["key"] for item in events],
-        ).values_list("event_key", "session_id")
-    )
-    counts = {"confirmed_sessions": 0, "confirmed_minutes": 0, "pending_sessions": 0, "pending_minutes": 0}
-    rows = []
-    for event in events:
-        session_id = linked.get(event["key"])
-        rows.append({**event, "linked": bool(session_id)})
-        if session_id:
-            continue
-        prefix = event["status"]
-        counts[f"{prefix}_sessions"] += 1
-        counts[f"{prefix}_minutes"] += max(
-            0,
-            int(
-                (
-                    min(end, datetime.fromisoformat(event["end"])) - max(start, datetime.fromisoformat(event["start"]))
-                ).total_seconds()
-                // 60
-            ),
-        )
+    """The live path's view of external training, over one freshly read window.
+
+    The counting itself lives in `plane.ext.capacity.training_workload` because
+    the report answers the same question over the materialized table, and the two
+    have to agree on what a linked invitation costs.
+    """
+    linked = linked_sessions(trainer.workspace_id, trainer.user_id, [item["key"] for item in events], start, end)
+    rows = [{**event, "linked": event["key"] in linked} for event in events]
+    counts = external_counts(occurrence_tuples(events), linked=linked, start=start, end=end)
     return {**counts, "events": rows}

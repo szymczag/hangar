@@ -58,6 +58,7 @@ from plane.ext.models import (
     WorkshopSession,
 )
 from plane.ext.services import ensure_workspace_workshop_type
+from plane.ext.services.workshop_checklist import backfill_target_dates
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.permissions import ROLE, allow_permission
 
@@ -562,7 +563,17 @@ class WorkspaceCapacityEndpoint(BaseAPIView):
                 "from": start.isoformat(),
                 "to": end.isoformat(),
                 "trainers": calculate_workspace_capacity(
-                    workspace=workspace, viewer=request.user, start=start, end=end, trainer_ids=trainer_ids
+                    workspace=workspace,
+                    viewer=request.user,
+                    start=start,
+                    end=end,
+                    trainer_ids=trainer_ids,
+                    # Resolved here, where the request is, rather than inside the
+                    # calculation: a title belongs to the trainer's calendar, so
+                    # only an administrator or that trainer may read it.
+                    may_read_titles=WorkspaceMember.objects.filter(
+                        workspace=workspace, member=request.user, role=20, is_active=True
+                    ).exists(),
                 ),
             }
         )
@@ -672,7 +683,9 @@ def _validate_draft(request, workspace):
     # is not in: the alternative confirms that a given identifier exists.
     if (
         issue is None
-        or not ProjectMember.objects.filter(project_id=issue.project_id, member=request.user, is_active=True).exists()
+        or not ProjectMember.objects.filter(
+            project_id=issue.project_id, member=request.user, role__gte=ROLE.MEMBER.value, is_active=True
+        ).exists()
     ):
         return None, Response({"error": "No such Workshop work item in this workspace."}, status=404)
     if not issue.type_id or issue.type.system_key != IssueType.SystemKey.WORKSHOP:
@@ -699,6 +712,17 @@ class WorkshopPlanDraftListEndpoint(BaseAPIView):
         if response := _disabled():
             return response
         workspace = Workspace.objects.get(slug=slug)
+        # Each draft can carry a reservation, so an unbounded number of drafts is
+        # an unbounded number of ways to take a trainer's time out of
+        # circulation. The saved-plan list only ever showed fifty of them.
+        if (
+            WorkshopPlanDraft.objects.filter(workspace=workspace, owner=request.user).count()
+            >= settings.CAPACITY_MAX_PLAN_DRAFTS_PER_USER
+        ):
+            return Response(
+                {"error": ("You have as many saved plans as this workspace allows. Delete one you no longer need.")},
+                status=status.HTTP_409_CONFLICT,
+            )
         values, error = _validate_draft(request, workspace)
         if error:
             return error
@@ -816,7 +840,17 @@ class WorkshopPlanDraftDetailEndpoint(BaseAPIView):
         return Response(status=204)
 
 
-def _blocks_conflict(*, workspace, trainer, blocked_start, blocked_end, now, excluding_draft=None, excluding_hold=None):
+def _blocks_conflict(
+    *,
+    workspace,
+    trainer,
+    blocked_start,
+    blocked_end,
+    now,
+    excluding_draft=None,
+    excluding_hold=None,
+    excluding_schedule=None,
+):
     """
     Whether this trainer's complete block collides with anything already taken.
 
@@ -827,7 +861,9 @@ def _blocks_conflict(*, workspace, trainer, blocked_start, blocked_end, now, exc
     work item -- so scheduling cannot assume the hold is still honest.
 
     `excluding_draft` skips the plan's own holds when taking a new one;
-    `excluding_hold` skips the single hold being spent.
+    `excluding_hold` skips the single hold being spent; `excluding_schedule`
+    skips the workshop being rewritten, whose own sessions are about to be
+    replaced and must not collide with their replacements.
     """
     holds = WorkshopPlanHold.objects.filter(
         workspace=workspace,
@@ -844,7 +880,19 @@ def _blocks_conflict(*, workspace, trainer, blocked_start, blocked_end, now, exc
     if holds.exists():
         return True
 
-    sessions = WorkshopSession.objects.filter(schedule__workspace=workspace, trainers=trainer.user).distinct()
+    # Bounded by time as well as by trainer. The buffers are per session and can
+    # reach a day on each side, so the window is widened rather than dropped --
+    # but without any bound this walked every session the trainer has ever had,
+    # and it does so while the trainer row is locked, which makes scan time into
+    # lock-hold time.
+    sessions = WorkshopSession.objects.filter(
+        schedule__workspace=workspace,
+        trainers=trainer.user,
+        starts_at__lt=blocked_end + timedelta(minutes=1440),
+        ends_at__gt=blocked_start - timedelta(minutes=2880),
+    ).distinct()
+    if excluding_schedule is not None:
+        sessions = sessions.exclude(schedule=excluding_schedule)
     return any(
         session.starts_at - timedelta(minutes=session.preparation_minutes + session.travel_before_minutes) < blocked_end
         and session.ends_at + timedelta(minutes=session.travel_after_minutes) > blocked_start
@@ -852,8 +900,72 @@ def _blocks_conflict(*, workspace, trainer, blocked_start, blocked_end, now, exc
     )
 
 
+def _schedule_conflict(*, issue, parsed_sessions, now):
+    """The first collision in a proposed set of sessions, or None.
+
+    Two questions, because they have different blast radii. Sessions in the
+    submitted payload are checked against each other, which can only ever refuse
+    a request somebody is making right now. They are then checked against other
+    workshops and live holds, skipping this workshop's own stored sessions --
+    those are about to be replaced, so colliding with them would make every edit
+    impossible.
+    """
+    for position, session in enumerate(parsed_sessions):
+        start = session["starts_at"] - timedelta(
+            minutes=session["preparation_minutes"] + session["travel_before_minutes"]
+        )
+        end = session["ends_at"] + timedelta(minutes=session["travel_after_minutes"])
+        for other_position, other in enumerate(parsed_sessions):
+            if other_position >= position or not (session["trainer_ids"] & other["trainer_ids"]):
+                continue
+            other_start = other["starts_at"] - timedelta(
+                minutes=other["preparation_minutes"] + other["travel_before_minutes"]
+            )
+            other_end = other["ends_at"] + timedelta(minutes=other["travel_after_minutes"])
+            if other_start < end and other_end > start:
+                return f"Sessions {other_position + 1} and {position + 1} put the same trainer in two places at once."
+
+    schedule = WorkshopSchedule.objects.filter(issue=issue).first()
+    trainers = {
+        profile.user_id: profile
+        for profile in TrainerProfile.objects.filter(
+            workspace=issue.workspace,
+            user_id__in={trainer_id for session in parsed_sessions for trainer_id in session["trainer_ids"]},
+        ).select_related("user")
+    }
+    for position, session in enumerate(parsed_sessions):
+        start = session["starts_at"] - timedelta(
+            minutes=session["preparation_minutes"] + session["travel_before_minutes"]
+        )
+        end = session["ends_at"] + timedelta(minutes=session["travel_after_minutes"])
+        for trainer_id in sorted(session["trainer_ids"]):
+            trainer = trainers.get(trainer_id)
+            if trainer is None:
+                continue
+            if _blocks_conflict(
+                workspace=issue.workspace,
+                trainer=trainer,
+                blocked_start=start,
+                blocked_end=end,
+                now=now,
+                excluding_schedule=schedule,
+            ):
+                return f"Session {position + 1} collides with something already booked for {trainer.user.display_name}."
+    return None
+
+
 class WorkshopPlanHoldEndpoint(BaseAPIView):
+    """Reserving a trainer for seventy-two hours.
+
+    Throttled with the ledger's own classes, deliberately sharing its budget.
+    `booking_preflight` forces a fresh Google read *before* the conflict check,
+    so a caller who only ever gets 409s still spends the quota the ledger
+    throttle exists to protect -- leaving this endpoint unthrottled was a way
+    around it.
+    """
+
     authentication_classes = [CsrfEnforcedSessionAuthentication]
+    throttle_classes = [CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle]
 
     @staticmethod
     def _draft(request, slug, draft_id):
@@ -912,6 +1024,30 @@ class WorkshopPlanHoldEndpoint(BaseAPIView):
             status=WorkshopPlanHold.Status.ACTIVE,
             expires_at__lte=now,
         ).update(status=WorkshopPlanHold.Status.RELEASED, updated_by=request.user)
+        # Count after the sweep above, so expired reservations do not count
+        # against anybody. A reservation removes a trainer's time for seventy-two
+        # hours, so how many one person may hold at once is a direct limit on
+        # everybody else's ability to book -- and nothing bounded it before.
+        held = (
+            WorkshopPlanHold.objects.filter(
+                workspace=draft.workspace,
+                draft__owner=request.user,
+                status=WorkshopPlanHold.Status.ACTIVE,
+                expires_at__gt=now,
+            )
+            .exclude(draft=draft)
+            .count()
+        )
+        if held >= settings.CAPACITY_MAX_ACTIVE_HOLDS_PER_USER:
+            return Response(
+                {
+                    "error": (
+                        "You are already holding as much trainer time as this workspace allows. "
+                        "Release a reservation before taking another."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         conflict = _blocks_conflict(
             workspace=draft.workspace,
             trainer=trainer,
@@ -1024,7 +1160,9 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
     slot rather than losing the one they had.
     """
 
+    # Same reasoning as the hold endpoint: its preflight reads Google first.
     authentication_classes = [CsrfEnforcedSessionAuthentication]
+    throttle_classes = [CalendarCapacityUserThrottle, CalendarCapacityWorkspaceThrottle]
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     @booking_preflight(scheduling=True)
@@ -1074,7 +1212,9 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
         # item can change type, and the requester can lose the project.
         if not issue.type_id or issue.type.system_key != IssueType.SystemKey.WORKSHOP:
             return Response({"error": "Only Workshop work items can be scheduled."}, status=400)
-        if not ProjectMember.objects.filter(project_id=issue.project_id, member=request.user, is_active=True).exists():
+        if not ProjectMember.objects.filter(
+            project_id=issue.project_id, member=request.user, role__gte=ROLE.MEMBER.value, is_active=True
+        ).exists():
             return Response({"error": "No such Workshop work item in this workspace."}, status=404)
 
         now = timezone.now()
@@ -1188,6 +1328,10 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
                     origin=base_host(request=request, is_app=True),
                 )
             )
+
+        # The workshop now has a date, so any checklist subtask that was created
+        # before it had one can finally be dated. Only the undated ones move.
+        backfill_target_dates(issue)
 
         hold.status = WorkshopPlanHold.Status.SCHEDULED
         hold.updated_by = request.user
@@ -1315,6 +1459,23 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                 {"id": session_id, "starts_at": starts_at, "ends_at": ends_at, "trainer_ids": trainer_ids, **values}
             )
 
+        # Overlap is checked here too, not only in the planner.
+        #
+        # Three paths create sessions -- the planner, this editor and the
+        # calendar import -- and until now only the planner asked whether the
+        # trainer was already taken. A coordinator could place a session straight
+        # on top of another coordinator's hold or workshop, and the resulting row
+        # then blocked everybody else through the very check it had skipped.
+        #
+        # Deliberately the database-only question the planner already asks, not a
+        # Google read: this endpoint has never talked to Google, and making it do
+        # so would give editing a workshop a new way to fail that has nothing to
+        # do with the edit. Google availability stays the planner's concern, at
+        # the point where time is actually being taken.
+        conflict = _schedule_conflict(issue=issue, parsed_sessions=parsed_sessions, now=timezone.now())
+        if conflict:
+            return Response({"error": conflict}, status=409)
+
         # Use the planner's lock order: trainer profiles, then the parent issue.
         list(
             TrainerProfile.objects.select_for_update()
@@ -1352,6 +1513,7 @@ class WorkshopScheduleEndpoint(BaseAPIView):
             else:
                 session = WorkshopSession.objects.create(schedule=schedule, position=position, **values)
             session.trainers.set(trainer_ids)
+        backfill_target_dates(issue)
         _audit(
             request,
             workspace_id=issue.workspace_id,

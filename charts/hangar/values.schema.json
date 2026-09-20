@@ -292,7 +292,7 @@
     "googleCalendarCapacity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "limits"],
+      "required": ["enabled", "limits", "materialization"],
       "properties": {
         "enabled": { "type": "boolean" },
         "limits": {
@@ -302,6 +302,17 @@
           "properties": {
             "userRate": { "type": "string", "pattern": "^[1-9][0-9]*/(second|minute|hour|day)$" },
             "workspaceRate": { "type": "string", "pattern": "^[1-9][0-9]*/(second|minute|hour|day)$" }
+          }
+        },
+        "materialization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "windowPastDays", "windowFutureDays", "retiredRetentionDays"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "windowPastDays": { "type": "integer", "minimum": 0, "maximum": 730 },
+            "windowFutureDays": { "type": "integer", "minimum": 30, "maximum": 730 },
+            "retiredRetentionDays": { "type": "integer", "minimum": 1, "maximum": 365 }
           }
         }
       }

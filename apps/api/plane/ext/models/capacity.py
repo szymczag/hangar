@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from plane.db.models.base import BaseModel
 
@@ -51,6 +52,11 @@ class CapacityAuditEvent(models.Model):
         PLAN_HOLD_CREATED = "plan_hold.created", "Plan hold created"
         PLAN_HOLD_RELEASED = "plan_hold.released", "Plan hold released"
         PLAN_SCHEDULED = "plan.scheduled", "Plan scheduled"
+        CHECKLIST_TEMPLATE_UPDATED = "checklist_template.updated", "Checklist template updated"
+        CHECKLIST_TEMPLATE_REMOVED = "checklist_template.removed", "Checklist template removed"
+        CHECKLIST_APPLIED = "checklist.applied", "Checklist applied"
+        WORKSHOP_ROLE_UPDATED = "workshop_role.updated", "Workshop role updated"
+        WORKSHOP_ROLE_REMOVED = "workshop_role.removed", "Workshop role removed"
 
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)
@@ -320,3 +326,158 @@ class GoogleTrainingEventLink(BaseModel):
         constraints = [
             models.UniqueConstraint(fields=["workspace", "trainer", "event_key"], name="ext_training_event_link_unique")
         ]
+
+
+class TrainingEventOccurrence(BaseModel):
+    """A recognized training invitation, kept so a report need not ask Google.
+
+    The live paths read Google every time, which is right for them: the ledger
+    shows this week and booking must not act on a quarter-hour-old answer. A
+    report over a month cannot work that way -- twenty-five trainers times a
+    month is a request Google will not serve in one window, and `list_events`
+    refuses past two thousand events anyway.
+
+    So a sweep writes what it recognizes here and the report reads only this
+    table. The two never appear in one response, which is what keeps them from
+    double counting. `event_key` is deliberately the same HMAC `recognized_event`
+    produces, so `GoogleTrainingEventLink` joins on it with no new column.
+    """
+
+    class Status(models.TextChoices):
+        CONFIRMED = "confirmed", "Confirmed"
+        PENDING = "pending", "Pending"
+
+    class State(models.TextChoices):
+        ACTIVE = "active", "Active"
+        # Google says the invitation is gone or was declined.
+        CANCELLED = "cancelled", "Cancelled"
+        # A full rescan of the window did not see it. Only a full scan may
+        # conclude this: an invitation moved outside the window fails the time
+        # filter, so the incremental pass never sees it and must not guess.
+        DISAPPEARED = "disappeared", "Disappeared"
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="training_event_occurrences")
+    trainer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_event_occurrences"
+    )
+    trainer_profile = models.ForeignKey(
+        TrainerProfile, on_delete=models.CASCADE, related_name="training_event_occurrences"
+    )
+    event_key = models.CharField(max_length=64)
+    rule = models.ForeignKey(
+        GoogleTrainingRule, null=True, blank=True, on_delete=models.SET_NULL, related_name="occurrences"
+    )
+    # Snapshot, because a report about last quarter should still say which
+    # calendar an occurrence came from after the rule itself has been removed.
+    rule_label = models.CharField(max_length=100, blank=True)
+    calendar_id_hash = models.CharField(max_length=64)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    status = models.CharField(max_length=16, choices=Status.choices)
+    state = models.CharField(max_length=16, choices=State.choices, default=State.ACTIVE)
+    # Encrypted at rest like every other calendar-derived value here, and only
+    # ever written for events that matched a rule.
+    encrypted_summary = models.TextField(blank=True)
+    encryption_key_id = models.CharField(max_length=64, blank=True)
+    # What this training became in Hangar, if anybody imported it.
+    #
+    # Not derivable from `GoogleTrainingEventLink`, which is what the import
+    # creates: that link is member-level self-service to delete, so using its
+    # absence as "not imported yet" lets one unlink turn a single training into
+    # two Workshops. This records the decision itself, which nothing but another
+    # import changes. SET_NULL because deleting the work item should leave the
+    # occurrence importable again rather than deleting the calendar's record.
+    imported_issue = models.ForeignKey(
+        "db.Issue",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="imported_training_occurrences",
+    )
+    first_seen_at = models.DateTimeField()
+    last_seen_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "ext_training_event_occurrences"
+        verbose_name = "Training event occurrence"
+        ordering = ("starts_at", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "trainer", "event_key"], name="ext_training_occurrence_unique"
+            ),
+            models.CheckConstraint(
+                condition=Q(ends_at__gt=models.F("starts_at")), name="ext_training_occurrence_range"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["workspace", "starts_at", "ends_at"], name="ext_train_occ_ws_range_idx"),
+            models.Index(fields=["trainer", "starts_at"], name="ext_train_occ_trainer_idx"),
+            models.Index(fields=["workspace", "state", "starts_at"], name="ext_train_occ_state_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.trainer_id} {self.event_key[:12]}"
+
+
+class TrainingCalendarSyncState(BaseModel):
+    """How far the sweep has got on one rule's calendar.
+
+    Keyed on the rule rather than the trainer on purpose. A rule names a shared
+    calendar, so every consenting trainer would read an identical event list from
+    it; sweeping per trainer would multiply the quota by the roster for no extra
+    information, and a wide window per trainer walks straight into the
+    two-thousand-event ceiling. One read per calendar, fanned out in memory
+    against each consenting trainer's own address, keeps the consent boundary
+    while paying for the transport once.
+    """
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="training_sync_states")
+    rule = models.OneToOneField(GoogleTrainingRule, on_delete=models.CASCADE, related_name="sync_state")
+    window_starts_at = models.DateTimeField()
+    window_ends_at = models.DateTimeField()
+    last_incremental_at = models.DateTimeField(null=True, blank=True)
+    last_full_scan_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    failure_count = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    lease_token = models.UUIDField(null=True, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ext_training_calendar_sync_states"
+        verbose_name = "Training calendar sync state"
+        indexes = [models.Index(fields=["available_at"], name="ext_train_sync_ready_idx")]
+
+    def __str__(self):
+        return f"{self.rule_id}"
+
+
+class TrainerTrainingSyncState(BaseModel):
+    """Whether a trainer's rows in the report can be trusted.
+
+    A trainer who never consented, or who has personally lost access to the
+    shared calendar, has no occurrences -- and a report must not render that as
+    a trainer who simply ran no training. This is what lets the report exclude
+    them from totals and say so instead.
+    """
+
+    class ConsentState(models.TextChoices):
+        OK = "ok", "Ok"
+        CONSENT_MISSING = "consent_missing", "Consent missing"
+        REAUTH_REQUIRED = "reauth_required", "Reauthorization required"
+        NOT_CONNECTED = "not_connected", "Not connected"
+        ACCESS_LOST = "access_lost", "Access lost"
+
+    trainer_profile = models.OneToOneField(TrainerProfile, on_delete=models.CASCADE, related_name="training_sync_state")
+    consent_state = models.CharField(max_length=32, choices=ConsentState.choices, default=ConsentState.NOT_CONNECTED)
+    last_materialized_at = models.DateTimeField(null=True, blank=True)
+    last_probed_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        db_table = "ext_trainer_training_sync_states"
+        verbose_name = "Trainer training sync state"
+
+    def __str__(self):
+        return f"{self.trainer_profile_id} {self.consent_state}"

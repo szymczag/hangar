@@ -7,12 +7,22 @@
 import { parseInertHTML } from "@plane/utils";
 import { assetDuplicationHandlers } from "@/plane-editor/helpers/asset-duplication";
 
-// Clipboard HTML is parsed into a DOMParser document, never assigned to
-// `innerHTML` of an element created with `document.createElement`. Such an
-// element belongs to the live document even while detached, so
-// `<img src=x onerror=...>` would load and run its handler before the schema
-// ever filters the paste. A DOMParser document has no browsing context:
-// nothing loads and no handler runs.
+/**
+ * Parse pasted HTML somewhere nothing can run.
+ *
+ * Assigning clipboard HTML to `innerHTML` does not execute `<script>`, which is
+ * what makes the pattern look safe. It does create elements that fetch:
+ * `<img src=x onerror=…>` attempts its load and fires its handler even on an
+ * element that was never inserted into the page. Inspecting the paste would
+ * then be the very thing that executes it, and the clipboard flavour this reads
+ * is one any page can set on a copy event.
+ *
+ * A document from `DOMParser` has no browsing context, so nothing loads and no
+ * handler runs. `isPlainishHtml` in the markdown paste plugin already settled
+ * this for the sibling paste path; the two agree now. parseInertHTML is that
+ * parse, through the "hangar-inert" Trusted Types policy
+ * (docs/trusted-types-plan.md).
+ */
 const parseInertBody = (html: string): HTMLElement => parseInertHTML(html).body;
 
 // Utility function to process HTML content with all registered handlers
@@ -33,7 +43,10 @@ export const processAssetDuplication = (htmlContent: string): { processedHtml: s
         }
       });
 
-      // Re-parse the processed HTML for the next iteration
+      // Re-read the rewritten markup for the next handler. The result itself is
+      // built by replacing strings in the original HTML rather than serialized
+      // from this document, so parsing it inertly changes nothing but where the
+      // elements live.
       inertBody = parseInertBody(processedHtml);
     }
   }

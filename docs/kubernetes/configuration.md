@@ -148,6 +148,11 @@ googleCalendarCapacity:
   limits:
     userRate: 20/minute
     workspaceRate: 60/minute
+  materialization:
+    enabled: false
+    windowPastDays: 90
+    windowFutureDays: 180
+    retiredRetentionDays: 30
 
 existingSecrets:
   application:
@@ -178,6 +183,22 @@ Capacity requests query Google live and cache anonymous busy intervals in
 Valkey for five minutes. Basic free/busy access reads no event details. Optional
 training recognition reads times, organizer and attendee responses, and retains
 only matched occurrence times, response status and an opaque identity in its cache.
+
+`materialization` is a second switch on top of `enabled`, and does nothing
+without it. It starts the background sweep that records recognized training so
+the training report and the calendar import have something to read; with it off,
+both surfaces are reachable and empty, and every trainer is reported as never
+synced rather than as having run no training. Turn it on deliberately, because
+the sweep reads the titles of events that match a rule, which plain capacity
+never does — see the release notes for what is kept and who may read it.
+
+`windowPastDays` and `windowFutureDays` are how far the sweep re-reads, snapped
+outwards to whole months. They are not a retention policy: records outside the
+window are left alone, because a report about last year is what they exist to
+answer. They do bound what is collected, so training planned further ahead than
+`windowFutureDays` is silently not picked up — set it past the horizon your
+calendar is actually planned to. `retiredRetentionDays` is how long a record the
+sweep marked gone is kept before deletion.
 It requests no titles, descriptions, locations or conferencing data and exposes no
 attendee lists in team capacity. Provider or credential failures produce unknown
 availability rather than free time; new bookings require fresh availability from

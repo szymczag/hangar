@@ -50,8 +50,12 @@ export const getEditorAssetDownloadSrc = (args: TEditorSrcArgs): string | undefi
 export const getTextContent = (jsx: React.ReactNode | null | undefined): string => {
   if (!jsx) return "";
 
-  // Parsed inert, not through innerHTML on a live-document element: the latter
-  // loads `<img onerror>` and runs its handler even while detached.
+  // Parsed inert, not through innerHTML on a live-document element: a detached
+  // element still fetches, so `<img src=x onerror=…>` fires its handler without
+  // ever being inserted. A parsed document has no browsing context and nothing
+  // runs. This helper is exported, so the caller's input cannot be assumed to be
+  // trusted. parseInertHTML is that parse, through the "hangar-inert" Trusted
+  // Types policy (docs/trusted-types-plan.md).
   return parseInertHTML(jsx.toString()).body.textContent?.trim() ?? "";
 };
 

@@ -73,10 +73,55 @@ export function parseWeekParam(value: string | null | undefined, fallback: Date,
   return startOfWeek(parsed);
 }
 
+export function startOfMonth(value: Date, timeZone?: string) {
+  const result = new TZDate(value.getTime(), timeZone ?? (value instanceof TZDate ? value.timeZone : undefined));
+  result.setDate(1);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+export function shiftMonth(value: Date, months: number) {
+  const result = startOfMonth(value);
+  // Set the day first. Stepping from the 31st into a month that has no 31st
+  // rolls over into the following one, so January would step to March; starting
+  // from the first of the month makes the arithmetic say what it means.
+  result.setMonth(result.getMonth() + months);
+  return result;
+}
+
+/** The `?month=` parameter, as a local calendar month. */
+export function formatMonthParam(value: Date) {
+  return `${value.getFullYear()}-${`${value.getMonth() + 1}`.padStart(2, "0")}`;
+}
+
+/**
+ * Read a `?month=` value, falling back to the month containing `fallback`.
+ *
+ * Same shape as `parseWeekParam` and for the same reasons: a plain `Date` when
+ * no zone is given, because `TZDate` reads a trailing `undefined` as a
+ * positional component rather than as "local"; and a rejection of anything that
+ * did not round-trip, because `new Date(2026, 13, 1)` rolls over in silence.
+ */
+export function parseMonthParam(value: string | null | undefined, fallback: Date, timeZone?: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(value ?? "");
+  if (!match) return startOfMonth(fallback, timeZone);
+  const [, year, month] = match;
+  const index = Number(month) - 1;
+  if (index < 0 || index > 11) return startOfMonth(fallback, timeZone);
+  const parsed = timeZone ? new TZDate(Number(year), index, 1, timeZone) : new Date(Number(year), index, 1);
+  if (Number.isNaN(parsed.getTime()) || parsed.getMonth() !== index) return startOfMonth(fallback, timeZone);
+  return startOfMonth(parsed);
+}
+
 export function formatMinutes(value: number) {
   const hours = Math.floor(value / 60);
   const minutes = value % 60;
   return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
+/** Hours to one decimal, for a report where minutes are noise. */
+export function formatHours(minutes: number) {
+  return `${Math.round((minutes / 60) * 10) / 10}h`;
 }
 
 export function connectionCopy(status: string) {

@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import logging
 from uuid import UUID
 
 from django.db import transaction
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
@@ -13,11 +15,19 @@ from rest_framework.response import Response
 from plane.app.views.base import BaseAPIView
 from plane.authentication.session import CsrfEnforcedSessionAuthentication
 from plane.db.models import Workspace, ProjectMember
-from plane.ext.models import GoogleTrainingRule, GoogleTrainingEventLink, TrainerProfile, WorkshopSession
+from plane.ext.models import (
+    GoogleTrainingEventLink,
+    GoogleTrainingRule,
+    TrainerProfile,
+    TrainingEventOccurrence,
+    WorkshopSession,
+)
 from plane.ext.capacity.crypto import encrypt_value, decrypt_value
 from plane.ext.capacity.training_events import training_events
 from plane.ext.views.capacity import _disabled
 from plane.utils.permissions import ROLE, allow_permission
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleTrainingRulesEndpoint(BaseAPIView):
@@ -74,12 +84,29 @@ class GoogleTrainingRulesEndpoint(BaseAPIView):
         return Response({"id": str(row.id)}, status=201)
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @transaction.atomic
     def delete(self, request, slug, rule_id=None):
         if rule_id is None:
             return Response(status=405)
         if response := _disabled():
             return response
-        get_object_or_404(GoogleTrainingRule, workspace__slug=slug, id=rule_id).delete()
+        rule = get_object_or_404(GoogleTrainingRule, workspace__slug=slug, id=rule_id)
+        # Retire this rule's occurrences before the rule goes.
+        #
+        # Deleting is soft, and the soft-delete cascade nulls SET_NULL relations
+        # (`bgtasks/deletion_task.py`), so the occurrences would survive with no
+        # rule at all. Both sweep paths that retire an occurrence -- cancellation
+        # and the full rescan -- select on the rule, so nothing could ever reach
+        # them again: they would keep counting in the report and keep being
+        # offered for import, for a calendar Hangar no longer recognizes.
+        #
+        # Re-adding the rule re-adopts them, because the occurrence key does not
+        # depend on the rule.
+        retired = TrainingEventOccurrence.objects.filter(rule=rule, state=TrainingEventOccurrence.State.ACTIVE).update(
+            state=TrainingEventOccurrence.State.DISAPPEARED, updated_at=timezone.now()
+        )
+        rule.delete()
+        logger.info("Training rule removed", extra={"rule_id": str(rule_id), "retired_occurrences": retired})
         return Response(status=204)
 
 

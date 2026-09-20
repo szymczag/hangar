@@ -46,6 +46,51 @@ Existing plans and sessions remain valid. Old clients retain the hold/schedule
 API; new clients can PATCH title/issue_id during a hold and schedule a candidate
 directly using an idempotency key. Apply migrations before deploying the new API.
 
+## Workshop checklists
+
+A workspace administrator defines checklist templates in **Settings → Workshop checklists**.
+Each template is a named, ordered list of subtasks; a workspace may keep up to twenty
+templates of up to thirty items each. One template may be marked as the default.
+
+Each item carries a title, an optional description, an assignment rule and a day offset.
+The assignment rule is one of: nobody, a specific person, the workshop's own trainer, or
+whoever holds a **workshop role**. The trainer rule resolves when the template is applied,
+against the Workshop's active trainer assignees, so one template serves every trainer. A
+person who is not an active project member able to hold work is skipped rather than
+assigned, and the response names them.
+
+**Workshop roles** are defined in the same screen: a role is a standing job in running a
+workshop — streaming, feedback, materials — and the people who currently do it. A template
+names the role, so when the rota changes an administrator edits the role once instead of
+every template that mentioned the departing person. A role holds up to 25 people and a
+workspace up to 30 roles; only workspace administrators change them.
+
+Applying an item in role mode assigns everyone who currently holds that role, so
+responsibility is visible and the holders settle it between themselves. A role nobody holds
+yet leaves the subtask unassigned rather than failing — an empty rota is a staffing
+question, not a reason to refuse the whole checklist. Deleting a role releases every
+checklist item that named it back to unassigned; the items themselves are never deleted.
+
+Applying a template creates the subtasks under the Workshop work item, each as an ordinary
+child work item with its own history entry. Application is idempotent by subtask name:
+applying the same template twice adds nothing, and applying it again after the template
+gained an item adds only that item. Only Workshop work items accept a checklist.
+
+The day offset is counted from the workshop's first session, negative for before it. A
+Workshop exists before it has a date, so subtasks created at that point have no due date;
+scheduling the workshop fills them in, counting calendar days in the trainer's timezone so
+that offsets spanning a daylight-saving change land on the day people expect. A due date
+already set by hand is never overwritten. Editing or deleting a template leaves the
+subtasks it has already created untouched.
+
+The planner applies the default template to a Workshop it creates. That call is best
+effort: a workspace with no default template, or an unavailable checklist endpoint, does
+not prevent the workshop from being created.
+
+Migrations `ext.0030` and `ext.0031` add the template, item, origin and role tables and
+their audit actions. Existing workshops are unaffected; a workspace with no templates
+behaves exactly as before.
+
 ## Timezones and workload
 
 Booking hours follow the connected primary Google calendar's IANA timezone. Without
@@ -120,3 +165,139 @@ Session updates accept each existing session's `id` and preserve that row, its p
 origin and invitation links, including when sessions are reordered. IDs must be
 unique and belong to the edited Workshop. Removing a session removes its links;
 legacy clients that omit IDs retain the replace-all behavior.
+
+Editing a Workshop's sessions requires the same project role as editing the work
+item itself, and scheduling from the planner now requires it too: workspace
+membership alone was enough before, so a project guest could place sessions and
+assign a trainer through the planner while the work-item route refused them.
+
+Session edits are refused when they collide. Submitted sessions are checked
+against each other and against other workshops and live reservations for the
+same trainer; the Workshop's own stored sessions are ignored, since they are
+being replaced. This is the database question the planner already asks, not a
+Google read -- editing a Workshop has never contacted Google and does not start
+now. Google availability remains the planner's concern, at the point where time
+is actually taken. Consecutive sessions, the ordinary multi-day case, are
+unaffected.
+
+Importing a training from the calendar deliberately does not perform this check:
+it records what the calendar already says is happening, so refusing an overlap
+there would refuse to reflect reality.
+
+Reservations and saved plans are capped per person per workspace
+(`CAPACITY_MAX_ACTIVE_HOLDS_PER_USER`, default ten; `CAPACITY_MAX_PLAN_DRAFTS_PER_USER`,
+default fifty). A reservation removes a trainer's time from circulation for
+seventy-two hours, so the number one person may hold at once is a direct limit
+on everybody else's ability to book, and nothing bounded it before. Expired
+reservations hold nothing and do not count.
+
+Taking or spending a reservation is throttled with the same limits as the
+capacity ledger, and shares its budget on purpose: both read Google before
+deciding anything, so a caller who only ever receives conflicts still spends the
+quota the ledger's throttle exists to protect.
+
+## Materializing recognized training
+
+The ledger reads Google on every request, which is right for a week and
+impossible for a quarter: Google will not serve a roster's month in one request,
+and an event listing refuses a window holding more than two thousand events. A
+background sweep therefore records what it recognizes, and reporting reads only
+that record.
+
+Enable it with `ENABLE_GOOGLE_TRAINING_MATERIALIZATION=1`, which has no effect
+unless Google Calendar capacity is enabled as well. The sweep covers a rolling
+window — ninety days back and one hundred and eighty forward by default,
+configurable — snapped outwards to whole months so its boundary does not shift
+daily. The window is how far back the sweep re-reads, not how much history is
+kept: older occurrences are left alone, because a report about last year is what
+the record exists to answer.
+
+Sweeping is keyed on the rule's calendar rather than on each trainer. A rule
+names a shared calendar, so every consenting trainer would read an identical
+event list from it; one read per calendar is fanned out in memory against each
+consenting trainer's own verified address. Consent is unchanged by this: an
+occurrence is still only recorded for a trainer who has granted the training
+scope themselves.
+
+A pass every quarter hour asks Google only for what changed since the last
+success, with a short overlap so an event updated mid-pass is not missed. Such a
+pass may never conclude that an invitation disappeared: an event moved outside
+the window no longer matches the time filter, so an empty answer means "nothing
+changed", not "everything is gone". A full rescan runs daily and is the only
+pass permitted to retire an occurrence by absence. Cancellations do not wait for
+it — a cancelled invitation is matched by its own occurrence key and retired
+immediately, because a cancelled training that goes on blocking a trainer is
+what somebody plans staffing around.
+
+Calendars are handed to workers by lease, so two dispatchers divide the work
+rather than sweeping the same calendar twice. A lease that expires is
+reclaimable, which is what makes a worker dying mid-sweep self-healing. A Google
+failure is recorded on the calendar's own row and backs off there; it never
+discards what was already known, because stale rows with an honest freshness
+marker beat an empty table. Retired occurrences are deleted after a grace
+period; nothing else is ever pruned.
+
+Event titles are requested on this path only, through a separate client method.
+The live availability path keeps running without them, so no event summary
+reaches its cache or any of its responses. A title is kept only for an event
+that already matched a rule — organizer and attendee both — and is stored
+encrypted with the same key material as the rest of the calendar configuration.
+
+## Importing calendar training as Workshops
+
+Training planned in the calendar blocks time and counts in the report, but it is
+not a work item, so nothing can be attached to it: no checklist, no status, no
+client contact. **Team capacity → Import from calendar** lists recognized
+trainings that have no linked session, and creates a Workshop work item for the
+ones an administrator selects.
+
+Importing creates the work item, its schedule and one session, assigns the
+trainer, and links the invitation to that session in one transaction. The link
+is what stops the training being counted as delivery and as external training at
+the same time. "Not yet imported" means the invitation has no link — never a
+work item with a similar name; no title matching is performed.
+
+The calendar title becomes the work item's name. Without one, the rule's label
+and the date are used. A trainer who is not an assignable member of the chosen
+project is reported rather than imported unassigned, and one such row does not
+stop the rest of the batch. Importing is administrator-only, and still requires
+a seat in the target project.
+
+## Filtering the team ledger
+
+Team capacity draws several kinds of commitment at once, and the question being
+asked is usually about one of them. **Only training** narrows the timeline to
+booking hours and recognized training in a click; the individual toggles are
+there because "why is this person unavailable" is usually answered by a
+different layer. Working hours are always drawn, since they are the canvas the
+rest sits on. The selection lives in `?layers=`, so a narrowed ledger can be
+pasted into a message like any other link.
+
+Where a training's title has been recorded, the timeline names it. The title
+comes from the sweep's record rather than from a live read -- the availability
+path still never asks Google for event summaries, so none reach its cache -- and
+is shown only to a workspace administrator or to the trainer looking at their
+own week. Everybody else, and any window the sweep has not yet reached, sees the
+generic label.
+
+## Training report
+
+**Capacity → Reports** answers how much training a trainer ran over any period
+up to four hundred days. It reads the materialized record and the workshop
+sessions, and makes no call to Google — which is the whole reason the record
+exists.
+
+Per trainer it reports distinct Workshops, sessions, delivery minutes and
+preparation/travel minutes, and separately confirmed and pending external
+training. An invitation linked to a session counts as delivery only, exactly as
+in the weekly ledger. `export=csv` returns the same figures as a download.
+
+Because the figures come from a record rather than a live read, the response
+says how fresh it is: when each calendar was last swept successfully and last
+fully rescanned, what window has been collected, and whether the requested range
+falls inside it. A trainer whose consent lapsed, or who has never been swept,
+is marked and excluded from totals rather than reported as having run nothing.
+
+Migration `0032_training_event_materialization` adds the occurrence record and
+the sweep bookkeeping. It is additive and backfills nothing; a workspace that
+never enables materialization behaves exactly as before.

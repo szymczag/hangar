@@ -11,6 +11,7 @@ import {
   Building,
   HeartHandshake,
   LayoutDashboard,
+  ListChecks,
   Users,
   Webhook,
 } from "lucide-react";
@@ -27,4 +28,5 @@ export const WORKSPACE_SETTINGS_ICONS: Record<TWorkspaceSettingsTabs, LucideIcon
   webhooks: Webhook,
   // Fork (see FORK.md)
   "home-defaults": LayoutDashboard,
+  "workshop-templates": ListChecks,
 };

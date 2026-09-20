@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.60`. It is qualified for evaluation on
+The current release is `0.1.0-rc.61`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.60` qualification boundary is:
+The `0.1.0-rc.61` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -116,23 +116,25 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.60`                               |
-| Helm chart version | `0.1.0-rc.60`                                |
-| Git tag            | `hangar-v0.1.0-rc.60`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.60` |
+| Product version    | `v0.1.0-rc.61`                               |
+| Helm chart version | `0.1.0-rc.61`                                |
+| Git tag            | `hangar-v0.1.0-rc.61`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.61` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
-by incomplete publication attempts. `rc.59` carried the same changes as this release and
-refused publication on an unsigned tag, so nothing was published under it. Releases `rc.31` through `rc.38` are retired
+by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
+refused publication on an unsigned tag, so nothing was published under it.
+Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
-installation, upgrade, or rollback targets. `rc.58` is the immediately previous
+installation, upgrade, or rollback targets. `rc.60` is the immediately previous
 retained GitHub release.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-Rollback to rc.58 carries no schema consequence, because rc.60 introduces no
-migration. It does return the Work Items list to showing every work item, and
-removes the Parent property, the work item type icon and the Parent and Epic
-groupings; API clients that adopted the markdown write fields must send HTML
-again. Preserve a
+Rollback to rc.60 carries no schema consequence, because rc.61 introduces only
+additive tables that the older build never reads. It does remove the workshop
+checklist templates, the training report and the calendar import screens from the
+interface, leaves reservations unbounded again, and stops the planner refusing
+colliding sessions. Checklist subtasks already created remain as ordinary work
+items. Preserve a
 database backup before upgrading and review the rollback limits in the release notes.
 Published versions are immutable and are never repaired in place. In
 particular, `rc.24`, `rc.25`, and `rc.28` each published only a subset of their
@@ -140,7 +142,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.60` notes](../releases/hangar-v0.1.0-rc.60.md) — review
+- [Release `v0.1.0-rc.61` notes](../releases/hangar-v0.1.0-rc.61.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -167,17 +169,24 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.0-rc.58`, tag `hangar-v0.1.0-rc.58`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.0-rc.58`.
+The previous release is `0.1.0-rc.60`, tag `hangar-v0.1.0-rc.60`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.0-rc.60`.
 
-Release rc.60 adds no migrations. Update the API, workers and frontends together as
-usual; the ordinary release Job is all that is required.
+Release rc.61 adds four migrations. All four only create tables and backfill nothing,
+so the ordinary release Job is all that is required; update the API, workers and
+frontends together as usual.
 
 Basic calendar access continues to consume free/busy ranges. Optional invitation
 recognition requires `calendar.events.readonly`, a separate trainer consent, and
 workspace administrator rules configured in Team capacity. It reads times and
-participation without requesting event titles or descriptions. Missing access or
-unverified configured calendars block new bookings. See the
+participation without requesting event titles or descriptions. Optional
+materialization (`googleCalendarCapacity.materialization.enabled`, off by
+default, and inert unless `googleCalendarCapacity.enabled` is also set)
+additionally reads the title of events that already match a rule, for the
+training report and the calendar import; the availability path is unchanged and
+still requests none. Leaving it off does not hide those two screens — they are
+reachable and empty, and every trainer is reported as never synced. Missing
+access or unverified configured calendars block new bookings. See the
 [configuration reference](configuration.md#google-calendar-trainer-capacity) and
 [planner setup](../capacity-planner.md) before enabling those rules.
 
@@ -188,9 +197,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The release workflow verifies anonymous access to the rc.60 chart archive, OCI
+The release workflow verifies anonymous access to the rc.61 chart archive, OCI
 chart and digest-pinned images, and creates provenance attestations and keyless
-Cosign signatures. No new live-cluster qualification is claimed for rc.60.
+Cosign signatures. No new live-cluster qualification is claimed for rc.61.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure

@@ -34,6 +34,10 @@ data:
   ENABLE_GOOGLE_CALENDAR_CAPACITY: {{ ternary "1" "0" .Values.googleCalendarCapacity.enabled | quote }}
   CALENDAR_CAPACITY_USER_RATE: {{ .Values.googleCalendarCapacity.limits.userRate | quote }}
   CALENDAR_CAPACITY_WORKSPACE_RATE: {{ .Values.googleCalendarCapacity.limits.workspaceRate | quote }}
+  ENABLE_GOOGLE_TRAINING_MATERIALIZATION: {{ ternary "1" "0" .Values.googleCalendarCapacity.materialization.enabled | quote }}
+  GOOGLE_TRAINING_SWEEP_WINDOW_PAST_DAYS: {{ printf "%d" (int64 .Values.googleCalendarCapacity.materialization.windowPastDays) | quote }}
+  GOOGLE_TRAINING_SWEEP_WINDOW_FUTURE_DAYS: {{ printf "%d" (int64 .Values.googleCalendarCapacity.materialization.windowFutureDays) | quote }}
+  GOOGLE_TRAINING_RETIRED_RETENTION_DAYS: {{ printf "%d" (int64 .Values.googleCalendarCapacity.materialization.retiredRetentionDays) | quote }}
   TODOIST_IMPORT_LEASE_SECONDS: {{ printf "%d" (int64 .Values.todoistImports.leaseSeconds) | quote }}
   TODOIST_IMPORT_RECOVERY_GRACE_SECONDS: {{ printf "%d" (int64 .Values.todoistImports.recoveryGraceSeconds) | quote }}
   TODOIST_IMPORT_SOURCE_RETENTION_HOURS: {{ printf "%d" (int64 .Values.todoistImports.sourceRetentionHours) | quote }}

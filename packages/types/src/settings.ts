@@ -18,7 +18,9 @@ export type TWorkspaceSettingsTabs =
   | "imports"
   | "webhooks"
   // Fork (see FORK.md): the home page a workspace gives its people.
-  | "home-defaults";
+  | "home-defaults"
+  // Fork (see FORK.md): the subtasks a Workshop starts with.
+  | "workshop-templates";
 export type TWorkspaceSettingsItem = {
   key: TWorkspaceSettingsTabs;
   i18n_label: string;
