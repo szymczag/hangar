@@ -318,6 +318,20 @@ credential. Any other address would produce an invitation whose copy never
 appears where recognition looks. Inviting clients is a separate decision about
 sending mail outside the organization, and not this one.
 
+Three paths create or remove sessions, and each records the intent inside its
+own transaction: scheduling from the planner, replacing a Workshop's sessions,
+and removing the schedule. The last two collect the departing sessions _before_
+deleting them, because afterwards there is nothing left to enumerate and the
+invitations they sent outlive them.
+
+Those three are not the guarantee, though. Deleting the work item cascades into
+the schedule and its sessions without passing through any of them, and so does
+anything else that reaches the tables directly. A reconciler runs every ten
+minutes, compares every row that still intends to be present against what the
+database now says, and withdraws what no longer has a session or a trainer.
+**That task is the authority; the helpers in the views only make the ordinary
+case prompt.**
+
 States a row can rest in:
 
 | State               | Meaning                                                                                                                                |

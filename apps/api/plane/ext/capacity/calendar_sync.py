@@ -476,3 +476,45 @@ def sync_row(client, row, *, now=None):
     row.last_error_code = ""
     row.save()
     return {"result": "synced"}
+
+
+def reconcile_orphans(now=None):
+    """Withdraw invitations whose session is gone, however it went.
+
+    The helpers in the scheduling views cover the ordinary paths, and they are
+    not the authority -- deleting the work item cascades into the schedule and
+    its sessions without passing through any of them, and so does anything else
+    that reaches the tables directly. This task is the authority: it compares
+    every live row against what the database now says and fixes the difference.
+
+    Cheap when there is nothing to do, which is almost always: one indexed query
+    over rows that still intend to be present.
+    """
+    now = now or timezone.now()
+    touched = []
+    rows = (
+        WorkshopSessionCalendarEvent.objects.filter(intent=WorkshopSessionCalendarEvent.Intent.PRESENT)
+        .select_related("session")
+        .only(
+            "id",
+            "intent",
+            "revision",
+            "synced_revision",
+            "state",
+            "attempts",
+            "available_at",
+            "google_event_id",
+            "session",
+            "source_session_id",
+            "trainer_id",
+            "synced_at",
+        )
+    )
+    for row in rows.iterator(chunk_size=200):
+        session = row.session
+        if session is None:
+            touched.extend(_mark_absent(row, now))
+            continue
+        if not session.trainers.filter(pk=row.trainer_id).exists():
+            touched.extend(_mark_absent(row, now))
+    return touched

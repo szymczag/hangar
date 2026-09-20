@@ -19,8 +19,9 @@ from plane.db.models import Issue, IssueType, Project
 from plane.ext.capacity.calendar_sync import (
     claim_rows,
     event_id_for,
-    reconcile_session,
     mark_sessions_absent,
+    reconcile_orphans,
+    reconcile_session,
     sync_row,
 )
 from plane.ext.capacity.google import GoogleCalendarError
@@ -342,3 +343,79 @@ def test_nothing_is_recorded_while_write_back_is_off(settings, workspace, create
 
     assert reconcile_session(session, actor=create_user) == []
     assert WorkshopSessionCalendarEvent.objects.count() == 0
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_removing_the_schedule_withdraws_before_the_sessions_go(writeback, workspace, create_user):
+    """The order matters: afterwards there is nothing left to enumerate.
+
+    Deleting the schedule hard-deletes its sessions, so the invitations have to
+    be named while the sessions still exist or they are never withdrawn.
+    """
+    _connected_trainer(workspace, create_user)
+    writer = _credential(create_user, "writer-subject", "coordinator@example.test")
+    _rule(workspace, writer)
+    session = _session(workspace, create_user, trainers=[create_user])
+    reconcile_session(session, actor=create_user)
+    row = WorkshopSessionCalendarEvent.objects.get()
+    row.synced_revision = row.revision
+    row.state = WorkshopSessionCalendarEvent.State.SYNCED
+    row.save()
+
+    departing = [session.id]
+    mark_sessions_absent(departing, actor=create_user)
+    session.schedule.delete(soft=False)
+
+    surviving = WorkshopSessionCalendarEvent.objects.get(source_session_id=departing[0])
+    assert surviving.intent == WorkshopSessionCalendarEvent.Intent.ABSENT
+    assert surviving.state == WorkshopSessionCalendarEvent.State.PENDING
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_session_deleted_behind_the_views_is_caught_by_the_reconciler(writeback, workspace, create_user):
+    """Deleting the work item cascades past every helper in the views.
+
+    The reconciler, not those helpers, is what guarantees the calendar ends up
+    right -- they only make the ordinary case prompt.
+    """
+    _connected_trainer(workspace, create_user)
+    writer = _credential(create_user, "writer-subject", "coordinator@example.test")
+    _rule(workspace, writer)
+    session = _session(workspace, create_user, trainers=[create_user])
+    reconcile_session(session, actor=create_user)
+    row = WorkshopSessionCalendarEvent.objects.get()
+    row.synced_revision = row.revision
+    row.state = WorkshopSessionCalendarEvent.State.SYNCED
+    row.save()
+
+    # Straight past the endpoints, the way an issue deletion arrives.
+    session.schedule.issue.delete(soft=False)
+
+    assert reconcile_orphans(now=NOW)
+
+    row.refresh_from_db()
+    assert row.intent == WorkshopSessionCalendarEvent.Intent.ABSENT
+    assert row.state == WorkshopSessionCalendarEvent.State.PENDING
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_the_reconciler_leaves_live_sessions_alone(writeback, workspace, create_user):
+    """It runs every ten minutes, so a false positive would be expensive."""
+    _connected_trainer(workspace, create_user)
+    writer = _credential(create_user, "writer-subject", "coordinator@example.test")
+    _rule(workspace, writer)
+    session = _session(workspace, create_user, trainers=[create_user])
+    reconcile_session(session, actor=create_user)
+    row = WorkshopSessionCalendarEvent.objects.get()
+    row.synced_revision = row.revision
+    row.state = WorkshopSessionCalendarEvent.State.SYNCED
+    row.save()
+
+    assert reconcile_orphans(now=NOW) == []
+
+    row.refresh_from_db()
+    assert row.intent == WorkshopSessionCalendarEvent.Intent.PRESENT
+    assert row.state == WorkshopSessionCalendarEvent.State.SYNCED

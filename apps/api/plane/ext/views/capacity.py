@@ -58,6 +58,7 @@ from plane.ext.models import (
     WorkshopSchedule,
     WorkshopSession,
 )
+from plane.ext.capacity.calendar_sync import enqueue, mark_sessions_absent, reconcile_session
 from plane.ext.services import ensure_workspace_workshop_type
 from plane.ext.services.workshop_checklist import backfill_target_dates
 from plane.license.utils.instance_value import get_configuration_value
@@ -1399,6 +1400,13 @@ class WorkshopPlanScheduleEndpoint(BaseAPIView):
         # before it had one can finally be dated. Only the undated ones move.
         backfill_target_dates(issue)
 
+        # Record what the shared calendar ought to say, inside the booking's own
+        # transaction. A worker sends it afterwards, so a slow or unreachable
+        # Google cannot make a booking fail -- and a transaction that rolls back
+        # takes the intent with it rather than leaving an invitation for a
+        # session that never existed.
+        enqueue(reconcile_session(session, actor=request.user))
+
         hold.status = WorkshopPlanHold.Status.SCHEDULED
         hold.updated_by = request.user
         hold.save(update_fields=["status", "updated_by", "updated_at"])
@@ -1564,9 +1572,14 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                 "travel_after_minutes": first["travel_after_minutes"],
             },
         )
+        # Collect before deleting: afterwards there is nothing left to
+        # enumerate, and these are exactly the sessions whose invitations still
+        # have to be withdrawn from the calendar.
+        departing = list(schedule.sessions.exclude(id__in=retained).values_list("id", flat=True))
         schedule.sessions.exclude(id__in=retained).delete(soft=False)
         # Move retained positions aside before reordering under the unique constraint.
         schedule.sessions.update(position=F("position") + 1000)
+        touched = []
         for position, values in enumerate(parsed_sessions):
             trainer_ids = values.pop("trainer_ids")
             session_id = values.pop("id")
@@ -1579,7 +1592,10 @@ class WorkshopScheduleEndpoint(BaseAPIView):
             else:
                 session = WorkshopSession.objects.create(schedule=schedule, position=position, **values)
             session.trainers.set(trainer_ids)
+            touched.extend(reconcile_session(session, actor=request.user))
         backfill_target_dates(issue)
+        touched.extend(mark_sessions_absent(departing, actor=request.user))
+        enqueue(touched)
         _audit(
             request,
             workspace_id=issue.workspace_id,
@@ -1597,7 +1613,12 @@ class WorkshopScheduleEndpoint(BaseAPIView):
         # A schedule can be recreated later; hard deletion avoids the one-to-one
         # uniqueness conflict that a soft-deleted row would otherwise retain.
         issue = self._issue(slug, project_id, issue_id)
+        # Same order as above: name the sessions while they still exist, because
+        # the invitations they sent outlive them and have to be withdrawn.
+        departing = list(WorkshopSession.objects.filter(schedule__issue=issue).values_list("id", flat=True))
+        touched = mark_sessions_absent(departing, actor=request.user)
         WorkshopSchedule.objects.filter(issue=issue).delete(soft=False)
+        enqueue(touched)
         _audit(
             request,
             workspace_id=issue.workspace_id,
