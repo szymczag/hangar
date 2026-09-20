@@ -294,6 +294,9 @@ catalogs:
     emoji-regex:
       specifier: ^10.3.0
       version: 10.5.0
+    emojibase-data:
+      specifier: 15.3.2
+      version: 15.3.2
     export-to-csv:
       specifier: ^1.4.0
       version: 1.4.0
@@ -938,6 +941,9 @@ importers:
       date-fns:
         specifier: 'catalog:'
         version: 4.1.0
+      emojibase-data:
+        specifier: 'catalog:'
+        version: 15.3.2(emojibase@16.0.0)
       isbot:
         specifier: 'catalog:'
         version: 5.1.31
@@ -1138,6 +1144,9 @@ importers:
       emoji-picker-react:
         specifier: 'catalog:'
         version: 4.12.2(react@19.2.8)
+      emojibase-data:
+        specifier: 'catalog:'
+        version: 15.3.2(emojibase@16.0.0)
       export-to-csv:
         specifier: 'catalog:'
         version: 1.4.0

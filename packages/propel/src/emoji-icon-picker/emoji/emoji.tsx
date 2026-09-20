@@ -6,6 +6,7 @@
 
 import { useEffect, useRef } from "react";
 import { EmojiPicker } from "frimousse";
+import { getEmojiDataUrl } from "./data-url";
 import { cn } from "../../utils";
 
 type EmojiRootProps = {
@@ -33,6 +34,8 @@ export function EmojiRoot(props: EmojiRootProps) {
 
   return (
     <EmojiPicker.Root
+      // This instance's own copy of the data, never a CDN's; see data-url.ts.
+      emojibaseUrl={getEmojiDataUrl()}
       data-slot="emoji-picker"
       className="isolate flex h-full w-full flex-col rounded-md border-none p-2"
       onEmojiSelect={(val) => onChange(val.emoji)}
@@ -55,27 +58,27 @@ export function EmojiRoot(props: EmojiRootProps) {
           data-slot="emoji-picker-list"
           className={cn("pb-2 select-none")}
           components={{
-            CategoryHeader: ({ category, ...props }) => (
+            CategoryHeader: ({ category, ...headerProps }) => (
               <div
                 data-slot="emoji-picker-list-category-header"
                 className="bg-surface-1 px-3 pb-1.5 text-11 font-medium text-tertiary"
-                {...props}
+                {...headerProps}
               >
                 {category.label}
               </div>
             ),
-            Row: ({ children, ...props }) => (
-              <div data-slot="emoji-picker-list-row" className="scroll-my-1.5 px-1.5" {...props}>
+            Row: ({ children, ...rowProps }) => (
+              <div data-slot="emoji-picker-list-row" className="scroll-my-1.5 px-1.5" {...rowProps}>
                 {children}
               </div>
             ),
-            Emoji: ({ emoji, ...props }) => (
+            Emoji: ({ emoji, ...emojiProps }) => (
               <button
                 type="button"
                 aria-label={emoji?.label ?? emoji?.emoji}
                 data-slot="emoji-picker-list-emoji"
                 className="data-active:bg-accent flex size-8 items-center justify-center rounded-md text-16"
-                {...props}
+                {...emojiProps}
               >
                 {emoji.emoji}
               </button>

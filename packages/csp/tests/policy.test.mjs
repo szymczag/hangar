@@ -41,12 +41,13 @@ test("the policy never relaxes to unsafe sources", () => {
   assert.equal(directive(policy, "frame-ancestors"), "'none'");
   assert.equal(directive(policy, "frame-src"), "'none'");
   assert.equal(directive(policy, "img-src"), "'self' blob: data: https://images.example");
-  assert.equal(directive(policy, "connect-src"), "'self' https://cdn.jsdelivr.net https://storage.example");
+  assert.equal(directive(policy, "connect-src"), "'self' https://storage.example");
 });
 
-test("images come only from this instance unless the deployment adds its storage", () => {
-  assert.deepEqual(APP_SOURCES.imgSrc, []);
+test("nothing is fetched from another host unless the deployment adds one", () => {
+  assert.deepEqual(APP_SOURCES, { connectSrc: [], imgSrc: [] });
   assert.equal(directive(buildContentSecurityPolicy(), "img-src"), "'self' blob: data:");
+  assert.equal(directive(buildContentSecurityPolicy(), "connect-src"), "'self'");
 });
 
 test("inline scripts are hashed exactly, external ones are skipped", () => {

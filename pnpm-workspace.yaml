@@ -5,6 +5,7 @@ packages:
   - "!apps/proxy"
 
 catalog:
+  "emojibase-data": "15.3.2"
   "@simplewebauthn/browser": "13.2.2"
   "@zxcvbn-ts/core": "4.1.2"
   "@zxcvbn-ts/language-common": "4.1.2"

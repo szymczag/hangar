@@ -5,8 +5,8 @@
  */
 
 import { readFileSync } from "node:fs";
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { RICH_DESCRIPTION, createWorkItem, post, projectId, signIn, slug } from "../src/app";
+import { expect, test } from "@playwright/test";
+import { createPage, createWorkItem, openPage, post, projectId, signIn, slug } from "../src/app";
 import { attachDiagnostics, enforceContentSecurityPolicy, watch } from "../src/enforce";
 
 // The surfaces served by something other than the single-page apps' nginx:
@@ -21,23 +21,6 @@ test.beforeEach(async ({ context }) => {
 test.afterEach(async ({ page }, testInfo) => {
   await attachDiagnostics(page, testInfo);
 });
-
-async function createPage(context: BrowserContext, baseURL: string, name: string) {
-  return post(context.request, baseURL, `/api/workspaces/${slug}/projects/${projectId}/pages/`, {
-    name,
-    description_html: RICH_DESCRIPTION,
-  });
-}
-
-/** Opens a page and waits until its editor holds the stored content. */
-async function openPage(page: Page, pageId: string) {
-  const collaboration = page.waitForEvent("websocket", (socket) => socket.url().includes("/live/collaboration"));
-  await page.goto(`/${slug}/projects/${projectId}/pages/${pageId}/`);
-  await collaboration;
-  const editor = page.locator(".ProseMirror", { hasText: "legacy cell" });
-  await expect(editor.locator('td[data-background-color="purple"]')).toBeVisible();
-  return editor;
-}
 
 test("a published board renders a work item with Trusted Types enforced", async ({ page, context, baseURL }) => {
   await signIn(context, baseURL!);
@@ -63,7 +46,7 @@ test("a published board renders a work item with Trusted Types enforced", async 
 
 test("a page edits through the live server with Trusted Types enforced", async ({ page, context, baseURL }) => {
   await signIn(context, baseURL!);
-  const created = await createPage(context, baseURL!, "Trusted Types: page");
+  const created = await createPage(context.request, baseURL!, "Trusted Types: page");
   const reports = watch(page);
 
   const editor = await openPage(page, created.id);
@@ -88,7 +71,7 @@ test("a page edits through the live server with Trusted Types enforced", async (
 test("a page exports to PDF with Trusted Types enforced", async ({ page, context, baseURL }) => {
   await signIn(context, baseURL!);
   const name = "Trusted Types: export";
-  const created = await createPage(context, baseURL!, name);
+  const created = await createPage(context.request, baseURL!, name);
   const reports = watch(page);
 
   await openPage(page, created.id);

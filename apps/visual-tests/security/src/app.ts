@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { expect, type APIRequestContext, type BrowserContext } from "@playwright/test";
+import { expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { fixtures } from "../../src/manifest.js";
 import { trustedTypesMode, type TObservation } from "./enforce";
 
@@ -68,4 +68,24 @@ export function expectOnlyHostileObservations(observations: TObservation[]) {
     expect(observation["violated-directive"]).toBe(enforcing ? "html-changed" : "html-would-change");
     expect(observation["script-sample"]).toMatch(/onerror|onload/);
   }
+}
+
+/** Creates a page with the rich description above. */
+export const createPage = (request: APIRequestContext, baseURL: string, name: string) =>
+  post(request, baseURL, `/api/workspaces/${slug}/projects/${projectId}/pages/`, {
+    name,
+    description_html: RICH_DESCRIPTION,
+  });
+
+/**
+ * Opens a page and waits until its editor holds the stored content, which
+ * arrives over the collaborative session rather than with the document.
+ */
+export async function openPage(page: Page, pageId: string) {
+  const collaboration = page.waitForEvent("websocket", (socket) => socket.url().includes("/live/collaboration"));
+  await page.goto(`/${slug}/projects/${projectId}/pages/${pageId}/`);
+  await collaboration;
+  const editor = page.locator(".ProseMirror", { hasText: "legacy cell" });
+  await expect(editor.locator('td[data-background-color="purple"]')).toBeVisible();
+  return editor;
 }

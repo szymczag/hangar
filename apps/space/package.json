@@ -37,6 +37,7 @@
     "axios": "catalog:",
     "clsx": "catalog:",
     "date-fns": "catalog:",
+    "emojibase-data": "catalog:",
     "isbot": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",

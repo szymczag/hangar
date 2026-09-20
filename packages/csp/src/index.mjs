@@ -29,11 +29,11 @@ export const RUNTIME_STYLE_ELEMENTS = [
 ];
 
 /**
- * Origins the frontends reach whatever the deployment:
+ * Origins the frontends reach whatever the deployment: none. Everything they
+ * need is served by this instance, including the emoji picker's data
+ * (scripts/vite-emoji-data.mjs).
  *
- * - connect-src cdn.jsdelivr.net: the emoji picker (frimousse) loads its
- *   emoji data (JSON, not scripts) from there.
- *
+
  * Images are only ever this instance's own: its bundle, uploads in object
  * storage, and blob:/data: URLs made in the page. No image is loaded from
  * another host -- not a profile picture from an identity provider (those are
@@ -44,7 +44,7 @@ export const RUNTIME_STYLE_ELEMENTS = [
  * live origin, a self-hosted GitLab's avatars) come from the environment.
  */
 export const APP_SOURCES = {
-  connectSrc: ["https://cdn.jsdelivr.net"],
+  connectSrc: [],
   imgSrc: [],
 };
 
