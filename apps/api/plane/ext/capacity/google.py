@@ -146,7 +146,7 @@ class GoogleCalendarClient:
                     headers={"Authorization": f"Bearer {token}"},
                     max_bytes=max_bytes,
                 )
-                payload = response.json() if expect_json and response.content else {}
+                payload = response.json() if expect_json and response.body else {}
                 GoogleCalendarCredential.objects.filter(pk=credential.pk).update(
                     status=GoogleCalendarCredential.Status.CONNECTED,
                     last_successful_at=timezone.now(),

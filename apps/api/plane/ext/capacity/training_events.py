@@ -4,6 +4,7 @@
 
 import hashlib
 import hmac
+import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -16,6 +17,8 @@ from plane.ext.capacity.crypto import decrypt_value
 from plane.ext.capacity.google import GoogleCalendarError
 from plane.ext.capacity.training_workload import external_counts, linked_sessions, occurrence_tuples
 from plane.ext.models import GoogleTrainingRule
+
+logger = logging.getLogger(__name__)
 
 EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly"
 
@@ -243,6 +246,12 @@ def training_events(trainer, start, end, *, force=False):
     except (GoogleCalendarError, ValueError, KeyError):
         stale = cache.get(key + ":stale")
         return (stale, "stale") if isinstance(stale, list) else ([], "unavailable")
+    except Exception as exc:  # noqa: BLE001 - only the type is logged
+        # Same reasoning as the availability read: unverified blocks a booking,
+        # a traceback takes the whole ledger down. `booking_preflight` accepts
+        # only "fresh" or "not_configured", so this refuses rather than permits.
+        logger.error("Training recognition failed with %s", type(exc).__name__)
+        return [], "unavailable"
 
 
 def training_workload(trainer, events, start, end):
