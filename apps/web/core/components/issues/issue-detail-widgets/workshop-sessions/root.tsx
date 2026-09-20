@@ -99,6 +99,7 @@ export function WorkshopSessionsCollapsible({
 
   const [sessions, setSessions] = useState<TEditableSession[]>([]);
   const [saving, setSaving] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -119,7 +120,6 @@ export function WorkshopSessionsCollapsible({
   const needsRetry = sessions.some((session) =>
     (session.calendar_sync ?? []).some((state) => state.state === "failed" || state.state === "blocked_no_writer")
   );
-  const [retrying, setRetrying] = useState(false);
   const retryCalendar = async () => {
     setRetrying(true);
     try {
