@@ -90,6 +90,32 @@ rollout, deliverability monitoring, suppression recovery, and incidents. The
 [email security model](../email-delivery-and-openpgp.md) explains data handling,
 retention, and OpenPGP policy.
 
+## Content-Security-Policy
+
+The web, admin and space images send a Content-Security-Policy of their own, and
+`contentSecurityPolicy.reportOnly` now defaults to `false`: the policy is
+enforced, and violations are reported to the API, which logs them as
+`Content-Security-Policy violation`. Set it to `true` to watch reports without
+blocking anything, for example while adding an origin.
+
+Two rules decide whether a deployment needs anything else:
+
+- **Images are this instance's own.** The chart adds the object-storage origin
+  itself; `contentSecurityPolicy.imgSrc` is only for storage served from a
+  further origin of yours. An image a description points at on another host is
+  not loaded, and a profile picture from an identity provider is copied into
+  object storage at sign-in. For rows written before this release, run
+  `python manage.py localize_external_images` (reports first, then `--apply`)
+  in an API pod.
+- **Sign-in posts to the API, which answers with a redirect.** Chrome checks
+  `form-action` on that redirect, so `hangar.publicOrigin` and the base URLs
+  must be the origins users actually open, or the form is refused and sign-in
+  silently does nothing.
+
+Trusted Types keep their own switch, `contentSecurityPolicy.trustedTypes`, which
+stays at `report`. See
+[content-security-policy.md](../content-security-policy.md).
+
 ## Todoist import isolation
 
 Todoist imports are disabled by default. Setting `todoistImports.enabled=true`

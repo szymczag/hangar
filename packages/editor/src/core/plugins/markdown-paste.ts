@@ -6,6 +6,8 @@
 
 import type { Editor } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+// plane imports
+import { parseInertHTML } from "@plane/utils";
 
 /**
  * Markdown pasted from an application that also writes HTML to the clipboard.
@@ -87,13 +89,13 @@ export const htmlAddsNoFormatting = (htmlText: string, plainText: string): boole
 export const isPlainishHtml = (html: string, plainText: string): boolean => {
   if (!html.trim()) return true;
 
-  // DOMParser, not `innerHTML` on a detached element. Assigning clipboard HTML
+  // parseInertHTML (DOMParser), not `innerHTML` on a detached element. Assigning clipboard HTML
   // to `innerHTML` does not run <script>, but it does create elements that
   // fetch: `<img src=x onerror=...>` loads and fires its handler even when the
   // element was never inserted into the page, which would make inspecting the
   // paste the very thing that executes it. A document from DOMParser has no
   // browsing context, so nothing loads and no handler runs.
-  const parsed = new DOMParser().parseFromString(html, "text/html");
+  const parsed = parseInertHTML(html);
   const tagNames = Array.from(parsed.body.querySelectorAll("*")).map((element) => element.tagName);
   if (!hasOnlyPlainWrappers(tagNames)) return false;
   return htmlAddsNoFormatting(parsed.body.textContent ?? "", plainText);

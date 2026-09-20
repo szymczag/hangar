@@ -9,35 +9,11 @@ import type { AxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "@plane/constants";
 import { getFileMetaDataForUpload, generateFileUploadPayload } from "@plane/services";
 import type { EFileAssetType, TFileEntityInfo, TFileSignedURLResponse } from "@plane/types";
-import { getAssetIdFromUrl } from "@plane/utils";
+import { getAssetIdFromUrl, isAssetId } from "@plane/utils";
 // helpers
 // services
 import { APIService } from "@/services/api.service";
 import { FileUploadService } from "@/services/file-upload.service";
-
-export interface UnSplashImage {
-  id: string;
-  created_at: Date;
-  updated_at: Date;
-  promoted_at: Date;
-  width: number;
-  height: number;
-  color: string;
-  blur_hash: string;
-  description: null;
-  alt_description: string;
-  urls: UnSplashImageUrls;
-  [key: string]: any;
-}
-
-export interface UnSplashImageUrls {
-  raw: string;
-  full: string;
-  regular: string;
-  small: string;
-  thumb: string;
-  small_s3: string;
-}
 
 export enum TFileAssetType {
   COMMENT_DESCRIPTION = "COMMENT_DESCRIPTION",
@@ -236,6 +212,7 @@ export class FileService extends APIService {
   async restoreNewAsset(workspaceSlug: string, src: string): Promise<void> {
     // remove the last slash and get the asset id
     const assetId = getAssetIdFromUrl(src);
+    if (!isAssetId(assetId)) throw new Error("Invalid asset id");
     return this.post(`/api/assets/v2/workspaces/${workspaceSlug}/restore/${assetId}/`)
       .then((response) => response?.data)
       .catch((error) => {
@@ -269,18 +246,6 @@ export class FileService extends APIService {
     this.cancelSource.cancel("Upload canceled");
   }
 
-  async getUnsplashImages(query?: string): Promise<UnSplashImage[]> {
-    return this.get(`/api/unsplash/`, {
-      params: {
-        query,
-      },
-    })
-      .then((res) => res?.data?.results ?? res?.data)
-      .catch((err) => {
-        throw err?.response?.data;
-      });
-  }
-
   async duplicateAsset(
     workspaceSlug: string,
     assetId: string,
@@ -290,6 +255,8 @@ export class FileService extends APIService {
       project_id?: string;
     }
   ): Promise<{ asset_id: string }> {
+    // assetId comes from an image src in user content
+    if (!isAssetId(assetId)) throw new Error("Invalid asset id");
     return this.post(`/api/assets/v2/workspaces/${workspaceSlug}/duplicate-assets/${assetId}/`, data)
       .then((response) => response?.data)
       .catch((error) => {

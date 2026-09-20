@@ -6,6 +6,7 @@
 
 // plane imports
 import type { TDocumentPayload, TDuplicateAssetData, TDuplicateAssetResponse, TEditorAssetType } from "@plane/types";
+import { parseInertHTML } from "@plane/utils";
 // plane web imports
 import {
   extractAdditionalAssetsFromHTMLContent,
@@ -20,10 +21,8 @@ import { convertHTMLDocumentToAllFormats } from "./yjs-utils";
  * @returns {string[]} array of asset sources
  */
 const extractAssetsFromHTMLContent = (htmlContent: string): string[] => {
-  // create a DOM parser
-  const parser = new DOMParser();
-  // parse the HTML string into a DOM document
-  const doc = parser.parseFromString(htmlContent, "text/html");
+  // parse the HTML string into an inert DOM document
+  const doc = parseInertHTML(htmlContent);
   // collect all unique asset sources
   const assetSources = new Set<string>();
   // extract sources from image components
@@ -43,10 +42,8 @@ const extractAssetsFromHTMLContent = (htmlContent: string): string[] => {
  */
 const replaceAssetsInHTMLContent = (props: { htmlContent: string; assetMap: Record<string, string> }): string => {
   const { htmlContent, assetMap } = props;
-  // create a DOM parser
-  const parser = new DOMParser();
-  // parse the HTML string into a DOM document
-  const doc = parser.parseFromString(htmlContent, "text/html");
+  // parse the HTML string into an inert DOM document
+  const doc = parseInertHTML(htmlContent);
   // replace sources in image components
   const imageComponents = doc.querySelectorAll("image-component");
   imageComponents.forEach((component) => {

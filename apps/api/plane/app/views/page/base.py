@@ -154,10 +154,10 @@ class PageViewSet(BaseViewSet):
         )
 
         if serializer.is_valid():
-            serializer.save()
-            # capture the page transaction
+            page = serializer.save()
+            # capture the page transaction from the stored, sanitized HTML
             page_transaction.delay(
-                new_description_html=request.data.get("description_html", "<p></p>"),
+                new_description_html=page.description_html or "<p></p>",
                 old_description_html=None,
                 page_id=serializer.data["id"],
             )
@@ -197,11 +197,11 @@ class PageViewSet(BaseViewSet):
             serializer = PageDetailSerializer(page, data=request.data, partial=True)
             page_description = page.description_html
             if serializer.is_valid():
-                serializer.save()
-                # capture the page transaction
+                page = serializer.save()
+                # capture the page transaction from the stored, sanitized HTML
                 if request.data.get("description_html"):
                     page_transaction.delay(
-                        new_description_html=request.data.get("description_html", "<p></p>"),
+                        new_description_html=page.description_html or "<p></p>",
                         old_description_html=page_description,
                         page_id=page_id,
                     )
@@ -569,12 +569,12 @@ class PagesDescriptionViewSet(BaseViewSet):
         # Use serializer for validation and update
         serializer = PageBinaryUpdateSerializer(page, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            page = serializer.save()
 
-            # Capture the page transaction
+            # Capture the page transaction from the stored, sanitized HTML
             if request.data.get("description_html"):
                 page_transaction.delay(
-                    new_description_html=request.data.get("description_html", "<p></p>"),
+                    new_description_html=page.description_html or "<p></p>",
                     old_description_html=old_description_html,
                     page_id=page_id,
                 )

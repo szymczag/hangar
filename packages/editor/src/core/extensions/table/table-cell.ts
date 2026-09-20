@@ -9,6 +9,7 @@ import { TableMap } from "@tiptap/pm/tables";
 // constants
 import { CORE_EXTENSIONS } from "@/constants/extension";
 // helpers
+import { sanitizeColorKey } from "@/helpers/attribute-guards";
 import { findParentNodeOfType } from "@/helpers/common";
 // local imports
 import { TableCellSelectionOutlinePlugin } from "./plugins/selection-outline/plugin";
@@ -47,11 +48,28 @@ export const TableCell = Node.create<TableCellOptions>({
           return value;
         },
       },
+      // Palette keys only. Read from the data attributes this node renders,
+      // or from the legacy `background`/`textcolor` attributes older content
+      // stored as CSS variables. Rendered as data attributes coloured by
+      // editor.css, never as inline style (CSS injection, and refused by a
+      // strict Content-Security-Policy).
       background: {
         default: null,
+        parseHTML: (element) =>
+          sanitizeColorKey(element.getAttribute("data-background-color") ?? element.getAttribute("background")),
+        renderHTML: (attributes) => {
+          const background = sanitizeColorKey(attributes.background);
+          return background ? { "data-background-color": background } : {};
+        },
       },
       textColor: {
         default: null,
+        parseHTML: (element) =>
+          sanitizeColorKey(element.getAttribute("data-text-color") ?? element.getAttribute("textcolor")),
+        renderHTML: (attributes) => {
+          const textColor = sanitizeColorKey(attributes.textColor);
+          return textColor ? { "data-text-color": textColor } : {};
+        },
       },
     };
   },
@@ -109,13 +127,7 @@ export const TableCell = Node.create<TableCellOptions>({
     return [{ tag: "td" }];
   },
 
-  renderHTML({ node, HTMLAttributes }) {
-    return [
-      "td",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        style: `background-color: ${node.attrs.background}; color: ${node.attrs.textColor};`,
-      }),
-      0,
-    ];
+  renderHTML({ HTMLAttributes }) {
+    return ["td", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
   },
 });

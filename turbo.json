@@ -4,6 +4,7 @@
   "globalEnv": [
     "APP_VERSION",
     "DEV",
+    "HANGAR_BUNDLE_SOURCEMAPS",
     "LOG_LEVEL",
     "NODE_ENV",
     "SENTRY_DSN",

@@ -203,6 +203,31 @@ podDefaults:
                 app.kubernetes.io/part-of: hangar
   topologySpreadConstraints: []
 
+# Content-Security-Policy of the web, admin and space frontends. The policy
+# is built into each image; these are the origins only the deployment knows.
+# The object storage origin is added automatically.
+contentSecurityPolicy:
+  # Enforced. Set true to only report violations to the API (logged as
+  # "Content-Security-Policy violation"), e.g. while checking a new origin.
+  reportOnly: false
+  reportUri: /api/csp-report/
+  # Extra image origins, space separated. Images are this instance's own: the
+  # chart adds the object-storage origin itself, and nothing else belongs here
+  # unless storage is served from a further origin of yours.
+  imgSrc: ""
+  # Extra origins the browser connects to (e.g. a separate API or live origin).
+  connectSrc: ""
+  # Origins that may be framed inside the application (e.g. a changelog page).
+  frameSrc: ""
+  # Who may embed a published Spaces board; "'self'" allows only this instance.
+  spaceFrameAncestors: "'self'"
+  # Trusted Types (docs/trusted-types-plan.md), a policy of its own that does
+  # not follow reportOnly. "report" reports every DOM sink that still takes a
+  # plain string while the pages' default policy only observes; "enforce"
+  # enforces it and the default policy sanitizes -- opt in only after a release
+  # cycle of reports shows nothing legitimate would change; "off" removes it.
+  trustedTypes: report
+
 web:
   replicas: 2
   image:

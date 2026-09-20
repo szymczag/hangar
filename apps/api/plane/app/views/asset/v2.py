@@ -922,6 +922,10 @@ class ProjectAssetEndpoint(BaseAPIView):
             object_name=asset.asset.name,
             disposition="attachment",
             filename=asset.attributes.get("name"),
+            # Never the stored type: object storage may share the app's origin,
+            # and an uploaded script served as text/javascript could then be
+            # loaded by a page on it, whatever the disposition says.
+            content_type="application/octet-stream",
         )
         # Redirect to the signed URL
         return HttpResponseRedirect(signed_url)

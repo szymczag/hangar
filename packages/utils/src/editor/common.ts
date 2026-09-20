@@ -5,7 +5,9 @@
  */
 
 // local imports
+import { isAssetId } from "../asset-id";
 import { getFileURL } from "../file";
+import { parseInertHTML } from "../inert-html";
 
 type TEditorSrcArgs = {
   assetId: string;
@@ -19,6 +21,7 @@ type TEditorSrcArgs = {
  */
 export const getEditorAssetSrc = (args: TEditorSrcArgs): string | undefined => {
   const { assetId, projectId, workspaceSlug } = args;
+  if (!isAssetId(assetId)) return undefined;
   let url: string | undefined = "";
   if (projectId) {
     url = getFileURL(`/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}/${assetId}/`);
@@ -34,6 +37,7 @@ export const getEditorAssetSrc = (args: TEditorSrcArgs): string | undefined => {
  */
 export const getEditorAssetDownloadSrc = (args: TEditorSrcArgs): string | undefined => {
   const { assetId, projectId, workspaceSlug } = args;
+  if (!isAssetId(assetId)) return undefined;
   let url: string | undefined = "";
   if (projectId) {
     url = getFileURL(`/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}/download/${assetId}/`);
@@ -46,12 +50,13 @@ export const getEditorAssetDownloadSrc = (args: TEditorSrcArgs): string | undefi
 export const getTextContent = (jsx: React.ReactNode | null | undefined): string => {
   if (!jsx) return "";
 
-  // `DOMParser`, not `innerHTML` on a detached element: a detached element still
-  // fetches, so `<img src=x onerror=…>` fires its handler without ever being
-  // inserted. A parsed document has no browsing context and nothing runs. This
-  // helper is exported, so the caller's input cannot be assumed to be trusted.
-  const parsed = new DOMParser().parseFromString(jsx.toString(), "text/html");
-  return parsed.body.textContent?.trim() ?? "";
+  // Parsed inert, not through innerHTML on a live-document element: a detached
+  // element still fetches, so `<img src=x onerror=…>` fires its handler without
+  // ever being inserted. A parsed document has no browsing context and nothing
+  // runs. This helper is exported, so the caller's input cannot be assumed to be
+  // trusted. parseInertHTML is that parse, through the "hangar-inert" Trusted
+  // Types policy (docs/trusted-types-plan.md).
+  return parseInertHTML(jsx.toString()).body.textContent?.trim() ?? "";
 };
 
 export const isEditorEmpty = (description: string | undefined): boolean =>

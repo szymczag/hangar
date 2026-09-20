@@ -1,0 +1,45 @@
+{
+  "name": "@plane/csp",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Content-Security-Policy owned by the frontends",
+  "license": "AGPL-3.0",
+  "bin": {
+    "hangar-bundle-sinks": "./bin/bundle-sinks.mjs",
+    "hangar-csp-nginx": "./bin/nginx-headers.mjs"
+  },
+  "type": "module",
+  "main": "./src/index.mjs",
+  "types": "./src/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.mts",
+      "default": "./src/index.mjs"
+    },
+    "./package.json": "./package.json",
+    "./trusted-types": {
+      "types": "./src/trusted-types.d.mts",
+      "default": "./src/trusted-types.mjs"
+    },
+    "./vite-emoji-data": {
+      "types": "./src/vite-emoji-data.d.mts",
+      "default": "./src/vite-emoji-data.mjs"
+    }
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check:lint": "oxlint --max-warnings=0 .",
+    "check:format": "oxfmt --check .",
+    "fix:lint": "oxlint --fix .",
+    "fix:format": "oxfmt ."
+  },
+  "dependencies": {
+    "dompurify": "catalog:",
+    "emojibase-data": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "source-map-js": "catalog:",
+    "vite": "catalog:"
+  }
+}

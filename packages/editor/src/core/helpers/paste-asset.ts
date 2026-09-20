@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { parseInertHTML } from "@plane/utils";
 import { assetDuplicationHandlers } from "@/plane-editor/helpers/asset-duplication";
 
 /**
@@ -18,19 +19,21 @@ import { assetDuplicationHandlers } from "@/plane-editor/helpers/asset-duplicati
  *
  * A document from `DOMParser` has no browsing context, so nothing loads and no
  * handler runs. `isPlainishHtml` in the markdown paste plugin already settled
- * this for the sibling paste path; the two agree now.
+ * this for the sibling paste path; the two agree now. parseInertHTML is that
+ * parse, through the "hangar-inert" Trusted Types policy
+ * (docs/trusted-types-plan.md).
  */
-const parseInertly = (htmlContent: string): Document => new DOMParser().parseFromString(htmlContent, "text/html");
+const parseInertBody = (html: string): HTMLElement => parseInertHTML(html).body;
 
 // Utility function to process HTML content with all registered handlers
 export const processAssetDuplication = (htmlContent: string): { processedHtml: string } => {
-  let parsed = parseInertly(htmlContent);
+  let inertBody = parseInertBody(htmlContent);
 
   let processedHtml = htmlContent;
 
   // Process each registered component type
   for (const [componentName, handler] of Object.entries(assetDuplicationHandlers)) {
-    const elements = parsed.body.querySelectorAll(componentName);
+    const elements = inertBody.querySelectorAll(componentName);
 
     if (elements.length > 0) {
       elements.forEach((element) => {
@@ -44,7 +47,7 @@ export const processAssetDuplication = (htmlContent: string): { processedHtml: s
       // built by replacing strings in the original HTML rather than serialized
       // from this document, so parsing it inertly changes nothing but where the
       // elements live.
-      parsed = parseInertly(processedHtml);
+      inertBody = parseInertBody(processedHtml);
     }
   }
 

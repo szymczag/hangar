@@ -5,6 +5,7 @@ packages:
   - "!apps/proxy"
 
 catalog:
+  "emojibase-data": "15.3.2"
   "@simplewebauthn/browser": "13.2.2"
   "@zxcvbn-ts/core": "4.1.2"
   "@zxcvbn-ts/language-common": "4.1.2"
@@ -108,6 +109,7 @@ catalog:
   "cors": "^2.8.5"
   "@date-fns/tz": "^1.4.1"
   "date-fns": "^4.1.0"
+  "dompurify": "3.4.15"
   "dotenv": "16.4.7"
   "effect": "3.20.0"
   "emoji-picker-react": "^4.5.16"
@@ -159,7 +161,6 @@ catalog:
   "react-is": "^18.2.0"
   "react-markdown": "10.1.0"
   "react-masonry-component": "^6.3.0"
-  "react-pdf-html": "^2.1.2"
   "react-popper": "^2.3.0"
   "react-router": "8.3.0"
   "recharts": "^2.15.1"
@@ -169,6 +170,7 @@ catalog:
   "remark-gfm": "^4.0.1"
   "remark-stringify": "^11.0.0"
   "sanitize-html": "2.17.7"
+  "source-map-js": "1.2.1"
   "serve": "14.2.5"
   "sharp": "^0.35.4"
   "smooth-scroll-into-view-if-needed": "^2.0.2"

@@ -6,6 +6,7 @@
 
 import { useCallback } from "react";
 // helpers
+import { parseInertHTML } from "@plane/utils";
 import type { TCustomComponentsMetaData } from "@plane/utils";
 // helpers
 import { getEditorAssetSrc } from "@/helpers/editor.helper";
@@ -23,8 +24,7 @@ export const useParseEditorContent = (args: TArgs) => {
 
   const getEditorMetaData = useCallback(
     (htmlContent: string): TCustomComponentsMetaData => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlContent, "text/html");
+      const doc = parseInertHTML(htmlContent);
       const imageMetaData: TCustomComponentsMetaData["file_assets"] = [];
       // process image components
       const imageComponents = doc.querySelectorAll("image-component");

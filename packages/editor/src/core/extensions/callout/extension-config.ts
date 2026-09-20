@@ -5,6 +5,7 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import { stringToEmoji } from "@plane/propel/emoji-icon-picker";
 import type { MarkdownSerializerState } from "@tiptap/pm/markdown";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 // constants
@@ -29,18 +30,15 @@ export const CustomCalloutExtensionConfig: CustomCalloutExtensionType = Node.cre
   content: "block+",
 
   addAttributes() {
-    const attributes = {
-      // Reduce instead of map to accumulate the attributes directly into an object
-      ...Object.values(ECalloutAttributeNames).reduce(
-        (acc, value) => {
-          acc[value] = {
-            default: DEFAULT_CALLOUT_BLOCK_ATTRIBUTES[value],
-          };
-          return acc;
-        },
-        {} as Record<ECalloutAttributeNames, { default: TCalloutBlockAttributes[ECalloutAttributeNames] }>
-      ),
-    };
+    const attributes = Object.values(ECalloutAttributeNames).reduce(
+      (acc, value) => {
+        acc[value] = {
+          default: DEFAULT_CALLOUT_BLOCK_ATTRIBUTES[value],
+        };
+        return acc;
+      },
+      {} as Record<ECalloutAttributeNames, { default: TCalloutBlockAttributes[ECalloutAttributeNames] }>
+    );
 
     return attributes;
   },
@@ -53,9 +51,10 @@ export const CustomCalloutExtensionConfig: CustomCalloutExtensionType = Node.cre
           const logoInUse = attrs["data-logo-in-use"];
           // add callout logo
           if (logoInUse === "emoji") {
-            state.write(
-              `> <img src="${attrs["data-emoji-url"]}" alt="${attrs["data-emoji-unicode"]}" width="30px" />\n`
-            );
+            // The emoji itself, not the image of it the picker also stored:
+            // that URL is on a CDN, and exported markdown should not send a
+            // reader to one (docs/content-security-policy.md).
+            state.write(`> ${stringToEmoji(attrs["data-emoji-unicode"] ?? "")}\n`);
           } else {
             state.write(`> <icon>${attrs["data-icon-name"]} icon</icon>\n`);
           }

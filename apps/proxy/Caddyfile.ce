@@ -17,6 +17,14 @@
 
 	reverse_proxy /static/* api:8000
 
+	# Object storage shares the application's origin here. Whatever an upload
+	# claims to be, it must not be sniffed into something executable or render
+	# as a page with the application's privileges.
+	@bucket path /{$BUCKET_NAME} /{$BUCKET_NAME}/*
+	header @bucket {
+		X-Content-Type-Options "nosniff"
+		Content-Security-Policy "sandbox; default-src 'none'"
+	}
 	reverse_proxy /{$BUCKET_NAME}/* plane-minio:9000
 	reverse_proxy /{$BUCKET_NAME} plane-minio:9000
 

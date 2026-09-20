@@ -1,0 +1,58 @@
+#!/bin/sh
+# Copyright (c) 2026-present Maciej Szymczak and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+#
+# Sourced by the nginx image's entrypoint before 20-envsubst-on-templates.sh.
+# It gives every Content-Security-Policy variable in
+# /etc/nginx/templates/security-headers.conf.template a value (envsubst leaves
+# an unset variable in place, which would corrupt the header) and points the
+# rendered file at /tmp, the one writable path on a read-only root filesystem.
+
+export HANGAR_CSP_IMG_SRC="${HANGAR_CSP_IMG_SRC-}"
+export HANGAR_CSP_CONNECT_SRC="${HANGAR_CSP_CONNECT_SRC-}"
+export HANGAR_CSP_MEDIA_SRC="${HANGAR_CSP_MEDIA_SRC-}"
+export HANGAR_CSP_FRAME_SRC="${HANGAR_CSP_FRAME_SRC:-'none'}"
+export HANGAR_CSP_FORM_ACTION="${HANGAR_CSP_FORM_ACTION-}"
+
+# Defaults match @plane/csp (DEFAULT_REPORT_ONLY, DEFAULT_REPORT_URI): the
+# policy is enforced and violations are reported to the API.
+# HANGAR_CSP_REPORT_ONLY=true sends it report-only instead; an empty
+# HANGAR_CSP_REPORT_URI sends no reports.
+HANGAR_CSP_REPORT_URI="${HANGAR_CSP_REPORT_URI-/api/csp-report/}"
+if [ -n "${HANGAR_CSP_REPORT_URI}" ]; then
+  export HANGAR_CSP_REPORT="; report-uri ${HANGAR_CSP_REPORT_URI}"
+else
+  export HANGAR_CSP_REPORT=""
+fi
+
+if [ "${HANGAR_CSP_REPORT_ONLY:-false}" = "true" ]; then
+  export HANGAR_CSP_HEADER="Content-Security-Policy-Report-Only"
+else
+  export HANGAR_CSP_HEADER="Content-Security-Policy"
+fi
+
+# Trusted Types (docs/trusted-types-plan.md): a policy of its own, whose mode
+# is HANGAR_CSP_TRUSTED_TYPES -- report (default), enforce or off -- and not
+# HANGAR_CSP_REPORT_ONLY. An unknown value means report, never enforce. An
+# empty policy makes nginx omit the header. The mode is also written into the
+# page (the sub_filter in the template), so the browser's default policy
+# sanitizes exactly when the header is enforced. The text must equal
+# TRUSTED_TYPES_MEASUREMENT in @plane/csp; tests/nginx.test.mjs checks it.
+case "${HANGAR_CSP_TRUSTED_TYPES:-report}" in
+  off | enforce) export HANGAR_CSP_TRUSTED_TYPES_MODE="${HANGAR_CSP_TRUSTED_TYPES}" ;;
+  *) export HANGAR_CSP_TRUSTED_TYPES_MODE="report" ;;
+esac
+if [ "${HANGAR_CSP_TRUSTED_TYPES_MODE}" = "off" ]; then
+  export HANGAR_CSP_TRUSTED_TYPES_POLICY=""
+else
+  export HANGAR_CSP_TRUSTED_TYPES_POLICY="require-trusted-types-for 'script'; trusted-types hangar-inert default dompurify${HANGAR_CSP_REPORT}"
+fi
+if [ "${HANGAR_CSP_TRUSTED_TYPES_MODE}" = "enforce" ]; then
+  export HANGAR_CSP_TRUSTED_TYPES_HEADER="Content-Security-Policy"
+else
+  export HANGAR_CSP_TRUSTED_TYPES_HEADER="Content-Security-Policy-Report-Only"
+fi
+
+export NGINX_ENVSUBST_OUTPUT_DIR="/tmp/nginx-conf.d"
+mkdir -p "$NGINX_ENVSUBST_OUTPUT_DIR"

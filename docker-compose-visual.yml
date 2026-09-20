@@ -5,7 +5,7 @@
 #
 # Prerequisite:
 #   ./setup.sh                                   # creates apps/api/.env
-#   pnpm turbo run build --filter=web --filter=admin
+#   pnpm turbo run build --filter=web --filter=admin --filter=space --filter=live
 #
 # Usage:
 #   docker compose -f docker-compose-visual.yml up -d --wait
@@ -14,7 +14,7 @@
 #
 # Notes:
 # - One origin. `vr-edge` serves the built SPAs and proxies /api, /auth and
-#   /static to the API, which is what removes the cookie-domain problem: the
+#   /static to the API, /spaces to space and /live to live, which is what removes the cookie-domain problem: the
 #   browser never leaves the origin it was handed a session on.
 # - There is a broker but deliberately no celery worker, and the distinction
 #   matters in both directions. Without a broker the API 500s wherever it
@@ -115,6 +115,10 @@ services:
       # the counts the seed wrote instead of racing to completion.
       AMQP_URL: redis://vr-redis:6379/1
       AWS_S3_ENDPOINT_URL: http://vr-minio:9000
+      # Presigned upload and download URLs point at the edge, which proxies
+      # the bucket as apps/proxy/Caddyfile.ce does, so the browser stores a
+      # file on the page's own origin (connect-src and img-src allow no other).
+      AWS_S3_PUBLIC_ENDPOINT_URL: http://vr-edge
       CORS_ALLOWED_ORIGINS: http://vr-edge,http://localhost:8100
       # Fixed rather than random: a changing key changes what encrypted instance
       # configuration decrypts to, and with it what the interface renders.
@@ -156,6 +160,11 @@ services:
       # the console; the default points at localhost:3001, which does not exist
       # inside this network.
       WEB_URL: ""
+      # Where the API redirects after a form sign-in (base_host falls back to it
+      # when WEB_URL is empty). apps/api/.env points it at a dev server; a
+      # redirect off the page's origin is refused by form-action, which Chrome
+      # applies to redirects too, so it has to be the edge.
+      APP_BASE_URL: http://vr-edge
       ADMIN_BASE_URL: ""
       SPACE_BASE_URL: ""
       LIVE_BASE_URL: ""
@@ -202,17 +211,75 @@ services:
       vr-redis: { condition: service_healthy }
       vr-minio: { condition: service_healthy }
 
+  # The public boards (server-rendered) and the collaboration/PDF server. The
+  # visual suite does not photograph either; the security suite needs both,
+  # because space sends its own policy per request and pages and the PDF export
+  # only work through live. Both run their build output from the repository in
+  # the Playwright image, whose Node matches the one that installed
+  # node_modules -- a separate image would have to reinstall them.
+  vr-space:
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
+    networks: [vr_env]
+    environment:
+      PORT: "3000"
+      # The policy at its default (enforced), so the suite tests the header
+      # space actually sends; Trusted Types are added by the suite, as for the
+      # other frontends.
+      HANGAR_CSP_TRUSTED_TYPES: "off"
+    volumes:
+      - .:/work:ro
+    working_dir: /work/apps/space
+    command: ["./node_modules/.bin/react-router-serve", "./build/server/index.js"]
+    healthcheck:
+      test: ["CMD", "node", "/work/apps/visual-tests/scripts/http-ok.mjs", "http://localhost:3000/spaces/"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      vr-api: { condition: service_healthy }
+
+  vr-live:
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
+    networks: [vr_env]
+    environment:
+      PORT: "3000"
+      API_BASE_URL: http://vr-api:8000
+      LIVE_BASE_PATH: /live
+      LIVE_SERVER_SECRET_KEY: visual-regression-live-key
+      REDIS_URL: redis://vr-redis:6379/
+      CORS_ALLOWED_ORIGINS: http://vr-edge
+    volumes:
+      - .:/work:ro
+    working_dir: /work
+    command: ["node", "apps/live"]
+    healthcheck:
+      test: ["CMD", "node", "/work/apps/visual-tests/scripts/http-ok.mjs", "http://localhost:3000/live/health/"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      vr-api: { condition: service_healthy }
+      vr-redis: { condition: service_healthy }
+
   vr-edge:
     image: docker.io/library/caddy:2-alpine
     networks: [vr_env]
     ports:
       - "8100:80"
+    # The frontends' Content-Security-Policy, rendered from their builds by
+    # scripts/vr.mjs as the nginx images would render it, but enforced.
+    environment:
+      VR_CSP_WEB: "${VR_CSP_WEB}"
+      VR_CSP_ADMIN: "${VR_CSP_ADMIN}"
+      VR_CSP_TRUSTED_TYPES: "${VR_CSP_TRUSTED_TYPES}"
     volumes:
       - ./apps/visual-tests/Caddyfile.vr:/etc/caddy/Caddyfile:ro
       - ./apps/web/build/client:/srv/web:ro
       - ./apps/admin/build/client:/srv/admin:ro
     depends_on:
       vr-api: { condition: service_healthy }
+      vr-space: { condition: service_healthy }
+      vr-live: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
       interval: 5s

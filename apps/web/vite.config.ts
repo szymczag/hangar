@@ -3,6 +3,7 @@ import * as dotenv from "dotenv";
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { emojiData } from "@plane/csp/vite-emoji-data";
 
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
@@ -20,8 +21,12 @@ export default defineConfig(() => ({
   },
   build: {
     assetsInlineLimit: 0,
+    // Hidden source maps only for the Trusted Types bundle contract
+    // (packages/csp/bin/bundle-sinks.mjs), which maps each DOM sink in the
+    // bundle to the package or file it came from. Never set for images.
+    sourcemap: process.env.HANGAR_BUNDLE_SOURCEMAPS === "1" ? ("hidden" as const) : false,
   },
-  plugins: [reactRouter(), tsconfigPaths({ projects: [path.resolve(__dirname, "tsconfig.json")] })],
+  plugins: [emojiData(), reactRouter(), tsconfigPaths({ projects: [path.resolve(__dirname, "tsconfig.json")] })],
   resolve: {
     alias: {
       // Next.js compatibility shims used within web

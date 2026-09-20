@@ -5,18 +5,15 @@
  */
 
 import { useState } from "react";
-import type { PageProps } from "@react-pdf/renderer";
-import { pdf } from "@react-pdf/renderer";
 import { Controller, useForm } from "react-hook-form";
 import { useParams } from "react-router";
-// plane editor
+// plane imports
+import { LIVE_URL } from "@plane/constants";
 import type { EditorRefApi } from "@plane/editor";
 // plane ui
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { CustomSelect, EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
-// components
-import { PDFDocument } from "@/components/editor/pdf";
 // hooks
 import { useParseEditorContent } from "@/hooks/use-parse-editor-content";
 
@@ -24,11 +21,13 @@ type Props = {
   editorRef: EditorRefApi | null;
   isOpen: boolean;
   onClose: () => void;
+  pageId: string | undefined;
   pageTitle: string;
 };
 
 type TExportFormats = "pdf" | "markdown";
-type TPageFormats = Exclude<PageProps["size"], undefined>;
+// The page sizes the live server's PDF export accepts.
+type TPageFormats = "A4" | "A3" | "A2" | "LETTER" | "LEGAL" | "TABLOID";
 type TContentVariety = "everything" | "no-assets";
 
 type TFormValues = {
@@ -101,8 +100,19 @@ const defaultValues: TFormValues = {
   content_variety: "everything",
 };
 
+const initiateDownload = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1000);
+};
+
 export function ExportPageModal(props: Props) {
-  const { editorRef, isOpen, onClose, pageTitle } = props;
+  const { editorRef, isOpen, onClose, pageId, pageTitle } = props;
   // states
   const [isExporting, setIsExporting] = useState(false);
   // params
@@ -112,7 +122,7 @@ export function ExportPageModal(props: Props) {
     defaultValues,
   });
   // parse editor content
-  const { replaceCustomComponentsFromHTMLContent, replaceCustomComponentsFromMarkdownContent } = useParseEditorContent({
+  const { replaceCustomComponentsFromMarkdownContent } = useParseEditorContent({
     projectId,
     workspaceSlug: workspaceSlug ?? "",
   });
@@ -133,31 +143,29 @@ export function ExportPageModal(props: Props) {
     }, 300);
   };
 
-  const initiateDownload = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 1000);
-  };
-
   // handle export as a PDF
+  // Rendered by the live server from the saved page. Rendering in the browser
+  // pulled a WebAssembly layout engine into the bundle, which a
+  // Content-Security-Policy without 'wasm-unsafe-eval' refuses.
   const handleExportAsPDF = async () => {
-    try {
-      const pageContent = `<h1 class="page-title">${pageTitle}</h1>${editorRef?.getDocument().html ?? "<p></p>"}`;
-      const parsedPageContent = await replaceCustomComponentsFromHTMLContent({
-        htmlContent: pageContent,
+    if (!pageId || !workspaceSlug) throw new Error("Missing page details for the PDF export");
+    const outputFileName = `${fileName}-${selectedPageFormat.toString().toLowerCase()}.pdf`;
+    const response = await fetch(`${LIVE_URL}/pdf-export/`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pageId,
+        workspaceSlug,
+        projectId: projectId || undefined,
+        title: pageTitle,
+        pageSize: selectedPageFormat,
+        fileName: outputFileName,
         noAssets: selectedContentVariety === "no-assets",
-      });
-
-      const blob = await pdf(<PDFDocument content={parsedPageContent} pageFormat={selectedPageFormat} />).toBlob();
-      initiateDownload(blob, `${fileName}-${selectedPageFormat.toString().toLowerCase()}.pdf`);
-    } catch (error) {
-      throw new Error(`Error in exporting as a PDF: ${error}`);
-    }
+      }),
+    });
+    if (!response.ok) throw new Error(`PDF export failed with status ${response.status}`);
+    initiateDownload(await response.blob(), outputFileName);
   };
   // handle export as markdown
   const handleExportAsMarkdown = async () => {
@@ -171,7 +179,7 @@ export function ExportPageModal(props: Props) {
       const blob = new Blob([parsedMarkdownContent], { type: "text/markdown" });
       initiateDownload(blob, `${fileName}.md`);
     } catch (error) {
-      throw new Error(`Error in exporting as markdown: ${error}`);
+      throw new Error(`Error in exporting as markdown: ${error}`, { cause: error });
     }
   };
   // handle export

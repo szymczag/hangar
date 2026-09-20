@@ -7,6 +7,7 @@
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts } from "react-router";
 import type { LinksFunction } from "react-router";
+import { DEFAULT_TRUSTED_TYPES_MODE, TRUSTED_TYPES_META_NAME } from "@plane/csp/trusted-types";
 import { ThemeProvider } from "next-themes";
 // plane imports
 import { SITE_DESCRIPTION, SITE_NAME } from "@plane/constants";
@@ -65,6 +66,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* The Trusted Types mode, which nginx rewrites to match the headers it
+            sends (@plane/csp); the entry reads it before React renders. */}
+        <meta name={TRUSTED_TYPES_META_NAME} content={DEFAULT_TRUSTED_TYPES_MODE} suppressHydrationWarning />
         <meta name="theme-color" content="#7080d0" />
         {/* Meta info for PWA */}
         <meta name="application-name" content="Hangar" />

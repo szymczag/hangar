@@ -83,9 +83,11 @@
       @apply font-medium text-left;
     }
 
-    tr[background="none"],
-    tr:not([background]) {
-      th {
+    /* Cell and row colours are palette keys in data attributes, coloured by
+       the [data-background-color] rules in editor.css. A coloured header or
+       row keeps its colour; only an uncoloured header gets the default. */
+    tr:not([data-background-color]) {
+      th:not([data-background-color]) {
         @apply bg-layer-3;
       }
     }

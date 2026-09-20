@@ -12,7 +12,7 @@ from email.utils import formatdate
 from pathlib import PurePath
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment, Declaration, ProcessingInstruction
 
 from .openpgp import encrypt_for_certificate
 
@@ -63,12 +63,36 @@ def _append_receipt(text_body: str, html_body: str, receipt_code: str) -> tuple[
     return text_body, html_body
 
 
+def _remove_parser_differential_markup(soup: BeautifulSoup) -> None:
+    """Drop markup that Python's html.parser and a browser read differently.
+
+    `<!--><img src=x onerror=...>-->` is one comment to html.parser, so the
+    image inside is never seen by the rules below, but a browser ends that
+    comment at `<!-->` and renders the image. The same holds for a comment
+    that begins with `->` or contains `--!>`. Such comments are removed; the
+    Outlook conditional comments the templates rely on never take that form.
+    Processing instructions and stray declarations inside the body have no
+    legitimate use in a message and are removed as well.
+    """
+    for node in soup.find_all(string=lambda text: isinstance(text, (Comment, ProcessingInstruction))):
+        if isinstance(node, ProcessingInstruction):
+            node.extract()
+            continue
+        text = str(node)
+        if text.startswith(">") or text.startswith("->") or "--!>" in text:
+            node.extract()
+    for node in soup.find_all(string=lambda text: isinstance(text, Declaration)):
+        if node.parent is not soup:
+            node.extract()
+
+
 def sanitize_email_html(html_body: str) -> str:
     """Remove resources that an email client could fetch when a message opens."""
 
     if not html_body:
         return ""
     soup = BeautifulSoup(html_body, "html.parser")
+    _remove_parser_differential_markup(soup)
     for tag in soup.find_all(
         [
             "audio",

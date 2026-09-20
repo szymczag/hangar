@@ -4,15 +4,15 @@
  * See the LICENSE file for details.
  */
 
-import { getAttributes } from "@tiptap/core";
 import type { MarkType } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { isNavigableHref } from "../url-security";
 
 type ClickHandlerOptions = {
   type: MarkType;
 };
 
-export function clickHandler(options: ClickHandlerOptions): Plugin {
+export function clickHandler(_options: ClickHandlerOptions): Plugin {
   return new Plugin({
     key: new PluginKey("handleClickLink"),
     props: {
@@ -29,29 +29,22 @@ export function clickHandler(options: ClickHandlerOptions): Plugin {
           a = a?.parentNode as HTMLElement;
         }
 
-        if (!els.find((value) => value.nodeName === "A")) {
+        // The anchor itself, not event.target: a click on bold or italic text
+        // inside a link targets that child. Its `href` is the browser-resolved
+        // URL; the raw mark attribute is never used, because a value that
+        // arrived through a collaborative update never passed parseHTML.
+        const anchor = els.find((value) => value?.nodeName === "A") as HTMLAnchorElement | undefined;
+        if (!anchor) {
           return false;
         }
 
-        const attrs = getAttributes(view.state, options.type.name);
-        const link = event.target as HTMLLinkElement;
-
-        const href = link?.href ?? attrs.href;
-        const target = link?.target ?? attrs.target;
-
-        if (link && href) {
-          // Defence-in-depth: link.href is the browser-resolved URL (whitespace
-          // already stripped by the browser's WHATWG URL parser), so a protocol
-          // check here is sufficient to catch any dangerous URI that slipped past
-          // the editor's parse/render-time guards. Matches the blocked-scheme list
-          // in isValidHttpUrl (javascript:, data:, vbscript:, file:, about:)
-          // to keep the policy consistent (GHSA-v2vv-7wq3-8w2j).
-          if (/^(javascript|data|vbscript|file|about):/i.test(href)) {
-            return false;
-          }
-
-          window.open(href, target);
-
+        // renderHTML blanks a dangerous href; `anchor.href` would resolve that
+        // empty attribute to the current page, so check the attribute first.
+        const href = anchor.getAttribute("href") ? anchor.href : "";
+        if (href && isNavigableHref(href)) {
+          // Always a new browsing context without an opener, so the opened
+          // page cannot navigate this one (reverse tabnabbing).
+          window.open(href, "_blank", "noopener,noreferrer");
           return true;
         }
 

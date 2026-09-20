@@ -24,6 +24,7 @@ from plane.mailer.tokens import email_idempotency_token
 from plane.mailer.service import enqueue_rendered_email
 from plane.settings.redis import redis_instance
 from plane.utils.host import app_base_url
+from plane.utils.content_validator import sanitize_email_fragment
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 
@@ -188,9 +189,18 @@ def process_html_content(content):
         return None
     processed_content_list = []
     for html_content in content:
-        processed_content = process_mention(html_content)
+        processed_content = sanitize_email_fragment(process_mention(html_content))
         processed_content_list.append(processed_content)
     return processed_content_list
+
+
+def sanitize_comment_values(values):
+    """Comment HTML is rendered into the e-mail with `|safe`. Activity rows
+    written before the payload was sanitized still hold raw request HTML, so
+    it is cleaned again here, for mail only."""
+    if values is None:
+        return None
+    return [sanitize_email_fragment(value) for value in values]
 
 
 # A row stays unprocessed until it is sent, and stack_email_notification re-picks
@@ -265,6 +275,8 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
                 mention = changes.pop("mention", False)
                 actors_involved.append(actor_id)
                 if comment:
+                    comment["new_value"] = sanitize_comment_values(comment.get("new_value"))
+                    comment["old_value"] = sanitize_comment_values(comment.get("old_value"))
                     comments.append(
                         {
                             "actor_comments": comment,

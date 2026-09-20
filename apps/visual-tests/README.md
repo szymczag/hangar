@@ -233,6 +233,50 @@ the secret-field behaviour into the _shared_ console form components (FORK.md
 rows 27, 35, 51), so a regression there lands on an upstream page as readily as
 on OIDC or SAML.
 
+## Under the production Content-Security-Policy
+
+The edge serves web and admin with the Content-Security-Policy their builds
+generated, enforced, plus the default report-only Trusted Types policy
+(`scripts/vr.mjs` renders both from the build; space sends its own). An
+automatic fixture in `src/fixtures.ts` collects every `securitypolicyviolation`
+in the pages of a test and fails it on any, because a refused image or
+connection does not always change the screenshot. The browser's own reports to
+the API are not used for this: they are sent asynchronously and lost when the
+context closes after the screenshot.
+
+The one allowance is for the suite itself: Playwright applies `screenshot.css`
+as an inline `<style>`, so that exact text is allowed by hash. Editing the file
+changes the hash, which `pnpm vr` recomputes.
+
+## The security suite
+
+`security/` is a second Playwright configuration on the same stack. It serves
+every document with the Content-Security-Policy its build generated (space
+keeps the one its server sends, enforced on `vr-space`) plus
+`require-trusted-types-for 'script'`, both enforced, and fails on any
+violation, any Trusted Types error in the page, and any report from the default
+policy that it does not expect (docs/trusted-types-plan.md). It covers signing
+in through the real forms (web, console, published board), the editor and its
+pastes, comments, stickies, a page edited through live, the PDF export, a
+published board and the instance console, each twice: with the
+default policy observing (`HANGAR_CSP_TRUSTED_TYPES=report`) and sanitizing
+(`=enforce`).
+
+`pnpm vr` runs it once, after the visual suite, because it writes: work items,
+comments, stickies, pages and a published board would otherwise appear in
+screenshots. It is not part of the soak. To iterate on it with the stack up:
+
+```bash
+podman-compose -f docker-compose-visual.yml run --rm --no-deps vr-playwright \
+  npx playwright test -c security/playwright.config.ts
+```
+
+A failed test prints `csp-diagnostics`: the violations, page errors and failed
+requests the page produced, so a page that never renders says whether the
+policy stopped it or it was only slow. Before the first test the suite waits
+for the container's IPv6 address to leave duplicate address detection; when it
+settles Chromium fails requests in flight with `ERR_NETWORK_CHANGED`.
+
 ## Scope
 
 Light theme for everything; dark only where a story uses a semantic token no
@@ -240,7 +284,8 @@ existing dark story covers. Theme regressions are token regressions, so the
 twenty-eighth dark baseline carries almost no information at linear review cost.
 
 `light-contrast`, `dark-contrast` and `custom` are out of scope, as are
-`apps/space` and `apps/live` — `Caddyfile.vr` deliberately does not route them.
+`apps/space` and `apps/live`: the stack runs them for the security suite, but
+nothing here photographs them.
 
 ## Not part of `pnpm check`
 

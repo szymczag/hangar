@@ -7,6 +7,8 @@
 import { mergeAttributes, Node } from "@tiptap/core";
 // constants
 import { CORE_EXTENSIONS } from "@/constants/extension";
+// helpers
+import { sanitizeColorKey } from "@/helpers/attribute-guards";
 // local imports
 import { DEFAULT_COLUMN_WIDTH } from "./table";
 
@@ -42,8 +44,19 @@ export const TableHeader = Node.create<TableHeaderOptions>({
           return value;
         },
       },
+      // Palette keys only. Read from the data attributes this node renders,
+      // or from the legacy `background`/`textcolor` attributes older content
+      // stored as CSS variables. Rendered as data attributes coloured by
+      // editor.css, never as inline style (CSS injection, and refused by a
+      // strict Content-Security-Policy).
       background: {
-        default: "none",
+        default: null,
+        parseHTML: (element) =>
+          sanitizeColorKey(element.getAttribute("data-background-color") ?? element.getAttribute("background")),
+        renderHTML: (attributes) => {
+          const background = sanitizeColorKey(attributes.background);
+          return background ? { "data-background-color": background } : {};
+        },
       },
     };
   },
@@ -56,13 +69,7 @@ export const TableHeader = Node.create<TableHeaderOptions>({
     return [{ tag: "th" }];
   },
 
-  renderHTML({ node, HTMLAttributes }) {
-    return [
-      "th",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        style: `background-color: ${node.attrs.background};`,
-      }),
-      0,
-    ];
+  renderHTML({ HTMLAttributes }) {
+    return ["th", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
   },
 });

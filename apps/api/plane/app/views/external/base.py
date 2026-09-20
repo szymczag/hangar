@@ -4,11 +4,11 @@
 
 # Python import
 import os
+from html import escape
 from typing import List, Dict, Tuple
 
 # Third party import
 from openai import OpenAI
-import requests
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -19,9 +19,14 @@ from plane.app.serializers import ProjectLiteSerializer, WorkspaceLiteSerializer
 from plane.db.models import Project, Workspace
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.exception_logger import log_exception
-from plane.utils.url_security import pinned_fetch
 
 from ..base import BaseAPIView
+
+
+def _llm_text_as_html(text: str) -> str:
+    """Model output is untrusted text: a prompt can make it return markup. It is
+    escaped, and only its line breaks become HTML."""
+    return escape(text or "").replace("\n", "<br/>")
 
 
 class LLMProvider:
@@ -174,7 +179,7 @@ class GPTIntegrationEndpoint(BaseAPIView):
         return Response(
             {
                 "response": text,
-                "response_html": text.replace("\n", "<br/>"),
+                "response_html": _llm_text_as_html(text),
                 "project_detail": ProjectLiteSerializer(project).data,
                 "workspace_detail": WorkspaceLiteSerializer(workspace).data,
             },
@@ -207,80 +212,7 @@ class WorkspaceGPTIntegrationEndpoint(BaseAPIView):
         return Response(
             {
                 "response": text,
-                "response_html": text.replace("\n", "<br/>"),
+                "response_html": _llm_text_as_html(text),
             },
             status=status.HTTP_200_OK,
         )
-
-
-class UnsplashEndpoint(BaseAPIView):
-    API_ORIGIN = "https://api.unsplash.com"
-    REQUEST_TIMEOUT_SECONDS = 10
-
-    @staticmethod
-    def _pagination_value(raw_value, *, default, maximum):
-        try:
-            value = int(raw_value)
-        except (TypeError, ValueError):
-            return default, False
-
-        if value < 1 or value > maximum:
-            return default, False
-        return value, True
-
-    def get(self, request):
-        (UNSPLASH_ACCESS_KEY,) = get_configuration_value(
-            [
-                {
-                    "key": "UNSPLASH_ACCESS_KEY",
-                    "default": os.environ.get("UNSPLASH_ACCESS_KEY"),
-                }
-            ]
-        )
-        # Check unsplash access key
-        if not UNSPLASH_ACCESS_KEY:
-            return Response([], status=status.HTTP_200_OK)
-
-        # Query parameters
-        query = request.GET.get("query", "").strip()
-        page, valid_page = self._pagination_value(
-            request.GET.get("page", 1), default=1, maximum=10_000
-        )
-        per_page, valid_per_page = self._pagination_value(
-            request.GET.get("per_page", 20), default=20, maximum=30
-        )
-        if not valid_page or not valid_per_page:
-            return Response(
-                {"error": "page must be between 1 and 10000 and per_page between 1 and 30"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        path = "/search/photos" if query else "/photos"
-        params = {"page": page, "per_page": per_page}
-        if query:
-            params["query"] = query
-
-        try:
-            resp = pinned_fetch(
-                "GET",
-                f"{self.API_ORIGIN}{path}",
-                headers={
-                    "Accept": "application/json",
-                    "Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}",
-                },
-                params=params,
-                timeout=self.REQUEST_TIMEOUT_SECONDS,
-            )
-            if status.is_redirect(resp.status_code):
-                resp.close()
-                return Response(
-                    {"error": "Unexpected response from Unsplash"},
-                    status=status.HTTP_502_BAD_GATEWAY,
-                )
-            return Response(resp.json(), status=resp.status_code)
-        except (requests.RequestException, ValueError) as exc:
-            log_exception(exc)
-            return Response(
-                {"error": "Unable to retrieve images from Unsplash"},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )

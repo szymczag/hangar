@@ -38,6 +38,26 @@ app.kubernetes.io/part-of: hangar
 {{- printf "%s://%s" .Values.publicUrl.scheme .Values.publicUrl.host -}}
 {{- end -}}
 
+{{/*
+The origin browsers load uploads from, for the frontends' Content-Security-Policy.
+Matches how the API signs URLs: the public endpoint when set, path-style or
+virtual-hosted (bucket as a subdomain), and the application's own origin in
+evaluation mode, where object storage is routed under it.
+*/}}
+{{- define "hangar.objectStoragePublicOrigin" -}}
+{{- if .Values.evaluation.enabled -}}
+{{- include "hangar.publicOrigin" . -}}
+{{- else -}}
+{{- $storage := .Values.externalServices.objectStorage -}}
+{{- $url := urlParse (default $storage.endpoint $storage.publicEndpoint) -}}
+{{- if $storage.pathStyle -}}
+{{- printf "%s://%s" $url.scheme $url.host -}}
+{{- else -}}
+{{- printf "%s://%s.%s" $url.scheme $storage.bucket $url.host -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "hangar.gatewayName" -}}
 {{- default (include "hangar.fullname" .) .Values.gateway.name -}}
 {{- end -}}

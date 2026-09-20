@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 # Module imports
 from .base import BaseSerializer, DynamicBaseSerializer
+from plane.utils.content_validator import validate_html_content
 from .project import ProjectLiteSerializer
 
 # Django imports
@@ -51,6 +52,19 @@ class ModuleWriteSerializer(BaseSerializer):
         data = super().to_representation(instance)
         data["member_ids"] = [str(member.id) for member in instance.members.all()]
         return data
+
+    def validate_description_html(self, value):
+        # A JSONField upstream, but only ever an HTML string. Nothing renders it
+        # today; the API returns it to every consumer, so it gets the same
+        # allowlist as every other rich-text field.
+        if value in (None, ""):
+            return value
+        if not isinstance(value, str):
+            raise serializers.ValidationError("HTML content must be a string")
+        is_valid, error_msg, sanitized_html = validate_html_content(value)
+        if not is_valid:
+            raise serializers.ValidationError(error_msg)
+        return sanitized_html if sanitized_html is not None else value
 
     def validate(self, data):
         if (

@@ -6,8 +6,9 @@
 
 import { Mark, mergeAttributes } from "@tiptap/core";
 // constants
-import { COLORS_LIST } from "@/constants/common";
 import { CORE_EXTENSIONS } from "@/constants/extension";
+// helpers
+import { sanitizeColorKey } from "@/helpers/attribute-guards";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -50,51 +51,25 @@ export const CustomColorExtension = Mark.create({
   },
 
   addAttributes() {
+    // Palette keys only, rendered as data attributes and coloured by
+    // editor.css. No inline style: an arbitrary value interpolated into
+    // `style` was CSS injection, and inline style attributes are what a
+    // strict Content-Security-Policy (style-src-attr 'none') refuses.
     return {
       color: {
         default: null,
-        parseHTML: (element: HTMLElement) => element.getAttribute("data-text-color"),
-        renderHTML: (attributes: { color: string }) => {
-          const { color } = attributes;
-          if (!color) {
-            return {};
-          }
-
-          let elementAttributes: Record<string, string> = {
-            "data-text-color": color,
-          };
-
-          if (!COLORS_LIST.find((c) => c.key === color)) {
-            elementAttributes = {
-              ...elementAttributes,
-              style: `color: ${color}`,
-            };
-          }
-
-          return elementAttributes;
+        parseHTML: (element: HTMLElement) => sanitizeColorKey(element.getAttribute("data-text-color")),
+        renderHTML: (attributes: { color: unknown }) => {
+          const color = sanitizeColorKey(attributes.color);
+          return color ? { "data-text-color": color } : {};
         },
       },
       backgroundColor: {
         default: null,
-        parseHTML: (element: HTMLElement) => element.getAttribute("data-background-color"),
-        renderHTML: (attributes: { backgroundColor: string }) => {
-          const { backgroundColor } = attributes;
-          if (!backgroundColor) {
-            return {};
-          }
-
-          let elementAttributes: Record<string, string> = {
-            "data-background-color": backgroundColor,
-          };
-
-          if (!COLORS_LIST.find((c) => c.key === backgroundColor)) {
-            elementAttributes = {
-              ...elementAttributes,
-              style: `background-color: ${backgroundColor}`,
-            };
-          }
-
-          return elementAttributes;
+        parseHTML: (element: HTMLElement) => sanitizeColorKey(element.getAttribute("data-background-color")),
+        renderHTML: (attributes: { backgroundColor: unknown }) => {
+          const backgroundColor = sanitizeColorKey(attributes.backgroundColor);
+          return backgroundColor ? { "data-background-color": backgroundColor } : {};
         },
       },
     };
