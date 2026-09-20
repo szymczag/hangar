@@ -77,6 +77,13 @@ export type TGoogleCalendar = {
   access_role: string;
   selected: boolean;
 };
+/** Where one trainer's invitation to one session has got to. */
+export type TCalendarSyncState = {
+  trainer_id: string;
+  state: "pending" | "synced" | "failed" | "blocked_no_writer" | "blocked";
+  last_error_code: string;
+  synced_at: string | null;
+};
 export type TWorkshopSession = {
   id: string | null;
   starts_at: string;
@@ -85,6 +92,8 @@ export type TWorkshopSession = {
   travel_before_minutes: number;
   travel_after_minutes: number;
   trainer_ids: string[];
+  /** Empty when write-back is off, which is its own answer. */
+  calendar_sync?: TCalendarSyncState[];
 };
 export type TWorkshopSchedule = {
   issue_id: string;
@@ -324,6 +333,18 @@ export class CapacityService extends APIService {
   }
 
   /** Start the Google consent that lets a rule write into its calendar. */
+  /** Clear the backoff on this workshop's calendar writes and try again now. */
+  async resyncWorkshopCalendar(workspaceSlug: string, projectId: string, issueId: string) {
+    const csrfToken = await this.csrfToken();
+    return this.data<{ queued: number }>(
+      this.post(
+        `/api/workspaces/${workspaceSlug}/projects/${projectId}/work-items/${issueId}/workshop-schedule/resync/`,
+        undefined,
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
+    );
+  }
+
   async startCalendarWriter(workspaceSlug: string, ruleId: string) {
     const csrfToken = await this.csrfToken();
     return this.data<{ authorization_url: string }>(

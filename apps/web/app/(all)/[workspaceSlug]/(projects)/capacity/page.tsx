@@ -149,8 +149,9 @@ function TrainingRecognitionPanel({
         <p className="my-2 text-body-xs-regular text-secondary">
           On. Hangar reads the calendars your workspace administrator configured to learn which trainings exist and what
           they are called, and reads your own calendar to learn which of them are yours and how you answered. Your own
-          calendar is read for identity only — no titles or descriptions of your own events are requested from it.
-          Hangar will not create events or send invitations.
+          calendar is read for identity only — no titles or descriptions of your own events are requested from it. This
+          permission reads; it never writes to your calendar. Your workspace may separately create workshops in the
+          shared training calendar and invite you, which arrives as an ordinary Google invitation for you to accept.
         </p>
       ) : (
         <>
@@ -162,7 +163,7 @@ function TrainingRecognitionPanel({
           <p className="my-2 text-body-xs-regular text-secondary">
             Granting it lets Hangar read your calendar to match your invitations against the training calendars your
             workspace administrator configured. It reads identity and your answer, never the titles or descriptions of
-            your own events, and it never creates events or sends invitations.
+            your own events, and it never writes to your calendar.
           </p>
         </>
       )}

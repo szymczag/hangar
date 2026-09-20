@@ -64,6 +64,7 @@ from plane.ext.views.capacity import (
     TrainerScheduleEndpoint,
     TrainerSelfEndpoint,
     WorkspaceCapacityEndpoint,
+    WorkshopCalendarResyncEndpoint,
     WorkshopScheduleEndpoint,
     WorkshopPlanDraftDetailEndpoint,
     WorkshopPlanDraftListEndpoint,
@@ -149,6 +150,11 @@ urlpatterns = [
         f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/",
         WorkshopScheduleEndpoint.as_view(),
         name="workshop-schedule",
+    ),
+    path(
+        f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/resync/",
+        WorkshopCalendarResyncEndpoint.as_view(),
+        name="workshop-schedule-resync",
     ),
     path(
         "workspaces/<str:slug>/capacity/workshop-roles/",

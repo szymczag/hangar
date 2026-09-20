@@ -7,6 +7,7 @@
 import { CarFront, Clock3, Timer, Trash2 } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { useMember } from "@/hooks/store/use-member";
+import { CalendarSyncBadges } from "./calendar-sync-badges";
 import { blockedSpan, type TEditableSession } from "./helper";
 
 const FIELD =
@@ -91,6 +92,7 @@ export function WorkshopSessionRow({
 }: Props) {
   const { getUserDetails } = useMember();
   const span = blockedSpan(session);
+  const trainerName = (trainerId: string) => getUserDetails(trainerId)?.display_name ?? "Trainer";
 
   return (
     <div className="@container rounded-lg border border-subtle bg-layer-1 p-3">
@@ -104,6 +106,8 @@ export function WorkshopSessionRow({
           </Button>
         ) : null}
       </div>
+
+      <CalendarSyncBadges states={session.calendar_sync} nameFor={trainerName} />
 
       <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
         <Field label="Starts">

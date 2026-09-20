@@ -73,6 +73,7 @@ export function toEditableSessions(
     travel_before_minutes: session.travel_before_minutes,
     travel_after_minutes: session.travel_after_minutes,
     trainer_ids: session.trainer_ids,
+    calendar_sync: session.calendar_sync,
   }));
 }
 

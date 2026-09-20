@@ -347,6 +347,27 @@ causes, and the identity check behind the first of them matters: consent was
 given for one account to act, and an event appearing from another is a surprise
 in somebody else's calendar.
 
+### What somebody editing a schedule sees
+
+The Workshop's session list reports each invitation **per trainer**, not one
+verdict per session: a session delivered by two people can have one invitation
+sent and the other blocked on somebody who never connected Google, and "partly
+synced" tells nobody whom to chase. A row whose desired state has moved on
+reports as still working whatever it last recorded, because reporting `synced`
+there would promise a calendar entry that does not exist yet.
+
+Withdrawals in progress are deliberately not shown. They are not something the
+person editing the schedule can act on, and listing trainers who are no longer
+on a session would only confuse.
+
+A **Retry calendar** action appears only when something is actually stuck, and
+clears the backoff rather than calling Google inline -- the worker remains the
+only thing that writes, so one impatient administrator cannot turn a rate limit
+into a storm of retries. It does not revive a `blocked` row: those causes are
+facts about the world rather than timing, and if the fact changed, saving the
+schedule again is what records it. Leaving them blocked keeps the reason visible
+instead of hiding it behind a spinner.
+
 Enabled by `ENABLE_GOOGLE_CALENDAR_WRITEBACK`, a third switch on top of capacity
 because this is the only part of the subsystem that changes somebody else's
 calendar rather than reading it.
