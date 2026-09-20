@@ -203,58 +203,26 @@ class GoogleCalendarClient:
                 remember_primary_timezone(credential, calendars)
                 return calendars
 
-    def list_events(self, credential, calendar_id, *, time_min, time_max):
-        events, page_token, pages = [], None, 0
-        while True:
-            pages += 1
-            if pages > MAX_PAGES:
-                raise GoogleCalendarError("events_window_too_large")
-            query = {
-                "timeMin": time_min,
-                "timeMax": time_max,
-                "singleEvents": "true",
-                "showDeleted": "false",
-                "maxResults": 250,
-                "fields": (
-                    "nextPageToken,timeZone,items(id,iCalUID,status,organizer(email),"
-                    "attendees(email,responseStatus),attendeesOmitted,start,end,originalStartTime)"
-                ),
-            }
-            if page_token:
-                query["pageToken"] = page_token
-            payload = self._authorized_json(
-                credential,
-                "GET",
-                (
-                    f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}/events"
-                    f"?{urlencode(query)}"
-                ),
-            )
-            if not isinstance(payload, dict) or not isinstance(payload.get("items", []), list):
-                raise GoogleCalendarError("invalid_events_response")
-            items = payload.get("items", [])
-            if len(events) + len(items) > 2000:
-                raise GoogleCalendarError("events_window_too_large")
-            for item in items:
-                if not isinstance(item, dict):
-                    raise GoogleCalendarError("invalid_events_response")
-                events.append({**item, "calendar_timezone": payload.get("timeZone", "UTC")})
-            page_token = payload.get("nextPageToken")
-            if not page_token:
-                return events
+    # Three reads, three field masks, one loop. The masks are the whole point of
+    # this subsystem's privacy story, so they sit next to each other where a
+    # reviewer can compare them, rather than in three near-identical methods
+    # where one of them quietly grows a field.
+    _AVAILABILITY_FIELDS = "nextPageToken,timeZone,items(id,iCalUID,status,start,end,originalStartTime)"
+    _RULE_CALENDAR_FIELDS = (
+        "nextPageToken,timeZone,items(id,iCalUID,status,summary,updated,start,end,"
+        "originalStartTime,extendedProperties/private)"
+    )
+    _OWN_CALENDAR_FIELDS = (
+        "nextPageToken,timeZone,items(id,iCalUID,status,updated,start,end,originalStartTime,"
+        "attendees(email,responseStatus),attendeesOmitted)"
+    )
 
-    def list_training_events(self, credential, calendar_id, *, time_min, time_max, updated_min=None) -> list[dict]:
-        """Read a rule calendar for the sweep, titles included.
+    def _paged_events(self, credential, calendar_id, *, fields, time_min, time_max, updated_min=None):
+        """Every event page for one calendar and window, under one field mask.
 
-        Deliberately separate from `list_events` rather than a flag on it. The
-        live path -- the ledger and every booking check -- must keep running
-        without titles, so that no event summary can reach its five-minute Redis
-        cache or any API response. One field mask serving both would put them
-        there the first time anybody widened it.
-
-        `updated_min` turns the read incremental. It has to come with
-        `showDeleted`, because a cancellation is precisely an event whose only
-        recent change is that it stopped existing, and the sweep has to see it.
+        `updated_min` turns the read incremental, and forces `showDeleted`: a
+        cancellation is precisely an event whose only recent change is that it
+        stopped existing, and a caller asking for changes has to see it.
         """
         events, page_token, pages = [], None, 0
         while True:
@@ -267,11 +235,7 @@ class GoogleCalendarClient:
                 "singleEvents": "true",
                 "showDeleted": "true" if updated_min else "false",
                 "maxResults": 250,
-                "fields": (
-                    "nextPageToken,timeZone,items(id,iCalUID,status,summary,updated,organizer(email),"
-                    "attendees(email,responseStatus),attendeesOmitted,start,end,originalStartTime,"
-                    "extendedProperties/private)"
-                ),
+                "fields": fields,
             }
             if updated_min:
                 query["updatedMin"] = updated_min
@@ -297,6 +261,62 @@ class GoogleCalendarClient:
             page_token = payload.get("nextPageToken")
             if not page_token:
                 return events
+
+    def list_events(self, credential, calendar_id, *, time_min, time_max):
+        """Times only. Kept for callers that must never see event content."""
+        return self._paged_events(
+            credential,
+            calendar_id,
+            fields=self._AVAILABILITY_FIELDS,
+            time_min=time_min,
+            time_max=time_max,
+        )
+
+    def list_training_events(self, credential, calendar_id, *, time_min, time_max, updated_min=None) -> list[dict]:
+        """Read a rule's calendar: what trainings exist, when, and called what.
+
+        Titles are requested here and nowhere else. It is safe precisely because
+        of which calendar this is -- a rule names the calendar the organization
+        keeps its trainings on, so every title on it is a training title. The
+        same mask pointed at somebody's own calendar would be reading their
+        private life, which is why `list_own_training_responses` exists and does
+        not ask for `summary`.
+
+        Attendees are deliberately absent: a calendar whose owner hides the
+        guest list returns none, so building recognition on them means
+        recognizing almost nothing. Membership comes from the trainer's own copy
+        instead.
+        """
+        return self._paged_events(
+            credential,
+            calendar_id,
+            fields=self._RULE_CALENDAR_FIELDS,
+            time_min=time_min,
+            time_max=time_max,
+            updated_min=updated_min,
+        )
+
+    def list_own_training_responses(self, credential, *, time_min, time_max, updated_min=None) -> list[dict]:
+        """Read a trainer's own calendar for identity and answer, never content.
+
+        This is the half of recognition the rule's calendar cannot supply. An
+        organizer who hides the guest list hides it from the API too, so the
+        only place a trainer's involvement is legible is their own copy of the
+        invitation, where they are always their own attendee.
+
+        The mask asks for no `summary` and no `description`, so the titles of
+        this person's private meetings are not merely discarded -- they are
+        never sent. That is a stronger statement than filtering, and it is the
+        reason this read is acceptable at all.
+        """
+        return self._paged_events(
+            credential,
+            "primary",
+            fields=self._OWN_CALENDAR_FIELDS,
+            time_min=time_min,
+            time_max=time_max,
+            updated_min=updated_min,
+        )
 
     def freebusy(self, credential, calendar_ids: list[str], *, time_min: str, time_max: str) -> list[dict]:
         busy = []

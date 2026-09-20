@@ -337,11 +337,11 @@ export class CapacityService extends APIService {
   }
 
   listTrainingRules(workspaceSlug: string) {
-    return this.data<{ results: Array<{ id: string; label: string; calendar_id: string; organizer: string }> }>(
+    return this.data<{ results: Array<{ id: string; label: string; calendar_id: string }> }>(
       this.get(`/api/workspaces/${workspaceSlug}/capacity/google/training-rules/`)
     );
   }
-  async addTrainingRule(workspaceSlug: string, rule: { label: string; calendar_id: string; organizer: string }) {
+  async addTrainingRule(workspaceSlug: string, rule: { label: string; calendar_id: string }) {
     const token = await this.csrfToken();
     return this.data(
       this.post(`/api/workspaces/${workspaceSlug}/capacity/google/training-rules/`, rule, {

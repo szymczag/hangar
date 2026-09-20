@@ -1331,7 +1331,7 @@ def test_training_rules_are_admin_only_and_encrypted(settings, workspace, create
     client = APIClient()
     client.force_login(create_user)
     url = f"/api/workspaces/{workspace.slug}/capacity/google/training-rules/"
-    rule = {"label": "Company workshops", "calendar_id": "shared@example.test", "organizer": "organizer@example.test"}
+    rule = {"label": "Company workshops", "calendar_id": "shared@example.test"}
     WorkspaceMember.objects.filter(workspace=workspace, member=create_user).update(role=15)
     assert client.get(url).status_code == 403
     assert client.post(url, rule, format="json").status_code == 403
@@ -1340,7 +1340,6 @@ def test_training_rules_are_admin_only_and_encrypted(settings, workspace, create
     assert result.status_code == 201
     stored = GoogleTrainingRule.objects.get(id=result.data["id"])
     assert stored.encrypted_calendar_id != rule["calendar_id"]
-    assert stored.encrypted_organizer != rule["organizer"]
     assert client.get(url).data["results"][0]["calendar_id"] == rule["calendar_id"]
     assert client.delete(f"{url}{stored.id}/").status_code == 204
 
@@ -1389,26 +1388,34 @@ def test_training_import_stale_cache_and_explicit_deduplication(settings, worksp
         workspace=workspace,
         label="Training",
         encrypted_calendar_id=encrypt_value("shared@example.test")[0],
-        encrypted_organizer=encrypt_value("organizer@example.test")[0],
         encryption_key_id=key_id,
     )
     start = parse_datetime("2026-09-14T07:00:00Z")
     end = start + timedelta(hours=4)
-    event = {
+    # Two calendars, two masks: the rule's carries the title and no guests, the
+    # trainer's own carries the answer and no title.
+    on_rule_calendar = {
         "id": "one",
         "iCalUID": "one@example.test",
-        "organizer": {"email": "organizer@example.test"},
+        "summary": "Network security",
+        "start": {"dateTime": start.isoformat()},
+        "end": {"dateTime": end.isoformat()},
+    }
+    own_copy = {
+        "id": "one_copy",
+        "iCalUID": "one@example.test",
         "attendees": [{"email": "trainer@example.test", "responseStatus": "accepted"}],
         "start": {"dateTime": start.isoformat()},
         "end": {"dateTime": end.isoformat()},
     }
     client = MagicMock()
-    client.list_events.return_value = [event]
+    client.list_training_events.return_value = [on_rule_calendar]
+    client.list_own_training_responses.return_value = [own_copy]
     monkeypatch.setattr(calculation, "_google_client", lambda: client)
     rows, freshness = training_events(trainer, start, end, force=True)
     assert freshness == "fresh"
     assert training_workload(trainer, rows, start, end)["confirmed_minutes"] == 240
-    client.list_events.side_effect = GoogleCalendarError("provider_unavailable")
+    client.list_own_training_responses.side_effect = GoogleCalendarError("provider_unavailable")
     assert training_events(trainer, start, end, force=True) == (rows, "stale")
     project = Project.objects.create(name="Training", identifier="LINK", workspace=workspace, created_by=create_user)
     state = State.objects.create(name="Backlog", color="#000000", group="backlog", project=project, workspace=workspace)

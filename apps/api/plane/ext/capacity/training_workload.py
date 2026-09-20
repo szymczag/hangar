@@ -21,9 +21,10 @@ from datetime import datetime
 
 from plane.ext.models import GoogleTrainingEventLink
 
-# The only statuses that carry external workload. `recognized_event` produces no
-# others -- declined and cancelled invitations never become occurrences at all --
-# but counting defensively means a future status cannot silently inflate a total.
+# The only statuses that carry external workload. `recognized_occurrences`
+# produces no others -- declined and cancelled invitations never become
+# occurrences at all -- but counting defensively means a future status cannot
+# silently inflate a total.
 EXTERNAL_STATUSES = ("confirmed", "pending")
 
 

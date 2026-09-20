@@ -305,10 +305,23 @@ class WorkshopBookingOperation(BaseModel):
 
 
 class GoogleTrainingRule(BaseModel):
+    """A calendar whose events are this workspace's trainings.
+
+    The calendar is the whole rule. An organizer address used to be half of it,
+    and could not work: a shared calendar that hides its guest list returns no
+    attendees to the API, so there was nothing to test an organizer against, and
+    Google names the calendar itself as the organizer of anything created on it
+    rather than the person who created it.
+
+    `encrypted_organizer` is retained, unused and written empty, so that a
+    downgrade to a release that still reads it finds a column rather than an
+    error. It goes in a later migration, once no supported release reads it.
+    """
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="google_training_rules")
     label = models.CharField(max_length=100)
     encrypted_calendar_id = models.TextField()
-    encrypted_organizer = models.TextField()
+    encrypted_organizer = models.TextField(blank=True, default="")
     encryption_key_id = models.CharField(max_length=64)
 
     class Meta:
@@ -339,8 +352,8 @@ class TrainingEventOccurrence(BaseModel):
 
     So a sweep writes what it recognizes here and the report reads only this
     table. The two never appear in one response, which is what keeps them from
-    double counting. `event_key` is deliberately the same HMAC `recognized_event`
-    produces, so `GoogleTrainingEventLink` joins on it with no new column.
+    double counting. `event_key` is the same HMAC the live path derives, so
+    `GoogleTrainingEventLink` joins on it with no new column.
     """
 
     class Status(models.TextChoices):

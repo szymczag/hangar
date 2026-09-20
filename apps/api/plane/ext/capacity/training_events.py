@@ -39,37 +39,115 @@ def event_time(value, zone):
     raise GoogleCalendarError("invalid_event_time")
 
 
-def recognized_event(event, *, organizer, participant, calendar_id):
-    """Only exact organizer + verified OAuth email; creator and self are not identity."""
-    organizer_data = event.get("organizer") or {}
-    attendees = event.get("attendees") or []
-    if (
-        not isinstance(organizer_data, dict)
-        or not isinstance(attendees, list)
-        or any(not isinstance(item, dict) for item in attendees)
-    ):
-        raise GoogleCalendarError("invalid_event_participants")
-    if event.get("status") == "cancelled" or str(organizer_data.get("email", "")).casefold() != organizer.casefold():
-        return None
-    if event.get("attendeesOmitted"):
-        raise GoogleCalendarError("incomplete_event_participants")
-    attendee = next(
-        (item for item in attendees if str(item.get("email", "")).casefold() == participant.casefold()),
-        None,
-    )
-    if attendee is None or attendee.get("responseStatus") == "declined":
-        return None
-    status = "confirmed" if attendee.get("responseStatus") == "accepted" else "pending"
-    start = event_time(event.get("start"), event.get("calendar_timezone", "UTC"))
-    end = event_time(event.get("end"), event.get("calendar_timezone", "UTC"))
-    if start >= end:
-        raise GoogleCalendarError("invalid_event_time")
-    return {
-        "key": event_key(event, calendar_id=calendar_id),
-        "start": start.isoformat(),
-        "end": end.isoformat(),
-        "status": status,
-    }
+DECLINED = "declined"
+ACCEPTED = "accepted"
+
+# What a trainer's own answer means for capacity. Anything that is not an
+# outright refusal blocks time, because a training somebody has not answered yet
+# is still a training somebody is expected at.
+_CONFIRMED_RESPONSES = frozenset({ACCEPTED})
+
+
+def training_index(events, *, calendar_id):
+    """What the rule's calendar says exists, keyed by occurrence identity.
+
+    Returns `(index, cancelled_keys)`. The index is every live event on the
+    calendar; the cancelled set is every event Google says is gone, which a
+    caller retires rather than records.
+
+    This half of recognition deliberately asks no question about *who*. A
+    calendar whose owner hides the guest list -- the ordinary setting for a
+    shared organizational calendar -- returns no attendees at all, so an
+    identity test applied here would reject almost every real training. Identity
+    comes from `own_responses`, read from the trainer's own copy.
+    """
+    index, cancelled = {}, set()
+    for event in events:
+        try:
+            key = event_key(event, calendar_id=calendar_id)
+        except GoogleCalendarError:
+            # Too malformed to identify. It cannot be recorded and it cannot
+            # cancel anything; a full rescan retires it by absence.
+            continue
+        if event.get("status") == "cancelled":
+            cancelled.add(key)
+            continue
+        try:
+            start = event_time(event.get("start"), event.get("calendar_timezone", "UTC"))
+            end = event_time(event.get("end"), event.get("calendar_timezone", "UTC"))
+        except GoogleCalendarError:
+            continue
+        if start >= end:
+            continue
+        index[key] = {
+            "key": key,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "summary": event.get("summary"),
+        }
+    return index, cancelled
+
+
+def own_responses(events, *, participant):
+    """How this trainer answered, from their own copy of each invitation.
+
+    An event in somebody's own calendar that also exists on the rule's calendar
+    is, by construction, an invitation they received: a copy does not appear
+    there otherwise. The attendee entry is read only for the answer.
+
+    `participant` is the address Google itself verified for this credential, not
+    anything a user typed. Where the answer cannot be read -- a guest list the
+    API omits even to its own attendee -- the event still counts, as pending.
+    Silence is not a refusal.
+    """
+    responses = {}
+    for event in events:
+        if event.get("status") == "cancelled":
+            continue
+        try:
+            key = event_key(event, calendar_id="primary")
+        except GoogleCalendarError:
+            continue
+        attendees = event.get("attendees")
+        if not isinstance(attendees, list):
+            responses[key] = "" if event.get("attendeesOmitted") else None
+            continue
+        mine = next(
+            (
+                item
+                for item in attendees
+                if isinstance(item, dict) and str(item.get("email", "")).casefold() == participant.casefold()
+            ),
+            None,
+        )
+        responses[key] = str(mine.get("responseStatus") or "") if mine else None
+    return responses
+
+
+def recognized_occurrences(index, responses):
+    """The intersection: trainings on the rule's calendar that are this person's.
+
+    Neither source alone is enough, and that is the point. The calendar knows
+    what a training is; only the trainer's own copy knows whose it is. Matching
+    on the occurrence key means the two halves are talking about the same
+    instance of the same recurrence, not merely the same series.
+    """
+    occurrences = []
+    for key, answer in responses.items():
+        entry = index.get(key)
+        if entry is None or answer is None:
+            continue
+        if answer.casefold() == DECLINED:
+            continue
+        occurrences.append(
+            {
+                "key": key,
+                "start": entry["start"],
+                "end": entry["end"],
+                "status": "confirmed" if answer.casefold() in _CONFIRMED_RESPONSES else "pending",
+            }
+        )
+    return sorted(occurrences, key=lambda item: (item["start"], item["key"]))
 
 
 def event_key(event, *, calendar_id):
@@ -78,11 +156,12 @@ def event_key(event, *, calendar_id):
     iCalUID plus the original occurrence distinguishes recurrence while
     deduplicating the same invitation seen through several configured calendars.
 
-    Separate from `recognized_event` because the sweep needs it for an event
-    that will never be recognized: a cancellation carries no usable attendee
-    list, but it still has to be matched against the occurrence it cancels.
-    Sharing the computation is the point -- two implementations that drifted
-    would silently break every link between an invitation and its session.
+    This is also what makes the two halves of recognition comparable. The same
+    occurrence read from the rule's calendar and from a trainer's own calendar
+    produces the same key, because the key is derived from the event's own
+    identity rather than from where it was read. Two implementations that
+    drifted would silently break every link between an invitation and its
+    session, so there is exactly one.
     """
     occurrence = event.get("originalStartTime") or event.get("start")
     origin = event_time(occurrence, event.get("calendar_timezone", "UTC")).astimezone(timezone.utc).isoformat()
@@ -90,6 +169,35 @@ def event_key(event, *, calendar_id):
         raise GoogleCalendarError("invalid_event_identity")
     identity = event.get("iCalUID") or f"{calendar_id}:{event.get('id', '')}"
     return hmac.new(settings.SECRET_KEY.encode(), f"{identity}:{origin}".encode(), hashlib.sha256).hexdigest()
+
+
+def _rule_index(client, credential, rules, start, end, *, force=False):
+    """The workspace's trainings for this window, shared by every trainer.
+
+    Cached per workspace rather than per trainer on purpose. A rule names one
+    shared calendar and every trainer would read exactly the same list from it,
+    so a per-trainer read multiplies a fixed answer by the size of the roster
+    and spends Google's quota to learn nothing new.
+
+    The cached value carries titles, so it is keyed on the rules and the window
+    only -- never on a viewer -- and whether a given viewer may *see* a title is
+    decided later, where the viewer is known.
+    """
+    revision = hashlib.sha256(str([(rule.id, rule.updated_at) for rule in rules]).encode()).hexdigest()[:20]
+    cache_key = f"gcal:training-index:{rules[0].workspace_id}:{revision}:{start.isoformat()}:{end.isoformat()}"
+    cached = cache.get(cache_key)
+    if not force and isinstance(cached, dict):
+        return cached
+    index = {}
+    for rule in rules:
+        calendar_id = decrypt_value(rule.encrypted_calendar_id, rule.encryption_key_id)
+        events = client.list_training_events(
+            credential, calendar_id, time_min=start.isoformat(), time_max=end.isoformat()
+        )
+        entries, _ = training_index(events, calendar_id=calendar_id)
+        index.update(entries)
+    cache.set(cache_key, index, 300)
+    return index
 
 
 def training_events(trainer, start, end, *, force=False):
@@ -117,26 +225,16 @@ def training_events(trainer, start, end, *, force=False):
 
         client = _google_client()
         participant = decrypt_value(credential.encrypted_google_email, credential.encryption_key_id)
-        results = {}
-        calendars = {}
-        for rule in rules:
-            calendar_id = decrypt_value(rule.encrypted_calendar_id, rule.encryption_key_id)
-            organizer = decrypt_value(rule.encrypted_organizer, rule.encryption_key_id)
-            if calendar_id not in calendars:
-                calendars[calendar_id] = client.list_events(
-                    credential, calendar_id, time_min=start.isoformat(), time_max=end.isoformat()
-                )
-            for event in calendars[calendar_id]:
-                occurrence = recognized_event(
-                    event, organizer=organizer, participant=participant, calendar_id=calendar_id
-                )
-                if (
-                    occurrence
-                    and datetime.fromisoformat(occurrence["start"]) < end
-                    and datetime.fromisoformat(occurrence["end"]) > start
-                ):
-                    results[occurrence["key"]] = occurrence
-        rows = sorted(results.values(), key=lambda item: (item["start"], item["key"]))
+        index = _rule_index(client, credential, rules, start, end, force=force)
+        responses = own_responses(
+            client.list_own_training_responses(credential, time_min=start.isoformat(), time_max=end.isoformat()),
+            participant=participant,
+        )
+        rows = [
+            occurrence
+            for occurrence in recognized_occurrences(index, responses)
+            if datetime.fromisoformat(occurrence["start"]) < end and datetime.fromisoformat(occurrence["end"]) > start
+        ]
         cache.set(key, rows, 300)
         cache.set(key + ":stale", rows, 3600)
         register_busy_cache_key(selection.id, key)
