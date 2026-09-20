@@ -18,6 +18,8 @@ import type { TTrainingReportRow, TTrainingSyncStatus } from "@/services/capacit
 import type { Route } from "./+types/page";
 import {
   errorMessage,
+  formatDate,
+  formatDateTime,
   formatHours,
   formatMonthParam,
   parseMonthParam,
@@ -126,9 +128,7 @@ export default function CapacityReportsPage({ params }: Route.ComponentProps) {
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-primary" />
             This month falls outside the range currently collected
             {data.coverage.window_starts_at && data.coverage.window_ends_at
-              ? ` (${new Date(data.coverage.window_starts_at).toLocaleDateString()} – ${new Date(
-                  data.coverage.window_ends_at
-                ).toLocaleDateString()})`
+              ? ` (${formatDate(data.coverage.window_starts_at)} – ${formatDate(data.coverage.window_ends_at)})`
               : ""}
             , so externally organized training is not shown for it.
           </p>
@@ -169,7 +169,7 @@ export default function CapacityReportsPage({ params }: Route.ComponentProps) {
               </span>
               {data?.data_as_of && (
                 <span className="text-body-xs-regular text-secondary">
-                  Data as of {new Date(data.data_as_of).toLocaleString()}
+                  Data as of {formatDateTime(data.data_as_of)}
                 </span>
               )}
               {excluded.length > 0 && (

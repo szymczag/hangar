@@ -119,6 +119,24 @@ export function formatMinutes(value: number) {
   return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
+// Built once, at module scope. Constructing an `Intl.DateTimeFormat` is
+// expensive, and `toLocaleString()` constructs one per call -- so a table that
+// formats a timestamp per row rebuilt the formatter on every row of every
+// render. Both options match what the bare `toLocale*` calls produced, so the
+// rendered text is unchanged.
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat();
+const DATE_FORMAT = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "numeric", day: "numeric" });
+
+/** A timestamp in the viewer's own locale and zone, formatter reused. */
+export function formatDateTime(value: string | number | Date) {
+  return DATE_TIME_FORMAT.format(new Date(value));
+}
+
+/** A date in the viewer's own locale, formatter reused. */
+export function formatDate(value: string | number | Date) {
+  return DATE_FORMAT.format(new Date(value));
+}
+
 /** Hours to one decimal, for a report where minutes are noise. */
 export function formatHours(minutes: number) {
   return `${Math.round((minutes / 60) * 10) / 10}h`;
