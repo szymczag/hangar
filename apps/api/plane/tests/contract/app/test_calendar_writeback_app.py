@@ -419,3 +419,53 @@ def test_the_reconciler_leaves_live_sessions_alone(writeback, workspace, create_
     row.refresh_from_db()
     assert row.intent == WorkshopSessionCalendarEvent.Intent.PRESENT
     assert row.state == WorkshopSessionCalendarEvent.State.SYNCED
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_the_schedule_reports_each_trainers_invitation_separately(writeback, workspace, create_user):
+    """One verdict per session would not say whom to chase."""
+    from plane.ext.views.capacity import WorkshopScheduleEndpoint
+
+    _connected_trainer(workspace, create_user)
+    writer = _credential(create_user, "writer-subject", "coordinator@example.test")
+    _rule(workspace, writer)
+    session = _session(workspace, create_user, trainers=[create_user])
+    reconcile_session(session, actor=create_user)
+
+    states = WorkshopScheduleEndpoint._calendar_sync([session.id])
+
+    assert states[str(session.id)][0]["trainer_id"] == str(create_user.id)
+    assert states[str(session.id)][0]["state"] == WorkshopSessionCalendarEvent.State.PENDING
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_row_whose_desired_state_moved_on_is_not_reported_as_synced(writeback, workspace, create_user):
+    """Otherwise the schedule promises a calendar entry that does not exist yet."""
+    from plane.ext.views.capacity import WorkshopScheduleEndpoint
+
+    _connected_trainer(workspace, create_user)
+    writer = _credential(create_user, "writer-subject", "coordinator@example.test")
+    _rule(workspace, writer)
+    session = _session(workspace, create_user, trainers=[create_user])
+    reconcile_session(session, actor=create_user)
+    row = WorkshopSessionCalendarEvent.objects.get()
+    row.state = WorkshopSessionCalendarEvent.State.SYNCED
+    row.synced_revision = row.revision - 1
+    row.save()
+
+    states = WorkshopScheduleEndpoint._calendar_sync([session.id])
+
+    assert states[str(session.id)][0]["state"] == WorkshopSessionCalendarEvent.State.PENDING
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_nothing_is_reported_while_write_back_is_off(settings, workspace, create_user):
+    from plane.ext.views.capacity import WorkshopScheduleEndpoint
+
+    settings.GOOGLE_CALENDAR_CAPACITY_ENABLED = True
+    settings.GOOGLE_CALENDAR_WRITEBACK_ENABLED = False
+
+    assert WorkshopScheduleEndpoint._calendar_sync(["00000000-0000-0000-0000-000000000000"]) == {}

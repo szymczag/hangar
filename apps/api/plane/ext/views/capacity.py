@@ -57,8 +57,14 @@ from plane.ext.models import (
     WorkshopPlanHold,
     WorkshopSchedule,
     WorkshopSession,
+    WorkshopSessionCalendarEvent,
 )
-from plane.ext.capacity.calendar_sync import enqueue, mark_sessions_absent, reconcile_session
+from plane.ext.capacity.calendar_sync import (
+    enqueue,
+    mark_sessions_absent,
+    reconcile_session,
+    writeback_enabled,
+)
 from plane.ext.services import ensure_workspace_workshop_type
 from plane.ext.services.workshop_checklist import backfill_target_dates
 from plane.license.utils.instance_value import get_configuration_value
@@ -596,6 +602,59 @@ class GoogleCalendarsEndpoint(BaseAPIView):
             metadata={"forced_local": request.query_params.get("force_local") == "true"},
         )
         return Response(status=204)
+
+
+class WorkshopCalendarResyncEndpoint(BaseAPIView):
+    """Try the shared calendar again now, rather than at the next sweep.
+
+    Exists because the usual reason a row is stuck is something a person just
+    fixed -- a reconnected writing account, a trainer who finally connected
+    Google -- and asking them to wait out a backoff they cannot see is how a
+    feature acquires a reputation for not working.
+
+    It clears the backoff rather than calling Google inline: the worker is still
+    the only thing that writes, so one impatient administrator cannot turn a
+    rate limit into a storm of retries.
+    """
+
+    authentication_classes = [CsrfEnforcedSessionAuthentication]
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    @transaction.atomic
+    def post(self, request, slug, project_id, issue_id):
+        if response := _disabled():
+            return response
+        if not writeback_enabled():
+            return Response({"error": "Calendar write-back is disabled."}, status=404)
+        issue = get_object_or_404(
+            Issue,
+            pk=issue_id,
+            project_id=project_id,
+            workspace__slug=slug,
+            project__project_projectmember__member=request.user,
+        )
+        session_ids = list(WorkshopSession.objects.filter(schedule__issue=issue).values_list("id", flat=True))
+        rows = list(
+            WorkshopSessionCalendarEvent.objects.select_for_update()
+            .filter(source_session_id__in=session_ids)
+            .exclude(synced_revision=F("revision"))
+        )
+        now = timezone.now()
+        for row in rows:
+            row.attempts = 0
+            row.available_at = now
+            # A blocked row is not retried by clearing a timer: its cause is a
+            # fact about the world, and if that fact changed, re-planning is
+            # what records the change. Leaving it blocked keeps the reason
+            # visible instead of hiding it behind a spinner.
+            if row.state in (
+                WorkshopSessionCalendarEvent.State.FAILED,
+                WorkshopSessionCalendarEvent.State.BLOCKED_NO_WRITER,
+            ):
+                row.state = WorkshopSessionCalendarEvent.State.PENDING
+            row.save(update_fields=["attempts", "available_at", "state", "updated_at"])
+        enqueue([row.id for row in rows if row.state == WorkshopSessionCalendarEvent.State.PENDING])
+        return Response({"queued": sum(1 for row in rows if row.state == WorkshopSessionCalendarEvent.State.PENDING)})
 
 
 class WorkspaceCapacityEndpoint(BaseAPIView):
@@ -1628,8 +1687,54 @@ class WorkshopScheduleEndpoint(BaseAPIView):
         return Response(status=204)
 
     @staticmethod
+    def _calendar_sync(session_ids):
+        """What the shared calendar currently says about each session.
+
+        Returned per session and per trainer rather than as one verdict: a
+        session delivered by two people can have one invitation sent and the
+        other blocked on a trainer who never connected Google, and collapsing
+        that into "partly synced" tells nobody which of them to chase.
+
+        Absent rows are omitted deliberately. A withdrawal in progress is not
+        something the person editing the schedule can act on, and listing
+        trainers who are no longer on a session would be confusing.
+        """
+        if not writeback_enabled() or not session_ids:
+            return {}
+        rows = WorkshopSessionCalendarEvent.objects.filter(
+            source_session_id__in=session_ids, intent=WorkshopSessionCalendarEvent.Intent.PRESENT
+        ).values(
+            "source_session_id",
+            "trainer_id",
+            "state",
+            "last_error_code",
+            "synced_at",
+            "revision",
+            "synced_revision",
+        )
+        by_session = {}
+        for row in rows:
+            by_session.setdefault(str(row["source_session_id"]), []).append(
+                {
+                    "trainer_id": str(row["trainer_id"]),
+                    # A row whose desired state has moved on is still working,
+                    # whatever it last recorded -- reporting `synced` there would
+                    # promise a calendar entry that does not exist yet.
+                    "state": (
+                        row["state"]
+                        if row["synced_revision"] == row["revision"]
+                        else WorkshopSessionCalendarEvent.State.PENDING
+                    ),
+                    "last_error_code": row["last_error_code"],
+                    "synced_at": row["synced_at"].isoformat() if row["synced_at"] else None,
+                }
+            )
+        return by_session
+
+    @staticmethod
     def _payload(schedule):
         sessions = list(schedule.sessions.prefetch_related("trainers").all())
+        sync = WorkshopScheduleEndpoint._calendar_sync([session.id for session in sessions])
         if not sessions:
             trainer_ids = [str(value) for value in schedule.issue.issue_assignee.values_list("assignee_id", flat=True)]
             session_payloads = [
@@ -1641,6 +1746,7 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                     "travel_before_minutes": schedule.travel_before_minutes,
                     "travel_after_minutes": schedule.travel_after_minutes,
                     "trainer_ids": trainer_ids,
+                    "calendar_sync": [],
                 }
             ]
         else:
@@ -1653,6 +1759,7 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                     "travel_before_minutes": session.travel_before_minutes,
                     "travel_after_minutes": session.travel_after_minutes,
                     "trainer_ids": [str(trainer.id) for trainer in session.trainers.all()],
+                    "calendar_sync": sync.get(str(session.id), []),
                 }
                 for session in sessions
             ]

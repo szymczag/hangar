@@ -114,6 +114,33 @@ export function WorkshopSessionsCollapsible({
       current.map((session) => (session.localId === localId ? { ...session, ...patch } : session))
     );
 
+  // Offered only when something is actually stuck, because a button that is
+  // always there invites clicking at a calendar that is working perfectly well.
+  const needsRetry = sessions.some((session) =>
+    (session.calendar_sync ?? []).some((state) => state.state === "failed" || state.state === "blocked_no_writer")
+  );
+  const [retrying, setRetrying] = useState(false);
+  const retryCalendar = async () => {
+    setRetrying(true);
+    try {
+      await capacityService.resyncWorkshopCalendar(workspaceSlug, projectId, issueId);
+      await mutate();
+      setToast({
+        type: TOAST_TYPE.SUCCESS,
+        title: "Trying again",
+        message: "The training calendar will be updated shortly.",
+      });
+    } catch {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Could not retry",
+        message: "Try again in a moment.",
+      });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   const save = async () => {
     if (!isSchedulable(sessions)) return;
     setSaving(true);
@@ -232,6 +259,11 @@ export function WorkshopSessionsCollapsible({
               {data ? (
                 <Button variant="secondary" size="sm" disabled={saving} onClick={remove}>
                   Remove all
+                </Button>
+              ) : null}
+              {needsRetry ? (
+                <Button variant="secondary" size="sm" loading={retrying} onClick={retryCalendar}>
+                  Retry calendar
                 </Button>
               ) : null}
               <span className="ml-auto text-11 text-placeholder">Times shown in {timezone}</span>
