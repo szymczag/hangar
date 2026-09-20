@@ -126,18 +126,27 @@ class GoogleCalendarClient:
         except requests.RequestException as exc:
             raise GoogleCalendarError("revocation_failed") from exc
 
-    def _authorized_json(self, credential, method, url, *, json_body=None, max_bytes=1024 * 1024):
+    def _authorized_json(self, credential, method, url, *, json_body=None, max_bytes=1024 * 1024, expect_json=True):
+        """A Google API call, with one token refresh on 401.
+
+        `expect_json=False` exists for the calls that succeed with no body at
+        all. Deleting an event answers `204 No Content`, and parsing that as
+        JSON raises -- which this method would report as `provider_unavailable`,
+        so a delete that worked would be retried forever against an event that
+        is already gone.
+        """
         for attempt in range(2):
             token = self.access_token(credential, force=attempt == 1)
             try:
-                payload = _request(
+                response = _request(
                     method,
                     url,
                     origin=GOOGLE_API_ORIGIN,
                     json_body=json_body,
                     headers={"Authorization": f"Bearer {token}"},
                     max_bytes=max_bytes,
-                ).json()
+                )
+                payload = response.json() if expect_json and response.content else {}
                 GoogleCalendarCredential.objects.filter(pk=credential.pk).update(
                     status=GoogleCalendarCredential.Status.CONNECTED,
                     last_successful_at=timezone.now(),
@@ -148,7 +157,22 @@ class GoogleCalendarClient:
                 if "HTTP 401" in str(exc) and attempt == 0:
                     cache.delete(f"gcal:access:{credential.id}")
                     continue
-                code = "rate_limited" if "HTTP 429" in str(exc) else "provider_error"
+                # The write paths act on these differently: a conflict means
+                # the event we were about to create already exists under our own
+                # identifier, and a missing one means a delete has nothing left
+                # to do. Collapsing them into `provider_error` would turn both
+                # into retries that can never succeed.
+                message = str(exc)
+                if "HTTP 429" in message:
+                    code = "rate_limited"
+                elif "HTTP 409" in message:
+                    code = "already_exists"
+                elif "HTTP 404" in message:
+                    code = "not_found"
+                elif "HTTP 410" in message:
+                    code = "gone"
+                else:
+                    code = "provider_error"
                 raise GoogleCalendarError(code) from exc
             except (requests.RequestException, ValueError, UnicodeDecodeError) as exc:
                 raise GoogleCalendarError("provider_unavailable") from exc
@@ -295,6 +319,52 @@ class GoogleCalendarClient:
             time_max=time_max,
             updated_min=updated_min,
         )
+
+    def insert_event(self, credential, calendar_id, event: dict, *, send_updates="all") -> dict:
+        """Create one event on a calendar, with the identifier we chose.
+
+        Supplying our own `id` is what makes this idempotent: a redelivered
+        Celery message, or a retry after a response we never saw, lands on the
+        same identifier and Google answers `409` instead of creating a second
+        event. The caller treats that conflict as success and reconciles.
+        """
+        query = urlencode({"sendUpdates": send_updates, "conferenceDataVersion": 0})
+        return self._authorized_json(
+            credential,
+            "POST",
+            f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}/events?{query}",
+            json_body=event,
+        )
+
+    def update_event(self, credential, calendar_id, event_id: str, event: dict, *, send_updates="all") -> dict:
+        query = urlencode({"sendUpdates": send_updates})
+        return self._authorized_json(
+            credential,
+            "PUT",
+            (
+                f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}"
+                f"/events/{quote(event_id, safe='')}?{query}"
+            ),
+            json_body=event,
+        )
+
+    def delete_event(self, credential, calendar_id, event_id: str, *, send_updates="all") -> None:
+        """Remove an event. A `404` or `410` means it is already gone, which is the goal."""
+        query = urlencode({"sendUpdates": send_updates})
+        try:
+            self._authorized_json(
+                credential,
+                "DELETE",
+                (
+                    f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}"
+                    f"/events/{quote(event_id, safe='')}?{query}"
+                ),
+                expect_json=False,
+            )
+        except GoogleCalendarError as exc:
+            if exc.code in ("not_found", "gone"):
+                return
+            raise
 
     def list_own_training_responses(self, credential, *, time_min, time_max, updated_min=None) -> list[dict]:
         """Read a trainer's own calendar for identity and answer, never content.

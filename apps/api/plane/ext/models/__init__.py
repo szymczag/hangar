@@ -50,6 +50,7 @@ from .capacity import (
     TrainingEventOccurrence,
     WorkshopSchedule,
     WorkshopSession,
+    WorkshopSessionCalendarEvent,
 )
 
 __all__ = [
@@ -95,6 +96,7 @@ __all__ = [
     "TrainingEventOccurrence",
     "WorkshopSchedule",
     "WorkshopSession",
+    "WorkshopSessionCalendarEvent",
 ]
 
 from .capacity import GoogleTrainingRule, GoogleTrainingEventLink

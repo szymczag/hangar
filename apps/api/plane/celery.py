@@ -162,6 +162,14 @@ app.conf.beat_schedule = {
         "task": "plane.ext.tasks.prune_training_event_occurrences",
         "schedule": crontab(hour=4, minute=10),
     },
+    # Workshops scheduled in Hangar, written into the shared training calendar.
+    # A minute is short enough that a coordinator sees the entry appear while
+    # still looking at the screen, and the dispatcher costs one indexed query
+    # when there is nothing to do.
+    "dispatch-pending-calendar-syncs": {
+        "task": "plane.ext.tasks.dispatch_pending_calendar_syncs",
+        "schedule": 60.0,
+    },
     "recover-expired-todoist-import-leases": {
         "task": "plane.ext.tasks.recover_expired_import_leases",
         "schedule": 30.0,
