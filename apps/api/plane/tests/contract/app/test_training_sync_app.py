@@ -29,21 +29,43 @@ CALENDAR = "shared@example.test"
 
 
 class FakeClient:
-    """Stands in for the Google client; records what the sweep asked for."""
+    """Stands in for the Google client, and enforces its field masks.
 
-    def __init__(self, events, *, fail=None):
+    Each test writes one event carrying everything about it. The fake then hands
+    each read only the fields the real mask asks for: the rule's calendar sees a
+    title and no guests, the trainer's own calendar sees guests and no title.
+
+    That split is the point. A fake that returned whole events would let a test
+    pass on data Google would never send -- which is exactly how the previous
+    implementation came to depend on an attendee list a shared calendar hides.
+    """
+
+    def __init__(self, events, *, fail=None, own_events=None):
         self.events = events
+        self.own_events = events if own_events is None else own_events
         self.fail = fail
         self.calls = []
+
+    @staticmethod
+    def _in_window(events, time_min, time_max):
+        return [event for event in events if time_min <= event["start"]["dateTime"] < time_max]
 
     def list_training_events(self, credential, calendar_id, *, time_min, time_max, updated_min=None):
         self.calls.append({"calendar_id": calendar_id, "updated_min": updated_min, "time_min": time_min})
         if self.fail:
             raise GoogleCalendarError(self.fail)
         return [
-            event
-            for event in self.events
-            if time_min <= event["start"]["dateTime"] < time_max
+            {key: value for key, value in event.items() if key not in ("attendees", "attendeesOmitted")}
+            for event in self._in_window(self.events, time_min, time_max)
+        ]
+
+    def list_own_training_responses(self, credential, *, time_min, time_max, updated_min=None):
+        self.calls.append({"calendar_id": "primary", "updated_min": updated_min, "time_min": time_min})
+        if self.fail:
+            raise GoogleCalendarError(self.fail)
+        return [
+            {key: value for key, value in event.items() if key != "summary"}
+            for event in self._in_window(self.own_events, time_min, time_max)
         ]
 
 
@@ -51,7 +73,6 @@ def _event(*, key_id="one", starts=STARTS, hours=4, response="accepted", status=
     event = {
         "id": key_id,
         "iCalUID": f"{key_id}@example.test",
-        "organizer": {"email": ORGANIZER},
         "attendees": [{"email": TRAINER_EMAIL, "responseStatus": response}],
         "start": {"dateTime": starts.isoformat().replace("+00:00", "Z")},
         "end": {"dateTime": (starts + timedelta(hours=hours)).isoformat().replace("+00:00", "Z")},
@@ -90,7 +111,6 @@ def _rule(workspace):
         workspace=workspace,
         label="Shared training calendar",
         encrypted_calendar_id=encrypted_calendar,
-        encrypted_organizer=encrypt_value(ORGANIZER)[0],
         encryption_key_id=key_id,
     )
 
@@ -123,12 +143,16 @@ def test_a_recognized_invitation_becomes_an_occurrence_with_its_title(keys, work
 @pytest.mark.contract
 @pytest.mark.django_db
 def test_an_event_that_matches_no_rule_leaves_no_trace_of_its_title(keys, workspace, create_user):
-    """The security boundary of the titles feature, asserted end to end."""
+    """The security boundary of the titles feature, asserted end to end.
+
+    The trainer holds a copy of something -- a private appointment -- that is
+    not on the training calendar. It must not become a training, and its title
+    must not be stored, merely because this person is in it.
+    """
     _consenting_trainer(workspace, create_user, keys)
     rule = _rule(workspace)
-    stranger = _event(key_id="other", summary="Somebody's private appointment")
-    stranger["organizer"] = {"email": "someone-else@example.test"}
-    client = FakeClient([stranger])
+    private = _event(key_id="other", summary="Somebody's private appointment")
+    client = FakeClient([], own_events=[private])
 
     result = sweep_rule(client, rule, now=NOW, full=True)
 
@@ -171,7 +195,7 @@ def test_a_cancelled_invitation_is_retired_without_waiting_for_a_full_scan(keys,
 
     cancelled = _event(status="cancelled")
     cancelled.pop("attendees")
-    sweep_rule(FakeClient([cancelled]), rule, now=NOW + timedelta(minutes=15))
+    sweep_rule(FakeClient([cancelled], own_events=[]), rule, now=NOW + timedelta(minutes=15))
 
     assert TrainingEventOccurrence.objects.get().state == TrainingEventOccurrence.State.CANCELLED
 

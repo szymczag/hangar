@@ -119,27 +119,38 @@ uncached calendar read.
 ## Recognizing training invitations
 
 Workspace administrators configure **Team capacity → Training calendar rules**.
-Each rule matches both a calendar ID and the exact organizer email. The event
-creator does not affect matching. Calendar IDs and organizer emails are encrypted
-using the existing calendar encryption key; only workspace administrators can read
-or change rules. No organization-specific identifiers belong in repository files.
+A rule names one calendar, and every event on it counts as a training. Calendar
+identifiers are encrypted using the existing calendar encryption key; only
+workspace administrators can read or change rules. No organization-specific
+identifiers belong in repository files.
+
+Whose training it is comes from the trainer's own copy of the invitation, not
+from the shared calendar's guest list -- a shared calendar normally hides that,
+and Google hides it from the API too. The full mechanism, the measurements behind
+it and the design that it replaced are in
+[training recognition](capacity-training-recognition.md); that document is the
+reference for this subsystem.
 
 Each trainer then opens **My capacity → Allow training calendar access**. This
 separate consent adds `https://www.googleapis.com/auth/calendar.events.readonly` to
 the existing read-only connection. Configure that optional scope on the Google OAuth
 consent screen before using this feature. Existing connections keep their original
-permissions until the trainer opts in. The trainer's Google account must itself be
-able to read the configured shared calendar; an administrator's rule grants no
-Google permissions. Disconnecting Google removes the connection and indexed caches.
+permissions until the trainer opts in. An administrator's rule grants no Google
+permissions, and nobody can grant this consent on a trainer's behalf: a trainer
+who has not granted it is reported as such rather than as having run no training.
+Disconnecting Google removes the connection and indexed caches.
 
-Hangar matches the trainer through the verified Google account email, not the
-calendar copy's `self` flag. Accepted invitations count as confirmed external
-training; tentative and unanswered invitations count separately as pending. Both
-block booking. Declined and cancelled invitations are ignored. Recurring instances
-are expanded, and all-day end dates are exclusive in the source calendar timezone.
-The importer requests times, organizer and participant responses; it requests no
-titles or descriptions and exposes no attendee lists or organizer addresses in the
-team workload response.
+Accepted invitations count as confirmed external training; tentative and
+unanswered invitations count separately as pending. Both block booking. Declined
+and cancelled invitations are ignored. Recurring instances are expanded and are
+distinguished from one another, and all-day end dates are exclusive in the source
+calendar timezone.
+Two reads with different field masks serve this. The rule's calendar is asked
+for times and titles, which is safe because every event on it is a training. The
+trainer's own calendar is asked for times and their own response only -- no title
+and no description of a private meeting is ever requested from it, which is a
+stronger guarantee than discarding one. No attendee list or organizer address
+appears in any response.
 
 Successful reads are cached for five minutes. Last-known results can be displayed
 for up to one hour with an unverified status. New holds and scheduling always require

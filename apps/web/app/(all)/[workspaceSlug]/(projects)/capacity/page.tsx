@@ -121,6 +121,58 @@ function CalendarPicker({
   );
 }
 
+/**
+ * Whether this trainer's invitations are being recognized, and what to do about it.
+ *
+ * Its own component because the "not granted" state is the one somebody is
+ * actually in when their report reads zero, and it needs room to say what is
+ * missing and that nobody else can grant it for them. Inlined, that wording put
+ * enough branches into the page to be worth extracting on its own merits.
+ */
+function TrainingRecognitionPanel({
+  enabled,
+  busy,
+  onConnect,
+}: {
+  enabled: boolean;
+  busy: boolean;
+  onConnect: () => void;
+}) {
+  return (
+    <section
+      className={`rounded-lg border p-4 ${
+        enabled ? "border-subtle bg-surface-1" : "border-warning-border bg-warning-component-surface-light"
+      }`}
+    >
+      <h2 className="text-body-sm-medium">Training invitation recognition</h2>
+      {enabled ? (
+        <p className="my-2 text-body-xs-regular text-secondary">
+          On. Hangar reads the calendars your workspace administrator configured to learn which trainings exist and what
+          they are called, and reads your own calendar to learn which of them are yours and how you answered. Your own
+          calendar is read for identity only — no titles or descriptions of your own events are requested from it.
+          Hangar will not create events or send invitations.
+        </p>
+      ) : (
+        <>
+          <p className="my-2 text-body-xs-regular text-secondary">
+            <strong className="text-body-xs-medium">Your trainings are not being counted.</strong> Hangar can see that
+            you are busy, but not that the busy time is training, so you appear in the team ledger and the monthly
+            report as having run none. Nobody else can turn this on for you.
+          </p>
+          <p className="my-2 text-body-xs-regular text-secondary">
+            Granting it lets Hangar read your calendar to match your invitations against the training calendars your
+            workspace administrator configured. It reads identity and your answer, never the titles or descriptions of
+            your own events, and it never creates events or sends invitations.
+          </p>
+        </>
+      )}
+      <Button variant={enabled ? "secondary" : "primary"} loading={busy} onClick={onConnect}>
+        {enabled ? "Renew training calendar access" : "Allow training calendar access"}
+      </Button>
+    </section>
+  );
+}
+
 export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
   const workspaceSlug = params.workspaceSlug;
   const { config } = useInstance();
@@ -285,20 +337,11 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               </section>
             )}
             {isConnected && (
-              <section className="rounded-lg border border-subtle bg-surface-1 p-4">
-                <h2 className="text-body-sm-medium">Training invitation recognition</h2>
-                <p className="my-2 text-body-xs-regular text-secondary">
-                  Optional additional Google permission reads event times, organizer and attendee responses from
-                  calendars configured by your workspace administrator. Only invitations addressed to your Google
-                  account count. Titles and descriptions are not requested. Hangar will not create events or send
-                  invitations.
-                </p>
-                <Button variant="secondary" loading={connecting} onClick={() => void connect(true)}>
-                  {ownProfile.training_events_enabled
-                    ? "Renew training calendar access"
-                    : "Allow training calendar access"}
-                </Button>
-              </section>
+              <TrainingRecognitionPanel
+                enabled={ownProfile.training_events_enabled === true}
+                busy={connecting}
+                onConnect={() => void connect(true)}
+              />
             )}
             {isConnected ? (
               <button

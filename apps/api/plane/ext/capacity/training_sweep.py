@@ -132,8 +132,8 @@ def summary_for(event, *, matched):
     The filter is the security boundary of the whole titles feature, so it is a
     named function rather than an inline condition: an event that did not match
     must never hand its title to anything that could persist or log it. Callers
-    pass `matched` from `recognized_event`, which has already applied the
-    organizer and participant checks.
+    pass `matched` from `recognized_occurrences`, which has already established
+    that this trainer holds a copy of this invitation.
     """
     if not matched:
         return ""

@@ -146,7 +146,15 @@ export function connectionCopy(status: string) {
   if (status === "connected") return "Google connected";
   if (status === "not_connected") return "Calendar not connected";
   if (status === "no_calendars_selected") return "Choose calendars";
-  return "Availability unknown";
+  if (status === "reauthorization_required") return "Reconnect Google";
+  if (status === "revoked") return "Google access revoked";
+  if (status === "not_configured") return "Google not configured";
+  if (status === "consent_required") return "Training access not granted";
+  // Anything else is a provider error code we have no better words for. Say so,
+  // and say the code: a viewer who cannot act on "unknown" can at least quote
+  // this, and a blank label was how a workspace spent an evening believing it
+  // had no trainings rather than no consent.
+  return `Availability unknown (${status})`;
 }
 
 export function availabilityCopy(status: string) {

@@ -4,16 +4,21 @@
 
 """Reading one rule's calendar and writing what it recognizes to the table.
 
-The sweep is keyed on the rule, not the trainer. A rule names a *shared*
-calendar, so every consenting trainer would read an identical event list from
-it: sweeping per trainer would multiply Google's quota by the roster for no
-extra information, and a nine-month window per trainer walks straight into the
-two-thousand-event ceiling `list_training_events` enforces.
+The sweep is keyed on the rule, not the trainer, for the half of the work that
+is identical for everybody. A rule names a *shared* calendar, so every trainer
+would read the same event list from it: reading it once and reusing it saves the
+roster's worth of quota, and a nine-month window per trainer walks straight into
+the two-thousand-event ceiling `_paged_events` enforces.
 
-One read, then fanned out in memory: each event is offered to every consenting
-trainer's own verified address through the existing `recognized_event`. The
-consent boundary is preserved, because materializing anything for a trainer
-still requires that trainer's own flags -- only the transport is shared.
+The other half cannot be shared, because it is precisely the part that differs
+per person. A shared organizational calendar is normally configured to hide its
+guest list, and Google honours that in the API as well -- so the rule's calendar
+can say what trainings exist and when, but not whose they are. Each trainer's
+own calendar is read separately for that, under a field mask that asks for no
+titles at all, and the two are matched on the occurrence key.
+
+Consent is therefore enforced twice over: a trainer with no credential is not
+read, and a trainer who is not an attendee has no copy to find.
 
 The decisions about windows, slicing and what a pass may conclude live in
 `training_sweep`; this module is the part that talks to Google and the database.
@@ -30,7 +35,7 @@ from django.utils import timezone as django_timezone
 
 from plane.ext.capacity.crypto import decrypt_value, encrypt_value
 from plane.ext.capacity.google import GoogleCalendarError
-from plane.ext.capacity.training_events import EVENTS_SCOPE, event_key, recognized_event
+from plane.ext.capacity.training_events import EVENTS_SCOPE, own_responses, recognized_occurrences, training_index
 from plane.ext.capacity.training_sweep import (
     backoff_until,
     month_slices,
@@ -275,12 +280,12 @@ def sweep_rule(client, rule, *, now=None, full=False):
     credential = profile.calendar_selection.credential
 
     calendar_id = decrypt_value(rule.encrypted_calendar_id, rule.encryption_key_id)
-    organizer = decrypt_value(rule.encrypted_organizer, rule.encryption_key_id)
     calendar_hash = _calendar_hash(calendar_id)
 
     matched = 0
     cancelled_keys = set()
     try:
+        index = {}
         for slice_start, slice_end in month_slices(window_start, window_end):
             events = client.list_training_events(
                 credential,
@@ -289,37 +294,42 @@ def sweep_rule(client, rule, *, now=None, full=False):
                 time_max=slice_end.isoformat().replace("+00:00", "Z"),
                 updated_min=updated_min.isoformat().replace("+00:00", "Z") if updated_min else None,
             )
-            for event in events:
-                if event.get("status") == "cancelled":
-                    try:
-                        cancelled_keys.add(event_key(event, calendar_id=calendar_id))
-                    except GoogleCalendarError:
-                        # An event too malformed to identify cannot cancel
-                        # anything; the full scan will retire it by absence.
-                        continue
+            entries, cancelled_slice = training_index(events, calendar_id=calendar_id)
+            index.update(entries)
+            cancelled_keys |= cancelled_slice
+
+        for reader_profile, email in readers:
+            reader_credential = reader_profile.calendar_selection.credential
+            responses = {}
+            for slice_start, slice_end in month_slices(window_start, window_end):
+                responses.update(
+                    own_responses(
+                        client.list_own_training_responses(
+                            reader_credential,
+                            time_min=slice_start.isoformat().replace("+00:00", "Z"),
+                            time_max=slice_end.isoformat().replace("+00:00", "Z"),
+                            updated_min=updated_min.isoformat().replace("+00:00", "Z") if updated_min else None,
+                        ),
+                        participant=email,
+                    )
+                )
+            for occurrence in recognized_occurrences(index, responses):
+                if not occurrence_in_window(
+                    datetime.fromisoformat(occurrence["start"]),
+                    datetime.fromisoformat(occurrence["end"]),
+                    window_start,
+                    window_end,
+                ):
                     continue
-                for reader_profile, email in readers:
-                    occurrence = recognized_event(
-                        event, organizer=organizer, participant=email, calendar_id=calendar_id
-                    )
-                    if occurrence is None:
-                        continue
-                    if not occurrence_in_window(
-                        datetime.fromisoformat(occurrence["start"]),
-                        datetime.fromisoformat(occurrence["end"]),
-                        window_start,
-                        window_end,
-                    ):
-                        continue
-                    _upsert(
-                        occurrence,
-                        profile=reader_profile,
-                        rule=rule,
-                        calendar_hash=calendar_hash,
-                        summary=summary_for(event, matched=True),
-                        now=now,
-                    )
-                    matched += 1
+                _upsert(
+                    occurrence,
+                    profile=reader_profile,
+                    rule=rule,
+                    calendar_hash=calendar_hash,
+                    summary=summary_for(index[occurrence["key"]], matched=True),
+                    now=now,
+                )
+                matched += 1
     except (GoogleCalendarError, ValueError, KeyError) as exc:
         code = getattr(exc, "code", "provider_unavailable")
         state.failure_count += 1

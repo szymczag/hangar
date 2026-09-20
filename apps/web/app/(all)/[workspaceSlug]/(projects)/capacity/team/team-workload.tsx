@@ -75,7 +75,7 @@ export function TeamWorkload({
                     {trainer.training_status && !["fresh", "not_configured"].includes(trainer.training_status) && (
                       <p className="text-danger-primary">
                         {trainer.training_status === "consent_required"
-                          ? "Calendar access required"
+                          ? "Has not allowed training recognition — ask them to enable it in My capacity"
                           : "Unverified calendar data"}
                       </p>
                     )}

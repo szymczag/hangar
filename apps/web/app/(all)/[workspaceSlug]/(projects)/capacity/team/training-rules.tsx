@@ -22,7 +22,7 @@ export function TrainingRules({
     error: loadError,
     mutate,
   } = useSWR(["capacity-training-rules", workspaceSlug], () => service.listTrainingRules(workspaceSlug));
-  const [rule, setRule] = useState({ label: "", calendar_id: "", organizer: "" });
+  const [rule, setRule] = useState({ label: "", calendar_id: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const save = async (removeId?: string) => {
@@ -32,7 +32,7 @@ export function TrainingRules({
       if (removeId) await service.deleteTrainingRule(workspaceSlug, removeId);
       else {
         await service.addTrainingRule(workspaceSlug, rule);
-        setRule({ label: "", calendar_id: "", organizer: "" });
+        setRule({ label: "", calendar_id: "" });
       }
       await mutate();
       await onChanged();
@@ -48,8 +48,9 @@ export function TrainingRules({
         Training calendar rules · Workspace administrators
       </summary>
       <p className="my-3 text-body-xs-regular text-secondary">
-        Count invitations from this calendar AND this organizer. Each trainer must grant event access and have access to
-        the shared calendar. Rules apply to this workspace. Identifiers are encrypted in storage.
+        Everything on this calendar counts as training. Whose training it is comes from each trainer&apos;s own copy of
+        the invitation, so a trainer who has not granted event access appears here as having none. Rules apply to this
+        workspace, and the calendar identifier is encrypted in storage.
       </p>
       {(error || loadError) && (
         <p role="alert" className="text-body-xs-regular text-danger-primary">
@@ -61,9 +62,7 @@ export function TrainingRules({
           <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-subtle py-2">
             <div>
               <strong className="text-body-xs-medium">{item.label}</strong>
-              <p className="text-body-xs-regular break-all text-secondary">
-                {item.calendar_id} · {item.organizer}
-              </p>
+              <p className="text-body-xs-regular break-all text-secondary">{item.calendar_id}</p>
             </div>
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => void save(item.id)}>
               Remove rule
@@ -82,14 +81,13 @@ export function TrainingRules({
           [
             { key: "label", label: "Rule name" },
             { key: "calendar_id", label: "Calendar ID" },
-            { key: "organizer", label: "Organizer email" },
           ] as const
         ).map((field) => (
           <label key={field.key} className="text-body-xs-medium">
             {field.label}
             <input
               required
-              type={field.key === "organizer" ? "email" : "text"}
+              type="text"
               autoComplete="off"
               value={rule[field.key]}
               disabled={busy}

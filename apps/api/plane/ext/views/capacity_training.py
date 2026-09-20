@@ -8,8 +8,6 @@ from uuid import UUID
 from django.db import transaction
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 
 from plane.app.views.base import BaseAPIView
@@ -47,7 +45,6 @@ class GoogleTrainingRulesEndpoint(BaseAPIView):
                         "id": str(row.id),
                         "label": row.label,
                         "calendar_id": decrypt_value(row.encrypted_calendar_id, row.encryption_key_id),
-                        "organizer": decrypt_value(row.encrypted_organizer, row.encryption_key_id),
                     }
                     for row in rows
                 ]
@@ -62,23 +59,25 @@ class GoogleTrainingRulesEndpoint(BaseAPIView):
         if response := _disabled():
             return response
         workspace = get_object_or_404(Workspace.objects.select_for_update(), slug=slug)
-        label, calendar_id, organizer = (request.data.get(key) for key in ("label", "calendar_id", "organizer"))
-        if not all(isinstance(value, str) and value.strip() for value in (label, calendar_id, organizer)):
-            return Response({"error": "Label, calendar ID and organizer email are required."}, status=400)
-        if len(label) > 100 or len(calendar_id) > 1024 or len(organizer) > 254:
+        label, calendar_id = (request.data.get(key) for key in ("label", "calendar_id"))
+        if not all(isinstance(value, str) and value.strip() for value in (label, calendar_id)):
+            return Response({"error": "Label and calendar ID are required."}, status=400)
+        if len(label) > 100 or len(calendar_id) > 1024:
             return Response({"error": "A rule value is too long."}, status=400)
-        try:
-            validate_email(organizer.strip())
-        except ValidationError:
-            return Response({"error": "Enter a valid organizer email."}, status=400)
         if GoogleTrainingRule.objects.filter(workspace=workspace).count() >= 10:
             return Response({"error": "Use at most ten training rules."}, status=400)
         encrypted_calendar, key_id = encrypt_value(calendar_id.strip())
+        # An organizer is no longer part of the rule. It used to be the identity
+        # test, and it cannot be one: a shared calendar that hides its guest list
+        # -- the ordinary setting -- returns no attendee to compare an organizer
+        # against, and Google names the calendar itself as organizer for anything
+        # created on it, never the person who created it. The calendar is the
+        # rule; whose training it is comes from each trainer's own copy.
         row = GoogleTrainingRule.objects.create(
             workspace=workspace,
             label=label.strip(),
             encrypted_calendar_id=encrypted_calendar,
-            encrypted_organizer=encrypt_value(organizer.strip().casefold())[0],
+            encrypted_organizer="",
             encryption_key_id=key_id,
         )
         return Response({"id": str(row.id)}, status=201)
