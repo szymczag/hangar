@@ -50,7 +50,7 @@ No directive contains `'unsafe-inline'`, `'unsafe-eval'` or `'wasm-unsafe-eval'`
 | `form-action`, `base-uri`, `worker-src`, `manifest-src`, `font-src`, `media-src` | `'self'`                                                                                |                                                                                                                                       |
 
 The emoji picker's data is served by the app itself
-(`scripts/vite-emoji-data.mjs`) from the `emojibase-data` package, so opening it
+(`packages/csp/src/vite-emoji-data.mjs`) from the `emojibase-data` package, so opening it
 tells no third party who uses this deployment and the version follows the
 lockfile rather than a CDN's "latest".
 

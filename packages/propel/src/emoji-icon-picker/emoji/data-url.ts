@@ -9,7 +9,7 @@
 // frimousse's default is a public CDN, which would tell a third party who is
 // using this deployment every time the picker opens, and which the
 // Content-Security-Policy's connect-src does not allow. The data is served
-// from this instance instead (scripts/vite-emoji-data.mjs). An app whose base
+// from this instance instead (packages/csp/src/vite-emoji-data.mjs). An app whose base
 // path is not "/" -- the published boards, the console -- sets its own at
 // start-up, because the path has to resolve under it.
 

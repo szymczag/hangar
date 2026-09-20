@@ -20,6 +20,10 @@
     "./trusted-types": {
       "types": "./src/trusted-types.d.mts",
       "default": "./src/trusted-types.mjs"
+    },
+    "./vite-emoji-data": {
+      "types": "./src/vite-emoji-data.d.mts",
+      "default": "./src/vite-emoji-data.mjs"
     }
   },
   "scripts": {
@@ -30,10 +34,12 @@
     "fix:format": "oxfmt ."
   },
   "dependencies": {
-    "dompurify": "catalog:"
+    "dompurify": "catalog:",
+    "emojibase-data": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "source-map-js": "catalog:"
+    "source-map-js": "catalog:",
+    "vite": "catalog:"
   }
 }

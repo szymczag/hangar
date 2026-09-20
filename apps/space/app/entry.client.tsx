@@ -18,7 +18,7 @@ import { setEmojiDataUrl } from "@plane/propel/emoji-icon-picker";
 installTrustedTypesPolicies({ reportUrl: `${API_BASE_URL}/api/csp-report/` });
 
 // The emoji picker reads its data from this app, under whatever base path it
-// is served on (scripts/vite-emoji-data.mjs), never from a CDN.
+// is served on (packages/csp/src/vite-emoji-data.mjs), never from a CDN.
 setEmojiDataUrl(`${import.meta.env.BASE_URL}emojibase`);
 
 startTransition(() => {

@@ -31,7 +31,7 @@ export const RUNTIME_STYLE_ELEMENTS = [
 /**
  * Origins the frontends reach whatever the deployment: none. Everything they
  * need is served by this instance, including the emoji picker's data
- * (scripts/vite-emoji-data.mjs).
+ * (packages/csp/src/vite-emoji-data.mjs).
  *
 
  * Images are only ever this instance's own: its bundle, uploads in object

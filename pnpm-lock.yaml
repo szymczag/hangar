@@ -941,9 +941,6 @@ importers:
       date-fns:
         specifier: 'catalog:'
         version: 4.1.0
-      emojibase-data:
-        specifier: 'catalog:'
-        version: 15.3.2(emojibase@16.0.0)
       isbot:
         specifier: 'catalog:'
         version: 5.1.31
@@ -1144,9 +1141,6 @@ importers:
       emoji-picker-react:
         specifier: 'catalog:'
         version: 4.12.2(react@19.2.8)
-      emojibase-data:
-        specifier: 'catalog:'
-        version: 15.3.2(emojibase@16.0.0)
       export-to-csv:
         specifier: 'catalog:'
         version: 1.4.0
@@ -1314,6 +1308,9 @@ importers:
       dompurify:
         specifier: 'catalog:'
         version: 3.4.15
+      emojibase-data:
+        specifier: 'catalog:'
+        version: 15.3.2(emojibase@16.0.0)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1321,6 +1318,9 @@ importers:
       source-map-js:
         specifier: 'catalog:'
         version: 1.2.1
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@22.12.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.6)(yaml@2.8.3)
 
   packages/decorators:
     devDependencies:

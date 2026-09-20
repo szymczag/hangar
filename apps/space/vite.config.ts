@@ -3,7 +3,7 @@ import * as dotenv from "dotenv";
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { emojiData } from "../../scripts/vite-emoji-data.mjs";
+import { emojiData } from "@plane/csp/vite-emoji-data";
 import { joinUrlPath } from "@plane/utils";
 
 dotenv.config({ path: path.resolve(__dirname, ".env") });

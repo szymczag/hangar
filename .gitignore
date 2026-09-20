@@ -130,7 +130,6 @@ temp/
 !scripts/community-billing-page.test.mjs
 !scripts/community-modal.test.mjs
 !scripts/generate-release-notes.mjs
-!scripts/vite-emoji-data.mjs
 !scripts/vr.mjs
 !packages/i18n/scripts/
 !.github/scripts/
