@@ -49,6 +49,7 @@ from plane.ext.capacity.throttles import CalendarCapacityUserThrottle, CalendarC
 from plane.ext.models import (
     CapacityAuditEvent,
     GoogleCalendarCredential,
+    GoogleTrainingRule,
     TrainerCalendarSelection,
     TrainerProfile,
     WorkshopBookingOperation,
@@ -75,6 +76,15 @@ EMAIL_SCOPE_ALIASES = {
 }
 REQUIRED_CALENDAR_SCOPES = CALENDAR_SCOPES - {"email"}
 
+# Writing a workshop into the shared training calendar. Deliberately its own
+# scope set rather than an addition to the trainer's: a coordinator who connects
+# only to create entries has no use for free/busy or the calendar list, and
+# asking for permissions a feature does not exercise is the habit this subsystem
+# refuses. `calendar.app.created` cannot serve here -- the training calendar
+# already exists and was not created by this application.
+CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+WRITER_SCOPES = {"openid", "email", CALENDAR_WRITE_SCOPE}
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,6 +94,10 @@ def _parse_granted_scopes(scope: object) -> set[str]:
 
 def _has_required_calendar_scopes(granted: set[str]) -> bool:
     return REQUIRED_CALENDAR_SCOPES.issubset(granted) and not EMAIL_SCOPE_ALIASES.isdisjoint(granted)
+
+
+def _has_required_writer_scopes(granted: set[str]) -> bool:
+    return CALENDAR_WRITE_SCOPE in granted and not EMAIL_SCOPE_ALIASES.isdisjoint(granted)
 
 
 def _select_primary_calendar(client, selection, *, created: bool) -> None:
@@ -117,6 +131,12 @@ def _audit(request, *, workspace_id, action, trainer_id=None, issue_id=None, met
         action=action,
         metadata=metadata or {},
     )
+
+
+def _is_workspace_admin(request, slug) -> bool:
+    return WorkspaceMember.objects.filter(
+        workspace__slug=slug, member=request.user, role=ROLE.ADMIN.value, is_active=True
+    ).exists()
 
 
 def _disabled():
@@ -316,7 +336,20 @@ class GoogleCalendarStartEndpoint(BaseAPIView):
     def post(self, request, slug):
         if response := _disabled():
             return response
-        trainer = get_object_or_404(TrainerProfile, workspace__slug=slug, user=request.user, status="active")
+        # Two connections come through here, and only one of them belongs to a
+        # trainer. The coordinator who writes workshops into the shared calendar
+        # need not be a trainer at all, so the writer variant must not be gated
+        # on a trainer profile -- doing so would lock out exactly the person the
+        # feature exists for.
+        writing = request.data.get("calendar_writer") is True
+        trainer = None
+        rule = None
+        if writing:
+            if not _is_workspace_admin(request, slug):
+                return Response({"error": "Only workspace administrators connect a writing account."}, status=403)
+            rule = get_object_or_404(GoogleTrainingRule, workspace__slug=slug, id=request.data.get("rule_id"))
+        else:
+            trainer = get_object_or_404(TrainerProfile, workspace__slug=slug, user=request.user, status="active")
         try:
             _, client_id = _google_client()
         except GoogleCalendarError:
@@ -324,24 +357,29 @@ class GoogleCalendarStartEndpoint(BaseAPIView):
         redirect_uri = request.build_absolute_uri("/auth/google/calendar/callback/")
         verifier = secrets.token_urlsafe(64)
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
-        state = start_oauth_transaction(
-            request, OAUTH_SESSION_KEY, host=request.get_host(), next_path=f"/{slug}/capacity"
-        )
+        next_path = f"/{slug}/capacity/team" if writing else f"/{slug}/capacity"
+        state = start_oauth_transaction(request, OAUTH_SESSION_KEY, host=request.get_host(), next_path=next_path)
         request.session[OAUTH_SESSION_KEY].update(
             {
-                "trainer_id": str(trainer.id),
+                "trainer_id": str(trainer.id) if trainer else "",
                 "workspace_slug": slug,
                 "code_verifier": verifier,
                 "training_events": request.data.get("training_events") is True,
+                "calendar_writer": writing,
+                "rule_id": str(rule.id) if rule else "",
             }
         )
+        if writing:
+            requested_scopes = WRITER_SCOPES
+        else:
+            requested_scopes = CALENDAR_SCOPES | (
+                {EVENTS_SCOPE} if request.data.get("training_events") is True else set()
+            )
         params = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "scope": " ".join(
-                sorted(CALENDAR_SCOPES | ({EVENTS_SCOPE} if request.data.get("training_events") is True else set()))
-            ),
+            "scope": " ".join(sorted(requested_scopes)),
             "state": state,
             "access_type": "offline",
             "include_granted_scopes": "true",
@@ -357,14 +395,28 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
     def get(self, request):
         transaction_data, valid = consume_oauth_transaction(request, OAUTH_SESSION_KEY, request.GET.get("state"))
         slug = transaction_data.get("workspace_slug", "")
-        failure = f"/{slug}/capacity?google=failed"
+        writing = transaction_data.get("calendar_writer") is True
+        landing = f"/{slug}/capacity/team" if writing else f"/{slug}/capacity"
+        failure = f"{landing}?google=failed"
         if not valid or transaction_data.get("host") != request.get_host() or not request.GET.get("code"):
             return HttpResponseRedirect(failure)
-        trainer = TrainerProfile.objects.filter(
-            pk=transaction_data.get("trainer_id"), workspace__slug=slug, user=request.user, status="active"
-        ).first()
-        if trainer is None:
-            return HttpResponseRedirect(failure)
+        trainer = None
+        rule = None
+        if writing:
+            # Re-checked here rather than trusted from the session: the
+            # authorization happened before the round trip to Google, and an
+            # administrator can lose the role while it is in flight.
+            if not _is_workspace_admin(request, slug):
+                return HttpResponseRedirect(failure)
+            rule = GoogleTrainingRule.objects.filter(pk=transaction_data.get("rule_id"), workspace__slug=slug).first()
+            if rule is None:
+                return HttpResponseRedirect(failure)
+        else:
+            trainer = TrainerProfile.objects.filter(
+                pk=transaction_data.get("trainer_id"), workspace__slug=slug, user=request.user, status="active"
+            ).first()
+            if trainer is None:
+                return HttpResponseRedirect(failure)
         redirect_uri = request.build_absolute_uri("/auth/google/calendar/callback/")
         try:
             client, _ = _google_client()
@@ -372,10 +424,14 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                 code=request.GET["code"], redirect_uri=redirect_uri, code_verifier=transaction_data["code_verifier"]
             )
             granted = _parse_granted_scopes(token.get("scope"))
-            if not _has_required_calendar_scopes(granted):
-                raise GoogleCalendarError("missing_scopes")
-            if transaction_data.get("training_events") and EVENTS_SCOPE not in granted:
-                raise GoogleCalendarError("missing_scopes")
+            if writing:
+                if not _has_required_writer_scopes(granted):
+                    raise GoogleCalendarError("missing_scopes")
+            else:
+                if not _has_required_calendar_scopes(granted):
+                    raise GoogleCalendarError("missing_scopes")
+                if transaction_data.get("training_events") and EVENTS_SCOPE not in granted:
+                    raise GoogleCalendarError("missing_scopes")
             userinfo = client.userinfo(token["access_token"])
             existing = GoogleCalendarCredential.objects.filter(user=request.user, google_subject=userinfo["id"]).first()
             refresh_token = token.get("refresh_token") or (
@@ -396,20 +452,30 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                     "last_error_code": "",
                 },
             )
-            selection, created = TrainerCalendarSelection.objects.update_or_create(
-                trainer=trainer, defaults={"credential": credential}
-            )
-            if transaction_data.get("training_events"):
-                selection.training_events_enabled = True
-                selection.revision += 1
-                selection.save(update_fields=["training_events_enabled", "revision", "updated_at"])
-            _select_primary_calendar(client, selection, created=created)
-            _audit(
-                request,
-                workspace_id=trainer.workspace_id,
-                trainer_id=trainer.user_id,
-                action=CapacityAuditEvent.Action.GOOGLE_CONNECTED,
-            )
+            if writing:
+                rule.writer_credential = credential
+                rule.save(update_fields=["writer_credential", "updated_at"])
+                _audit(
+                    request,
+                    workspace_id=rule.workspace_id,
+                    action=CapacityAuditEvent.Action.CALENDAR_WRITER_CONNECTED,
+                    metadata={"rule_id": str(rule.id)},
+                )
+            else:
+                selection, created = TrainerCalendarSelection.objects.update_or_create(
+                    trainer=trainer, defaults={"credential": credential}
+                )
+                if transaction_data.get("training_events"):
+                    selection.training_events_enabled = True
+                    selection.revision += 1
+                    selection.save(update_fields=["training_events_enabled", "revision", "updated_at"])
+                _select_primary_calendar(client, selection, created=created)
+                _audit(
+                    request,
+                    workspace_id=trainer.workspace_id,
+                    trainer_id=trainer.user_id,
+                    action=CapacityAuditEvent.Action.GOOGLE_CONNECTED,
+                )
         except GoogleCalendarError as exc:
             error_code = "missing_scopes" if exc.code == "missing_scopes" else "google_calendar_error"
             logger.warning(
@@ -423,7 +489,7 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
                 extra={"error_code": "invalid_token_response"},
             )
             return HttpResponseRedirect(failure)
-        return HttpResponseRedirect(f"/{slug}/capacity?google=connected")
+        return HttpResponseRedirect(f"{landing}?google=connected")
 
 
 class GoogleCalendarsEndpoint(BaseAPIView):

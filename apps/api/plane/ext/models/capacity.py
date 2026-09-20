@@ -57,6 +57,8 @@ class CapacityAuditEvent(models.Model):
         CHECKLIST_APPLIED = "checklist.applied", "Checklist applied"
         WORKSHOP_ROLE_UPDATED = "workshop_role.updated", "Workshop role updated"
         WORKSHOP_ROLE_REMOVED = "workshop_role.removed", "Workshop role removed"
+        CALENDAR_WRITER_CONNECTED = "calendar_writer.connected", "Calendar writer connected"
+        CALENDAR_WRITER_REMOVED = "calendar_writer.removed", "Calendar writer removed"
 
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)
@@ -323,6 +325,27 @@ class GoogleTrainingRule(BaseModel):
     encrypted_calendar_id = models.TextField()
     encrypted_organizer = models.TextField(blank=True, default="")
     encryption_key_id = models.CharField(max_length=64)
+    # Whose Google account writes workshops into this calendar.
+    #
+    # A person's own connection rather than a service account, deliberately: the
+    # coordinator already makes this move by hand, so the trail Google keeps
+    # names somebody who can be asked about it, and the organization never has
+    # to grant a standing credential write access to a shared calendar.
+    #
+    # The cost is accepted rather than hidden -- write-back depends on one
+    # person's token staying healthy, and every caller must treat "no writer" as
+    # an ordinary state instead of an error, because planning has to keep
+    # working while somebody reconnects.
+    #
+    # SET_NULL, not CASCADE: losing the credential must leave the rule and its
+    # recognition intact. Reading a calendar never needed a writer.
+    writer_credential = models.ForeignKey(
+        "ext.GoogleCalendarCredential",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="written_training_rules",
+    )
 
     class Meta:
         db_table = "ext_google_training_rules"

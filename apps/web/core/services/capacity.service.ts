@@ -323,6 +323,18 @@ export class CapacityService extends APIService {
     );
   }
 
+  /** Start the Google consent that lets a rule write into its calendar. */
+  async startCalendarWriter(workspaceSlug: string, ruleId: string) {
+    const csrfToken = await this.csrfToken();
+    return this.data<{ authorization_url: string }>(
+      this.post(
+        `/api/workspaces/${workspaceSlug}/capacity/google/start/`,
+        { calendar_writer: true, rule_id: ruleId },
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
+    );
+  }
+
   async startGoogle(workspaceSlug: string, trainingEvents = false) {
     const csrfToken = await this.csrfToken();
     return this.data<{ authorization_url: string }>(
@@ -337,9 +349,16 @@ export class CapacityService extends APIService {
   }
 
   listTrainingRules(workspaceSlug: string) {
-    return this.data<{ results: Array<{ id: string; label: string; calendar_id: string }> }>(
-      this.get(`/api/workspaces/${workspaceSlug}/capacity/google/training-rules/`)
-    );
+    return this.data<{
+      results: Array<{
+        id: string;
+        label: string;
+        calendar_id: string;
+        /** Whether this rule can write into its calendar, and why not. */
+        writer_status: "not_connected" | "ok" | "scope_missing" | "reauthorization_required";
+        writer_email: string;
+      }>;
+    }>(this.get(`/api/workspaces/${workspaceSlug}/capacity/google/training-rules/`));
   }
   async addTrainingRule(workspaceSlug: string, rule: { label: string; calendar_id: string }) {
     const token = await this.csrfToken();

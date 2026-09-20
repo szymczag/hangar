@@ -14,6 +14,7 @@ from plane.app.views.base import BaseAPIView
 from plane.authentication.session import CsrfEnforcedSessionAuthentication
 from plane.db.models import Workspace, ProjectMember
 from plane.ext.models import (
+    GoogleCalendarCredential,
     GoogleTrainingEventLink,
     GoogleTrainingRule,
     TrainerProfile,
@@ -22,10 +23,47 @@ from plane.ext.models import (
 )
 from plane.ext.capacity.crypto import encrypt_value, decrypt_value
 from plane.ext.capacity.training_events import training_events
-from plane.ext.views.capacity import _disabled
+from plane.ext.views.capacity import CALENDAR_WRITE_SCOPE, _disabled
 from plane.utils.permissions import ROLE, allow_permission
 
 logger = logging.getLogger(__name__)
+
+
+def _writer_status(rule) -> str:
+    """Whether this rule can currently write into its calendar.
+
+    Derived rather than stored. A second copy of the credential's health is a
+    second thing to keep in step, and the one that drifts is always the copy --
+    which here would mean telling an administrator that writing works while
+    every attempt fails.
+    """
+    credential = rule.writer_credential
+    if credential is None:
+        return "not_connected"
+    if credential.status != GoogleCalendarCredential.Status.CONNECTED:
+        return "reauthorization_required"
+    if CALENDAR_WRITE_SCOPE not in (credential.granted_scopes or []):
+        # Connected, but the write permission was never granted or was removed
+        # in the Google account. Distinct from a dead token: reconnecting is the
+        # fix for one, re-consenting for the other.
+        return "scope_missing"
+    return "ok"
+
+
+def _writer_email(rule) -> str:
+    """Which account writes, so an administrator can recognize it.
+
+    Empty when nothing is connected or the address cannot be decrypted with the
+    current keyring -- a rule that cannot name its writer is still a rule, and
+    failing the whole listing over a label would hide every other one.
+    """
+    credential = rule.writer_credential
+    if credential is None or not credential.encrypted_google_email:
+        return ""
+    try:
+        return decrypt_value(credential.encrypted_google_email, credential.encryption_key_id)
+    except Exception:  # noqa: BLE001 - a rotated-out key must not break the list
+        return ""
 
 
 class GoogleTrainingRulesEndpoint(BaseAPIView):
@@ -37,7 +75,11 @@ class GoogleTrainingRulesEndpoint(BaseAPIView):
             return Response(status=405)
         if response := _disabled():
             return response
-        rows = GoogleTrainingRule.objects.filter(workspace__slug=slug).order_by("label", "id")
+        rows = (
+            GoogleTrainingRule.objects.filter(workspace__slug=slug)
+            .select_related("writer_credential")
+            .order_by("label", "id")
+        )
         return Response(
             {
                 "results": [
@@ -45,6 +87,8 @@ class GoogleTrainingRulesEndpoint(BaseAPIView):
                         "id": str(row.id),
                         "label": row.label,
                         "calendar_id": decrypt_value(row.encrypted_calendar_id, row.encryption_key_id),
+                        "writer_status": _writer_status(row),
+                        "writer_email": _writer_email(row),
                     }
                     for row in rows
                 ]
