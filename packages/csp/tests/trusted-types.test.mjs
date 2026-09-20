@@ -255,7 +255,7 @@ test("next-themes' script is recognised in the served and in the client-rendered
   const index = new URL("../../../apps/web/build/client/index.html", import.meta.url);
   if (existsSync(index)) {
     const html = readFileSync(index, "utf8");
-    const served = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)]
+    const served = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script[^>]*>/gi)]
       .filter((match) => !/\bsrc=/.test(match[1]))
       .map((match) => match[2])
       .find((body) => body.includes("document.documentElement"));

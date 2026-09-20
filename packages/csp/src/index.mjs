@@ -51,7 +51,10 @@ export const APP_SOURCES = {
 /** `'sha256-…'` source expression for an exact inline script or style body. */
 export const hashSource = (content) => `'sha256-${createHash("sha256").update(content, "utf8").digest("base64")}'`;
 
-const INLINE_SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+// The end tag is `</script` followed by anything up to `>`: the HTML parser
+// ends a script at `</script\t\n foo>` too, so a stricter pattern would read
+// the rest of the document as script body and hash the wrong thing.
+const INLINE_SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script[^>]*>/gi;
 
 /**
  * Hash sources for every inline `<script>` in an HTML document. Scripts with a
