@@ -10,6 +10,22 @@ import { CapacityService } from "@/services/capacity.service";
 import { errorMessage } from "../shared/capacity-format.utils";
 
 const service = new CapacityService();
+/** Whether this rule can write, in words an administrator can act on. */
+function WriterState({ status, email }: { status: string; email: string }) {
+  if (status === "ok") {
+    return <p className="text-11 text-secondary">Writes as {email || "a connected account"}</p>;
+  }
+  return (
+    <p className="text-11 text-danger-primary">
+      {status === "scope_missing"
+        ? "The connected account has not granted permission to create events"
+        : status === "reauthorization_required"
+          ? "The connected account needs reconnecting"
+          : "No account connected — workshops planned in Hangar are not written to this calendar"}
+    </p>
+  );
+}
+
 export function TrainingRules({
   workspaceSlug,
   onChanged,
@@ -25,6 +41,21 @@ export function TrainingRules({
   const [rule, setRule] = useState({ label: "", calendar_id: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Writing is a separate Google consent, taken by whoever keeps the training
+  // calendar. It is deliberately not the trainer connection: that one reads, is
+  // granted per trainer, and belongs to somebody else entirely.
+  const connectWriter = async (ruleId: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const { authorization_url } = await service.startCalendarWriter(workspaceSlug, ruleId);
+      window.location.href = authorization_url;
+    } catch (cause) {
+      setError(errorMessage(cause, "Could not start the Google connection."));
+      setBusy(false);
+    }
+  };
+
   const save = async (removeId?: string) => {
     setBusy(true);
     setError("");
@@ -63,10 +94,21 @@ export function TrainingRules({
             <div>
               <strong className="text-body-xs-medium">{item.label}</strong>
               <p className="text-body-xs-regular break-all text-secondary">{item.calendar_id}</p>
+              <WriterState status={item.writer_status} email={item.writer_email} />
             </div>
-            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void save(item.id)}>
-              Remove rule
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant={item.writer_status === "ok" ? "secondary" : "primary"}
+                disabled={busy}
+                onClick={() => void connectWriter(item.id)}
+              >
+                {item.writer_status === "ok" ? "Change writing account" : "Connect writing account"}
+              </Button>
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => void save(item.id)}>
+                Remove rule
+              </Button>
+            </div>
           </li>
         ))}
       </ul>

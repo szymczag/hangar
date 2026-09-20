@@ -242,6 +242,46 @@ trainers who consented hold no copies of anything on that calendar in the
 window — they are not invited to these trainings, or the trainings are further
 ahead than `GOOGLE_TRAINING_SWEEP_WINDOW_FUTURE_DAYS`.
 
+## Writing into the calendar
+
+Recognition reads. Writing workshops back into the shared calendar is the other
+direction, and it is built on the same two-calendar shape: Hangar creates the
+event on the rule's calendar and invites the trainer, whose own copy then closes
+the loop through the intersection above. Nothing about that depends on the
+organizer, which is precisely why this became possible.
+
+A rule carries an optional **writer credential**: the Google account that
+creates those events. It is a person's own connection — the coordinator who
+already keeps the calendar — and deliberately not a service account, so the
+trail Google keeps names somebody who can be asked about an entry and the
+organization never grants a standing credential write access to a shared
+calendar. The cost is accepted rather than hidden: write-back depends on one
+person's token staying healthy.
+
+The consent is its own OAuth round trip with its own scope set —
+`calendar.events` plus identity, and none of the reading scopes. A coordinator
+who connects only to create entries has no use for free/busy or the calendar
+list, and asking for permissions a feature does not exercise is the habit this
+subsystem refuses. It is also not gated on a trainer profile, because the person
+who keeps the training calendar need not deliver training.
+
+A rule reports its writer as one of four states, derived from the credential
+rather than stored beside it:
+
+| State                      | Meaning                                                                       | What fixes it |
+| -------------------------- | ----------------------------------------------------------------------------- | ------------- |
+| `not_connected`            | No account attached                                                           | Connect one   |
+| `ok`                       | Connected, with permission to create events                                   | —             |
+| `scope_missing`            | Connected, but create permission was never granted or was withdrawn in Google | Re-consent    |
+| `reauthorization_required` | The token no longer works                                                     | Reconnect     |
+
+Losing the writer leaves the rule and its recognition intact: reading a calendar
+never needed a writer and must not start to. Disconnecting Google deletes the
+credential outright rather than soft-deleting it, which is what lets the
+database clear the reference — a soft delete would leave a rule pointing at a
+credential nobody can use, because `ON DELETE SET NULL` never runs for a row
+that is still there.
+
 ## Retained and unused
 
 `GoogleTrainingRule.encrypted_organizer` is written empty and read by nothing. It
