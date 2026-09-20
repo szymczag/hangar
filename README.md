@@ -27,25 +27,33 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 
 ## Project status
 
-| Capability                                    | Status                              | Tracking                                              |
-| --------------------------------------------- | ----------------------------------- | ----------------------------------------------------- |
-| Fork maintenance guide and CI baseline        | Available on `preview`              | [FORK.md](FORK.md)                                    |
-| Isolated backend extension scaffold           | Available on `preview`              | [#2](https://github.com/szymczag/hangar/pull/2)       |
-| OIDC backend                                  | Available on `preview`              | [#3](https://github.com/szymczag/hangar/pull/3)       |
-| OIDC administration and sign-in UI            | Available on `preview`              | [#4](https://github.com/szymczag/hangar/pull/4)       |
-| SAML 2.0 backend                              | Available on `preview`              | [#5](https://github.com/szymczag/hangar/pull/5)       |
-| SAML 2.0 administration and sign-in UI        | Available on `preview`              | [#6](https://github.com/szymczag/hangar/pull/6)       |
-| Immutable federated SSO identity binding      | Available on `preview`              | [#45](https://github.com/szymczag/hangar/pull/45)     |
-| Epics as level-1 work items                   | Available on `preview`              | [Feature guide](docs/epics-as-work-items.md)          |
-| Legacy Epic API compatibility                 | Available on `preview`              | [Feature guide](docs/epics-as-work-items.md)          |
-| Custom work-item types and properties backend | Available on `preview`              | [#10](https://github.com/szymczag/hangar/pull/10)     |
-| Custom work-item types and properties UI      | Available on `preview`              | [#11](https://github.com/szymczag/hangar/pull/11)     |
-| Time tracking and worklogs backend            | Available on `preview`              | [#12](https://github.com/szymczag/hangar/pull/12)     |
-| Time tracking and worklogs UI                 | Available on `preview`              | [#13](https://github.com/szymczag/hangar/pull/13)     |
-| Runner installation control-plane foundation  | Available on `preview`              | [#46](https://github.com/szymczag/hangar/pull/46)     |
-| Secure SES delivery and optional OpenPGP      | Available on `preview`              | [#44](https://github.com/szymczag/hangar/pull/44)     |
-| Todoist CSV importer                          | Available; opt-in and quota-bounded | [#50](https://github.com/szymczag/hangar/pull/50)     |
-| Helm chart evaluation profile                 | Public prerelease                   | [Kubernetes documentation](docs/kubernetes/README.md) |
+| Capability                                       | Status                              | Tracking                                              |
+| ------------------------------------------------ | ----------------------------------- | ----------------------------------------------------- |
+| Fork maintenance guide and CI baseline           | Available on `preview`              | [FORK.md](FORK.md)                                    |
+| Isolated backend extension scaffold              | Available on `preview`              | [#2](https://github.com/szymczag/hangar/pull/2)       |
+| OIDC backend                                     | Available on `preview`              | [#3](https://github.com/szymczag/hangar/pull/3)       |
+| OIDC administration and sign-in UI               | Available on `preview`              | [#4](https://github.com/szymczag/hangar/pull/4)       |
+| SAML 2.0 backend                                 | Available on `preview`              | [#5](https://github.com/szymczag/hangar/pull/5)       |
+| SAML 2.0 administration and sign-in UI           | Available on `preview`              | [#6](https://github.com/szymczag/hangar/pull/6)       |
+| Immutable federated SSO identity binding         | Available on `preview`              | [#45](https://github.com/szymczag/hangar/pull/45)     |
+| Epics as level-1 work items                      | Available on `preview`              | [Feature guide](docs/epics-as-work-items.md)          |
+| Legacy Epic API compatibility                    | Available on `preview`              | [Feature guide](docs/epics-as-work-items.md)          |
+| Custom work-item types and properties backend    | Available on `preview`              | [#10](https://github.com/szymczag/hangar/pull/10)     |
+| Custom work-item types and properties UI         | Available on `preview`              | [#11](https://github.com/szymczag/hangar/pull/11)     |
+| Time tracking and worklogs backend               | Available on `preview`              | [#12](https://github.com/szymczag/hangar/pull/12)     |
+| Time tracking and worklogs UI                    | Available on `preview`              | [#13](https://github.com/szymczag/hangar/pull/13)     |
+| Runner installation control-plane foundation     | Available on `preview`              | [#46](https://github.com/szymczag/hangar/pull/46)     |
+| Secure SES delivery and optional OpenPGP         | Available on `preview`              | [#44](https://github.com/szymczag/hangar/pull/44)     |
+| Todoist CSV importer                             | Available; opt-in and quota-bounded | [#50](https://github.com/szymczag/hangar/pull/50)     |
+| Helm chart evaluation profile                    | Public prerelease                   | [Kubernetes documentation](docs/kubernetes/README.md) |
+| Second factor for the instance console           | Available on `preview`              | [Feature guide](docs/god-mode-second-factor.md)       |
+| Instance branding and maintenance notice         | Available on `preview`              | [Feature guide](docs/instance-branding.md)            |
+| Workspace short links                            | Available on `preview`              | [Feature guide](docs/workspace-short-links.md)        |
+| Project duplication                              | Available on `preview`              | [Feature guide](docs/duplicating-projects.md)         |
+| Work-item hierarchy grouping and identifiers     | Available on `preview`              | [Feature guide](docs/epics-as-work-items.md)          |
+| Markdown in descriptions and comments            | Available on `preview`              | [Feature guide](docs/markdown-in-descriptions.md)     |
+| Capacity planning and workshops                  | Available on `preview`; opt-in      | [Feature guide](docs/capacity-planner.md)             |
+| Rich-text sanitizing and Content-Security-Policy | Available on `preview`              | [Security guide](docs/content-security-policy.md)     |
 
 “In review” means the code is not yet part of the supported `preview` branch. Do not
 plan a deployment around those capabilities until their pull requests have merged and
@@ -54,8 +62,8 @@ the table marks them as available.
 ## Deployment
 
 - [Docker deployment](deployments/cli/community/README.md)
-- [Kubernetes and Helm](docs/kubernetes/README.md) — `0.1.0-rc.51`
-  evaluation release; production support gates remain open.
+- [Kubernetes and Helm](docs/kubernetes/README.md) — evaluation release; the
+  guide names the qualified version and the support gates that remain open.
 - [Amazon SES, deliverability, and OpenPGP email](docs/aws-ses-email-operations.md)
   — secure transactional-email configuration and operations.
 
@@ -83,6 +91,30 @@ the table marks them as available.
   throttles bound concurrent work, retained source bytes, and rolling row use.
   The request throttles use atomic Valkey/Redis counters across API replicas and
   fail closed before parsing an upload when that dependency is unavailable.
+
+- [Content-Security-Policy](docs/content-security-policy.md) — the policy each
+  frontend sends, enforced by default, what an operator configures for a
+  separate API, live or storage origin, and why images are only ever this
+  instance's own.
+- [Rich-text sanitization](docs/rich-text-sanitization.md) — what the API
+  accepts in descriptions, comments, pages and stickies, and the one-off
+  commands that bring rows written earlier under the current allowlist.
+- [Trusted Types](docs/trusted-types-plan.md) — the DOM-sink work behind the
+  policy, what is measured in production, and the opt-in that enforces it.
+- [Secure file uploads](docs/secure-file-uploads.md) — direct-to-object-store
+  uploads, what the browser is trusted for, and what the API verifies.
+- [Authorization model](docs/authorization-model.md) — who may see and change
+  what, where the boundaries are, and how they are kept from eroding.
+- [Second factor for the console](docs/god-mode-second-factor.md) — the
+  security key the instance-admin console requires, and recovery.
+- [Capacity planning and workshops](docs/capacity-planner.md) — planning,
+  trainer search, bookings, and the instance flag that enables them.
+- [Markdown in descriptions and comments](docs/markdown-in-descriptions.md) —
+  what converts in the editor and through the API, and what does not.
+- [Instance branding](docs/instance-branding.md),
+  [workspace short links](docs/workspace-short-links.md) and
+  [project duplication](docs/duplicating-projects.md) — operator-facing
+  behaviour of three smaller surfaces.
 
 The inherited Plane Community chart is not a Hangar release and is not supported
 for new Hangar installations.
@@ -191,7 +223,7 @@ container image.
 ### Requirements
 
 - Docker Engine with Docker Compose
-- Node.js 22.18 or newer
+- Node.js 22.22 or newer
 - Corepack (the repository pins its pnpm version)
 - At least 12 GB of RAM recommended for the complete local stack
 
