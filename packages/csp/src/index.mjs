@@ -51,20 +51,29 @@ export const APP_SOURCES = {
 /** `'sha256-…'` source expression for an exact inline script or style body. */
 export const hashSource = (content) => `'sha256-${createHash("sha256").update(content, "utf8").digest("base64")}'`;
 
-// The end tag is `</script` followed by anything up to `>`: the HTML parser
-// ends a script at `</script\t\n foo>` too, so a stricter pattern would read
-// the rest of the document as script body and hash the wrong thing.
-const INLINE_SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script[^>]*>/gi;
+const SCRIPT_OPEN = /<script\b([^>]*)>/gi;
 
 /**
  * Hash sources for every inline `<script>` in an HTML document. Scripts with a
  * `src` are external and covered by 'self'.
+ *
+ * The body is taken by scanning for the end tag rather than by one regular
+ * expression over the whole document: `</script` ends a script however it
+ * continues (`</script\t\n foo>` is an end tag), and a lazy pattern that has
+ * to match that is one a crafted document can make backtrack.
  */
 export const inlineScriptHashes = (html) => {
+  const lower = html.toLowerCase();
   const hashes = [];
-  for (const [, attributes, body] of html.matchAll(INLINE_SCRIPT)) {
-    if (/\bsrc\s*=/i.test(attributes)) continue;
-    hashes.push(hashSource(body));
+  SCRIPT_OPEN.lastIndex = 0;
+  for (let open; (open = SCRIPT_OPEN.exec(html)) !== null; ) {
+    const bodyStart = open.index + open[0].length;
+    const closeStart = lower.indexOf("</script", bodyStart);
+    if (closeStart === -1) break;
+    const closeEnd = lower.indexOf(">", closeStart);
+    if (closeEnd === -1) break;
+    if (!/\bsrc\s*=/i.test(open[1])) hashes.push(hashSource(html.slice(bodyStart, closeStart)));
+    SCRIPT_OPEN.lastIndex = closeEnd + 1;
   }
   return [...new Set(hashes)];
 };

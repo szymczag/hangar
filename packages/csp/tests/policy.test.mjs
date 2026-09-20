@@ -60,6 +60,15 @@ test("inline scripts are hashed exactly, external ones are skipped", () => {
   assert.equal(hashSource("x"), expected("x"));
 });
 
+test("an inline script ends where the parser ends it, and a crafted document does not stall", () => {
+  // `</script` ends a script however it continues.
+  assert.deepEqual(inlineScriptHashes("<script>one</script\t\n foo>"), [hashSource("one")]);
+  // A document made of end-tag prefixes has no script to hash and returns at once.
+  const started = Date.now();
+  assert.deepEqual(inlineScriptHashes(`<script>${"</scri".repeat(50_000)}`), []);
+  assert.ok(Date.now() - started < 1_000);
+});
+
 test("runtime sources come from the environment and default to self", () => {
   assert.deepEqual(runtimeSourcesFromEnv({}), {
     imgSrc: "",
