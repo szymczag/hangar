@@ -51,6 +51,16 @@ function compareVersions(a, b) {
   return 0;
 }
 
+/**
+ * The bold sentence each curated item leads with, without the reasoning under it.
+ *
+ * `[\s\S]` rather than `.` on purpose: a lead-in long enough to wrap across
+ * lines is still one sentence, and matching only single-line ones dropped the
+ * longest -- which tend to be the most important -- without saying so.
+ */
+const leadsIn = (section) =>
+  [...section.matchAll(/^\*\*([\s\S]+?)\*\*/gm)].map((match) => match[1].replace(/\s+/g, " ").trim());
+
 export function latestReleaseNotes(directory = notesDirectory) {
   const versions = readdirSync(directory)
     .map((name) => /^hangar-v(.+)\.md$/.exec(name))
@@ -65,13 +75,18 @@ export function latestReleaseNotes(directory = notesDirectory) {
 
   // The curated notes lead each item with a bold sentence stating what changed;
   // the paragraph after it is the reasoning, which a dialog has no room for.
-  const section = markdown.split(/^## /m).find((block) => block.startsWith("Security and privacy")) ?? "";
-  // `[\s\S]` rather than `.` on purpose: a lead-in long enough to wrap across
-  // lines is still one sentence, and matching only single-line ones dropped the
-  // longest -- which tend to be the most important -- without saying so.
-  const highlights = [...section.matchAll(/^\*\*([\s\S]+?)\*\*/gm)]
-    .map((match) => match[1].replace(/\s+/g, " ").trim())
-    .slice(0, MAX_HIGHLIGHTS);
+  const sectionNamed = (name) => markdown.split(/^## /m).find((block) => block.startsWith(name)) ?? "";
+  // Security first, because when a release has security changes they are what
+  // an operator most needs to see. But not every release has them: a repair
+  // release says "no security or privacy changes identified" and leads nothing,
+  // and taking only that section left the dialog announcing that the build
+  // carries no release notes at all -- of a build whose notes exist and say
+  // something worth reading.
+  const security = leadsIn(sectionNamed("Security and privacy"));
+  const highlights = (security.length ? security : leadsIn(sectionNamed("Migrations and compatibility"))).slice(
+    0,
+    MAX_HIGHLIGHTS
+  );
 
   return { version, highlights };
 }

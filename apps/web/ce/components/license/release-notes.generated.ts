@@ -11,12 +11,10 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.62",
+  version: "0.1.0-rc.63",
   highlights: [
-    "Rich text stored through the API is sanitized against one allowlist, wherever it came from.",
-    "The frontends now send an enforced Content-Security-Policy.",
-    "Training recognition no longer depends on a guest list that shared calendars hide.",
-    "Writing into the shared calendar is a separate consent, with a separate scope.",
+    "Every authorized Google Calendar request failed in rc.62.",
+    "A failed read no longer takes the screen down with it.",
   ],
   upstream: {
     version: "1.4.0",
