@@ -11,12 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.61",
+  version: "0.1.0-rc.62",
   highlights: [
-    "Pasted HTML is now inspected in a document that cannot run it.",
-    "Placing a workshop session requires the role that editing one requires.",
-    "Reservations are bounded, and the paths that spend calendar quota are throttled.",
-    "The background sweep reads calendar event titles. The availability path still does not.",
+    "Rich text stored through the API is sanitized against one allowlist, wherever it came from.",
+    "The frontends now send an enforced Content-Security-Policy.",
+    "Training recognition no longer depends on a guest list that shared calendars hide.",
+    "Writing into the shared calendar is a separate consent, with a separate scope.",
   ],
   upstream: {
     version: "1.4.0",
