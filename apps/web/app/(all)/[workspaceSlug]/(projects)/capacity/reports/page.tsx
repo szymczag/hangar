@@ -7,43 +7,22 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router";
 import useSWR from "swr";
-import { AlertTriangle, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { Loader } from "@plane/ui";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
 import { useInstance } from "@/hooks/store/use-instance";
 import { CapacityService } from "@/services/capacity.service";
-import type { TTrainingReportRow, TTrainingSyncStatus } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
-import {
-  errorMessage,
-  formatDate,
-  formatDateTime,
-  formatHours,
-  formatMonthParam,
-  parseMonthParam,
-  shiftMonth,
-} from "../shared/capacity-format.utils";
+import { formatMonthParam, parseMonthParam, shiftMonth } from "../shared/capacity-format.utils";
 import { MonthStepper } from "../shared/month-stepper";
 import { useViewerTimezone } from "../shared/viewer-timezone";
+import { ReportNotices } from "./report-notices";
+import { ReportTable } from "./report-table";
+import { ReportTotals } from "./report-totals";
 
 const capacityService = new CapacityService();
-
-/** Why a row is not counted, in the words somebody planning staffing needs. */
-const SYNC_COPY: Record<TTrainingSyncStatus, string> = {
-  ok: "",
-  stale: "Calendar data is out of date",
-  never_synced: "Calendar has never been read",
-  consent_missing: "Calendar access not granted",
-  reauth_required: "Google connection needs renewing",
-  not_connected: "No Google calendar connected",
-  access_lost: "Lost access to the training calendar",
-};
-
-function rowTotal(rows: TTrainingReportRow[], field: keyof TTrainingReportRow) {
-  return rows.reduce((sum, row) => sum + (row.counts_towards_totals ? Number(row[field]) : 0), 0);
-}
 
 /**
  * How much training a team ran over a month.
@@ -54,6 +33,11 @@ function rowTotal(rows: TTrainingReportRow[], field: keyof TTrainingReportRow) {
  * been read is marked and left out of the totals, because rendering them as a
  * zero would read as "ran nothing" to somebody deciding who takes the next
  * workshop.
+ *
+ * This component owns only the question -- which month, fetched how -- and hands
+ * the answer to three pieces that each say one thing. What the report says about
+ * its own trustworthiness lives in `ReportNotices` rather than between the
+ * heading and the table, so the next such caveat has somewhere to go.
  */
 export default function CapacityReportsPage({ params }: Route.ComponentProps) {
   const workspaceSlug = params.workspaceSlug;
@@ -90,8 +74,6 @@ export default function CapacityReportsPage({ params }: Route.ComponentProps) {
   if (config && !featureEnabled) return <NotAuthorizedView section="settings" className="h-auto" />;
 
   const rows = data?.trainers ?? [];
-  const excluded = rows.filter((row) => !row.counts_towards_totals);
-  const staleCalendars = data?.coverage.calendars.filter((calendar) => calendar.status !== "ok") ?? [];
 
   return (
     <div className="h-full overflow-y-auto bg-surface-2">
@@ -120,37 +102,7 @@ export default function CapacityReportsPage({ params }: Route.ComponentProps) {
           </Button>
         </div>
 
-        {data && !data.coverage.requested_range_covered && (
-          <p
-            role="status"
-            className="flex items-start gap-2 rounded-lg border border-subtle bg-surface-1 p-3 text-body-xs-regular text-secondary"
-          >
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-primary" />
-            This month falls outside the range currently collected
-            {data.coverage.window_starts_at && data.coverage.window_ends_at
-              ? ` (${formatDate(data.coverage.window_starts_at)} – ${formatDate(data.coverage.window_ends_at)})`
-              : ""}
-            , so externally organized training is not shown for it.
-          </p>
-        )}
-
-        {staleCalendars.length > 0 && (
-          <p
-            role="status"
-            className="flex items-start gap-2 rounded-lg border border-subtle bg-surface-1 p-3 text-body-xs-regular text-secondary"
-          >
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-primary" />
-            {staleCalendars.length === 1
-              ? "One training calendar has not been read recently, so these figures may be out of date."
-              : `${staleCalendars.length} training calendars have not been read recently, so these figures may be out of date.`}
-          </p>
-        )}
-
-        {error && (
-          <p role="alert" className="text-body-xs-regular text-danger-primary">
-            {errorMessage(error, "The report could not be loaded.")}
-          </p>
-        )}
+        <ReportNotices report={data} error={error} />
 
         {isLoading && !data ? (
           <Loader className="space-y-3">
@@ -159,80 +111,8 @@ export default function CapacityReportsPage({ params }: Route.ComponentProps) {
           </Loader>
         ) : (
           <section aria-label="Training per trainer" className="rounded-xl border border-subtle bg-surface-1 p-5">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <h2 className="text-body-sm-medium">
-                {rows.length - excluded.length} trainer{rows.length - excluded.length === 1 ? "" : "s"} counted
-              </h2>
-              <span className="text-body-xs-regular text-secondary">
-                {rowTotal(rows, "workshop_count")} workshops · {formatHours(rowTotal(rows, "delivery_minutes"))}{" "}
-                delivered · {formatHours(rowTotal(rows, "external_confirmed_minutes"))} external
-              </span>
-              {data?.data_as_of && (
-                <span className="text-body-xs-regular text-secondary">
-                  Data as of {formatDateTime(data.data_as_of)}
-                </span>
-              )}
-              {excluded.length > 0 && (
-                <span className="text-body-xs-regular text-warning-primary">{excluded.length} not counted</span>
-              )}
-            </div>
-
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-left text-body-xs-regular">
-                <thead className="text-secondary">
-                  <tr>
-                    {[
-                      "Trainer",
-                      "Workshops",
-                      "Sessions",
-                      "Delivered",
-                      "Preparation & travel",
-                      "External confirmed",
-                      "External pending",
-                    ].map((label) => (
-                      <th key={label} className="px-3 py-2 font-medium">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.trainer_id} className="border-t border-subtle">
-                      <th scope="row" className="px-3 py-3 font-medium">
-                        {row.display_name}
-                        {!row.counts_towards_totals && (
-                          <span className="font-normal mt-0.5 block text-warning-primary">
-                            {SYNC_COPY[row.sync_status] ?? "Not counted"}
-                          </span>
-                        )}
-                      </th>
-                      <td className="px-3 py-3">{row.workshop_count}</td>
-                      <td className="px-3 py-3">{row.session_count}</td>
-                      <td className="px-3 py-3">{formatHours(row.delivery_minutes)}</td>
-                      <td className="px-3 py-3">{formatHours(row.buffer_minutes)}</td>
-                      <td className="px-3 py-3">
-                        {row.counts_towards_totals
-                          ? `${row.external_confirmed_sessions} · ${formatHours(row.external_confirmed_minutes)}`
-                          : "—"}
-                      </td>
-                      <td className="px-3 py-3">
-                        {row.counts_towards_totals
-                          ? `${row.external_pending_sessions} · ${formatHours(row.external_pending_minutes)}`
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                  {rows.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-3 py-6 text-center text-secondary">
-                        No trainers in this workspace yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <ReportTotals rows={rows} dataAsOf={data?.data_as_of} />
+            <ReportTable rows={rows} />
           </section>
         )}
       </div>
