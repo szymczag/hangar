@@ -20,7 +20,13 @@ import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
 import { CapacityService } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
-import { errorMessage, formatMonthParam, parseMonthParam, shiftMonth } from "../shared/capacity-format.utils";
+import {
+  errorMessage,
+  formatDateTime,
+  formatMonthParam,
+  parseMonthParam,
+  shiftMonth,
+} from "../shared/capacity-format.utils";
 import { MonthStepper } from "../shared/month-stepper";
 import { useViewerTimezone } from "../shared/viewer-timezone";
 
@@ -220,7 +226,7 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
                         {row.title ?? row.rule_label}
                       </th>
                       <td className="px-3 py-3">{row.display_name}</td>
-                      <td className="px-3 py-3">{new Date(row.starts_at).toLocaleString()}</td>
+                      <td className="px-3 py-3">{formatDateTime(row.starts_at)}</td>
                       <td className="px-3 py-3">{Math.round((row.minutes / 60) * 10) / 10}h</td>
                       <td className="px-3 py-3">{row.status === "confirmed" ? "Accepted" : "Not answered yet"}</td>
                     </tr>
