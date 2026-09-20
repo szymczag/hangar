@@ -170,6 +170,13 @@ app.conf.beat_schedule = {
         "task": "plane.ext.tasks.dispatch_pending_calendar_syncs",
         "schedule": 60.0,
     },
+    # The authority on what the calendar should hold, as opposed to the helpers
+    # in the scheduling views: deleting a work item cascades into its sessions
+    # without passing through any of them.
+    "reconcile-orphaned-calendar-events": {
+        "task": "plane.ext.tasks.reconcile_orphaned_calendar_events",
+        "schedule": crontab(minute="*/10"),
+    },
     "recover-expired-todoist-import-leases": {
         "task": "plane.ext.tasks.recover_expired_import_leases",
         "schedule": 30.0,

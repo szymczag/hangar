@@ -453,6 +453,19 @@ def sweep_training_calendar(self, rule_id: str, lease_token: str, full: bool = F
 
 
 @shared_task
+def reconcile_orphaned_calendar_events() -> int:
+    """Catch the sessions that disappeared without telling anybody."""
+    from plane.ext.capacity.calendar_sync import enqueue, reconcile_orphans, writeback_enabled
+
+    if not writeback_enabled():
+        return 0
+
+    touched = reconcile_orphans()
+    enqueue(touched)
+    return len(touched)
+
+
+@shared_task
 def dispatch_pending_calendar_syncs() -> int:
     """Hand every outbox row that owes Google work to a worker."""
     from plane.ext.capacity.calendar_sync import claim_rows, writeback_enabled
