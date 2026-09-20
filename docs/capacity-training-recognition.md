@@ -282,6 +282,61 @@ database clear the reference — a soft delete would leave a rule pointing at a
 credential nobody can use, because `ON DELETE SET NULL` never runs for a row
 that is still there.
 
+### How a workshop reaches the calendar
+
+Planning records intent; a worker reconciles it. The request never waits for
+Google, because a coordinator who cannot book while a calendar API is slow would
+stop using the planner and would be right to.
+
+One outbox row per session and trainer, because a session can be delivered by
+more than one person and each gets their own invitation. The row carries what
+the calendar _ought_ to say; `revision` moves whenever that changes and
+`synced_revision` records what Google was last told, so anything where the two
+differ owes work whatever its state says. That is what makes a row stuck in
+`failed` recoverable by editing the session again, with nobody having to reason
+about how it got stuck.
+
+**Writing twice is not possible.** The event identifier is
+`hg` + base32hex(HMAC(SECRET_KEY, "<session>:<trainer>")), so a redelivered
+message or a retry after an answer that never arrived lands on the identifier
+that already exists. Google answers `409`, and the worker treats that as its cue
+to update rather than insert — the event can only be ours, since nothing else
+could have derived that identifier.
+
+**A row outlives its session.** Sessions are hard-deleted when a schedule is
+replaced, and deleting the work item cascades into them. The row that still owes
+Google a withdrawal is exactly the row that matters then, so it holds a durable
+`source_session_id` and its session reference is `SET_NULL`.
+
+**The event covers the delivery, not the buffers.** Preparation and travel are
+Hangar's own arithmetic for deciding whether somebody is free. A three-hour
+entry for a one-hour training surprises the people reading the calendar, and
+this calendar is read by people.
+
+**Only the trainer is invited**, at the address Google itself verified for their
+credential. Any other address would produce an invitation whose copy never
+appears where recognition looks. Inviting clients is a separate decision about
+sending mail outside the organization, and not this one.
+
+States a row can rest in:
+
+| State               | Meaning                                                                                                                                |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `pending`           | Owed to Google, will be retried with backoff                                                                                           |
+| `synced`            | Google agrees with `revision`                                                                                                          |
+| `failed`            | Twelve attempts spent; still recoverable by changing the desired state                                                                 |
+| `blocked_no_writer` | The rule has no writing account, or its token needs reauthorizing                                                                      |
+| `blocked`           | Writing would be wrong: the rule's writer changed under a queued row, the rule is gone, or the trainer has no verified Google identity |
+
+`blocked` is deliberately distinct from `failed`. Retrying cannot fix any of its
+causes, and the identity check behind the first of them matters: consent was
+given for one account to act, and an event appearing from another is a surprise
+in somebody else's calendar.
+
+Enabled by `ENABLE_GOOGLE_CALENDAR_WRITEBACK`, a third switch on top of capacity
+because this is the only part of the subsystem that changes somebody else's
+calendar rather than reading it.
+
 ## Retained and unused
 
 `GoogleTrainingRule.encrypted_organizer` is written empty and read by nothing. It

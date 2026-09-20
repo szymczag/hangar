@@ -453,6 +453,71 @@ def sweep_training_calendar(self, rule_id: str, lease_token: str, full: bool = F
 
 
 @shared_task
+def dispatch_pending_calendar_syncs() -> int:
+    """Hand every outbox row that owes Google work to a worker."""
+    from plane.ext.capacity.calendar_sync import claim_rows, writeback_enabled
+
+    if not writeback_enabled():
+        return 0
+
+    claimed = claim_rows(timezone.now())
+    for row_id, lease_token in claimed:
+        sync_workshop_calendar_events.apply_async(args=[[str(row_id)], str(lease_token)])
+    return len(claimed)
+
+
+@shared_task(bind=True, acks_late=True, reject_on_worker_lost=True)
+def sync_workshop_calendar_events(self, row_ids: list[str], lease_token: str | None = None) -> int:
+    """Make the shared calendar agree with what Hangar scheduled.
+
+    Failures are recorded on the row and not raised: a rate-limited write should
+    back off on its own row rather than retry through Celery and multiply the
+    requests that caused the limit. The lease is always handed back, because a
+    row nobody holds is a row the next dispatcher can pick up.
+    """
+    from plane.ext.capacity.calculation import _google_client
+    from plane.ext.capacity.calendar_sync import release_row, sync_row, writeback_enabled
+    from plane.ext.capacity.google import GoogleCalendarError
+    from plane.ext.models import WorkshopSessionCalendarEvent
+
+    if not writeback_enabled():
+        logger.warning("Calendar write-back ignored because it is disabled")
+        return 0
+
+    try:
+        client = _google_client()
+    except GoogleCalendarError:
+        logger.warning("Calendar write-back skipped: Google is not configured")
+        for row_id in row_ids:
+            if lease_token:
+                release_row(row_id, lease_token)
+        return 0
+
+    synced = 0
+    for row_id in row_ids:
+        row = (
+            WorkshopSessionCalendarEvent.objects.select_related("rule", "credential", "trainer")
+            .filter(pk=row_id)
+            .first()
+        )
+        if row is None:
+            continue
+        try:
+            outcome = sync_row(client, row)
+        finally:
+            if lease_token:
+                release_row(row_id, lease_token)
+        if outcome.get("result") == "synced":
+            synced += 1
+        else:
+            logger.info(
+                "Calendar write-back did not complete",
+                extra={"result": outcome.get("result"), "error_code": outcome.get("error", "")},
+            )
+    return synced
+
+
+@shared_task
 def prune_training_event_occurrences() -> int:
     """Drop occurrences the sweep retired, once they are old enough.
 

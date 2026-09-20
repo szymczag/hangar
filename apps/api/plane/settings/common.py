@@ -99,6 +99,15 @@ CAPACITY_MAX_PLAN_DRAFTS_PER_USER = _bounded_integer_setting("CAPACITY_MAX_PLAN_
 GOOGLE_TRAINING_MATERIALIZATION_ENABLED = (
     GOOGLE_CALENDAR_CAPACITY_ENABLED and os.environ.get("ENABLE_GOOGLE_TRAINING_MATERIALIZATION", "0") == "1"
 )
+# Writing workshops into the shared training calendar. A third switch, on top of
+# capacity, because it is the only part of this subsystem that changes somebody
+# else's calendar rather than reading it -- an instance may well want the ledger
+# and the report without that.
+GOOGLE_CALENDAR_WRITEBACK_ENABLED = (
+    GOOGLE_CALENDAR_CAPACITY_ENABLED and os.environ.get("ENABLE_GOOGLE_CALENDAR_WRITEBACK", "0") == "1"
+)
+GOOGLE_CALENDAR_WRITE_BATCH = _bounded_integer_setting("GOOGLE_CALENDAR_WRITE_BATCH", 20, 1, 200)
+GOOGLE_CALENDAR_WRITE_LEASE_SECONDS = _bounded_integer_setting("GOOGLE_CALENDAR_WRITE_LEASE_SECONDS", 300, 60, 3600)
 GOOGLE_TRAINING_SWEEP_WINDOW_PAST_DAYS = _bounded_integer_setting(
     "GOOGLE_TRAINING_SWEEP_WINDOW_PAST_DAYS", 90, 0, 730
 )

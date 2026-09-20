@@ -364,6 +364,92 @@ class GoogleTrainingEventLink(BaseModel):
         ]
 
 
+class WorkshopSessionCalendarEvent(BaseModel):
+    """The event a session ought to have in the shared calendar, and its progress.
+
+    An outbox rather than a call from the request. Planning a workshop must
+    succeed whether or not Google is reachable -- a coordinator who cannot book
+    because a calendar API is slow would rightly stop using the planner -- so
+    the request records the intent in the same transaction as the session and a
+    worker reconciles it afterwards.
+
+    One row per (session, trainer): a session can be delivered by more than one
+    person, and each of them gets their own invitation.
+    """
+
+    class Intent(models.TextChoices):
+        PRESENT = "present", "Present"
+        ABSENT = "absent", "Absent"
+
+    class State(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SYNCED = "synced", "Synced"
+        FAILED = "failed", "Failed"
+        BLOCKED_NO_WRITER = "blocked_no_writer", "Blocked: no writing account"
+        BLOCKED = "blocked", "Blocked"
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE)
+    # SET_NULL, and `source_session_id` is the durable key.
+    #
+    # Sessions are hard-deleted when a schedule is replaced, and deleting the
+    # work item cascades into them. CASCADE here would take the row with them --
+    # including the rows that still owe Google a deletion, which is precisely
+    # when the row matters most.
+    session = models.ForeignKey(WorkshopSession, on_delete=models.SET_NULL, null=True, blank=True)
+    source_session_id = models.UUIDField(db_index=True)
+    source_issue_id = models.UUIDField(null=True, blank=True, db_index=True)
+    trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    rule = models.ForeignKey("ext.GoogleTrainingRule", on_delete=models.SET_NULL, null=True, blank=True)
+    # Who planned it. The worker has no request, and the audit model requires an
+    # actor, so the person who caused the write is carried here rather than the
+    # event being attributed to nobody.
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    credential = models.ForeignKey(
+        "ext.GoogleCalendarCredential", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    # The identity of the account that was meant to write, pinned at the moment
+    # of planning. Checked again before writing: a rule whose writer changed in
+    # between must not have a queued row silently written by somebody else.
+    credential_subject = models.CharField(max_length=255, blank=True, default="")
+    google_event_id = models.CharField(max_length=128, blank=True, default="")
+    google_ical_uid = models.CharField(max_length=255, blank=True, default="")
+    intent = models.CharField(max_length=16, choices=Intent.choices, default=Intent.PRESENT)
+    desired_starts_at = models.DateTimeField(null=True, blank=True)
+    desired_ends_at = models.DateTimeField(null=True, blank=True)
+    desired_fingerprint = models.CharField(max_length=64, blank=True, default="")
+    # `revision` moves whenever the desired state changes; `synced_revision`
+    # records what Google was last told. Anything where they differ owes work,
+    # whatever its state says -- which is what makes a stuck row recoverable
+    # without anybody having to reason about how it got stuck.
+    revision = models.PositiveBigIntegerField(default=1)
+    synced_revision = models.PositiveBigIntegerField(default=0)
+    state = models.CharField(max_length=24, choices=State.choices, default=State.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    lease_token = models.UUIDField(null=True, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True, default="")
+    synced_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ext_workshop_session_calendar_events"
+        constraints = [
+            models.UniqueConstraint(fields=["trainer", "source_session_id"], name="ext_workshop_calendar_event_unique"),
+            models.CheckConstraint(check=Q(attempts__lte=100), name="ext_workshop_calendar_event_attempts"),
+            models.CheckConstraint(
+                check=Q(intent="absent") | Q(desired_starts_at__isnull=False, desired_ends_at__isnull=False),
+                name="ext_workshop_calendar_event_window",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["state", "available_at"]),
+            models.Index(fields=["workspace", "state"]),
+        ]
+
+
 class TrainingEventOccurrence(BaseModel):
     """A recognized training invitation, kept so a report need not ask Google.
 
