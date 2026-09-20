@@ -40,6 +40,7 @@ export function TrainingRules({
   } = useSWR(["capacity-training-rules", workspaceSlug], () => service.listTrainingRules(workspaceSlug));
   const [rule, setRule] = useState({ label: "", calendar_id: "" });
   const [busy, setBusy] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState("");
   // Writing is a separate Google consent, taken by whoever keeps the training
   // calendar. It is deliberately not the trainer connection: that one reads, is
@@ -47,20 +48,18 @@ export function TrainingRules({
   const connectWriter = async (ruleId: string) => {
     setBusy(true);
     setError("");
-    // Stays busy on the way out on purpose: the page is leaving for Google and
-    // a button that springs back to life invites a second click that starts a
-    // second consent. The flag is still cleared in `finally` for every path
-    // that does not navigate, so a redirect that never happens cannot strand
-    // the form.
-    let leaving = false;
     try {
       const { authorization_url } = await service.startCalendarWriter(workspaceSlug, ruleId);
-      leaving = true;
+      // A separate flag from `busy`, because it is a separate fact: `busy` means
+      // a request is in flight and always ends, while this means the page is on
+      // its way to Google and is never cleared. Carrying both on one flag meant
+      // a path where it never came back.
+      setRedirecting(true);
       window.location.href = authorization_url;
     } catch (cause) {
       setError(errorMessage(cause, "Could not start the Google connection."));
     } finally {
-      if (!leaving) setBusy(false);
+      setBusy(false);
     }
   };
 
@@ -108,7 +107,7 @@ export function TrainingRules({
               <Button
                 size="sm"
                 variant={item.writer_status === "ok" ? "secondary" : "primary"}
-                disabled={busy}
+                disabled={busy || redirecting}
                 onClick={() => void connectWriter(item.id)}
               >
                 {item.writer_status === "ok" ? "Change writing account" : "Connect writing account"}
