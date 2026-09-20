@@ -43,6 +43,25 @@
 - `pnpm turbo run <command> --filter=<package>` - Target specific package/app
 - `pnpm --filter=@plane/ui storybook` - Start Storybook on port 6006
 
+## Reading CI
+
+A green tick is not the report. Two checks are advisory: they publish findings
+and still pass, so reading only the check list throws that information away.
+
+- **React Doctor** posts its findings as a pull request comment and as inline
+  review comments; the check line shows only a score. Read it with
+  `gh pr view <number> --comments` once CI settles, before calling a pull
+  request ready, and either fix what it names or say why not. On a push to
+  `preview` it scans the whole project instead of the diff, which is where the
+  standing backlog is visible rather than the diff's slice of it.
+- **CodeQL** shows as one tick; the findings are code scanning alerts. Read them
+  with `gh api repos/<owner>/<repo>/code-scanning/alerts` (query parameters can
+  trip a scope check — the bare path works), and check that anything dismissed
+  was dismissed for a reason that still holds.
+
+Four render-time formatter warnings and two complexity warnings reached a
+release because both were read as pass/fail.
+
 ## Code Style
 
 - **Imports**: Use `workspace:*` for internal packages, `catalog:` for external deps
