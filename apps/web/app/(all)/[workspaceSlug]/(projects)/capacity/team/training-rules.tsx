@@ -47,12 +47,20 @@ export function TrainingRules({
   const connectWriter = async (ruleId: string) => {
     setBusy(true);
     setError("");
+    // Stays busy on the way out on purpose: the page is leaving for Google and
+    // a button that springs back to life invites a second click that starts a
+    // second consent. The flag is still cleared in `finally` for every path
+    // that does not navigate, so a redirect that never happens cannot strand
+    // the form.
+    let leaving = false;
     try {
       const { authorization_url } = await service.startCalendarWriter(workspaceSlug, ruleId);
+      leaving = true;
       window.location.href = authorization_url;
     } catch (cause) {
       setError(errorMessage(cause, "Could not start the Google connection."));
-      setBusy(false);
+    } finally {
+      if (!leaving) setBusy(false);
     }
   };
 
