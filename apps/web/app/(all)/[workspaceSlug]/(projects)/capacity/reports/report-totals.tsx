@@ -6,6 +6,7 @@
 
 import type { TTrainingReportRow } from "@/services/capacity.service";
 import { formatDateTime, formatHours } from "../shared/capacity-format.utils";
+import { rowTotal } from "./report-totals.utils";
 
 /**
  * What the workspace ran this month, and how much of it is trustworthy.
@@ -15,11 +16,6 @@ import { formatDateTime, formatHours } from "../shared/capacity-format.utils";
  * somebody deciding who takes the next workshop, which is the opposite of what
  * the data says.
  */
-
-/** Sum one column over the rows that may be trusted, and only those. */
-export function rowTotal(rows: TTrainingReportRow[], field: keyof TTrainingReportRow) {
-  return rows.reduce((sum, row) => sum + (row.counts_towards_totals ? Number(row[field]) : 0), 0);
-}
 
 export function ReportTotals({ rows, dataAsOf }: { rows: TTrainingReportRow[]; dataAsOf: string | null | undefined }) {
   const excluded = rows.filter((row) => !row.counts_towards_totals).length;

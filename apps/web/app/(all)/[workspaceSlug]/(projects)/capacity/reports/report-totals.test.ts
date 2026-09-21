@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TTrainingReportRow } from "@/services/capacity.service";
-import { rowTotal } from "./report-totals";
+import { rowTotal } from "./report-totals.utils";
 
 const row = (overrides: Partial<TTrainingReportRow>): TTrainingReportRow => ({
   trainer_id: "trainer",
