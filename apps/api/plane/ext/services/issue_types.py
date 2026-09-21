@@ -105,6 +105,18 @@ def ensure_project_workshop_type(project):
     return workshop
 
 
+def project_workshop_type(project):
+    """The Workshop type, if this project offers it; otherwise None. Never adds it."""
+    link = (
+        ProjectIssueType.objects.filter(
+            project=project, issue_type__system_key=IssueType.SystemKey.WORKSHOP, deleted_at__isnull=True
+        )
+        .select_related("issue_type")
+        .first()
+    )
+    return link.issue_type if link else None
+
+
 def workshops_enabled(project) -> bool:
     """Whether this project offers the Workshop type.
 
