@@ -84,7 +84,10 @@ export const CreateWorkshop = observer(function CreateWorkshop({
         </p>
       )}
       {projectId && types && !workshop && (
-        <p className="text-body-xs-regular text-secondary">This project does not have the Workshop type enabled.</p>
+        <p className="text-body-xs-regular text-secondary">
+          This project does not offer Workshops. A project administrator can turn them on in the project&apos;s work
+          item type settings.
+        </p>
       )}
       {open && workshop && (
         <CreateUpdateIssueModal

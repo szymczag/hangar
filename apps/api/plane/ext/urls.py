@@ -6,6 +6,7 @@
 
 from django.urls import include, path
 
+from plane.ext.views.project_workshops import ProjectWorkshopsEndpoint
 from plane.ext.views.epic import (
     EpicActivityEndpoint,
     EpicArchiveEndpoint,
@@ -150,6 +151,11 @@ urlpatterns = [
         f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/",
         WorkshopScheduleEndpoint.as_view(),
         name="workshop-schedule",
+    ),
+    path(
+        f"{PROJECT_BASE}/capacity/workshops/",
+        ProjectWorkshopsEndpoint.as_view(),
+        name="project-workshops",
     ),
     path(
         f"{PROJECT_BASE}/work-items/<uuid:issue_id>/workshop-schedule/resync/",

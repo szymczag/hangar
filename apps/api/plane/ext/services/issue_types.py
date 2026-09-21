@@ -3,7 +3,7 @@
 
 from django.db import transaction
 
-from plane.db.models import Issue, IssueType, Project, Workspace
+from plane.db.models import Issue, IssueType, Workspace
 from plane.db.models.issue_type import ProjectIssueType
 
 
@@ -73,14 +73,11 @@ def ensure_project_system_types(project):
     ProjectIssueType.objects.filter(pk=epic_link.pk).update(level=1, is_default=False)
     Issue.objects.filter(project=project, type__isnull=True).update(type=task_type)
 
-    # Capacity is opt-in. Once a workspace has a trainer profile, keep the
-    # canonical Workshop type available in every project without making it the
-    # default work item type.
-    from plane.ext.models import TrainerProfile
-
-    if TrainerProfile.objects.filter(workspace_id=project.workspace_id).exists():
-        ensure_project_workshop_type(project)
-
+    # Workshop is deliberately not among the types every project gets. It used to
+    # arrive in every project the moment anybody in the workspace became a
+    # trainer, which put a training-specific type in the picker of projects that
+    # have nothing to do with training. A project now opts in from its own
+    # settings -- see `enable_workshops`.
     return task_type, epic_type
 
 
@@ -108,8 +105,48 @@ def ensure_project_workshop_type(project):
     return workshop
 
 
-def ensure_workspace_workshop_type(workspace):
-    workshop = None
-    for project in Project.objects.filter(workspace=workspace, archived_at__isnull=True):
-        workshop = ensure_project_workshop_type(project)
-    return workshop
+def workshops_enabled(project) -> bool:
+    """Whether this project offers the Workshop type.
+
+    The answer is the project's own link to the type, which is already where
+    project-scoped availability lives: listing a project's types and validating a
+    new work item's type both read it, so a project without the link cannot hold
+    a new Workshop by any route, not merely by the one with a picker.
+    """
+    return ProjectIssueType.objects.filter(
+        project=project,
+        issue_type__system_key=IssueType.SystemKey.WORKSHOP,
+        deleted_at__isnull=True,
+    ).exists()
+
+
+def workshop_count(project) -> int:
+    return Issue.objects.filter(project=project, type__system_key=IssueType.SystemKey.WORKSHOP).count()
+
+
+class WorkshopsInUse(Exception):
+    """Raised when a project still holding Workshops is asked to stop offering them."""
+
+
+@transaction.atomic
+def enable_workshops(project):
+    """Offer the Workshop type in this project. Idempotent."""
+    return ensure_project_workshop_type(project)
+
+
+@transaction.atomic
+def disable_workshops(project):
+    """Stop offering the Workshop type here, if nothing in the project is one.
+
+    Refused while Workshops exist, because they would be left as work items of a
+    type their own project no longer offers -- editable, but no longer creatable
+    alongside, and invisible to anybody reasoning from the picker about what the
+    project holds. Moving or retyping them first is a decision for a person.
+    """
+    if workshop_count(project):
+        raise WorkshopsInUse
+    ProjectIssueType.objects.filter(
+        project=project,
+        issue_type__system_key=IssueType.SystemKey.WORKSHOP,
+        deleted_at__isnull=True,
+    ).delete()

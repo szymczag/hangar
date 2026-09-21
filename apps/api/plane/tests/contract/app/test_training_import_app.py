@@ -19,7 +19,7 @@ from plane.ext.models import (
     WorkshopSchedule,
     WorkshopSession,
 )
-from plane.ext.services.issue_types import ensure_project_system_types
+from plane.ext.services.issue_types import enable_workshops, ensure_project_system_types
 from plane.tests.factories import UserFactory
 
 STARTS = datetime(2026, 11, 3, 9, 0, tzinfo=timezone.utc)
@@ -46,6 +46,9 @@ def _project(workspace, owner, *, members=()):
         ProjectMember.objects.create(project=project, member=member, workspace=workspace, role=15)
     State.objects.create(name="Backlog", project=project, workspace=workspace, group="backlog", default=True)
     ensure_project_system_types(project)
+    # A training project opts in to Workshops; importing refuses a project that
+    # has not, rather than switching the type on as a side effect.
+    enable_workshops(project)
     return project
 
 

@@ -22,6 +22,7 @@ import { IssueTypeIdentifier } from "@/components/issues/issue-detail/issue-iden
 // plane web
 import { issueTypeService } from "@/plane-web/services/issue-type.service";
 import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
+import { WorkshopsCard } from "./workshops-card";
 import type { TIssuePropertyExt, TIssuePropertyType, TIssueTypeExt } from "@/plane-web/types/issue-types";
 
 const PROPERTY_TYPE_OPTIONS: { key: TIssuePropertyType; label: string }[] = [
@@ -348,6 +349,14 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
             </Button>
           )}
         </div>
+      )}
+      {hasSystemTypes && (
+        <WorkshopsCard
+          workspaceSlug={workspaceSlug}
+          projectId={projectId}
+          isAdmin={isAdmin}
+          onChanged={() => void mutate()}
+        />
       )}
       {(issueTypes ?? []).map((issueType) => (
         <TypeCard

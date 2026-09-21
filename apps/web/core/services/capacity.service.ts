@@ -355,6 +355,24 @@ export class CapacityService extends APIService {
     );
   }
 
+  /** Whether this project offers the Workshop type, and how many it holds. */
+  getProjectWorkshops(workspaceSlug: string, projectId: string) {
+    return this.data<{ enabled: boolean; workshop_count: number }>(
+      this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/capacity/workshops/`)
+    );
+  }
+
+  async setProjectWorkshops(workspaceSlug: string, projectId: string, enabled: boolean) {
+    const csrfToken = await this.csrfToken();
+    return this.data<{ enabled: boolean; workshop_count: number }>(
+      this.put(
+        `/api/workspaces/${workspaceSlug}/projects/${projectId}/capacity/workshops/`,
+        { enabled },
+        { headers: { "X-CSRFTOKEN": csrfToken } }
+      )
+    );
+  }
+
   async startCalendarWriter(workspaceSlug: string, ruleId: string) {
     const csrfToken = await this.csrfToken();
     return this.data<{ authorization_url: string }>(

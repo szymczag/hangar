@@ -65,7 +65,6 @@ from plane.ext.capacity.calendar_sync import (
     reconcile_session,
     writeback_enabled,
 )
-from plane.ext.services import ensure_workspace_workshop_type
 from plane.ext.services.workshop_checklist import backfill_target_dates
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.permissions import ROLE, allow_permission
@@ -218,7 +217,8 @@ class TrainerSelfEndpoint(BaseAPIView):
             trainer_id=profile.user_id,
             action=CapacityAuditEvent.Action.TRAINER_ACTIVATED,
         )
-        ensure_workspace_workshop_type(workspace)
+        # Becoming a trainer no longer puts the Workshop type into every project.
+        # Which projects hold training is a decision each project makes itself.
         profile = TrainerProfile.objects.select_related("user").get(pk=profile.pk)
         return Response(_profile_payload(profile), status=status.HTTP_201_CREATED)
 
