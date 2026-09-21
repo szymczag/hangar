@@ -14,7 +14,8 @@ from plane.db.models import Project, ProjectMember, Workspace
 from plane.ext.models import TrainingEventOccurrence
 from plane.ext.services.training_import import (
     import_occurrences,
-    occurrence_payload,
+    training_groups,
+    training_payload,
     parse_range,
     pending_occurrences,
 )
@@ -59,11 +60,14 @@ class TrainingImportEndpoint(BaseAPIView):
 
         workspace = get_object_or_404(Workspace, slug=slug)
         occurrences = pending_occurrences(workspace.id, start=start, end=end, trainer_ids=trainer_ids)
+        # One row per training, not per trainer: a two-trainer training is one
+        # thing to import, and listing it twice invited importing it twice.
+        groups = training_groups(occurrences[:1000])
         return Response(
             {
                 "from": start.isoformat(),
                 "to": end.isoformat(),
-                "results": [occurrence_payload(row, with_title=True) for row in occurrences[:500]],
+                "results": [training_payload(group, with_title=True) for group in groups[:500]],
             }
         )
 

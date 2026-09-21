@@ -239,8 +239,18 @@ export type TTrainingReport = {
   trainers: TTrainingReportRow[];
 };
 /** A training that exists in the calendar but not yet as a work item. */
+/** One trainer on a training offered for import, with their own answer. */
+export type TPendingTrainingTrainer = {
+  trainer_id: string;
+  display_name: string;
+  status: "confirmed" | "pending";
+};
 export type TPendingTrainingImport = {
+  /** Any occurrence of the training; importing it imports the whole training. */
   id: string;
+  occurrence_ids: string[];
+  /** Everybody on the training -- one row per training, not per trainer. */
+  trainers: TPendingTrainingTrainer[];
   trainer_id: string;
   display_name: string;
   starts_at: string;
@@ -251,7 +261,7 @@ export type TPendingTrainingImport = {
   title: string | null;
 };
 export type TTrainingImportResult = {
-  created: Array<{ occurrence_id: string; issue_id: string; name: string }>;
+  created: Array<{ occurrence_id: string; issue_id: string; name: string; trainer_ids?: string[] }>;
   skipped: Array<{ occurrence_id: string; reason: string }>;
 };
 

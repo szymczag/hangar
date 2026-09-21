@@ -268,8 +268,15 @@ titles that the rest of the product deliberately does not show. With five
 capacity entries it is often folded under **More** at the foot of the workspace
 section.
 
-Importing creates the work item, its schedule and one session, assigns the
-trainer, and links the invitation to that session in one transaction. The link
+A training is listed once however many trainers it has, and importing it creates
+one work item, its schedule and one session with **every** trainer on it,
+assigns them all, and links each trainer's invitation to that session in one
+transaction. Selecting any trainer's row imports the whole training: importing
+half of it would leave the other half to become a second Workshop later.
+
+A trainer who cannot hold work in the chosen project is left out and stays
+listed. Once they join the project, importing that row again puts them on the
+Workshop that already exists rather than creating another. The link
 is what stops the training being counted as delivery and as external training at
 the same time. "Not yet imported" means the invitation has no link — never a
 work item with a similar name; no title matching is performed.
