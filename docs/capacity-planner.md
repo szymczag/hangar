@@ -258,9 +258,15 @@ encrypted with the same key material as the rest of the calendar configuration.
 
 Training planned in the calendar blocks time and counts in the report, but it is
 not a work item, so nothing can be attached to it: no checklist, no status, no
-client contact. **Team capacity → Import from calendar** lists recognized
-trainings that have no linked session, and creates a Workshop work item for the
-ones an administrator selects.
+client contact. **Import from calendar**, in the sidebar's capacity entries,
+lists recognized trainings that have no linked session, and creates a Workshop
+work item for the ones an administrator selects.
+
+It is a sidebar entry of its own rather than a section of Team capacity, and it
+appears only to workspace administrators, because the listing carries calendar
+titles that the rest of the product deliberately does not show. With five
+capacity entries it is often folded under **More** at the foot of the workspace
+section.
 
 Importing creates the work item, its schedule and one session, assigns the
 trainer, and links the invitation to that session in one transaction. The link
