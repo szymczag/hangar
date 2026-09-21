@@ -99,104 +99,157 @@ def pending_occurrences(workspace_id, *, start, end, trainer_ids=None):
     return queryset
 
 
-@transaction.atomic
-def import_occurrence(occurrence, *, project, actor, request=None):
-    """Create the Workshop this invitation describes, and link the two.
+def training_groups(occurrences):
+    """Occurrences gathered into trainings, in the order they were given.
 
-    Returns `(issue, reason)`. A reason means nothing was created: either the
-    invitation is already linked, or the trainer cannot hold work in the chosen
-    project, which is a decision for a person rather than something to paper
-    over by assigning nobody.
+    An occurrence is one trainer's view of one training -- the record is unique
+    per (workspace, trainer, event key) -- so a training delivered by two people
+    arrives as two rows. The event key is derived from the event's own identity
+    and not from who was invited, which makes it the same for everybody on the
+    training, and that is what they are grouped by.
+
+    Without this the listing showed a two-trainer training twice, and importing
+    both rows created two Workshops for one training.
     """
-    # Re-read under a row lock. The listing filtered on these, but a concurrent
-    # import of the same row, or a sweep retiring it in between, must not be
-    # decided by what the client last saw.
-    occurrence = (
+    groups = {}
+    for occurrence in occurrences:
+        groups.setdefault(occurrence.event_key, []).append(occurrence)
+    return list(groups.values())
+
+
+@transaction.atomic
+def import_training(event_key, *, workspace_id, project, actor, request=None):
+    """Create the one Workshop a training describes, with every trainer on it.
+
+    Returns `(issue, reason, skipped)`. With a reason, nothing was created: the
+    training is already in Hangar, it no longer exists, or none of its trainers
+    can hold work in the chosen project. `skipped` names the occurrences of
+    trainers who could not be put on it -- the training is still created for
+    the rest, and those rows stay in the listing, because that part of the
+    training genuinely is not in Hangar yet.
+    """
+    # Every trainer's row, re-read under a lock. The listing filtered on these,
+    # but a concurrent import of the same training, or a sweep retiring it in
+    # between, must not be decided by what the client last saw.
+    occurrences = list(
         TrainingEventOccurrence.objects.select_for_update()
         .select_related("trainer", "trainer_profile")
-        .get(pk=occurrence.pk)
+        .filter(workspace_id=workspace_id, event_key=event_key)
+        .order_by("id")
     )
+    if not occurrences:
+        return None, "no_longer_active", []
 
-    if occurrence.imported_issue_id is not None:
-        return None, "already_imported"
-    if occurrence.state != TrainingEventOccurrence.State.ACTIVE:
+    live = [row for row in occurrences if row.state == TrainingEventOccurrence.State.ACTIVE]
+    if not live:
         # A cancelled or vanished invitation still sits in the table for its
         # retention period, so an id harvested from an earlier listing stays
         # usable unless the state is checked here rather than only in the query.
-        return None, "no_longer_active"
-    if GoogleTrainingEventLink.objects.filter(
-        workspace_id=occurrence.workspace_id,
-        trainer_id=occurrence.trainer_id,
-        event_key=occurrence.event_key,
-    ).exists():
-        return None, "already_linked"
+        return None, "no_longer_active", []
 
-    if not ProjectMember.objects.filter(
-        project=project, member_id=occurrence.trainer_id, role__gte=ASSIGNABLE_ROLE, is_active=True
-    ).exists():
-        return None, "trainer_not_in_project"
+    pending = [row for row in live if row.imported_issue_id is None]
+    linked = set(
+        GoogleTrainingEventLink.objects.filter(
+            workspace_id=workspace_id, event_key=event_key, trainer_id__in=[row.trainer_id for row in pending]
+        ).values_list("trainer_id", flat=True)
+    )
+    pending = [row for row in pending if row.trainer_id not in linked]
+    if not pending:
+        return None, "already_imported", []
 
+    members = set(
+        ProjectMember.objects.filter(
+            project=project,
+            member_id__in=[row.trainer_id for row in pending],
+            role__gte=ASSIGNABLE_ROLE,
+            is_active=True,
+        ).values_list("member_id", flat=True)
+    )
+    eligible = [row for row in pending if row.trainer_id in members]
+    skipped = [row for row in pending if row.trainer_id not in members]
+    if not eligible:
+        return None, "trainer_not_in_project", []
+
+    # Part of this training may already be a Workshop: an earlier import took the
+    # trainers who could hold work in the project and left the rest listed. Those
+    # join the Workshop that exists -- creating another would be the very
+    # duplication this grouping exists to prevent, arriving by the back door.
+    existing = next((row.imported_issue_id for row in live if row.imported_issue_id), None)
+    if existing is not None:
+        return _join_existing(
+            existing, eligible, skipped, event_key=event_key, workspace_id=workspace_id, project=project, actor=actor
+        )
+
+    first = eligible[0]
     workshop_type = ensure_project_workshop_type(project)
     default_state = State.objects.filter(project=project, default=True).first()
-    zone = occurrence.trainer_profile.timezone if occurrence.trainer_profile else "UTC"
+    zone = first.trainer_profile.timezone if first.trainer_profile else "UTC"
 
+    # Every row describes the same event, so they share a time and a title. The
+    # first eligible one speaks for them all.
     issue = Issue.objects.create(
-        name=occurrence_title(occurrence, zone=zone),
+        name=occurrence_title(first, zone=zone),
         project=project,
-        workspace_id=occurrence.workspace_id,
+        workspace_id=workspace_id,
         state=default_state,
         type=workshop_type,
-        start_date=occurrence.starts_at.date(),
-        target_date=occurrence.ends_at.date(),
+        start_date=first.starts_at.date(),
+        target_date=first.ends_at.date(),
         created_by=actor,
         updated_by=actor,
     )
-    IssueAssignee.objects.create(
-        issue=issue,
-        assignee_id=occurrence.trainer_id,
-        project=project,
-        workspace_id=occurrence.workspace_id,
-        created_by=actor,
-        updated_by=actor,
-    )
-
-    schedule = WorkshopSchedule.objects.create(
-        issue=issue,
-        starts_at=occurrence.starts_at,
-        ends_at=occurrence.ends_at,
-        created_by=actor,
-        updated_by=actor,
-    )
-    session = WorkshopSession.objects.create(
-        schedule=schedule,
-        position=0,
-        starts_at=occurrence.starts_at,
-        ends_at=occurrence.ends_at,
-        created_by=actor,
-        updated_by=actor,
-    )
-    session.trainers.add(occurrence.trainer_id)
-
-    # The link is what stops the same training being counted as Hangar delivery
-    # and as external training at once, so it is created here rather than left
-    # to the trainer to do by hand afterwards.
-    try:
-        GoogleTrainingEventLink.objects.create(
-            workspace_id=occurrence.workspace_id,
-            trainer_id=occurrence.trainer_id,
-            event_key=occurrence.event_key,
-            session=session,
+    for row in eligible:
+        IssueAssignee.objects.create(
+            issue=issue,
+            assignee_id=row.trainer_id,
+            project=project,
+            workspace_id=workspace_id,
             created_by=actor,
             updated_by=actor,
         )
+
+    schedule = WorkshopSchedule.objects.create(
+        issue=issue,
+        starts_at=first.starts_at,
+        ends_at=first.ends_at,
+        created_by=actor,
+        updated_by=actor,
+    )
+    # One session with every trainer on it -- not a session each. The training
+    # is one event; splitting it would put the same afternoon in Hangar twice.
+    session = WorkshopSession.objects.create(
+        schedule=schedule,
+        position=0,
+        starts_at=first.starts_at,
+        ends_at=first.ends_at,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.trainers.add(*[row.trainer_id for row in eligible])
+
+    # One link per trainer, all to the same session. The link is what stops the
+    # training being counted as Hangar delivery and as external training at
+    # once, and it is keyed per trainer because each of them was invited
+    # separately.
+    try:
+        for row in eligible:
+            GoogleTrainingEventLink.objects.create(
+                workspace_id=workspace_id,
+                trainer_id=row.trainer_id,
+                event_key=event_key,
+                session=session,
+                created_by=actor,
+                updated_by=actor,
+            )
     except IntegrityError:
         # Another import won the unique index between the check above and here.
         # That is the correct outcome, not a server error: the training already
         # exists in Hangar, and this transaction rolls back the duplicate.
         raise AlreadyImported from None
 
-    occurrence.imported_issue = issue
-    occurrence.save(update_fields=["imported_issue", "updated_at"])
+    TrainingEventOccurrence.objects.filter(pk__in=[row.pk for row in eligible]).update(
+        imported_issue=issue, updated_at=timezone.now()
+    )
 
     epoch = int(timezone.now().timestamp())
     origin = base_host(request=request, is_app=True) if request is not None else None
@@ -223,35 +276,112 @@ def import_occurrence(occurrence, *, project, actor, request=None):
         )
 
     transaction.on_commit(announce)
-    return issue, None
+    return issue, None, skipped
+
+
+def _join_existing(issue_id, eligible, skipped, *, event_key, workspace_id, project, actor):
+    """Put the remaining trainers of a partly imported training on its Workshop."""
+    link = (
+        GoogleTrainingEventLink.objects.select_related("session")
+        .filter(workspace_id=workspace_id, event_key=event_key)
+        .first()
+    )
+    issue = Issue.objects.filter(pk=issue_id).first()
+    if link is None or issue is None:
+        # The Workshop or its session was removed since. Treat what is left as a
+        # training nobody has imported rather than attaching it to nothing.
+        return None, "no_longer_active", []
+    if issue.project_id != project.id:
+        # Joining a Workshop in a different project than the one chosen would
+        # quietly move work somewhere the importer did not ask for.
+        return None, "imported_elsewhere", []
+
+    session = link.session
+    session.trainers.add(*[row.trainer_id for row in eligible])
+    present = set(issue.issue_assignee.values_list("assignee_id", flat=True))
+    for row in eligible:
+        if row.trainer_id not in present:
+            IssueAssignee.objects.create(
+                issue=issue,
+                assignee_id=row.trainer_id,
+                project=project,
+                workspace_id=workspace_id,
+                created_by=actor,
+                updated_by=actor,
+            )
+    try:
+        for row in eligible:
+            GoogleTrainingEventLink.objects.create(
+                workspace_id=workspace_id,
+                trainer_id=row.trainer_id,
+                event_key=event_key,
+                session=session,
+                created_by=actor,
+                updated_by=actor,
+            )
+    except IntegrityError:
+        raise AlreadyImported from None
+    TrainingEventOccurrence.objects.filter(pk__in=[row.pk for row in eligible]).update(
+        imported_issue=issue, updated_at=timezone.now()
+    )
+    return issue, None, skipped
 
 
 def import_occurrences(occurrences, *, project, actor, request=None):
-    """Import several, reporting per row rather than failing the whole batch."""
+    """Import the trainings these rows belong to, reporting per training.
+
+    Any row of a training imports the whole training: selecting one trainer's
+    row of a two-trainer training means that training, and importing only that
+    trainer's half would leave the other half to be imported later as a second
+    Workshop -- the duplication this grouping exists to prevent.
+    """
     created, skipped = [], []
-    for occurrence in occurrences:
+    for group in training_groups(occurrences):
+        head = group[0]
         try:
-            issue, reason = import_occurrence(occurrence, project=project, actor=actor, request=request)
+            issue, reason, left_out = import_training(
+                head.event_key, workspace_id=head.workspace_id, project=project, actor=actor, request=request
+            )
         except AlreadyImported:
-            issue, reason = None, "already_imported"
+            issue, reason, left_out = None, "already_imported", []
         if issue is None:
-            skipped.append({"occurrence_id": str(occurrence.id), "reason": reason})
-        else:
-            created.append({"occurrence_id": str(occurrence.id), "issue_id": str(issue.id), "name": issue.name})
+            skipped.extend({"occurrence_id": str(row.id), "reason": reason} for row in group)
+            continue
+        created.append(
+            {
+                "occurrence_id": str(head.id),
+                "issue_id": str(issue.id),
+                "name": issue.name,
+                "trainer_ids": [str(value) for value in issue.issue_assignee.values_list("assignee_id", flat=True)],
+            }
+        )
+        skipped.extend({"occurrence_id": str(row.id), "reason": "trainer_not_in_project"} for row in left_out)
     return {"created": created, "skipped": skipped}
 
 
-def occurrence_payload(occurrence, *, with_title):
+def training_payload(group, *, with_title):
+    """One listing row per training, naming everybody on it."""
+    head = group[0]
     return {
-        "id": str(occurrence.id),
-        "trainer_id": str(occurrence.trainer_id),
-        "display_name": occurrence.trainer.display_name,
-        "starts_at": occurrence.starts_at.isoformat(),
-        "ends_at": occurrence.ends_at.isoformat(),
-        "minutes": int((occurrence.ends_at - occurrence.starts_at).total_seconds() // 60),
-        "status": occurrence.status,
-        "rule_label": occurrence.rule_label,
-        "title": occurrence_title(occurrence) if with_title else None,
+        # Any occurrence id of the training imports all of it; the first is
+        # offered so an older client that posts one id per row still works.
+        "id": str(head.id),
+        "occurrence_ids": [str(row.id) for row in group],
+        "trainers": [
+            {"trainer_id": str(row.trainer_id), "display_name": row.trainer.display_name, "status": row.status}
+            for row in group
+        ],
+        # Kept for clients that render a single trainer per row.
+        "trainer_id": str(head.trainer_id),
+        "display_name": ", ".join(row.trainer.display_name for row in group),
+        "starts_at": head.starts_at.isoformat(),
+        "ends_at": head.ends_at.isoformat(),
+        "minutes": int((head.ends_at - head.starts_at).total_seconds() // 60),
+        # Confirmed only when everybody on it has accepted: one trainer who has
+        # not answered is exactly what somebody importing needs to see.
+        "status": "confirmed" if all(row.status == "confirmed" for row in group) else "pending",
+        "rule_label": head.rule_label,
+        "title": occurrence_title(head) if with_title else None,
     }
 
 

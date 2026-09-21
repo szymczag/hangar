@@ -217,7 +217,7 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
                       <td className="px-3 py-3">
                         <input
                           type="checkbox"
-                          aria-label={`Select ${row.title ?? "training"} for ${row.display_name}`}
+                          aria-label={`Select ${row.title ?? "training"} with ${row.display_name}`}
                           checked={selected.has(row.id)}
                           onChange={() => toggle(row.id)}
                         />
@@ -225,7 +225,22 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
                       <th scope="row" className="px-3 py-3 font-medium">
                         {row.title ?? row.rule_label}
                       </th>
-                      <td className="px-3 py-3">{row.display_name}</td>
+                      <td className="px-3 py-3">
+                        {/* Every trainer on the training, with whoever has not
+                            answered marked: importing takes all of them into one
+                            Workshop, so the row has to say who "all" is. */}
+                        {(row.trainers?.length
+                          ? row.trainers
+                          : [{ trainer_id: row.trainer_id, display_name: row.display_name, status: row.status }]
+                        ).map((trainer) => (
+                          <span key={trainer.trainer_id} className="block">
+                            {trainer.display_name}
+                            {trainer.status !== "confirmed" && (
+                              <span className="ml-1 text-tertiary">· not answered</span>
+                            )}
+                          </span>
+                        ))}
+                      </td>
                       <td className="px-3 py-3">{formatDateTime(row.starts_at)}</td>
                       <td className="px-3 py-3">{Math.round((row.minutes / 60) * 10) / 10}h</td>
                       <td className="px-3 py-3">{row.status === "confirmed" ? "Accepted" : "Not answered yet"}</td>

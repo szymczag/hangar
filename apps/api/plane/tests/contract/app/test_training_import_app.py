@@ -359,3 +359,109 @@ def test_deleting_the_work_item_offers_the_training_for_import_again(keys, works
 
     assert occurrence.imported_issue_id is None
     assert [row["id"] for row in client.get(url, WINDOW).data["results"]] == [str(occurrence.id)]
+
+
+def _import(client, csrf, workspace, project, occurrence_ids):
+    return client.post(
+        f"/api/workspaces/{workspace.slug}/capacity/training-imports/",
+        {"project_id": str(project.id), "occurrence_ids": [str(value) for value in occurrence_ids]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_training_with_two_trainers_is_listed_once(keys, workspace, create_user):
+    """One training, one row, both names on it.
+
+    Each trainer's view of a training is its own record, so a two-trainer
+    training used to be listed twice -- which is what invited importing it twice.
+    """
+    other = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
+    rule = _rule(workspace)
+    _occurrence(workspace, create_user, rule, key="shared")
+    _occurrence(workspace, other, rule, key="shared")
+    client, _ = _client(create_user)
+
+    response = client.get(f"/api/workspaces/{workspace.slug}/capacity/training-imports/", WINDOW)
+
+    [row] = response.data["results"]
+    assert {trainer["trainer_id"] for trainer in row["trainers"]} == {str(create_user.id), str(other.id)}
+    assert len(row["occurrence_ids"]) == 2
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_training_with_two_trainers_becomes_one_workshop(keys, workspace, create_user):
+    """The defect this grouping exists for.
+
+    Importing both trainers' rows used to create two Workshops for one training,
+    each with one trainer. It is one Workshop, one session, both trainers on it,
+    and each of them linked to that session so neither is counted twice.
+    """
+    other = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
+    rule = _rule(workspace)
+    first = _occurrence(workspace, create_user, rule, key="shared")
+    second = _occurrence(workspace, other, rule, key="shared")
+    project = _project(workspace, create_user, members=[other])
+    client, csrf = _client(create_user)
+
+    response = _import(client, csrf, workspace, project, [first.id, second.id])
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert len(response.data["created"]) == 1
+    assert Issue.objects.filter(project=project).count() == 1
+    session = WorkshopSession.objects.get()
+    assert set(session.trainers.values_list("id", flat=True)) == {create_user.id, other.id}
+    assert GoogleTrainingEventLink.objects.filter(session=session).count() == 2
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_selecting_one_trainers_row_imports_the_whole_training(keys, workspace, create_user):
+    """Importing half a training would leave the other half to become a second Workshop."""
+    other = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
+    rule = _rule(workspace)
+    first = _occurrence(workspace, create_user, rule, key="shared")
+    _occurrence(workspace, other, rule, key="shared")
+    project = _project(workspace, create_user, members=[other])
+    client, csrf = _client(create_user)
+
+    _import(client, csrf, workspace, project, [first.id])
+
+    session = WorkshopSession.objects.get()
+    assert set(session.trainers.values_list("id", flat=True)) == {create_user.id, other.id}
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_a_trainer_added_to_the_project_later_joins_the_existing_workshop(keys, workspace, create_user):
+    """The duplication, arriving by the back door.
+
+    The first import takes only the trainer who can hold work in the project and
+    leaves the other listed. Once that trainer joins the project, importing again
+    must put them on the Workshop that exists -- not create a second one.
+    """
+    other = UserFactory()
+    WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
+    rule = _rule(workspace)
+    first = _occurrence(workspace, create_user, rule, key="shared")
+    second = _occurrence(workspace, other, rule, key="shared")
+    project = _project(workspace, create_user)
+    client, csrf = _client(create_user)
+
+    response = _import(client, csrf, workspace, project, [first.id, second.id])
+    assert len(response.data["created"]) == 1
+    assert {row["reason"] for row in response.data["skipped"]} == {"trainer_not_in_project"}
+
+    ProjectMember.objects.create(project=project, member=other, workspace=workspace, role=15)
+    _import(client, csrf, workspace, project, [second.id])
+
+    assert Issue.objects.filter(project=project).count() == 1
+    session = WorkshopSession.objects.get()
+    assert set(session.trainers.values_list("id", flat=True)) == {create_user.id, other.id}
+    assert GoogleTrainingEventLink.objects.filter(session=session).count() == 2
