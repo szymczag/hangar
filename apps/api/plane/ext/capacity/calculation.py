@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, time, timedelta, timezone as dt_timezone
 from concurrent.futures import ThreadPoolExecutor
 from zoneinfo import ZoneInfo
@@ -106,6 +107,9 @@ def _google_client():
     return GoogleCalendarClient(client_id=client_id, client_secret=client_secret)
 
 
+logger = logging.getLogger(__name__)
+
+
 def _google_busy(trainer, start, end, *, force=False):
     try:
         selection = trainer.calendar_selection
@@ -177,6 +181,20 @@ def _google_busy(trainer, start, end, *, force=False):
             return _intersections(stale_intervals, [(start, end)]), "connected", "stale"
         error_code = getattr(exc, "code", "provider_unavailable")
         return [], error_code, error_code
+    except Exception as exc:  # noqa: BLE001 - see below; only the type is logged
+        # A defect in this module must not take the ledger down with it.
+        #
+        # The rule this subsystem is built on runs the other way: a read that
+        # failed has to read as unverified, which blocks a booking rather than
+        # permitting one. `booking_preflight` refuses anything that is not
+        # `fresh`, so an unexpected failure here costs a refused booking and a
+        # marked row -- never a trainer who looks free because the code broke.
+        #
+        # Deliberately no stale fallback: a known provider failure is a state we
+        # understand and can serve the last answer for, and this is not.
+        # Logged at error, by type only, so it is visible rather than absorbed.
+        logger.error("Google availability read failed with %s", type(exc).__name__)
+        return [], "provider_error", "provider_error"
 
 
 def _load_google_busy(trainer, start, end):
