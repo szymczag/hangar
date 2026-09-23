@@ -20,6 +20,8 @@ export type TIssuePropertyOptionExt = {
 
 export type TIssuePropertyExt = {
   id: string;
+  /** Set on the properties the product itself reads, such as a Workshop's trainers. */
+  system_key: string | null;
   display_name: string;
   description: string;
   property_type: TIssuePropertyType;

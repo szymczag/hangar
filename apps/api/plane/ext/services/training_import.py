@@ -38,6 +38,7 @@ from plane.ext.models import (
     WorkshopSession,
 )
 from plane.ext.services.issue_types import project_workshop_type
+from plane.ext.services.workshop_properties import set_workshop_trainers, workshop_trainer_ids
 from plane.utils.host import base_host
 
 # Matching IssueCreateSerializer: below this a project member cannot hold work.
@@ -233,6 +234,10 @@ def import_training(event_key, *, workspace_id, project, actor, request=None):
         updated_by=actor,
     )
     session.trainers.add(*[row.trainer_id for row in eligible])
+    # The invitation already says who delivers this training, so the work item's
+    # trainer property says it too. Leaving the coordinator to retype it is how
+    # the property ends up disagreeing with the sessions.
+    set_workshop_trainers(issue, [row.trainer_id for row in eligible], actor=actor)
 
     # One link per trainer, all to the same session. The link is what stops the
     # training being counted as Hangar delivery and as external training at
@@ -305,6 +310,9 @@ def _join_existing(issue_id, eligible, skipped, *, event_key, workspace_id, proj
 
     session = link.session
     session.trainers.add(*[row.trainer_id for row in eligible])
+    # Joining, not replacing: the Workshop already names the trainers an earlier
+    # import could place, and these are the rest of the same training.
+    set_workshop_trainers(issue, [*workshop_trainer_ids(issue), *[row.trainer_id for row in eligible]], actor=actor)
     present = set(issue.issue_assignee.values_list("assignee_id", flat=True))
     for row in eligible:
         if row.trainer_id not in present:

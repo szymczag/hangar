@@ -73,6 +73,14 @@ const PropertyRow = observer(function PropertyRow(props: {
             {PROPERTY_TYPE_OPTIONS.find((option) => option.key === property.property_type)?.label}
           </span>
           {property.is_required && <span className="text-11 text-danger-primary">required</span>}
+          {property.system_key && (
+            <span
+              className="rounded-sm bg-layer-1 px-1.5 py-0.5 text-11 text-tertiary"
+              title="Hangar reads this property. Rename it freely; it cannot be removed."
+            >
+              built in
+            </span>
+          )}
         </div>
       </div>
       {isSelect && (

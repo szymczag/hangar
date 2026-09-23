@@ -65,6 +65,7 @@ from plane.ext.capacity.calendar_sync import (
     reconcile_session,
     writeback_enabled,
 )
+from plane.ext.services.workshop_properties import delivering_trainer_ids
 from plane.ext.services.workshop_checklist import backfill_target_dates
 from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.permissions import ROLE, allow_permission
@@ -1531,6 +1532,13 @@ class WorkshopScheduleEndpoint(BaseAPIView):
         assignees = set(issue.issue_assignee.values_list("assignee_id", flat=True))
         if not assignees:
             return Response({"error": "A Workshop requires at least one trainer."}, status=400)
+        # Whom a session gets when it does not name anybody: the work item's
+        # trainer property, which is where the coordinator says who delivers this
+        # training. A workshop from before the property falls back to its
+        # assignees, which is what the property will hold once anybody edits it.
+        default_trainer_ids = [value for value in delivering_trainer_ids(issue) if value in assignees] or list(
+            assignees
+        )
         active_trainers = set(
             TrainerProfile.objects.filter(
                 workspace=issue.workspace, user_id__in=assignees, status="active"
@@ -1572,7 +1580,7 @@ class WorkshopScheduleEndpoint(BaseAPIView):
                         {"error": f"Session {position + 1}: {field} must be between 0 and 1440."}, status=400
                     )
                 values[field] = value
-            raw_trainer_ids = item.get("trainer_ids", list(assignees))
+            raw_trainer_ids = item.get("trainer_ids", default_trainer_ids)
             if not isinstance(raw_trainer_ids, list) or not raw_trainer_ids:
                 return Response({"error": f"Session {position + 1} requires at least one trainer."}, status=400)
             try:

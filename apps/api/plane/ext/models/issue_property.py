@@ -24,8 +24,23 @@ class PropertyTypeChoices(models.TextChoices):
 class IssueProperty(BaseModel):
     """A custom field attached to an IssueType."""
 
+    class SystemKey(models.TextChoices):
+        """Properties the product itself reads, rather than only displays.
+
+        A property is identified by its display name everywhere else, which is
+        fine while only people read it. The Workshop roles are different: the
+        planner, the checklists and the calendar import all have to find the
+        trainers of a workshop, and a coordinator renaming a column must not
+        take that away from them.
+        """
+
+        SALES = "workshop_sales", "Workshop sales"
+        PROJECT_MANAGER = "workshop_pm", "Workshop project manager"
+        TRAINER = "workshop_trainer", "Workshop trainer"
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="ext_issue_properties")
     issue_type = models.ForeignKey("db.IssueType", on_delete=models.CASCADE, related_name="properties")
+    system_key = models.CharField(max_length=32, choices=SystemKey.choices, blank=True)
     display_name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     property_type = models.CharField(max_length=30, choices=PropertyTypeChoices.choices)
@@ -47,7 +62,12 @@ class IssueProperty(BaseModel):
                 fields=["issue_type", "display_name"],
                 condition=Q(deleted_at__isnull=True),
                 name="ext_issue_property_unique_name_per_type",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["issue_type", "system_key"],
+                condition=Q(deleted_at__isnull=True) & ~Q(system_key=""),
+                name="ext_issue_property_unique_system_key_per_type",
+            ),
         ]
         indexes = [models.Index(fields=["issue_type"]), models.Index(fields=["workspace"])]
 

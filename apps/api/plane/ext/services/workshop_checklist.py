@@ -22,6 +22,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from plane.db.models import Issue, IssueAssignee, ProjectMember, State
+from plane.ext.services.workshop_properties import delivering_trainer_ids
 from plane.ext.models import (
     TrainerProfile,
     WorkshopChecklistOrigin,
@@ -143,10 +144,12 @@ def apply_checklist_template(*, template, issue, actor, request=None):
     existing_names = set(
         Issue.objects.filter(parent_id=issue.id, deleted_at__isnull=True).values_list("name", flat=True)
     )
+    # "The workshop's trainer" is whoever the work item's trainer property names;
+    # a workshop from before that property falls back to its assignees.
     workshop_trainer_ids = list(
         TrainerProfile.objects.filter(
             workspace_id=issue.workspace_id,
-            user_id__in=issue.issue_assignee.values_list("assignee_id", flat=True),
+            user_id__in=delivering_trainer_ids(issue),
             status=TrainerProfile.Status.ACTIVE,
         )
         .order_by("id")
