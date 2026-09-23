@@ -19,9 +19,10 @@ import {
   formatRange,
   rangeMinutes,
 } from "../shared/capacity-timeline.utils";
-import { DAY_KEYS, DAY_LABELS, availabilityCopy, errorMessage, formatMinutes } from "../shared/capacity-format.utils";
+import { availabilityCopy, errorMessage, formatMinutes } from "../shared/capacity-format.utils";
 import type { useCapacityData } from "../shared/use-capacity-data";
 import { WeekStepper } from "../shared/week-stepper";
+import { DayTabs } from "./day-tabs";
 import { TrainerDayTimeline } from "./trainer-day-timeline";
 
 function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Date) {
@@ -146,60 +147,14 @@ export function CapacityLedger({
         </div>
       ) : capacity?.trainers.length ? (
         <div>
-          <div className="border-b border-subtle bg-surface-1 px-5 py-3">
-            <div
-              className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${showWeekends ? "lg:grid-cols-7" : "lg:grid-cols-5"}`}
-              aria-label="Choose planning day"
-            >
-              {DAY_KEYS.slice(0, visibleDayCount).map((day, index) => {
-                const bounds = dayBounds(weekStart, index);
-                const availableCount = capacity.trainers.filter(
-                  (trainer) => availableRanges(trainer.intervals, bounds.start, bounds.end).length > 0
-                ).length;
-                const conflictCount = capacity.trainers.reduce(
-                  (count, trainer) =>
-                    count +
-                    trainer.conflicts.filter((conflict) => intervalPosition(conflict, bounds.start, bounds.end)).length,
-                  0
-                );
-                const selected = selectedDayIndexInView === index;
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => setSelectedDayIndex(index)}
-                    className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-                      selected
-                        ? "border-accent-primary bg-accent-primary/10"
-                        : "border-subtle bg-surface-2 hover:border-strong"
-                    }`}
-                  >
-                    <span className="flex items-baseline justify-between gap-2">
-                      <span className="text-body-xs-medium text-primary">{DAY_LABELS[index]}</span>
-                      <span className="text-11 text-placeholder">
-                        {bounds.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
-                      </span>
-                    </span>
-                    <span className="mt-1 block text-11 text-secondary">
-                      {availableCount} available
-                      {conflictCount ? <span className="text-danger-primary"> · {conflictCount} conflicts</span> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {onShowWeekends ? (
-              <button
-                type="button"
-                aria-pressed={showWeekends}
-                className="mt-2 text-11 text-accent-primary"
-                onClick={() => onShowWeekends(!showWeekends)}
-              >
-                {showWeekends ? "Hide weekends" : "Show weekends"}
-              </button>
-            ) : null}
-          </div>
+          <DayTabs
+            weekStart={weekStart}
+            trainers={capacity.trainers}
+            selectedIndex={selectedDayIndexInView}
+            onSelect={setSelectedDayIndex}
+            showWeekends={showWeekends}
+            onShowWeekends={onShowWeekends}
+          />
           <div className="divide-y divide-subtle lg:hidden">
             {capacity.trainers.map((trainer) => {
               const metrics = trainerDayMetrics(trainer, selectedDay.start, selectedDay.end);

@@ -58,12 +58,17 @@ function CalendarPicker({
   // whatever a colleague once shared. The ones that answer "when am I busy" are
   // the primary calendar and whatever the trainer has already chosen; the rest
   // are a list to scroll past, so they start folded away.
-  const ordered = useMemo(
-    () => [...calendars].toSorted((left, right) => Number(right.primary) - Number(left.primary) || 0),
-    [calendars]
-  );
-  const prominent = ordered.filter((item) => item.primary || selected.has(item.id) || item.is_training_calendar);
-  const rest = ordered.filter((item) => !prominent.includes(item));
+  const { prominent, rest } = useMemo(() => {
+    const primary: TGoogleCalendar[] = [];
+    const alsoShown: TGoogleCalendar[] = [];
+    const folded: TGoogleCalendar[] = [];
+    for (const calendar of calendars) {
+      if (calendar.primary) primary.push(calendar);
+      else if (selected.has(calendar.id) || calendar.is_training_calendar) alsoShown.push(calendar);
+      else folded.push(calendar);
+    }
+    return { prominent: [...primary, ...alsoShown], rest: folded };
+  }, [calendars, selected]);
   const visible = showAll ? [...prominent, ...rest] : prominent;
   const save = async () => {
     setSaving(true);
