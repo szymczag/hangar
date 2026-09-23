@@ -76,6 +76,8 @@ export type TGoogleCalendar = {
   primary: boolean;
   access_role: string;
   selected: boolean;
+  /** A calendar a workspace rule already reads as training; it may not block time. */
+  is_training_calendar?: boolean;
 };
 /** Where one trainer's invitation to one session has got to. */
 export type TCalendarSyncState = {

@@ -360,16 +360,18 @@ test("booking hours keep focus while typing and copy to active days", async ({ a
   await end.pressSequentially("1");
   await expect(end).toHaveValue("1");
   await expect(end).toBeFocused();
-  await end.pressSequentially("9");
-  await expect(end).toHaveValue("19");
+  // 16:00 rather than 19:00: the default day is now 09:00-17:00 plus an evening
+  // from 19:00, and an end of 19:00 would run into that second window.
+  await end.pressSequentially("6");
+  await expect(end).toHaveValue("16");
   await end.press("Tab");
-  await expect(end).toHaveValue("19:00");
+  await expect(end).toHaveValue("16:00");
   await page.getByRole("button", { name: "Copy to active days" }).click();
-  await expect(page.getByRole("textbox", { name: "Tue interval 1 end" })).toHaveValue("19:00");
+  await expect(page.getByRole("textbox", { name: "Tue interval 1 end" })).toHaveValue("16:00");
   await expect(page.getByRole("textbox", { name: "Sun interval 1 end" })).toHaveCount(0);
   await page.getByRole("checkbox", { name: "Include days off" }).check();
   await page.getByRole("button", { name: "Set the same for all days" }).click();
-  await expect(page.getByRole("textbox", { name: "Sun interval 1 end" })).toHaveValue("19:00");
+  await expect(page.getByRole("textbox", { name: "Sun interval 1 end" })).toHaveValue("16:00");
   // Deliberately leave these edits unsaved: the visual personas share a database.
   await capture(page, "capacity-booking-hours", { ready: end, target: page.getByRole("main").last() });
 });

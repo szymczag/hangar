@@ -137,6 +137,12 @@ jobs:
         env:
           HANGAR_BUNDLE_SOURCEMAPS: "1"
         run: |
+          # The step above built these without source maps into the same
+          # directories. Leaving those chunks in place made the scan see a
+          # mixture of mapped and unmapped files, whose sinks it could not
+          # attribute, and the check passed or failed depending on which
+          # artifacts survived.
+          rm -rf apps/web/build apps/admin/build apps/space/build
           pnpm turbo run build --filter=web --filter=admin --filter=space
           for app in web admin space; do
             node packages/csp/bin/bundle-sinks.mjs \

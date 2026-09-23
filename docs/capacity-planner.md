@@ -176,6 +176,30 @@ Migration `0028_calendar_primary_timezone` adds nullable refresh metadata and an
 initially empty Google timezone. Existing connections populate it on their next
 uncached calendar read.
 
+## Booking hours and blocking calendars
+
+A new trainer is assumed bookable **09:00-17:00 and 19:00-22:00 on weekdays** --
+a working day and an evening, with the late afternoon left out. The single
+09:00-22:00 block this replaces gave everybody thirteen unbroken hours and made
+the planner look as though the whole team was free every evening. A trainer sets
+their real hours on My capacity; what the default has to be is closer to true
+than a block nobody works. When the default changed, trainers who had never saved
+their hours were moved onto it, and only those: the revision counter is what
+tells an untouched schedule apart from somebody who chose those hours on purpose.
+
+Blocking calendars are the trainer's own. A **shared training calendar cannot be
+one of them**: it carries everybody's training, so choosing it would block this
+trainer's week with other people's workshops, while their own trainings are
+already blocked by recognition, from their own invitations. Such a calendar is
+marked in the list, cannot be ticked, and is refused by the API with
+`training_calendar_not_blocking` -- the check belongs on the server because the
+list is only the polite half of it.
+
+The rest of the list starts folded. A Google account carries holidays, birthdays,
+subscribed calendars and whatever a colleague once shared; the ones that answer
+"when am I busy" are the primary calendar and whatever the trainer has already
+chosen, so those are shown and the rest sit behind **Show N more calendars**.
+
 ## Recognizing training invitations
 
 Workspace administrators configure **Team capacity → Training calendar rules**.
@@ -356,6 +380,12 @@ there because "why is this person unavailable" is usually answered by a
 different layer. Working hours are always drawn, since they are the canvas the
 rest sits on. The selection lives in `?layers=`, so a narrowed ledger can be
 pasted into a message like any other link.
+
+The rail shows Monday to Friday. Training runs on weekdays, and two dead tabs
+took a seventh of a row whose whole job is the week's shape; **Show weekends**
+brings Saturday and Sunday back, because a weekend course is a real thing, it is
+simply not what the rail is scanned for. Like the layers, the choice lives in the
+URL (`?weekends=1`), so a link to that Saturday carries the weekend with it.
 
 Where a training's title has been recorded, the timeline names it. The title
 comes from the sweep's record rather than from a live read -- the availability

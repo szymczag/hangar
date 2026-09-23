@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link2, Unplug } from "lucide-react";
 import useSWR, { mutate } from "swr";
 import { Button } from "@plane/propel/button";
@@ -49,10 +49,22 @@ function CalendarPicker({
 }) {
   const [selected, setSelected] = useState(() => {
     const saved = calendars.filter((item) => item.selected).map((item) => item.id);
-    const primary = calendars.find((item) => item.primary)?.id;
+    const primary = calendars.find((item) => item.primary && !item.is_training_calendar)?.id;
     return new Set(saved.length || !primary ? saved : [primary]);
   });
   const [saving, setSaving] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  // A Google account carries holidays, birthdays, subscribed calendars and
+  // whatever a colleague once shared. The ones that answer "when am I busy" are
+  // the primary calendar and whatever the trainer has already chosen; the rest
+  // are a list to scroll past, so they start folded away.
+  const ordered = useMemo(
+    () => [...calendars].toSorted((left, right) => Number(right.primary) - Number(left.primary) || 0),
+    [calendars]
+  );
+  const prominent = ordered.filter((item) => item.primary || selected.has(item.id) || item.is_training_calendar);
+  const rest = ordered.filter((item) => !prominent.includes(item));
+  const visible = showAll ? [...prominent, ...rest] : prominent;
   const save = async () => {
     setSaving(true);
     try {
@@ -83,14 +95,17 @@ function CalendarPicker({
         </Button>
       </div>
       <div className="grid gap-2 md:grid-cols-2">
-        {calendars.map((calendar) => (
+        {visible.map((calendar) => (
           <label
             key={calendar.id}
-            className="flex cursor-pointer items-center gap-3 rounded-md border border-subtle px-3 py-2 text-body-xs-regular hover:bg-surface-2"
+            className={`flex items-center gap-3 rounded-md border border-subtle px-3 py-2 text-body-xs-regular ${
+              calendar.is_training_calendar ? "opacity-70" : "cursor-pointer hover:bg-surface-2"
+            }`}
           >
             <input
               type="checkbox"
               checked={selected.has(calendar.id)}
+              disabled={calendar.is_training_calendar}
               onChange={() =>
                 setSelected((current) => {
                   const next = new Set(current);
@@ -107,11 +122,27 @@ function CalendarPicker({
                   {calendar.id}
                 </span>
               )}
+              {calendar.is_training_calendar ? (
+                <span className="block text-11 text-placeholder">
+                  Shared training calendar. It carries everybody&apos;s training, so it cannot block your time — your
+                  own trainings are recognized from your invitations.
+                </span>
+              ) : null}
             </span>
             {calendar.primary ? <span className="shrink-0 text-11 text-placeholder">Primary</span> : null}
           </label>
         ))}
       </div>
+      {rest.length ? (
+        <button
+          type="button"
+          aria-expanded={showAll}
+          className="mt-2 text-11 text-accent-primary"
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll ? "Show fewer calendars" : `Show ${rest.length} more calendar${rest.length === 1 ? "" : "s"}`}
+        </button>
+      ) : null}
       {selected.size === 0 ? (
         <p role="alert" className="mt-2 text-11 text-danger-primary">
           Select at least one blocking calendar. Primary may be replaced by another calendar.

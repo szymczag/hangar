@@ -55,6 +55,9 @@ type Props = {
   becomeTrainer: { onClick: () => void; busy: boolean } | null;
   /** Which interval kinds to draw; omitted means all of them. */
   layers?: Set<TCapacityInterval["kind"]>;
+  /** Whether Saturday and Sunday get a tab. Training happens on weekdays. */
+  showWeekends?: boolean;
+  onShowWeekends?: (next: boolean) => void;
 };
 
 /**
@@ -68,7 +71,16 @@ type Props = {
  * nothing else has an opinion about it. The week is not: the planner reads the
  * same window, so it stays with the caller's hook.
  */
-export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, becomeTrainer, layers }: Props) {
+export function CapacityLedger({
+  data,
+  isAdmin,
+  ownProfile,
+  onManageSchedule,
+  becomeTrainer,
+  layers,
+  showWeekends = false,
+  onShowWeekends,
+}: Props) {
   const {
     capacity,
     capacityError,
@@ -89,7 +101,13 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
     const day = new TZDate(Date.now(), timeZone).getDay();
     return day === 0 || day === 6 ? 0 : day - 1;
   });
-  const selectedDay = useMemo(() => dayBounds(weekStart, selectedDayIndex), [selectedDayIndex, weekStart]);
+  // Weekends are hidden by default: training runs on weekdays, and two dead
+  // tabs took a seventh of a rail whose whole job is the week's shape. They are
+  // a toggle rather than a removal because a weekend course is a real thing --
+  // it is simply not what the rail is scanned for.
+  const visibleDayCount = showWeekends ? 7 : 5;
+  const selectedDayIndexInView = selectedDayIndex < visibleDayCount ? selectedDayIndex : 0;
+  const selectedDay = useMemo(() => dayBounds(weekStart, selectedDayIndexInView), [selectedDayIndexInView, weekStart]);
   const hasActiveProfile = ownProfile?.status === "active";
 
   return (
@@ -129,8 +147,11 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
       ) : capacity?.trainers.length ? (
         <div>
           <div className="border-b border-subtle bg-surface-1 px-5 py-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7" aria-label="Choose planning day">
-              {DAY_KEYS.map((day, index) => {
+            <div
+              className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${showWeekends ? "lg:grid-cols-7" : "lg:grid-cols-5"}`}
+              aria-label="Choose planning day"
+            >
+              {DAY_KEYS.slice(0, visibleDayCount).map((day, index) => {
                 const bounds = dayBounds(weekStart, index);
                 const availableCount = capacity.trainers.filter(
                   (trainer) => availableRanges(trainer.intervals, bounds.start, bounds.end).length > 0
@@ -141,7 +162,7 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
                     trainer.conflicts.filter((conflict) => intervalPosition(conflict, bounds.start, bounds.end)).length,
                   0
                 );
-                const selected = selectedDayIndex === index;
+                const selected = selectedDayIndexInView === index;
                 return (
                   <button
                     key={day}
@@ -168,6 +189,16 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
                 );
               })}
             </div>
+            {onShowWeekends ? (
+              <button
+                type="button"
+                aria-pressed={showWeekends}
+                className="mt-2 text-11 text-accent-primary"
+                onClick={() => onShowWeekends(!showWeekends)}
+              >
+                {showWeekends ? "Hide weekends" : "Show weekends"}
+              </button>
+            ) : null}
           </div>
           <div className="divide-y divide-subtle lg:hidden">
             {capacity.trainers.map((trainer) => {
