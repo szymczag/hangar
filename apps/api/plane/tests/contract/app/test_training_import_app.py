@@ -19,7 +19,13 @@ from plane.ext.models import (
     WorkshopSchedule,
     WorkshopSession,
 )
-from plane.ext.services.issue_types import ensure_project_system_types
+from plane.ext.services.issue_types import (
+    disable_workshops,
+    enable_workshops,
+    ensure_project_system_types,
+    workshops_enabled,
+)
+from plane.ext.services.training_import import import_training
 from plane.tests.factories import UserFactory
 
 STARTS = datetime(2026, 11, 3, 9, 0, tzinfo=timezone.utc)
@@ -46,6 +52,9 @@ def _project(workspace, owner, *, members=()):
         ProjectMember.objects.create(project=project, member=member, workspace=workspace, role=15)
     State.objects.create(name="Backlog", project=project, workspace=workspace, group="backlog", default=True)
     ensure_project_system_types(project)
+    # A training project opts in to Workshops; importing refuses a project that
+    # has not, rather than switching the type on as a side effect.
+    enable_workshops(project)
     return project
 
 
@@ -280,9 +289,7 @@ def test_a_retired_training_cannot_be_imported_from_a_stale_listing(keys, worksp
     occurrence = _occurrence(workspace, create_user, rule)
     project = _project(workspace, create_user)
     client, csrf = _client(create_user)
-    TrainingEventOccurrence.objects.filter(pk=occurrence.pk).update(
-        state=TrainingEventOccurrence.State.CANCELLED
-    )
+    TrainingEventOccurrence.objects.filter(pk=occurrence.pk).update(state=TrainingEventOccurrence.State.CANCELLED)
 
     response = client.post(
         f"/api/workspaces/{workspace.slug}/capacity/training-imports/",
@@ -465,3 +472,26 @@ def test_a_trainer_added_to_the_project_later_joins_the_existing_workshop(keys, 
     session = WorkshopSession.objects.get()
     assert set(session.trainers.values_list("id", flat=True)) == {create_user.id, other.id}
     assert GoogleTrainingEventLink.objects.filter(session=session).count() == 2
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_an_import_does_not_switch_workshops_back_on(keys, workspace, create_user):
+    """Turned off after the view let the request through, the import yields.
+
+    It used to add the type back on its own, which would undo an administrator
+    who had just turned Workshops off.
+    """
+    rule = _rule(workspace)
+    occurrence = _occurrence(workspace, create_user, rule)
+    project = _project(workspace, create_user)
+    disable_workshops(project)
+
+    issue, reason, _ = import_training(
+        occurrence.event_key, workspace_id=workspace.id, project=project, actor=create_user
+    )
+
+    assert issue is None
+    assert reason == "workshops_not_enabled"
+    assert not workshops_enabled(project)
+    assert Issue.objects.filter(project=project).count() == 0

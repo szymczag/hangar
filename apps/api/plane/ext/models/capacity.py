@@ -59,6 +59,8 @@ class CapacityAuditEvent(models.Model):
         WORKSHOP_ROLE_REMOVED = "workshop_role.removed", "Workshop role removed"
         CALENDAR_WRITER_CONNECTED = "calendar_writer.connected", "Calendar writer connected"
         CALENDAR_WRITER_REMOVED = "calendar_writer.removed", "Calendar writer removed"
+        WORKSHOPS_ENABLED = "workshops.enabled", "Workshops enabled in a project"
+        WORKSHOPS_DISABLED = "workshops.disabled", "Workshops disabled in a project"
 
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     workspace_id = models.UUIDField(db_index=True)

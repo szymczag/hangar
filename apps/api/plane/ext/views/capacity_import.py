@@ -19,6 +19,7 @@ from plane.ext.services.training_import import (
     parse_range,
     pending_occurrences,
 )
+from plane.ext.services.issue_types import workshops_enabled
 from plane.ext.views.capacity import _disabled
 from plane.utils.permissions import ROLE, allow_permission
 
@@ -84,6 +85,16 @@ class TrainingImportEndpoint(BaseAPIView):
         # work item has to be created by somebody who belongs there.
         if not ProjectMember.objects.filter(project=project, member=request.user, is_active=True).exists():
             return Response({"error": "Join the project before importing into it."}, status=403)
+        # Importing used to switch the Workshop type on in whatever project was
+        # chosen, which is exactly the back door the per-project opt-in closes.
+        if not workshops_enabled(project):
+            return Response(
+                {
+                    "error": "Workshops are not enabled in this project. Turn them on in its work item type settings.",
+                    "code": "workshops_not_enabled",
+                },
+                status=400,
+            )
 
         raw_ids = request.data.get("occurrence_ids")
         if not isinstance(raw_ids, list) or not raw_ids:

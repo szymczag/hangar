@@ -38,6 +38,7 @@ const SKIP_COPY: Record<string, string> = {
   already_linked: "already linked to a session",
   no_longer_active: "no longer in the calendar",
   trainer_not_in_project: "the trainer cannot be assigned work in that project",
+  workshops_not_enabled: "that project no longer offers Workshops",
 };
 
 /**

@@ -46,6 +46,32 @@ Existing plans and sessions remain valid. Old clients retain the hold/schedule
 API; new clients can PATCH title/issue_id during a hold and schedule a candidate
 directly using an idempotency key. Apply migrations before deploying the new API.
 
+## Which projects hold Workshops
+
+A project offers the Workshop type only if it opts in, from **Project settings →
+Work item types → Enable Workshops**, and only its administrators decide —
+together with any workspace administrator who belongs to the project, which is
+the platform's rule for every project setting.
+
+It used to arrive in every project the moment anybody in the workspace became a
+trainer, which put a training-specific type in the picker of projects that have
+nothing to do with training. Nothing adds it on its own any more: not becoming a
+trainer, not creating a project, and not importing training from the calendar,
+which now refuses a project that has not opted in rather than switching the type
+on for it.
+
+The opt-in is the project's own link to the type, which is where project-scoped
+availability already lives. A project without it cannot hold a new Workshop by
+any route — the picker omits it, and creating a work item of that type is
+refused by the server.
+
+Turning Workshops off is refused while the project holds any, because they would
+be left as work items of a type their own project no longer offers. Move or
+retype them first.
+
+When this was introduced, projects that already held a Workshop kept the type;
+every other project stopped offering it and can turn it back on.
+
 ## Workshop checklists
 
 A workspace administrator defines checklist templates in **Settings → Workshop checklists**.

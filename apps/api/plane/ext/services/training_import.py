@@ -37,7 +37,7 @@ from plane.ext.models import (
     WorkshopSchedule,
     WorkshopSession,
 )
-from plane.ext.services.issue_types import ensure_project_workshop_type
+from plane.ext.services.issue_types import project_workshop_type
 from plane.utils.host import base_host
 
 # Matching IssueCreateSerializer: below this a project member cannot hold work.
@@ -180,8 +180,15 @@ def import_training(event_key, *, workspace_id, project, actor, request=None):
             existing, eligible, skipped, event_key=event_key, workspace_id=workspace_id, project=project, actor=actor
         )
 
+    # The view checks this before it starts, but only here is it decided under the
+    # transaction that creates the Workshop. Switching the type on instead, as
+    # this used to, would undo an administrator who turned Workshops off a
+    # moment ago.
+    workshop_type = project_workshop_type(project)
+    if workshop_type is None:
+        return None, "workshops_not_enabled", []
+
     first = eligible[0]
-    workshop_type = ensure_project_workshop_type(project)
     default_state = State.objects.filter(project=project, default=True).first()
     zone = first.trainer_profile.timezone if first.trainer_profile else "UTC"
 
