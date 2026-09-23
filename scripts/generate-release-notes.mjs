@@ -82,11 +82,13 @@ export function latestReleaseNotes(directory = notesDirectory) {
   // and taking only that section left the dialog announcing that the build
   // carries no release notes at all -- of a build whose notes exist and say
   // something worth reading.
+  // Security first, then what the build changes for an operator. Taking only
+  // the security section when it had anything at all was the other half of the
+  // same fault: a release whose one security item sat beside three migrations
+  // worth reading showed the dialog a single line and hid the rest.
   const security = leadsIn(sectionNamed("Security and privacy"));
-  const highlights = (security.length ? security : leadsIn(sectionNamed("Migrations and compatibility"))).slice(
-    0,
-    MAX_HIGHLIGHTS
-  );
+  const migrations = leadsIn(sectionNamed("Migrations and compatibility"));
+  const highlights = [...new Set([...security, ...migrations])].slice(0, MAX_HIGHLIGHTS);
 
   return { version, highlights };
 }
