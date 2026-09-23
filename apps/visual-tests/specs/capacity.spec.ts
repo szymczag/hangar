@@ -74,6 +74,29 @@ test("team capacity", async ({ asUser }) => {
   await capture(page, "capacity-team", { ready: trainer, target: main });
 });
 
+test("the training report", async ({ asUser }) => {
+  const page = await asUser("admin");
+  const seed = fixtures();
+  const main = page.getByRole("main").last();
+
+  // Pinned, not "this month". The stepper renders the month's own name, so a
+  // floating month is a baseline that passes on the day it is taken and breaks
+  // on the first of the next -- the joining-date bomb this suite's README
+  // describes, in a screen where nothing else would reveal it.
+  await page.goto(`/${seed.workspace.slug}/capacity/reports?month=2026-10`);
+
+  // The seeded workspace has trainer profiles and no sweep has ever run, so
+  // both are reported as never synced and excluded from the totals. That is the
+  // more valuable state to photograph than "everything counted": it is the one
+  // carrying the warning under each name, the "not counted" tally and the
+  // dashes in the external columns.
+  const summary = main.getByText(/counted/i).first();
+  await expect(summary).toBeVisible();
+  await expect(main.getByText(seed.trainers[0], { exact: false }).first()).toBeVisible();
+
+  await capture(page, "capacity-report", { ready: summary, target: main });
+});
+
 test("the workshop planner", async ({ asUser }) => {
   const page = await asUser("admin");
   const seed = fixtures();
