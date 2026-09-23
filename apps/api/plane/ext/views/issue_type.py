@@ -18,6 +18,7 @@ from plane.db.models.issue_type import ProjectIssueType
 from plane.ext.models import IssueProperty, IssuePropertyOption, IssuePropertyValue, PropertyTypeChoices
 from plane.ext.serializers.issue_property import IssuePropertyOptionSerializer, IssuePropertySerializer
 from plane.ext.serializers.issue_type import IssueTypeSerializer
+from plane.ext.services.workshop_properties import sync_trainer_assignees
 from plane.ext.utils.property_validators import validate_property_values
 from plane.ext.services import ensure_project_system_types
 
@@ -155,6 +156,16 @@ class IssuePropertyDetailEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN])
     def delete(self, request, slug, project_id, property_id):
         prop = scoped_property(slug, project_id, property_id)
+        if prop.system_key:
+            # The product reads this one. Renaming it is fine -- losing it would
+            # take the trainers away from the planner and the checklists.
+            return Response(
+                {
+                    "error": "This property is part of the Workshop type and cannot be removed. Rename it instead.",
+                    "code": "system_property",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         prop.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -306,4 +317,8 @@ class IssuePropertyValuesEndpoint(BaseAPIView):
                     )
                     for row in rows
                 )
+            # Naming somebody as a trainer of a Workshop assigns them to it: the
+            # ledger, the planner and the schedule editor all ask the work item's
+            # assignees who is delivering it.
+            sync_trainer_assignees(issue, actor=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

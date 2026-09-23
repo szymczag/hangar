@@ -5,6 +5,7 @@ from django.db import transaction
 
 from plane.db.models import Issue, IssueType, Workspace
 from plane.db.models.issue_type import ProjectIssueType
+from plane.ext.services.workshop_properties import ensure_workshop_properties
 
 
 @transaction.atomic
@@ -102,6 +103,10 @@ def ensure_project_workshop_type(project):
         issue_type=workshop,
         defaults={"workspace_id": project.workspace_id, "level": 0, "is_default": False},
     )
+    # The roles a workshop is sold, run and delivered by. Provisioned with the
+    # type rather than on demand, so the first workshop anybody creates already
+    # has somewhere to record its trainers.
+    ensure_workshop_properties(workshop)
     return workshop
 
 

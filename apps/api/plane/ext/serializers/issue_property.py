@@ -31,6 +31,7 @@ class IssuePropertySerializer(serializers.ModelSerializer):
         model = IssueProperty
         fields = [
             "id",
+            "system_key",
             "display_name",
             "description",
             "property_type",
@@ -46,7 +47,7 @@ class IssuePropertySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "issue_type", "options", "created_at", "updated_at"]
+        read_only_fields = ["id", "system_key", "issue_type", "options", "created_at", "updated_at"]
 
     def validate(self, attrs):
         property_type = attrs.get("property_type", getattr(self.instance, "property_type", None))

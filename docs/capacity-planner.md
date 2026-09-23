@@ -72,6 +72,40 @@ retype them first.
 When this was introduced, projects that already held a Workshop kept the type;
 every other project stopped offering it and can turn it back on.
 
+## Who a workshop belongs to
+
+A Workshop carries three member properties: **Sales**, **PM** and **Trainers**.
+They are provisioned with the type, and they are ordinary properties — a
+coordinator edits them in the work item, renames them, reorders them, marks them
+required. What they cannot do is remove one, because the product reads them: each
+carries a `system_key` (`workshop_sales`, `workshop_pm`, `workshop_trainer`), so
+renaming the column to anything at all leaves the planner, the checklists and the
+calendar import still able to find the trainers. Deleting one is refused with
+`system_property`; the settings screen marks them "built in".
+
+Only the trainer property has consequences, because delivery is what takes time:
+
+- **Sessions start from it.** A session that does not name its own trainers gets
+  the ones this property names; a session may still override them, which is what
+  a training split between two people over two days needs.
+- **The checklists read it.** A template item assigned to "the workshop's
+  trainer" resolves to the people named here.
+- **Naming somebody assigns them.** The ledger, the planner and the schedule
+  editor all ask the work item's assignees who is delivering it, so naming a
+  trainer adds the assignment rather than teaching each of those about a new
+  field. Somebody who cannot hold work in the project is reported back instead,
+  which is a decision for a person and not something to paper over.
+- **Dropping somebody leaves the assignment alone.** They may still hold subtasks
+  of that workshop, and quietly unassigning them would lose that silently.
+
+The calendar import fills the property from the invitation, including the second
+trainer of a training two people run, and a later import of the rest of the same
+training joins them rather than replacing what is there.
+
+A Workshop created before these properties existed has no values in them. It
+falls back to its assignees everywhere the trainers are asked for, so nothing
+changes for it until somebody edits the property.
+
 ## Workshop checklists
 
 A workspace administrator defines checklist templates in **Settings → Workshop checklists**.
