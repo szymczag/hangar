@@ -114,9 +114,16 @@ jobs:
       - name: Check baseline churn
         if: github.event_name == 'pull_request'
         env:
-          PR_BODY: ${{ github.event.pull_request.body }}
+          # Read now rather than from the event payload. The payload carries the
+          # body as it was when the run was triggered, so somebody answering this
+          # very check by editing the description saw it fail again, with the
+          # explanation sitting in the pull request the whole time.
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          FALLBACK_BODY: ${{ github.event.pull_request.body }}
         run: |
-          printf '%s' "$PR_BODY" > /tmp/pr-body.txt
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json body --jq .body > /tmp/pr-body.txt ||
+            printf '%s' "$FALLBACK_BODY" > /tmp/pr-body.txt
           node apps/visual-tests/scripts/check-baseline-churn.mjs \
             "origin/${{ github.event.pull_request.base.ref }}" /tmp/pr-body.txt
 
