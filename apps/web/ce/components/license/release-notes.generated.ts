@@ -11,10 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.63",
+  version: "0.1.0-rc.64",
   highlights: [
-    "Every authorized Google Calendar request failed in rc.62.",
-    "A failed read no longer takes the screen down with it.",
+    "A shared training calendar can no longer block a trainer's time.",
+    "Workshops are offered only by projects that ask for them.",
+    "A Workshop now carries three roles: Sales, PM and Trainers.",
+    "Delivery is tied to the trainer property",
+    "The default working week is a working day and an evening",
   ],
   upstream: {
     version: "1.4.0",
