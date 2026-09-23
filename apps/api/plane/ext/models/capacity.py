@@ -21,9 +21,18 @@ def empty_week():
 
 
 def default_working_week():
-    working_day = [{"start": "09:00", "end": "22:00"}]
+    """The hours a trainer is assumed bookable in until they say otherwise.
+
+    Two windows rather than one long one: a working day and an evening, with the
+    late afternoon left out, because the single 09:00-22:00 block this replaces
+    offered every trainer thirteen unbroken hours and made the planner look as
+    though everybody was free all evening. A trainer edits this on My capacity;
+    what matters is that the untouched default is closer to true than a block
+    nobody works.
+    """
+    working_day = ({"start": "09:00", "end": "17:00"}, {"start": "19:00", "end": "22:00"})
     return {
-        day: ([dict(working_day[0])] if day not in ("sat", "sun") else [])
+        day: ([dict(window) for window in working_day] if day not in ("sat", "sun") else [])
         for day in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
     }
 

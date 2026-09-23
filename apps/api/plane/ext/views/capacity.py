@@ -500,6 +500,27 @@ class GoogleCalendarCallbackEndpoint(BaseAPIView):
         return HttpResponseRedirect(f"{landing}?google=connected")
 
 
+def _training_calendar_ids(workspace_id):
+    """The calendars this workspace's rules already read as training.
+
+    A trainer who also picks one of these as a blocking calendar blocks their own
+    time with every training the company runs, not only their own -- the rule
+    calendar carries everybody's. Recognition already blocks the ones that are
+    theirs, from their own invitations, so the answer is to keep these out of the
+    blocking list rather than to explain the arithmetic afterwards.
+    """
+    ids = set()
+    for rule in GoogleTrainingRule.objects.filter(workspace_id=workspace_id):
+        try:
+            ids.add(decrypt_value(rule.encrypted_calendar_id, rule.encryption_key_id))
+        except Exception:
+            # A rule encrypted under a key this instance no longer has is one we
+            # cannot compare against. Better to leave the calendar selectable
+            # than to fail the whole listing over it.
+            continue
+    return ids
+
+
 class GoogleCalendarsEndpoint(BaseAPIView):
     authentication_classes = [CsrfEnforcedSessionAuthentication]
 
@@ -520,8 +541,10 @@ class GoogleCalendarsEndpoint(BaseAPIView):
         except GoogleCalendarError as exc:
             return Response({"error": exc.code}, status=503)
         selected = set(selection.calendar_id_hashes)
+        training = _training_calendar_ids(selection.trainer.workspace_id)
         for calendar in calendars:
             calendar["selected"] = TrainerCalendarSelection.calendar_hash(calendar["id"]) in selected
+            calendar["is_training_calendar"] = calendar["id"] in training
         return Response({"calendars": calendars, "selection_revision": selection.revision})
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
@@ -553,6 +576,17 @@ class GoogleCalendarsEndpoint(BaseAPIView):
             return Response({"error": exc.code}, status=503)
         if not set(calendar_ids).issubset(allowed):
             return Response({"error": "A selected calendar is unavailable."}, status=400)
+        if set(calendar_ids) & _training_calendar_ids(selection.trainer.workspace_id):
+            return Response(
+                {
+                    "error": (
+                        "A shared training calendar cannot block your time: it carries everybody's training, "
+                        "not only yours. Your own trainings are already recognized from your invitations."
+                    ),
+                    "code": "training_calendar_not_blocking",
+                },
+                status=400,
+            )
         encrypted = [encrypt_value(value)[0] for value in sorted(set(calendar_ids))]
         selection.encrypted_calendar_ids = encrypted
         selection.calendar_id_hashes = [

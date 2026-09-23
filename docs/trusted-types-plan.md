@@ -182,7 +182,13 @@ the sink. This also covers screens the probe did not visit.
   (`HANGAR_BUNDLE_SOURCEMAPS=1`) and fails when a sink appears that
   `packages/csp/bundle-sinks/<app>.json` does not name, or when a named one
   disappears. Each entry carries a reviewed reason; `--update` rewrites the
-  file for review. It runs in the web-apps pull-request workflow.
+  file for review. It runs in the web-apps pull-request workflow, which removes
+  the build directories first: the step before it builds the same apps without
+  source maps, and a directory holding both kinds of chunk used to make the scan
+  see sinks it could not attribute. It attributed them to the chunk's own file
+  name, which is build output, so the inventory gained and lost entries between
+  runs and the check failed at random. Such a chunk is now reported by name and
+  the scan stops, rather than inventing an owner nobody can review.
 - Security suite: `apps/visual-tests/security/` runs on the visual suite's
   stack, after it (`pnpm vr`), because it writes. Every document gets the
   policy its build generated (space: the one its server sent, enforced) plus

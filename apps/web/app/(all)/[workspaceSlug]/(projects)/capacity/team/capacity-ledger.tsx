@@ -19,9 +19,10 @@ import {
   formatRange,
   rangeMinutes,
 } from "../shared/capacity-timeline.utils";
-import { DAY_KEYS, DAY_LABELS, availabilityCopy, errorMessage, formatMinutes } from "../shared/capacity-format.utils";
+import { availabilityCopy, errorMessage, formatMinutes } from "../shared/capacity-format.utils";
 import type { useCapacityData } from "../shared/use-capacity-data";
 import { WeekStepper } from "../shared/week-stepper";
+import { DayTabs } from "./day-tabs";
 import { TrainerDayTimeline } from "./trainer-day-timeline";
 
 function trainerDayMetrics(trainer: TTrainerCapacity, dayStart: Date, dayEnd: Date) {
@@ -55,6 +56,9 @@ type Props = {
   becomeTrainer: { onClick: () => void; busy: boolean } | null;
   /** Which interval kinds to draw; omitted means all of them. */
   layers?: Set<TCapacityInterval["kind"]>;
+  /** Whether Saturday and Sunday get a tab. Training happens on weekdays. */
+  showWeekends?: boolean;
+  onShowWeekends?: (next: boolean) => void;
 };
 
 /**
@@ -68,7 +72,16 @@ type Props = {
  * nothing else has an opinion about it. The week is not: the planner reads the
  * same window, so it stays with the caller's hook.
  */
-export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, becomeTrainer, layers }: Props) {
+export function CapacityLedger({
+  data,
+  isAdmin,
+  ownProfile,
+  onManageSchedule,
+  becomeTrainer,
+  layers,
+  showWeekends = false,
+  onShowWeekends,
+}: Props) {
   const {
     capacity,
     capacityError,
@@ -89,7 +102,13 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
     const day = new TZDate(Date.now(), timeZone).getDay();
     return day === 0 || day === 6 ? 0 : day - 1;
   });
-  const selectedDay = useMemo(() => dayBounds(weekStart, selectedDayIndex), [selectedDayIndex, weekStart]);
+  // Weekends are hidden by default: training runs on weekdays, and two dead
+  // tabs took a seventh of a rail whose whole job is the week's shape. They are
+  // a toggle rather than a removal because a weekend course is a real thing --
+  // it is simply not what the rail is scanned for.
+  const visibleDayCount = showWeekends ? 7 : 5;
+  const selectedDayIndexInView = selectedDayIndex < visibleDayCount ? selectedDayIndex : 0;
+  const selectedDay = useMemo(() => dayBounds(weekStart, selectedDayIndexInView), [selectedDayIndexInView, weekStart]);
   const hasActiveProfile = ownProfile?.status === "active";
 
   return (
@@ -128,47 +147,14 @@ export function CapacityLedger({ data, isAdmin, ownProfile, onManageSchedule, be
         </div>
       ) : capacity?.trainers.length ? (
         <div>
-          <div className="border-b border-subtle bg-surface-1 px-5 py-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7" aria-label="Choose planning day">
-              {DAY_KEYS.map((day, index) => {
-                const bounds = dayBounds(weekStart, index);
-                const availableCount = capacity.trainers.filter(
-                  (trainer) => availableRanges(trainer.intervals, bounds.start, bounds.end).length > 0
-                ).length;
-                const conflictCount = capacity.trainers.reduce(
-                  (count, trainer) =>
-                    count +
-                    trainer.conflicts.filter((conflict) => intervalPosition(conflict, bounds.start, bounds.end)).length,
-                  0
-                );
-                const selected = selectedDayIndex === index;
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => setSelectedDayIndex(index)}
-                    className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-                      selected
-                        ? "border-accent-primary bg-accent-primary/10"
-                        : "border-subtle bg-surface-2 hover:border-strong"
-                    }`}
-                  >
-                    <span className="flex items-baseline justify-between gap-2">
-                      <span className="text-body-xs-medium text-primary">{DAY_LABELS[index]}</span>
-                      <span className="text-11 text-placeholder">
-                        {bounds.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
-                      </span>
-                    </span>
-                    <span className="mt-1 block text-11 text-secondary">
-                      {availableCount} available
-                      {conflictCount ? <span className="text-danger-primary"> · {conflictCount} conflicts</span> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <DayTabs
+            weekStart={weekStart}
+            trainers={capacity.trainers}
+            selectedIndex={selectedDayIndexInView}
+            onSelect={setSelectedDayIndex}
+            showWeekends={showWeekends}
+            onShowWeekends={onShowWeekends}
+          />
           <div className="divide-y divide-subtle lg:hidden">
             {capacity.trainers.map((trainer) => {
               const metrics = trainerDayMetrics(trainer, selectedDay.start, selectedDay.end);

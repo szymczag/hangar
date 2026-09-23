@@ -107,10 +107,14 @@ def test_weekly_schedule_requires_every_day():
         validate_weekly_schedule({"mon": []})
 
 
-def test_default_working_week_covers_weekdays_from_nine_to_twenty_two():
+def test_default_working_week_is_a_working_day_and_an_evening():
+    """Not one thirteen-hour block: that made everybody look free all evening."""
     schedule = default_working_week()
 
-    assert all(schedule[day] == [{"start": "09:00", "end": "22:00"}] for day in ("mon", "tue", "wed", "thu", "fri"))
+    assert all(
+        schedule[day] == [{"start": "09:00", "end": "17:00"}, {"start": "19:00", "end": "22:00"}]
+        for day in ("mon", "tue", "wed", "thu", "fri")
+    )
     assert schedule["sat"] == []
     assert schedule["sun"] == []
 

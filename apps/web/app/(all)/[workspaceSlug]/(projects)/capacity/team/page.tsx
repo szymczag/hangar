@@ -65,6 +65,20 @@ export default function TeamCapacityPage({ params }: Route.ComponentProps) {
       { replace: true, preventScrollReset: true }
     );
 
+  // Weekends off by default, and in the URL beside the week and the layers so a
+  // link to "that Saturday" carries the weekend with it.
+  const showWeekends = searchParams.get("weekends") === "1";
+  const setShowWeekends = (next: boolean) =>
+    setSearchParams(
+      (previous) => {
+        const updated = new URLSearchParams(previous);
+        if (next) updated.set("weekends", "1");
+        else updated.delete("weekends");
+        return updated;
+      },
+      { replace: true, preventScrollReset: true }
+    );
+
   const { data: ownProfile, mutate: mutateOwnProfile } = useSWR(
     featureEnabled ? ["capacity-trainer-self", workspaceSlug] : null,
     () => capacityService.getOwnTrainerProfile(workspaceSlug)
@@ -85,6 +99,8 @@ export default function TeamCapacityPage({ params }: Route.ComponentProps) {
 
         <CapacityLedger
           layers={layers}
+          showWeekends={showWeekends}
+          onShowWeekends={setShowWeekends}
           data={data}
           isAdmin={isAdmin}
           ownProfile={ownProfile}

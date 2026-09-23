@@ -70,16 +70,13 @@ export const ownerOf = (source, assetsDirectory, root) => {
 export const scanBundle = (assetsDirectory) => {
   const root = repositoryRoot(assetsDirectory);
   const found = new Map();
+  const unmappedWithSinks = new Set();
   let mappedFiles = 0;
   for (const file of readdirSync(assetsDirectory).filter((name) => name.endsWith(".js"))) {
     const code = readFileSync(join(assetsDirectory, file), "utf8");
     const mapPath = join(assetsDirectory, `${file}.map`);
     const consumer = existsSync(mapPath) ? new SourceMapConsumer(JSON.parse(readFileSync(mapPath, "utf8"))) : null;
     if (consumer) mappedFiles += 1;
-    // Files the build generates itself (React Router's manifest, Vite's preload
-    // helper, re-export stubs) have no source map; they are named by file,
-    // without the content hash.
-    const generatedOwner = `generated:${file.replace(/-[\w-]{8}\.js$/, "").replace(/\.js$/, "")}`;
     const lineStarts = [0];
     for (let index = code.indexOf("\n"); index !== -1; index = code.indexOf("\n", index + 1))
       lineStarts.push(index + 1);
@@ -87,14 +84,23 @@ export const scanBundle = (assetsDirectory) => {
       for (const match of code.matchAll(pattern)) {
         let line = 0;
         while (line + 1 < lineStarts.length && lineStarts[line + 1] <= match.index) line += 1;
-        const position = consumer?.originalPositionFor({ line: line + 1, column: match.index - lineStarts[line] });
-        const owner = consumer ? ownerOf(position?.source, assetsDirectory, root) : generatedOwner;
-        const key = `${sink} ${owner}`;
+        if (!consumer) {
+          // A chunk carrying a sink but no source map cannot be attributed, and
+          // naming it after its own file name was worse than useless: chunk
+          // names are build output, so the inventory gained and lost entries
+          // between runs and the check failed at random. It is a stale artifact
+          // from an earlier build without maps, and the caller is told to say so
+          // rather than left to review an owner that does not exist.
+          unmappedWithSinks.add(file);
+          continue;
+        }
+        const position = consumer.originalPositionFor({ line: line + 1, column: match.index - lineStarts[line] });
+        const key = `${sink} ${ownerOf(position?.source, assetsDirectory, root)}`;
         found.set(key, (found.get(key) ?? 0) + 1);
       }
     }
   }
-  return { found, mappedFiles };
+  return { found, mappedFiles, unmappedWithSinks: [...unmappedWithSinks].toSorted() };
 };
 
 export const compareWithInventory = (found, inventory) => {
@@ -119,9 +125,18 @@ export const main = () => {
     console.error("usage: hangar-bundle-sinks --assets <dir> --inventory <file.json> [--update]");
     process.exit(2);
   }
-  const { found, mappedFiles } = scanBundle(values.assets);
+  const { found, mappedFiles, unmappedWithSinks } = scanBundle(values.assets);
   if (mappedFiles === 0) {
     console.error(`hangar-bundle-sinks: ${values.assets} has no source maps; build with HANGAR_BUNDLE_SOURCEMAPS=1`);
+    process.exit(2);
+  }
+  if (unmappedWithSinks.length > 0) {
+    console.error(
+      `hangar-bundle-sinks: ${values.assets} mixes chunks with and without source maps, so the sinks in these ` +
+        `cannot be attributed:\n  ${unmappedWithSinks.join("\n  ")}\n` +
+        "Usually artifacts left by an earlier build without maps. Remove the build directory and rebuild with " +
+        "HANGAR_BUNDLE_SOURCEMAPS=1."
+    );
     process.exit(2);
   }
   const inventory = existsSync(values.inventory) ? JSON.parse(readFileSync(values.inventory, "utf8")) : { sinks: {} };

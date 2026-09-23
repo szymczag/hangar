@@ -91,7 +91,10 @@ def test_trainer_opt_in_requires_and_accepts_server_issued_csrf(settings, worksp
     assert accepted.data["user_id"] == str(create_user.id)
     assert accepted.data["status"] == TrainerProfile.Status.ACTIVE
     assert accepted.data["weekly_schedule"] == {
-        **{day: [{"start": "09:00", "end": "22:00"}] for day in ("mon", "tue", "wed", "thu", "fri")},
+        **{
+            day: [{"start": "09:00", "end": "17:00"}, {"start": "19:00", "end": "22:00"}]
+            for day in ("mon", "tue", "wed", "thu", "fri")
+        },
         "sat": [],
         "sun": [],
     }

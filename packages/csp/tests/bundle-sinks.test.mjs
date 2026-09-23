@@ -5,9 +5,12 @@
  */
 
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
-import { SINKS, compareWithInventory, ownerOf } from "../src/bundle-sinks.mjs";
+import { SINKS, compareWithInventory, ownerOf, scanBundle } from "../src/bundle-sinks.mjs";
 
 const root = "/repo";
 const assets = "/repo/apps/web/build/client/assets";
@@ -55,4 +58,31 @@ test("new, stale and unreviewed entries are all reported", () => {
     stale: ["eval npm:x", "innerHTML npm:gone"],
     unreviewed: ["eval npm:x"],
   });
+});
+
+test("a chunk with a sink but no source map is reported, not attributed to its own file name", () => {
+  // The flake this closes: chunk names are build output, so naming an unmapped
+  // chunk after itself made the inventory gain and lose entries between runs,
+  // and the check passed or failed depending on which artifacts were lying
+  // around. Such a file is now named to the caller instead.
+  const directory = mkdtempSync(join(tmpdir(), "bundle-sinks-"));
+  writeFileSync(join(directory, "pnpm-workspace.yaml"), "packages: []\n");
+  const assetsDirectory = join(directory, "assets");
+  mkdirSync(assetsDirectory);
+  writeFileSync(join(assetsDirectory, "mapped-a1b2c3d4.js"), "el.innerHTML = x;\n");
+  writeFileSync(
+    join(assetsDirectory, "mapped-a1b2c3d4.js.map"),
+    JSON.stringify({ version: 3, sources: ["../../core/thing.ts"], names: [], mappings: "AAAA" })
+  );
+  writeFileSync(join(assetsDirectory, "root-e5f6a7b8.js"), "el.innerHTML = y;\n");
+
+  const { found, unmappedWithSinks } = scanBundle(assetsDirectory);
+
+  assert.deepEqual(unmappedWithSinks, ["root-e5f6a7b8.js"]);
+  assert.equal(
+    [...found.keys()].some((key) => key.includes("generated:")),
+    false
+  );
+
+  rmSync(directory, { recursive: true, force: true });
 });
