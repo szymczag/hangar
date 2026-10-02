@@ -565,7 +565,7 @@ overrides:
   path-to-regexp@<1: 0.1.13
   defu: 6.1.5
   postcss: 8.5.25
-  axios: 1.18.1
+  axios: 1.20.0
   follow-redirects: 1.16.0
   uuid: 14.0.0
   fast-uri: 3.1.6
@@ -785,8 +785,8 @@ importers:
         specifier: 'catalog:'
         version: 2.27.3(@tiptap/core@2.27.3(@tiptap/pm@3.31.3))(@tiptap/pm@3.31.3)
       axios:
-        specifier: 1.18.1
-        version: 1.18.1
+        specifier: 1.20.0
+        version: 1.20.0
       compression:
         specifier: 'catalog:'
         version: 1.8.1
@@ -933,8 +933,8 @@ importers:
         specifier: 'catalog:'
         version: 8.3.0(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@5.8.3)
       axios:
-        specifier: 1.18.1
-        version: 1.18.1
+        specifier: 1.20.0
+        version: 1.20.0
       clsx:
         specifier: 'catalog:'
         version: 2.1.1
@@ -1124,8 +1124,8 @@ importers:
         specifier: 'catalog:'
         version: 8.21.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       axios:
-        specifier: 1.18.1
-        version: 1.18.1
+        specifier: 1.20.0
+        version: 1.20.0
       clsx:
         specifier: 'catalog:'
         version: 2.1.1
@@ -1711,8 +1711,8 @@ importers:
         specifier: workspace:*
         version: link:../types
       axios:
-        specifier: 1.18.1
-        version: 1.18.1
+        specifier: 1.20.0
+        version: 1.20.0
       file-type:
         specifier: 'catalog:'
         version: 21.3.3
@@ -5547,8 +5547,8 @@ packages:
     resolution: {integrity: sha512-0bDNnY/u6pPwHDMoF0FieU354oBi0a8rD9FcsLwzcGWbc8KS8KPIi7y+s13OlVY+gMWc/9xEMUgNE6Qm8ZllYQ==}
     engines: {node: '>=4'}
 
-  axios@1.18.1:
-    resolution: {integrity: sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==}
+  axios@1.20.0:
+    resolution: {integrity: sha512-r8aOh8j9cGKpgQAqpzrUHnSIc6a59Y3Xf/cv8sy1DrHCkZHzQGEuoq1tARk6qSyDdtQGSDgpb9kFlruzPvrgwg==}
 
   babel-dead-code-elimination@1.0.12:
     resolution: {integrity: sha512-GERT7L2TiYcYDtYk1IpD+ASAYXjKbLTDPhBtYj7X1NuRMDTMtAx9kyBenub1Ev41lo91OHCKdmP+egTDmfQ7Ig==}
@@ -12436,7 +12436,7 @@ snapshots:
 
   attr-accept@2.2.5: {}
 
-  axios@1.18.1:
+  axios@1.20.0:
     dependencies:
       follow-redirects: 1.16.0
       form-data: 4.0.6
