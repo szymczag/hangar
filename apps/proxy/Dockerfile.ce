@@ -22,7 +22,7 @@ RUN cd "$(find /tmp -maxdepth 1 -name 'buildenv_*' -type d | head -1)" && \
     go get go.opentelemetry.io/otel@v1.44.0 && \
     go get go.opentelemetry.io/otel/sdk@v1.44.0 && \
     go mod tidy && \
-    go build -o /usr/bin/caddy -ldflags "-w -s" -trimpath .
+    go build -o /usr/bin/caddy -ldflags "-w -s" -trimpath -tags nobadger,nomysql,nopgx .
 
 RUN go version -m /usr/bin/caddy | grep -qE 'golang.org/x/crypto[[:space:]]+v0.55.0[[:space:]]' && \
     go version -m /usr/bin/caddy | grep -qE 'golang.org/x/net[[:space:]]+v0.57.0[[:space:]]' && \

@@ -14,6 +14,9 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework import status
 from rest_framework.response import Response
 
+# Django imports
+from django.http import HttpResponseRedirect
+
 # Module imports
 from plane.authentication.adapter.error import (
     AuthenticationException,
