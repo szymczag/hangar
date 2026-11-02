@@ -128,7 +128,7 @@ services:
 
   plane-db:
     container_name: plane-db
-    image: postgres:15.7-alpine
+    image: docker.io/library/postgres:15.7-alpine
     restart: always
     command: postgres -c 'max_connections=1000'
     volumes:
@@ -143,14 +143,14 @@ services:
 
   plane-redis:
     container_name: plane-redis
-    image: valkey/valkey:7.2.11-alpine
+    image: docker.io/valkey/valkey:7.2.11-alpine
     restart: always
     volumes:
       - redisdata:/data
 
   plane-mq:
     container_name: plane-mq
-    image: rabbitmq:3.13.6-management-alpine
+    image: docker.io/library/rabbitmq:3.13.6-management-alpine
     restart: always
     env_file:
       - .env
@@ -162,15 +162,35 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
 
   plane-minio:
+    # S3-compatible object storage. MinIO's community images are no longer
+    # published, so this runs SeaweedFS under the same service name and port.
+    # Its uid owns /data in the image, so a new named volume starts writable.
+    # Installs that still hold uploads in the MinIO `uploads` volume must run
+    # migrate-object-storage.sh once (setup.sh upgrade does this for you).
     container_name: plane-minio
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: docker.io/chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     restart: always
-    command: server /export --console-address ":9090"
-    volumes:
-      - uploads:/export
+    user: "1000:1000"
     environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        for key in WEED_JWT_SIGNING_KEY WEED_JWT_SIGNING_READ_KEY WEED_JWT_FILER_SIGNING_KEY WEED_JWT_FILER_SIGNING_READ_KEY; do
+          export "$$key=$$(head -c 32 /dev/urandom | base64 | tr -d '=+/\n')"
+        done
+        exec weed -logtostderr=true mini -dir=/data -ip=plane-minio -ip.bind=0.0.0.0 -s3.port=9000 \
+          -bucket=${AWS_S3_BUCKET_NAME:-uploads},${IMPORT_S3_BUCKET_NAME:-uploads-imports} \
+          -master.telemetry=false -admin.ui=false -webdav=false
+    volumes:
+      - object-storage:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   # Comment this if you already have a reverse proxy running
   proxy:
@@ -194,5 +214,5 @@ services:
 volumes:
   pgdata:
   redisdata:
-  uploads:
+  object-storage:
   rabbitmq_data:

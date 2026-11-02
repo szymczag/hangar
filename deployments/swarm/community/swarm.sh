@@ -369,6 +369,22 @@ function upgrade() {
     fi
 
     download
+
+    # The bundled object storage moved from MinIO to SeaweedFS, which cannot
+    # read MinIO's volume. Swarm volumes are local to a node, so the copy has to
+    # run on the node that holds the legacy volume, with the stack removed.
+    if docker volume inspect "${stack_name}_uploads" >/dev/null 2>&1 \
+        && ! docker volume inspect "${stack_name}_object-storage" >/dev/null 2>&1; then
+        removeStack
+        echo ""
+        echo "Uploads are still in the legacy MinIO volume '${stack_name}_uploads'."
+        echo "On the node that holds it, download migrate-object-storage.sh from the"
+        echo "$APP_RELEASE release assets and run:"
+        echo "    ./migrate-object-storage.sh --project ${stack_name} --env-file $DOCKER_ENV_PATH"
+        echo "then deploy the stack again. The stack was left removed."
+        exit 1
+    fi
+
     redeployStack
 }
 
@@ -482,7 +498,7 @@ function viewLogs(){
         echo "   7) Proxy"
         echo "   8) Redis"
         echo "   9) Postgres"
-        echo "   10) Minio"
+        echo "   10) Object Storage"
         echo "   11) RabbitMQ"
         echo "   0) Back to Main Menu"
         echo 

@@ -732,6 +732,7 @@ jobs:
           cp deployments/cli/community/install.sh release-assets/setup.sh
           cp deployments/cli/community/restore.sh release-assets/
           cp deployments/cli/community/restore-airgapped.sh release-assets/
+          cp deployments/cli/community/migrate-object-storage.sh release-assets/
           cp deployments/cli/community/docker-compose.yml release-assets/
           cp deployments/cli/community/variables.env release-assets/
           cp deployments/swarm/community/swarm.sh release-assets/

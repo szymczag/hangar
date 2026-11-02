@@ -1,11 +1,11 @@
 ARG PLANE_VERSION=v0.27.1
 ARG IMAGE_PREFIX=ghcr.io/szymczag/hangar-
-FROM --platform=$BUILDPLATFORM tonistiigi/binfmt AS binfmt
+FROM --platform=$BUILDPLATFORM docker.io/tonistiigi/binfmt AS binfmt
 
 # **************************************************
 #  STAGE 0: Image Loading
 # **************************************************
-FROM node:22-alpine AS node
+FROM docker.io/library/node:22-alpine AS node
 
 FROM ${IMAGE_PREFIX}web:${PLANE_VERSION} AS web-img
 FROM ${IMAGE_PREFIX}api:${PLANE_VERSION} AS backend-img
@@ -17,7 +17,7 @@ FROM ${IMAGE_PREFIX}proxy:${PLANE_VERSION} AS proxy-img
 # **************************************************
 #  STAGE 1: Runner
 # **************************************************
-FROM python:3.12.12-alpine AS runner
+FROM docker.io/library/python:3.12.12-alpine AS runner
 
 WORKDIR /app
 

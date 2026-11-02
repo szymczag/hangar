@@ -1,6 +1,6 @@
 services:
   plane-redis:
-    image: valkey/valkey:7.2.11-alpine
+    image: docker.io/valkey/valkey:7.2.11-alpine
     restart: unless-stopped
     networks:
       - dev_env
@@ -10,7 +10,7 @@ services:
       - "6379:6379"
 
   plane-mq:
-    image: rabbitmq:3.13.6-management-alpine
+    image: docker.io/library/rabbitmq:3.13.6-management-alpine
     restart: unless-stopped
     networks:
       - dev_env
@@ -24,34 +24,37 @@ services:
       RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
 
   plane-minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # S3-compatible object storage. MinIO's community images are no longer
+    # published, so this runs SeaweedFS behind the same host name and port.
+    image: docker.io/chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     restart: unless-stopped
     networks:
       - dev_env
-    entrypoint: >
-      /bin/sh -c "
-      mkdir -p /export/${AWS_S3_BUCKET_NAME} &&
-      mkdir -p /export/${IMPORT_S3_BUCKET_NAME:-uploads-imports} &&
-      minio server /export --console-address ':9090' &
-      sleep 5 &&
-      mc alias set myminio http://localhost:9000 ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} &&
-      mc mb myminio/${AWS_S3_BUCKET_NAME} -p || true
-      && mc mb myminio/${IMPORT_S3_BUCKET_NAME:-uploads-imports} -p || true
-      && tail -f /dev/null
-      "
-    volumes:
-      - uploads:/export
-    env_file:
-      - .env
     environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        for key in WEED_JWT_SIGNING_KEY WEED_JWT_SIGNING_READ_KEY WEED_JWT_FILER_SIGNING_KEY WEED_JWT_FILER_SIGNING_READ_KEY; do
+          export "$$key=$$(head -c 32 /dev/urandom | base64 | tr -d '=+/\n')"
+        done
+        exec weed -logtostderr=true mini -dir=/data -ip=plane-minio -ip.bind=0.0.0.0 -s3.port=9000 \
+          -bucket=${AWS_S3_BUCKET_NAME},${IMPORT_S3_BUCKET_NAME:-uploads-imports} \
+          -master.telemetry=false -admin.ui=false -webdav=false
+    volumes:
+      - object-storage:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     ports:
       - "9000:9000"
-      - "9090:9090"
 
   plane-db:
-    image: postgres:15.7-alpine
+    image: docker.io/library/postgres:15.7-alpine
     restart: unless-stopped
     networks:
       - dev_env
@@ -168,7 +171,7 @@ services:
 
 volumes:
   redisdata:
-  uploads:
+  object-storage:
   pgdata:
   rabbitmq_data:
 
