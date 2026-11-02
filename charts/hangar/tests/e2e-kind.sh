@@ -666,6 +666,15 @@ replacement_object_storage_pod=$(kubectl --namespace "$NAMESPACE" get pod \
   -o jsonpath='{.items[0].metadata.name}')
 kubectl --namespace "$NAMESPACE" exec "$replacement_object_storage_pod" -- \
   grep -qx hangar-e2e /data/hangar-e2e-marker
+# The filer and volume servers sit next to the S3 port inside the pod. Without
+# signing keys they serve bucket contents unauthenticated; check from inside
+# the pod, where no NetworkPolicy applies, that unsigned requests are refused.
+kubectl --namespace "$NAMESPACE" exec "$replacement_object_storage_pod" -- sh -ec '
+  read_status=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8888/buckets/)
+  write_status=$(curl -s -o /dev/null -w "%{http_code}" -F f=@/etc/hostname http://127.0.0.1:8888/buckets/e2e-unsigned)
+  [ "$read_status" = 401 ] || { echo "unsigned filer read returned $read_status" >&2; exit 1; }
+  [ "$write_status" = 401 ] || { echo "unsigned filer write returned $write_status" >&2; exit 1; }
+'
 
 helm upgrade "$RELEASE_NAME" "$chart_reference" \
   --namespace "$NAMESPACE" \

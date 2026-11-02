@@ -301,6 +301,13 @@ reserved public route prefixes are rejected by the schema.
 The evaluation route applies only to `bucket`. `importBucket` remains reachable
 only by the API and workers over the internal object-storage Service.
 
+Inside the evaluation Pod, SeaweedFS runs as a single `weed mini` process whose
+filer and volume HTTP ports require JWT-signed requests; the keys are generated
+at each start and never stored. Only the S3 port (`8333`) accepts requests from
+clients, authenticated with the `existingSecrets.objectStorage` credentials.
+Telemetry, the admin UI and WebDAV are disabled. None of this is configurable:
+the evaluation store exposes S3 and nothing else.
+
 Production does not render this proxy route. Its `publicEndpoint` must be
 publicly reachable by browsers; `endpoint` may use a separate address reachable
 only from the API and workers.

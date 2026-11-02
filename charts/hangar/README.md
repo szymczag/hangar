@@ -163,7 +163,9 @@ API with the default `nginx` preset.
 Evaluation installs additionally route the configured `/<bucket>` path to the
 bundled SeaweedFS S3 service so browser presigned uploads do not fall through to
 the web frontend. The separate `externalServices.objectStorage.importBucket` is
-server-only and is never added to Ingress or Gateway routes.
+server-only and is never added to Ingress or Gateway routes. Only that S3 port
+serves objects: the store's filer and volume ports refuse unsigned requests,
+and its telemetry, admin UI and WebDAV are disabled.
 
 ## Validate a source change
 

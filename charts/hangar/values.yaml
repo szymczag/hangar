@@ -541,7 +541,7 @@ evaluation-valkey:
 evaluationObjectStorage:
   image:
     repository: docker.io/chrislusf/seaweedfs
-    tag: 4.39@sha256:1f4d22c98089dba5e849ea3a1f24a7d85b3177ab39a8d9a70275856882ce2be3
+    tag: 4.48@sha256:aba492e2a4e4c90bff795745e8e660affa1f09e7650f5981bd7bccd1a06cd931
     pullPolicy: IfNotPresent
   serviceAccountName: hangar-evaluation-dependencies
   nodeSelector:

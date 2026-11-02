@@ -116,6 +116,43 @@ Trusted Types keep their own switch, `contentSecurityPolicy.trustedTypes`, which
 stays at `report`. See
 [content-security-policy.md](../content-security-policy.md).
 
+## Evaluation object storage
+
+The evaluation profile's bundled SeaweedFS (`evaluationObjectStorage`) now runs
+`docker.io/chrislusf/seaweedfs:4.48` (amd64 digest
+`sha256:aba492e2a4e4c90bff795745e8e660affa1f09e7650f5981bd7bccd1a06cd931`,
+previously 4.39) and is hardened inside the Pod rather than only by
+NetworkPolicy:
+
+- **Filer and volume servers require signed requests.** `weed mini` runs the
+  master, volume, filer and S3 servers in one process. The filer (`8888`) and
+  volume (`8080`/`9340`) HTTP ports otherwise serve and accept bucket contents
+  without S3 credentials. The container now generates JWT signing keys at each
+  start (they never leave the process and are not stored in a Secret), so those
+  ports answer `401` to unsigned reads and writes. Only the authenticated S3
+  port, `8333`, reaches objects. This holds even where NetworkPolicies are
+  disabled (`networkPolicy.enabled=false`) or the CNI does not enforce them.
+- **Telemetry, the admin UI and WebDAV are off.** SeaweedFS reports anonymous
+  cluster statistics by default; the egress policy already blocked that, and
+  now the server no longer tries. The unauthenticated admin UI and WebDAV
+  server are not started.
+
+The S3 Service, port, credentials Secret, buckets and PVC are unchanged; no
+values change is needed. `helm upgrade` rolls the StatefulSet once, and objects
+on the existing PVC remain available. Rolling back to the previous chart
+restores 4.39 on the same data. Only the S3 port was ever exposed through the
+Service, Ingress or Gateway, so clients are unaffected.
+
+To confirm the hardening on a running install:
+
+```bash
+pod=$(kubectl -n <namespace> get pod -l app.kubernetes.io/name=evaluationObjectStorage -o name)
+kubectl -n <namespace> exec "$pod" -- curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8888/buckets/
+# 401
+```
+
+Production installs use external object storage and are not affected.
+
 ## Todoist import isolation
 
 Todoist imports are disabled by default. Setting `todoistImports.enabled=true`
