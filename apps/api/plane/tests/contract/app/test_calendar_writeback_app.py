@@ -320,8 +320,12 @@ def test_only_rows_that_owe_work_are_claimed(writeback, workspace, create_user):
     session = _session(workspace, create_user, trainers=[create_user])
     reconcile_session(session, actor=create_user)
     row = WorkshopSessionCalendarEvent.objects.get()
+    # reconcile_session stamps `available_at` with the real clock, so claim on
+    # it too: claiming at the fixed NOW stopped matching once the calendar
+    # passed NOW, and the test failed on every run after 2026-10-15.
+    now = datetime.now(timezone.utc)
 
-    assert len(claim_rows(NOW)) == 1
+    assert len(claim_rows(now)) == 1
 
     row.refresh_from_db()
     row.synced_revision = row.revision
@@ -329,7 +333,7 @@ def test_only_rows_that_owe_work_are_claimed(writeback, workspace, create_user):
     row.lease_expires_at = None
     row.save()
 
-    assert claim_rows(NOW) == []
+    assert claim_rows(now) == []
 
 
 @pytest.mark.contract
