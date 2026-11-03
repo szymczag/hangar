@@ -21,16 +21,20 @@ FROM docker.io/library/python:3.12.12-alpine AS runner
 
 WORKDIR /app
 
+# OS security updates. --available forces reinstall from the current repos;
+# bump APK_SECURITY_PATCH to bust buildx's cached layer (keyed on this command
+# string), otherwise a rebuild silently re-ships the old packages.
 ARG APK_SECURITY_PATCH=2026-09-08
 RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
 
-# Every apk invocation has to happen before `/usr/lib` is overwritten from the
-# node stage below. That copy replaces libapk.so with node:22-alpine's older
-# build while /sbin/apk stays the upgraded one, and apk then dies with
-# "Error relocating /sbin/apk: apk_fs_is_malicious_filename: symbol not found".
-# The packages themselves survive the copy -- checked, not assumed -- so the
-# only thing that must not outlive it is apk itself.
+# The node binary only links libstdc++ and libgcc_s from /usr/lib, so install
+# them from apk instead of copying node:22-alpine's whole /usr/lib. That copy
+# overwrote the libraries upgraded above (libcrypto, libssl, libz, libapk) with
+# node's copies from a different Alpine release, shipping unpatched versions
+# and breaking /sbin/apk.
 RUN apk add --no-cache \
+    "libstdc++" \
+    "libgcc" \
     "libpq" \
     "libxslt" \
     "xmlsec" \
@@ -41,8 +45,6 @@ RUN apk add --no-cache \
     "ncdu" \
     "vim"
 
-
-COPY --from=node /usr/lib /usr/lib
 COPY --from=node /usr/local/lib /usr/local/lib
 COPY --from=node /usr/local/include /usr/local/include
 COPY --from=node /usr/local/bin /usr/local/bin

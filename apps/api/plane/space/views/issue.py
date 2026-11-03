@@ -352,12 +352,14 @@ class IssueCommentPublicViewSet(BaseViewSet):
                 {"error": "Comments are not enabled for this project"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # Scoped to this board's project and issue, not only to the author.
+        # Bind the comment to this board + issue, matching create()/get_queryset().
         comment = IssueComment.objects.get(
             pk=pk,
-            actor=request.user,
             issue_id=issue_id,
             project_id=project_deploy_board.project_id,
+            workspace_id=project_deploy_board.workspace_id,
+            access="EXTERNAL",
+            actor=request.user,
         )
         serializer = IssueCommentSerializer(comment, data=_public_comment_data(request.data), partial=True)
         if serializer.is_valid():
@@ -382,11 +384,14 @@ class IssueCommentPublicViewSet(BaseViewSet):
                 {"error": "Comments are not enabled for this project"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Bind the comment to this board + issue, matching create()/get_queryset().
         comment = IssueComment.objects.get(
             pk=pk,
-            actor=request.user,
             issue_id=issue_id,
             project_id=project_deploy_board.project_id,
+            workspace_id=project_deploy_board.workspace_id,
+            access="EXTERNAL",
+            actor=request.user,
         )
         issue_activity.delay(
             type="comment.activity.deleted",
@@ -475,8 +480,12 @@ class IssueReactionPublicViewSet(BaseViewSet):
                 {"error": "Reactions are not enabled for this project board"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Bind the reaction to this board's project, not just its workspace,
+        # matching create() - otherwise a reaction on an issue in a different
+        # project of the same workspace could be reached through this board.
         issue_reaction = IssueReaction.objects.get(
             workspace_id=project_deploy_board.workspace_id,
+            project_id=project_deploy_board.project_id,
             issue_id=issue_id,
             reaction=reaction_code,
             actor=request.user,
@@ -512,6 +521,10 @@ class CommentReactionPublicViewSet(BaseViewSet):
                     .filter(workspace_id=project_deploy_board.workspace_id)
                     .filter(project_id=project_deploy_board.project_id)
                     .filter(comment_id=self.kwargs.get("comment_id"))
+                    # Only reactions on public (EXTERNAL) comments are visible
+                    # through the public board, matching create()'s
+                    # _comment_in_board_scope check.
+                    .filter(comment__access="EXTERNAL")
                     .order_by("-created_at")
                     .distinct()
                 )
@@ -553,7 +566,13 @@ class CommentReactionPublicViewSet(BaseViewSet):
                 requested_data=json.dumps(self.request.data, cls=DjangoJSONEncoder),
                 actor_id=str(self.request.user.id),
                 issue_id=None,
-                project_id=str(self.kwargs.get("project_id", None)),
+                # This route's URL only supplies `anchor` and `comment_id`,
+                # never `project_id` - self.kwargs.get("project_id") was
+                # always None here, silently corrupting the activity log for
+                # every comment reaction created on a public board. Use the
+                # project resolved from the deploy board, matching destroy()
+                # below.
+                project_id=str(project_deploy_board.project_id),
                 current_instance=None,
                 epoch=int(timezone.now().timestamp()),
             )
@@ -568,10 +587,13 @@ class CommentReactionPublicViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Only a reaction on a public (EXTERNAL) comment bound to this board
+        # can be removed through it, matching create() and get_queryset().
         comment_reaction = CommentReaction.objects.get(
             project_id=project_deploy_board.project_id,
             workspace_id=project_deploy_board.workspace_id,
             comment_id=comment_id,
+            comment__access="EXTERNAL",
             reaction=reaction_code,
             actor=request.user,
         )
