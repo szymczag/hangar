@@ -107,7 +107,8 @@ Select an Action you want to perform:
    5) Upgrade
    6) View Logs
    7) Backup Data
-   8) Exit
+   8) Migrate Object Storage (MinIO -> SeaweedFS)
+   9) Exit
 
 Action [2]: 1
 ```
@@ -197,7 +198,8 @@ Select a Action you want to perform:
    5) Upgrade
    6) View Logs
    7) Backup Data
-   8) Exit
+   8) Migrate Object Storage (MinIO -> SeaweedFS)
+   9) Exit
 
 Action [2]: 2
 ```
@@ -232,7 +234,8 @@ Select a Action you want to perform:
    5) Upgrade
    6) View Logs
    7) Backup Data
-   8) Exit
+   8) Migrate Object Storage (MinIO -> SeaweedFS)
+   9) Exit
 
 Action [2]: 3
 ```
@@ -279,7 +282,8 @@ Select a Action you want to perform:
    5) Upgrade
    6) View Logs
    7) Backup Data
-   8) Exit
+   8) Migrate Object Storage (MinIO -> SeaweedFS)
+   9) Exit
 
 Action [2]: 4
 ```
@@ -323,7 +327,8 @@ Select a Action you want to perform:
    5) Upgrade
    6) View Logs
    7) Backup Data
-   8) Exit
+   8) Migrate Object Storage (MinIO -> SeaweedFS)
+   9) Exit
 
 Action [2]: 5
 ```
@@ -385,7 +390,8 @@ Select a Action you want to perform:
    5) Upgrade
    6) View Logs
    7) Backup Data
-   8) Exit
+   8) Migrate Object Storage (MinIO -> SeaweedFS)
+   9) Exit
 
 Action [2]: 6
 ```
@@ -419,7 +425,7 @@ Select a Service you want to view the logs for:
    7) Proxy
    8) Redis
    9) Postgres
-   10) Minio
+   10) Object Storage
    11) RabbitMQ
    0) Back to Main Menu
 
@@ -493,7 +499,8 @@ Select a Action you want to perform:
    5) Upgrade
    6) View Logs
    7) Backup Data
-   8) Exit
+   8) Migrate Object Storage (MinIO -> SeaweedFS)
+   9) Exit
 
 Action [2]: 7
 ```
@@ -503,7 +510,7 @@ In response, you can find the backup folder
 ```bash
 Backing Up plane-app_pgdata
 Backing Up plane-app_redisdata
-Backing Up plane-app_uploads
+Backing Up plane-app_object-storage
 
 Backup completed successfully. Backup files are stored in /....../plane-app/backup/20240502-1120
 ```
@@ -550,15 +557,81 @@ When you want to restore the previously backed-up data, follow the instructions 
    .....Restoring plane-app_redisdata
    .....Successfully restored volume plane-app_redisdata from redisdata.tar.gz
 
-   Found /opt/plane-selfhost/plane-app/backup/20240722-0914/uploads.tar.gz
-   .....Restoring plane-app_uploads
-   .....Successfully restored volume plane-app_uploads from uploads.tar.gz
+   Found /opt/plane-selfhost/plane-app/backup/20240722-0914/object-storage.tar.gz
+   .....Restoring plane-app_object-storage
+   .....Successfully restored volume plane-app_object-storage from object-storage.tar.gz
 
 
    Restore completed successfully.
    ```
 
 1. Start the Hangar instance using `./setup.sh start`.
+
+   A backup taken before the move to SeaweedFS contains `uploads.tar.gz` (MinIO
+   format). It restores into `plane-app_uploads`; run
+   `./setup.sh migrate-storage` afterwards to copy it into SeaweedFS (see
+   [Object storage: MinIO to SeaweedFS](#object-storage-minio-to-seaweedfs)).
+
+---
+
+### Object storage: MinIO to SeaweedFS
+
+The bundled S3-compatible storage (`plane-minio`) now runs
+[SeaweedFS](https://github.com/seaweedfs/seaweedfs) instead of MinIO. MinIO no
+longer publishes community images: the pinned image can no longer be pulled
+anonymously, so new installs could not start their storage at all.
+
+The service keeps its name and port (`plane-minio:9000`), so `plane.env`, the
+proxy and external S3 settings are unchanged. Uploads now live in the
+`plane-app_object-storage` volume. SeaweedFS cannot read MinIO's on-disk
+format, so an existing install has to copy its uploads across **once**.
+
+**What happens on upgrade.** `./setup.sh upgrade` stops the stack, downloads
+the release and, when it finds the old `plane-app_uploads` volume, runs
+`migrate-object-storage.sh`. The script:
+
+1. starts a temporary MinIO-compatible reader on the old volume (the MinIO
+   image already cached on the host, or the `pgsty/silo` MinIO fork when it is
+   not) and a temporary SeaweedFS on the new volume;
+2. copies every bucket with rclone and then compares every object's content;
+3. marks the new volume as migrated only when every bucket verified.
+
+The old volume is never modified or deleted. Until the migration has
+finished, `./setup.sh start` refuses to start rather than serve an empty
+object store.
+
+**Running it yourself.** With the stack stopped:
+
+```bash
+./setup.sh migrate-storage
+# or directly, e.g. for a non-default project name or Podman:
+CONTAINER_CLI=podman ./plane-app/migrate-object-storage.sh \
+  --project plane-app --env-file ./plane-app/plane.env
+```
+
+`--check` only reports (exit code `0` = nothing pending, `3` = migration
+pending). Re-running after a successful migration is a no-op.
+
+**Rolling back.** Restore the archived compose file from
+`plane-app/archive/` and start the stack; it uses `plane-app_uploads`
+again. Uploads made after the migration exist only in
+`plane-app_object-storage`.
+
+**Removing the old data.** Once uploads work in the upgraded install:
+
+```bash
+docker volume rm plane-app_uploads
+```
+
+**External S3.** If `plane-minio` is disabled because the install uses
+external S3 storage, nothing needs migrating; set
+`SKIP_OBJECT_STORAGE_MIGRATION=1` if an unused `plane-app_uploads` volume is
+still present.
+
+**Docker Swarm.** Volumes are node-local. `swarm.sh upgrade` removes the
+stack and stops when the node still holds `<stack>_uploads`; run
+`migrate-object-storage.sh --project <stack> --env-file <plane.env>` on that
+node, then deploy the stack again.
 
 ---
 

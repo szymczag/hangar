@@ -23,7 +23,7 @@ task removes abandoned pending assets and their objects after one hour.
 Server-side HEAD, GET, COPY, upload, and delete operations always use the
 configured internal object-storage endpoint. Presigned browser URLs use a
 separate configured public endpoint, or the trusted `WEB_URL` compatibility
-fallback for MinIO. Request `Host` headers never select an outbound storage
+fallback for the bundled object storage (`USE_MINIO=1`). Request `Host` headers never select an outbound storage
 destination.
 
 ## Rendering policy

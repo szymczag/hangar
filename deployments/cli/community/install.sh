@@ -18,6 +18,7 @@ UPPER_CPU_ARCH=$(tr '[:lower:]' '[:upper:]' <<< "$CPU_ARCH")
 mkdir -p $PLANE_INSTALL_DIR/archive
 DOCKER_FILE_PATH=$PLANE_INSTALL_DIR/docker-compose.yaml
 DOCKER_ENV_PATH=$PLANE_INSTALL_DIR/plane.env
+MIGRATE_STORAGE_SCRIPT=$PLANE_INSTALL_DIR/migrate-object-storage.sh
 
 function print_header() {
 clear
@@ -292,6 +293,20 @@ function download() {
         fi
     fi
 
+    # Object storage migration helper (MinIO volume -> SeaweedFS volume).
+    RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/$APP_RELEASE/migrate-object-storage.sh?$(date +%s)")
+    STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+    if [ "$STATUS" -ne 200 ]; then
+        RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$FALLBACK_DOWNLOAD_URL/migrate-object-storage.sh?$(date +%s)")
+        STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+    fi
+    if [ "$STATUS" -eq 200 ]; then
+        echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g' > "$MIGRATE_STORAGE_SCRIPT"
+        chmod +x "$MIGRATE_STORAGE_SCRIPT"
+    else
+        echo "Warning: failed to download migrate-object-storage.sh (HTTP $STATUS)."
+    fi
+
     if [ -f "$DOCKER_ENV_PATH" ];
     then
         cp "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/archive/$TS.env"
@@ -334,7 +349,36 @@ function download() {
     echo "In case of 'Upgrade', please check the 'plane.env 'file for any new variables and update them accordingly"
     echo ""
 }
+# The bundled object storage moved from MinIO to SeaweedFS, which cannot read
+# MinIO's volume. Returns 0 when uploads still live only in the legacy volume.
+function objectStorageMigrationPending() {
+    [ "${SKIP_OBJECT_STORAGE_MIGRATION:-0}" == "1" ] && return 1
+    if [ ! -x "$MIGRATE_STORAGE_SCRIPT" ]; then
+        # Without the helper, fall back to the volume check alone.
+        docker volume inspect "${SERVICE_FOLDER}_uploads" >/dev/null 2>&1 \
+            && ! docker volume inspect "${SERVICE_FOLDER}_object-storage" >/dev/null 2>&1
+        return $?
+    fi
+    "$MIGRATE_STORAGE_SCRIPT" --project "$SERVICE_FOLDER" --env-file "$DOCKER_ENV_PATH" --check
+    [ $? -eq 3 ]
+}
+function migrateObjectStorage() {
+    if [ ! -x "$MIGRATE_STORAGE_SCRIPT" ]; then
+        echo "migrate-object-storage.sh is missing from $PLANE_INSTALL_DIR."
+        echo "Run the upgrade again, or download it from the release assets."
+        return 1
+    fi
+    "$MIGRATE_STORAGE_SCRIPT" --project "$SERVICE_FOLDER" --env-file "$DOCKER_ENV_PATH" "$@"
+}
 function startServices() {
+    if objectStorageMigrationPending; then
+        echo ""
+        echo "Uploads are still in the legacy MinIO volume '${SERVICE_FOLDER}_uploads'."
+        echo "Starting now would serve an empty object store. Migrate them first:"
+        echo "    $0 migrate-storage"
+        echo "(If this install uses external S3 storage instead, set SKIP_OBJECT_STORAGE_MIGRATION=1.)"
+        exit 1
+    fi
     /bin/bash -c "$COMPOSE_CMD -f $DOCKER_FILE_PATH --env-file=$DOCKER_ENV_PATH up -d --pull if_not_present --quiet-pull"
 
     local migrator_container_id=$(docker container ls -aq -f "name=$SERVICE_FOLDER-migrator")
@@ -459,6 +503,15 @@ function upgrade() {
     echo "***** DOWNLOADING STABLE VERSION ****"
     install
 
+    if objectStorageMigrationPending; then
+        echo
+        echo "***** MIGRATING OBJECT STORAGE (MinIO -> SeaweedFS) ****"
+        migrateObjectStorage || {
+            echo "Object storage migration failed; the services were left stopped."
+            exit 1
+        }
+    fi
+
     echo "***** PLEASE VALIDATE AND START SERVICES ****"
 }
 function viewSpecificLogs(){
@@ -489,7 +542,7 @@ function viewLogs(){
         echo "   7) Proxy"
         echo "   8) Redis"
         echo "   9) Postgres"
-        echo "   10) Minio"
+        echo "   10) Object Storage"
         echo "   11) RabbitMQ"
         echo "   0) Back to Main Menu"
         echo 
@@ -597,7 +650,7 @@ function backupData() {
     fi
 
     backup_container_dir "$BACKUP_FOLDER" "plane-db" "/var/lib/postgresql/data" "pgdata" || exit 1
-    backup_container_dir "$BACKUP_FOLDER" "plane-minio" "/export" "uploads" || exit 1
+    backup_container_dir "$BACKUP_FOLDER" "plane-minio" "/data" "object-storage" || exit 1
     backup_container_dir "$BACKUP_FOLDER" "plane-mq" "/var/lib/rabbitmq" "rabbitmq_data" || exit 1
     backup_container_dir "$BACKUP_FOLDER" "plane-redis" "/data" "redisdata" || exit 1
 
@@ -619,10 +672,11 @@ function askForAction() {
         echo "   5) Upgrade"
         echo "   6) View Logs"
         echo "   7) Backup Data"
-        echo "   8) Exit"
+        echo "   8) Migrate Object Storage (MinIO -> SeaweedFS)"
+        echo "   9) Exit"
         echo 
         read -p "Action [2]: " ACTION
-        until [[ -z "$ACTION" || "$ACTION" =~ ^[1-8]$ ]]; do
+        until [[ -z "$ACTION" || "$ACTION" =~ ^[1-9]$ ]]; do
             echo "$ACTION: invalid selection."
             read -p "Action [2]: " ACTION
         done
@@ -661,7 +715,10 @@ function askForAction() {
     elif [ "$ACTION" == "7" ]  || [ "$DEFAULT_ACTION" == "backup" ];
     then
         backupData
-    elif [ "$ACTION" == "8" ]
+    elif [ "$ACTION" == "8" ]  || [ "$DEFAULT_ACTION" == "migrate-storage" ];
+    then
+        migrateObjectStorage
+    elif [ "$ACTION" == "9" ]
     then
         exit 0
     else

@@ -30,9 +30,9 @@ class ContainerRuntimeHardeningTests(unittest.TestCase):
                 self.assertIn("apk upgrade --no-cache --available", dockerfile)
 
     def test_python_runtime_images_use_patched_base(self):
-        self.assertIn("FROM python:3.12.12-alpine", self._read("apps/api/Dockerfile.api"))
+        self.assertIn("FROM docker.io/library/python:3.12.12-alpine", self._read("apps/api/Dockerfile.api"))
         self.assertIn(
-            "FROM python:3.12.12-alpine AS runner",
+            "FROM docker.io/library/python:3.12.12-alpine AS runner",
             self._read("deployments/aio/community/Dockerfile"),
         )
 

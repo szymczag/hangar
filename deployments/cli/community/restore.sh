@@ -67,7 +67,7 @@ function restoreData() {
     fi
 
     local volume_suffix
-    volume_suffix="_pgdata|_redisdata|_uploads|_rabbitmq_data"
+    volume_suffix="_pgdata|_redisdata|_object-storage|_uploads|_rabbitmq_data"
     local volumes
     volumes=$(docker volume ls -f "name=plane-app" --format "{{.Name}}" | grep -E "$volume_suffix")
     # Check if there are any matching volumes

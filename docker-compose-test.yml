@@ -37,7 +37,7 @@ name: hangar-test
 
 services:
   test-db:
-    image: postgres:15.7-alpine
+    image: docker.io/library/postgres:15.7-alpine
     networks:
       - test_env
     env_file:
@@ -55,7 +55,7 @@ services:
       retries: 10
 
   test-redis:
-    image: valkey/valkey:7.2.11-alpine
+    image: docker.io/valkey/valkey:7.2.11-alpine
     networks:
       - test_env
     tmpfs:
@@ -67,7 +67,7 @@ services:
       retries: 10
 
   test-mq:
-    image: rabbitmq:3.13.6-management-alpine
+    image: docker.io/library/rabbitmq:3.13.6-management-alpine
     networks:
       - test_env
     env_file:
@@ -95,29 +95,28 @@ services:
       retries: 10
 
   test-minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # S3-compatible object storage. MinIO's community images are no longer
+    # published, so this runs SeaweedFS behind the same host name and port.
+    image: docker.io/chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     networks:
       - test_env
-    env_file:
-      - ./apps/api/.env
     environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-access-key}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-secret-key}
-    entrypoint: >
-      /bin/sh -c "
-      mkdir -p /export/${AWS_S3_BUCKET_NAME:-uploads} &&
-      mkdir -p /export/${IMPORT_S3_BUCKET_NAME:-uploads-imports} &&
-      minio server /export --console-address ':9090' &
-      sleep 3 &&
-      mc alias set local http://localhost:9000 ${AWS_ACCESS_KEY_ID:-access-key} ${AWS_SECRET_ACCESS_KEY:-secret-key} &&
-      mc mb local/${AWS_S3_BUCKET_NAME:-uploads} -p || true &&
-      mc mb local/${IMPORT_S3_BUCKET_NAME:-uploads-imports} -p || true &&
-      tail -f /dev/null
-      "
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-access-key}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-secret-key}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        for key in WEED_JWT_SIGNING_KEY WEED_JWT_SIGNING_READ_KEY WEED_JWT_FILER_SIGNING_KEY WEED_JWT_FILER_SIGNING_READ_KEY; do
+          export "$$key=$$(head -c 32 /dev/urandom | base64 | tr -d '=+/\n')"
+        done
+        exec weed -logtostderr=true mini -dir=/data -ip=test-minio -ip.bind=0.0.0.0 -s3.port=9000 \
+          -bucket=${AWS_S3_BUCKET_NAME:-uploads},${IMPORT_S3_BUCKET_NAME:-uploads-imports} \
+          -master.telemetry=false -admin.ui=false -webdav=false
     tmpfs:
-      - /export
+      - /data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/healthz"]
       interval: 10s
       timeout: 5s
       retries: 10

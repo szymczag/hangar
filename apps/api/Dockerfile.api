@@ -1,4 +1,4 @@
-FROM python:3.12.12-alpine
+FROM docker.io/library/python:3.12.12-alpine
 
 ARG APP_VERSION=v0.1.0
 
