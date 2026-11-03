@@ -13,7 +13,6 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from plane.authentication.provider.credentials.email import EmailProvider
 from plane.authentication.rate_limit import throttle_auth_redirect
 from plane.authentication.utils.login import user_login
-from plane.authentication.rate_limit import throttle_auth_redirect
 from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
 from plane.db.models import User

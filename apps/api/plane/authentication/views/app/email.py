@@ -12,7 +12,6 @@ from django.views import View
 from plane.authentication.provider.credentials.email import EmailProvider
 from plane.authentication.rate_limit import throttle_auth_redirect
 from plane.authentication.utils.login import user_login
-from plane.authentication.rate_limit import throttle_auth_redirect
 from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
 from plane.authentication.utils.redirection_path import get_redirection_path
