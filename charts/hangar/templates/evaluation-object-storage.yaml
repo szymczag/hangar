@@ -53,10 +53,23 @@ spec:
         - name: seaweedfs
           image: {{ printf "%s:%s" .Values.evaluationObjectStorage.image.repository .Values.evaluationObjectStorage.image.tag | quote }}
           imagePullPolicy: {{ .Values.evaluationObjectStorage.image.pullPolicy }}
+          # `weed mini` runs master, volume, filer and S3 in one process. The
+          # filer and volume HTTP ports serve and accept bucket contents without
+          # S3 authentication unless JWT signing keys are set. The keys only have
+          # to agree inside this process, so they are generated per start and
+          # never stored; only the authenticated S3 port can then reach objects,
+          # whether or not the cluster enforces the NetworkPolicies. Telemetry,
+          # the admin UI and WebDAV are not used and stay off.
+          command:
+            - /bin/sh
+            - -ec
           args:
-            - mini
-            - -dir=/data
-            - -ip.bind=0.0.0.0
+            - |
+              for key in WEED_JWT_SIGNING_KEY WEED_JWT_SIGNING_READ_KEY WEED_JWT_FILER_SIGNING_KEY WEED_JWT_FILER_SIGNING_READ_KEY; do
+                export "$key=$(head -c 32 /dev/urandom | base64 | tr -d '=+/\n')"
+              done
+              exec weed -logtostderr=true mini -dir=/data -ip.bind=0.0.0.0 \
+                -master.telemetry=false -admin.ui=false -webdav=false
           env:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:

@@ -190,6 +190,8 @@ assert_present 'Source: hangar/charts/evaluation-rabbitmq' "$evaluation_render" 
 assert_present '^[[:space:]]+deprecated_features\.permit\.transient_nonexcl_queues = true$' "$evaluation_render" "evaluation RabbitMQ must permit the queue type required by Celery"
 assert_present 'Source: hangar/charts/evaluation-valkey' "$evaluation_render" "evaluation Valkey did not render"
 assert_present '^  name: hangar-hangar-evaluation-object-storage$' "$evaluation_render" "evaluation object storage did not render"
+assert_present 'WEED_JWT_SIGNING_KEY WEED_JWT_SIGNING_READ_KEY WEED_JWT_FILER_SIGNING_KEY WEED_JWT_FILER_SIGNING_READ_KEY' "$evaluation_render" "evaluation object storage must sign filer and volume traffic"
+assert_present '^[[:space:]]+-master\.telemetry=false -admin\.ui=false -webdav=false$' "$evaluation_render" "evaluation object storage must disable telemetry, the admin UI and WebDAV"
 assert_present '^automountServiceAccountToken: false$' "$evaluation_render" "evaluation service accounts must disable token mounting"
 dependency_service_account_uses="$(grep -Ec '^[[:space:]]+serviceAccountName: hangar-evaluation-dependencies$' "$evaluation_render")"
 [[ "$dependency_service_account_uses" -eq 4 ]] || fail "every evaluation dependency Pod must use the tokenless dependency ServiceAccount"
@@ -245,7 +247,7 @@ assert_invalid "short migrator database wait" --set migrator.databaseWaitSeconds
 assert_invalid "migrator wait exceeding Job deadline" --set migrator.activeDeadlineSeconds=300 --set migrator.databaseWaitSeconds=300
 assert_invalid "reserved Pod label override" --set-string global.podLabels.app\\.kubernetes\\.io/component=attacker
 assert_invalid "mutable evaluation image" --set-string evaluation-postgresql.image.tag=18.4
-assert_invalid "mutable evaluation object-storage image" --set-string evaluationObjectStorage.image.tag=4.39
+assert_invalid "mutable evaluation object-storage image" --set-string evaluationObjectStorage.image.tag=4.48
 assert_invalid "evaluation RBAC" --set evaluation-rabbitmq.rbac.create=true
 assert_invalid "disabled RabbitMQ Celery compatibility" --set-string evaluation-rabbitmq.customConfig=
 assert_invalid "evaluation service-account creation" --set evaluation-postgresql.serviceAccount.create=true

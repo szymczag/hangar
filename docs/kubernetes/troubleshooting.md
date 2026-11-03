@@ -50,6 +50,7 @@ Never collect or share:
 | Frontend returns 404/503             | Ingress class, route, Service, or readiness | Ingress events, endpoints, controller logs                |
 | `/live` disconnects                  | WebSocket forwarding or Live readiness      | controller WebSocket settings, Live logs, endpoints       |
 | Presigned upload returns 404/405     | Object-storage bucket route or backend      | rendered bucket path, storage Service, policy, proxy logs |
+| SeaweedFS filer answers 401          | Expected: unsigned filer access is refused  | use the S3 port `8333` with the object-storage Secret     |
 | Dependency timeout                   | DNS, NetworkPolicy, firewall, or TLS        | selectors, CIDRs, service endpoints, provider firewall    |
 | Read-only filesystem error           | Application writes outside allowed paths    | Container log and image version; do not disable hardening |
 | Upgrade rolled back                  | Migration or rollout failed                 | Helm history, revision Job, controller events             |
@@ -176,6 +177,12 @@ path fell through to the `/` route. Also confirm the
 `evaluation-object-storage-ingress` NetworkPolicy selects the actual ingress or
 Gateway data-plane Pods. Presigned URLs and request cookies are credentials;
 redact them from support output and invalidate them after accidental disclosure.
+
+In the evaluation object store, only port `8333` serves objects. The filer
+(`8888`) and volume ports answer `401` to anything not signed by the process
+itself; that is the intended hardening, not a fault. Inspect evaluation objects
+through S3 (for example with the AWS CLI and the `existingSecrets.objectStorage`
+credentials), not through the filer.
 
 The import bucket must not appear in any Ingress or HTTPRoute. If an import is
 rejected with `upload_failed`, verify that the configured import bucket differs

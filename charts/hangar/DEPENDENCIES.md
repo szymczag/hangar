@@ -27,7 +27,7 @@ the corresponding platform manifest digest.
 | RabbitMQ              | `docker.io/rabbitmq:4.3.1`           | `sha256:11846d5a067c15c0f260d6c387263e34972b884a6e711561608753c22fca5221` |
 | RabbitMQ init         | `docker.io/busybox:stable`           | `sha256:b7f3d86d6e84fc17718c48bcde1450807faa2d56704205c697b4bd5df7b9e29f` |
 | Valkey                | `docker.io/valkey/valkey:9.1.0`      | `sha256:e30fbdc8d6d6b355712e50f4008321026f69db3e450254b4f0008d22745d8d0e` |
-| SeaweedFS `weed mini` | `docker.io/chrislusf/seaweedfs:4.39` | `sha256:1f4d22c98089dba5e849ea3a1f24a7d85b3177ab39a8d9a70275856882ce2be3` |
+| SeaweedFS `weed mini` | `docker.io/chrislusf/seaweedfs:4.48` | `sha256:aba492e2a4e4c90bff795745e8e660affa1f09e7650f5981bd7bccd1a06cd931` |
 
 ## Validation and signing toolchain
 
@@ -51,7 +51,10 @@ commit SHAs in their workflow files.
   `Retain` where the upstream chart exposes that control.
 - The evaluation object store is a chart-owned, single-node `weed mini`
   StatefulSet. It consumes caller-managed credentials directly and does not
-  render a random Helm-managed Secret.
+  render a random Helm-managed Secret. Its filer and volume servers require
+  JWT-signed requests (keys generated in-process at each start, never stored),
+  so only the authenticated S3 port reaches objects even where NetworkPolicies
+  are not enforced; telemetry, the admin UI and WebDAV are disabled.
 - No dependency receives Kubernetes RBAC. Service-account token automounting is
   disabled.
 - All rendered containers use a read-only root filesystem, non-root identity,
