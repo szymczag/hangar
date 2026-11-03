@@ -42,14 +42,14 @@ catalog:
   "@react-router/node": "8.3.0"
   "@react-router/serve": "8.3.0"
   "@storybook/addon-designs": "11.1.3"
-  "@storybook/addon-docs": "10.4.6"
-  "@storybook/addon-links": "10.4.6"
-  "@storybook/addon-onboarding": "10.4.6"
+  "@storybook/addon-docs": "10.6.5"
+  "@storybook/addon-links": "10.6.5"
+  "@storybook/addon-onboarding": "10.6.5"
   "@storybook/addon-styling-webpack": "3.0.2"
   "@storybook/addon-webpack5-compiler-swc": "4.0.3"
-  "@storybook/react": "10.4.6"
-  "@storybook/react-vite": "10.4.6"
-  "@storybook/react-webpack5": "10.4.6"
+  "@storybook/react": "10.6.5"
+  "@storybook/react-vite": "10.6.5"
+  "@storybook/react-webpack5": "10.6.5"
   "@tailwindcss/postcss": "4.1.17"
   "@tailwindcss/typography": "0.5.19"
   "@tanstack/react-table": "^8.21.3"
@@ -95,21 +95,21 @@ catalog:
   "@types/react-dom": "19.2.3"
   "@types/sanitize-html": "2.16.0"
   "@types/ws": "^8.18.1"
-  "@vitest/coverage-v8": "^4.1.11"
+  "@vitest/coverage-v8": "^4.1.12"
   "ast-types": "0.14.2"
   "autoprefixer": "^10.4.19"
-  "axios": "1.18.1"
+  "axios": "1.20.0"
   "buffer": "^6.0.3"
   "chroma-js": "^3.2.0"
   "class-variance-authority": "0.7.1"
   "clsx": "^2.1.1"
   "cmdk": "^1.1.1"
   "comlink": "^4.4.1"
-  "compression": "1.8.1"
+  "compression": "1.8.2"
   "cors": "^2.8.5"
   "@date-fns/tz": "^1.4.1"
   "date-fns": "^4.1.0"
-  "dompurify": "3.4.15"
+  "dompurify": "3.4.17"
   "dotenv": "16.4.7"
   "effect": "3.20.0"
   "emoji-picker-react": "^4.5.16"
@@ -169,12 +169,12 @@ catalog:
   "rehype-remark": "^10.0.1"
   "remark-gfm": "^4.0.1"
   "remark-stringify": "^11.0.0"
-  "sanitize-html": "2.17.7"
-  "source-map-js": "1.2.1"
+  "sanitize-html": "2.18.1"
+  "source-map-js": "1.2.2"
   "serve": "14.2.5"
-  "sharp": "^0.35.4"
+  "sharp": "^0.35.5"
   "smooth-scroll-into-view-if-needed": "^2.0.2"
-  "storybook": "10.4.6"
+  "storybook": "10.6.5"
   "swr": "2.4.2"
   "tailwind-merge": "3.4.0"
   "tailwindcss": "4.1.17"
@@ -187,9 +187,9 @@ catalog:
   "unified": "^11.0.5"
   "use-font-face-observer": "^1.3.0"
   "uuid": "14.0.0"
-  "vite": "8.0.16"
+  "vite": "8.2.4"
   "vite-tsconfig-paths": "^5.1.4"
-  "vitest": "^4.1.11"
+  "vitest": "^4.1.12"
   "winston": "^3.17.0"
   "ws": "8.21.0"
   "y-indexeddb": "^9.0.12"
@@ -202,24 +202,28 @@ overrides:
   mdast-util-to-hast: 13.2.1
   valibot: 1.4.2
   js-yaml: 4.3.2
-  glob: 11.1.0
-  brace-expansion: 5.0.9
+  # GHSA-3g3m-2fjr-6pw4 is fixed only in 14.0.2. The one consumer is Storybook's
+  # react-docgen plugin (^13.0.1); 14 keeps the same API.
+  glob: 14.0.3
+  brace-expansion: 5.0.12
   nanoid: 3.3.18
   esbuild: 0.28.1
   "@babel/core": 7.29.7
   "@babel/helpers": 7.29.7
   "@babel/runtime": 7.29.7
   chokidar: 3.6.0
-  prosemirror-view: 1.40.0
+  # Paste-handling XSS (GHSA-c8x8-7fp4-3x9w), fixed 1.42.3. @tiptap/pm 2.27.3
+  # itself asks for ^1.42.3; this matches upstream's pin.
+  prosemirror-view: 1.42.6
   "@types/express": 4.17.23
   typescript: "catalog:"
   vite: "catalog:"
-  qs: 6.16.0
+  qs: 6.16.2
   diff: 5.2.2
   webpack: 5.104.1
   lodash-es: "catalog:"
   lodash: 4.18.1
-  markdown-it: 14.2.0
+  markdown-it: 14.3.3
   linkify-it: 5.0.2
   rollup: 4.59.0
   "minimatch@3": 3.1.4
@@ -227,7 +231,7 @@ overrides:
   serialize-javascript: 7.0.5
   "ajv@6": 6.14.0
   "ajv@8": 8.18.0
-  "undici@7": 7.29.0
+  "undici@7": 7.30.1
   flatted: 3.4.2
   picomatch: 2.3.2
   "yaml@1": 1.10.3
@@ -235,16 +239,18 @@ overrides:
   "path-to-regexp@<1": 0.1.13
   defu: 6.1.5
   postcss: 8.5.25
-  "postcss-selector-parser@>=7.1.0 <7.1.3": "7.1.3"
-  "postcss-selector-parser@>=6.1.0 <6.1.3": "6.1.3"
+  # GHSA-rj75-hqrm-r3gf (quadratic selector parsing). @tailwindcss/typography
+  # pins 6.0.10 exactly, so the floor has to be forced for the whole major.
+  "postcss-selector-parser@6": 6.1.5
+  "postcss-selector-parser@7": 7.1.7
   axios: "catalog:"
-  follow-redirects: 1.16.0
+  follow-redirects: 1.16.2
   uuid: "catalog:"
   # EXACT pin: bump the number, never widen -- 4.x breaks ajv's ^3.0.1 (the only
   # consumer here). Floor is 3.1.8, not 3.1.7: it also fixes GHSA-hrr3-gc8f-f4qj,
   # which is MEDIUM so the HIGH/CRITICAL scan won't catch a slip back.
-  fast-uri: 3.1.8
-  body-parser: 1.20.6
+  fast-uri: 3.1.9
+  body-parser: 1.20.9
   tmp: 0.2.7
   form-data: 4.0.6
   "ws@8": 8.21.0
@@ -252,18 +258,27 @@ overrides:
   "@opentelemetry/core": 2.8.0
   "@opentelemetry/resources": 2.8.0
   "@opentelemetry/sdk-trace-base": 2.8.0
-  morgan: 1.12.0
+  morgan: 1.12.1
+  # express 4 and 5 both pin proxy-addr ~2.0.7 (GHSA-jqcg-44mw-7w3h).
+  proxy-addr: 2.0.8
+  # serve and @react-router/serve pin compression 1.8.1 (GHSA-vc2v-76pw-4v95).
+  compression: "catalog:"
+  source-map-js: "catalog:"
+  # vitest pins its mocker exactly; keep it on the fixed release with vitest.
+  "@vitest/mocker": 4.1.12
+  # oxfmt pins tinypool 2.1.0 exactly (GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr).
+  tinypool: 2.2.0
   # Prototype pollution and unbounded query-cache growth, both reachable as DoS
   # (CVE-2026-73088 / CVE-2026-73089). browserslist is build tooling only
   # (babel/postcss/vite), but the runtime images copy node_modules wholesale, so
   # it lands in the scanned surface.
   browserslist: ">=4.28.7"
   # CVE-2026-63376 (prototype-pollution -> arbitrary code execution in the TOML
-  # parser, fixed 4.1.2) and CVE-2026-77465 (DoS via uncontrolled recursion,
-  # fixed 4.2.0). toml reaches us only transitively and its parent's range
-  # already allows the fix -- the lockfile simply predates both. Hold below
-  # 5.0.0, which is outside that range.
-  toml: ">=4.2.0 <5"
+  # parser, fixed 4.1.2), CVE-2026-77465 (DoS via uncontrolled recursion,
+  # fixed 4.2.0) and GHSA-4qx8-w7c3-pj3p / GHSA-9j65-hcg3-gc64 (fixed only in
+  # 5.0.1). The sole consumer is react-doctor's effect beta (dev tooling), whose
+  # ^4.1.1 range has no fixed release; 5.x keeps the same CommonJS parse() API.
+  toml: ">=5.0.1 <6"
 
 allowBuilds:
   "@parcel/watcher": true
@@ -274,13 +289,6 @@ allowBuilds:
   sharp: false
 
 minimumReleaseAgeExclude:
-  - "@storybook/addon-docs@10.4.6"
-  - "@storybook/builder-vite@10.4.6"
-  - "@storybook/csf-plugin@10.4.6"
-  - "@storybook/react-dom-shim@10.4.6"
-  - "@storybook/react-vite@10.4.6"
-  - "@storybook/react@10.4.6"
-  - storybook@10.4.6
   - "@blueprintjs/core@6.18.0"
 
 patchedDependencies:
