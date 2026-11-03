@@ -130,8 +130,8 @@ README now links to the Hangar chart documentation.
 The inherited `.github/workflows/feature-deployment.yml` workflow was not an
 acceptable Hangar deployment path. It includes Plane-specific configuration,
 external deployment assumptions, and Kubernetes commands that skip TLS
-verification. Its root job is now explicitly disabled and it is not reused for
-chart qualification or deployment.
+verification. It was first disabled and has since been removed; it is not
+reused for chart qualification or deployment.
 
 Hangar's release workflow publishes AMD64 component images for `web`, `admin`,
 `space`, `live`, `api`, and `proxy`, plus an all-in-one image. ARM64 is outside

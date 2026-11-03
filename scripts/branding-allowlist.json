@@ -20,9 +20,9 @@
     "rationale": "Compatibility fixtures and tests intentionally retain upstream-shaped sample data."
   },
   {
-    "pathPattern": "(^|/)AGENTS\\.md$|^apps/live/package\\.json$|^\\.github/workflows/feature-deployment\\.yml$",
+    "pathPattern": "(^|/)AGENTS\\.md$|^apps/live/package\\.json$",
     "rules": ["product-name"],
-    "rationale": "Agent guidance, inherited package attribution, and the disabled upstream workflow are compatibility or attribution metadata."
+    "rationale": "Agent guidance and inherited package attribution are compatibility or attribution metadata."
   },
   {
     "pathPattern": "^apps/api/plane/utils/email\\.py$",
