@@ -208,6 +208,10 @@ class TestGuestWorklogActivityConfidentiality:
     @pytest.mark.django_db
     def test_workspace_admin_with_guest_project_role_sees_worklog_activity(self, workspace, project, issue):
         client, user = make_role_client(workspace, project, role=5, workspace_role=20)
+        # A project guest only sees others' work items with guest_view_all_features,
+        # whatever their workspace role; this test is about the worklog rows.
+        project.guest_view_all_features = True
+        project.save(update_fields=["guest_view_all_features"])
         worklog_activity = IssueActivity.objects.create(
             issue=issue,
             project=project,
