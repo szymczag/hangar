@@ -10,7 +10,7 @@ from functools import wraps
 from django.http import HttpResponseRedirect
 
 # Third party imports
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle, UserRateThrottle
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -23,11 +23,15 @@ from plane.authentication.utils.host import base_host
 from plane.utils.path_validator import get_safe_redirect_url
 
 
-class AuthenticationThrottle(AnonRateThrottle):
+class AuthenticationThrottle(SimpleRateThrottle):
     # Rate is configurable per-deployment via the AUTHENTICATION_RATE_LIMIT
     # env var (DRF format: "<num>/<period>" where period is second/minute/hour/day).
     rate = os.environ.get("AUTHENTICATION_RATE_LIMIT", "10/minute")
     scope = "authentication"
+
+    def get_cache_key(self, request, view):
+        # Key on the client IP for every caller, signed in or not.
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
     def throttle_failure_view(self, request, *args, **kwargs):
         try:
