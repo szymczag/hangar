@@ -98,24 +98,26 @@ class TestExternalApiCommentAuthz:
     """A Guest / non-author must not edit or delete another user's comment."""
 
     def test_guest_cannot_patch_comment(self, workspace, project, issue, comment):
+        # The guest cannot view another user's work item, so it is not found.
         guest = _project_member(workspace, project, role=5)
         response = _token_client(guest).patch(
             COMMENT_URL.format(slug=workspace.slug, project_id=project.id, issue_id=issue.id, pk=comment.id),
             {"comment_html": "<p>tampered</p>"},
             format="json",
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN, (
+        assert response.status_code == status.HTTP_404_NOT_FOUND, (
             f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
         )
         comment.refresh_from_db()
         assert comment.comment_html == "<p>original</p>"
 
     def test_guest_cannot_delete_comment(self, workspace, project, issue, comment):
+        # The guest cannot view another user's work item, so it is not found.
         guest = _project_member(workspace, project, role=5)
         response = _token_client(guest).delete(
             COMMENT_URL.format(slug=workspace.slug, project_id=project.id, issue_id=issue.id, pk=comment.id)
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN, (
+        assert response.status_code == status.HTTP_404_NOT_FOUND, (
             f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
         )
         assert IssueComment.objects.filter(pk=comment.id).exists()
