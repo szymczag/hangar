@@ -90,7 +90,8 @@ class ForgotPasswordSpaceEndpoint(APIView):
             )
             return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
 
-        # Get the user
+        # Fork (see FORK.md): the answer is the same whether or not an account
+        # exists, so this form cannot be used to find out who has one.
         user = User.objects.filter(email=email).first()
         if user:
             # Get the reset token for user
@@ -98,15 +99,10 @@ class ForgotPasswordSpaceEndpoint(APIView):
             current_site = base_host(request=request, is_space=True)
             # send the forgot password email
             forgot_password.delay(user.first_name, user.email, uidb64, token, current_site)
-            return Response(
-                {"message": "Check your email to reset your password"},
-                status=status.HTTP_200_OK,
-            )
-        exc = AuthenticationException(
-            error_code=AUTHENTICATION_ERROR_CODES["USER_DOES_NOT_EXIST"],
-            error_message="USER_DOES_NOT_EXIST",
+        return Response(
+            {"message": "Check your email to reset your password"},
+            status=status.HTTP_200_OK,
         )
-        return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
 
 
 class ResetPasswordSpaceEndpoint(View):
