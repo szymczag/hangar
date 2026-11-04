@@ -42,6 +42,12 @@ class IssueReactionViewSet(BaseViewSet):
             .distinct()
         )
 
+    # Declared so the routed GET carries the project-role check its siblings use;
+    # BaseViewSet refuses routed actions served by an undecorated DRF mixin.
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def list(self, request, slug, project_id, issue_id):
+        return super().list(request, slug, project_id, issue_id)
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def create(self, request, slug, project_id, issue_id):
         serializer = IssueReactionSerializer(data=request.data)

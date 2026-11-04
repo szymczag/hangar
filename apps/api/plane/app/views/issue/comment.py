@@ -60,6 +60,17 @@ class IssueCommentViewSet(BaseViewSet):
             .distinct()
         )
 
+    # list and retrieve are declared so the routed GETs carry the project-role
+    # check their siblings use; BaseViewSet refuses routed actions served by an
+    # undecorated DRF mixin.
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def list(self, request, slug, project_id, issue_id):
+        return super().list(request, slug, project_id, issue_id)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def retrieve(self, request, slug, project_id, issue_id, pk):
+        return super().retrieve(request, slug, project_id, issue_id, pk)
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def create(self, request, slug, project_id, issue_id):
         project = Project.objects.get(pk=project_id)
@@ -186,6 +197,11 @@ class CommentReactionViewSet(BaseViewSet):
             .order_by("-created_at")
             .distinct()
         )
+
+    # See IssueCommentViewSet.list.
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def list(self, request, slug, project_id, comment_id):
+        return super().list(request, slug, project_id, comment_id)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def create(self, request, slug, project_id, comment_id):
