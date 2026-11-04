@@ -231,7 +231,7 @@ Tokens created before this keep `workspace = NULL` and their previous reach: the
 owner's memberships. Nothing revokes them, and raising the threshold does not
 either — it governs minting, not tokens already issued.
 
-The threshold is reported to the application on `/api/instances/`, so it offers
+The threshold is reported to signed-in users on `/api/users/me/instance-config/`, so the application offers
 the feature only where creating a token would succeed: the workspace chooser
 lists the memberships that qualify, and where none do the offer is withdrawn with
 the reason rather than accepting a form and refusing it on save. Existing tokens
@@ -253,6 +253,35 @@ anything workspace-bound.
 
 The secret is returned **only** when the token is created. Reads and renames
 answer with `APITokenReadSerializer`, which excludes it.
+
+## What the instance tells a visitor without a session
+
+`/api/instances/` is `AllowAny` because every sign-in page reads it before anyone
+has a session. Without a verified console session it answers only what those
+pages and the failure pages render: the sign-in methods and whether sign-up is
+open, whether email can be sent, the branding, the licence offer
+(`product`, without the running version) and the console's setup state
+(`is_setup_done`, `workspaces_exist`). The allowlists are
+`ANONYMOUS_CONFIG_KEYS`, `ANONYMOUS_PRODUCT_KEYS` and `ANONYMOUS_INSTANCE_KEYS`
+in `plane/license/api/views/instance.py`.
+
+Everything else — the instance's name, id, domain and version, the default
+workspace, integration identifiers, limits and internal URLs — goes to a
+signed-in user through `/api/users/me/instance-config/`, which the web app loads
+after it has the current user. That route sits outside `/api/instances/`
+because the session middleware reads the console cookie on any path containing
+`instances`, so the application session never authenticates there. Both routes
+read one cached payload, stored under the `/api/instances/` key that
+configuration writes invalidate.
+
+A console session that has passed the password but not the second factor is
+authenticated yet gets the public answer: the full payload follows
+`InstanceAdminPermission`, not `is_authenticated`.
+
+Forgot-password answers the same way whether or not an account exists. The
+email check on the sign-in form still says whether an address has an account,
+because the form chooses the next step from that answer; it is rate-limited by
+`AuthenticationThrottle`.
 
 ## Assets served without a session
 

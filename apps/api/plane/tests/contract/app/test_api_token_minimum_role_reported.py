@@ -14,10 +14,13 @@ and a drifting copy either hides a feature that works or offers one that does
 not.
 """
 
+import uuid
+
 import pytest
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
+from plane.db.models import User
 from plane.license.models import InstanceConfiguration
 from plane.utils.api_token_policy import DEFAULT_MINIMUM_ROLE, api_token_minimum_role
 from plane.tests.contract.app import test_google_auth as _google_auth
@@ -49,7 +52,7 @@ def _configure(value):
 def test_the_instance_reports_the_threshold(db, setup_instance):
     _configure("15")
 
-    reported = APIClient().get("/api/instances/").data["config"]
+    reported = _member_config()
 
     assert reported["api_token_minimum_role"] == 15
 
@@ -60,7 +63,7 @@ def test_the_reported_value_is_the_one_the_endpoint_enforces(db, setup_instance)
     """One value, read from one place, so the offer and the refusal agree."""
     _configure("20")
 
-    reported = APIClient().get("/api/instances/").data["config"]
+    reported = _member_config()
 
     assert reported["api_token_minimum_role"] == api_token_minimum_role()
 
@@ -72,4 +75,12 @@ def test_an_unreadable_setting_does_not_lock_everyone_out(db, setup_instance):
     _configure("not a number")
 
     assert api_token_minimum_role() == DEFAULT_MINIMUM_ROLE
-    assert APIClient().get("/api/instances/").data["config"]["api_token_minimum_role"] == DEFAULT_MINIMUM_ROLE
+    assert _member_config()["api_token_minimum_role"] == DEFAULT_MINIMUM_ROLE
+
+
+def _member_config():
+    """Signed-in users read these keys from the member endpoint; /api/instances/ withholds them without a session."""
+    member = User.objects.create(email=f"member-{uuid.uuid4().hex[:6]}@corp.example", username=uuid.uuid4().hex)
+    client = APIClient()
+    client.force_authenticate(user=member)
+    return client.get("/api/users/me/instance-config/").data["config"]

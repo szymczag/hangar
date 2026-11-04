@@ -121,6 +121,9 @@ export class UserStore implements IUserStore {
           this.userProfile.fetchUserProfile(),
           this.userSettings.fetchCurrentUserSettings(),
           this.store.workspaceRoot.fetchWorkspaces(),
+          // Not fatal: the public instance information is already loaded, and the
+          // pages that need the rest fall back to their defaults without it.
+          this.store.instance.fetchMemberInstanceInfo().catch(() => undefined),
         ]);
         runInAction(() => {
           this.data = user;

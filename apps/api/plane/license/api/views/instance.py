@@ -13,7 +13,7 @@ from plane.mailer.configuration import is_email_delivery_configured
 
 # Third party imports
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 # Module imports
@@ -33,6 +33,92 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_control
 
 
+# The key every instance-payload cache entry is stored under. Writers invalidate
+# "/api/instances/", so both readers of the payload must cache under that path.
+INSTANCE_CACHE_PATH = "/api/instances/"
+
+# What a page shown before sign-in reads. Anything not listed here is withheld
+# from callers without a session: the instance's identity and version, the
+# default workspace, integration identifiers and the internal URLs.
+ANONYMOUS_CONFIG_KEYS = frozenset(
+    {
+        "enable_signup",
+        "is_google_enabled",
+        "is_google_auto_redirect_enabled",
+        "is_github_enabled",
+        "is_gitlab_enabled",
+        "is_gitea_enabled",
+        "is_magic_login_enabled",
+        "is_email_password_enabled",
+        "is_oidc_enabled",
+        "oidc_provider_name",
+        "is_saml_enabled",
+        "saml_provider_name",
+        "is_smtp_configured",
+        "branding_name",
+        "sign_in_header",
+        "sign_in_subheader",
+        "logo_url",
+        "favicon_url",
+        "login_background_url",
+        "accent_color",
+        "login_backdrop_color",
+        "show_license_notice",
+        "show_external_links",
+        "support_text",
+    }
+)
+# The product block carries the licence offer, which is shown to everyone; the
+# running version is not.
+ANONYMOUS_PRODUCT_KEYS = frozenset(
+    {
+        "name",
+        "repository_url",
+        "source_url",
+        "documentation_url",
+        "issues_url",
+        "security_url",
+        "terms_url",
+        "privacy_url",
+    }
+)
+# The admin console decides between its setup and sign-in screens from these.
+ANONYMOUS_INSTANCE_KEYS = frozenset({"is_setup_done", "workspaces_exist"})
+
+
+def _pick(source, keys):
+    return {key: value for key, value in (source or {}).items() if key in keys}
+
+
+def anonymous_instance_payload(data):
+    """Reduce an instance payload to what a caller without a session may read."""
+    if "config" not in data:
+        # No instance row yet: only the setup state and the product identity.
+        return {
+            "is_activated": data.get("is_activated", False),
+            "is_setup_done": data.get("is_setup_done", False),
+            "product": _pick(data.get("product"), ANONYMOUS_PRODUCT_KEYS),
+        }
+    config = _pick(data["config"], ANONYMOUS_CONFIG_KEYS)
+    config["product"] = _pick(data["config"].get("product"), ANONYMOUS_PRODUCT_KEYS)
+    return {"config": config, "instance": _pick(data.get("instance"), ANONYMOUS_INSTANCE_KEYS)}
+
+
+class InstanceMemberConfigEndpoint(BaseAPIView):
+    """The full instance payload for a signed-in user of the application.
+
+    Lives outside /api/instances/ because the session middleware reads the
+    admin cookie on every path containing "instances". Shares the cached
+    payload with InstanceEndpoint, so a configuration change reaches both.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @method_decorator(cache_control(private=True, no_cache=True))
+    def get(self, request):
+        return InstanceEndpoint.full_payload(self, request)
+
+
 def _safe_colour(value) -> str:
     """Return the value only if it is a plain hex colour."""
     candidate = str(value or "").strip()
@@ -45,9 +131,23 @@ class InstanceEndpoint(BaseAPIView):
             return [InstanceAdminPermission()]
         return [AllowAny()]
 
-    @cache_response(60 * 60 * 2, user=False)
-    @method_decorator(cache_control(private=True, max_age=12))
+    # Fork (see FORK.md): the clients read this before anyone signs in, and the
+    # web app's own session never authenticates here (only the admin session
+    # does), so a signed-in web user is anonymous to this endpoint too. Without
+    # a verified console session the answer is trimmed to what a sign-in or failure page needs;
+    # everything else is served to signed-in users by InstanceMemberConfigEndpoint.
+    # The browser must not reuse one answer for the other, hence no-cache.
+    @method_decorator(cache_control(private=True, no_cache=True))
     def get(self, request):
+        response = self.full_payload(request)
+        # A console session that has not yet presented its second factor is
+        # authenticated but not trusted; it gets the public answer.
+        if response.status_code != status.HTTP_200_OK or InstanceAdminPermission().has_permission(request, self):
+            return response
+        return Response(anonymous_instance_payload(response.data), status=status.HTTP_200_OK)
+
+    @cache_response(60 * 60 * 2, path=INSTANCE_CACHE_PATH, user=False)
+    def full_payload(self, request):
         instance = Instance.objects.first()
 
         # get the instance

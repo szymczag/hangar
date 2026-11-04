@@ -31,4 +31,16 @@ export class InstanceService extends APIService {
         throw error;
       });
   }
+
+  /**
+   * The full instance configuration, for a signed-in user. /api/instances/ answers
+   * a caller without an admin session with only what the sign-in pages need.
+   */
+  async getMemberInstanceInfo(): Promise<IInstanceInfo> {
+    return this.get("/api/users/me/instance-config/")
+      .then((response) => response.data)
+      .catch((error) => {
+        throw error;
+      });
+  }
 }

@@ -27,6 +27,7 @@ export interface IInstanceStore {
   error: TError | undefined;
   // action
   fetchInstanceInfo: () => Promise<void>;
+  fetchMemberInstanceInfo: () => Promise<void>;
 }
 
 export class InstanceStore implements IInstanceStore {
@@ -46,6 +47,7 @@ export class InstanceStore implements IInstanceStore {
       error: observable,
       // actions
       fetchInstanceInfo: action,
+      fetchMemberInstanceInfo: action,
     });
     // services
     this.instanceService = new InstanceService();
@@ -74,5 +76,17 @@ export class InstanceStore implements IInstanceStore {
       });
       throw error;
     }
+  };
+
+  /**
+   * @description adds what only a signed-in user is told — the version, the default
+   * workspace, integration identifiers, limits — to the public instance information
+   */
+  fetchMemberInstanceInfo = async () => {
+    const memberInfo = await this.instanceService.getMemberInstanceInfo();
+    runInAction(() => {
+      this.instance = { ...this.instance, ...memberInfo.instance } as IInstance;
+      this.config = { ...this.config, ...memberInfo.config } as IInstanceConfig;
+    });
   };
 }

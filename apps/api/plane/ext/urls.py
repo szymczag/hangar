@@ -7,6 +7,7 @@
 from django.urls import include, path
 
 from plane.ext.views.project_workshops import ProjectWorkshopsEndpoint
+from plane.license.api.views.instance import InstanceMemberConfigEndpoint
 from plane.ext.views.epic import (
     EpicActivityEndpoint,
     EpicArchiveEndpoint,
@@ -90,6 +91,8 @@ PROJECT_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>"
 EPIC_BASE = "workspaces/<str:slug>/projects/<uuid:project_id>/epics"
 
 urlpatterns = [
+    # The instance configuration for a signed-in user; see InstanceMemberConfigEndpoint.
+    path("users/me/instance-config/", InstanceMemberConfigEndpoint.as_view(), name="instance-member-config"),
     path(
         "workspaces/<str:slug>/capacity/training-imports/",
         TrainingImportEndpoint.as_view(),
