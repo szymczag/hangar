@@ -361,16 +361,18 @@ class IssueCommentPublicViewSet(BaseViewSet):
             access="EXTERNAL",
             actor=request.user,
         )
-        serializer = IssueCommentSerializer(comment, data=_public_comment_data(request.data), partial=True)
+        data = _public_comment_data(request.data)
+        current_instance = json.dumps(IssueCommentSerializer(comment).data, cls=DjangoJSONEncoder)
+        serializer = IssueCommentSerializer(comment, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             issue_activity.delay(
                 type="comment.activity.updated",
-                requested_data=json.dumps(_public_comment_data(request.data), cls=DjangoJSONEncoder),
+                requested_data=json.dumps(data, cls=DjangoJSONEncoder),
                 actor_id=str(request.user.id),
                 issue_id=str(issue_id),
                 project_id=str(project_deploy_board.project_id),
-                current_instance=json.dumps(IssueCommentSerializer(comment).data, cls=DjangoJSONEncoder),
+                current_instance=current_instance,
                 epoch=int(timezone.now().timestamp()),
             )
             return Response(serializer.data, status=status.HTTP_200_OK)

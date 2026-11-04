@@ -71,6 +71,7 @@ class WorkspaceProjectAnchorEndpoint(BaseAPIView):
         project_deploy_board = DeployBoard.objects.get(
             workspace__slug=slug,
             project_id=project_id,
+            entity_identifier=project_id,
             entity_name="project",
             is_disabled=False,
         )
