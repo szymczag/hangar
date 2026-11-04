@@ -11,7 +11,6 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from plane.app.permissions import ROLE
 from plane.db.models import DeployBoard, FileAsset, IssueComment, ProjectMember
 from plane.settings.storage import S3Storage
 from plane.utils.file_asset_upload import (
@@ -239,16 +238,16 @@ class EntityAssetEndpoint(BaseAPIView):
         # Check if the project is published
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
-        membership = _active_project_member(deploy_board=deploy_board, user=request.user)
-        if membership is None:
+        if _active_project_member(deploy_board=deploy_board, user=request.user) is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
-        # Get the asset
-        asset = FileAsset.objects.get(
+        # A public-site user may only delete assets they created.
+        asset = FileAsset.objects.filter(
             id=pk,
             workspace=deploy_board.workspace,
             project_id=deploy_board.project_id,
-        )
-        if asset.created_by_id != request.user.id and membership.role != ROLE.ADMIN.value:
+            created_by=request.user,
+        ).first()
+        if asset is None:
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -270,13 +269,17 @@ class AssetRestoreEndpoint(BaseAPIView):
         # Check if the project is published
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
-        membership = _active_project_member(deploy_board=deploy_board, user=request.user)
-        if membership is None:
+        if _active_project_member(deploy_board=deploy_board, user=request.user) is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Get the asset — scope to project to prevent cross-project IDOR
-        asset = FileAsset.all_objects.get(id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id)
-        if asset.created_by_id != request.user.id and membership.role != ROLE.ADMIN.value:
+        # A public-site user may only restore assets they created.
+        asset = FileAsset.all_objects.filter(
+            id=pk,
+            workspace=deploy_board.workspace,
+            project_id=deploy_board.project_id,
+            created_by=request.user,
+        ).first()
+        if asset is None:
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -296,8 +299,7 @@ class EntityBulkAssetEndpoint(BaseAPIView):
         # Check if the project is published
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
-        membership = _active_project_member(deploy_board=deploy_board, user=request.user)
-        if membership is None:
+        if _active_project_member(deploy_board=deploy_board, user=request.user) is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
         if not deploy_board.is_comments_enabled:
@@ -322,13 +324,10 @@ class EntityBulkAssetEndpoint(BaseAPIView):
             workspace=deploy_board.workspace,
             project_id=deploy_board.project_id,
             entity_type=FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
+            # A public-site user may only rebind assets they created.
+            created_by=request.user,
         )
         if assets.count() != len(set(asset_ids)):
-            return Response(
-                {"error": "The requested asset could not be found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        if membership.role != ROLE.ADMIN.value and assets.exclude(created_by=request.user).exists():
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
