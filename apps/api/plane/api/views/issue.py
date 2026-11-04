@@ -2114,6 +2114,7 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
         ],
         responses={
             204: OpenApiResponse(description="Work item attachment deleted successfully"),
+            403: FORBIDDEN_RESPONSE,
             404: ATTACHMENT_NOT_FOUND_RESPONSE,
         },
     )
