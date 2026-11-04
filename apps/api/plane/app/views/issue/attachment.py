@@ -113,6 +113,13 @@ class IssueAttachmentEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):
+        # A restricted guest may only touch attachments of issues they created,
+        # mirroring the issue-detail visibility rule.
+        if issue_hidden_from_guest(request, slug, project_id, issue_id):
+            return Response(
+                {"error": "You are not allowed to view this issue"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if not ProjectMember.objects.filter(
             project_id=project_id,
             workspace__slug=slug,
@@ -255,6 +262,13 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):
+        # A restricted guest may only touch attachments of issues they created,
+        # mirroring the issue-detail visibility rule.
+        if issue_hidden_from_guest(request, slug, project_id, issue_id):
+            return Response(
+                {"error": "You are not allowed to view this issue"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if not ProjectMember.objects.filter(
             project_id=project_id,
             workspace__slug=slug,
