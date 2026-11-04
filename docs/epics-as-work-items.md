@@ -120,12 +120,35 @@ Use the standard project work-item endpoints for new integrations. Set `type_id`
 the project’s active Epic type when creating or updating a work item. Work-item
 responses expose both `type_id` and the derived `is_epic` value.
 
-Project type management is available under:
+Project type management for the signed-in application is available under:
 
 ```text
 GET  /api/workspaces/{workspace_slug}/projects/{project_id}/issue-types/
 POST /api/workspaces/{workspace_slug}/projects/{project_id}/issue-types/enable/
 ```
+
+An API token uses the same catalogue on the external API, which is what the
+Plane SDK and MCP server call. Send `X-Api-Key`. The list is a JSON array, and
+each object carries `id`, `name`, `is_epic`, an integer `level`, and
+`project_ids`. `is_epic` stays read-only. The first project list also provisions
+Task and Epic when that project does not have them yet, so the Epic id is
+available before any Epic work item exists.
+
+```text
+GET   /api/v1/workspaces/{slug}/projects/{project_id}/work-item-types/
+GET   /api/v1/workspaces/{slug}/projects/{project_id}/work-item-types/{type_id}/
+POST  /api/v1/workspaces/{slug}/projects/{project_id}/work-item-types/
+PATCH /api/v1/workspaces/{slug}/projects/{project_id}/work-item-types/{type_id}/
+GET   /api/v1/workspaces/{slug}/work-item-types/
+POST  /api/v1/workspaces/{slug}/projects/{project_id}/import-work-item-types/
+```
+
+`import-work-item-types` accepts `{"work_item_types": ["<type id>"]}` and links
+those workspace types to the project. Creating a type still cannot set
+`is_epic`; Epic remains the system type. A project member may read. Creating,
+editing, deleting, and importing require a project admin, or a workspace admin
+who is a member of the project. Workspace-scoped writes require a workspace
+admin.
 
 The work-item list endpoint accepts `group_by` and `sub_group_by` values of
 `parent_id` and `epic_id`. With `epic_id`, each returned work item includes the
