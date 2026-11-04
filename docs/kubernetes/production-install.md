@@ -52,6 +52,12 @@ Provision dedicated, least-privilege identities for Hangar:
 | RabbitMQ       | Authenticated AMQP URL                                        | TLS, virtual host, queue durability, capacity, and availability             |
 | Object storage | HTTPS S3-compatible endpoint, bucket, region, and credentials | Bucket policy, versioning, encryption, lifecycle, backups, and availability |
 
+For a `rediss://` Valkey URL, the API verifies the server certificate and
+hostname against the system CA bundle. The chart does not mount a custom CA
+bundle, so the Valkey certificate must chain to a public CA. As a temporary
+measure for a private CA, append `?ssl_cert_reqs=none` to the URL in the cache
+Secret. This turns verification off, as earlier releases did.
+
 Hangar's current Celery/Kombu stack can create transient, non-exclusive reply
 queues. Verify compatibility with your RabbitMQ release. RabbitMQ 4.x may require
 the `transient_nonexcl_queues` deprecated feature to be permitted until the
