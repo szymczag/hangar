@@ -12,7 +12,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from plane.app.permissions import ROLE
-from plane.db.models import DeployBoard, FileAsset, Issue, IssueComment, ProjectMember
+from plane.db.models import DeployBoard, FileAsset, IssueComment, ProjectMember
 from plane.settings.storage import S3Storage
 from plane.utils.file_asset_upload import (
     UPLOAD_URL_EXPIRATION_SECONDS,
@@ -42,6 +42,17 @@ def _active_project_member(*, deploy_board, user):
         project_id=deploy_board.project_id,
         member=user,
         is_active=True,
+    ).first()
+
+
+def _own_board_comment(comment_id, deploy_board, user):
+    """The user's own EXTERNAL comment in the board's project, or None."""
+    return IssueComment.objects.filter(
+        id=comment_id,
+        project_id=deploy_board.project_id,
+        workspace_id=deploy_board.workspace_id,
+        access="EXTERNAL",
+        actor=user,
     ).first()
 
 
@@ -111,37 +122,30 @@ class EntityAssetEndpoint(BaseAPIView):
         if _active_project_member(deploy_board=deploy_board, user=request.user) is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
-        entity_type = request.data.get("entity_type", "")
-        entity_identifier = request.data.get("entity_identifier")
+        # Public uploads are only for comment images on boards with comments enabled
+        if not deploy_board.is_comments_enabled:
+            return Response(
+                {"error": "Comments are not enabled for this project"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        if entity_type not in {
-            FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
-            FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
-        }:
+        entity_type = request.data.get("entity_type", "")
+        # The client sends "" for a comment that does not exist yet; keep such uploads unbound
+        entity_identifier = request.data.get("entity_identifier") or None
+
+        if entity_type != FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
             return Response(
                 {"error": "Invalid entity type.", "status": False},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if entity_type == FileAsset.EntityTypeContext.ISSUE_DESCRIPTION:
-            entity = Issue.objects.filter(
-                id=entity_identifier,
-                workspace_id=deploy_board.workspace_id,
-                project_id=deploy_board.project_id,
-            ).first()
-            entity_fields = {"issue_id": entity.id} if entity else None
-        else:
-            entity = IssueComment.objects.filter(
-                id=entity_identifier,
-                workspace_id=deploy_board.workspace_id,
-                project_id=deploy_board.project_id,
-            ).first()
-            entity_fields = {"comment_id": entity.id} if entity else None
-        if entity_fields is None:
-            return Response(
-                {"error": "Invalid entity context.", "status": False},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        # An existing comment must be the caller's own comment on this board
+        entity_fields = {}
+        if entity_identifier:
+            comment = _own_board_comment(entity_identifier, deploy_board, request.user)
+            if comment is None:
+                return Response({"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND)
+            entity_fields = {"comment_id": comment.id}
 
         try:
             metadata = validate_upload_metadata(
@@ -296,22 +300,22 @@ class EntityBulkAssetEndpoint(BaseAPIView):
         if membership is None:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
+        if not deploy_board.is_comments_enabled:
+            return Response(
+                {"error": "Comments are not enabled for this project"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Assets may only be bound to the caller's own comment on this board
+        comment = _own_board_comment(entity_id, deploy_board, request.user)
+        if comment is None:
+            return Response({"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND)
+
         asset_ids = request.data.get("asset_ids", [])
 
         # Check if the asset ids are provided
         if not isinstance(asset_ids, list) or not asset_ids:
             return Response({"error": "No asset ids provided."}, status=status.HTTP_400_BAD_REQUEST)
-
-        comment = IssueComment.objects.filter(
-            id=entity_id,
-            workspace=deploy_board.workspace,
-            project_id=deploy_board.project_id,
-        ).first()
-        if comment is None:
-            return Response(
-                {"error": "The requested entity could not be found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
 
         assets = FileAsset.objects.filter(
             id__in=asset_ids,
