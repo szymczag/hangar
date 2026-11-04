@@ -335,7 +335,7 @@ class UserServerAssetEndpoint(BaseAPIView):
         )
 
         # Get the presigned URL
-        storage = S3Storage(request=request, is_server=True)
+        storage = S3Storage(request=request)
         # Generate a presigned URL to share an S3 object
         presigned_url = storage.generate_presigned_post(
             object_name=asset_key,
@@ -453,6 +453,13 @@ class GenericAssetEndpoint(BaseAPIView):
             if not can_read_file_asset(user_id=request.user.id, asset=asset):
                 return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
 
+            # A project-bound asset requires active membership of its project.
+            if not asset.is_project_accessible_to(request.user):
+                return Response(
+                    {"error": "You don't have access to this asset."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             # Check if the asset exists and is uploaded
             if not asset.is_uploaded:
                 return Response(
@@ -565,7 +572,7 @@ class GenericAssetEndpoint(BaseAPIView):
 
         asset_key = build_pending_asset_key(namespace=str(workspace.id), name=metadata.name)
 
-        # Check for existing asset with same external details if provided
+        # Check for existing asset with same external details in this project
         if external_id and external_source:
             existing_assets = FileAsset.objects.filter(
                 workspace__slug=slug,

@@ -395,30 +395,6 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         else:
             return
 
-    def has_project_asset_access(self, request, asset):
-        """Return whether the user may access a workspace-scoped asset.
-
-        This endpoint is authorized at the WORKSPACE level, so a workspace
-        member/guest could otherwise reach an asset that belongs to a project
-        they are not a member of. For project-bound assets, require an active
-        ProjectMember of the asset's project. Workspace-level entity types
-        (WORKSPACE_LOGO, USER_AVATAR, USER_COVER) have project_id=None and are
-        always allowed.
-        """
-        if asset.project_id is None:
-            return True
-        # Scope the membership lookup to the asset's workspace as well as its
-        # project, mirroring allow_permission's PROJECT branch. This prevents a
-        # member of the same project in a different workspace from passing the
-        # check should an asset row ever be inconsistent (asset.workspace_id !=
-        # asset.project.workspace_id).
-        return ProjectMember.objects.filter(
-            member=request.user,
-            workspace_id=asset.workspace_id,
-            project_id=asset.project_id,
-            is_active=True,
-        ).exists()
-
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug):
         entity_type = request.data.get("entity_type")
@@ -520,7 +496,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         if asset is None:
             return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         # enforce project-level access for project-bound assets
-        if not self.has_project_asset_access(request, asset):
+        if not asset.is_project_accessible_to(request.user):
             return Response(
                 {"error": "You don't have access to this asset."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -553,7 +529,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         if asset is None:
             return Response({"error": "Asset not found."}, status=status.HTTP_404_NOT_FOUND)
         # enforce project-level access for project-bound assets
-        if not self.has_project_asset_access(request, asset):
+        if not asset.is_project_accessible_to(request.user):
             return Response(
                 {"error": "You don't have access to this asset."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -572,7 +548,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         # get the asset id
         asset = FileAsset.objects.get(id=asset_id, workspace__slug=slug)
         # enforce project-level access for project-bound assets
-        if not self.has_project_asset_access(request, asset):
+        if not asset.is_project_accessible_to(request.user):
             return Response(
                 {"error": "You don't have access to this asset."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -1143,6 +1119,13 @@ class WorkspaceAssetDownloadEndpoint(BaseAPIView):
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # A project-bound asset requires active membership of its project.
+        if not asset.is_project_accessible_to(request.user):
+            return Response(
+                {"error": "You don't have access to this asset."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         storage = S3Storage(request=request)
