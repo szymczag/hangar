@@ -28,6 +28,7 @@ from django.utils import timezone
 
 # Third party imports
 from rest_framework import status
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 
 # drf-spectacular imports
@@ -58,6 +59,7 @@ from plane.api.serializers import (
     RelatedIssueSerializer,
 )
 from plane.app.permissions import (
+    ProjectAdminPermission,
     ProjectEntityPermission,
     ProjectLitePermission,
     ProjectMemberPermission,
@@ -902,6 +904,12 @@ class LabelListCreateAPIEndpoint(BaseAPIView):
     model = Label
     permission_classes = [ProjectMemberPermission]
     use_read_replica = True
+
+    # Label writes are project-admin-only, matching the app API.
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [ProjectMemberPermission()]
+        return [ProjectAdminPermission()]
 
     def get_queryset(self):
         return (
@@ -2106,6 +2114,7 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
         ],
         responses={
             204: OpenApiResponse(description="Work item attachment deleted successfully"),
+            403: FORBIDDEN_RESPONSE,
             404: ATTACHMENT_NOT_FOUND_RESPONSE,
         },
     )
