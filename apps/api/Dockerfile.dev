@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED 1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 
 
 RUN apk --no-cache add \
-    "bash~=5.2" \
+    "bash~=5.3" \
     "libpq" \
     "libmagic" \
     "libxslt" \
@@ -14,7 +14,6 @@ RUN apk --no-cache add \
     "xmlsec" \
     "gnupg" \
     "libffi-dev" \
-    "bash~=5.2" \
     "g++" \
     "gcc" \
     "cargo" \
