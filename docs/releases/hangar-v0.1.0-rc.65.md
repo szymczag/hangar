@@ -72,20 +72,22 @@ volumes are node-local. The service name and the S3 port are unchanged, so
 
 **A `rediss://` connection now verifies its certificate.** Valkey or Redis behind
 a self-signed or private-CA certificate stops connecting until `REDIS_SSL_CA_CERTS`
-names the CA, or the URL carries `ssl_cert_reqs=none`. The chart cannot mount a CA
-bundle, so on Kubernetes the second is the workaround, set in the cache Secret's
-URL.
+names the CA, or the URL carries `ssl_cert_reqs=none`, which turns verification
+off again as earlier releases did. The chart cannot mount a CA bundle, so on
+Kubernetes the second is the temporary workaround, set in the cache Secret's URL.
 
 **A deploy board that points at another project is repaired.** Migration `0134`
 re-points every project board at its own project. When that project already has a
-live board, the extra board is unpublished instead. Public Space endpoints answer
+live board, the extra board is soft-deleted, which unpublishes it. Public Space endpoints answer
 404 for a board that still disagrees with its project.
 
 **Writes from another origin are refused.** A browser on a foreign origin gets 403
 on cookie-authenticated API writes. A deployment that serves the frontends and the
 API from the origins in its base URLs is unaffected. Behind more than one proxy,
 set `NUM_PROXIES` (and `TRUSTED_PROXIES`) so the throttle sees the client's address
-rather than the last proxy's; the Compose deployment passes both through.
+rather than the last proxy's. The Compose deployment passes both through, and its
+`TRUSTED_PROXIES` default of `0.0.0.0/0` trusts every forwarded address, so narrow
+it to the proxy's network where clients can reach the API directly.
 
 **The evaluation chart's bundled SeaweedFS is hardened inside the Pod.** It moves
 from 4.39 to 4.48 and signs filer and volume traffic with keys generated at each
@@ -108,8 +110,8 @@ version `0.1.0-rc.65`, and OCI chart
 
 The limitations described in `0.1.0-rc.64` are unchanged.
 
-Rolling back to rc.64 is safe for the database: migration `0134` has no reverse
-step, and the boards it repaired stay repaired, which the older build reads
+Rolling back to rc.64 is safe for the database: reversing migration `0134` is
+allowed and does nothing, so the boards it repaired stay repaired, which the older build reads
 without trouble. It is not safe for a Docker Compose install's uploads. rc.64
 names a MinIO image that can no longer be pulled, and the old `uploads` volume
 holds only what was there before the migration, so anything uploaded afterwards

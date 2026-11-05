@@ -194,8 +194,8 @@ retained GitHub release and the supported rollback target for this one. `rc.62`
 is **not a usable target for any deployment with Google Calendar capacity
 enabled**: every call to Google fails on it, so roll back past it, to `rc.61`.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-Rolling back to rc.64 is safe for the database: migration `0134` has no reverse
-step, and the deploy boards it repaired stay repaired, which the older build reads
+Rolling back to rc.64 is safe for the database: reversing migration `0134` is
+allowed and does nothing, so the deploy boards it repaired stay repaired, which the older build reads
 without trouble. The evaluation object store returns to SeaweedFS 4.39, which
 reads what 4.48 wrote, and again leaves its filer and volume ports unsigned behind
 NetworkPolicy alone. Rolling back to rc.63 additionally re-adds the Workshop type
@@ -250,14 +250,16 @@ on that release.
 Release rc.65 adds one migration, `0134` in the `db` application, and the
 ordinary release Job applies it; update the API, workers and frontends together
 as usual. It re-points any project deploy board that names another project at its
-own, unpublishing the extra board where the project already has one. Three
+own, soft-deleting (and so unpublishing) the extra board where the project
+already has one. Three
 changes in this release can stop a running deployment from working as before, so
 check them before upgrading:
 
 - **A `rediss://` Valkey must present a certificate the API trusts.** Connections
   now verify the certificate and hostname. The chart cannot mount a CA bundle, so
   for a self-signed or private-CA Valkey add `ssl_cert_reqs=none` to the URL in the
-  cache Secret ([production install](production-install.md)).
+  cache Secret, which turns certificate verification off again as a temporary
+  measure ([production install](production-install.md)).
 - **Cookie-authenticated writes must come from the instance's own origins.** A
   browser on another origin gets 403, and so does a client whose origin is missing
   from the base URLs.
