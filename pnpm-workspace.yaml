@@ -215,6 +215,10 @@ overrides:
   # Paste-handling XSS (GHSA-c8x8-7fp4-3x9w), fixed 1.42.3. @tiptap/pm 2.27.3
   # itself asks for ^1.42.3; this matches upstream's pin.
   prosemirror-view: 1.42.6
+  # prosemirror-view 1.42 needs prosemirror-model ^1.25.12 while the rest of the
+  # tree resolved 1.25.11. Two copies in one bundle make every Fragment check
+  # fail ("multiple versions of prosemirror-model"), which broke pasting.
+  prosemirror-model: 1.25.12
   "@types/express": 4.17.23
   typescript: "catalog:"
   vite: "catalog:"
