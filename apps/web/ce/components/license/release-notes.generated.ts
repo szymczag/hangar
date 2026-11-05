@@ -11,13 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.65",
+  version: "0.1.0-rc.66",
   highlights: [
-    "A visitor without a session no longer learns what the instance is.",
-    "More than forty of upstream Plane's security fixes from after v1.4.3 are in.",
-    "Sessions and sign-in are harder to abuse.",
-    "Assets are served inline only as validated images.",
-    "Images in a new public-board comment upload again.",
+    "A project cover or workspace logo can no longer be used to delete someone else's file.",
+    "Only an admin changes a project's cover.",
+    "Changing an asset inside a project requires membership of the project.",
+    "The proxy's Caddy is built on a patched Go.",
   ],
   upstream: {
     version: "1.4.0",
