@@ -1,4 +1,0 @@
-# Advisories Trivy may report that are accepted, each with the reason. Trivy
-# runs with --ignore-unfixed, so an advisory without a patched release needs no
-# entry here; one with a fix should be fixed rather than listed.
-vulnerabilities: []
