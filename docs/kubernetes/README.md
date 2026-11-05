@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.64`. It is qualified for evaluation on
+The current release is `0.1.0-rc.65`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.64` qualification boundary is:
+The `0.1.0-rc.65` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -179,27 +179,29 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.64`                               |
-| Helm chart version | `0.1.0-rc.64`                                |
-| Git tag            | `hangar-v0.1.0-rc.64`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.64` |
+| Product version    | `v0.1.0-rc.65`                               |
+| Helm chart version | `0.1.0-rc.65`                                |
+| Git tag            | `hangar-v0.1.0-rc.65`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.65` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
 refused publication on an unsigned tag, so nothing was published under it.
 Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
-installation, upgrade, or rollback targets. `rc.63` is the immediately previous
+installation, upgrade, or rollback targets. `rc.64` is the immediately previous
 retained GitHub release and the supported rollback target for this one. `rc.62`
 is **not a usable target for any deployment with Google Calendar capacity
 enabled**: every call to Google fails on it, so roll back past it, to `rc.61`.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
-Rolling back to rc.63 is safe in form -- an older build never reads the three
-columns and rows rc.64 adds -- but it is not without consequence. The older build
-re-adds the Workshop type to every project the next time it provisions system
-types, which is exactly the behaviour rc.64 removes; the Workshop role properties
-and everything recorded in them are dropped; and trainers whose hours rc.64 moved
-are returned to the previous default. Going back further, to rc.61, additionally
+Rolling back to rc.64 is safe for the database: migration `0134` has no reverse
+step, and the deploy boards it repaired stay repaired, which the older build reads
+without trouble. The evaluation object store returns to SeaweedFS 4.39, which
+reads what 4.48 wrote, and again leaves its filer and volume ports unsigned behind
+NetworkPolicy alone. Rolling back to rc.63 additionally re-adds the Workshop type
+to every project the next time system types are provisioned, drops the Workshop
+role properties and everything recorded in them, and returns trainers whose hours
+rc.64 moved to the previous default. Going back further, to rc.61, additionally
 returns the frontends to a report-only Content-Security-Policy, removes the
 calendar write-back surfaces, and restores the previous training recognition --
 which on a calendar that hides its guest list recognizes almost nothing. A
@@ -213,7 +215,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.64` notes](../releases/hangar-v0.1.0-rc.64.md) — review
+- [Release `v0.1.0-rc.65` notes](../releases/hangar-v0.1.0-rc.65.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -240,20 +242,31 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.0-rc.63`, tag `hangar-v0.1.0-rc.63`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.0-rc.63`. Anybody still on rc.62 with
+The previous release is `0.1.0-rc.64`, tag `hangar-v0.1.0-rc.64`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.0-rc.64`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
-Release rc.64 adds three migrations, all in the `ext` application, and the
-ordinary release Job applies them; update the API, workers and frontends together
-as usual. Two of them change what an operator will see afterwards. Projects that
-hold no Workshop stop offering the Workshop type, which they can turn back on in
-their own work item type settings, and trainers who never saved their booking
-hours move from a single 09:00-22:00 block to 09:00-17:00 plus 19:00-22:00 on
-weekdays. The third adds the Sales, PM and Trainers properties to the Workshop
-type. Read the release notes before upgrading if either of the first two matters
-to a workspace.
+Release rc.65 adds one migration, `0134` in the `db` application, and the
+ordinary release Job applies it; update the API, workers and frontends together
+as usual. It re-points any project deploy board that names another project at its
+own, unpublishing the extra board where the project already has one. Three
+changes in this release can stop a running deployment from working as before, so
+check them before upgrading:
+
+- **A `rediss://` Valkey must present a certificate the API trusts.** Connections
+  now verify the certificate and hostname. The chart cannot mount a CA bundle, so
+  for a self-signed or private-CA Valkey add `ssl_cert_reqs=none` to the URL in the
+  cache Secret ([production install](production-install.md)).
+- **Cookie-authenticated writes must come from the instance's own origins.** A
+  browser on another origin gets 403, and so does a client whose origin is missing
+  from the base URLs.
+- **`/api/instances/` answers only the sign-in configuration without a console
+  session.** A monitor or script that read the version from it must sign in and
+  read `/api/users/me/instance-config/`, or use the image's version label.
+
+The evaluation profile's SeaweedFS rolls once on upgrade (see
+[Evaluation object storage](#evaluation-object-storage)).
 
 Before upgrading, check that `hangar.publicOrigin` and the base URLs are the
 origins users actually open. The Content-Security-Policy is enforced from this
@@ -288,9 +301,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The release workflow verifies anonymous access to the rc.64 chart archive, OCI
+The release workflow verifies anonymous access to the rc.65 chart archive, OCI
 chart and digest-pinned images, and creates provenance attestations and keyless
-Cosign signatures. No new live-cluster qualification is claimed for rc.64.
+Cosign signatures. No new live-cluster qualification is claimed for rc.65.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure
