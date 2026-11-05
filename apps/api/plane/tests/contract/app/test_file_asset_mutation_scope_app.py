@@ -121,7 +121,7 @@ def create_asset(*, workspace, creator, entity_type, project=None, issue=None, p
 @pytest.mark.contract
 class TestFileAssetMutationScope:
     @pytest.mark.django_db
-    def test_project_member_can_create_project_cover(
+    def test_project_member_cannot_create_project_cover(
         self,
         member_client,
         member,
@@ -145,16 +145,16 @@ class TestFileAssetMutationScope:
                 format="json",
             )
 
-        assert response.status_code == status.HTTP_200_OK
-        assert FileAsset.objects.filter(
-            id=response.data["asset_id"],
+        # The cover belongs to the project's settings, which only an admin edits.
+        assert response.status_code >= 400
+        assert not FileAsset.objects.filter(
             created_by=member,
             project=project,
             entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
         ).exists()
 
     @pytest.mark.django_db
-    def test_project_member_can_manage_another_members_project_cover(
+    def test_project_member_cannot_manage_another_members_project_cover(
         self,
         member,
         workspace,
@@ -192,12 +192,103 @@ class TestFileAssetMutationScope:
         delete_response = client.delete(project_url)
         restore_response = client.post(f"/api/assets/v2/workspaces/{workspace.slug}/restore/{asset.id}/")
 
+        assert patch_response.status_code == status.HTTP_404_NOT_FOUND
+        assert delete_response.status_code == status.HTTP_404_NOT_FOUND
+        assert restore_response.status_code == status.HTTP_404_NOT_FOUND
+        complete_upload.assert_not_called()
+        asset.refresh_from_db()
+        assert asset.is_deleted is False
+
+    @pytest.mark.django_db
+    def test_project_admin_can_manage_another_members_project_cover(
+        self,
+        member,
+        workspace,
+        project,
+    ):
+        admin = User.objects.create(
+            email=f"project-admin-{uuid4().hex[:8]}@plane.so",
+            username=f"project_admin_{uuid4().hex[:8]}",
+        )
+        WorkspaceMember.objects.create(workspace=workspace, member=admin, role=ROLE.MEMBER.value, is_active=True)
+        ProjectMember.objects.create(
+            project=project, workspace=workspace, member=admin, role=ROLE.ADMIN.value, is_active=True
+        )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+        asset = create_asset(
+            workspace=workspace,
+            project=project,
+            creator=member,
+            entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+        )
+        project_url = f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/{asset.id}/"
+
+        with mock.patch("plane.app.views.asset.v2.complete_asset_upload") as complete_upload:
+            patch_response = client.patch(project_url)
+        delete_response = client.delete(project_url)
+        restore_response = client.post(f"/api/assets/v2/workspaces/{workspace.slug}/restore/{asset.id}/")
+
         assert patch_response.status_code == status.HTTP_204_NO_CONTENT
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
         assert restore_response.status_code == status.HTTP_204_NO_CONTENT
         complete_upload.assert_called_once()
         asset.refresh_from_db()
         assert asset.is_deleted is False
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "entity_type",
+        [FileAsset.EntityTypeContext.ISSUE_ATTACHMENT, FileAsset.EntityTypeContext.ISSUE_DESCRIPTION],
+    )
+    def test_workspace_admin_outside_the_project_cannot_change_its_assets(
+        self, member, workspace, project, entity_type
+    ):
+        outsider_admin = User.objects.create(
+            email=f"ws-admin-{uuid4().hex[:8]}@plane.so",
+            username=f"ws_admin_{uuid4().hex[:8]}",
+        )
+        WorkspaceMember.objects.create(
+            workspace=workspace, member=outsider_admin, role=ROLE.ADMIN.value, is_active=True
+        )
+        client = APIClient()
+        client.force_authenticate(user=outsider_admin)
+        asset = create_asset(workspace=workspace, project=project, creator=member, entity_type=entity_type)
+
+        delete_response = client.delete(f"/api/assets/v2/workspaces/{workspace.slug}/{asset.id}/")
+        asset.refresh_from_db()
+        assert delete_response.status_code in (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND)
+        assert asset.is_deleted is False
+
+        FileAsset.objects.filter(pk=asset.pk).update(is_deleted=True)
+        restore_response = client.post(f"/api/assets/v2/workspaces/{workspace.slug}/restore/{asset.id}/")
+        assert restore_response.status_code in (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND)
+        assert FileAsset.all_objects.get(pk=asset.pk).is_deleted is True
+
+    @pytest.mark.django_db
+    def test_workspace_admin_in_the_project_can_delete_another_users_attachment(
+        self, member, workspace, project
+    ):
+        ws_admin = User.objects.create(
+            email=f"ws-admin-in-{uuid4().hex[:8]}@plane.so",
+            username=f"ws_admin_in_{uuid4().hex[:8]}",
+        )
+        WorkspaceMember.objects.create(workspace=workspace, member=ws_admin, role=ROLE.ADMIN.value, is_active=True)
+        ProjectMember.objects.create(
+            project=project, workspace=workspace, member=ws_admin, role=ROLE.MEMBER.value, is_active=True
+        )
+        client = APIClient()
+        client.force_authenticate(user=ws_admin)
+        asset = create_asset(
+            workspace=workspace,
+            project=project,
+            creator=member,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+        )
+
+        response = client.delete(f"/api/assets/v2/workspaces/{workspace.slug}/{asset.id}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
 
     @pytest.mark.django_db
     def test_workspace_admin_with_project_guest_role_can_create_project_cover(

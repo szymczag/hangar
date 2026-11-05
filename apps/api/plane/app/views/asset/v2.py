@@ -924,14 +924,14 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
             role=ROLE.ADMIN.value,
             is_active=True,
         )
-        project_manager = ProjectMember.objects.select_for_update().filter(
+        project_admin = ProjectMember.objects.select_for_update().filter(
             project_id=project_id,
             workspace=workspace,
             member=request.user,
-            role__in=[ROLE.ADMIN.value, ROLE.MEMBER.value],
+            role=ROLE.ADMIN.value,
             is_active=True,
         )
-        return workspace_admin.exists() or project_manager.exists()
+        return workspace_admin.exists() or project_admin.exists()
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, entity_id):
