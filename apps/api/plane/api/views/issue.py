@@ -96,6 +96,7 @@ from plane.utils.file_asset_upload import (
     validate_upload_metadata,
 )
 from plane.utils.file_asset_permissions import can_mutate_file_asset
+from plane.utils.serializers import writable_data
 from plane.utils.issue_relation_mapper import get_actual_relation
 from plane.bgtasks.webhook_task import model_activity
 from plane.app.permissions import ROLE
@@ -563,11 +564,6 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
                 )
 
             serializer.save()
-            # Refetch the issue
-            issue = Issue.objects.filter(workspace__slug=slug, project_id=project_id, pk=serializer.data["id"]).first()
-            issue.created_at = request.data.get("created_at", timezone.now())
-            issue.created_by_id = request.data.get("created_by", request.user.id)
-            issue.save(update_fields=["created_at", "created_by"])
 
             # Track the issue
             issue_activity.delay(
@@ -723,9 +719,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                 # changes and dispatch the issue activity
                 current_instance = json.dumps(IssueSerializer(issue).data, cls=DjangoJSONEncoder)
 
-                # Get the requested data, encode it as django object and pass it
-                # to serializer to validation
-                requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
+                # Pass the requested data to the serializer for validation
                 serializer = IssueSerializer(
                     issue,
                     data=request.data,
@@ -739,9 +733,11 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                     # If the serializer is valid, save the issue and dispatch
                     # the update issue activity worker event.
                     serializer.save()
+                    # Read-only fields are ignored on save, so they are not reported as changes either.
+                    accepted_data = writable_data(serializer, request.data)
                     issue_activity.delay(
                         type="issue.activity.updated",
-                        requested_data=requested_data,
+                        requested_data=json.dumps(accepted_data, cls=DjangoJSONEncoder),
                         actor_id=str(request.user.id),
                         issue_id=str(issue.id),
                         project_id=str(project_id),
@@ -754,7 +750,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                     model_activity.delay(
                         model_name="issue",
                         model_id=str(issue.id),
-                        requested_data=request.data,
+                        requested_data=accepted_data,
                         current_instance=current_instance,
                         actor_id=request.user.id,
                         slug=slug,
@@ -785,19 +781,6 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                 # issue activity worker event as created
                 if serializer.is_valid():
                     serializer.save()
-                    # Refetch the issue
-                    issue = Issue.objects.filter(
-                        workspace__slug=slug,
-                        project_id=project_id,
-                        pk=serializer.data["id"],
-                    ).first()
-
-                    # If any of the created_at or created_by is present, update
-                    # the issue with the provided data, else return with the
-                    # default states given.
-                    issue.created_at = request.data.get("created_at", timezone.now())
-                    issue.created_by_id = request.data.get("created_by", request.user.id)
-                    issue.save(update_fields=["created_at", "created_by"])
 
                     issue_activity.delay(
                         type="issue.activity.created",
@@ -860,7 +843,6 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         project = Project.objects.select_for_update().get(pk=project_id, workspace__slug=slug)
         issue = Issue.objects.select_for_update().get(workspace__slug=slug, project_id=project_id, pk=pk)
         current_instance = json.dumps(IssueSerializer(issue).data, cls=DjangoJSONEncoder)
-        requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
         serializer = IssueSerializer(
             issue,
             data=request.data,
@@ -887,9 +869,11 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                 )
 
             serializer.save()
+            # Read-only fields are ignored on save, so they are not reported as changes either.
+            accepted_data = writable_data(serializer, request.data)
             issue_activity.delay(
                 type="issue.activity.updated",
-                requested_data=requested_data,
+                requested_data=json.dumps(accepted_data, cls=DjangoJSONEncoder),
                 actor_id=str(request.user.id),
                 issue_id=str(pk),
                 project_id=str(project_id),
@@ -902,7 +886,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             model_activity.delay(
                 model_name="issue",
                 model_id=str(pk),
-                requested_data=request.data,
+                requested_data=accepted_data,
                 current_instance=current_instance,
                 actor_id=request.user.id,
                 slug=slug,
@@ -1290,13 +1274,12 @@ class IssueLinkListCreateAPIEndpoint(BaseAPIView):
         Add a new external link to a work item with URL, title, and metadata.
         Automatically tracks link creation activity.
         """
+        Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=issue_id)
         serializer = IssueLinkCreateSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(project_id=project_id, issue_id=issue_id)
             crawl_work_item_link_title.delay(serializer.instance.id, serializer.instance.url)
             link = IssueLink.objects.get(pk=serializer.instance.id)
-            link.created_by_id = request.data.get("created_by", request.user.id)
-            link.save(update_fields=["created_by"])
             issue_activity.delay(
                 type="link.activity.created",
                 requested_data=json.dumps(serializer.data, cls=DjangoJSONEncoder),
@@ -1601,11 +1584,6 @@ class IssueCommentListCreateAPIEndpoint(BaseAPIView):
         if serializer.is_valid():
             serializer.save(project_id=project_id, issue_id=issue_id, actor=request.user)
             issue_comment = IssueComment.objects.get(pk=serializer.instance.id)
-            # Update the created_at and the created_by and save the comment
-            issue_comment.created_at = request.data.get("created_at", timezone.now())
-            issue_comment.created_by_id = request.data.get("created_by", request.user.id)
-            issue_comment.actor_id = request.data.get("created_by", request.user.id)
-            issue_comment.save(update_fields=["created_at", "created_by"])
 
             issue_activity.delay(
                 type="comment.activity.created",
@@ -2761,6 +2739,8 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
         relation_type = serializer.validated_data["relation_type"]
         issues = serializer.validated_data["issues"]
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
+        # The URL issue is one side of every relation; bind it to the URL project too.
+        Issue.issue_objects.get(workspace__slug=slug, project_id=project_id, pk=issue_id)
 
         actual_relation = get_actual_relation(relation_type)
         is_reverse = relation_type in ["blocking", "start_after", "finish_after"]
@@ -2793,7 +2773,7 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
 
         issue_activity.delay(
             type="issue_relation.activity.created",
-            requested_data=json.dumps(request.data, cls=DjangoJSONEncoder),
+            requested_data=json.dumps({"relation_type": relation_type, "issues": issues}, cls=DjangoJSONEncoder),
             actor_id=str(request.user.id),
             issue_id=str(issue_id),
             project_id=str(project_id),

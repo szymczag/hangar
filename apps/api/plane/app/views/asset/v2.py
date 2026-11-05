@@ -43,6 +43,7 @@ from plane.utils.file_asset_upload import (
     UploadError,
     build_pending_asset_key,
     complete_asset_upload,
+    stored_mime_type,
     upload_error_payload,
     validate_upload_metadata,
 )
@@ -57,8 +58,9 @@ from plane.utils.file_asset_permissions import (
 class UserAssetsV2Endpoint(BaseAPIView):
     """This endpoint is used to upload user profile images."""
 
-    def asset_delete(self, asset_id):
-        asset = FileAsset.objects.filter(id=asset_id).first()
+    def asset_delete(self, asset_id, user_id):
+        # Only delete an asset owned by the user it is unlinked from
+        asset = FileAsset.objects.filter(id=asset_id, user_id=user_id).first()
         if asset is None:
             return
         asset.is_deleted = True
@@ -73,7 +75,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
             user.avatar = ""
             # Delete the previous avatar
             if user.avatar_asset_id:
-                self.asset_delete(user.avatar_asset_id)
+                self.asset_delete(user.avatar_asset_id, user.id)
             # Save the new avatar
             user.avatar_asset_id = asset_id
             user.save()
@@ -91,7 +93,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
             user.cover_image = None
             # Delete the previous cover image
             if user.cover_image_asset_id:
-                self.asset_delete(user.cover_image_asset_id)
+                self.asset_delete(user.cover_image_asset_id, user.id)
             # Save the new cover image
             user.cover_image_asset_id = asset_id
             user.save()
@@ -661,7 +663,7 @@ class StaticFileAssetEndpoint(BaseAPIView):
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
+        asset_mime_type = stored_mime_type(asset)
         if asset_mime_type not in {
             "image/gif",
             "image/jpeg",

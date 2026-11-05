@@ -209,6 +209,9 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
         # Get the workspace
         workspace = Workspace.objects.get(slug=slug)
 
+        # The URL issue must belong to the URL workspace + project (404 otherwise).
+        Issue.objects.get(pk=issue_id, workspace=workspace, project_id=project_id)
+
         asset_key = build_pending_asset_key(namespace=str(workspace.id), name=metadata.name)
 
         # Get the size limit

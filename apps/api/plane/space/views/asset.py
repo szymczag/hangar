@@ -16,6 +16,7 @@ from plane.settings.storage import S3Storage
 from plane.utils.file_asset_upload import (
     UPLOAD_URL_EXPIRATION_SECONDS,
     UPLOAD_VALIDATION_VERSION,
+    stored_mime_type,
     UploadError,
     build_pending_asset_key,
     complete_asset_upload,
@@ -91,11 +92,10 @@ class EntityAssetEndpoint(BaseAPIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Get the presigned URL.
-        # Force attachment disposition for script-capable MIME types to prevent
-        # same-origin XSS when Spaces assets are served on the application's origin.
+        # Get the presigned URL. Inline only for an allow-listed image type, which S3Storage
+        # pins as the response Content-Type; any other type downloads.
         storage = S3Storage(request=request)
-        asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
+        asset_mime_type = stored_mime_type(asset)
         can_render_inline = asset.upload_validation_version == UPLOAD_VALIDATION_VERSION and asset_mime_type in {
             "image/gif",
             "image/jpeg",

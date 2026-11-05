@@ -42,6 +42,7 @@ from plane.utils.exception_logger import log_exception
 from plane.utils.file_asset_upload import (
     UPLOAD_URL_EXPIRATION_SECONDS,
     UPLOAD_VALIDATION_VERSION,
+    stored_mime_type,
     RASTER_IMAGE_MIME_BY_EXTENSION,
     UploadError,
     build_pending_asset_key,
@@ -467,12 +468,10 @@ class GenericAssetEndpoint(BaseAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Generate presigned URL for GET.
-            # Force attachment disposition for script-capable MIME types (e.g. SVG)
-            # to prevent same-origin XSS when the asset URL shares the app's origin
-            # (default MinIO self-hosted setup).
+            # Generate presigned URL for GET. Inline only for an allow-listed image type, which S3Storage
+            # pins as the response Content-Type; any other type downloads.
             storage = S3Storage(request=request, is_server=True)
-            asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
+            asset_mime_type = stored_mime_type(asset)
             inline_types = set(RASTER_IMAGE_MIME_BY_EXTENSION.values())
             can_render_inline = (
                 asset.upload_validation_version == UPLOAD_VALIDATION_VERSION and asset_mime_type in inline_types
