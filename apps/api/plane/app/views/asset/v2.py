@@ -319,8 +319,17 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
             return None
         return None
 
-    def asset_delete(self, asset_id):
-        asset = FileAsset.objects.filter(id=asset_id).first()
+    def asset_delete(self, asset_id, *, workspace_id, entity_type, project_id=None):
+        """Retire the entity's previous asset, and only if it really is one.
+
+        The previous id is read from a column a client could once write, so it is
+        matched against the entity it is supposed to belong to before anything is
+        deleted.
+        """
+        scope = {"id": asset_id, "workspace_id": workspace_id, "entity_type": entity_type}
+        if project_id is not None:
+            scope["project_id"] = project_id
+        asset = FileAsset.objects.filter(**scope).first()
         # Check if the asset exists
         if asset is None:
             return
@@ -338,7 +347,11 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
                 return
             # Delete the previous logo
             if workspace.logo_asset_id:
-                self.asset_delete(workspace.logo_asset_id)
+                self.asset_delete(
+                    workspace.logo_asset_id,
+                    workspace_id=workspace.id,
+                    entity_type=FileAsset.EntityTypeContext.WORKSPACE_LOGO,
+                )
             # Save the new logo
             workspace.logo = ""
             workspace.logo_asset_id = asset_id
@@ -360,7 +373,12 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
                 return
             # Delete the previous cover image
             if project.cover_image_asset_id:
-                self.asset_delete(project.cover_image_asset_id)
+                self.asset_delete(
+                    project.cover_image_asset_id,
+                    workspace_id=project.workspace_id,
+                    entity_type=FileAsset.EntityTypeContext.PROJECT_COVER,
+                    project_id=project.id,
+                )
             # Save the new cover image
             project.cover_image = ""
             project.cover_image_asset_id = asset_id
@@ -924,14 +942,14 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
             role=ROLE.ADMIN.value,
             is_active=True,
         )
-        project_manager = ProjectMember.objects.select_for_update().filter(
+        project_admin = ProjectMember.objects.select_for_update().filter(
             project_id=project_id,
             workspace=workspace,
             member=request.user,
-            role__in=[ROLE.ADMIN.value, ROLE.MEMBER.value],
+            role=ROLE.ADMIN.value,
             is_active=True,
         )
-        return workspace_admin.exists() or project_manager.exists()
+        return workspace_admin.exists() or project_admin.exists()
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, entity_id):

@@ -24,7 +24,13 @@ def _active_project_membership(*, user_id, workspace_id, project_id):
 
 
 def can_manage_project_cover(*, user_id, workspace_id, project_id) -> bool:
-    """Authorize project-cover changes using workspace and project roles."""
+    """Authorize project-cover changes with the rule project settings use.
+
+    The cover is part of the project's settings, which only a project admin or a
+    workspace admin may change (ProjectViewSet.partial_update). Associating a
+    cover asset writes project.cover_image_asset directly, so it must not be the
+    side door through which a project member changes it.
+    """
 
     return (
         is_workspace_asset_admin(
@@ -36,9 +42,7 @@ def can_manage_project_cover(*, user_id, workspace_id, project_id) -> bool:
             workspace_id=workspace_id,
             project_id=project_id,
         )
-        .filter(
-            role__in=[ROLE.ADMIN.value, ROLE.MEMBER.value],
-        )
+        .filter(role=ROLE.ADMIN.value)
         .exists()
     )
 
@@ -121,7 +125,10 @@ def can_mutate_file_asset(*, user_id, asset: FileAsset) -> bool:
             workspace_id=asset.workspace_id,
             project_id=asset.project_id,
         )
-        if not project_membership.exists() and not workspace_admin:
+        # Active membership of the asset's project first, for a workspace admin
+        # too: can_read_file_asset already refuses a non-member, and an asset a
+        # caller may not read is not one they may delete, restore or rebind.
+        if not project_membership.exists():
             return False
         return (
             asset.created_by_id == user_id

@@ -113,8 +113,13 @@ their creator, and public pages still require an active project link and
 membership in that linked project. This applies consistently to current,
 legacy multipart, bulk, duplicate, and draft-conversion paths.
 Project-cover creation, duplication, association, completion, deletion, and
-restoration additionally require an active project member or administrator;
-project guests cannot change the project cover through an asset side channel.
+restoration require a project administrator or a workspace administrator, the
+same rule as the project settings the cover belongs to; project members and
+guests cannot change the project cover through an asset side channel.
+Changing any other asset bound to a project (an attachment, a description
+image) requires active membership of that project, for a workspace administrator
+as well; within it, the uploader, a project administrator or a workspace
+administrator may delete, restore or rebind it.
 Public Spaces and API downloads render raster content inline only when the
 trusted database validation marker is current; historical unvalidated assets
 remain available only as forced `application/octet-stream` attachments.
