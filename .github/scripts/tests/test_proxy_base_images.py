@@ -21,7 +21,7 @@ class ProxyBaseImageTests(unittest.TestCase):
         )
 
         self.assertEqual(len(references), 2)
-        self.assertEqual({version for version, _, _ in references}, {"2.11.4"})
+        self.assertEqual({version for version, _, _ in references}, {"2.11.7"})
         self.assertEqual({variant for _, variant, _ in references}, {"-builder", ""})
 
 
