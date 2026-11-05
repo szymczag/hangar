@@ -11,6 +11,7 @@ from .user import UserLiteSerializer, UserAdminLiteSerializer
 
 
 from plane.db.models import (
+    FileAsset,
     Workspace,
     WorkspaceMember,
     WorkspaceMemberInvite,
@@ -56,6 +57,22 @@ class WorkSpaceSerializer(DynamicBaseSerializer):
             raise serializers.ValidationError(
                 "Name must contain at least one letter or number"
             )
+        return value
+
+    def validate_logo_asset(self, value):
+        """Only this workspace's own logo asset may be named here, or none.
+
+        Same reason as ProjectSerializer.validate_cover_image_asset: the next logo
+        upload soft-deletes whatever this field points at.
+        """
+        if value is None:
+            return value
+        if (
+            self.instance is None
+            or value.entity_type != FileAsset.EntityTypeContext.WORKSPACE_LOGO
+            or value.workspace_id != self.instance.id
+        ):
+            raise serializers.ValidationError("Choose a logo uploaded for this workspace.")
         return value
 
     def validate_slug(self, value):

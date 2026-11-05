@@ -22,6 +22,7 @@ from plane.db.models import (
     DeployBoard,
     ProjectPublicMember,
     IssueSequence,
+    FileAsset,
 )
 from plane.utils.content_validator import (
     validate_html_content,
@@ -42,6 +43,27 @@ class ProjectSerializer(BaseSerializer):
         # created_by when it is None, so a supplied value would survive — mark them
         # read-only so the client value is ignored.
         read_only_fields = ["workspace", "deleted_at", "created_by", "updated_by"]
+
+    def validate_cover_image_asset(self, value):
+        """Only this project's own cover asset may be named here, or none.
+
+        The field is a writable FK over every FileAsset. A caller who can edit one
+        project (its creator, say) could otherwise point it at any asset -- another
+        project's cover, an attachment, another workspace's file -- and the next
+        cover upload would soft-delete that asset as the "previous" cover. Covers
+        are bound through the asset endpoints, which check the role; the web app
+        only ever sends null here.
+        """
+        if value is None:
+            return value
+        if (
+            self.instance is None
+            or value.entity_type != FileAsset.EntityTypeContext.PROJECT_COVER
+            or value.project_id != self.instance.id
+            or value.workspace_id != self.instance.workspace_id
+        ):
+            raise serializers.ValidationError("Choose a cover uploaded for this project.")
+        return value
 
     def validate_name(self, name):
         project_id = self.instance.id if self.instance else None
