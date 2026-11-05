@@ -52,16 +52,19 @@ class ContainerRuntimeHardeningTests(unittest.TestCase):
     def test_custom_caddy_asserts_security_module_floors(self):
         dockerfile = self._read("apps/proxy/Dockerfile.ce")
         for module in (
-            "golang.org/x/crypto@v0.55.0",
-            "golang.org/x/net@v0.57.0",
-            "golang.org/x/text@v0.41.0",
-            "google.golang.org/grpc@v1.83.1",
-            "go.opentelemetry.io/otel@v1.44.0",
-            "go.opentelemetry.io/otel/sdk@v1.44.0",
+            "golang.org/x/crypto@v0.57.0",
+            "golang.org/x/net@v0.60.0",
+            "golang.org/x/text@v0.42.0",
+            "google.golang.org/grpc@v1.83.2",
+            "github.com/go-jose/go-jose/v4@v4.1.6",
+            "go.opentelemetry.io/otel@v1.46.0",
+            "go.opentelemetry.io/otel/sdk@v1.46.0",
         ):
             with self.subTest(module=module):
                 self.assertIn(module, dockerfile)
-        self.assertEqual(dockerfile.count("go version -m /usr/bin/caddy"), 4)
+        self.assertEqual(dockerfile.count("go version -m /usr/bin/caddy"), 5)
+        # The toolchain floor: Go 1.27.3 carries the stdlib advisory fixes.
+        self.assertIn("go version /usr/bin/caddy | grep -qE ': go1\\.(27\\.", dockerfile)
 
 
 if __name__ == "__main__":
