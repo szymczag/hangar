@@ -7,6 +7,9 @@ import logging
 import os
 import uuid
 
+# Django imports
+from django.conf import settings
+
 # Third party imports
 import boto3
 from botocore.exceptions import ClientError
@@ -123,14 +126,13 @@ class S3Storage(S3Boto3Storage):
 
     def _get_content_disposition(self, disposition, filename=None):
         """Helper method to generate Content-Disposition header value"""
-        if filename is None:
+        # Asset names are client-editable; use only a non-empty string, else a random name.
+        if not isinstance(filename, str) or not filename:
             filename = uuid.uuid4().hex
 
-        if filename:
-            # Encode the filename to handle special characters
-            encoded_filename = quote(filename)
-            return f"{disposition}; filename*=UTF-8''{encoded_filename}"
-        return disposition
+        # Encode the filename to handle special characters
+        encoded_filename = quote(filename)
+        return f"{disposition}; filename*=UTF-8''{encoded_filename}"
 
     def generate_presigned_url(
         self,
@@ -141,18 +143,27 @@ class S3Storage(S3Boto3Storage):
         filename=None,
         content_type=None,
     ):
-        """Generate a presigned URL to share an S3 object"""
+        """Generate a presigned URL to share an S3 object.
+
+        Inline is honoured only when ``content_type`` is in ``INLINE_SAFE_MIME_TYPES``,
+        and that type is then pinned as the response Content-Type, whatever the stored
+        object's own type is. Anything else, including SVG and HTML, or a missing type,
+        is served as an attachment typed application/octet-stream.
+        """
         if expiration is None:
             expiration = self.signed_url_expiration
-        content_disposition = self._get_content_disposition(disposition, filename)
+        params = {"Bucket": self.aws_storage_bucket_name, "Key": str(object_name)}
+        content_type = content_type.split(";")[0].strip().lower() if isinstance(content_type, str) else ""
+        if disposition == "inline" and content_type in settings.INLINE_SAFE_MIME_TYPES:
+            params["ResponseContentType"] = content_type
+        else:
+            disposition = "attachment"
+            # Never the stored type: object storage may share the app's origin, and an
+            # uploaded script served as text/javascript could be loaded by a page on it
+            # whatever the disposition says.
+            params["ResponseContentType"] = "application/octet-stream"
+        params["ResponseContentDisposition"] = self._get_content_disposition(disposition, filename)
         try:
-            params = {
-                "Bucket": self.aws_storage_bucket_name,
-                "Key": str(object_name),
-                "ResponseContentDisposition": content_disposition,
-            }
-            if content_type:
-                params["ResponseContentType"] = content_type
             response = self.s3_presign_client.generate_presigned_url(
                 "get_object",
                 Params=params,

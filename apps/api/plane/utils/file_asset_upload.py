@@ -34,6 +34,18 @@ RASTER_IMAGE_MIME_BY_EXTENSION = {
     ".webp": "image/webp",
 }
 
+def stored_mime_type(asset) -> str:
+    """The asset's recorded MIME type without parameters, or "" when it is missing.
+
+    ``attributes`` is client-editable JSON, so the value may be any JSON type; a
+    non-string answers "" rather than raising, and is then never served inline.
+    """
+    value = (asset.attributes or {}).get("type")
+    if not isinstance(value, str):
+        return ""
+    return value.split(";")[0].strip().lower()
+
+
 ATTACHMENT_MIME_BY_EXTENSION = {
     **RASTER_IMAGE_MIME_BY_EXTENSION,
     ".7z": "application/x-7z-compressed",
