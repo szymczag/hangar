@@ -269,7 +269,7 @@ def test_providers_that_overwrite_profiles_are_reported(db, setup_instance):
     _seed("ENABLE_GITHUB_SYNC", "0")
 
     cache.clear()
-    config = APIClient().get("/api/instances/").data["config"]
+    config = _member_config()
 
     assert "google" in config["provider_managed_profiles"]
     assert "github" not in config["provider_managed_profiles"]
@@ -280,4 +280,12 @@ def test_providers_that_overwrite_profiles_are_reported(db, setup_instance):
 def test_no_provider_manages_profiles_by_default(db, setup_instance):
     cache.clear()
 
-    assert APIClient().get("/api/instances/").data["config"]["provider_managed_profiles"] == []
+    assert _member_config()["provider_managed_profiles"] == []
+
+
+def _member_config():
+    """Signed-in users read these keys from the member endpoint; /api/instances/ withholds them without a session."""
+    member = User.objects.create(email=f"member-{uuid.uuid4().hex[:6]}@corp.example", username=uuid.uuid4().hex)
+    client = APIClient()
+    client.force_authenticate(user=member)
+    return client.get("/api/users/me/instance-config/").data["config"]
