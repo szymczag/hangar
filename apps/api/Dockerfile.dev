@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.12.5-alpine AS backend
+FROM docker.io/library/python:3.12.12-alpine AS backend
 
 # set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED 1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 
 
 RUN apk --no-cache add \
-    "bash~=5.2" \
+    "bash~=5.3" \
     "libpq" \
     "libmagic" \
     "libxslt" \
@@ -14,7 +14,6 @@ RUN apk --no-cache add \
     "xmlsec" \
     "gnupg" \
     "libffi-dev" \
-    "bash~=5.2" \
     "g++" \
     "gcc" \
     "cargo" \
