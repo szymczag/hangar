@@ -11,11 +11,10 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.67",
+  version: "0.1.0-rc.68",
   highlights: [
-    "The space and live images no longer ship the build toolchain.",
-    "A workspace created from the instance-admin console cannot start with someone else's logo.",
-    "minimatch moves past its last open advisory.",
+    "No change in this release alters what is read, written, stored or shown.",
+    "Upgrading a database that holds a Workshop no longer fails.",
   ],
   upstream: {
     version: "1.4.0",
