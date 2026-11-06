@@ -72,9 +72,9 @@ class ContainerRuntimeHardeningTests(unittest.TestCase):
     def test_custom_caddy_asserts_security_module_floors(self):
         dockerfile = self._read("apps/proxy/Dockerfile.ce")
         for module in (
-            "golang.org/x/crypto@v0.57.0",
-            "golang.org/x/net@v0.60.0",
-            "golang.org/x/text@v0.42.0",
+            "golang.org/x/crypto@v0.58.0",
+            "golang.org/x/net@v0.62.0",
+            "golang.org/x/text@v0.43.0",
             "google.golang.org/grpc@v1.83.2",
             "github.com/go-jose/go-jose/v4@v4.1.6",
             "go.opentelemetry.io/otel@v1.46.0",
