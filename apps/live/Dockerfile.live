@@ -48,7 +48,27 @@ ENV TURBO_TELEMETRY_DISABLED=1
 RUN pnpm turbo run build --filter=live
 
 # *****************************************************************************
-# STAGE 3: Run the project
+# STAGE 3: Install runtime dependencies only
+# *****************************************************************************
+# The build above needs TypeScript, tsdown and vitest; the server does not. The
+# built workspace packages are taken from the installer without their
+# node_modules, and pnpm links them again with production dependencies only.
+# Install scripts are skipped: the root `prepare` runs husky, a dev tool, and
+# the native modules ship prebuilt binaries.
+FROM base AS runtime-deps
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/out/json/ .
+COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=installer /app/packages ./packages
+RUN find packages -mindepth 2 -maxdepth 2 -name node_modules -type d -prune -exec rm -rf {} +
+
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch --prod --store-dir=/pnpm/store
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store CI=true pnpm install --offline --frozen-lockfile --prod --ignore-scripts --store-dir=/pnpm/store
+
+# *****************************************************************************
+# STAGE 4: Run the project
 # *****************************************************************************
 
 FROM base AS runner
@@ -65,10 +85,10 @@ RUN apk del go 2>/dev/null || true
 # npm is build tooling and is not used by the runtime command.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
-COPY --chown=node:node --from=installer /app/packages ./packages
+COPY --chown=node:node --from=runtime-deps /app/packages ./packages
 COPY --chown=node:node --from=installer /app/apps/live/dist ./apps/live/dist
-COPY --chown=node:node --from=installer /app/apps/live/node_modules ./apps/live/node_modules
-COPY --chown=node:node --from=installer /app/node_modules ./node_modules
+COPY --chown=node:node --from=runtime-deps /app/apps/live/node_modules ./apps/live/node_modules
+COPY --chown=node:node --from=runtime-deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=installer /app/apps/live/package.json ./apps/live/package.json
 
 # esbuild and tsgolint are build-only Go binaries; remove from runtime image to eliminate stdlib CVEs
