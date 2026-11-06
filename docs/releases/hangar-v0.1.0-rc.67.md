@@ -2,8 +2,9 @@
 
 **The space and live images no longer ship the build toolchain.** Both
 images copied their `node_modules` from the build stage, which installs
-development dependencies, so Vite, React Router's dev tooling, tsdown, vitest
-and their dependencies shipped although nothing in the image runs them. Each image now installs its runtime dependencies separately, from the
+development dependencies, so Vite and React Router's dev tooling in `space`, and
+tsdown and vitest in `live`, shipped with their dependencies although nothing in
+the image runs them. Each image now installs its runtime dependencies separately, from the
 same lockfile, without development dependencies and without install scripts.
 `node_modules` shrinks from about 1 GB to 600 MB in `space` and from 1.2 GB to
 715 MB in `live`, about 450 and 430 packages fewer. The all-in-one image takes
@@ -20,7 +21,7 @@ by id are removed.
 
 **minimatch moves past its last open advisory.** GHSA-g3hv-75wg-m249 covers
 minimatch 7 to 10 and is fixed only in 11.0.1. The 10 line, used only by eslint
-in the development tools, now resolves to 11.0.4. Nothing that ships in an image
+and deslop-js among the development tools, now resolves to 11.0.4. Nothing that ships in an image
 used it.
 
 ## Migrations and compatibility
@@ -40,8 +41,10 @@ version `0.1.0-rc.67`, and OCI chart
 
 The limitations described in `0.1.0-rc.65` are unchanged, apart from the
 development dependencies, which `space` and `live` no longer carry. TypeScript
-stays in both images: pnpm installs it automatically as an optional peer of
-`@react-router/node` and `i18next`, and nothing runs it. The editor's Tiptap 2
+stays in both images, because pnpm installs it automatically as an optional peer
+of `@react-router/node` and `i18next`. Tailwind stays in `space`, because the
+shared Tailwind configuration package declares its PostCSS plugin as a runtime
+dependency. Nothing runs either. The editor's Tiptap 2
 carries a moderate `mergeAttributes` advisory that is fixed only in Tiptap 3.
 
 Rolling back to rc.66 needs no schema change. It restores the larger images and
