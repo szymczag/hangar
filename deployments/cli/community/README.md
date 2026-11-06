@@ -324,6 +324,12 @@ If all goes well, you will see the confirmation from docker cli
 
 It is always advised to keep Hangar up to date with the latest release.
 
+> Download the latest `setup.sh` (see [Downloading Latest Release](#downloading-latest-release)) before upgrading: the upgrade runs your local copy of the script.
+>
+> **Object-storage credentials.** The bundled object storage takes its login from `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `plane.env`, and the proxy serves its S3 API on the application's origin. Older templates shipped the public pair `access-key` / `secret-key`, which let anybody sign requests that list, read, overwrite or delete uploads. `setup.sh` now generates a random pair on install, and on upgrade replaces any pair whose secret is still `secret-key`; it prints a notice when it does. The API and the object storage pick the new pair up together when the services start, and uploads stay where they are. The old pair is kept as `LEGACY_MINIO_ROOT_USER` / `LEGACY_MINIO_ROOT_PASSWORD` for `migrate-object-storage.sh`, which still needs it to read a volume written by MinIO. A pair you set yourself, or external S3 storage (`USE_MINIO=0` or another `AWS_S3_ENDPOINT_URL`), is left alone. If anything outside Hangar used the old pair, give it the new one.
+>
+> If the API logs `SECURITY: AWS_SECRET_ACCESS_KEY is the placeholder` (for example after an upgrade run with an older `setup.sh`), replace the pair by hand: stop the services, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `plane.env` to random values (`LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40`), set `LEGACY_MINIO_ROOT_USER=access-key` and `LEGACY_MINIO_ROOT_PASSWORD=secret-key` if uploads still wait for `migrate-storage`, and start the services again.
+
 Lets again run the `./setup.sh` command. You will again be prompted with the below options. This time select `5` to upgrade the release.
 
 #### Docker Compose

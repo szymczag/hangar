@@ -147,6 +147,54 @@ function updateEnvFile() {
     fi
 }
 
+# The bundled object storage takes its login from plane.env, and the proxy serves
+# its S3 API on the application's origin: with the template pair anybody can sign
+# requests that list, read, overwrite or delete every upload. Replace that pair on
+# install and on upgrade; external S3 settings are left alone.
+function generateStorageCredentials(){
+    local use_minio endpoint access_key secret_key
+    use_minio=$(getEnvValue "USE_MINIO" "$DOCKER_ENV_PATH")
+    endpoint=$(getEnvValue "AWS_S3_ENDPOINT_URL" "$DOCKER_ENV_PATH")
+    use_minio=${use_minio//[\"\']/}
+    endpoint=${endpoint//[\"\']/}
+    if [ "${use_minio:-1}" != "1" ] || [ "${endpoint:-http://plane-minio:9000}" != "http://plane-minio:9000" ]; then
+        return 0
+    fi
+
+    # Empty values fall back to the template pair in docker-compose.yml. Older
+    # templates quoted the values, so quotes are ignored when comparing.
+    access_key=$(getEnvValue "AWS_ACCESS_KEY_ID" "$DOCKER_ENV_PATH")
+    secret_key=$(getEnvValue "AWS_SECRET_ACCESS_KEY" "$DOCKER_ENV_PATH")
+    access_key=${access_key//[\"\']/}
+    secret_key=${secret_key//[\"\']/}
+    # The secret is what protects the store, so a pair with any other secret stays.
+    if [ "${secret_key:-secret-key}" != "secret-key" ]; then
+        return 0
+    fi
+
+    # A legacy MinIO volume was written under the old login; migrate-object-storage.sh
+    # reads it with these. They are the public template values, not a secret.
+    if [ -z "$(getEnvValue "LEGACY_MINIO_ROOT_PASSWORD" "$DOCKER_ENV_PATH")" ]; then
+        updateEnvFile "LEGACY_MINIO_ROOT_USER" "${access_key:-access-key}" "$DOCKER_ENV_PATH"
+        updateEnvFile "LEGACY_MINIO_ROOT_PASSWORD" "secret-key" "$DOCKER_ENV_PATH"
+    fi
+
+    local new_access new_secret
+    new_access=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 20)
+    new_secret=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40)
+    if [ ${#new_access} -ne 20 ] || [ ${#new_secret} -ne 40 ]; then
+        echo "Failed to generate object-storage credentials. Exiting..." >&2
+        exit 1
+    fi
+    updateEnvFile "AWS_ACCESS_KEY_ID" "$new_access" "$DOCKER_ENV_PATH"
+    updateEnvFile "AWS_SECRET_ACCESS_KEY" "$new_secret" "$DOCKER_ENV_PATH"
+    if [ -n "$access_key$secret_key" ]; then
+        echo "NOTICE: the template object-storage credentials were replaced; the new AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are in plane.env. Update any external client that used the old pair." >&2
+    else
+        echo "Generated object-storage credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) in plane.env" >&2
+    fi
+}
+
 function download() {
     cd $SCRIPT_DIR || exit 1  
     TS=$(date +%s)
@@ -211,6 +259,7 @@ function download() {
     mv $PLANE_INSTALL_DIR/variables-upgrade.env $DOCKER_ENV_PATH
 
     syncEnvFile
+    generateStorageCredentials
 
     updateEnvFile "APP_RELEASE" "$APP_RELEASE" "$DOCKER_ENV_PATH"
 
