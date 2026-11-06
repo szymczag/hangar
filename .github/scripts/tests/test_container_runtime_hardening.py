@@ -59,6 +59,16 @@ class ContainerRuntimeHardeningTests(unittest.TestCase):
         self.assertNotIn("--from=installer /app/node_modules", runner)
         self.assertNotIn("--from=installer /app/apps/space/node_modules", runner)
 
+    def test_live_runtime_ships_production_dependencies_only(self):
+        dockerfile = self._read("apps/live/Dockerfile.live")
+        self.assertIn("FROM base AS runtime-deps", dockerfile)
+        self.assertIn("pnpm install --offline --frozen-lockfile --prod --ignore-scripts", dockerfile)
+        runner = dockerfile.split("FROM base AS runner", 1)[1]
+        for path in ("/app/packages ./packages", "/app/apps/live/node_modules", "/app/node_modules ./node_modules"):
+            with self.subTest(path=path):
+                self.assertIn(f"--from=runtime-deps {path}", runner)
+                self.assertNotIn(f"--from=installer {path}", runner)
+
     def test_custom_caddy_asserts_security_module_floors(self):
         dockerfile = self._read("apps/proxy/Dockerfile.ce")
         for module in (
