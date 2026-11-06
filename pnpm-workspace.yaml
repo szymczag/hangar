@@ -231,7 +231,10 @@ overrides:
   linkify-it: 5.0.2
   rollup: 4.59.0
   "minimatch@3": 3.1.4
-  "minimatch@10": 10.2.3
+  # Globparts amplification (GHSA-g3hv-75wg-m249) affects every 7.x-10.x and is
+  # fixed only in 11.0.1. The 10.x users are eslint and its config loader, which
+  # react-doctor and deslop-js pull in as dev tools.
+  "minimatch@10": 11.0.4
   serialize-javascript: 7.0.5
   "ajv@6": 6.14.0
   "ajv@8": 8.18.0
