@@ -120,6 +120,10 @@ Changing any other asset bound to a project (an attachment, a description
 image) requires active membership of that project, for a workspace administrator
 as well; within it, the uploader, a project administrator or a workspace
 administrator may delete, restore or rebind it.
+A project's `cover_image_asset` and a workspace's `logo_asset` accept only that
+entity's own cover or logo, or `null`, and refuse any value on create, through
+the workspace screens and the instance-admin console alike: the next upload of
+that kind deletes whatever the field names as the previous one.
 Public Spaces and API downloads render raster content inline only when the
 trusted database validation marker is current; historical unvalidated assets
 remain available only as forced `application/octet-stream` attachments.

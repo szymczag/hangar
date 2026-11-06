@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.66`. It is qualified for evaluation on
+The current release is `0.1.0-rc.67`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.66` qualification boundary is:
+The `0.1.0-rc.67` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -179,20 +179,21 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.66`                               |
-| Helm chart version | `0.1.0-rc.66`                                |
-| Git tag            | `hangar-v0.1.0-rc.66`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.66` |
+| Product version    | `v0.1.0-rc.67`                               |
+| Helm chart version | `0.1.0-rc.67`                                |
+| Git tag            | `hangar-v0.1.0-rc.67`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.67` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
 refused publication on an unsigned tag, so nothing was published under it.
 Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
-installation, upgrade, or rollback targets. `rc.65` is the immediately previous
+installation, upgrade, or rollback targets. `rc.66` is the immediately previous
 retained GitHub release and the supported rollback target for this one; rolling
-back to it needs no schema change and restores the looser asset rules and the
-previous Caddy build of the proxy. `rc.62`
+back to it needs no schema change and restores the larger `space` and `live`
+images. Rolling back to `rc.65` also needs no schema change and restores the
+looser asset rules and the previous Caddy build of the proxy. `rc.62`
 is **not a usable target for any deployment with Google Calendar capacity
 enabled**: every call to Google fails on it, so roll back past it, to `rc.61`.
 Earlier `rc.12` through `rc.17` additionally contain frontend migration failures.
@@ -217,7 +218,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.66` notes](../releases/hangar-v0.1.0-rc.66.md) — review
+- [Release `v0.1.0-rc.67` notes](../releases/hangar-v0.1.0-rc.67.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -244,13 +245,18 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.0-rc.65`, tag `hangar-v0.1.0-rc.65`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.0-rc.65`. Anybody still on rc.62 with
+The previous release is `0.1.0-rc.66`, tag `hangar-v0.1.0-rc.66`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.0-rc.66`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
-Release rc.66 adds no migrations and changes no schema; update the API, workers
-and frontends together as usual. It tightens who may change assets: only a
+Release rc.67 adds no migrations and changes no schema; update the API, workers,
+frontends and `live` together as usual. The `space` and `live` images now carry
+runtime dependencies only, and the instance-admin console's workspace create
+refuses a `logo_asset`. Nothing in the chart changes.
+
+An upgrade from rc.65 or earlier also takes in rc.66, which adds no migrations
+either. It tightens who may change assets: only a
 project admin or a workspace admin changes a project's cover, changing a
 project's attachments needs membership of that project (for a workspace admin
 too), and a project or workspace accepts only its own cover or logo in
@@ -311,9 +317,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The release workflow verifies anonymous access to the rc.66 chart archive, OCI
+The release workflow verifies anonymous access to the rc.67 chart archive, OCI
 chart and digest-pinned images, and creates provenance attestations and keyless
-Cosign signatures. No new live-cluster qualification is claimed for rc.66.
+Cosign signatures. No new live-cluster qualification is claimed for rc.67.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure

@@ -11,12 +11,11 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.66",
+  version: "0.1.0-rc.67",
   highlights: [
-    "A project cover or workspace logo can no longer be used to delete someone else's file.",
-    "Only an admin changes a project's cover.",
-    "Changing an asset inside a project requires membership of the project.",
-    "The proxy's Caddy is built on a patched Go.",
+    "The space and live images no longer ship the build toolchain.",
+    "A workspace created from the instance-admin console cannot start with someone else's logo.",
+    "minimatch moves past its last open advisory.",
   ],
   upstream: {
     version: "1.4.0",
