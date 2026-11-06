@@ -11,13 +11,10 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.69",
+  version: "0.1.0-rc.70",
   highlights: [
-    "Compose and Swarm installs no longer run object storage on a public login.",
-    "Only project admins change states through the public API.",
-    "A magic sign-in code can no longer be guessed without limit.",
-    "An API token can no longer be hidden from its owner's list.",
-    "Sign-in redirects refuse paths that name another host.",
+    "The proxy's Caddy no longer carries a known HTML parser flaw.",
+    "Your work opens again for anyone assigned a work item without a state.",
   ],
   upstream: {
     version: "1.4.0",
