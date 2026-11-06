@@ -22,11 +22,16 @@ export function ProfileStateDistribution({ stateDistribution, userProfile }: Pro
   const { t } = useTranslation();
   if (!userProfile) return null;
 
+  // Work items without a state come back with a null group; they have no slice to draw.
+  const stateGroups = userProfile.state_distribution.filter((group) =>
+    Object.hasOwn(STATE_GROUPS, group.state_group ?? "")
+  );
+
   return (
     <div className="flex flex-col space-y-2">
       <h3 className="text-16 font-medium">{t("profile.stats.state_distribution.title")}</h3>
       <Card className="h-full">
-        {userProfile.state_distribution.length > 0 ? (
+        {stateGroups.length > 0 ? (
           <div className="grid h-[300px] w-full grid-cols-1 gap-x-6 md:grid-cols-2">
             <PieChart
               className="size-full"
@@ -37,16 +42,14 @@ export function ProfileStateDistribution({ stateDistribution, userProfile }: Pro
                 bottom: 12,
                 left: -10,
               }}
-              data={
-                userProfile.state_distribution.map((group) => ({
-                  id: group.state_group,
-                  key: group.state_group,
-                  value: group.state_count,
-                  name: capitalizeFirstLetter(group.state_group),
-                  color: STATE_GROUPS[group.state_group]?.color,
-                })) ?? []
-              }
-              cells={userProfile.state_distribution.map((group) => ({
+              data={stateGroups.map((group) => ({
+                id: group.state_group,
+                key: group.state_group,
+                value: group.state_count,
+                name: capitalizeFirstLetter(group.state_group),
+                color: STATE_GROUPS[group.state_group]?.color,
+              }))}
+              cells={stateGroups.map((group) => ({
                 key: group.state_group,
                 fill: STATE_GROUPS[group.state_group]?.color,
               }))}
