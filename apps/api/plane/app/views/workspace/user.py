@@ -448,6 +448,8 @@ class WorkspaceUserProfileStatsEndpoint(BaseAPIView):
                 workspace__slug=slug,
             )
             .filter(**filters)
+            # A work item without a state has no group to report; the chart cannot draw a null one.
+            .filter(state__isnull=False)
             .annotate(state_group=F("state__group"))
             .values("state_group")
             .annotate(state_count=Count("state_group"))

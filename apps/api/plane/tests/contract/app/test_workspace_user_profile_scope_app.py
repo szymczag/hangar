@@ -185,6 +185,22 @@ class TestWorkspaceUserProfileStatsScope:
         assert list(data["present_cycles"]) == []
         assert {str(r["cycle__id"]) for r in data["upcoming_cycles"]} == {str(upcoming.id)}
 
+    @pytest.mark.django_db
+    def test_state_distribution_skips_work_items_without_a_state(self, session_client, workspace, project, create_user):
+        """A work item with no state is counted as assigned but adds no null group to the distribution."""
+        stateless = _make_issue("No state", project, workspace, create_user)
+        stated = _make_issue("Started", project, workspace, create_user)
+        started = State.objects.create(name="Doing", group="started", project=project, workspace=workspace)
+        Issue.objects.filter(pk=stated.pk).update(state=started)
+        Issue.objects.filter(pk=stateless.pk).update(state=None)
+        for issue in (stateless, stated):
+            IssueAssignee.objects.create(issue=issue, assignee=create_user, project=project, workspace=workspace)
+
+        response = session_client.get(STATS_URL.format(slug=workspace.slug, user_id=create_user.id))
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["assigned_issues"] == 2
+        assert [(r["state_group"], r["state_count"]) for r in response.data["state_distribution"]] == [("started", 1)]
+
 
 @pytest.mark.contract
 class TestWorkspaceUserProfileIssuesGuestScope:

@@ -310,7 +310,7 @@ class UserWorkspaceDashboardEndpoint(BaseAPIView):
         )
 
         state_distribution = (
-            Issue.issue_objects.filter(workspace__slug=slug, assignees__in=[request.user])
+            Issue.issue_objects.filter(workspace__slug=slug, assignees__in=[request.user], state__isnull=False)
             .annotate(state_group=F("state__group"))
             .values("state_group")
             .annotate(state_count=Count("state_group"))
