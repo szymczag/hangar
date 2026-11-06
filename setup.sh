@@ -77,6 +77,34 @@ else
     success=false
 fi
 
+# Generate object-storage credentials. The root .env feeds the local object
+# storage and apps/api/.env the API, so both get the same pair; a file whose
+# secret is no longer the template value keeps its own.
+echo -e "\n${YELLOW}Generating object-storage credentials...${NC}"
+storage_access_key=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c20)
+storage_secret_key=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c40)
+if [ ${#storage_access_key} -ne 20 ] || [ ${#storage_secret_key} -ne 40 ]; then
+    echo -e "${RED}Error: Failed to generate object-storage credentials.${NC}"
+    success=false
+else
+    for env_file in ./.env ./apps/api/.env; do
+        if [ ! -f "$env_file" ]; then
+            echo -e "${RED}✗${NC} $env_file not found. Object-storage credentials not added."
+            success=false
+        elif ! grep -Eq '^AWS_SECRET_ACCESS_KEY=["'"'"']?secret-key["'"'"']?[[:space:]]*$' "$env_file"; then
+            echo -e "${GREEN}✓${NC} $env_file already has its own object-storage credentials"
+        elif sed -i.bak \
+            -e "s/^AWS_ACCESS_KEY_ID=.*/AWS_ACCESS_KEY_ID=\"$storage_access_key\"/" \
+            -e "s/^AWS_SECRET_ACCESS_KEY=.*/AWS_SECRET_ACCESS_KEY=\"$storage_secret_key\"/" "$env_file"; then
+            rm -f "$env_file.bak"
+            echo -e "${GREEN}✓${NC} Added AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to $env_file"
+        else
+            echo -e "${RED}✗${NC} Failed to set object-storage credentials in $env_file"
+            success=false
+        fi
+    done
+fi
+
 # Activate pnpm (version set in package.json)
 corepack enable pnpm || success=false
 # Install Node dependencies

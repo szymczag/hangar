@@ -14,6 +14,9 @@ x-redis-env: &redis-env
   REDIS_SSL_CERT_REQS: ${REDIS_SSL_CERT_REQS:-required}
   REDIS_SSL_CA_CERTS: ${REDIS_SSL_CA_CERTS:-}
 
+# setup.sh generates the object-storage keys. The template fallbacks keep older
+# installs starting (the API and the object storage must agree), and the API
+# logs a critical warning while the template secret is in use.
 x-aws-s3-env: &aws-s3-env
   AWS_REGION: ${AWS_REGION:-}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-access-key}

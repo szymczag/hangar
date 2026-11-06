@@ -40,6 +40,7 @@ Usage: $0 [options]
 
   --project NAME         Compose project name (default: plane-app)
   --env-file FILE        plane.env holding AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+                         (and LEGACY_MINIO_ROOT_USER / _PASSWORD for the old volume)
   --legacy-volume NAME   MinIO volume to read (default: <project>_uploads)
   --target-volume NAME   SeaweedFS volume to fill (default: <project>_object-storage)
   --yes                  Do not ask for confirmation
@@ -77,6 +78,12 @@ ACCESS_KEY="$(env_value AWS_ACCESS_KEY_ID "$ENV_FILE")"
 SECRET_KEY="$(env_value AWS_SECRET_ACCESS_KEY "$ENV_FILE")"
 ACCESS_KEY="${ACCESS_KEY:-${AWS_ACCESS_KEY_ID:-access-key}}"
 SECRET_KEY="${SECRET_KEY:-${AWS_SECRET_ACCESS_KEY:-secret-key}}"
+# setup.sh replaces the template pair and records the old one here; the legacy
+# MinIO volume was written under it. Without a record the pair has not changed.
+LEGACY_ACCESS_KEY="$(env_value LEGACY_MINIO_ROOT_USER "$ENV_FILE")"
+LEGACY_SECRET_KEY="$(env_value LEGACY_MINIO_ROOT_PASSWORD "$ENV_FILE")"
+LEGACY_ACCESS_KEY="${LEGACY_ACCESS_KEY:-$ACCESS_KEY}"
+LEGACY_SECRET_KEY="${LEGACY_SECRET_KEY:-$SECRET_KEY}"
 
 log() { printf '>> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -162,7 +169,7 @@ volume_exists "$TARGET_VOLUME" || "$CLI" volume create "$TARGET_VOLUME" >/dev/nu
 
 log "Starting the legacy reader"
 "$CLI" run -d --name "$SRC" --network "$NETWORK" \
-    -e MINIO_ROOT_USER="$ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$SECRET_KEY" \
+    -e MINIO_ROOT_USER="$LEGACY_ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$LEGACY_SECRET_KEY" \
     -v "$LEGACY_VOLUME:/export" \
     "$LEGACY_IMAGE" server /export >/dev/null
 
@@ -183,7 +190,7 @@ rclone() {
     "$CLI" run --rm --network "$NETWORK" -e RCLONE_CONFIG=/dev/null \
         -e RCLONE_CONFIG_SRC_TYPE=s3 -e RCLONE_CONFIG_SRC_PROVIDER=Minio \
         -e RCLONE_CONFIG_SRC_ENDPOINT="http://$SRC:9000" \
-        -e RCLONE_CONFIG_SRC_ACCESS_KEY_ID="$ACCESS_KEY" -e RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY="$SECRET_KEY" \
+        -e RCLONE_CONFIG_SRC_ACCESS_KEY_ID="$LEGACY_ACCESS_KEY" -e RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY="$LEGACY_SECRET_KEY" \
         -e RCLONE_CONFIG_DST_TYPE=s3 -e RCLONE_CONFIG_DST_PROVIDER=SeaweedFS \
         -e RCLONE_CONFIG_DST_ENDPOINT="http://$DST:9000" \
         -e RCLONE_CONFIG_DST_ACCESS_KEY_ID="$ACCESS_KEY" -e RCLONE_CONFIG_DST_SECRET_ACCESS_KEY="$SECRET_KEY" \
