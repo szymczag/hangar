@@ -235,6 +235,10 @@ overrides:
   # fixed only in 11.0.1. The 10.x users are eslint and its config loader, which
   # react-doctor and deslop-js pull in as dev tools.
   "minimatch@10": 11.0.4
+  # Unbounded collection validation (GHSA-mrhx-c7xc-m3w5) affects every zod
+  # before 4.6.6. The only 3.x user is eslint-plugin-react-hooks, via
+  # react-doctor; it and zod-validation-error accept zod 4.
+  "zod@3": 4.6.7
   serialize-javascript: 7.0.5
   "ajv@6": 6.14.0
   "ajv@8": 8.18.0
