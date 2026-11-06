@@ -259,7 +259,8 @@ on that release.
 Release rc.70 adds no migrations and changes nothing in the chart. It fixes the
 profile overview ("Your work"), which failed to render for anyone assigned a
 work item without a state; the user stats and the user's workspace dashboard summary no longer
-return a `state_distribution` row whose group is null.
+return a `state_distribution` row whose group is null. The `proxy` image's
+Caddy is rebuilt with `golang.org/x/net` 0.62.0, past CVE-2026-78661.
 
 An upgrade from rc.68 or earlier also takes in rc.69, which adds migration `db.0135_remove_apitoken_is_service_and_allowed_rate_limit`,
 which drops two unused API token columns and rewrites no rows; the release Job

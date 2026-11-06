@@ -1,6 +1,12 @@
 ## Security and privacy
 
-No security or privacy changes identified.
+**The proxy's Caddy no longer carries a known HTML parser flaw.** The image scan
+of rc.69 found `golang.org/x/net` 0.60.0 in the Caddy binary of the `proxy`
+image. Its HTML parser can be made to exhaust resources by crafted input
+(CVE-2026-78661, rated high). The build now pins `golang.org/x/net` 0.62.0, which
+fixes it, together with `golang.org/x/crypto` 0.58.0 and `golang.org/x/text`
+0.43.0, which that release requires, and still checks all three in the binary it
+produces. The Caddyfile and every proxy setting are unchanged.
 
 ## Migrations and compatibility
 
@@ -26,5 +32,6 @@ version `0.1.0-rc.70`, and OCI chart
 
 The limitations described in `0.1.0-rc.69` are unchanged. Rolling back to
 `0.1.0-rc.69` needs no schema change and brings the failing profile overview
-back for the people it affected. Rolling back further, to `0.1.0-rc.68`, needs
+back for the people it affected, along with the earlier `golang.org/x/net` in
+the proxy. Rolling back further, to `0.1.0-rc.68`, needs
 the rc.69 migration reversed first, as the rc.69 notes describe.

@@ -12,7 +12,10 @@ export type TBuildIdentity = {
 
 export const RELEASE_NOTES: TBuildIdentity = {
   version: "0.1.0-rc.70",
-  highlights: ["Your work opens again for anyone assigned a work item without a state."],
+  highlights: [
+    "The proxy's Caddy no longer carries a known HTML parser flaw.",
+    "Your work opens again for anyone assigned a work item without a state.",
+  ],
   upstream: {
     version: "1.4.0",
     revision: "917b23a6",
