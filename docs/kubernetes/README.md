@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.68`. It is qualified for evaluation on
+The current release is `0.1.0-rc.69`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.68` qualification boundary is:
+The `0.1.0-rc.69` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -179,10 +179,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.68`                               |
-| Helm chart version | `0.1.0-rc.68`                                |
-| Git tag            | `hangar-v0.1.0-rc.68`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.68` |
+| Product version    | `v0.1.0-rc.69`                               |
+| Helm chart version | `0.1.0-rc.69`                                |
+| Git tag            | `hangar-v0.1.0-rc.69`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.69` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -191,10 +191,12 @@ Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
 installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
-`ext.0037` fails there, so upgrade to `rc.68` instead. `rc.67` is the
+`ext.0037` fails there, so upgrade to `rc.68` or later instead. `rc.68` is the
 immediately previous retained GitHub release and the supported rollback target
-for this one; rolling back to it needs no schema change. Rolling back to `rc.66`
-needs none either and restores the larger `space` and `live` images. Rolling
+for this one; rolling back to it needs migration `db.0135` reversed first, as
+described below. Rolling back further, to `rc.67`, needs no other schema change.
+Rolling back to `rc.66` needs none either and restores the larger `space` and
+`live` images. Rolling
 back to `rc.65` also needs no schema change and restores the
 looser asset rules and the previous Caddy build of the proxy. `rc.62`
 is **not a usable target for any deployment with Google Calendar capacity
@@ -221,7 +223,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.68` notes](../releases/hangar-v0.1.0-rc.68.md) — review
+- [Release `v0.1.0-rc.69` notes](../releases/hangar-v0.1.0-rc.69.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -248,16 +250,32 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.0-rc.67`, tag `hangar-v0.1.0-rc.67`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.0-rc.67`. Anybody still on rc.62 with
+The previous release is `0.1.0-rc.68`, tag `hangar-v0.1.0-rc.68`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.0-rc.68`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
-Release rc.68 adds no migrations. It repairs `ext.0037`, shipped in rc.64, which
+Release rc.69 adds migration `db.0135_remove_apitoken_is_service_and_allowed_rate_limit`,
+which drops two unused API token columns and rewrites no rows; the release Job
+applies it as usual. rc.68 loads both columns whenever it authenticates an API
+key, and the migration Job runs alongside the rollout, so rc.68 pods still
+serving once it has applied refuse API-key requests until they are replaced;
+sessions are not affected. To roll back to rc.68, first run
+`python manage.py migrate db 0134_reset_project_deploy_board_identity` in an
+rc.69 API pod, then roll the release back. The reversal recreates both columns
+with their former defaults. Between the two steps creating an API token fails on
+rc.69, and an rc.69 pod that restarts waits for migrations, so keep that window
+short. The `v1` state endpoints now refuse writes from project members who are
+not admins, so an integration that manages states needs a project admin's token.
+The object-storage credential change in rc.69 concerns the Compose and Swarm
+bundles only; the chart already takes those credentials from the
+`existingSecrets.objectStorage` Secret, and nothing in the chart changes.
+
+An upgrade from rc.67 or earlier also takes in rc.68, which adds no migrations. It repairs `ext.0037`, shipped in rc.64, which
 failed the release Job on every database holding a Workshop with
 `AttributeError: type object 'Issue' has no attribute 'objects'`; the migration
-is atomic, so such a deployment is still at `ext.0036` and the rc.68 release Job
-applies the rest. Nothing in the chart changes.
+is atomic, so such a deployment is still at `ext.0036` and the release Job
+applies the rest.
 
 An upgrade from rc.66 or earlier also takes in rc.67, which adds no migrations
 either. The `space` and `live` images now carry
@@ -326,9 +344,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The release workflow verifies anonymous access to the rc.68 chart archive, OCI
+The release workflow verifies anonymous access to the rc.69 chart archive, OCI
 chart and digest-pinned images, and creates provenance attestations and keyless
-Cosign signatures. No new live-cluster qualification is claimed for rc.68.
+Cosign signatures. No new live-cluster qualification is claimed for rc.69.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure
