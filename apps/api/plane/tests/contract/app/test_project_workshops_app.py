@@ -210,3 +210,37 @@ def test_the_migration_keeps_workshops_where_they_are_used(capacity, workspace, 
     assert workshops_enabled(used)
     assert not workshops_enabled(unused)
     assert ProjectIssueType.all_objects.filter(project=unused, issue_type=workshop).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_the_migration_runs_against_the_historical_models(capacity, workspace, create_user):
+    """The migrator calls the function with the historical app registry, not the
+    live one. The historical `Issue` carries only its default manager,
+    `issue_objects`, so `Issue.objects` fails there although it works on the
+    live model: rc.67 shipped that call and failed on every database holding a
+    Workshop link, which an empty test database never does.
+    """
+    import importlib
+
+    from django.db import connection
+    from django.db.migrations.loader import MigrationLoader
+
+    migration = importlib.import_module("plane.ext.migrations.0037_workshops_per_project")
+    # The suite runs with migrations disabled; the loader needs the real modules
+    # to build the historical state.
+    capacity.MIGRATION_MODULES = {}
+    historical = MigrationLoader(connection).project_state(("ext", "0036_workshop_calendar_outbox")).apps
+    assert not hasattr(historical.get_model("db", "Issue"), "objects")
+
+    used = _project(workspace, create_user, identifier="HUS")
+    unused = _project(workspace, create_user, identifier="HNO")
+    workshop = enable_workshops(used)
+    enable_workshops(unused)
+    Issue.objects.create(name="Kept", project=used, workspace=workspace, type=workshop, created_by=create_user)
+
+    migration.retire_unused_workshop_links(historical, None)
+
+    assert workshops_enabled(used)
+    assert not workshops_enabled(unused)
+
