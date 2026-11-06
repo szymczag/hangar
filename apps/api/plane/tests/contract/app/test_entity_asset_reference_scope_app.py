@@ -16,9 +16,15 @@ from uuid import uuid4
 
 import pytest
 from rest_framework import status
+from rest_framework.test import APIClient
 
-from plane.db.models import FileAsset, Project, ProjectMember, Workspace, WorkspaceMember
+from plane.db.models import FileAsset, Project, ProjectMember, User, Workspace, WorkspaceMember
+from plane.license.models import InstanceAdmin
+from plane.tests.contract.app import test_google_auth as _google_auth
+from plane.tests.support.admin_session import authenticate_admin
 from plane.utils.file_asset_upload import UPLOAD_VALIDATION_VERSION
+
+setup_instance = _google_auth.setup_instance
 
 
 def _project(workspace, owner, identifier):
@@ -147,3 +153,36 @@ class TestPreviousAssetDeletionIsScoped:
         assert foreign.is_deleted is False
         own_project.refresh_from_db()
         assert own_project.cover_image_asset_id == new_cover.id
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestInstanceAdminWorkspaceLogo:
+    """The god-mode workspace create takes the same field and must refuse it too."""
+
+    @pytest.fixture
+    def admin_client(self, db, setup_instance):
+        admin = User.objects.create(email="admin@ops.example", username=uuid4().hex)
+        InstanceAdmin.objects.create(instance=setup_instance, user=admin, role=20)
+        client = APIClient()
+        authenticate_admin(client, admin)
+        return client
+
+    def test_a_new_workspace_cannot_start_with_someone_elses_logo(self, admin_client, workspace, create_user):
+        foreign = _asset(workspace, create_user, FileAsset.EntityTypeContext.WORKSPACE_LOGO)
+
+        response = admin_client.post(
+            "/api/instances/workspaces/",
+            {"name": "Fresh", "slug": "fresh-ws", "logo_asset": str(foreign.id)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert not Workspace.objects.filter(slug="fresh-ws").exists()
+
+    def test_a_new_workspace_without_a_logo_is_created(self, admin_client):
+        response = admin_client.post(
+            "/api/instances/workspaces/", {"name": "Fresh", "slug": "fresh-ws"}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED

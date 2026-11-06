@@ -8,7 +8,7 @@ from rest_framework import serializers
 # Module imports
 from .base import BaseSerializer
 from .user import UserLiteSerializer
-from plane.db.models import Workspace
+from plane.db.models import FileAsset, Workspace
 from plane.utils.constants import RESTRICTED_WORKSPACE_SLUGS
 from plane.utils.content_validator import has_alphanumeric
 from plane.utils.url import contains_url
@@ -32,6 +32,23 @@ class WorkspaceSerializer(BaseSerializer):
             raise serializers.ValidationError(
                 "Name must contain at least one letter or number"
             )
+        return value
+
+    def validate_logo_asset(self, value):
+        """Only this workspace's own logo asset may be named here, or none.
+
+        Mirrors the app-level WorkSpaceSerializer: the next logo upload
+        soft-deletes whatever this field points at, so a new workspace starts
+        without one.
+        """
+        if value is None:
+            return value
+        if (
+            self.instance is None
+            or value.entity_type != FileAsset.EntityTypeContext.WORKSPACE_LOGO
+            or value.workspace_id != self.instance.id
+        ):
+            raise serializers.ValidationError("Choose a logo uploaded for this workspace.")
         return value
 
     def validate_slug(self, value):
