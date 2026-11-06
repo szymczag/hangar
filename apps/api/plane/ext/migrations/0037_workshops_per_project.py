@@ -21,17 +21,22 @@ def retire_unused_workshop_links(apps, schema_editor):
     Soft-deleted by setting `deleted_at`, the way the application removes this
     link, so the uniqueness condition on live links still lets a project re-enable
     Workshops afterwards.
+
+    Historical models carry only their default manager, under its own name, so
+    the queries go through `_base_manager`: `Issue` declares `issue_objects`,
+    which makes it the default, and the historical `Issue` has no `objects`.
+    Every query filters `deleted_at` itself.
     """
-    ProjectIssueType = apps.get_model("db", "ProjectIssueType")
-    Issue = apps.get_model("db", "Issue")
+    ProjectIssueType = apps.get_model("db", "ProjectIssueType")._base_manager
+    Issue = apps.get_model("db", "Issue")._base_manager
     now = timezone.now()
-    links = ProjectIssueType.objects.filter(issue_type__system_key="workshop", deleted_at__isnull=True)
+    links = ProjectIssueType.filter(issue_type__system_key="workshop", deleted_at__isnull=True)
     for link in links.iterator():
-        in_use = Issue.objects.filter(
+        in_use = Issue.filter(
             project_id=link.project_id, type_id=link.issue_type_id, deleted_at__isnull=True
         ).exists()
         if not in_use:
-            ProjectIssueType.objects.filter(pk=link.pk).update(deleted_at=now)
+            ProjectIssueType.filter(pk=link.pk).update(deleted_at=now)
 
 
 class Migration(migrations.Migration):
