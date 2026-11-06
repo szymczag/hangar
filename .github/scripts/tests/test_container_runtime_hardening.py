@@ -49,6 +49,16 @@ class ContainerRuntimeHardeningTests(unittest.TestCase):
             self._read("deployments/aio/community/supervisor.conf"),
         )
 
+    def test_space_runtime_ships_production_dependencies_only(self):
+        dockerfile = self._read("apps/space/Dockerfile.space")
+        self.assertIn("FROM base AS runtime-deps", dockerfile)
+        self.assertIn("pnpm install --offline --frozen-lockfile --prod --ignore-scripts", dockerfile)
+        runner = dockerfile.split("FROM base AS runner", 1)[1]
+        self.assertIn("--from=runtime-deps /app/node_modules ./node_modules", runner)
+        self.assertIn("--from=runtime-deps /app/apps/space/node_modules ./apps/space/node_modules", runner)
+        self.assertNotIn("--from=installer /app/node_modules", runner)
+        self.assertNotIn("--from=installer /app/apps/space/node_modules", runner)
+
     def test_custom_caddy_asserts_security_module_floors(self):
         dockerfile = self._read("apps/proxy/Dockerfile.ce")
         for module in (
