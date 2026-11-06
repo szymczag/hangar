@@ -11,6 +11,7 @@ import useSWR from "swr";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
 // helpers
+import { isValidNextPath } from "@plane/utils";
 import { EPageTypes } from "@/helpers/authentication.helper";
 // hooks
 import { useWorkspace } from "@/hooks/store/use-workspace";
@@ -24,11 +25,12 @@ type TAuthenticationWrapper = {
   pageType?: TPageType;
 };
 
-const isValidURL = (url: string): boolean => {
-  const disallowedSchemes = /^(https?|ftp):\/\//i;
-  return !disallowedSchemes.test(url);
-};
-
+// next_path is only followed when it is a same-origin relative path. The
+// previous local check only rejected a literal http(s)/ftp scheme, so
+// "//evil.com", "///evil.com" and "/\t/evil.com" (browsers drop tabs/CR/LF and
+// resolve a leading "//" as authority-relative) were handed to router.push()
+// and left the site after sign-in. isValidNextPath requires a leading "/",
+// rejects "//" and backslashes, and re-checks the host after URL parsing.
 export const AuthenticationWrapper = observer(function AuthenticationWrapper(props: TAuthenticationWrapper) {
   const pathname = usePathname();
   const router = useAppRouter();
@@ -59,7 +61,7 @@ export const AuthenticationWrapper = observer(function AuthenticationWrapper(pro
     let redirectionRoute = "/create-workspace";
 
     // validating the nextPath from the router query
-    if (nextPath && isValidURL(nextPath.toString())) {
+    if (nextPath && isValidNextPath(nextPath.toString())) {
       redirectionRoute = nextPath.toString();
       return redirectionRoute;
     }
