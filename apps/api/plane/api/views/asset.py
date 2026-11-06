@@ -56,15 +56,6 @@ from plane.utils.file_asset_permissions import can_read_file_asset
 class UserAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload user profile images."""
 
-    def asset_delete(self, asset_id):
-        asset = FileAsset.objects.filter(id=asset_id).first()
-        if asset is None:
-            return
-        asset.is_deleted = True
-        asset.deleted_at = timezone.now()
-        asset.save(update_fields=["is_deleted", "deleted_at"])
-        return
-
     def entity_asset_delete(self, entity_type, asset, request):
         # User Avatar
         if entity_type == FileAsset.EntityTypeContext.USER_AVATAR:
@@ -256,15 +247,6 @@ class UserAssetEndpoint(BaseAPIView):
 
 class UserServerAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload user profile images."""
-
-    def asset_delete(self, asset_id):
-        asset = FileAsset.objects.filter(id=asset_id).first()
-        if asset is None:
-            return
-        asset.is_deleted = True
-        asset.deleted_at = timezone.now()
-        asset.save(update_fields=["is_deleted", "deleted_at"])
-        return
 
     def entity_asset_delete(self, entity_type, asset, request):
         # User Avatar
