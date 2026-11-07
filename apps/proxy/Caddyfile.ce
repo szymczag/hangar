@@ -25,8 +25,14 @@
 		X-Content-Type-Options "nosniff"
 		Content-Security-Policy "sandbox; default-src 'none'"
 	}
-	reverse_proxy /{$BUCKET_NAME}/* plane-minio:9000
-	reverse_proxy /{$BUCKET_NAME} plane-minio:9000
+	# Only the bundled object storage is served from the application's origin.
+	# With USE_MINIO=0 uploads live in external storage and are fetched from
+	# there, so the bucket path is not routed to the idle bundled service.
+	@bundled_bucket {
+		path /{$BUCKET_NAME} /{$BUCKET_NAME}/*
+		expression `"{$USE_MINIO:1}" == "1"`
+	}
+	reverse_proxy @bundled_bucket plane-minio:9000
 
 	reverse_proxy /* web:3000
 }

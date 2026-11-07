@@ -174,10 +174,18 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      USE_MINIO: ${USE_MINIO:-1}
     entrypoint:
       - /bin/sh
       - -c
       - |
+        # With USE_MINIO=0 the API uses external object storage; this service
+        # then serves nothing and opens no port, so it cannot be written to.
+        if [ "$$USE_MINIO" != 1 ]; then
+          echo "USE_MINIO is not 1: external object storage is in use; the bundled store stays idle."
+          trap 'exit 0' TERM INT
+          while :; do sleep 3600 & wait $$!; done
+        fi
         for key in WEED_JWT_SIGNING_KEY WEED_JWT_SIGNING_READ_KEY WEED_JWT_FILER_SIGNING_KEY WEED_JWT_FILER_SIGNING_READ_KEY; do
           export "$$key=$$(head -c 32 /dev/urandom | base64 | tr -d '=+/\n')"
         done
@@ -187,7 +195,7 @@ services:
     volumes:
       - object-storage:/data
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/healthz"]
+      test: ["CMD-SHELL", "[ \"$$USE_MINIO\" != 1 ] || wget -q -O /dev/null http://127.0.0.1:9000/healthz"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -205,6 +213,7 @@ services:
     environment:
       FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-5242880}
       BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
+      USE_MINIO: ${USE_MINIO:-1}
     depends_on:
       - web
       - api
