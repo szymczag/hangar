@@ -11,10 +11,11 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.70",
+  version: "0.1.0-rc.71",
   highlights: [
-    "The proxy's Caddy no longer carries a known HTML parser flaw.",
-    "Your work opens again for anyone assigned a work item without a state.",
+    "Release images carry current Alpine packages again.",
+    "Compose and Swarm installs on external storage no longer run an open object store.",
+    "The live server moves to the fixed Effect release.",
   ],
   upstream: {
     version: "1.4.0",
