@@ -39,7 +39,6 @@
     "lint-staged": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
-    "react-doctor": "^0.4.2",
     "sharp": "catalog:",
     "turbo": "catalog:"
   },
