@@ -175,6 +175,20 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
             'printf \'%s\' "$GITHUB_TOKEN" | helm registry login', stage_assets
         )
 
+    def test_every_release_build_refreshes_alpine_packages(self):
+        # The apk upgrade layer is cached across runs; a per-run value busts it
+        # so each release ships the Alpine fixes available when it is built.
+        build_steps = self.workflow.split("uses: docker/build-push-action@")[1:]
+        self.assertEqual(len(build_steps), 2)
+        for step in build_steps:
+            build_args = step.split("          build-args: |\n", maxsplit=1)[1].split(
+                "          labels: |", maxsplit=1
+            )[0]
+            self.assertIn(
+                "APK_SECURITY_PATCH=${{ github.run_id }}-${{ github.run_attempt }}",
+                build_args,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

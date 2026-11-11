@@ -26,7 +26,7 @@ class ContainerRuntimeHardeningTests(unittest.TestCase):
         for path in paths:
             with self.subTest(path=path):
                 dockerfile = self._read(path)
-                self.assertIn("ARG APK_SECURITY_PATCH=2026-09-08", dockerfile)
+                self.assertIn("ARG APK_SECURITY_PATCH=2026-11-11", dockerfile)
                 self.assertIn("apk upgrade --no-cache --available", dockerfile)
 
     def test_python_runtime_images_use_patched_base(self):

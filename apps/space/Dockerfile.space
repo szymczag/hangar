@@ -96,7 +96,7 @@ FROM base AS runner
 ENV NODE_ENV=production
 
 # Refresh runtime OS packages independently of the application layers.
-ARG APK_SECURITY_PATCH=2026-09-08
+ARG APK_SECURITY_PATCH=2026-11-11
 RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
 
 # Remove go from Alpine APK database; not needed at runtime and carries stdlib CVEs
