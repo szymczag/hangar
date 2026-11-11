@@ -23,8 +23,9 @@ WORKDIR /app
 
 # OS security updates. --available forces reinstall from the current repos;
 # bump APK_SECURITY_PATCH to bust buildx's cached layer (keyed on this command
-# string), otherwise a rebuild silently re-ships the old packages.
-ARG APK_SECURITY_PATCH=2026-09-08
+# string), otherwise a rebuild silently re-ships the old packages. Release
+# builds pass a per-run value, so every release refreshes this layer.
+ARG APK_SECURITY_PATCH=2026-11-11
 RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
 
 # The node binary only links libstdc++ and libgcc_s from /usr/lib, so install

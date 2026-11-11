@@ -34,7 +34,7 @@ RUN go version -m /usr/bin/caddy | grep -qE 'golang.org/x/crypto[[:space:]]+v0.5
 
 FROM docker.io/library/caddy:2.11.7-alpine@sha256:04913b1da43339a40ad1ea87827d70a576ac5aa6cf674c6e24fdca675887533a
 
-ARG APK_SECURITY_PATCH=2026-09-08
+ARG APK_SECURITY_PATCH=2026-11-11
 RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available && apk add --no-cache nss-tools bash curl
 
 COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy

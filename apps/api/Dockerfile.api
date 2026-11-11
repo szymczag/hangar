@@ -12,7 +12,7 @@ ARG HANGAR_SOURCE_REVISION=""
 ENV HANGAR_SOURCE_REVISION=$HANGAR_SOURCE_REVISION
 
 # Force the security-upgrade layer to refresh when the patch epoch changes.
-ARG APK_SECURITY_PATCH=2026-09-08
+ARG APK_SECURITY_PATCH=2026-11-11
 RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade --no-cache --available
 
 WORKDIR /code
