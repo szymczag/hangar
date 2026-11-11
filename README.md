@@ -189,6 +189,11 @@ are rejected. Release-built API and Live images embed that same product version 
 `APP_VERSION`, so offline version reporting does not depend on the upstream
 `package.json` value.
 
+GitHub's `/releases/latest` endpoint ignores pre-releases, and every Hangar release
+so far is published as a pre-release. Until a stable release exists, the example URL
+returns no release, the check fails quietly, and the instance keeps reporting its
+packaged version.
+
 ## Verifying release images
 
 Approved semver-tagged container releases are signed by the Hangar publication
@@ -202,7 +207,7 @@ Install Cosign, obtain the digest for the version you intend to deploy, and veri
 both the exact workflow identity and GitHub's OIDC issuer:
 
 ```sh
-VERSION=v0.1.0-rc.51
+VERSION=v0.1.0-rc.71
 GIT_TAG=hangar-$VERSION
 DIGEST=sha256:replace-with-the-published-digest
 IMAGE=ghcr.io/szymczag/hangar-api
@@ -214,9 +219,10 @@ cosign verify \
 ```
 
 Replace `api` with `web`, `admin`, `space`, `live`, `proxy`, or `aio` as needed.
-Pin deployments to the verified digest rather than relying on the mutable `stable`
-tag. Hangar also publishes an SBOM and GitHub build-provenance attestation for every
-container image.
+Pin deployments to the verified digest. A mutable `stable` tag is promoted only
+for non-prerelease versions, and none has been published yet. Hangar also
+publishes an SBOM and GitHub build-provenance attestation for every container
+image.
 
 ## Development quick start
 

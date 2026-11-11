@@ -36,12 +36,12 @@
 
 - `pnpm dev` - Start all dev servers (web:3000, admin:3001)
 - `pnpm build` - Build all packages and apps
-- `pnpm check` - Run all checks (format, lint, types)
+- `pnpm check` - Run all checks (format, lint, types, branding, brand assets, release notes, React runtime contracts)
 - `pnpm check:lint` - OxLint across all packages
 - `pnpm check:types` - TypeScript type checking
 - `pnpm fix` - Auto-fix format and lint issues
 - `pnpm turbo run <command> --filter=<package>` - Target specific package/app
-- `pnpm --filter=@plane/ui storybook` - Start Storybook on port 6006
+- `pnpm --filter=@plane/ui storybook` - Start Storybook on port 6007
 
 ## Reading CI
 

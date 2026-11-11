@@ -21,7 +21,7 @@ social engineering, spam, or denial-of-service attacks against systems you do no
 ## Scope
 
 In scope is code maintained in this repository, including fork-specific authentication,
-epics, work-item properties, and worklog functionality once those features merge.
+epics, work-item properties, and worklog functionality.
 
 Reports about upstream dependencies must demonstrate an impact on Hangar. Findings that
 require physical access, a man-in-the-middle position, or attacks against unrelated

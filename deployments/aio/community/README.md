@@ -6,9 +6,9 @@ The Hangar Community All-In-One Docker image packages all Hangar services into a
 
 The AIO image contains the following services:
 
-- **Web App** (Port 3001): Main Hangar web interface
+- **Web App**: Main Hangar web interface, served as static files by the proxy at `/`
 - **Space** (Port 3002): Public project spaces
-- **Admin** (Port 3003): Administrative interface
+- **Admin**: Administrative interface, served as static files by the proxy at `/god-mode`
 - **API Server** (Port 3004): Backend API
 - **Live Server** (Port 3005): Real-time collaboration
 - **Proxy** (Port 80, 443): Caddy reverse proxy
@@ -59,8 +59,12 @@ docker run --name plane-aio --rm -it \
     -e AWS_ACCESS_KEY_ID=your-access-key \
     -e AWS_SECRET_ACCESS_KEY=your-secret-key \
     -e AWS_S3_BUCKET_NAME=your-bucket \
-    ghcr.io/szymczag/hangar-aio:stable
+    ghcr.io/szymczag/hangar-aio:v0.1.0-rc.71
 ```
+
+Hangar publishes no `stable` tag yet. For a durable deployment, pin the image to
+its verified digest; see
+[Verifying release images](../../../README.md#verifying-release-images).
 
 ### Example with IP Address
 
@@ -78,7 +82,7 @@ docker run --name myaio --rm -it \
     -e AWS_S3_BUCKET_NAME=plane-app \
     -e AWS_S3_ENDPOINT_URL=http://${MYIP}:19000 \
     -e FILE_SIZE_LIMIT=10485760 \
-    ghcr.io/szymczag/hangar-aio:stable
+    ghcr.io/szymczag/hangar-aio:v0.1.0-rc.71
 ```
 
 ## Configuration Options
@@ -91,8 +95,8 @@ docker run --name myaio --rm -it \
 
 #### Security & Secrets
 
-- `SECRET_KEY`: Django secret key (default provided)
-- `LIVE_SERVER_SECRET_KEY`: Live server secret (default provided)
+- `SECRET_KEY`: Django secret key (auto-generated on first boot if not set)
+- `LIVE_SERVER_SECRET_KEY`: Live server secret (auto-generated on first boot if not set)
 
 - `REDIS_SSL_CERT_REQS`: For a `rediss://` `REDIS_URL`, the Redis server certificate and hostname are verified by default (`required`). Set it to `none` to skip verification.
 - `REDIS_SSL_CA_CERTS`: Path inside the container to a CA bundle, for a Redis server whose certificate is issued by a private CA. Mount the file with `-v`, for example `-v /path/to/redis-ca.pem:/certs/redis-ca.pem:ro -e REDIS_SSL_CA_CERTS=/certs/redis-ca.pem`.
@@ -127,13 +131,17 @@ To build the AIO image yourself:
 
 ```bash
 cd deployments/aio/community
-IMAGE_NAME=myplane-aio ./build.sh --release=v0.27.1 [--platform=linux/amd64]
+./build.sh --release=v0.1.0-rc.71 --image-name=my-hangar-aio
 ```
+
+`build.sh` prepares the `dist/` directory and prints the `docker build` command to
+run next; it does not build the image itself.
 
 Available build options:
 
 - `--release`: Hangar version to build (required)
-- `--image-name`: Custom image name (default: `plane-aio-community`)
+- `--image-name`: Custom image name (default: `ghcr.io/szymczag/hangar-aio`; the
+  `IMAGE_NAME` environment variable sets the same value)
 
 ## Troubleshooting
 

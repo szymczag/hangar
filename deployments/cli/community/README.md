@@ -46,7 +46,7 @@ After installation, you can verify the installation by opening a terminal (Comma
 
 ## Installing Hangar
 
-Installing plane is a very easy and minimal step process.
+Installing Hangar is a very easy and minimal step process.
 
 ### Prerequisite
 
@@ -100,7 +100,7 @@ This will prompt you with the below options.
 
 ```bash
 Select an Action you want to perform:
-   1) Install (x86_64)
+   1) Install
    2) Start
    3) Stop
    4) Restart
@@ -120,7 +120,7 @@ This will create a folder `plane-app` and will download 2 files inside that
 - `docker-compose.yaml`
 - `plane.env`
 
-Again the `options [1-8]` will be popped up, and this time hit `8` to exit.
+Again the `options [1-9]` will be popped up, and this time hit `9` to exit.
 
 #### Docker Swarm
 
@@ -201,7 +201,7 @@ Lets again run the `./setup.sh` command. You will again be prompted with the bel
 
 ```bash
 Select a Action you want to perform:
-   1) Install (x86_64)
+   1) Install
    2) Start
    3) Stop
    4) Restart
@@ -237,7 +237,7 @@ Lets again run the `./setup.sh` command. You will again be prompted with the bel
 
 ```bash
 Select a Action you want to perform:
-   1) Install (x86_64)
+   1) Install
    2) Start
    3) Stop
    4) Restart
@@ -285,7 +285,7 @@ Lets again run the `./setup.sh` command. You will again be prompted with the bel
 
 ```bash
 Select a Action you want to perform:
-   1) Install (x86_64)
+   1) Install
    2) Start
    3) Stop
    4) Restart
@@ -336,7 +336,7 @@ Lets again run the `./setup.sh` command. You will again be prompted with the bel
 
 ```bash
 Select a Action you want to perform:
-   1) Install (x86_64)
+   1) Install
    2) Start
    3) Stop
    4) Restart
@@ -355,7 +355,7 @@ You must expect the below message
 
 ![Alt text](images/upgrade.png)
 
-Once done, choose `8` to exit from prompt.
+Once done, choose `9` to exit from prompt.
 
 > It is very important for you to validate the `plane.env` for the new changes.
 
@@ -399,7 +399,7 @@ This time select `6` to view logs.
 
 ```bash
 Select a Action you want to perform:
-   1) Install (x86_64)
+   1) Install
    2) Start
    3) Stop
    4) Restart
@@ -508,7 +508,7 @@ Lets again run the `./setup.sh` command. You will again be prompted with the bel
 
 ```bash
 Select a Action you want to perform:
-   1) Install (x86_64)
+   1) Install
    2) Start
    3) Stop
    4) Restart
@@ -524,9 +524,18 @@ Action [2]: 7
 In response, you can find the backup folder
 
 ```bash
-Backing Up plane-app_pgdata
-Backing Up plane-app_redisdata
-Backing Up plane-app_object-storage
+Backing up plane-db data...
+Copying plane-db data directory...
+Successfully backed up pgdata data
+Backing up plane-minio data...
+Copying plane-minio data directory...
+Successfully backed up object-storage data
+Backing up plane-mq data...
+Copying plane-mq data directory...
+Successfully backed up rabbitmq_data data
+Backing up plane-redis data...
+Copying plane-redis data directory...
+Successfully backed up redisdata data
 
 Backup completed successfully. Backup files are stored in /....../plane-app/backup/20240502-1120
 ```
@@ -655,31 +664,6 @@ file is no longer necessary. Set `USE_MINIO=1` again to use the bundled storage.
 stack and stops when the node still holds `<stack>_uploads`; run
 `migrate-object-storage.sh --project <stack> --env-file <plane.env>` on that
 node, then deploy the stack again.
-
----
-
-### Restore for Commercial Air-Gapped (Docker Compose)
-
-When you want to restore the previously backed-up data on Hangar Commercial Air-Gapped version, follow the instructions below.
-
-1. Download the restore script using the command below
-
-   ```bash
-   curl -fsSL -o restore-airgapped.sh https://github.com/szymczag/hangar/releases/latest/download/restore-airgapped.sh
-   chmod +x restore-airgapped.sh
-   ```
-
-1. Copy the backup folder and the `restore-airgapped.sh` to `Commercial Airgapped Edition` server
-
-1. Make sure that Hangar Commercial (Airgapped) is extracted and ready to get started. In case it is running, you would need to stop that.
-
-1. Execute the command below to restore your data.
-
-   ```bash
-   ./restore-airgapped.sh <path to backup folder containing *.tar.gz files>
-   ```
-
-1. After restoration, you are ready to start Hangar Commercial (Airgapped) will all your previously saved data.
 
 ---
 

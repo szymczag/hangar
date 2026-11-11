@@ -59,6 +59,24 @@ that one over-limit request returns `429` without creating a job or source.
 
 ## Upgrade a release
 
+### Upgrade from `rc.51` or later
+
+Upgrades from `rc.51` onward follow the same Helm procedure as earlier releases:
+read the release-specific constraints, verify the artifacts, create a coordinated
+recovery point, render and compare, upgrade atomically, and run the post-upgrade
+checks, as described from
+[Read release-specific constraints](#1-read-release-specific-constraints) onward.
+This guide does not repeat a section per release for them.
+
+The [Kubernetes documentation](README.md#release-identity) records the current
+release, the versions that are not installation, upgrade, or rollback targets, and
+the supported rollback chain. In particular, `rc.64` through `rc.67` are not upgrade
+targets for a deployment that holds a Workshop, and rolling back from `rc.69` or
+later to `rc.68` needs migration `db.0135` reversed first. The per-release notes in
+[`docs/releases/`](../releases/README.md) describe each release's migrations,
+compatibility, and rollback steps; read every release between the current and
+target versions before upgrading.
+
 ### Upgrade from `rc.47` to `rc.51`
 
 Upgrade directly from the immediately previous retained GitHub release, `rc.47`.
@@ -179,7 +197,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target chart is `0.1.0-rc.51`, its application version is
    `v0.1.0-rc.51`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc39);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
@@ -219,7 +237,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target chart is `0.1.0-rc.27`, its application version is
    `v0.1.0-rc.27`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc27);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. deploy every application image as one coordinated Helm revision. Do not mix
@@ -260,7 +278,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target chart is `0.1.0-rc.26`, its application version is
    `v0.1.0-rc.26`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc26);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule API, migrator, workers, Spaces, and web applications as one
@@ -299,7 +317,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target chart is `0.1.0-rc.23`, its application version is
    `v0.1.0-rc.23`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc23);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule API, migrator, and workers as one coordinated Helm revision. Do not
@@ -345,7 +363,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target chart is `0.1.0-rc.22`, its application version is
    `v0.1.0-rc.22`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc22);
+   [release verification procedure](security.md#verify-a-release);
 3. if the deployment intentionally uses a custom PostHog collector, set
    `POSTHOG_HOST` in the API and worker deployment environment before running
    migrations; the chart does not expose this as a supported value;
@@ -408,7 +426,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target chart is `0.1.0-rc.21`, its application version is
    `v0.1.0-rc.21`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc21);
+   [release verification procedure](security.md#verify-a-release);
 3. if Gitea OAuth or SMTP is enabled, review the destination policy in the
    [federated SSO guide](../federated-sso-security.md) or
    [email security model](../email-delivery-and-openpgp.md); private destinations
@@ -481,7 +499,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target package is `0.1.0-rc.19`, its application version is
    `v0.1.0-rc.19`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc19);
+   [release verification procedure](security.md#verify-a-release);
 3. verify that the internal object-storage endpoint is reachable only from the
    intended workloads, the public endpoint is the browser-facing origin,
    anonymous bucket access is disabled, and neither value is derived from an
@@ -558,7 +576,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target package is `0.1.0-rc.18`, its application version is
    `v0.1.0-rc.18`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc18);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule all Hangar application components as one coordinated rollout.
@@ -621,7 +639,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target package is `0.1.0-rc.17`, its application version is
    `v0.1.0-rc.17`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc17);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule all Hangar application components as one coordinated rollout.
@@ -679,7 +697,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target package is `0.1.0-rc.16`, its application version is
    `v0.1.0-rc.16`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc16);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule all Hangar application components as one coordinated rollout.
@@ -739,7 +757,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target package is `0.1.0-rc.15`, its application version is
    `v0.1.0-rc.15`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc15);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule all Hangar application components as one coordinated rollout.
@@ -796,7 +814,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target package is `0.1.0-rc.14`, its application version is
    `v0.1.0-rc.14`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc14);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule all Hangar application components as one coordinated rollout.
@@ -844,7 +862,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target package is `0.1.0-rc.13`, its application version is
    `v0.1.0-rc.13`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc13);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and verify that only the
    expected release versions and immutable image digests change; and
 4. schedule the API, workers, Live service, and frontends as one coordinated
@@ -893,7 +911,7 @@ Before upgrading:
    record the current Helm revision and application image digests;
 2. confirm the target package is `0.1.0-rc.12`, its application version is
    `v0.1.0-rc.12`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc12);
+   [release verification procedure](security.md#verify-a-release);
 3. render the existing values against the target chart and review the immutable
    image digests, migration Job, Secret references, and NetworkPolicies; and
 4. schedule the API, workers, Live service, and frontends as one coordinated
@@ -937,7 +955,7 @@ Before upgrading:
    background tasks to reach a safe boundary before the migration Job starts;
 3. confirm the target package is `0.1.0-rc.11`, its application version is
    `v0.1.0-rc.11`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc11); and
+   [release verification procedure](security.md#verify-a-release); and
 4. render the existing values against the target chart and review the migration
    Job, immutable image digests, and unchanged Secret and NetworkPolicy contract.
 
@@ -994,7 +1012,7 @@ Before upgrading:
    mutations and record the remaining jobs before replacing API and worker Pods;
 3. confirm the target package is `0.1.0-rc.10`, its application version is
    `v0.1.0-rc.10`, and its signatures and digests pass the
-   [release verification procedure](security.md#verify-release-010-rc10); and
+   [release verification procedure](security.md#verify-a-release); and
 4. render the existing values against the target chart and review the migration
    Job and image changes before applying them.
 
