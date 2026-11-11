@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0-rc.70`. It is qualified for evaluation on
+The current release is `0.1.0-rc.71`. It is qualified for evaluation on
 AMD64 Kubernetes clusters. It is not yet a supported production release.
 
 > [!IMPORTANT]
@@ -50,7 +50,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0-rc.70` qualification boundary is:
+The `0.1.0-rc.71` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -179,10 +179,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                                |
 | ------------------ | -------------------------------------------- |
-| Product version    | `v0.1.0-rc.70`                               |
-| Helm chart version | `0.1.0-rc.70`                                |
-| Git tag            | `hangar-v0.1.0-rc.70`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.70` |
+| Product version    | `v0.1.0-rc.71`                               |
+| Helm chart version | `0.1.0-rc.71`                                |
+| Git tag            | `hangar-v0.1.0-rc.71`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0-rc.71` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -191,10 +191,11 @@ Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
 installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
-`ext.0037` fails there, so upgrade to `rc.68` or later instead. `rc.69` is the
+`ext.0037` fails there, so upgrade to `rc.68` or later instead. `rc.70` is the
 immediately previous retained GitHub release and the supported rollback target
-for this one; rolling back to it needs no schema change. Rolling back further, to
-`rc.68`, needs migration `db.0135` reversed first, as described below. Rolling
+for this one; rolling back to it needs no schema change, and neither does
+rolling back further, to `rc.69`. Rolling back to `rc.68` needs migration
+`db.0135` reversed first, as described below. Rolling
 back to `rc.67` after that needs no other schema change.
 Rolling back to `rc.66` needs none either and restores the larger `space` and
 `live` images. Rolling
@@ -224,7 +225,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0-rc.70` notes](../releases/hangar-v0.1.0-rc.70.md) — review
+- [Release `v0.1.0-rc.71` notes](../releases/hangar-v0.1.0-rc.71.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -251,16 +252,25 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.0-rc.69`, tag `hangar-v0.1.0-rc.69`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.0-rc.69`. Anybody still on rc.62 with
+The previous release is `0.1.0-rc.70`, tag `hangar-v0.1.0-rc.70`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.0-rc.70`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
-Release rc.70 adds no migrations and changes nothing in the chart. It fixes the
+Release rc.71 adds no migrations and changes nothing in the chart. Its images
+carry current Alpine packages, which fixes `libxslt` (CVE-2026-87636,
+CVE-2026-9947) in the `web`, `admin` and `api` images and `krb5-libs` in the
+`api` image: release builds now upgrade the Alpine packages afresh instead of
+reusing that step from the build cache. The `live` image moves to `effect`
+3.22.4 and `@effect/platform` 0.97 (GHSA-chp3-j5qr-2vfr), whose affected cookie
+helpers Hangar does not call. The other change, idling the bundled object
+storage when `USE_MINIO=0`, concerns Compose and Swarm installs only.
+
+Release rc.70 also added no migrations and changed nothing in the chart. It fixed the
 profile overview ("Your work"), which failed to render for anyone assigned a
 work item without a state; the user stats and the user's workspace dashboard summary no longer
 return a `state_distribution` row whose group is null. The `proxy` image's
-Caddy is rebuilt with `golang.org/x/net` 0.62.0, past CVE-2026-78661.
+Caddy was rebuilt with `golang.org/x/net` 0.62.0, past CVE-2026-78661.
 
 An upgrade from rc.68 or earlier also takes in rc.69, which adds migration `db.0135_remove_apitoken_is_service_and_allowed_rate_limit`,
 which drops two unused API token columns and rewrites no rows; the release Job
@@ -351,9 +361,9 @@ Pod Security, migrations, HTTPS ingress, WebSockets, positive and negative
 network-policy checks, dependency connectivity, object-storage persistence, an
 atomic upgrade, rollback-on-failure behavior, uninstall, and retained PVCs.
 
-The release workflow verifies anonymous access to the rc.70 chart archive, OCI
+The release workflow verifies anonymous access to the rc.71 chart archive, OCI
 chart and digest-pinned images, and creates provenance attestations and keyless
-Cosign signatures. No new live-cluster qualification is claimed for rc.70.
+Cosign signatures. No new live-cluster qualification is claimed for rc.71.
 
 Production support remains blocked on production-profile installation and
 application-flow testing, coordinated backup and restore, migration-failure
