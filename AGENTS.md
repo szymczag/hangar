@@ -59,6 +59,18 @@ and still pass, so reading only the check list throws that information away.
   trip a scope check — the bare path works), and check that anything dismissed
   was dismissed for a reason that still holds.
 
+**Security scan** is a gate, not advisory, but its nightly image job reads
+differently from the rest. It scans the images of the latest published GitHub
+Release, nightly and right after each release. Its findings are packages
+inside those images, mostly Alpine OS packages, which Dependabot never sees.
+They land as code scanning alerts (categories `trivy-image-*`) and in the one
+open issue labelled `security-scan`. The workflow keeps that issue current and
+closes it when the latest release scans clean. A red image job either has
+findings or could not scan, and its log says which. The fix is a new release:
+release builds refresh the Alpine packages, and anything else needs its
+pinned version raised. Dependabot alerts cover only the npm and pip
+manifests.
+
 Four render-time formatter warnings and two complexity warnings reached a
 release because both were read as pass/fail.
 
