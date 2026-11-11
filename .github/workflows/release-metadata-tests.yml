@@ -16,6 +16,11 @@ on:
       - ".github/workflows/release-metadata-tests.yml"
       - "docs/releases/**"
       - "docs/kubernetes/README.md"
+      - "deployments/cli/community/**"
+      - "deployments/swarm/community/**"
+      - "apps/*/public/config.js"
+      - "apps/space/app/issues/**"
+      - "packages/constants/src/endpoints.ts"
   push:
     branches:
       - preview
@@ -30,6 +35,11 @@ on:
       - ".github/workflows/release-metadata-tests.yml"
       - "docs/releases/**"
       - "docs/kubernetes/README.md"
+      - "deployments/cli/community/**"
+      - "deployments/swarm/community/**"
+      - "apps/*/public/config.js"
+      - "apps/space/app/issues/**"
+      - "packages/constants/src/endpoints.ts"
 
 permissions:
   contents: read

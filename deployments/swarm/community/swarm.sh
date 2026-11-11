@@ -38,13 +38,17 @@ EOF
 
 function checkLatestRelease(){
     echo "Checking for the latest release..." >&2
-    local latest_release=$(curl -s https://api.github.com/repos/$GH_REPO/releases/latest |  grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"//;s/"//g')
+    # Hangar publishes every release candidate as a GitHub pre-release, and
+    # /releases/latest never returns a pre-release. Take the newest published
+    # release instead (the list is newest first and anonymous requests never
+    # see drafts). Release tags are hangar-vX.Y.Z; images are tagged vX.Y.Z.
+    local latest_release=$(curl -sSL "https://api.github.com/repos/$GH_REPO/releases?per_page=20" | grep -o '"tag_name": *"hangar-v[^"]*"' | head -n 1 | sed 's/"tag_name": *"hangar-//;s/"//g')
     if [ -z "$latest_release" ]; then
         echo "Failed to check for the latest release. Exiting..." >&2
         exit 1
     fi
 
-    echo $latest_release    
+    echo $latest_release
 }
 
 # Function to read stack name from env file
@@ -206,7 +210,7 @@ function download() {
     echo $FALLBACK_DOWNLOAD_URL
     echo $APP_RELEASE
 
-    RESPONSE=$(curl -H 'Cache-Control: no-cache, no-store' -s -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/$APP_RELEASE/docker-compose.yml?$(date +%s)")
+    RESPONSE=$(curl -H 'Cache-Control: no-cache, no-store' -s -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/docker-compose.yml?$(date +%s)")
     BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
     STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
 
@@ -222,13 +226,13 @@ function download() {
             echo "$BODY" > $PLANE_INSTALL_DIR/docker-compose.yml
         else
             echo "Failed to download docker-compose.yml. HTTP Status: $STATUS"
-            echo "URL: $RELEASE_DOWNLOAD_URL/$APP_RELEASE/docker-compose.yml"
+            echo "URL: $RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/docker-compose.yml"
             mv $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yml $PLANE_INSTALL_DIR/docker-compose.yml
             exit 1
         fi
     fi
 
-    RESPONSE=$(curl -H 'Cache-Control: no-cache, no-store' -s -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/$APP_RELEASE/variables.env?$(date +%s)")
+    RESPONSE=$(curl -H 'Cache-Control: no-cache, no-store' -s -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/variables.env?$(date +%s)")
     BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
     STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
 
@@ -244,7 +248,7 @@ function download() {
             echo "$BODY" > $PLANE_INSTALL_DIR/variables-upgrade.env
         else
             echo "Failed to download variables.env. HTTP Status: $STATUS"
-            echo "URL: $RELEASE_DOWNLOAD_URL/$APP_RELEASE/variables.env"
+            echo "URL: $RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/variables.env"
             mv $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yml $PLANE_INSTALL_DIR/docker-compose.yml
             exit 1
         fi
@@ -659,6 +663,8 @@ fi
 if [ -f "$DOCKER_ENV_PATH" ]; then
     DOCKERHUB_USER=$(getEnvValue "DOCKERHUB_USER" "$DOCKER_ENV_PATH")
     APP_RELEASE=$(getEnvValue "APP_RELEASE" "$DOCKER_ENV_PATH")
+    # Images are tagged vX.Y.Z; the release tag adds a hangar- prefix.
+    APP_RELEASE=${APP_RELEASE#hangar-}
 
     if [ -z "$DOCKERHUB_USER" ]; then
         DOCKERHUB_USER=ghcr.io/szymczag

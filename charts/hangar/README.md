@@ -146,9 +146,10 @@ before admitting the package to a controlled environment.
 
 `publicUrl` is the installation's single external origin. The chart uses it for
 backend host/CORS settings, Live, all five frontend URL variables, TLS host
-matching, and a generated runtime `config.js`. Published frontend images also
-bake the default origin as a fallback, while the runtime file lets an operator
-change the hostname without rebuilding static assets. The runtime file supplies
+matching, and a generated runtime `config.js`. Published frontend images carry
+no origin of their own: without a runtime file they use the page's origin, and
+the chart's file names `publicUrl` so an operator can change the hostname
+without rebuilding static assets. The runtime file supplies
 the Live origin and `/live` base path together, keeping collaboration
 WebSockets on the route exposed by both the proxy and Live service.
 
