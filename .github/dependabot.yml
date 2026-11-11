@@ -1,0 +1,85 @@
+# Dependabot configuration.
+#
+# npm and pip receive security updates only. The application tree follows
+# upstream Plane, and routine version bumps there would collide with upstream
+# syncs; open-pull-requests-limit: 0 turns version updates off without
+# affecting security updates, which the groups below batch into one pull
+# request per ecosystem.
+#
+# Container base images and GitHub Actions receive weekly version updates.
+# Dependabot finds every file whose name contains "dockerfile" (Dockerfile.web,
+# Dockerfile.ce, Dockerfile.dev, ...). A bump of a base image that a test pins
+# (.github/scripts/tests/test_container_runtime_hardening.py,
+# test_proxy_base_images.py) needs that test updated in the same pull request.
+#
+# Dependabot does not see OS packages inside the published images. Those are
+# covered by the nightly image scan in .github/workflows/security-scan.yml, and
+# every release build refreshes them (APK_SECURITY_PATCH in build-branch.yml).
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /apps/api/requirements
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      pip-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories:
+      - /apps/web
+      - /apps/admin
+      - /apps/space
+      - /apps/live
+      - /apps/api
+      - /apps/proxy
+      - /deployments/aio/community
+    target-branch: preview
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      base-images:
+        patterns: ["*"]
+    ignore:
+      # Node majors and Python minors change the runtime; move them on purpose.
+      - dependency-name: "*node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "*python"
+        versions: [">=3.13"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: preview
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
