@@ -39,7 +39,11 @@ authenticated `/convert-document/` server-to-server call. Rotating it therefore
 requires a coordinated restart of Live and the general worker deployment.
 
 The web frontend receives the Live origin and `VITE_LIVE_BASE_PATH=/live`
-through its generated, non-cacheable runtime `config.js`. Collaboration
+through its generated, non-cacheable runtime `config.js`. The published images
+compile in no origin, so outside the chart (Compose, Swarm and the AIO image)
+the frontends reach the API, Live, Spaces and God Mode on the page's own origin;
+before rc.72 they carried the chart's placeholder `https://hangar.example.com`
+instead, which only the chart replaced. Collaboration
 WebSockets therefore use `/live/collaboration`, matching the chart proxy route
 and the Live service. Published images also bake `/live` as a fallback, so a
 missing runtime file cannot silently move collaboration traffic to the root.

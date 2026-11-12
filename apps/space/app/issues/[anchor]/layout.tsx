@@ -38,8 +38,16 @@ export async function loader({ params }: Route.LoaderArgs) {
     return { metadata: null };
   }
 
+  // The published images carry no API origin: the browser reaches the API on its
+  // own origin, which the server does not know. Without one there is nothing to
+  // ask, and the page keeps its default metadata.
+  const apiBaseUrl = process.env.VITE_API_BASE_URL;
+  if (!apiBaseUrl) {
+    return { metadata: null };
+  }
+
   try {
-    const response = await fetch(`${process.env.VITE_API_BASE_URL}/api/public/anchor/${anchor}/meta/`);
+    const response = await fetch(`${apiBaseUrl}/api/public/anchor/${anchor}/meta/`);
 
     if (!response.ok) {
       return { metadata: null };
