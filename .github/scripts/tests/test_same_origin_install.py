@@ -13,7 +13,9 @@ origin unless a runtime `config.js` names one.
 
 The Compose and Swarm installers resolved "stable" through GitHub's
 `/releases/latest`, which never returns a pre-release, and every Hangar release
-is one. They also fetched release assets from `v…` while the tags are
+up to 0.1.0 is one. They now take the newest stable release, and the newest
+pre-release only while no stable release exists, so a release candidate
+published after a stable release does not reach a stable install. They also fetched release assets from `v…` while the tags are
 `hangar-v…`, so a fresh install stopped before it began.
 """
 
@@ -38,6 +40,36 @@ ORIGIN_VARIABLES = ("API", "WEB", "ADMIN", "SPACE", "LIVE")
 RELEASES_FIXTURE = """[
   {"tag_name": "hangar-v0.1.0-rc.71", "prerelease": true, "draft": false},
   {"tag_name": "hangar-v0.1.0-rc.70", "prerelease": true, "draft": false}
+]"""
+
+STABLE_FIXTURE = """[
+  {"tag_name": "hangar-v0.1.1-rc.1", "prerelease": true, "draft": false},
+  {"tag_name": "hangar-v0.1.0", "prerelease": false, "draft": false},
+  {"tag_name": "hangar-v0.1.0-rc.72", "prerelease": true, "draft": false}
+]"""
+
+TWO_STABLE_FIXTURE = """[
+  {"tag_name": "hangar-v0.1.2-rc.1", "prerelease": true, "draft": false},
+  {"tag_name": "hangar-v0.1.1", "prerelease": false, "draft": false},
+  {"tag_name": "hangar-v0.1.0", "prerelease": false, "draft": false}
+]"""
+
+PRETTY_FIXTURE = """[
+  {
+    "url": "https://api.github.com/repos/szymczag/hangar/releases/2",
+    "tag_name": "hangar-v0.1.1-rc.1",
+    "name": "Hangar v0.1.1-rc.1",
+    "draft": false,
+    "prerelease": true,
+    "body": "Not a \\"tag_name\\": \\"hangar-v9.9.9\\" entry"
+  },
+  {
+    "url": "https://api.github.com/repos/szymczag/hangar/releases/1",
+    "tag_name": "hangar-v0.1.0",
+    "name": "Hangar v0.1.0",
+    "draft": false,
+    "prerelease": false
+  }
 ]"""
 
 
@@ -113,6 +145,23 @@ class InstallerReleaseTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "v0.1.0-rc.71", script.name)
             self.assertIn("/repos/szymczag/hangar/releases?", result.curl_args)
             self.assertNotIn("/releases/latest", result.curl_args)
+
+    def test_a_stable_release_wins_over_newer_pre_releases(self):
+        for script in INSTALLERS:
+            result = self._latest(script, STABLE_FIXTURE)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "v0.1.0", script.name)
+
+    def test_the_newest_stable_release_is_chosen(self):
+        for script in INSTALLERS:
+            result = self._latest(script, TWO_STABLE_FIXTURE)
+            self.assertEqual(result.stdout.strip(), "v0.1.1", script.name)
+
+    def test_the_live_api_layout_is_understood(self):
+        # The API pretty-prints, one key per line, with other keys in between.
+        for script in INSTALLERS:
+            result = self._latest(script, PRETTY_FIXTURE)
+            self.assertEqual(result.stdout.strip(), "v0.1.0", script.name)
 
     def test_a_release_list_without_hangar_tags_stops_the_install(self):
         for script in INSTALLERS:
