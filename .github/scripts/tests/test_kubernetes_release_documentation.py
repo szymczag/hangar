@@ -34,9 +34,18 @@ _NOTES_NAME = re.compile(r"^hangar-v(.+)\.md$")
 _REQUIRE_LITERAL = re.compile(r'require_literal "(.+)"\s*$', re.MULTILINE)
 
 
+def _parts(value):
+    return [int(part) if part.isdigit() else part for part in re.split(r"[.-]", value)]
+
+
 def version_sort_key(version):
-    """Sort "0.1.0-rc.9" below "0.1.0-rc.10", which a string sort does not."""
-    return [int(part) if part.isdigit() else part for part in re.split(r"[.-]", version)]
+    """Sort "0.1.0-rc.9" below "0.1.0-rc.10", which a string sort does not.
+
+    As in semver, a release sorts above its own candidates: "0.1.0" comes after
+    "0.1.0-rc.72", although a plain part-by-part sort puts the shorter first.
+    """
+    core, _, stage = version.partition("-")
+    return (_parts(core), 1 if not stage else 0, _parts(stage))
 
 
 def released_versions():
@@ -56,6 +65,14 @@ def workflow_literals(chart_version, version, git_tag):
         literal = literal.replace("$GIT_TAG", git_tag)
         literals.append(literal)
     return literals
+
+
+class VersionOrderTests(unittest.TestCase):
+    def test_a_release_sorts_above_its_candidates(self):
+        self.assertEqual(
+            sorted(["0.1.0", "0.1.0-rc.9", "0.1.1-rc.1", "0.1.0-rc.72", "0.0.9"], key=version_sort_key),
+            ["0.0.9", "0.1.0-rc.9", "0.1.0-rc.72", "0.1.0", "0.1.1-rc.1"],
+        )
 
 
 class KubernetesReleaseDocumentationTests(unittest.TestCase):

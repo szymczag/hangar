@@ -59,11 +59,12 @@ docker run --name plane-aio --rm -it \
     -e AWS_ACCESS_KEY_ID=your-access-key \
     -e AWS_SECRET_ACCESS_KEY=your-secret-key \
     -e AWS_S3_BUCKET_NAME=your-bucket \
-    ghcr.io/szymczag/hangar-aio:v0.1.0-rc.72
+    ghcr.io/szymczag/hangar-aio:v0.1.0
 ```
 
-Hangar publishes no `stable` tag yet. For a durable deployment, pin the image to
-its verified digest; see
+The `stable` tag follows the newest stable release and moves when the next one
+is published. For a durable deployment, pin the image to a version or its
+verified digest; see
 [Verifying release images](../../../README.md#verifying-release-images).
 
 ### Example with IP Address
@@ -82,7 +83,7 @@ docker run --name myaio --rm -it \
     -e AWS_S3_BUCKET_NAME=plane-app \
     -e AWS_S3_ENDPOINT_URL=http://${MYIP}:19000 \
     -e FILE_SIZE_LIMIT=10485760 \
-    ghcr.io/szymczag/hangar-aio:v0.1.0-rc.72
+    ghcr.io/szymczag/hangar-aio:v0.1.0
 ```
 
 ## Configuration Options
@@ -131,7 +132,7 @@ To build the AIO image yourself:
 
 ```bash
 cd deployments/aio/community
-./build.sh --release=v0.1.0-rc.72 --image-name=my-hangar-aio
+./build.sh --release=v0.1.0 --image-name=my-hangar-aio
 ```
 
 `build.sh` prepares the `dist/` directory and prints the `docker build` command to

@@ -66,7 +66,7 @@ Installing Hangar is a very easy and minimal step process.
 
 Download the script from the newest release on the
 [Releases page](https://github.com/szymczag/hangar/releases); the commands below
-use `hangar-v0.1.0-rc.72`. Whichever copy you run, `install` and `upgrade` look
+use `hangar-v0.1.0`. Whichever copy you run, `install` and `upgrade` look
 up the release themselves and fetch that release's compose file and settings.
 They take the newest stable release, and the newest pre-release only while no
 stable release has been published, so a release candidate never replaces a
@@ -82,7 +82,7 @@ cd plane-selfhost
 #### For _Docker Compose_ based setup
 
 ```
-curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0-rc.72/setup.sh
+curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0/setup.sh
 
 chmod +x setup.sh
 ```
@@ -90,7 +90,7 @@ chmod +x setup.sh
 #### For _Docker Swarm_ based setup
 
 ```
-curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0-rc.72/swarm.sh
+curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0/swarm.sh
 
 chmod +x setup.sh
 ```
@@ -560,7 +560,7 @@ When you want to restore the previously backed-up data, follow the instructions 
 1. Download the restore script using the command below. We suggest downloading it in the same folder as `setup.sh`.
 
    ```bash
-   curl -fsSL -o restore.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0-rc.72/restore.sh
+   curl -fsSL -o restore.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0/restore.sh
    chmod +x restore.sh
    ```
 

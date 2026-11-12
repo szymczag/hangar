@@ -18,9 +18,10 @@ Hangar is an independent, community-maintained fork of
 project-management core while keeping upstream updates practical.
 
 > [!IMPORTANT]
-> Hangar is under active development. It does not currently publish stable releases,
-> hosted services, or production-ready container images. The `preview` branch is the
-> integration branch for contributors.
+> Hangar `0.1.0` is the first stable release, for Docker Compose, Docker Swarm and
+> the all-in-one image. The Helm chart is qualified for evaluation only and is not
+> yet supported in production on Kubernetes. Hangar offers no hosted service. The
+> `preview` branch is the integration branch for contributors and is not a release.
 
 Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 “Plane” and the Plane logo are trademarks of Plane Software, Inc.
@@ -45,7 +46,7 @@ Hangar is not affiliated with, endorsed by, or supported by Plane Software, Inc.
 | Runner installation control-plane foundation     | Available on `preview`              | [#46](https://github.com/szymczag/hangar/pull/46)     |
 | Secure SES delivery and optional OpenPGP         | Available on `preview`              | [#44](https://github.com/szymczag/hangar/pull/44)     |
 | Todoist CSV importer                             | Available; opt-in and quota-bounded | [#50](https://github.com/szymczag/hangar/pull/50)     |
-| Helm chart evaluation profile                    | Public prerelease                   | [Kubernetes documentation](docs/kubernetes/README.md) |
+| Helm chart evaluation profile                    | Evaluation only                     | [Kubernetes documentation](docs/kubernetes/README.md) |
 | Second factor for the instance console           | Available on `preview`              | [Feature guide](docs/god-mode-second-factor.md)       |
 | Instance branding and maintenance notice         | Available on `preview`              | [Feature guide](docs/instance-branding.md)            |
 | Workspace short links                            | Available on `preview`              | [Feature guide](docs/workspace-short-links.md)        |
@@ -189,10 +190,9 @@ are rejected. Release-built API and Live images embed that same product version 
 `APP_VERSION`, so offline version reporting does not depend on the upstream
 `package.json` value.
 
-GitHub's `/releases/latest` endpoint ignores pre-releases, and every Hangar release
-so far is published as a pre-release. Until a stable release exists, the example URL
-returns no release, the check fails quietly, and the instance keeps reporting its
-packaged version.
+GitHub's `/releases/latest` endpoint ignores pre-releases, so the example URL
+reports the newest stable release, starting with `0.1.0`, and never a release
+candidate. If the check fails, the instance keeps reporting its packaged version.
 
 ## Verifying release images
 
@@ -207,7 +207,7 @@ Install Cosign, obtain the digest for the version you intend to deploy, and veri
 both the exact workflow identity and GitHub's OIDC issuer:
 
 ```sh
-VERSION=v0.1.0-rc.72
+VERSION=v0.1.0
 GIT_TAG=hangar-$VERSION
 DIGEST=sha256:replace-with-the-published-digest
 IMAGE=ghcr.io/szymczag/hangar-api
@@ -220,7 +220,7 @@ cosign verify \
 
 Replace `api` with `web`, `admin`, `space`, `live`, `proxy`, or `aio` as needed.
 Pin deployments to the verified digest. A mutable `stable` tag is promoted only
-for non-prerelease versions, and none has been published yet. Hangar also
+for stable releases, after publication succeeds, and moves with each one. Hangar also
 publishes an SBOM and GitHub build-provenance attestation for every container
 image.
 
