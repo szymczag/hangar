@@ -1,7 +1,7 @@
 # Kubernetes security and artifact verification
 
 This document explains the chart's security boundaries and provides commands for
-verifying the public `0.1.0-rc.51` release.
+verifying the public `0.1.0-rc.71` release.
 
 ## Security model
 
@@ -88,9 +88,9 @@ that does not enforce policies can fail open.
 
 ## Release trust chain
 
-For `0.1.0-rc.51`, the trust chain is:
+For `0.1.0-rc.71`, the trust chain is:
 
-1. signed Git tag `hangar-v0.1.0-rc.51` identifies the source commit;
+1. signed Git tag `hangar-v0.1.0-rc.71` identifies the source commit;
 2. the release workflow builds AMD64 images with BuildKit SBOM and provenance;
 3. GitHub creates build-provenance attestations;
 4. the workflow signs image and chart digests keylessly with GitHub OIDC;
@@ -101,16 +101,18 @@ For `0.1.0-rc.51`, the trust chain is:
 Verification must use immutable digests and the exact workflow identity. A valid
 signature for a different workflow, repository, tag, or issuer is not sufficient.
 
-## Verify release `0.1.0-rc.51`
+## Verify a release
 
-These commands require `curl`, `sha256sum`, GitHub CLI for the GitHub attestation,
-and Cosign for OCI signatures.
+The commands below verify the current release, `0.1.0-rc.71`; set `VERSION` and
+`GIT_TAG` to another published version to verify that one instead. They require
+`curl`, `sha256sum`, GitHub CLI for the GitHub attestation, and Cosign for OCI
+signatures.
 
 ### 1. Download public release assets
 
 ```bash
-export VERSION=0.1.0-rc.51
-export GIT_TAG=hangar-v0.1.0-rc.51
+export VERSION=0.1.0-rc.71
+export GIT_TAG=hangar-v0.1.0-rc.71
 export RELEASE_URL="https://github.com/szymczag/hangar/releases/download/$GIT_TAG"
 
 mkdir "hangar-$VERSION-release"
@@ -232,7 +234,7 @@ licenses, vulnerabilities, and maintenance status independently.
 
 ## Current limitations
 
-`0.1.0-rc.51` is a prerelease. Only the evaluation profile has completed live
+`0.1.0-rc.71` is a prerelease. Only the evaluation profile has completed live
 cluster qualification. Vulnerability and license approval, production security
 qualification, backup/restore, migration-failure recovery, and the complete
 support matrix remain open gates.

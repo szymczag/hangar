@@ -234,12 +234,17 @@ container sets and published no chart or GitHub Release.
 - [Configuration reference](configuration.md) — understand values, Secrets,
   routes, workloads, storage, and networking.
 - [Operations](operations.md) — verify, upgrade, rotate credentials, back up,
-  restore, roll back, and uninstall.
+  restore, roll back, and uninstall. Upgrades from `rc.51` onward follow
+  [one procedure](operations.md#upgrade-from-rc51-or-later), with the
+  release-specific steps in each release's notes.
 - [Security and artifact verification](security.md) — understand the security
-  model and verify checksums, attestations, signatures, and anonymous access.
+  model and [verify a release](security.md#verify-a-release): checksums,
+  attestations, signatures, and anonymous access.
 - [Troubleshooting](troubleshooting.md) — diagnose common installation and
   runtime failures without collecting credentials.
 - [Chart source](../../charts/hangar/README.md) — chart-maintainer entry point.
+  It names the same current release, retired versions, and rollback target as
+  [Release identity](#release-identity).
 - [Delivery and qualification plan](../kubernetes-deployment-plan.md) — normative
   requirements and remaining release gates.
 

@@ -1,6 +1,6 @@
 # Running the API Test Suite
 
-This guide covers running the Django/pytest suite for `apps/api` inside Docker via `docker-compose-test.yml` at the repo root. The compose file boots an isolated stack — Postgres, Valkey (Redis), RabbitMQ, MinIO — with tmpfs-backed data dirs, so every run begins from a clean slate and a single teardown command removes everything.
+This guide covers running the Django/pytest suite for `apps/api` inside Docker via `docker-compose-test.yml` at the repo root. The compose file boots an isolated stack — Postgres, Valkey (Redis), RabbitMQ, SeaweedFS (S3-compatible object storage) — with tmpfs-backed data dirs, so every run begins from a clean slate and a single teardown command removes everything.
 
 For background on the test layout, markers, and fixtures, see [`TESTING_GUIDE.md`](./TESTING_GUIDE.md) and [`README.md`](./README.md).
 
@@ -98,12 +98,12 @@ Test-time env overrides live in the compose file itself (`POSTGRES_HOST=test-db`
 - **Port already in use** — none of the test services publish host ports; if you see this it's coming from a different compose stack. Stop the local stack (`docker compose -f docker-compose-local.yml down`).
 - **Stale image after dependency changes** — rebuild explicitly: `docker compose -f docker-compose-test.yml build --no-cache api-tests`.
 - **Object storage bucket missing** — `test-minio` creates the buckets named by `AWS_S3_BUCKET_NAME` (default `uploads`) and `IMPORT_S3_BUCKET_NAME` (default `uploads-imports`) at startup. Change the value in `apps/api/.env` and re-run.
-- **Podman: `test-db` exits with `invalid character in extension owner`** — podman-compose 1.3 does not expand `${VAR:-default}` for a variable that is also defined in an `env_file`, so Postgres receives the literal `${POSTGRES_USER:-plane}` (object storage gets literal credentials the same way). Export the values before running the stack:
+- **Podman: `test-db` exits with `invalid character in extension owner`** — podman-compose 1.3 does not expand `${VAR:-default}` for a variable that is also defined in an `env_file`, so Postgres receives the literal `${POSTGRES_USER:-plane}` (object storage gets literal credentials the same way). Export the values before running the stack, taking the object-storage pair that `./setup.sh` generated in `apps/api/.env`:
 
   ```bash
   export POSTGRES_USER=plane POSTGRES_PASSWORD=plane POSTGRES_DB=plane \
-         AWS_ACCESS_KEY_ID=access-key AWS_SECRET_ACCESS_KEY=secret-key \
          AWS_S3_BUCKET_NAME=uploads IMPORT_S3_BUCKET_NAME=uploads-imports
+  export $(grep -E '^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)=' apps/api/.env | tr -d '"')
   ```
 
   Docker Compose expands them without this.

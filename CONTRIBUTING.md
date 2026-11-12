@@ -27,7 +27,7 @@ open a Hangar issue and explain what you tested.
 ### Requirements
 
 - Docker Engine with Docker Compose
-- Node.js 22.18 or newer
+- Node.js 22.22 or newer
 - Corepack
 - At least 12 GB of RAM recommended
 
