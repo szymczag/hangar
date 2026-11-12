@@ -26,6 +26,16 @@ They also downloaded the release files from `v0.1.0-…` while the tags are name
 release list and download its files from that tag. A release saved with the
 `hangar-` prefix is read as the same version.
 
+**The beat container stops when it is asked to.** Its start script ran
+`celery beat` as a child process, so the stop signal reached only the shell,
+which as the container's first process ignores it. `podman stop` and
+`docker stop` waited ten seconds and then killed the container, which a
+systemd unit wrapping it reports as a failure; Kubernetes waited the whole
+termination grace period on every rollout of `beat-worker`. In the all-in-one
+image, stopping beat left it running in the background, so restarting it could
+start a second scheduler. The script now hands its process to `celery beat`,
+which stops cleanly within a second.
+
 Public work item pages in Spaces ask the API for link-preview metadata while
 they render on the server. Without a configured API origin they now skip that
 request instead of sending it to the placeholder; the page renders as before.
@@ -40,12 +50,15 @@ version `0.1.0-rc.72`, and OCI chart
 
 ## Known limitations and rollback
 
-The limitations described in `0.1.0-rc.71` are unchanged. The Spaces
+The limitations described in `0.1.0-rc.71` are unchanged. While the beat
+container is still waiting for the database and migrations at start-up, a stop
+still waits for the runtime's timeout. The Spaces
 link-preview metadata described above is still not fetched on installs whose
 images carry no API origin; it was not fetched before either.
 
 Rolling back to `0.1.0-rc.71` needs no schema change and brings back the
 compiled-in placeholder origin, so Compose, Swarm and all-in-one installs stop
-working again; Helm installs are not affected. Rolling back further, to
+working again; Helm installs are not affected. It also brings back the slow,
+forced stop of the beat container. Rolling back further, to
 `0.1.0-rc.70`, needs no schema change either and brings back its Alpine
 packages and Effect release, as the rc.71 notes describe.

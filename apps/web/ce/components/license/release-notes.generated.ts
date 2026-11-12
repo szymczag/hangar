@@ -15,6 +15,7 @@ export const RELEASE_NOTES: TBuildIdentity = {
   highlights: [
     "The web app, God Mode and Spaces work again on Compose, Swarm and all-in-one installs.",
     "The Compose and Swarm installers find and download the release again.",
+    "The beat container stops when it is asked to.",
   ],
   upstream: {
     version: "1.4.0",

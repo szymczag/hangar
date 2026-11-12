@@ -273,7 +273,10 @@ page was opened from unless the runtime `config.js` names one. The chart has
 always set the origin through `config.js`, so Helm installs behave as before;
 the change repairs Compose, Swarm and all-in-one installs, whose installers also
 find and download the release again. A rollback to rc.71 brings the placeholder
-back, which the chart overrides as before.
+back, which the chart overrides as before. The `beat-worker` pod now stops on
+SIGTERM: its start script ran `celery beat` as a child that never received the
+signal, so every rollout or drain waited the full termination grace period and
+ended in SIGKILL.
 
 Release rc.71 also added no migrations and changed nothing in the chart. Its images
 carry current Alpine packages, which fixes `libxslt` (CVE-2026-87636,
