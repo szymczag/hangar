@@ -130,6 +130,14 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         promotion_position = self.workflow.index("docker buildx imagetools create")
         self.assertLess(release_position, promotion_position)
 
+    def test_release_job_can_push_the_stable_tags(self):
+        # Prereleases never reach the promotion step, so only the first stable
+        # release would find out that a read-only token cannot move `stable`.
+        release = self.workflow.split("\n  release:\n", maxsplit=1)[1]
+        self.assertIn("docker buildx imagetools create", release)
+        self.assertIn("      packages: write\n", release)
+        self.assertNotIn("      packages: read\n", release)
+
     def test_release_chart_is_immutable_and_qualified_before_publication(self):
         self.assertIn(
             'reject_existing_image_tag "ghcr.io/szymczag/charts/hangar:${VERSION#v}"',
