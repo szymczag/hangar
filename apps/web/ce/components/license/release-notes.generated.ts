@@ -11,11 +11,11 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0-rc.71",
+  version: "0.1.0-rc.72",
   highlights: [
-    "Release images carry current Alpine packages again.",
-    "Compose and Swarm installs on external storage no longer run an open object store.",
-    "The live server moves to the fixed Effect release.",
+    "The web app, God Mode and Spaces work again on Compose, Swarm and all-in-one installs.",
+    "The Compose and Swarm installers find and download the release again.",
+    "The beat container stops when it is asked to.",
   ],
   upstream: {
     version: "1.4.0",

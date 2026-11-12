@@ -207,7 +207,7 @@ Install Cosign, obtain the digest for the version you intend to deploy, and veri
 both the exact workflow identity and GitHub's OIDC issuer:
 
 ```sh
-VERSION=v0.1.0-rc.71
+VERSION=v0.1.0-rc.72
 GIT_TAG=hangar-$VERSION
 DIGEST=sha256:replace-with-the-published-digest
 IMAGE=ghcr.io/szymczag/hangar-api
