@@ -7,7 +7,7 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0-rc.71` (`appVersion: v0.1.0-rc.71`). Its
+The latest published chart is `0.1.0-rc.72` (`appVersion: v0.1.0-rc.72`). Its
 evaluation profile is live-qualified on AMD64. It is a prerelease and is not yet
 supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
@@ -36,7 +36,7 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0-rc.71
+  --version 0.1.0-rc.72
 ```
 
 Do not use `0.1.0-rc.1`, `0.1.0-rc.2`, `0.1.0-rc.20`, `0.1.0-rc.24`,
@@ -49,8 +49,9 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.1.0-rc.71`. `rc.70` is the immediately previous retained GitHub release and
-the supported rollback target; rolling back to it needs no schema change. Rolling
+Use `0.1.0-rc.72`. `rc.71` is the immediately previous retained GitHub release and
+the supported rollback target; rolling back to it, or further to `rc.70`
+and `rc.69`, needs no schema change. Rolling
 back past `rc.69` needs migration `db.0135` reversed first. The
 [Kubernetes documentation](../../docs/kubernetes/README.md) lists the full rollback
 chain and its limits.
@@ -129,8 +130,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0-rc.71` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.71)
+Release `0.1.0-rc.72` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0-rc.72)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
