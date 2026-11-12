@@ -58,11 +58,23 @@ function spinner() {
 
 function checkLatestRelease(){
     echo "Checking for the latest release..." >&2
-    # Hangar publishes every release candidate as a GitHub pre-release, and
-    # /releases/latest never returns a pre-release. Take the newest published
-    # release instead (the list is newest first and anonymous requests never
-    # see drafts). Release tags are hangar-vX.Y.Z; images are tagged vX.Y.Z.
-    local latest_release=$(curl -sSL "https://api.github.com/repos/$GH_REPO/releases?per_page=20" | grep -o '"tag_name": *"hangar-v[^"]*"' | head -n 1 | sed 's/"tag_name": *"hangar-//;s/"//g')
+    # Take the newest stable release, or the newest pre-release while no
+    # stable release exists. The list is newest first, anonymous requests never
+    # see drafts, and in each release "tag_name" precedes "prerelease".
+    # /releases/latest is not used: it never returns a pre-release, so it finds
+    # nothing until the first stable release. Release tags are hangar-vX.Y.Z;
+    # images are tagged vX.Y.Z.
+    local latest_release=$(curl -sSL "https://api.github.com/repos/$GH_REPO/releases?per_page=100" \
+        | grep -o '"tag_name": *"[^"]*"\|"prerelease": *[a-z]*' \
+        | awk -F'"' '
+            /"tag_name"/ { tag = ($4 ~ /^hangar-v/) ? $4 : ""; next }
+            tag != "" {
+                if (newest == "") newest = tag
+                if ($0 ~ /false$/ && stable == "") stable = tag
+                tag = ""
+            }
+            END { print (stable != "" ? stable : newest) }' \
+        | sed 's/^hangar-//')
     if [ -z "$latest_release" ]; then
         echo "Failed to check for the latest release. Exiting..." >&2
         exit 1

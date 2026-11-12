@@ -64,12 +64,14 @@ Installing Hangar is a very easy and minimal step process.
 
 ### Downloading Latest Release
 
-Hangar publishes every release as a GitHub pre-release, so GitHub's
-`releases/latest` links do not resolve. Download the script from the newest
-release on the [Releases page](https://github.com/szymczag/hangar/releases); the
-commands below use `hangar-v0.1.0-rc.72`. Whichever copy you run, `install` and
-`upgrade` look up the newest published release themselves, pre-releases
-included, and fetch that release's compose file and settings.
+Download the script from the newest release on the
+[Releases page](https://github.com/szymczag/hangar/releases); the commands below
+use `hangar-v0.1.0-rc.72`. Whichever copy you run, `install` and `upgrade` look
+up the release themselves and fetch that release's compose file and settings.
+They take the newest stable release, and the newest pre-release only while no
+stable release has been published, so a release candidate never replaces a
+stable install. GitHub's `releases/latest` links resolve only once a stable
+release exists, because they skip pre-releases.
 
 ```
 mkdir plane-selfhost
