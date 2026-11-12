@@ -123,3 +123,21 @@ test("a highlight that wraps across lines is still picked up", async () => {
     "A lead-in long enough that it wraps onto a second line before it closes.",
   ]);
 });
+
+test("a release ranks above its own release candidates", async () => {
+  // The first stable release sorted below its last candidate, so the dialog
+  // kept showing the candidate's notes.
+  const { compareVersions, latestReleaseNotes } = await import("./generate-release-notes.mjs");
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+
+  const sorted = ["0.1.0", "0.1.0-rc.9", "0.1.1-rc.1", "0.1.0-rc.72", "0.0.9"].toSorted(compareVersions);
+  assert.deepEqual(sorted, ["0.0.9", "0.1.0-rc.9", "0.1.0-rc.72", "0.1.0", "0.1.1-rc.1"]);
+
+  const dir = mkdtempSync(join(tmpdir(), "release-notes-"));
+  for (const version of ["0.1.0-rc.72", "0.1.0"]) {
+    writeFileSync(join(dir, `hangar-v${version}.md`), `## Security and privacy\n\n**From ${version}.** Body.\n`);
+  }
+  assert.equal(latestReleaseNotes(dir).version, "0.1.0");
+});

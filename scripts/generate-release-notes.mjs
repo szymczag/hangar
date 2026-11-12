@@ -34,11 +34,7 @@ function versionParts(value) {
   return value.split(/[.-]/).map((part) => (/^\d+$/.test(part) ? Number(part) : part));
 }
 
-/** Sort "0.1.0-rc.40" style versions numerically rather than lexically. */
-function compareVersions(a, b) {
-  const left = versionParts(a);
-  const right = versionParts(b);
-
+function compareParts(left, right) {
   for (let i = 0; i < Math.max(left.length, right.length); i++) {
     const l = left[i];
     const r = right[i];
@@ -49,6 +45,21 @@ function compareVersions(a, b) {
     return String(l).localeCompare(String(r));
   }
   return 0;
+}
+
+/**
+ * Sort "0.1.0-rc.40" style versions numerically rather than lexically. As in
+ * semver, a release ranks above its own candidates: 0.1.0 > 0.1.0-rc.72.
+ */
+export function compareVersions(a, b) {
+  const [leftCore, leftStage = ""] = a.split(/-(.*)/s);
+  const [rightCore, rightStage = ""] = b.split(/-(.*)/s);
+  const core = compareParts(versionParts(leftCore), versionParts(rightCore));
+  if (core !== 0) return core;
+  if (leftStage === rightStage) return 0;
+  if (leftStage === "") return 1;
+  if (rightStage === "") return -1;
+  return compareParts(versionParts(leftStage), versionParts(rightStage));
 }
 
 /**
