@@ -170,6 +170,9 @@ def test_pruning_removes_only_what_the_sweep_retired(keys, workspace, create_use
 @pytest.mark.contract
 @pytest.mark.django_db
 def test_a_recently_retired_occurrence_is_kept_for_its_grace_period(keys, workspace, create_user):
+    # The task prunes against the wall clock, so "recent" must be relative to it;
+    # a fixed date turns this test red once the grace period has passed.
+    recent = datetime.now(timezone.utc)
     profile = TrainerProfile.objects.create(workspace=workspace, user=create_user)
     rule = _rule(workspace)
     TrainingEventOccurrence.objects.create(
@@ -179,12 +182,12 @@ def test_a_recently_retired_occurrence_is_kept_for_its_grace_period(keys, worksp
         rule=rule,
         event_key="recent",
         calendar_id_hash="hash",
-        starts_at=NOW,
-        ends_at=NOW + timedelta(hours=2),
+        starts_at=recent,
+        ends_at=recent + timedelta(hours=2),
         status=TrainingEventOccurrence.Status.CONFIRMED,
         state=TrainingEventOccurrence.State.CANCELLED,
-        first_seen_at=NOW,
-        last_seen_at=NOW,
+        first_seen_at=recent,
+        last_seen_at=recent,
     )
 
     assert prune_training_event_occurrences() == 0
