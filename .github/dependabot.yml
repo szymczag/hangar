@@ -25,6 +25,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
+    # Version updates are off, so this changes nothing today; it keeps a
+    # re-enabled version update from proposing a release in its first week.
+    # Security updates are not delayed by a cooldown.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore(deps)"
     groups:
@@ -37,6 +42,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
+    # Version updates are off, so this changes nothing today; it keeps a
+    # re-enabled version update from proposing a release in its first week.
+    # Security updates are not delayed by a cooldown.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore(deps)"
     groups:

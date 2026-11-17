@@ -32,7 +32,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Validate image tag
         env:
@@ -50,10 +52,10 @@ jobs:
           version: v4.2.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.0.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.0.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -109,4 +111,5 @@ jobs:
         env:
           REGISTRY_USERNAME: ${{ github.actor }}
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-        run: charts/hangar/tests/e2e-kind.sh "${{ steps.package_chart.outputs.chart_package }}"
+          CHART_PACKAGE: ${{ steps.package_chart.outputs.chart_package }}
+        run: charts/hangar/tests/e2e-kind.sh "$CHART_PACKAGE"
