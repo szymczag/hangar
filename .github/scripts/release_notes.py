@@ -420,12 +420,25 @@ def generate_release_notes(
     identity = (
         f"{HANGAR_REPOSITORY}/.github/workflows/build-branch.yml@refs/tags/{current_tag}"
     )
-    verification_command = "\n".join(
+    issuer = "https://token.actions.githubusercontent.com"
+    checksum_verification = "\n".join(
+        (
+            "```sh",
+            "cosign verify-blob \\",
+            "  --bundle SHA256SUMS.sigstore.json \\",
+            f"  --certificate-identity '{identity}' \\",
+            f"  --certificate-oidc-issuer '{issuer}' \\",
+            "  SHA256SUMS",
+            "sha256sum --check --ignore-missing SHA256SUMS",
+            "```",
+        )
+    )
+    image_verification = "\n".join(
         (
             "```sh",
             "cosign verify \\",
             f"  --certificate-identity '{identity}' \\",
-            "  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \\",
+            f"  --certificate-oidc-issuer '{issuer}' \\",
             f"  '{IMAGE_PREFIX}<image>@sha256:<digest>'",
             "```",
         )
@@ -444,14 +457,28 @@ def generate_release_notes(
         upstream_description,
         curated_notes,
         "## Release assets and image families",
-        "Release assets contain the Hangar setup, restore, Docker Compose, environment, and Swarm tools.",
+        "Release assets contain the Hangar setup, restore, Docker Compose, environment, and Swarm tools, "
+        "and the Helm chart package. The Docker Compose file pins every Hangar image to the digest below.",
+        "\n".join(
+            (
+                "- `release-manifest.json`: the version, source commit, upstream baseline, image digests, "
+                "chart digest, SBOM checksums, and the signing identity of this release.",
+                "- `hangar-<image>.spdx.json`: the SPDX SBOM BuildKit attached to each image.",
+                "- `SHA256SUMS` and `SHA256SUMS.sigstore.json`: checksums of every other asset and their "
+                "Cosign keyless signature bundle.",
+            )
+        ),
         "All container images target `linux/amd64`:",
         "\n".join(digest_lines),
         prerelease_notice,
         "## Verification",
-        "Each digest includes an SBOM and GitHub build-provenance attestation and is signed with Cosign.",
+        "The identity below must match the one in the Hangar README: a downloaded file cannot vouch "
+        "for its own signer. Verify the checksum signature, then every downloaded asset against it:",
+        checksum_verification,
+        "`release-manifest.json` is covered by `SHA256SUMS`; compare its image digests with the ones you deploy. "
+        "Each image digest carries an SBOM and GitHub build-provenance attestation and is signed with Cosign. "
         "Verify a digest with:",
-        verification_command,
+        image_verification,
     ]
     return "\n\n".join(section for section in sections if section) + "\n"
 

@@ -301,6 +301,27 @@ class ReleaseNoteGenerationTests(unittest.TestCase):
         self.assertIn("does not update the `stable` image tag", output)
         self.assertNotIn("Changes since `v1.3.1`", output)
 
+        identity = (
+            "'https://github.com/szymczag/hangar/.github/workflows/build-branch.yml"
+            "@refs/tags/hangar-v0.2.0-rc.1'"
+        )
+        verification = output.split("## Verification", 1)[1]
+        self.assertIn(
+            "cosign verify-blob \\\n"
+            "  --bundle SHA256SUMS.sigstore.json \\\n"
+            f"  --certificate-identity {identity} \\\n"
+            "  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \\\n"
+            "  SHA256SUMS\n"
+            "sha256sum --check --ignore-missing SHA256SUMS\n",
+            verification,
+        )
+        self.assertIn(f"cosign verify \\\n  --certificate-identity {identity}", verification)
+        self.assertLess(verification.index("cosign verify-blob"), verification.index("cosign verify \\"))
+        assets = output.split("## Release assets and image families", 1)[1].split("## Verification", 1)[0]
+        for asset in ("`release-manifest.json`", "`hangar-<image>.spdx.json`", "`SHA256SUMS`", "`SHA256SUMS.sigstore.json`"):
+            self.assertIn(asset, assets)
+        self.assertIn("pins every Hangar image to the digest", assets)
+
     def test_requires_exact_review_for_non_linear_upstream_transition(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             repository = Path(temporary_directory)

@@ -1,0 +1,93 @@
+{
+  "SPDX": {
+    "spdxVersion": "SPDX-2.3",
+    "dataLicense": "CC0-1.0",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "sbom",
+    "documentNamespace": "https://anchore.com/syft/dir/sbom-434458b1-959b-49e2-ba83-ea6815d85641",
+    "creationInfo": {
+      "created": "2026-11-12T15:39:55Z",
+      "creators": ["Organization: Anchore, Inc", "Tool: syft-v1.51.0", "Tool: buildkit-v0.34.2"],
+      "licenseListVersion": "3.28"
+    },
+    "packages": [
+      {
+        "SPDXID": "SPDXRef-Package-apk-busybox-5b8a9495e4efe754",
+        "name": "busybox",
+        "versionInfo": "1.37.0-r30",
+        "supplier": "NOASSERTION",
+        "downloadLocation": "https://busybox.net/",
+        "sourceInfo": "acquired package info from APK DB: /lib/apk/db/installed",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceLocator": "pkg:apk/alpine/busybox@1.37.0-r30?arch=x86_64&distro=alpine-3.23.8",
+            "referenceType": "purl"
+          }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-python-celery-a6abcca80c205a10",
+        "name": "celery",
+        "versionInfo": "5.5.3",
+        "supplier": "Person: Ask Solem (auvipy@gmail.com)",
+        "downloadLocation": "NOASSERTION",
+        "sourceInfo": "acquired package info from installed python package manifest file: /usr/local/lib/python3.12/site-packages/celery-5.5.3.dist-info/METADATA, /usr/local/lib/python3.12/site-packages/celery-5.5.3.dist-info/RECORD, /usr/local/lib/python3.12/site-packages/celery-5.5.3.dist-info/top_level.txt",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceLocator": "pkg:pypi/celery@5.5.3",
+            "referenceType": "purl"
+          }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-python-django-14c397b6d51d3c80",
+        "name": "django",
+        "versionInfo": "5.2.17",
+        "supplier": "Person: Django Software Foundation (foundation@djangoproject.com)",
+        "downloadLocation": "NOASSERTION",
+        "sourceInfo": "acquired package info from installed python package manifest file: /usr/local/lib/python3.12/site-packages/django-5.2.17.dist-info/METADATA, /usr/local/lib/python3.12/site-packages/django-5.2.17.dist-info/RECORD, /usr/local/lib/python3.12/site-packages/django-5.2.17.dist-info/top_level.txt",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceLocator": "pkg:pypi/django@5.2.17",
+            "referenceType": "purl"
+          }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-apk-musl-0cd9c9c664b44d9b",
+        "name": "musl",
+        "versionInfo": "1.2.5-r24",
+        "supplier": "Person: Natanael Copa (ncopa@alpinelinux.org)",
+        "downloadLocation": "https://musl.libc.org/",
+        "sourceInfo": "acquired package info from APK DB: /lib/apk/db/installed",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceLocator": "pkg:apk/alpine/musl@1.2.5-r24?arch=x86_64&distro=alpine-3.23.8",
+            "referenceType": "purl"
+          }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-binary-python-877e29c7ed67805b",
+        "name": "python",
+        "versionInfo": "3.12.12",
+        "supplier": "NOASSERTION",
+        "downloadLocation": "NOASSERTION",
+        "sourceInfo": "acquired package info from the following paths: /usr/local/bin/python3.12, /usr/local/lib/libpython3.12.so.1.0",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceLocator": "pkg:generic/python@3.12.12",
+            "referenceType": "purl"
+          }
+        ]
+      }
+    ],
+    "files": [],
+    "relationships": []
+  }
+}
