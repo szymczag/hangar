@@ -428,6 +428,26 @@ class WiringTests(unittest.TestCase):
                     )
                     self.assertEqual("INSTALLED" in result.stdout, expected, result.stdout + result.stderr)
 
+    def test_a_named_release_skips_the_github_api(self):
+        upgrade = _function(INSTALL.read_text(), "upgrade", INSTALL)
+        stubs = (
+            "function checkLatestRelease() { echo ASKED-GITHUB; exit 1; }\n"
+            "function stopServices() { :; }\n"
+            'function install() { echo "INSTALLING $APP_RELEASE"; }\n'
+            "function objectStorageMigrationPending() { return 1; }\n"
+        )
+        result = subprocess.run(
+            ["bash", "-c", upgrade + "\n" + stubs + "APP_RELEASE=v0.0.1\nupgrade\n"],
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            env={"HANGAR_ASSUME_YES": "1", "HANGAR_RELEASE": "hangar-v9.9.9", "PATH": "/usr/bin:/bin"},
+        )
+        self.assertNotIn("ASKED-GITHUB", result.stdout)
+        self.assertIn("INSTALLING v9.9.9", result.stdout)
+        install = _function(INSTALL.read_text(), "install", INSTALL)
+        self.assertIn('APP_RELEASE=${HANGAR_RELEASE#hangar-}', install)
+
     def test_the_yes_flag_is_accepted_anywhere(self):
         for script in SCRIPTS:
             with self.subTest(script=script.name):

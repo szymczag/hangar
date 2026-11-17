@@ -28,8 +28,11 @@ DEPLOYMENT_NAME=$SERVICE_FOLDER
 #   HANGAR_INSTALL_SOURCE_DIR=<dir> takes docker-compose.yml, variables.env and
 #   migrate-object-storage.sh from <dir> (deployments/cli/community in a
 #   checkout) instead of downloading them from the release.
+#   HANGAR_RELEASE=vX.Y.Z installs or upgrades to that release instead of
+#   asking the GitHub API for the latest one, which rate-limits anonymous use.
 HANGAR_ASSUME_YES=${HANGAR_ASSUME_YES:-0}
 HANGAR_INSTALL_SOURCE_DIR=${HANGAR_INSTALL_SOURCE_DIR:-}
+HANGAR_RELEASE=${HANGAR_RELEASE:-}
 
 function print_header() {
 if [ "$HANGAR_ASSUME_YES" != "1" ] && [ -t 1 ]; then
@@ -249,7 +252,10 @@ function install() {
     echo "Begin Installing Hangar"
     echo ""
 
-    if [ "$APP_RELEASE" == "stable" ]; then
+    if [ -n "$HANGAR_RELEASE" ]; then
+        APP_RELEASE=${HANGAR_RELEASE#hangar-}
+        export APP_RELEASE
+    elif [ "$APP_RELEASE" == "stable" ]; then
         # exit inside checkLatestRelease only leaves the $(...) subshell
         APP_RELEASE=$(checkLatestRelease) || exit 1
         export APP_RELEASE
@@ -728,7 +734,11 @@ function restartServices() {
 }
 function upgrade() {
     local latest_release
-    latest_release=$(checkLatestRelease) || exit 1
+    if [ -n "$HANGAR_RELEASE" ]; then
+        latest_release=${HANGAR_RELEASE#hangar-}
+    else
+        latest_release=$(checkLatestRelease) || exit 1
+    fi
 
     echo ""
     echo "Current release: $APP_RELEASE"

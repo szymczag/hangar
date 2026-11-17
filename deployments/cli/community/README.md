@@ -400,7 +400,9 @@ It is always advised to keep Hangar up to date with the latest release.
 >
 > **Unattended upgrades.** Pass `--yes` (`./setup.sh --yes upgrade`) or set
 > `HANGAR_ASSUME_YES=1` to skip the confirmation prompt and keep the screen. An
-> unattended run refuses, rather than starts, a local image build.
+> unattended run refuses, rather than starts, a local image build. Set
+> `HANGAR_RELEASE=vX.Y.Z` to install or upgrade to that release rather than the
+> latest one the GitHub API reports.
 
 Lets again run the `./setup.sh` command. You will again be prompted with the below options. This time select `5` to upgrade the release.
 
