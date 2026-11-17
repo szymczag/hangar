@@ -31,8 +31,10 @@ remembering to look:
 
 1. **Watch.** The weekly `Upstream watch` workflow
    (`.github/workflows/upstream-watch.yml`) compares upstream with `UPSTREAM_BASE.json`:
-   stable releases newer than `package_version` and repository security advisories
-   published on or after `synced_at`. It keeps exactly one open issue labelled
+   stable releases newer than `package_version`, and repository security advisories
+   published on or after `synced_at` or fixed only in a published release newer than
+   `package_version` (so an older advisory a later release fixes stays listed when
+   `synced_at` moves). It keeps exactly one open issue labelled
    `upstream-sync` listing them, comments when the list changes, and closes the issue
    once the baseline covers everything.
 2. **Assess.** For each advisory, decide whether Hangar is affected: the code may be
@@ -44,10 +46,31 @@ remembering to look:
    `apps/api/plane/tests/unit/bg_tasks/test_ssrf_advisories.py`.
 4. **Record.** Name each addressed advisory in the "Security and privacy" section of
    the next `docs/releases/<tag>.md`.
-5. **Move the baseline.** The sync pull request updates `UPSTREAM_BASE.json`
-   (`revision`, `package_version`, `synced_at`) to the merged upstream commit; the next
-   weekly run then closes the issue. A backport alone does not move the baseline, so
-   the issue stays open, with the assessment recorded on it, until a sync catches up.
+5. **Move the baseline.** The sync pull request updates `package_version` and
+   `synced_at` in `UPSTREAM_BASE.json`; the next weekly run then drops what the sync
+   covers and closes the issue once nothing is left. A backport alone does not move
+   the baseline, so the issue stays open, with the assessment recorded on it, until a
+   sync catches up.
+
+**Syncs are signed squash commits.** `preview` requires signed commits and upstream's
+commits are not signed, so an upstream release is absorbed as one signed squash
+commit (v1.4.3 arrived as `eca57c46d1`, #348), not as a merge. Two things follow:
+
+- `revision` stays the last upstream commit that is actually in Hangar's history
+  (`917b23a6c16d`, v1.4.0). Release metadata and release notes check that it is an
+  ancestor of the release commit (`release_metadata.py`, `release_notes.py`), which a
+  squashed release never is. `package_version` and `synced_at` record what was
+  absorbed; `revision` records the merge base Git can prove.
+- Git's merge base with upstream never advances past that commit, so a plain trial
+  merge of a newer release diffs upstream from v1.4.0 and replays the changes already
+  squashed in. Pass the absorbed release as the base explicitly, so only what upstream
+  changed since then is merged:
+
+  ```bash
+  git fetch upstream --tags
+  base=$(git rev-parse "v$(jq -r .package_version UPSTREAM_BASE.json)^{commit}")
+  git merge-tree --write-tree --merge-base "$base" HEAD v1.5.0
+  ```
 
 ## Commit conventions
 
