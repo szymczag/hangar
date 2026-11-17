@@ -11,13 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.1",
+  version: "0.1.2",
   highlights: [
-    "Rebuilt images fix the reported Alpine vulnerabilities.",
-    "Compose and Swarm installs no longer run with published secrets.",
-    "Compose services run with fewer privileges.",
-    "Release assets are signed, checksummed and described by SBOMs.",
-    "The release pipeline is pinned and linted.",
+    "Project members can no longer read or change each other's personal settings.",
+    "Restricted guests can no longer reach files of work items hidden from them.",
+    "A failed upgrade download no longer leaves Hangar stopped.",
+    "The all-in-one image replaces every template Live key.",
   ],
   upstream: {
     version: "1.4.0",

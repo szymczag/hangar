@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.1`. It is a stable Hangar release for Docker
+The current release is `0.1.2`. It is a stable Hangar release for Docker
 Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
 for evaluation on AMD64 clusters only and is not yet a supported production
 release.
@@ -56,7 +56,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.1` qualification boundary is:
+The `0.1.2` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -185,10 +185,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                          |
 | ------------------ | -------------------------------------- |
-| Product version    | `v0.1.1`                               |
-| Helm chart version | `0.1.1`                                |
-| Git tag            | `hangar-v0.1.1`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.1` |
+| Product version    | `v0.1.2`                               |
+| Helm chart version | `0.1.2`                                |
+| Git tag            | `hangar-v0.1.2`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.2` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -197,10 +197,10 @@ Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
 installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
-`ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.0` is the
+`ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.1` is the
 immediately previous GitHub release and the supported rollback target for this
 one; rolling back to it needs no schema change, and neither does rolling back
-further, to `rc.72`, `rc.71`, `rc.70` or `rc.69`. Rolling back to `rc.68` needs migration
+further, to `0.1.0`, `rc.72`, `rc.71`, `rc.70` or `rc.69`. Rolling back to `rc.68` needs migration
 `db.0135` reversed first, as described below. Rolling
 back to `rc.67` after that needs no other schema change.
 Rolling back to `rc.66` needs none either and restores the larger `space` and
@@ -231,7 +231,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.1` notes](../releases/hangar-v0.1.1.md) — review
+- [Release `v0.1.2` notes](../releases/hangar-v0.1.2.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -263,10 +263,18 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.0`, tag `hangar-v0.1.0`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.0`. Anybody still on rc.62 with
+The previous release is `0.1.1`, tag `hangar-v0.1.1`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.1`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
+
+Release 0.1.2 adds no migrations and changes nothing in the chart, its values or
+its Secrets; upgrade from 0.1.1 with `helm upgrade` and no other action. It
+backports two upstream Plane authorization fixes: project members no longer read
+or change each other's personal member settings (GHSA-gx67-r6wp-3357), and
+project guests limited to their own work items can no longer download or copy
+the files of other work items by asset ID (GHSA-wq96-4xjj-j4qg). Rolling back to
+0.1.1 needs no schema change but reopens both.
 
 Release 0.1.1 adds no migrations and changes nothing in the chart, its values or
 its Secrets; upgrade from 0.1.0 with `helm upgrade` and no other action. Its
