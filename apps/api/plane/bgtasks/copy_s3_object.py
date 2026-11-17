@@ -24,7 +24,6 @@ from plane.utils.file_asset_upload import (
     UploadError,
     validate_upload_metadata,
 )
-from plane.utils.uuid import is_valid_uuid
 
 
 def get_entity_id_field(entity_type, entity_id):
@@ -42,11 +41,21 @@ def get_entity_id_field(entity_type, entity_id):
     return entity_mapping.get(entity_type, {})
 
 
+def _is_uuid(value):
+    # Any version: plane.utils.uuid.is_valid_uuid accepts only version 4 and
+    # would silently drop an uploaded asset whose id is not one.
+    try:
+        uuid.UUID(value)
+        return True
+    except (TypeError, ValueError, AttributeError):
+        return False
+
+
 def extract_asset_ids(html, tag):
     try:
         soup = BeautifulSoup(html, "html.parser")
         # Only uploaded assets carry a UUID src; external image URLs must not reach id__in
-        return [tag.get("src") for tag in soup.find_all(tag) if tag.get("src") and is_valid_uuid(tag.get("src"))]
+        return [tag.get("src") for tag in soup.find_all(tag) if tag.get("src") and _is_uuid(tag.get("src"))]
     except Exception as e:
         log_exception(e)
         return []

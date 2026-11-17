@@ -259,3 +259,12 @@ def test_extract_asset_ids_skips_external_urls():
     )
 
     assert extract_asset_ids(html, "image-component") == [asset_id]
+
+
+@pytest.mark.unit
+def test_extract_asset_ids_keeps_uuids_of_any_version():
+    """Only non-UUID srcs are skipped; an asset id need not be a version 4 UUID."""
+    asset_ids = ["11111111-1111-1111-1111-111111111111", str(uuid.uuid1())]
+    html = "".join(f'<image-component src="{asset_id}"></image-component>' for asset_id in asset_ids)
+
+    assert extract_asset_ids(html, "image-component") == asset_ids
