@@ -90,7 +90,7 @@ x-app-env: &app-env
   WEB_URL: ${WEB_URL:-http://localhost}
   DEBUG: ${DEBUG:-0}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
-  GUNICORN_WORKERS: 1
+  GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
   USE_MINIO: ${USE_MINIO:-1}
   # Empty by default: the API then connects with POSTGRES_* (x-db-env) and
   # RABBITMQ_* below, which is what the database and the broker were created
@@ -106,6 +106,7 @@ x-app-env: &app-env
   RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-plane}
   RABBITMQ_VHOST: ${RABBITMQ_VHOST:-plane}
   API_KEY_RATE_LIMIT: ${API_KEY_RATE_LIMIT:-60/minute}
+  AUTHENTICATION_RATE_LIMIT: ${AUTHENTICATION_RATE_LIMIT:-10/minute}
   NUM_PROXIES: ${NUM_PROXIES:-}
   MINIO_ENDPOINT_SSL: ${MINIO_ENDPOINT_SSL:-0}
   LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY}

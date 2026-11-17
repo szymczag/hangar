@@ -474,10 +474,13 @@ class WiringTests(unittest.TestCase):
 
         # The all-in-one image replaces template keys on start instead of refusing them.
         start = (REPOSITORY_ROOT / "deployments" / "aio" / "community" / "start.sh").read_text()
-        aio_django = set(re.findall(r'local _(?:insecure|placeholder)_sk="([^"]+)"', start))
-        aio_live = set(re.findall(r'local _(?:insecure|placeholder|template)_lssk="([^"]+)"', start))
-        self.assertEqual(aio_django, django)
-        self.assertEqual(aio_live, live_keys)
+        aio = {}
+        for name in ("INSECURE_SECRET_KEYS", "INSECURE_LIVE_SERVER_SECRET_KEYS"):
+            block = re.search(rf"^{name}=\((.*?)\)", start, re.DOTALL | re.MULTILINE)
+            self.assertIsNotNone(block, name)
+            aio[name] = set(re.findall(r'"([^"]+)"', block.group(1)))
+        self.assertEqual(aio["INSECURE_SECRET_KEYS"], django)
+        self.assertEqual(aio["INSECURE_LIVE_SERVER_SECRET_KEYS"], live_keys)
 
     def test_an_unattended_upgrade_does_not_ask(self):
         for script in SCRIPTS:

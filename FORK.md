@@ -31,8 +31,10 @@ remembering to look:
 
 1. **Watch.** The weekly `Upstream watch` workflow
    (`.github/workflows/upstream-watch.yml`) compares upstream with `UPSTREAM_BASE.json`:
-   stable releases newer than `package_version` and repository security advisories
-   published on or after `synced_at`. It keeps exactly one open issue labelled
+   stable releases newer than `package_version`, and repository security advisories
+   published on or after `synced_at` or fixed only in a published release newer than
+   `package_version` (so an older advisory a later release fixes stays listed when
+   `synced_at` moves). It keeps exactly one open issue labelled
    `upstream-sync` listing them, comments when the list changes, and closes the issue
    once the baseline covers everything.
 2. **Assess.** For each advisory, decide whether Hangar is affected: the code may be
@@ -44,10 +46,31 @@ remembering to look:
    `apps/api/plane/tests/unit/bg_tasks/test_ssrf_advisories.py`.
 4. **Record.** Name each addressed advisory in the "Security and privacy" section of
    the next `docs/releases/<tag>.md`.
-5. **Move the baseline.** The sync pull request updates `UPSTREAM_BASE.json`
-   (`revision`, `package_version`, `synced_at`) to the merged upstream commit; the next
-   weekly run then closes the issue. A backport alone does not move the baseline, so
-   the issue stays open, with the assessment recorded on it, until a sync catches up.
+5. **Move the baseline.** The sync pull request updates `package_version` and
+   `synced_at` in `UPSTREAM_BASE.json`; the next weekly run then drops what the sync
+   covers and closes the issue once nothing is left. A backport alone does not move
+   the baseline, so the issue stays open, with the assessment recorded on it, until a
+   sync catches up.
+
+**Syncs are signed squash commits.** `preview` requires signed commits and upstream's
+commits are not signed, so an upstream release is absorbed as one signed squash
+commit (v1.4.3 arrived as `eca57c46d1`, #348), not as a merge. Two things follow:
+
+- `revision` stays the last upstream commit that is actually in Hangar's history
+  (`917b23a6c16d`, v1.4.0). Release metadata and release notes check that it is an
+  ancestor of the release commit (`release_metadata.py`, `release_notes.py`), which a
+  squashed release never is. `package_version` and `synced_at` record what was
+  absorbed; `revision` records the merge base Git can prove.
+- Git's merge base with upstream never advances past that commit, so a plain trial
+  merge of a newer release diffs upstream from v1.4.0 and replays the changes already
+  squashed in. Pass the absorbed release as the base explicitly, so only what upstream
+  changed since then is merged:
+
+  ```bash
+  git fetch upstream --tags
+  base=$(git rev-parse "v$(jq -r .package_version UPSTREAM_BASE.json)^{commit}")
+  git merge-tree --write-tree --merge-base "$base" HEAD v1.5.0
+  ```
 
 ## Commit conventions
 
@@ -207,3 +230,7 @@ Planned (added when the phase lands):
 | 118 | `apps/api/plane/api/views/module.py` | External API errors | backport of upstream bf3fd8542f (makeplane/plane#10259): the module list, detail and archived-list counts (`backlog/unstarted/started/completed/cancelled_issues`) count the module's work items instead of distinct state groups, which made each 0 or 1 |
 | 119 | `apps/api/plane/app/urls/asset.py` | External API errors | backend part of upstream 3c5e52fd96 (makeplane/plane#10216): the legacy `workspaces/file-assets/<workspace_id>/<asset_key>/` route accepts only GET, DELETE, HEAD and OPTIONS, so a POST answers 405 instead of 500 from `FileAssetEndpoint.post(slug)`; upstream's `getAssetIdFromUrl` frontend change is not taken here |
 | 120 | `apps/api/plane/bgtasks/copy_s3_object.py` | External API errors | backport of upstream be1bebc774 (makeplane/plane#9938): `extract_asset_ids` keeps only UUID `src` values (any version, where upstream's `is_valid_uuid` accepts only version 4 and would drop such an asset), so an external image URL in a description no longer aborts the asset copy on duplicate with "is not a valid UUID"; the project copy service, which reuses it, is covered too |
+| 121 | `deployments/swarm/community/swarm.sh`, `deployments/cli/community/{docker-compose.yml,variables.env,README.md}`, `apps/api/run_tests.sh`, `apps/api/plane/tests/{conftest,conftest_external}.py`, `apps/api/plane/tests/{README,TESTING_GUIDE}.md` | Deployment fixes | backport of upstream 0b9ca512c8 (makeplane/plane#10264): the Swarm menu accepts `7) Exit`; Compose passes `GUNICORN_WORKERS` from `plane.env` instead of a fixed `1` and forwards `AUTHENTICATION_RATE_LIMIT`, so both settings `variables.env` offers take effect; the unused `DOCKER_PLATFORM` comment is dropped; `run_tests.sh` runs `run_tests.py` from `apps/api` with the installed Python (`PYTHON` overrides it) instead of upstream's `uv run`, because Hangar does not use uv; `mock_redis` and `mock_celery` are loaded by `conftest.py` and the unused `mock_elasticsearch` fixture is removed |
+| 122 | `setup.sh`, `deployments/aio/community/build.sh`, `deployments/cli/community/{install,migration-0.13-0.14,restore}.sh`, `deployments/swarm/community/swarm.sh` | Host portability | backport of upstream 4e0e4038a1 (makeplane/plane#10030): scripts run on a host start with `#!/usr/bin/env bash` and `install.sh` calls `bash -c` instead of `/bin/bash -c`, so they run on NixOS and other systems without `/bin/bash`; container entrypoints, including the all-in-one `start.sh`, keep `/bin/bash`. A test lists every host script under `deployments/` so a new one chooses its shebang on purpose |
+| 123 | `deployments/aio/community/start.sh` | All-in-one logs | backport of upstream dbe37b4bd5 (makeplane/plane#9818): `start.sh` creates `/app/logs/access` and `/app/logs/error` before starting supervisord, so the image starts with a host directory mounted at `/app/logs`; a test checks every log directory `supervisor.conf` names |
+| 124 | `deployments/aio/community/{start.sh,README.md,variables.env}` | All-in-one secrets | hand-port of upstream 2f2b981fe7 (makeplane/plane#9987): the `SECRET_KEY` and `LIVE_SERVER_SECRET_KEY` the image generates on first boot are kept in `/app/data/secrets.env` (mode 600) on the data volume instead of only in the container's `/app/plane.env`, so recreating the container keeps them; an explicit value in the environment or in `plane.env` still wins, and a value a 0.1.2 container generated in its own `plane.env` is copied to the volume on its next start. Upstream instead requires both keys and generates none; Hangar keeps generating them. Upstream's quoting fixes are taken: `plane.env` values are written with `awk` instead of `sed` and exported line by line instead of through `xargs`, and Hangar also strips one pair of surrounding quotes so the commented `CERT_ACME_DNS="..."` example keeps working. The template lists move to `INSECURE_SECRET_KEYS` / `INSECURE_LIVE_SERVER_SECRET_KEYS` arrays, still checked against the API and Live lists |

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # BRANCH set by the operator is the only way deployment files may come from a
 # branch rather than a release: when the release cannot be downloaded, and for
@@ -254,7 +254,7 @@ function buildYourOwnImage(){
     cd "$PLANE_TEMP_CODE_DIR" || exit
 
     # build.yml takes its build contexts relative to its own directory.
-    /bin/bash -c "$COMPOSE_CMD -f $PLANE_TEMP_CODE_DIR/deployments/cli/community/build.yml build --no-cache"  >&2
+    bash -c "$COMPOSE_CMD -f $PLANE_TEMP_CODE_DIR/deployments/cli/community/build.yml build --no-cache"  >&2
     if [ $? -ne 0 ]; then
         echo "Build failed. Exiting..."
         exit 1
@@ -833,7 +833,7 @@ function finishDownload() {
         CUSTOM_BUILD="false"
         rm -f "$DOCKER_OVERRIDE_PATH"
         updateCustomVariables
-        /bin/bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH pull --policy always"
+        bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH pull --policy always"
 
         if [ $? -ne 0 ]; then
             echo ""
@@ -878,7 +878,7 @@ function startServices() {
         echo "(If this install uses external S3 storage instead, set SKIP_OBJECT_STORAGE_MIGRATION=1.)"
         exit 1
     fi
-    /bin/bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH up -d --pull if_not_present --quiet-pull"
+    bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH up -d --pull if_not_present --quiet-pull"
 
     local migrator_container_id=$(docker container ls -aq -f "name=$SERVICE_FOLDER-migrator")
     if [ -n "$migrator_container_id" ]; then
@@ -960,7 +960,7 @@ function startServices() {
 
 }
 function stopServices() {
-    /bin/bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH down"
+    bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH down"
 }
 function restartServices() {
     stopServices
@@ -1037,13 +1037,13 @@ function upgrade() {
 function viewSpecificLogs(){
     local SERVICE_NAME=$1
 
-    if /bin/bash -c "$COMPOSE_CMD $(composeFiles) ps | grep -q '$SERVICE_NAME'"; then
+    if bash -c "$COMPOSE_CMD $(composeFiles) ps | grep -q '$SERVICE_NAME'"; then
         echo "Service '$SERVICE_NAME' is running."
     else
         echo "Service '$SERVICE_NAME' is not running."
     fi
 
-    /bin/bash -c "$COMPOSE_CMD $(composeFiles) logs -f $SERVICE_NAME"
+    bash -c "$COMPOSE_CMD $(composeFiles) logs -f $SERVICE_NAME"
 }
 function viewLogs(){
     
@@ -1121,7 +1121,7 @@ function backup_container_dir() {
     local SERVICE_FOLDER=$4
 
     echo "Backing up $CONTAINER_NAME data..."
-    local CONTAINER_ID=$(/bin/bash -c "$COMPOSE_CMD $(composeFiles) ps -q $CONTAINER_NAME")
+    local CONTAINER_ID=$(bash -c "$COMPOSE_CMD $(composeFiles) ps -q $CONTAINER_NAME")
     if [ -z "$CONTAINER_ID" ]; then
         echo "Error: $CONTAINER_NAME container not found. Make sure the services are running."
         return 1

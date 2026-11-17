@@ -125,7 +125,7 @@ When writing tests, follow these guidelines:
 
 Tests for components that interact with external services should:
 
-1. Use the `mock_redis`, `mock_elasticsearch`, and `mock_celery` fixtures for unit and most contract tests.
+1. Use the `mock_redis` and `mock_celery` fixtures for unit and most contract tests.
 2. For more comprehensive contract tests, use Docker-based test containers (optional).
 
 ## Coverage Reports

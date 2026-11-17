@@ -2,7 +2,8 @@ name: Upstream watch
 
 # Weekly check of what upstream Plane has published since UPSTREAM_BASE.json:
 # stable releases newer than its package_version and repository security
-# advisories published on or after its synced_at date. One issue labelled
+# advisories published on or after its synced_at date or fixed only in a
+# published release newer than package_version. One issue labelled
 # `upstream-sync` lists them; it is refreshed while anything is pending and
 # closed once a sync moves the baseline past everything. The maintenance loop
 # that follows from the issue is described in FORK.md.
