@@ -285,3 +285,43 @@ A release candidate is complete only when recorded test evidence demonstrates:
 
 Stable v1 additionally requires completed project-independence, security,
 installation, upgrade, backup, restore, and operations criteria.
+
+### Compose upgrade and restore gate
+
+For every stable release tag, the publication workflow runs
+`.github/workflows/compose-upgrade.yml` after the images are published and before
+the GitHub Release exists. `verify_publication` requires it to pass, so a failure
+leaves the release and `stable` unpublished; under the one-shot rule the fix ships
+as a new patch version. Prereleases and preview publications skip it.
+
+The gate walks the path an operator takes, on a fresh runner:
+
+1. install the latest stable GitHub Release (never a prerelease) with that
+   release's own `setup.sh`, `docker-compose.yml` and `variables.env`, and start it;
+2. seed it with `.github/scripts/compose_seed.py`: two workspaces, users in the
+   admin, member and guest roles, a project, a work item, a comment, a work log,
+   an attachment stored in the bundled object storage, and an API key;
+3. back it up with `setup.sh backup`, keeping `plane.env` beside the archives;
+4. upgrade it with the candidate's `setup.sh --yes upgrade` and Compose file to the
+   new version's images, which also replaces template secrets;
+5. remove that deployment with its volumes, restore the backup into a fresh
+   directory with `restore.sh`, and start it with the candidate.
+
+After the upgrade and after the restore, the seeded data must match the
+fingerprint taken before the upgrade, including the SHA-256 of the attachment read
+back from object storage; the seeded admin must sign in with a password through the
+proxy; and the API key must list the seeded project and work item.
+
+The same workflow runs weekly, on demand, and on pull requests that change the
+installer, the Compose file or `restore.sh`. Without an image tag it takes the
+commit's `preview-sha-<commit>` images when a preview build published them, and
+otherwise the previous release's own images, so the commit's installer and
+Compose file are still upgraded onto a deployment of that release. It never takes
+a moving `preview-*` tag, which can be older than the release.
+`.github/scripts/compose-upgrade.sh` runs the same steps on a workstation. The installer fixes the Compose project name to `plane-app`, so run
+the script only on a Docker host, or a Podman service, with no other `plane-app`
+deployment; it refuses to start otherwise.
+
+The gate covers the Docker Compose deployment only. The Helm chart is qualified
+separately in the `chart` job, and Docker Swarm and the all-in-one image are not
+upgrade-tested.

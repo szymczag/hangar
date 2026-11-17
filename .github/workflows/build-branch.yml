@@ -535,6 +535,20 @@ jobs:
     with:
       image_tag: ${{ needs.setup.outputs.primary_tag }}
 
+  compose_upgrade:
+    name: Qualify the Compose upgrade
+    # Stable releases only: operators upgrade from one stable release to the
+    # next. The previous stable release is installed with its own assets,
+    # upgraded to these images with this commit's installer, and its backup is
+    # restored. verify_publication holds the GitHub Release until it passes.
+    if: needs.setup.outputs.is_release == 'true' && needs.setup.outputs.is_prerelease != 'true'
+    needs: [setup, components, aio]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/compose-upgrade.yml
+    with:
+      to_image_tag: ${{ needs.setup.outputs.version }}
+
   chart:
     name: Publish Helm chart
     if: needs.setup.outputs.is_release == 'true'
@@ -674,7 +688,7 @@ jobs:
     if: >-
       always() &&
       !(github.event_name == 'workflow_dispatch' && inputs.reuse_preview_images == true)
-    needs: [setup, components, aio, chart]
+    needs: [setup, components, aio, chart, compose_upgrade]
     runs-on: ubuntu-22.04
     steps:
       - name: Require every publication job to succeed
@@ -683,7 +697,9 @@ jobs:
           COMPONENTS_RESULT: ${{ needs.components.result }}
           AIO_RESULT: ${{ needs.aio.result }}
           CHART_RESULT: ${{ needs.chart.result }}
+          COMPOSE_UPGRADE_RESULT: ${{ needs.compose_upgrade.result }}
           IS_RELEASE: ${{ needs.setup.outputs.is_release }}
+          IS_PRERELEASE: ${{ needs.setup.outputs.is_prerelease }}
         run: |
           set -euo pipefail
 
@@ -701,6 +717,15 @@ jobs:
           fi
           if [[ "$CHART_RESULT" != "$expected_chart_result" ]]; then
             echo "Unexpected chart publication result: $CHART_RESULT (expected $expected_chart_result)" >&2
+            exit 1
+          fi
+
+          expected_compose_upgrade_result=skipped
+          if [[ "$IS_RELEASE" == "true" && "$IS_PRERELEASE" != "true" ]]; then
+            expected_compose_upgrade_result=success
+          fi
+          if [[ "$COMPOSE_UPGRADE_RESULT" != "$expected_compose_upgrade_result" ]]; then
+            echo "Unexpected Compose upgrade qualification result: $COMPOSE_UPGRADE_RESULT (expected $expected_compose_upgrade_result)" >&2
             exit 1
           fi
 
