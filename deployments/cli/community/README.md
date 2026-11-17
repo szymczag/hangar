@@ -352,6 +352,20 @@ If all goes well, you will see the confirmation from docker cli
 
 It is always advised to keep Hangar up to date with the latest release.
 
+> **Back up first.** Run [Backup Data](#backup-data-docker-compose) and copy
+> `plane-app/plane.env` next to the backup before every upgrade. The upgrade runs
+> the new release's database migrations when it starts, and **putting the previous
+> images back does not undo them**: the previous release may refuse to start on the
+> migrated database, or run on a schema it does not know. To go back, restore that
+> backup with its `plane.env` (see [Restore Data](#restore-data-docker-compose)) and
+> start the previous release. Anything written after the backup is lost.
+>
+> Each stable release is tested on this path before it is published: the previous
+> stable release is installed from its release assets, filled with data, backed up,
+> upgraded with the new `setup.sh --yes upgrade`, and the backup is restored into a
+> fresh install; the data, the uploaded files, password sign-in and API keys are
+> checked after both steps.
+>
 > Download the latest `setup.sh` (see [Downloading Latest Release](#downloading-latest-release)) before upgrading: the upgrade runs your local copy of the script.
 >
 > **Object-storage credentials.** The bundled object storage takes its login from `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `plane.env`, and the proxy serves its S3 API on the application's origin. Older templates shipped the public pair `access-key` / `secret-key`, which let anybody sign requests that list, read, overwrite or delete uploads. `setup.sh` now generates a random pair on install, and on upgrade replaces any pair whose secret is still `secret-key`; it prints a notice when it does. The API and the object storage pick the new pair up together when the services start, and uploads stay where they are. The old pair is kept as `LEGACY_MINIO_ROOT_USER` / `LEGACY_MINIO_ROOT_PASSWORD` for `migrate-object-storage.sh`, which still needs it to read a volume written by MinIO. A pair you set yourself, or external S3 storage (`USE_MINIO=0` or another `AWS_S3_ENDPOINT_URL`), is left alone; with `USE_MINIO=0` the bundled storage stays idle and is not routed (see [External S3](#object-storage-minio-to-seaweedfs)). If anything outside Hangar used the old pair, give it the new one.
@@ -679,6 +693,17 @@ Successfully backed up redisdata data
 
 Backup completed successfully. Backup files are stored in /....../plane-app/backup/20240502-1120
 ```
+
+Unattended: `./setup.sh backup`.
+
+> **Keep `plane.env` with the backup.** Copy `plane-app/plane.env` into the backup
+> folder and store them together, protected like a password: the archives hold
+> data written with its database and RabbitMQ passwords, its object-storage key
+> pair, and its `SECRET_KEY`, which encrypts settings saved in God Mode. A new
+> install generates new values, which cannot open the restored data.
+>
+> The backup copies the data directories of the running services. Take it when
+> nobody is using the instance, so no write lands half-way through the copy.
 
 ---
 
