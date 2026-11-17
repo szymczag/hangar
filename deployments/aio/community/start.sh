@@ -1,5 +1,21 @@
 #!/bin/bash -e
 
+# Secrets the container generates are kept on the data volume, not in the
+# container layer, so recreating the container does not replace them. A new
+# SECRET_KEY would sign everybody out and make saved instance settings
+# unreadable.
+SECRETS_FILE="${HANGAR_SECRETS_FILE:-/app/data/secrets.env}"
+
+# Template values a deployment must never run with. They match
+# _INSECURE_SECRET_KEYS in apps/api/plane/settings/common.py and
+# INSECURE_LIVE_SERVER_SECRET_KEYS in apps/live/src/env.ts; a test keeps the
+# lists in step.
+INSECURE_SECRET_KEYS=("60gp0byfz2dvffa45cxl20p1scy9xbpf6d8c5y0geejgkyp1b5"
+                      "change-this-key-on-deployment")
+INSECURE_LIVE_SERVER_SECRET_KEYS=("htbqvBJAgpm9bzvf3r4urJer0ENReatceh"
+                                  "change-this-key-on-deployment"
+                                  "secret-key")
+
 print_header(){
     clear
     echo "------------------------------------------------"
@@ -15,8 +31,8 @@ print_header(){
     echo "    SITE_ADDRESS (default: ':80')"
     echo "    FILE_SIZE_LIMIT (default: 5242880)"
     echo "    APP_PROTOCOL (http or https)"
-    echo "    SECRET_KEY (auto-generated on first boot if not set)"
-    echo "    LIVE_SERVER_SECRET_KEY (auto-generated on first boot if not set)"
+    echo "    SECRET_KEY (generated on first boot if not set, kept in /app/data)"
+    echo "    LIVE_SERVER_SECRET_KEY (generated on first boot if not set, kept in /app/data)"
     echo ""
     echo ""
 }
@@ -44,6 +60,35 @@ check_required_env(){
     echo ""
 }
 
+# Set key=value in an env file, adding the key when it is missing. awk reads
+# the key and the value from its environment, so &, |, \ and spaces in a value
+# are written verbatim (sed would interpret them).
+set_file_value(){
+    local file="$1"
+    local key="$2"
+    local value="$3"
+
+    if ! grep -q "^$key=" "$file"; then
+        printf '%s=%s\n' "$key" "$value" >> "$file"
+        return 0
+    fi
+    (
+        umask 077
+        SFV_KEY="$key" SFV_VAL="$value" awk '
+            index($0, ENVIRON["SFV_KEY"] "=") == 1 { print ENVIRON["SFV_KEY"] "=" ENVIRON["SFV_VAL"]; next }
+            { print }
+        ' "$file" > "$file.tmp"
+    ) && mv "$file.tmp" "$file"
+}
+
+# The value of key in an env file, or nothing.
+read_file_value(){
+    local file="$1"
+    local key="$2"
+    [ -f "$file" ] || return 0
+    { grep -m1 "^$key=" "$file" || true; } | cut -d'=' -f2-
+}
+
 update_env_value(){
     local key="$1"
     local value="$2"
@@ -54,18 +99,102 @@ update_env_value(){
         exit 1
     fi
 
-    # check if the key exists and add it if it doesn't
-    if ! grep -q "^$key=.*" plane.env; then
-        echo "${key}=${value}" >> plane.env
+    # add a missing key; replace an existing one only with a non-empty value
+    if ! grep -q "^$key=" plane.env || [ -n "$value" ]; then
+        set_file_value plane.env "$key" "$value"
+    fi
+}
+
+# Succeeds when the first argument is set and is none of the others.
+is_usable_secret(){
+    local value="$1"
+    shift
+    [ -n "$value" ] || return 1
+    local insecure
+    for insecure in "$@"; do
+        [ "$value" = "$insecure" ] && return 1
+    done
+    return 0
+}
+
+generate_secret(){
+    tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c50
+}
+
+store_secret(){
+    local key="$1"
+    local value="$2"
+    if mkdir -p "$(dirname "$SECRETS_FILE")" &&
+        ( umask 077; touch "$SECRETS_FILE" ) &&
+        chmod 600 "$SECRETS_FILE" &&
+        set_file_value "$SECRETS_FILE" "$key" "$value"; then
+        return 0
+    fi
+    echo "Could not write $SECRETS_FILE; /app/data must be a writable volume" >&2
+    return 1
+}
+
+# Print the secret to run with, from the first source that holds a value other
+# than a template one:
+#   1. the environment;
+#   2. plane.env, where an operator may have set it, and where a container
+#      started before secrets moved to the data volume kept the one it
+#      generated. If the data volume holds none yet, the value is copied there,
+#      so the next container keeps it;
+#   3. the data volume, which holds the value generated on first boot;
+#   4. otherwise a new value, kept on the data volume.
+resolve_secret(){
+    local key="$1"
+    shift
+    local value="${!key}"
+    if is_usable_secret "$value" "$@"; then
+        printf '%s' "$value"
         return 0
     fi
 
-    # if key and value are not empty, update the value
-    if [ -n "$key" ] && [ -n "$value" ]; then
-        sed -i "s|^$key=.*|$key=$value|" plane.env
+    local stored
+    stored=$(read_file_value "$SECRETS_FILE" "$key")
+    value=$(read_file_value plane.env "$key")
+    if is_usable_secret "$value" "$@"; then
+        if ! is_usable_secret "$stored" "$@"; then
+            echo "Keeping the existing $key in $SECRETS_FILE" >&2
+            store_secret "$key" "$value" || return 1
+        fi
+        printf '%s' "$value"
         return 0
     fi
 
+    if is_usable_secret "$stored" "$@"; then
+        printf '%s' "$stored"
+        return 0
+    fi
+
+    echo "Generating $key and keeping it in $SECRETS_FILE" >&2
+    value=$(generate_secret)
+    store_secret "$key" "$value" || return 1
+    printf '%s' "$value"
+}
+
+# Export every KEY=value line of plane.env as is. The value is not word-split,
+# so spaces survive; one pair of surrounding quotes is removed, as the commented
+# examples in variables.env write them.
+export_env_file(){
+    local line key value
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            ""|\#*|"="*) continue ;;
+            *=*)
+                key="${line%%=*}"
+                value="${line#*=}"
+                if [ ${#value} -ge 2 ]; then
+                    case "$value" in
+                        \"*\"|\'*\') value="${value:1:${#value}-2}" ;;
+                    esac
+                fi
+                export "$key=$value"
+                ;;
+        esac
+    done < plane.env
 }
 
 check_pre_requisites(){
@@ -147,37 +276,12 @@ update_env_file(){
     update_env_value "USE_MINIO" "0"
 
     # Optional environment variables
-    # SECRET_KEY: if absent or set to a known placeholder/insecure value, preserve whatever
-    # is already stored in plane.env (survives restarts), or generate a fresh random value on
-    # first boot. Never write a publicly-known or placeholder value into plane.env.
-    local _insecure_sk="60gp0byfz2dvffa45cxl20p1scy9xbpf6d8c5y0geejgkyp1b5"
-    local _placeholder_sk="change-this-key-on-deployment"
-    if [ -z "$SECRET_KEY" ] || [ "$SECRET_KEY" = "$_insecure_sk" ] || [ "$SECRET_KEY" = "$_placeholder_sk" ]; then
-        local _stored_sk
-        _stored_sk=$(grep "^SECRET_KEY=" plane.env 2>/dev/null | cut -d'=' -f2-)
-        if [ -n "$_stored_sk" ] && [ "$_stored_sk" != "$_insecure_sk" ] && [ "$_stored_sk" != "$_placeholder_sk" ]; then
-            SECRET_KEY="$_stored_sk"
-        else
-            SECRET_KEY=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c50)
-        fi
-    fi
+    # SECRET_KEY and LIVE_SERVER_SECRET_KEY: an explicit value wins; otherwise
+    # the one generated on first boot, kept on the data volume.
+    SECRET_KEY=$(resolve_secret SECRET_KEY "${INSECURE_SECRET_KEYS[@]}")
     update_env_value "SECRET_KEY" "$SECRET_KEY"
     update_env_value "FILE_SIZE_LIMIT" "${FILE_SIZE_LIMIT:-5242880}"
-    # LIVE_SERVER_SECRET_KEY: same first-boot generation strategy.
-    # The same template values Live refuses (INSECURE_LIVE_SERVER_SECRET_KEYS in
-    # apps/live/src/env.ts).
-    local _insecure_lssk="htbqvBJAgpm9bzvf3r4urJer0ENReatceh"
-    local _placeholder_lssk="change-this-key-on-deployment"
-    local _template_lssk="secret-key"
-    if [ -z "$LIVE_SERVER_SECRET_KEY" ] || [ "$LIVE_SERVER_SECRET_KEY" = "$_insecure_lssk" ] || [ "$LIVE_SERVER_SECRET_KEY" = "$_placeholder_lssk" ] || [ "$LIVE_SERVER_SECRET_KEY" = "$_template_lssk" ]; then
-        local _stored_lssk
-        _stored_lssk=$(grep "^LIVE_SERVER_SECRET_KEY=" plane.env 2>/dev/null | cut -d'=' -f2-)
-        if [ -n "$_stored_lssk" ] && [ "$_stored_lssk" != "$_insecure_lssk" ] && [ "$_stored_lssk" != "$_placeholder_lssk" ] && [ "$_stored_lssk" != "$_template_lssk" ]; then
-            LIVE_SERVER_SECRET_KEY="$_stored_lssk"
-        else
-            LIVE_SERVER_SECRET_KEY=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c50)
-        fi
-    fi
+    LIVE_SERVER_SECRET_KEY=$(resolve_secret LIVE_SERVER_SECRET_KEY "${INSECURE_LIVE_SERVER_SECRET_KEYS[@]}")
     update_env_value "LIVE_SERVER_SECRET_KEY" "$LIVE_SERVER_SECRET_KEY"
 
     update_env_value "API_KEY_RATE_LIMIT" "${API_KEY_RATE_LIMIT:-60/minute}"
@@ -192,7 +296,7 @@ main(){
     update_env_file
 
     # load plane.env as exported variables
-    export $(grep -v '^#' plane.env | xargs)
+    export_env_file
 
     # Recreate log dirs at boot. A host bind of /app/logs replaces the
     # directories baked into the image, and supervisord refuses to start
