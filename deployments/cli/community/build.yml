@@ -2,35 +2,35 @@ services:
   web:
     image: ${DOCKERHUB_USER:-local}/hangar-web:${APP_RELEASE:-latest}
     build:
-      context: ../../
+      context: ../../../
       dockerfile: apps/web/Dockerfile.web
 
   space:
     image: ${DOCKERHUB_USER:-local}/hangar-space:${APP_RELEASE:-latest}
     build:
-      context: ../../
+      context: ../../../
       dockerfile: apps/space/Dockerfile.space
 
   admin:
     image: ${DOCKERHUB_USER:-local}/hangar-admin:${APP_RELEASE:-latest}
     build:
-      context: ../../
+      context: ../../../
       dockerfile: apps/admin/Dockerfile.admin
 
   live:
     image: ${DOCKERHUB_USER:-local}/hangar-live:${APP_RELEASE:-latest}
     build:
-      context: ../../
+      context: ../../../
       dockerfile: apps/live/Dockerfile.live
 
   api:
     image: ${DOCKERHUB_USER:-local}/hangar-api:${APP_RELEASE:-latest}
     build:
-      context: ../../apps/api
+      context: ../../../apps/api
       dockerfile: Dockerfile.api
 
   proxy:
     image: ${DOCKERHUB_USER:-local}/hangar-proxy:${APP_RELEASE:-latest}
     build:
-      context: ../../apps/proxy
+      context: ../../../apps/proxy
       dockerfile: Dockerfile.ce

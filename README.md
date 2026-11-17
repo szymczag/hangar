@@ -267,6 +267,23 @@ grep -o 'ghcr.io/szymczag/hangar-[a-z]*@sha256:[0-9a-f]*' docker-compose.yml | s
 Releases up to and including `hangar-v0.1.0` predate these assets; verify their
 images with `cosign verify` alone.
 
+`setup.sh` and `swarm.sh` make these checks themselves for the files they
+download on install and upgrade: they compare them with `SHA256SUMS`, check its
+signature against the identity above when Cosign is installed, and change
+nothing when a check fails. Set `HANGAR_REQUIRE_SIGNATURE=1` to make them refuse
+files they cannot verify; the
+[self-hosting guide](deployments/cli/community/README.md#how-setupsh-verifies-what-it-downloads)
+lists every case. The script itself is what you download by hand, so verify it
+first:
+
+```sh
+GIT_TAG=hangar-vX.Y.Z
+base="https://github.com/szymczag/hangar/releases/download/${GIT_TAG}"
+curl -fsSL -O "$base/setup.sh" -O "$base/SHA256SUMS" -O "$base/SHA256SUMS.sigstore.json"
+# cosign verify-blob as above, then:
+sha256sum --check --ignore-missing SHA256SUMS # macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
+```
+
 ## Development quick start
 
 ### Requirements
