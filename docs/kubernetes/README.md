@@ -6,10 +6,10 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.0`. It is the first stable Hangar release, for
-Docker Compose, Docker Swarm and the all-in-one image. On Kubernetes it is
-qualified for evaluation on AMD64 clusters only and is not yet a supported
-production release.
+The current release is `0.1.1`. It is a stable Hangar release for Docker
+Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
+for evaluation on AMD64 clusters only and is not yet a supported production
+release.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -56,7 +56,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.0` qualification boundary is:
+The `0.1.1` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -185,10 +185,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                          |
 | ------------------ | -------------------------------------- |
-| Product version    | `v0.1.0`                               |
-| Helm chart version | `0.1.0`                                |
-| Git tag            | `hangar-v0.1.0`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.0` |
+| Product version    | `v0.1.1`                               |
+| Helm chart version | `0.1.1`                                |
+| Git tag            | `hangar-v0.1.1`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.1` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -197,10 +197,10 @@ Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
 installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
-`ext.0037` fails there, so upgrade to `rc.68` or later instead. `rc.72` is the
-immediately previous retained GitHub release and the supported rollback target
-for this one; rolling back to it needs no schema change, and neither does
-rolling back further, to `rc.71`, `rc.70` or `rc.69`. Rolling back to `rc.68` needs migration
+`ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.0` is the
+immediately previous GitHub release and the supported rollback target for this
+one; rolling back to it needs no schema change, and neither does rolling back
+further, to `rc.72`, `rc.71`, `rc.70` or `rc.69`. Rolling back to `rc.68` needs migration
 `db.0135` reversed first, as described below. Rolling
 back to `rc.67` after that needs no other schema change.
 Rolling back to `rc.66` needs none either and restores the larger `space` and
@@ -231,7 +231,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.0` notes](../releases/hangar-v0.1.0.md) — review
+- [Release `v0.1.1` notes](../releases/hangar-v0.1.1.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -263,10 +263,21 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.0-rc.72`, tag `hangar-v0.1.0-rc.72`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.0-rc.72`. Anybody still on rc.62 with
+The previous release is `0.1.0`, tag `hangar-v0.1.0`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
+
+Release 0.1.1 adds no migrations and changes nothing in the chart, its values or
+its Secrets; upgrade from 0.1.0 with `helm upgrade` and no other action. Its
+images are rebuilt with current Alpine packages, which fixes the `libpq`
+findings the nightly scan reported in the 0.1.0 `api` image. The API now refuses
+to start with an empty or published template `SECRET_KEY`, and Live with an
+empty or template `LIVE_SERVER_SECRET_KEY`; the chart reads both from the
+operator's Secret, so a deployment that followed the configuration reference is
+unaffected. Each release also publishes a signed `SHA256SUMS`, a
+`release-manifest.json` naming every image digest, and one SPDX SBOM per image,
+alongside the chart. Rolling back to 0.1.0 needs no schema change.
 
 Release 0.1.0 adds no migrations and changes nothing in the chart. It carries the
 application code of rc.72 and is the first release published as stable rather

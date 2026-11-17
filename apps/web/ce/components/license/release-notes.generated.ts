@@ -11,10 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.0",
+  version: "0.1.1",
   highlights: [
-    "Hangar 0.1.0 is the first stable release.",
-    "Stable installs stay on stable releases.",
+    "Rebuilt images fix the reported Alpine vulnerabilities.",
+    "Compose and Swarm installs no longer run with published secrets.",
+    "Compose services run with fewer privileges.",
+    "Release assets are signed, checksummed and described by SBOMs.",
+    "The release pipeline is pinned and linted.",
   ],
   upstream: {
     version: "1.4.0",
