@@ -9,10 +9,10 @@ name: Workflow lint
 #   version comment no longer matches the commit. Reviewed exceptions live in
 #   .github/zizmor.yml, each with its reason.
 #
-# Both tools are pinned: actionlint by image digest, zizmor by the action's
-# commit and an exact zizmor version, which the action installs from a
-# hash-locked requirements file. Findings fail the job and are printed in the
-# log; nothing is uploaded, so neither job needs more than read access.
+# Both tools are pinned: actionlint by image digest, zizmor by an exact
+# version installed from the hash-locked .github/zizmor-requirements.txt.
+# Findings fail the job and are printed in the log; nothing is uploaded, so
+# neither job needs more than read access.
 
 on:
   workflow_dispatch:
@@ -58,11 +58,20 @@ jobs:
         with:
           persist-credentials: false
 
+      # Installed from PyPI rather than through zizmorcore/zizmor-action, which
+      # the repository's allowed-actions policy does not list. The
+      # requirements file pins the exact version and every file's hash.
+      - name: Install zizmor
+        run: |
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          "$RUNNER_TEMP/zizmor/bin/pip" install \
+            --quiet --disable-pip-version-check --no-deps --only-binary=:all: \
+            --require-hashes --requirement .github/zizmor-requirements.txt
+          echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
+
+      # The token only reads public data: online audits check that each pinned
+      # commit belongs to its repository and matches its version comment.
       - name: Run zizmor
-        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
-        with:
-          version: "1.32.0"
-          # Print findings and fail instead of uploading SARIF, which would
-          # need security-events: write.
-          advanced-security: false
-          annotations: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: zizmor --format github .
