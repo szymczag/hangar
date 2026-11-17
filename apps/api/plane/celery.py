@@ -87,6 +87,10 @@ app.conf.beat_schedule = {
         "task": "plane.bgtasks.email_delivery_task.consume_ses_email_events",
         "schedule": crontab(minute="*"),
     },
+    "check-every-five-minutes-to-unsnooze-intake-issues": {
+        "task": "plane.bgtasks.issue_automation_task.unsnooze_expired_intake_issues",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
     "push-instance-metrics": {
         "task": "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
         "schedule": schedule(run_every=timedelta(minutes=METRICS_PUSH_INTERVAL_MINUTES)),
