@@ -312,10 +312,13 @@ fingerprint taken before the upgrade, including the SHA-256 of the attachment re
 back from object storage; the seeded admin must sign in with a password through the
 proxy; and the API key must list the seeded project and work item.
 
-The same workflow runs weekly and on demand against preview images
-(`preview-sha-<commit>` when that commit was published, otherwise
-`preview-preview`), and `.github/scripts/compose-upgrade.sh` runs it on a
-workstation. The installer fixes the Compose project name to `plane-app`, so run
+The same workflow runs weekly, on demand, and on pull requests that change the
+installer, the Compose file or `restore.sh`. Without an image tag it takes the
+commit's `preview-sha-<commit>` images when a preview build published them, and
+otherwise the previous release's own images, so the commit's installer and
+Compose file are still upgraded onto a deployment of that release. It never takes
+a moving `preview-*` tag, which can be older than the release.
+`.github/scripts/compose-upgrade.sh` runs the same steps on a workstation. The installer fixes the Compose project name to `plane-app`, so run
 the script only on a Docker host, or a Podman service, with no other `plane-app`
 deployment; it refuses to start otherwise.
 

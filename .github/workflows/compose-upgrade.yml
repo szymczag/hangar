@@ -9,8 +9,9 @@ name: Compose upgrade and restore
 #
 # Publish Hangar Containers calls it for every stable release before the
 # GitHub Release exists. Pull requests that change the installer, and a weekly
-# run, check preview images against the latest stable release; run it by hand
-# for any other image tag.
+# run, upgrade the latest stable release with this commit's installer and
+# Compose file, onto this commit's preview images when a preview build
+# published them; run it by hand for any other image tag.
 
 on:
   workflow_call:
@@ -21,7 +22,7 @@ on:
         default: ""
         type: string
       to_image_tag:
-        description: Candidate image tag, such as v0.2.0; empty for this commit's preview images
+        description: Candidate image tag, such as v0.2.0; empty for this commit's preview images, else the from_release images
         required: false
         default: ""
         type: string
@@ -33,7 +34,7 @@ on:
         default: ""
         type: string
       to_image_tag:
-        description: Candidate image tag, such as preview-preview; empty for this commit's preview images, else preview-preview
+        description: Candidate image tag, such as preview-my-branch; empty for this commit's preview images, else the from_release images
         required: false
         default: ""
         type: string
@@ -80,6 +81,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           FROM_RELEASE: ${{ inputs.from_release }}
           TO_IMAGE_TAG: ${{ inputs.to_image_tag }}
+          # A pull request runs on its merge commit, which is never published.
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           if [ -z "$FROM_RELEASE" ]; then
@@ -91,9 +94,13 @@ jobs:
             exit 1
           fi
           if [ -z "$TO_IMAGE_TAG" ]; then
-            TO_IMAGE_TAG=preview-preview
-            if docker manifest inspect "${IMAGE_PREFIX}api:preview-sha-${GITHUB_SHA}" > /dev/null 2>&1; then
-              TO_IMAGE_TAG="preview-sha-${GITHUB_SHA}"
+            # This commit's images when a preview build published them. Otherwise
+            # the release's own images: the installer and Compose file of this
+            # commit are still upgraded onto them. A moving preview tag such as
+            # preview-preview is never taken; it can be older than the release.
+            TO_IMAGE_TAG=${FROM_RELEASE#hangar-}
+            if docker manifest inspect "${IMAGE_PREFIX}api:preview-sha-${CANDIDATE_SHA}" > /dev/null 2>&1; then
+              TO_IMAGE_TAG="preview-sha-${CANDIDATE_SHA}"
             fi
           fi
           if [[ ! "$TO_IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]]; then
