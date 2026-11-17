@@ -367,8 +367,12 @@ It is always advised to keep Hangar up to date with the latest release.
 >   signs in again, and pending password-reset links stop working. Settings
 >   saved in God Mode (SMTP password, sign-in provider secrets) were encrypted with
 >   the old key; the API re-encrypts them with the new one on its first start and
->   logs `... re-encrypted with the current SECRET_KEY.` for each. Keys you set
->   yourself are kept.
+>   logs `... re-encrypted with the current SECRET_KEY.` for each. Workspace and
+>   project invitation links keep working: their tokens are stored and compared
+>   as they are, not verified with the key. Keys you set yourself are kept.
+> - **refuses**, before it stops or changes anything, when the key would be
+>   replaced and `ENABLE_GOOGLE_CALENDAR_CAPACITY=1`; see
+>   [below](#replacing-a-template-secret_key-with-google-calendar-capacity).
 > - **keeps** `POSTGRES_PASSWORD=plane` and `RABBITMQ_PASSWORD=plane` on a deployment
 >   whose volumes already exist, and prints a `WARNING`: the database and broker
 >   were created with that password, and changing it in `plane.env` alone would
@@ -458,6 +462,32 @@ Once done, choose `7` to exit from prompt.
 > It is very important for you to validate the `plane.env` for the new changes.
 
 Once done with making changes in `plane.env` file, jump on to `Redeploy Stack`
+
+#### Replacing a template SECRET_KEY with Google Calendar capacity
+
+Google Calendar capacity derives two kinds of stored identifier from
+`SECRET_KEY`:
+
+- the hashes of each trainer's selected calendars;
+- the key that ties a training imported from Google (with
+  `ENABLE_GOOGLE_TRAINING_MATERIALIZATION=1`) to its occurrence and to the session
+  it was linked to. It comes from the Google event itself, so it cannot be
+  recomputed without reading every event again.
+
+The invitations Hangar writes into trainers' calendars are not affected: each
+keeps the Google event ID stored when it was planned.
+
+So when `SECRET_KEY` is a template value and `ENABLE_GOOGLE_CALENDAR_CAPACITY=1`,
+`setup.sh upgrade` and `swarm.sh` stop with an `ERROR` before they stop or
+change anything. To go ahead, run the upgrade with
+`HANGAR_ROTATE_SECRET_KEY=1 ./setup.sh upgrade`, and expect:
+
+- each trainer's calendar selection to show nothing selected until the trainer
+  selects the calendars again and saves;
+- trainings already imported from Google to be recognised as new occurrences on
+  the next sweep, so their links to sessions have to be made again. The next full
+  sweep marks the old occurrences as disappeared, and they are deleted after
+  `GOOGLE_TRAINING_RETIRED_RETENTION_DAYS`.
 
 #### Rotating the database and RabbitMQ passwords
 

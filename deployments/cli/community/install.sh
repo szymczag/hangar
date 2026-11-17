@@ -417,6 +417,36 @@ function generateServicePassword() {
     fi
 }
 
+# SECRET_KEY is also the HMAC key behind identifiers Google Calendar capacity
+# keeps: the hashes of each trainer's selected calendars and the keys that tie
+# trainings imported from Google to their occurrences and sessions. The keys
+# cannot be recomputed without Google's data, so replacing a template key on a
+# deployment that uses the feature is refused unless the operator says so.
+# Runs on the plane.env in place, before anything is downloaded or stopped.
+function checkSecretKeyRotation() {
+    local insecure_secret_keys="60gp0byfz2dvffa45cxl20p1scy9xbpf6d8c5y0geejgkyp1b5 change-this-key-on-deployment"
+    local current calendar
+    if [ ! -f "$DOCKER_ENV_PATH" ] || [ "${HANGAR_ROTATE_SECRET_KEY:-0}" == "1" ]; then
+        return 0
+    fi
+    calendar=$(envSetting ENABLE_GOOGLE_CALENDAR_CAPACITY 0)
+    if [ "$calendar" != "1" ]; then
+        return 0
+    fi
+    current=$(envSetting SECRET_KEY "")
+    # shellcheck disable=SC2086
+    if [ -n "$current" ] && ! isListed "$current" $insecure_secret_keys; then
+        return 0
+    fi
+    echo "ERROR: SECRET_KEY in plane.env is empty or a published template value, and ENABLE_GOOGLE_CALENDAR_CAPACITY=1." >&2
+    echo "This upgrade replaces SECRET_KEY, and Google Calendar capacity derives stored identifiers from it:" >&2
+    echo "trainers' calendar selections stop matching until they are saved again, and trainings imported from" >&2
+    echo "Google are seen as new occurrences, so their links to sessions have to be made again." >&2
+    echo "Read 'Replacing a template SECRET_KEY with Google Calendar capacity' in the README, then run the upgrade" >&2
+    echo "again with HANGAR_ROTATE_SECRET_KEY=1. Nothing has been changed." >&2
+    return 1
+}
+
 # Replaces secrets that are empty or a value a template shipped, after
 # syncEnvFile has carried the previous plane.env over. The two lists must match
 # _INSECURE_SECRET_KEYS in apps/api/plane/settings/common.py and the lists in
@@ -486,6 +516,7 @@ function copyLocalAssets() {
 
 function download() {
     local LOCAL_BUILD=$1
+    checkSecretKeyRotation || exit 1
     cd $SCRIPT_DIR
     TS=$(date +%s)
     PREVIOUS_COMPOSE_PATH=""
@@ -734,6 +765,7 @@ function restartServices() {
 }
 function upgrade() {
     local latest_release
+    checkSecretKeyRotation || exit 1
     if [ -n "$HANGAR_RELEASE" ]; then
         latest_release=${HANGAR_RELEASE#hangar-}
     else

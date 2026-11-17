@@ -47,6 +47,7 @@ FUNCTIONS = (
     "generateServicePassword",
     "generateSecrets",
     "isNewDeployment",
+    "checkSecretKeyRotation",
 )
 
 # What a deployment from an earlier release has in plane.env.
@@ -323,6 +324,74 @@ class LegacyConnectionTests(unittest.TestCase):
                 self.assertEqual(run.env["DATABASE_URL"], "postgresql://me:pw@db.example.com/hangar")
 
 
+class CalendarCapacityGuardTests(unittest.TestCase):
+    """SECRET_KEY keys identifiers Google Calendar capacity stores.
+
+    Replacing a template key on a deployment that uses the feature is refused
+    unless HANGAR_ROTATE_SECRET_KEY=1, before anything is downloaded.
+    """
+
+    def _check(self, script: Path, lines, rotate: str = "") -> subprocess.CompletedProcess:
+        with tempfile.TemporaryDirectory() as scratch:
+            env_path = Path(scratch) / "plane.env"
+            if lines is not None:
+                env_path.write_text("\n".join(lines) + "\n")
+            before = env_path.read_text() if lines is not None else None
+            environment = {"DOCKER_ENV_PATH": str(env_path), "PATH": "/usr/bin:/bin"}
+            if rotate:
+                environment["HANGAR_ROTATE_SECRET_KEY"] = rotate
+            result = subprocess.run(
+                ["bash", "-c", _program(script, "checkSecretKeyRotation\n")],
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+            if lines is not None:
+                self.assertEqual(env_path.read_text(), before)
+            return result
+
+    def test_a_template_key_with_calendar_capacity_is_refused(self):
+        for script in SCRIPTS:
+            for key in ("change-this-key-on-deployment", '"change-this-key-on-deployment"', ""):
+                with self.subTest(script=script.name, key=key):
+                    result = self._check(script, [f"SECRET_KEY={key}", "ENABLE_GOOGLE_CALENDAR_CAPACITY=1"])
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn("ENABLE_GOOGLE_CALENDAR_CAPACITY=1", result.stderr)
+                    self.assertIn("HANGAR_ROTATE_SECRET_KEY=1", result.stderr)
+                    self.assertIn("Nothing has been changed", result.stderr)
+
+    def test_the_override_and_everything_else_pass(self):
+        cases = (
+            (["SECRET_KEY=change-this-key-on-deployment", "ENABLE_GOOGLE_CALENDAR_CAPACITY=1"], "1"),
+            (["SECRET_KEY=change-this-key-on-deployment", "ENABLE_GOOGLE_CALENDAR_CAPACITY=0"], ""),
+            (["SECRET_KEY=change-this-key-on-deployment"], ""),
+            (["SECRET_KEY=operator-key", "ENABLE_GOOGLE_CALENDAR_CAPACITY=1"], ""),
+            (None, ""),
+        )
+        for script in SCRIPTS:
+            for lines, rotate in cases:
+                with self.subTest(script=script.name, lines=lines, rotate=rotate):
+                    result = self._check(script, lines, rotate)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stderr, "")
+        # Only exactly 1 overrides.
+        result = self._check(INSTALL, ["SECRET_KEY=", "ENABLE_GOOGLE_CALENDAR_CAPACITY=1"], "yes")
+        self.assertEqual(result.returncode, 1)
+
+    def test_the_guard_runs_before_anything_changes(self):
+        for script in SCRIPTS:
+            with self.subTest(script=script.name):
+                source = script.read_text()
+                download = _function(source, "download", script)
+                first = [line.strip() for line in download.splitlines()[1:] if line.strip()]
+                self.assertIn("checkSecretKeyRotation || exit 1", first[:3])
+                upgrade = _function(source, "upgrade", script)
+                self.assertLess(
+                    upgrade.index("checkSecretKeyRotation || exit 1"),
+                    upgrade.index("checkLatestRelease"),
+                )
+
+
 class EnvFileTests(unittest.TestCase):
     def _round_trip(self, script: Path, value: str) -> str:
         with tempfile.TemporaryDirectory() as scratch:
@@ -394,9 +463,12 @@ class WiringTests(unittest.TestCase):
         for script in SCRIPTS:
             with self.subTest(script=script.name):
                 source = script.read_text()
-                secret = re.search(r'local insecure_secret_keys="([^"]*)"', source).group(1).split()
+                secret_lists = re.findall(r'local insecure_secret_keys="([^"]*)"', source)
                 live_secret = re.search(r'local insecure_live_secret_keys="([^"]*)"', source).group(1).split()
-                self.assertEqual(set(secret), django)
+                # generateSecrets and checkSecretKeyRotation each carry the list.
+                self.assertEqual(len(secret_lists), 2)
+                for secret in secret_lists:
+                    self.assertEqual(set(secret.split()), django)
                 self.assertEqual(set(live_secret), live_keys)
 
     def test_an_unattended_upgrade_does_not_ask(self):
@@ -406,6 +478,7 @@ class WiringTests(unittest.TestCase):
                 upgrade = _function(source, "upgrade", script)
                 stubs = (
                     'function checkLatestRelease() { echo v9.9.9; }\n'
+                    'function checkSecretKeyRotation() { :; }\n'
                     'function stopServices() { :; }\n'
                     'function install() { echo INSTALLED; }\n'
                     'function download() { echo INSTALLED; }\n'
@@ -432,6 +505,7 @@ class WiringTests(unittest.TestCase):
         upgrade = _function(INSTALL.read_text(), "upgrade", INSTALL)
         stubs = (
             "function checkLatestRelease() { echo ASKED-GITHUB; exit 1; }\n"
+            "function checkSecretKeyRotation() { :; }\n"
             "function stopServices() { :; }\n"
             'function install() { echo "INSTALLING $APP_RELEASE"; }\n'
             "function objectStorageMigrationPending() { return 1; }\n"
