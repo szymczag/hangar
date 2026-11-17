@@ -162,6 +162,25 @@ Again the `options [1-7]` will be popped up, and this time hit `7` to exit.
 Before proceeding, we suggest used to review `.env` file and set the values.
 Below are the most import keys you must refer to. _<span style="color: #fcba03">You can use any text editor to edit this file</span>_.
 
+> **Secrets are generated for you.** The template ships `SECRET_KEY`,
+> `LIVE_SERVER_SECRET_KEY`, `POSTGRES_PASSWORD` and `RABBITMQ_PASSWORD` empty, and
+> `setup.sh` writes random values into `plane.env` on install (with the
+> object-storage pair, see [Upgrading](#upgrading-hangar-version)). Keep `plane.env`
+> private, for example with `chmod 600 plane-app/plane.env`. The API and Live refuse
+> to start while `SECRET_KEY` or `LIVE_SERVER_SECRET_KEY` is empty or a value a
+> template once shipped, and exit with status 64 saying which.
+>
+> `DATABASE_URL` and `AMQP_URL` stay empty: the API connects with the `POSTGRES_*`
+> and `RABBITMQ_*` settings, which are what the bundled database and broker were
+> created with. Set a URL only for an external database or broker; it then wins,
+> and a password inside it must be URL-encoded. Keep `RABBITMQ_PASSWORD` to letters
+> and digits, because the API builds a URL from it.
+>
+> Postgres and RabbitMQ keep the password they were created with in their volumes,
+> so editing `POSTGRES_PASSWORD` or `RABBITMQ_PASSWORD` later changes nothing but
+> the API's side and locks it out. Use
+> [the rotation procedure](#rotating-the-database-and-rabbitmq-passwords) instead.
+
 > `LISTEN_HTTP_PORT` - This is default set to `80`. Make sure the port you choose to use is not preoccupied. (e.g `LISTEN_HTTP_PORT=8080`)
 
 > `WEB_URL` - This is default set to `http://localhost`. Change this to the FQDN you plan to use along with LISTEN_HTTP_PORT (eg. `https://plane.example.com:8080` or `http://[IP-ADDRESS]:8080`)
@@ -339,6 +358,46 @@ It is always advised to keep Hangar up to date with the latest release.
 >
 > If the API logs `SECURITY: AWS_SECRET_ACCESS_KEY is the placeholder` (for example after an upgrade run with an older `setup.sh`), replace the pair by hand: stop the services, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `plane.env` to random values (`LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40`), set `LEGACY_MINIO_ROOT_USER=access-key` and `LEGACY_MINIO_ROOT_PASSWORD=secret-key` if uploads still wait for `migrate-storage`, and start the services again.
 
+> **Secrets and passwords.** Earlier templates shipped `SECRET_KEY` and
+> `LIVE_SERVER_SECRET_KEY` as `change-this-key-on-deployment`, and `plane` as the
+> database and RabbitMQ password. On upgrade, `setup.sh`:
+>
+> - replaces `SECRET_KEY` and `LIVE_SERVER_SECRET_KEY` when they are empty or a
+>   template value, and prints a `NOTICE`. **Everybody is signed out once** and
+>   signs in again, and pending password-reset links stop working. Settings
+>   saved in God Mode (SMTP password, sign-in provider secrets) were encrypted with
+>   the old key; the API re-encrypts them with the new one on its first start and
+>   logs `... re-encrypted with the current SECRET_KEY.` for each. Keys you set
+>   yourself are kept.
+> - **keeps** `POSTGRES_PASSWORD=plane` and `RABBITMQ_PASSWORD=plane` on a deployment
+>   whose volumes already exist, and prints a `WARNING`: the database and broker
+>   were created with that password, and changing it in `plane.env` alone would
+>   lock the API out. Rotate them with
+>   [the procedure below](#rotating-the-database-and-rabbitmq-passwords) when it
+>   suits you. A password is generated only for a deployment that has no volume
+>   yet.
+> - pins `DATABASE_URL` or `AMQP_URL` to the old `plane:plane` URL, with a
+>   `WARNING`, in one case only: the previous `docker-compose.yaml` connected with
+>   that fixed URL and ignored `POSTGRES_*` / `RABBITMQ_*`, so a deployment that
+>   edited those after its first start kept working on the old login. Pinning the
+>   URL keeps it working; rotate the password with the procedure below and then
+>   empty the URL.
+>
+> The API and Live now refuse to start with an empty or template `SECRET_KEY` or
+> `LIVE_SERVER_SECRET_KEY`. If you upgrade the images without running
+> `setup.sh upgrade`, set both to random values yourself (`openssl rand -hex 32`).
+>
+> **Hardening.** Every service runs with `no-new-privileges`; the application
+> containers and the bundled object storage drop all Linux capabilities, and the
+> proxy keeps only `NET_BIND_SERVICE`. Postgres, Valkey, RabbitMQ and the API
+> report their health in `docker compose ps`, and the API and workers wait for
+> healthy data services before starting. If you added your own services or
+> mounts to `docker-compose.yaml`, check they still start under these settings.
+>
+> **Unattended upgrades.** Pass `--yes` (`./setup.sh --yes upgrade`) or set
+> `HANGAR_ASSUME_YES=1` to skip the confirmation prompt and keep the screen. An
+> unattended run refuses, rather than starts, a local image build.
+
 Lets again run the `./setup.sh` command. You will again be prompted with the below options. This time select `5` to upgrade the release.
 
 #### Docker Compose
@@ -393,6 +452,42 @@ Once done, choose `7` to exit from prompt.
 > It is very important for you to validate the `plane.env` for the new changes.
 
 Once done with making changes in `plane.env` file, jump on to `Redeploy Stack`
+
+#### Rotating the database and RabbitMQ passwords
+
+Postgres and RabbitMQ store their password in their volumes, so the password is
+changed inside each service first and in `plane.env` second. Run this from the
+folder that holds `plane-app/` with the services running; the users below are
+`POSTGRES_USER` and `RABBITMQ_USER` from `plane.env` (`plane` by default).
+
+```bash
+cd plane-app
+compose() { docker compose -f docker-compose.yaml --env-file plane.env "$@"; }
+
+# 1. New random passwords (letters and digits only).
+NEW_DB_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)
+NEW_MQ_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)
+
+# 2. Change them inside Postgres and RabbitMQ.
+# psql over the local socket, which needs no password; the container's PGHOST
+# would otherwise send it over TCP, which does.
+compose exec plane-db psql -h /var/run/postgresql -U plane -d plane -c "ALTER ROLE plane WITH PASSWORD '$NEW_DB_PASSWORD';"
+compose exec plane-mq rabbitmqctl change_password plane "$NEW_MQ_PASSWORD"
+
+# 3. Write them to plane.env. If the upgrade pinned DATABASE_URL or AMQP_URL to
+#    the old plane:plane URL, empty it in the same edit.
+sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$NEW_DB_PASSWORD/; s/^RABBITMQ_PASSWORD=.*/RABBITMQ_PASSWORD=$NEW_MQ_PASSWORD/" plane.env
+cd ..
+
+# 4. Restart, so every container connects with the new passwords.
+./setup.sh restart
+```
+
+On macOS use `sed -i ''`. Between steps 2 and 4 the running containers keep
+their open connections; new connections fail until the restart, so do it in one
+go. For Docker Swarm, run step 2 with `docker exec` in the `plane-db` and
+`plane-mq` containers on the node that runs them
+(`docker ps -q -f name=<stack>_plane-db`), then redeploy the stack after step 3.
 
 ---
 
