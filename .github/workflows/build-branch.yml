@@ -709,10 +709,12 @@ jobs:
   release:
     name: Publish GitHub Release
     if: needs.setup.outputs.is_release == 'true'
-    needs: [setup, verify_publication, chart]
+    needs: [setup, signing_tools, verify_publication, chart]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+      # Keyless Cosign signing of SHA256SUMS needs this job's OIDC identity.
+      id-token: write
       # A stable release moves each image's `stable` tag, which is a push.
       packages: write
     steps:
@@ -737,9 +739,21 @@ jobs:
         with:
           version: v4.2.0
 
+      - name: Restore verified Cosign
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cosign-${{ github.run_id }}
+          path: ${{ runner.temp }}/cosign
+
+      - name: Add verified Cosign to PATH
+        run: |
+          chmod 0755 "$RUNNER_TEMP/cosign/cosign"
+          echo "$RUNNER_TEMP/cosign" >> "$GITHUB_PATH"
+
       - name: Stage release assets
         env:
           CHART_DIGEST: ${{ needs.chart.outputs.digest }}
+          GIT_TAG: ${{ needs.setup.outputs.git_tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.setup.outputs.version }}
         run: |
@@ -752,7 +766,18 @@ jobs:
           cp deployments/cli/community/docker-compose.yml release-assets/
           cp deployments/cli/community/variables.env release-assets/
           cp deployments/swarm/community/swarm.sh release-assets/
-          sed -i "s/\${APP_RELEASE:-stable}/\${APP_RELEASE:-${VERSION}}/g" release-assets/docker-compose.yml
+
+          # Resolve every image once; the compose pin, the SBOMs, the manifest
+          # and the release notes all read these digests. The images file
+          # stays outside release-assets: release-manifest.json publishes it.
+          python3 .github/scripts/release_evidence.py resolve \
+            --git-tag "$GIT_TAG" \
+            --images-output release-images.json \
+            --digests-output release-digests.json
+          python3 .github/scripts/release_evidence.py pin-compose \
+            --git-tag "$GIT_TAG" \
+            --images release-images.json \
+            --compose release-assets/docker-compose.yml
 
           printf '%s' "$GITHUB_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           helm pull oci://ghcr.io/szymczag/charts/hangar --version "${VERSION#v}" --destination release-assets
@@ -761,24 +786,27 @@ jobs:
           printf '%s  %s\n' "$chart_checksum" "$(basename "$chart_package")" > "${chart_package}.sha256"
           printf 'ghcr.io/szymczag/charts/hangar@%s\n' "$CHART_DIGEST" > release-assets/chart-oci-digest.txt
 
+          python3 .github/scripts/release_evidence.py sboms \
+            --images release-images.json \
+            --output-dir release-assets
+          python3 .github/scripts/release_evidence.py manifest \
+            --git-tag "$GIT_TAG" \
+            --commit-sha "$GITHUB_SHA" \
+            --upstream-base UPSTREAM_BASE.json \
+            --images release-images.json \
+            --sbom-dir release-assets \
+            --chart-package "$chart_package" \
+            --chart-digest "$CHART_DIGEST" \
+            --output release-assets/release-manifest.json
+
       - name: Generate release notes from published evidence
         env:
           GH_TOKEN: ${{ github.token }}
           GIT_TAG: ${{ needs.setup.outputs.git_tag }}
-          VERSION: ${{ needs.setup.outputs.version }}
         run: |
           set -euo pipefail
           gh api --paginate --slurp \
             "repos/$GITHUB_REPOSITORY/releases?per_page=100" > release-pages.json
-
-          digests='{}'
-          for image in web admin space live api proxy aio; do
-            image_ref="${IMAGE_PREFIX}${image}:${VERSION}"
-            manifest=$(docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}')
-            digest=$(jq -er '.digest | select(type == "string" and test("^sha256:[0-9a-f]{64}$"))' <<< "$manifest")
-            digests=$(jq --arg image "$image" --arg digest "$digest" '. + {($image): $digest}' <<< "$digests")
-          done
-          printf '%s\n' "$digests" > release-digests.json
 
           python3 .github/scripts/release_notes.py generate \
             --git-tag "$GIT_TAG" \
@@ -787,6 +815,41 @@ jobs:
             --digests release-digests.json \
             --transition-reviews docs/releases/upstream-transition-reviews.json \
             > release-notes.md
+
+      - name: Sign release checksums
+        env:
+          GIT_TAG: ${{ needs.setup.outputs.git_tag }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/release_evidence.py checksums --directory release-assets
+
+          # The identity users verify against is fixed by the documentation,
+          # not read back from the manifest this release is about to publish.
+          certificate_identity="https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/${GIT_TAG}"
+          manifest_identity=$(jq -er '.verification.certificate_identity' release-assets/release-manifest.json)
+          if [[ "$manifest_identity" != "$certificate_identity" ]]; then
+            echo "release-manifest.json names an unexpected signing identity: $manifest_identity" >&2
+            exit 1
+          fi
+
+          for attempt in 1 2 3; do
+            if cosign sign-blob --yes \
+              --bundle release-assets/SHA256SUMS.sigstore.json \
+              release-assets/SHA256SUMS; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "Cosign signing failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
+          cosign verify-blob \
+            --bundle release-assets/SHA256SUMS.sigstore.json \
+            --certificate-identity "$certificate_identity" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            release-assets/SHA256SUMS
+          (cd release-assets && sha256sum --check --strict SHA256SUMS)
 
       - name: Create GitHub Release
         env:

@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 from pathlib import Path
+import re
 import unittest
 
 
@@ -40,7 +41,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("name: Prepare release signing tool", self.workflow)
         self.assertIn("needs: [setup, signing_tools]", self.workflow)
         self.assertIn("name: cosign-${{ github.run_id }}", self.workflow)
-        self.assertEqual(self.workflow.count("actions/download-artifact@"), 3)
+        self.assertEqual(self.workflow.count("actions/download-artifact@"), 4)
         self.assertIn("needs: [setup, signing_tools, components]", self.workflow)
 
         preflight_position = self.workflow.index("name: Prepare release signing tool")
@@ -68,12 +69,12 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
             self.assertLess(restore_position, publish_position)
 
     def test_cosign_signing_retries_transient_service_failures(self):
-        self.assertEqual(self.workflow.count("for attempt in 1 2 3; do"), 3)
+        self.assertEqual(self.workflow.count("for attempt in 1 2 3; do"), 4)
         self.assertEqual(
             self.workflow.count('echo "Cosign signing failed after $attempt attempts"'),
-            3,
+            4,
         )
-        self.assertEqual(self.workflow.count("sleep $((attempt * 15))"), 3)
+        self.assertEqual(self.workflow.count("sleep $((attempt * 15))"), 4)
 
     def test_github_release_uses_the_git_tag_not_the_product_version(self):
         self.assertIn('gh release create "$GIT_TAG"', self.workflow)
@@ -182,6 +183,84 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn(
             'printf \'%s\' "$GITHUB_TOKEN" | helm registry login', stage_assets
         )
+
+    def release_job(self) -> str:
+        return self.workflow.split("\n  release:\n", maxsplit=1)[1]
+
+    def release_step(self, name: str) -> str:
+        return self.release_job().split(f"      - name: {name}\n", maxsplit=1)[1].split(
+            "      - name: ", maxsplit=1
+        )[0]
+
+    def test_release_digests_are_resolved_once_and_shared(self):
+        stage_assets = self.release_step("Stage release assets")
+        notes = self.release_step("Generate release notes from published evidence")
+        self.assertEqual(self.release_job().count("release_evidence.py resolve"), 1)
+        self.assertIn("--digests-output release-digests.json", stage_assets)
+        self.assertIn("--digests release-digests.json", notes)
+        self.assertNotIn("imagetools inspect", notes)
+        self.assertNotIn("imagetools inspect", stage_assets)
+
+    def test_release_compose_is_pinned_by_digest_not_by_tag(self):
+        stage_assets = self.release_step("Stage release assets")
+        self.assertIn("release_evidence.py pin-compose", stage_assets)
+        self.assertIn("--compose release-assets/docker-compose.yml", stage_assets)
+        self.assertNotIn("sed -i", stage_assets)
+        self.assertNotIn("APP_RELEASE:-", self.workflow)
+        copy_position = stage_assets.index("cp deployments/cli/community/docker-compose.yml")
+        self.assertLess(copy_position, stage_assets.index("release_evidence.py pin-compose"))
+
+    def test_release_publishes_manifest_and_sboms(self):
+        stage_assets = self.release_step("Stage release assets")
+        self.assertIn("release_evidence.py sboms", stage_assets)
+        self.assertIn("--output-dir release-assets", stage_assets)
+        self.assertIn("release_evidence.py manifest", stage_assets)
+        self.assertIn("--output release-assets/release-manifest.json", stage_assets)
+        self.assertIn('--chart-digest "$CHART_DIGEST"', stage_assets)
+        self.assertIn("--upstream-base UPSTREAM_BASE.json", stage_assets)
+        # The manifest hashes the chart package, so it must be pulled first.
+        self.assertLess(
+            stage_assets.index("helm pull"), stage_assets.index("release_evidence.py manifest")
+        )
+
+    def test_release_checksums_are_signed_and_verified_before_publication(self):
+        release = self.release_job()
+        self.assertIn("      id-token: write\n", release.split("    steps:", maxsplit=1)[0])
+        self.assertIn("needs: [setup, signing_tools, verify_publication, chart]", release)
+        self.assertNotIn("environment:", release.split("    steps:", maxsplit=1)[0])
+
+        sign = self.release_step("Sign release checksums")
+        identity = (
+            "https://github.com/szymczag/hangar/.github/workflows/build-branch.yml"
+            "@refs/tags/${GIT_TAG}"
+        )
+        self.assertIn(f'certificate_identity="{identity}"', sign)
+        self.assertIn("release_evidence.py checksums --directory release-assets", sign)
+        self.assertIn("cosign sign-blob --yes", sign)
+        self.assertIn("--bundle release-assets/SHA256SUMS.sigstore.json", sign)
+        self.assertIn("cosign verify-blob", sign)
+        self.assertIn('--certificate-identity "$certificate_identity"', sign)
+        self.assertIn(
+            '--certificate-oidc-issuer "https://token.actions.githubusercontent.com"', sign
+        )
+        self.assertIn("sha256sum --check --strict SHA256SUMS", sign)
+        self.assertLess(sign.index("checksums --directory"), sign.index("cosign sign-blob"))
+        self.assertLess(sign.index("cosign sign-blob"), sign.index("cosign verify-blob"))
+
+        restore_position = release.index("name: Restore verified Cosign")
+        stage_position = release.index("name: Stage release assets")
+        sign_position = release.index("name: Sign release checksums")
+        create_position = release.index("name: Create GitHub Release")
+        self.assertLess(restore_position, sign_position)
+        self.assertLess(stage_position, sign_position)
+        self.assertLess(sign_position, create_position)
+
+    def test_only_publication_and_release_jobs_request_oidc_tokens(self):
+        jobs = self.workflow.split("\njobs:\n", maxsplit=1)[1]
+        parts = re.split(r"^  ([a-z_]+):\n", jobs, flags=re.MULTILINE)[1:]
+        bodies = dict(zip(parts[::2], parts[1::2]))
+        oidc_jobs = [name for name, body in bodies.items() if "id-token: write" in body]
+        self.assertEqual(oidc_jobs, ["components", "aio", "chart", "release"])
 
     def test_every_release_build_refreshes_alpine_packages(self):
         # The apk upgrade layer is cached across runs; a per-run value busts it
