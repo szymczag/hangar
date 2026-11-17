@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # BRANCH set by the operator is the only way deployment files may come from a
 # branch rather than a release, when the release cannot be downloaded. Without
