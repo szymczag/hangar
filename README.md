@@ -203,11 +203,15 @@ Sigstore transparency log. Manually dispatched `preview-*` images are intentiona
 unsigned; a signature therefore identifies an image produced through the approved
 release flow.
 
-Install Cosign, obtain the digest for the version you intend to deploy, and verify
-both the exact workflow identity and GitHub's OIDC issuer:
+Install Cosign 3.0 or later, obtain the digest for the version you intend to
+deploy, and verify both the exact workflow identity and GitHub's OIDC issuer.
+The release workflow signs with Cosign 3, which stores image signatures as OCI
+referrers; older Cosign builds, including some distribution packages, look only
+for the legacy signature tag and report `no signatures found` for a correctly
+signed image. Check with `cosign version`.
 
 ```sh
-VERSION=v0.1.0
+VERSION=v0.1.1
 GIT_TAG=hangar-$VERSION
 DIGEST=sha256:replace-with-the-published-digest
 IMAGE=ghcr.io/szymczag/hangar-api
