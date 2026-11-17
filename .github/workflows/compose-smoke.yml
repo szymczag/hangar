@@ -14,6 +14,7 @@ on:
       - preview
     paths:
       - "deployments/cli/community/**"
+      - "deployments/swarm/community/**"
       - "apps/api/bin/**"
       - ".github/workflows/compose-smoke.yml"
 
@@ -81,11 +82,15 @@ jobs:
         run: |
           set -euo pipefail
           # swarm.sh deploys this same file with docker stack deploy, which
-          # validates it against its own, older schema.
+          # validates it against its own, older schema, after writeStackFile
+          # has removed the depends_on blocks that schema rejects.
+          eval "$(sed -n '/^function writeStackFile/,/^}/p' deployments/swarm/community/swarm.sh)"
+          DOCKER_FILE_PATH="$INSTALL_ROOT/plane-app/docker-compose.yaml" \
+            STACK_FILE_PATH="$RUNNER_TEMP/docker-stack.yml" writeStackFile
           set -o allexport
           source "$INSTALL_ROOT/plane-app/plane.env"
           set +o allexport
-          docker stack config -c "$INSTALL_ROOT/plane-app/docker-compose.yaml" > /dev/null
+          docker stack config -c "$RUNNER_TEMP/docker-stack.yml" > /dev/null
 
       - name: Start
         run: |

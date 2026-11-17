@@ -17,6 +17,7 @@ OS_NAME=$(uname)
 mkdir -p $PLANE_INSTALL_DIR/archive
 
 DOCKER_FILE_PATH=$PLANE_INSTALL_DIR/docker-compose.yml
+STACK_FILE_PATH=$PLANE_INSTALL_DIR/docker-stack.yml
 DOCKER_ENV_PATH=$PLANE_INSTALL_DIR/plane.env
 
 # Unattended use: HANGAR_ASSUME_YES=1 (or --yes) answers the upgrade prompt
@@ -438,6 +439,17 @@ function download() {
     updateEnvFile "APP_RELEASE" "$APP_RELEASE" "$DOCKER_ENV_PATH"
 
 }
+# docker-compose.yml orders its services with the long depends_on form, which
+# docker stack deploy rejects ("depends_on must be a list") although it ignores
+# depends_on anyway. Deploy a copy without those blocks.
+function writeStackFile() {
+    awk '
+        /^    depends_on:[[:space:]]*$/ { skip = 1; next }
+        skip && /^      / { next }
+        { skip = 0; print }
+    ' "$DOCKER_FILE_PATH" > "$STACK_FILE_PATH"
+}
+
 function deployStack() {   
     # Check if docker compose file and env file exist
     if [ ! -f "$DOCKER_FILE_PATH" ] || [ ! -f "$DOCKER_ENV_PATH" ]; then
@@ -460,7 +472,11 @@ function deployStack() {
     fi
 
     # Deploy the stack
-    docker stack deploy -c $DOCKER_FILE_PATH $stack_name
+    if ! writeStackFile; then
+        echo "Failed to write $STACK_FILE_PATH"
+        exit 1
+    fi
+    docker stack deploy -c $STACK_FILE_PATH $stack_name
 
     echo "Waiting for services to be deployed..."
     sleep 10

@@ -20,6 +20,8 @@ runner does not ship.
 """
 
 import re
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -27,6 +29,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 COMMUNITY_COMPOSE = REPOSITORY_ROOT / "deployments" / "cli" / "community" / "docker-compose.yml"
 ROOT_COMPOSE = REPOSITORY_ROOT / "docker-compose.yml"
 DEPENDABOT = REPOSITORY_ROOT / ".github" / "dependabot.yml"
+SWARM = REPOSITORY_ROOT / "deployments" / "swarm" / "community" / "swarm.sh"
 
 APPLICATION_SERVICES = {
     "web",
@@ -47,7 +50,10 @@ THIRD_PARTY_PREFIX = "docker.io/"
 
 def services(path: Path) -> dict:
     """Map each service name to the text of its block."""
-    text = path.read_text()
+    return services_from_text(path.read_text())
+
+
+def services_from_text(text: str) -> dict:
     section = text[text.index("\nservices:\n") + len("\nservices:\n") :]
     end = re.search(r"^\S", section, re.MULTILINE)
     if end:
@@ -147,6 +153,38 @@ class CommunityComposeHardeningTests(unittest.TestCase):
         self.assertIsNotNone(entry, "no docker-compose entry in dependabot.yml")
         self.assertIn("/deployments/cli/community", entry.group(1))
         self.assertIn("target-branch: preview", entry.group(1))
+
+
+class SwarmStackFileTests(unittest.TestCase):
+    """swarm.sh deploys the same file, minus what docker stack deploy rejects.
+
+    Its schema accepts depends_on only as a list, and it ignores depends_on
+    anyway, so writeStackFile drops the blocks and must change nothing else.
+    """
+
+    def test_the_stack_file_is_the_compose_file_without_depends_on(self):
+        source = SWARM.read_text()
+        function = re.search(r"^function writeStackFile\(\) \{.*?^\}$", source, re.DOTALL | re.MULTILINE)
+        self.assertIsNotNone(function)
+        self.assertIn("docker stack deploy -c $STACK_FILE_PATH $stack_name", source)
+        with tempfile.TemporaryDirectory() as scratch:
+            stack = Path(scratch) / "docker-stack.yml"
+            subprocess.run(
+                ["bash", "-c", function.group(0) + "\nwriteStackFile\n"],
+                check=True,
+                env={"DOCKER_FILE_PATH": str(COMMUNITY_COMPOSE), "STACK_FILE_PATH": str(stack), "PATH": "/usr/bin:/bin"},
+            )
+            written = stack.read_text().splitlines()
+
+        original = COMMUNITY_COMPOSE.read_text().splitlines()
+        self.assertNotIn("depends_on", "\n".join(written))
+        removed = [line for line in original if line not in written]
+        kept = [line for line in original if line in written]
+        self.assertEqual(kept, written)
+        self.assertTrue(removed)
+        for line in removed:
+            self.assertRegex(line, r"^    depends_on:$|^      [a-z0-9-]+:$|^        condition: service_\w+$")
+        self.assertEqual(set(services(COMMUNITY_COMPOSE)), set(services_from_text("\n".join(written) + "\n")))
 
 
 class RootComposeHardeningTests(unittest.TestCase):

@@ -394,6 +394,10 @@ It is always advised to keep Hangar up to date with the latest release.
 > healthy data services before starting. If you added your own services or
 > mounts to `docker-compose.yaml`, check they still start under these settings.
 >
+> Docker Swarm ignores `depends_on` and its schema rejects the form used for the
+> health ordering, so `swarm.sh` deploys a copy without those blocks,
+> `plane-app/docker-stack.yml`, written on every deploy.
+>
 > **Unattended upgrades.** Pass `--yes` (`./setup.sh --yes upgrade`) or set
 > `HANGAR_ASSUME_YES=1` to skip the confirmation prompt and keep the screen. An
 > unattended run refuses, rather than starts, a local image build.
