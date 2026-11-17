@@ -173,7 +173,7 @@ class InstallerReleaseTests(unittest.TestCase):
         for script in INSTALLERS:
             source = script.read_text()
             self.assertNotIn("$RELEASE_DOWNLOAD_URL/$APP_RELEASE/", source, script.name)
-            self.assertIn("$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/docker-compose.yml", source, script.name)
+            self.assertIn('fetchAssets "$dir" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE" "$@"', source, script.name)
             self.assertNotIn("$GH_REPO/releases/latest", source, script.name)
 
     def test_a_saved_release_tag_is_read_as_an_image_tag(self):

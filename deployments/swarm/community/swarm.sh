@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# BRANCH set by the operator is the only way deployment files may come from a
+# branch rather than a release, when the release cannot be downloaded. Without
+# it, a failed release download is an error.
+BRANCH_REQUESTED=${BRANCH:-}
 BRANCH=${BRANCH:-preview}
 SERVICE_FOLDER=plane-app
 SCRIPT_DIR=$PWD
@@ -22,7 +26,10 @@ DOCKER_ENV_PATH=$PLANE_INSTALL_DIR/plane.env
 
 # Unattended use: HANGAR_ASSUME_YES=1 (or --yes) answers the upgrade prompt
 # with yes and does not clear the screen.
+# HANGAR_REQUIRE_SIGNATURE=1 refuses deployment files whose Cosign signature
+# cannot be checked: no cosign, a release without SHA256SUMS, or a branch.
 HANGAR_ASSUME_YES=${HANGAR_ASSUME_YES:-0}
+HANGAR_REQUIRE_SIGNATURE=${HANGAR_REQUIRE_SIGNATURE:-0}
 
 function print_header() {
 if [ "$HANGAR_ASSUME_YES" != "1" ] && [ -t 1 ]; then
@@ -393,9 +400,192 @@ function isNewDeployment() {
     [ $? -eq 1 ]
 }
 
+# Release verification, the same in install.sh and swarm.sh. Every release
+# after hangar-v0.1.0 publishes SHA256SUMS over its assets and
+# SHA256SUMS.sigstore.json, the Cosign keyless signature the release workflow
+# made for that tag. Files are downloaded into a scratch directory and checked
+# there; the caller moves them into place only when this succeeds.
+
+# Downloads $1 to $2 and prints the HTTP status, 000 when nothing answered.
+# Leaves no file behind unless the status is 200.
+function fetchAsset() {
+    local url=$1 dest=$2 status
+    status=$(curl -sSfL -H 'Cache-Control: no-cache, no-store' -o "$dest" -w '%{http_code}' "$url?$(date +%s)" 2>/dev/null)
+    status=${status:-000}
+    if [ "$status" != "200" ]; then
+        rm -f "$dest"
+    fi
+    echo "$status"
+}
+
+# Prints the SHA-256 of file $1: sha256sum, or shasum on macOS.
+function sha256Of() {
+    local sum
+    if command -v sha256sum >/dev/null 2>&1; then
+        sum=$(sha256sum "$1" | awk '{ print $1 }')
+    elif command -v shasum >/dev/null 2>&1; then
+        sum=$(shasum -a 256 "$1" | awk '{ print $1 }')
+    else
+        echo "ERROR: neither sha256sum nor shasum is installed, so the release files cannot be verified." >&2
+        return 1
+    fi
+    if [ -z "$sum" ]; then
+        echo "ERROR: could not compute the SHA-256 of $1." >&2
+        return 1
+    fi
+    echo "$sum"
+}
+
+# Returns 0 when APP_RELEASE is newer than v0.1.0. Every such release
+# publishes SHA256SUMS, so a missing one is refused rather than tolerated.
+function releasePublishesChecksums() {
+    local version=${APP_RELEASE#v}
+    version=${version%%-*}
+    if ! [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+        return 1
+    fi
+    local major=$((10#${BASH_REMATCH[1]})) minor=$((10#${BASH_REMATCH[2]})) patch=$((10#${BASH_REMATCH[3]}))
+    [ "$major" -gt 0 ] || [ "$minor" -gt 1 ] || { [ "$minor" -eq 1 ] && [ "$patch" -gt 0 ]; }
+}
+
+# Checks the Cosign signature of $1/SHA256SUMS. The signer is fixed here, never
+# read from a downloaded file: whoever could replace the assets could replace
+# that file too.
+function verifyChecksumSignature() {
+    local dir=$1 status
+    local identity="https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/hangar-$APP_RELEASE"
+    local issuer="https://token.actions.githubusercontent.com"
+    if ! command -v cosign >/dev/null 2>&1; then
+        if [ "$HANGAR_REQUIRE_SIGNATURE" == "1" ]; then
+            echo "ERROR: cosign is not installed, and HANGAR_REQUIRE_SIGNATURE=1 requires the signature of SHA256SUMS to be checked." >&2
+            echo "Install cosign (https://docs.sigstore.dev/cosign/system_config/installation/) and run this again." >&2
+            return 1
+        fi
+        echo "WARNING: cosign is not installed, so the signature of SHA256SUMS was not checked; the files were compared only with the checksum list downloaded beside them." >&2
+        echo "Install cosign (https://docs.sigstore.dev/cosign/system_config/installation/) to have it checked, or check it by hand as" >&2
+        echo "'Verifying release assets' describes: https://github.com/szymczag/hangar#verifying-release-assets" >&2
+        echo "Set HANGAR_REQUIRE_SIGNATURE=1 to refuse files whose signature is not checked." >&2
+        return 0
+    fi
+    status=$(fetchAsset "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/SHA256SUMS.sigstore.json" "$dir/SHA256SUMS.sigstore.json")
+    if [ "$status" != "200" ]; then
+        echo "ERROR: release hangar-$APP_RELEASE publishes SHA256SUMS, but its signature SHA256SUMS.sigstore.json could not be downloaded (HTTP $status)." >&2
+        return 1
+    fi
+    if ! cosign verify-blob \
+        --bundle "$dir/SHA256SUMS.sigstore.json" \
+        --certificate-identity "$identity" \
+        --certificate-oidc-issuer "$issuer" \
+        "$dir/SHA256SUMS" >&2; then
+        echo "ERROR: SHA256SUMS of release hangar-$APP_RELEASE is not signed by $identity." >&2
+        return 1
+    fi
+    echo "SHA256SUMS is signed by the Hangar release workflow for hangar-$APP_RELEASE."
+}
+
+# Checks the files named after $1, in directory $1, against the SHA256SUMS of
+# release APP_RELEASE, after checking its signature.
+function verifyReleaseAssets() {
+    local dir=$1 name expected actual status
+    shift
+    status=$(fetchAsset "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/SHA256SUMS" "$dir/SHA256SUMS")
+    if [ "$status" == "404" ] && ! releasePublishesChecksums; then
+        if [ "$HANGAR_REQUIRE_SIGNATURE" == "1" ]; then
+            echo "ERROR: release hangar-$APP_RELEASE publishes no SHA256SUMS, and HANGAR_REQUIRE_SIGNATURE=1 refuses files it cannot verify." >&2
+            return 1
+        fi
+        echo "WARNING: release hangar-$APP_RELEASE publishes no SHA256SUMS (releases up to hangar-v0.1.0 predate it), so the downloaded files are not verified." >&2
+        return 0
+    fi
+    if [ "$status" == "404" ]; then
+        echo "ERROR: release hangar-$APP_RELEASE has no SHA256SUMS, although every release after hangar-v0.1.0 publishes one. The files are refused." >&2
+        return 1
+    fi
+    if [ "$status" != "200" ]; then
+        echo "ERROR: SHA256SUMS of release hangar-$APP_RELEASE could not be downloaded (HTTP $status)." >&2
+        return 1
+    fi
+    verifyChecksumSignature "$dir" || return 1
+    for name in "$@"; do
+        expected=$(awk -v name="$name" '{ file = $2; sub(/^\*/, "", file) } file == name { print $1; exit }' "$dir/SHA256SUMS")
+        if [ -z "$expected" ]; then
+            echo "ERROR: $name is not listed in SHA256SUMS of release hangar-$APP_RELEASE." >&2
+            return 1
+        fi
+        actual=$(sha256Of "$dir/$name") || return 1
+        if [ "$actual" != "$expected" ]; then
+            echo "ERROR: $name does not match SHA256SUMS of release hangar-$APP_RELEASE (listed $expected, downloaded $actual)." >&2
+            return 1
+        fi
+    done
+    echo "Verified $* against SHA256SUMS of release hangar-$APP_RELEASE."
+}
+
+# Downloads the files named after $2 from $2 into $1. A name ending in '?' is
+# optional: when it cannot be downloaded, that is reported and skipped.
+function fetchAssets() {
+    local dir=$1 base=$2 name file status
+    shift 2
+    for name in "$@"; do
+        file=${name%\?}
+        status=$(fetchAsset "$base/$file" "$dir/$file")
+        if [ "$status" == "200" ]; then
+            continue
+        fi
+        if [ "$file" != "$name" ]; then
+            echo "WARNING: $file could not be downloaded from $base/ (HTTP $status); continuing without it." >&2
+            continue
+        fi
+        echo "Failed to download $file from $base/ (HTTP $status)." >&2
+        return 1
+    done
+}
+
+# Downloads the deployment files named after $1 into the empty directory $1
+# and verifies them. They come from release APP_RELEASE. Only when the operator
+# set BRANCH, and the release cannot be downloaded, do they come from that
+# branch instead, unverified. Nothing is written outside $1.
+function downloadReleaseAssets() {
+    local dir=$1 name present=()
+    shift
+    echo "Downloading the deployment files of release hangar-$APP_RELEASE from $RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/"
+    if ! fetchAssets "$dir" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE" "$@"; then
+        if [ -z "$BRANCH_REQUESTED" ]; then
+            echo "ERROR: release hangar-$APP_RELEASE could not be downloaded from $RELEASE_DOWNLOAD_URL/. Check that it is published" >&2
+            echo "and reachable, or set BRANCH=<branch> to install the files of that branch instead, unverified." >&2
+            return 1
+        fi
+        if [ "$HANGAR_REQUIRE_SIGNATURE" == "1" ]; then
+            echo "ERROR: release hangar-$APP_RELEASE could not be downloaded, and HANGAR_REQUIRE_SIGNATURE=1 refuses the unverified files of branch $BRANCH." >&2
+            return 1
+        fi
+        rm -f "$dir"/*
+        echo "WARNING: release hangar-$APP_RELEASE could not be downloaded. Using the files of branch $BRANCH from $FALLBACK_DOWNLOAD_URL/ because BRANCH is set; they are not verified." >&2
+        fetchAssets "$dir" "$FALLBACK_DOWNLOAD_URL" "$@"
+        return $?
+    fi
+    for name in "$@"; do
+        name=${name%\?}
+        if [ -f "$dir/$name" ]; then
+            present+=("$name")
+        fi
+    done
+    verifyReleaseAssets "$dir" "${present[@]}"
+}
+
 function download() {
     checkSecretKeyRotation || exit 1
-    cd $SCRIPT_DIR || exit 1  
+    cd $SCRIPT_DIR || exit 1
+    # Fetched and verified in a scratch directory first, so a failed or
+    # tampered download leaves the deployment as it was.
+    local staging
+    staging=$(mktemp -d "$PLANE_INSTALL_DIR/.download.XXXXXX") || exit 1
+    if ! downloadReleaseAssets "$staging" docker-compose.yml variables.env; then
+        rm -rf "$staging"
+        echo "Nothing in $PLANE_INSTALL_DIR has been changed. Exiting..."
+        exit 1
+    fi
+
     TS=$(date +%s)
     PREVIOUS_COMPOSE_PATH=""
     PREVIOUS_ENV_EXISTS=0
@@ -405,54 +595,9 @@ function download() {
         mv $PLANE_INSTALL_DIR/docker-compose.yml $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yml
         PREVIOUS_COMPOSE_PATH=$PLANE_INSTALL_DIR/archive/$TS.docker-compose.yml
     fi
-
-    echo $RELEASE_DOWNLOAD_URL
-    echo $FALLBACK_DOWNLOAD_URL
-    echo $APP_RELEASE
-
-    RESPONSE=$(curl -H 'Cache-Control: no-cache, no-store' -s -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/docker-compose.yml?$(date +%s)")
-    BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
-    STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-    if [ "$STATUS" -eq 200 ]; then
-        echo "$BODY" > $PLANE_INSTALL_DIR/docker-compose.yml
-    else
-        # Fallback to download from the raw github url
-        RESPONSE=$(curl -H 'Cache-Control: no-cache, no-store' -s -w "HTTPSTATUS:%{http_code}" "$FALLBACK_DOWNLOAD_URL/docker-compose.yml?$(date +%s)")
-        BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
-        STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-        if [ "$STATUS" -eq 200 ]; then
-            echo "$BODY" > $PLANE_INSTALL_DIR/docker-compose.yml
-        else
-            echo "Failed to download docker-compose.yml. HTTP Status: $STATUS"
-            echo "URL: $RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/docker-compose.yml"
-            mv $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yml $PLANE_INSTALL_DIR/docker-compose.yml
-            exit 1
-        fi
-    fi
-
-    RESPONSE=$(curl -H 'Cache-Control: no-cache, no-store' -s -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/variables.env?$(date +%s)")
-    BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
-    STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-    if [ "$STATUS" -eq 200 ]; then
-        echo "$BODY" > $PLANE_INSTALL_DIR/variables-upgrade.env
-    else
-        # Fallback to download from the raw github url
-        RESPONSE=$(curl -H 'Cache-Control: no-cache, no-store' -s -w "HTTPSTATUS:%{http_code}" "$FALLBACK_DOWNLOAD_URL/variables.env?$(date +%s)")
-        BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
-        STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-        if [ "$STATUS" -eq 200 ]; then
-            echo "$BODY" > $PLANE_INSTALL_DIR/variables-upgrade.env
-        else
-            echo "Failed to download variables.env. HTTP Status: $STATUS"
-            echo "URL: $RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/variables.env"
-            mv $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yml $PLANE_INSTALL_DIR/docker-compose.yml
-            exit 1
-        fi
-    fi
+    mv "$staging/docker-compose.yml" "$PLANE_INSTALL_DIR/docker-compose.yml"
+    mv "$staging/variables.env" "$PLANE_INSTALL_DIR/variables-upgrade.env"
+    rm -rf "$staging"
 
     if [ -f "$DOCKER_ENV_PATH" ];
     then

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# BRANCH set by the operator is the only way deployment files may come from a
+# branch rather than a release: when the release cannot be downloaded, and for
+# a local image build. Without it, a failed release download is an error.
+BRANCH_REQUESTED=${BRANCH:-}
 BRANCH=${BRANCH:-preview}
 SCRIPT_DIR=$PWD
 SERVICE_FOLDER=plane-app
@@ -17,6 +21,8 @@ UPPER_CPU_ARCH=$(tr '[:lower:]' '[:upper:]' <<< "$CPU_ARCH")
 
 mkdir -p $PLANE_INSTALL_DIR/archive
 DOCKER_FILE_PATH=$PLANE_INSTALL_DIR/docker-compose.yaml
+# Written after a local image build; points the Hangar services at those images.
+DOCKER_OVERRIDE_PATH=$PLANE_INSTALL_DIR/docker-compose.override.yaml
 DOCKER_ENV_PATH=$PLANE_INSTALL_DIR/plane.env
 MIGRATE_STORAGE_SCRIPT=$PLANE_INSTALL_DIR/migrate-object-storage.sh
 # The Compose project name, which prefixes the volume names.
@@ -30,9 +36,13 @@ DEPLOYMENT_NAME=$SERVICE_FOLDER
 #   checkout) instead of downloading them from the release.
 #   HANGAR_RELEASE=vX.Y.Z installs or upgrades to that release instead of
 #   asking the GitHub API for the latest one, which rate-limits anonymous use.
+#   HANGAR_REQUIRE_SIGNATURE=1 refuses deployment files whose Cosign signature
+#   cannot be checked: no cosign, a release without SHA256SUMS, a branch, or
+#   HANGAR_INSTALL_SOURCE_DIR.
 HANGAR_ASSUME_YES=${HANGAR_ASSUME_YES:-0}
 HANGAR_INSTALL_SOURCE_DIR=${HANGAR_INSTALL_SOURCE_DIR:-}
 HANGAR_RELEASE=${HANGAR_RELEASE:-}
+HANGAR_REQUIRE_SIGNATURE=${HANGAR_REQUIRE_SIGNATURE:-0}
 
 function print_header() {
 if [ "$HANGAR_ASSUME_YES" != "1" ] && [ -t 1 ]; then
@@ -218,8 +228,11 @@ function syncEnvFile(){
     echo "Environment variables synced successfully" >&2
 }
 
+# Builds the Hangar images from the source of Git ref $1 (the release tag, or
+# the branch the operator named) as myplane/hangar-<image>:local.
 function buildYourOwnImage(){
-    echo "Building images locally..."
+    local source_ref=$1
+    echo "Building images locally from $source_ref..."
 
     export DOCKERHUB_USER="myplane"
     export APP_RELEASE="local"
@@ -231,13 +244,15 @@ function buildYourOwnImage(){
     rm -rf $PLANE_TEMP_CODE_DIR
     mkdir -p $PLANE_TEMP_CODE_DIR
     REPO=https://github.com/$GH_REPO.git
-    git clone "$REPO" "$PLANE_TEMP_CODE_DIR"  --branch "$BRANCH" --single-branch --depth 1
-
-    cp "$PLANE_TEMP_CODE_DIR/deployments/cli/community/build.yml" "$PLANE_TEMP_CODE_DIR/build.yml"
+    if ! git clone "$REPO" "$PLANE_TEMP_CODE_DIR" --branch "$source_ref" --single-branch --depth 1; then
+        echo "Failed to check out $source_ref of $REPO. Exiting..."
+        exit 1
+    fi
 
     cd "$PLANE_TEMP_CODE_DIR" || exit
 
-    /bin/bash -c "$COMPOSE_CMD -f build.yml build --no-cache"  >&2
+    # build.yml takes its build contexts relative to its own directory.
+    /bin/bash -c "$COMPOSE_CMD -f $PLANE_TEMP_CODE_DIR/deployments/cli/community/build.yml build --no-cache"  >&2
     if [ $? -ne 0 ]; then
         echo "Build failed. Exiting..."
         exit 1
@@ -255,7 +270,8 @@ function install() {
     if [ -n "$HANGAR_RELEASE" ]; then
         APP_RELEASE=${HANGAR_RELEASE#hangar-}
         export APP_RELEASE
-    elif [ "$APP_RELEASE" == "stable" ]; then
+    elif [ "$APP_RELEASE" == "stable" ] || [ "$APP_RELEASE" == "local" ]; then
+        # "local" names the images of a local build, not a release.
         # exit inside checkLatestRelease only leaves the $(...) subshell
         APP_RELEASE=$(checkLatestRelease) || exit 1
         export APP_RELEASE
@@ -498,26 +514,223 @@ function isNewDeployment() {
     [ $? -eq 1 ]
 }
 
-# Copies the deployment files from HANGAR_INSTALL_SOURCE_DIR instead of
-# downloading them.
+# Copies the deployment files from HANGAR_INSTALL_SOURCE_DIR into $1 instead
+# of downloading them.
 function copyLocalAssets() {
-    local name
+    local dir=$1 name
     for name in docker-compose.yml variables.env migrate-object-storage.sh; do
         if [ ! -f "$HANGAR_INSTALL_SOURCE_DIR/$name" ]; then
             echo "$name not found in $HANGAR_INSTALL_SOURCE_DIR"
             return 1
         fi
+        cp "$HANGAR_INSTALL_SOURCE_DIR/$name" "$dir/$name" || return 1
     done
-    cp "$HANGAR_INSTALL_SOURCE_DIR/docker-compose.yml" "$PLANE_INSTALL_DIR/docker-compose.yaml" &&
-        cp "$HANGAR_INSTALL_SOURCE_DIR/variables.env" "$PLANE_INSTALL_DIR/variables-upgrade.env" &&
-        cp "$HANGAR_INSTALL_SOURCE_DIR/migrate-object-storage.sh" "$MIGRATE_STORAGE_SCRIPT" &&
-        chmod +x "$MIGRATE_STORAGE_SCRIPT"
+}
+
+# Release verification, the same in install.sh and swarm.sh. Every release
+# after hangar-v0.1.0 publishes SHA256SUMS over its assets and
+# SHA256SUMS.sigstore.json, the Cosign keyless signature the release workflow
+# made for that tag. Files are downloaded into a scratch directory and checked
+# there; the caller moves them into place only when this succeeds.
+
+# Downloads $1 to $2 and prints the HTTP status, 000 when nothing answered.
+# Leaves no file behind unless the status is 200.
+function fetchAsset() {
+    local url=$1 dest=$2 status
+    status=$(curl -sSfL -H 'Cache-Control: no-cache, no-store' -o "$dest" -w '%{http_code}' "$url?$(date +%s)" 2>/dev/null)
+    status=${status:-000}
+    if [ "$status" != "200" ]; then
+        rm -f "$dest"
+    fi
+    echo "$status"
+}
+
+# Prints the SHA-256 of file $1: sha256sum, or shasum on macOS.
+function sha256Of() {
+    local sum
+    if command -v sha256sum >/dev/null 2>&1; then
+        sum=$(sha256sum "$1" | awk '{ print $1 }')
+    elif command -v shasum >/dev/null 2>&1; then
+        sum=$(shasum -a 256 "$1" | awk '{ print $1 }')
+    else
+        echo "ERROR: neither sha256sum nor shasum is installed, so the release files cannot be verified." >&2
+        return 1
+    fi
+    if [ -z "$sum" ]; then
+        echo "ERROR: could not compute the SHA-256 of $1." >&2
+        return 1
+    fi
+    echo "$sum"
+}
+
+# Returns 0 when APP_RELEASE is newer than v0.1.0. Every such release
+# publishes SHA256SUMS, so a missing one is refused rather than tolerated.
+function releasePublishesChecksums() {
+    local version=${APP_RELEASE#v}
+    version=${version%%-*}
+    if ! [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+        return 1
+    fi
+    local major=$((10#${BASH_REMATCH[1]})) minor=$((10#${BASH_REMATCH[2]})) patch=$((10#${BASH_REMATCH[3]}))
+    [ "$major" -gt 0 ] || [ "$minor" -gt 1 ] || { [ "$minor" -eq 1 ] && [ "$patch" -gt 0 ]; }
+}
+
+# Checks the Cosign signature of $1/SHA256SUMS. The signer is fixed here, never
+# read from a downloaded file: whoever could replace the assets could replace
+# that file too.
+function verifyChecksumSignature() {
+    local dir=$1 status
+    local identity="https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/hangar-$APP_RELEASE"
+    local issuer="https://token.actions.githubusercontent.com"
+    if ! command -v cosign >/dev/null 2>&1; then
+        if [ "$HANGAR_REQUIRE_SIGNATURE" == "1" ]; then
+            echo "ERROR: cosign is not installed, and HANGAR_REQUIRE_SIGNATURE=1 requires the signature of SHA256SUMS to be checked." >&2
+            echo "Install cosign (https://docs.sigstore.dev/cosign/system_config/installation/) and run this again." >&2
+            return 1
+        fi
+        echo "WARNING: cosign is not installed, so the signature of SHA256SUMS was not checked; the files were compared only with the checksum list downloaded beside them." >&2
+        echo "Install cosign (https://docs.sigstore.dev/cosign/system_config/installation/) to have it checked, or check it by hand as" >&2
+        echo "'Verifying release assets' describes: https://github.com/szymczag/hangar#verifying-release-assets" >&2
+        echo "Set HANGAR_REQUIRE_SIGNATURE=1 to refuse files whose signature is not checked." >&2
+        return 0
+    fi
+    status=$(fetchAsset "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/SHA256SUMS.sigstore.json" "$dir/SHA256SUMS.sigstore.json")
+    if [ "$status" != "200" ]; then
+        echo "ERROR: release hangar-$APP_RELEASE publishes SHA256SUMS, but its signature SHA256SUMS.sigstore.json could not be downloaded (HTTP $status)." >&2
+        return 1
+    fi
+    if ! cosign verify-blob \
+        --bundle "$dir/SHA256SUMS.sigstore.json" \
+        --certificate-identity "$identity" \
+        --certificate-oidc-issuer "$issuer" \
+        "$dir/SHA256SUMS" >&2; then
+        echo "ERROR: SHA256SUMS of release hangar-$APP_RELEASE is not signed by $identity." >&2
+        return 1
+    fi
+    echo "SHA256SUMS is signed by the Hangar release workflow for hangar-$APP_RELEASE."
+}
+
+# Checks the files named after $1, in directory $1, against the SHA256SUMS of
+# release APP_RELEASE, after checking its signature.
+function verifyReleaseAssets() {
+    local dir=$1 name expected actual status
+    shift
+    status=$(fetchAsset "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/SHA256SUMS" "$dir/SHA256SUMS")
+    if [ "$status" == "404" ] && ! releasePublishesChecksums; then
+        if [ "$HANGAR_REQUIRE_SIGNATURE" == "1" ]; then
+            echo "ERROR: release hangar-$APP_RELEASE publishes no SHA256SUMS, and HANGAR_REQUIRE_SIGNATURE=1 refuses files it cannot verify." >&2
+            return 1
+        fi
+        echo "WARNING: release hangar-$APP_RELEASE publishes no SHA256SUMS (releases up to hangar-v0.1.0 predate it), so the downloaded files are not verified." >&2
+        return 0
+    fi
+    if [ "$status" == "404" ]; then
+        echo "ERROR: release hangar-$APP_RELEASE has no SHA256SUMS, although every release after hangar-v0.1.0 publishes one. The files are refused." >&2
+        return 1
+    fi
+    if [ "$status" != "200" ]; then
+        echo "ERROR: SHA256SUMS of release hangar-$APP_RELEASE could not be downloaded (HTTP $status)." >&2
+        return 1
+    fi
+    verifyChecksumSignature "$dir" || return 1
+    for name in "$@"; do
+        expected=$(awk -v name="$name" '{ file = $2; sub(/^\*/, "", file) } file == name { print $1; exit }' "$dir/SHA256SUMS")
+        if [ -z "$expected" ]; then
+            echo "ERROR: $name is not listed in SHA256SUMS of release hangar-$APP_RELEASE." >&2
+            return 1
+        fi
+        actual=$(sha256Of "$dir/$name") || return 1
+        if [ "$actual" != "$expected" ]; then
+            echo "ERROR: $name does not match SHA256SUMS of release hangar-$APP_RELEASE (listed $expected, downloaded $actual)." >&2
+            return 1
+        fi
+    done
+    echo "Verified $* against SHA256SUMS of release hangar-$APP_RELEASE."
+}
+
+# Downloads the files named after $2 from $2 into $1. A name ending in '?' is
+# optional: when it cannot be downloaded, that is reported and skipped.
+function fetchAssets() {
+    local dir=$1 base=$2 name file status
+    shift 2
+    for name in "$@"; do
+        file=${name%\?}
+        status=$(fetchAsset "$base/$file" "$dir/$file")
+        if [ "$status" == "200" ]; then
+            continue
+        fi
+        if [ "$file" != "$name" ]; then
+            echo "WARNING: $file could not be downloaded from $base/ (HTTP $status); continuing without it." >&2
+            continue
+        fi
+        echo "Failed to download $file from $base/ (HTTP $status)." >&2
+        return 1
+    done
+}
+
+# Downloads the deployment files named after $1 into the empty directory $1
+# and verifies them. They come from release APP_RELEASE. Only when the operator
+# set BRANCH, and the release cannot be downloaded, do they come from that
+# branch instead, unverified. Nothing is written outside $1.
+function downloadReleaseAssets() {
+    local dir=$1 name present=()
+    shift
+    echo "Downloading the deployment files of release hangar-$APP_RELEASE from $RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/"
+    if ! fetchAssets "$dir" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE" "$@"; then
+        if [ -z "$BRANCH_REQUESTED" ]; then
+            echo "ERROR: release hangar-$APP_RELEASE could not be downloaded from $RELEASE_DOWNLOAD_URL/. Check that it is published" >&2
+            echo "and reachable, or set BRANCH=<branch> to install the files of that branch instead, unverified." >&2
+            return 1
+        fi
+        if [ "$HANGAR_REQUIRE_SIGNATURE" == "1" ]; then
+            echo "ERROR: release hangar-$APP_RELEASE could not be downloaded, and HANGAR_REQUIRE_SIGNATURE=1 refuses the unverified files of branch $BRANCH." >&2
+            return 1
+        fi
+        rm -f "$dir"/*
+        echo "WARNING: release hangar-$APP_RELEASE could not be downloaded. Using the files of branch $BRANCH from $FALLBACK_DOWNLOAD_URL/ because BRANCH is set; they are not verified." >&2
+        fetchAssets "$dir" "$FALLBACK_DOWNLOAD_URL" "$@"
+        return $?
+    fi
+    for name in "$@"; do
+        name=${name%\?}
+        if [ -f "$dir/$name" ]; then
+            present+=("$name")
+        fi
+    done
+    verifyReleaseAssets "$dir" "${present[@]}"
+}
+
+# Puts docker-compose.yml, variables.env and migrate-object-storage.sh into
+# the empty directory $1: copied from HANGAR_INSTALL_SOURCE_DIR, or downloaded
+# from the release and verified.
+function stageDeploymentFiles() {
+    local dir=$1
+    if [ -n "$HANGAR_INSTALL_SOURCE_DIR" ]; then
+        if [ "$HANGAR_REQUIRE_SIGNATURE" == "1" ]; then
+            echo "ERROR: HANGAR_REQUIRE_SIGNATURE=1 refuses the unverified files of HANGAR_INSTALL_SOURCE_DIR." >&2
+            return 1
+        fi
+        echo "Using the deployment files in $HANGAR_INSTALL_SOURCE_DIR (HANGAR_INSTALL_SOURCE_DIR); they are not verified against a release."
+        copyLocalAssets "$dir"
+        return $?
+    fi
+    downloadReleaseAssets "$dir" docker-compose.yml variables.env "migrate-object-storage.sh?"
 }
 
 function download() {
-    local LOCAL_BUILD=$1
+    local LOCAL_BUILD=$1 staging
     checkSecretKeyRotation || exit 1
-    cd $SCRIPT_DIR
+    cd "$SCRIPT_DIR" || exit 1
+    # Fetched and verified in a scratch directory first, so a failed or
+    # tampered download leaves the deployment as it was.
+    staging=$(mktemp -d "$PLANE_INSTALL_DIR/.download.XXXXXX") || exit 1
+    if ! stageDeploymentFiles "$staging"; then
+        rm -rf "$staging"
+        echo "Nothing in $PLANE_INSTALL_DIR has been changed. If an upgrade stopped the services,"
+        echo "'$0 start' starts the installed release again. Exiting..."
+        exit 1
+    fi
+
     TS=$(date +%s)
     PREVIOUS_COMPOSE_PATH=""
     if [ -f "$PLANE_INSTALL_DIR/docker-compose.yaml" ]
@@ -525,17 +738,13 @@ function download() {
         mv $PLANE_INSTALL_DIR/docker-compose.yaml $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yaml
         PREVIOUS_COMPOSE_PATH=$PLANE_INSTALL_DIR/archive/$TS.docker-compose.yaml
     fi
-
-    if [ -n "$HANGAR_INSTALL_SOURCE_DIR" ]; then
-        if ! copyLocalAssets; then
-            if [ -n "$PREVIOUS_COMPOSE_PATH" ]; then
-                mv "$PREVIOUS_COMPOSE_PATH" $PLANE_INSTALL_DIR/docker-compose.yaml
-            fi
-            exit 1
-        fi
-    else
-        downloadReleaseAssets
+    mv "$staging/docker-compose.yml" "$PLANE_INSTALL_DIR/docker-compose.yaml"
+    mv "$staging/variables.env" "$PLANE_INSTALL_DIR/variables-upgrade.env"
+    if [ -f "$staging/migrate-object-storage.sh" ]; then
+        mv "$staging/migrate-object-storage.sh" "$MIGRATE_STORAGE_SCRIPT"
+        chmod +x "$MIGRATE_STORAGE_SCRIPT"
     fi
+    rm -rf "$staging"
 
     if [ -f "$DOCKER_ENV_PATH" ];
     then
@@ -551,86 +760,74 @@ function download() {
     finishDownload "$LOCAL_BUILD"
 }
 
-function downloadReleaseAssets() {
-    RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/docker-compose.yml?$(date +%s)")
-    BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
-    STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-    if [ "$STATUS" -eq 200 ]; then
-        echo "$BODY" > $PLANE_INSTALL_DIR/docker-compose.yaml
+# The Compose files of this deployment: docker-compose.yaml as the release
+# published it and, after a local image build, the override that points the
+# Hangar services at the images built here. Every compose command uses both.
+function composeFiles() {
+    if [ -f "$DOCKER_OVERRIDE_PATH" ]; then
+        echo "-f $DOCKER_FILE_PATH -f $DOCKER_OVERRIDE_PATH"
     else
-        # Fallback to download from the raw github url
-        RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$FALLBACK_DOWNLOAD_URL/docker-compose.yml?$(date +%s)")
-        BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
-        STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-        if [ "$STATUS" -eq 200 ]; then
-            echo "$BODY" > $PLANE_INSTALL_DIR/docker-compose.yaml
-        else
-            echo "Failed to download docker-compose.yml. HTTP Status: $STATUS"
-            echo "URL: $RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/docker-compose.yml"
-            mv $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yaml $PLANE_INSTALL_DIR/docker-compose.yaml
-            exit 1
-        fi
+        echo "-f $DOCKER_FILE_PATH"
     fi
+}
 
-    RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/variables.env?$(date +%s)")
-    BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
-    STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-    if [ "$STATUS" -eq 200 ]; then
-        echo "$BODY" > $PLANE_INSTALL_DIR/variables-upgrade.env
-    else
-        # Fallback to download from the raw github url
-        RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$FALLBACK_DOWNLOAD_URL/variables.env?$(date +%s)")
-        BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
-        STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-
-        if [ "$STATUS" -eq 200 ]; then
-            echo "$BODY" > $PLANE_INSTALL_DIR/variables-upgrade.env
-        else
-            echo "Failed to download variables.env. HTTP Status: $STATUS"
-            echo "URL: $RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/variables.env"
-            mv $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yaml $PLANE_INSTALL_DIR/docker-compose.yaml
-            exit 1
-        fi
+# A release's docker-compose.yml names every Hangar image by digest, which a
+# local build cannot produce. Rather than edit the verified file, write an
+# override that gives each service using a hangar-<image> the image built
+# locally as $1/hangar-<image>:$2, and never pulls it.
+function writeLocalBuildOverride() {
+    local registry=$1 tag=$2 services
+    services=$(awk -v registry="$registry" -v tag="$tag" '
+        /^services:[[:space:]]*$/ { in_services = 1; next }
+        /^[^[:space:]#]/ { in_services = 0 }
+        in_services && /^  [A-Za-z0-9._-]+:[[:space:]]*$/ { service = $1; sub(/:$/, "", service); next }
+        in_services && service != "" && /^    image:/ && match($0, /\/hangar-[a-z0-9-]+/) {
+            printf "  %s:\n    image: %s/%s:%s\n    pull_policy: never\n", service, registry, substr($0, RSTART + 1, RLENGTH - 1), tag
+            service = ""
+        }
+    ' "$DOCKER_FILE_PATH")
+    if [ -z "$services" ]; then
+        echo "No Hangar image found in $DOCKER_FILE_PATH to replace with the local build." >&2
+        return 1
     fi
-
-    # Object storage migration helper (MinIO volume -> SeaweedFS volume).
-    RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/migrate-object-storage.sh?$(date +%s)")
-    STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-    if [ "$STATUS" -ne 200 ]; then
-        RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$FALLBACK_DOWNLOAD_URL/migrate-object-storage.sh?$(date +%s)")
-        STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-    fi
-    if [ "$STATUS" -eq 200 ]; then
-        echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g' > "$MIGRATE_STORAGE_SCRIPT"
-        chmod +x "$MIGRATE_STORAGE_SCRIPT"
-    else
-        echo "Warning: failed to download migrate-object-storage.sh (HTTP $STATUS)."
-    fi
+    {
+        echo "# Written by setup.sh after building the Hangar images locally. It points"
+        echo "# the Hangar services at those images instead of the digests the release"
+        echo "# pinned in docker-compose.yaml. An install or upgrade that builds locally"
+        echo "# writes it again; one that pulls the published images removes it."
+        echo "services:"
+        echo "$services"
+    } > "$DOCKER_OVERRIDE_PATH"
+    echo "Wrote $DOCKER_OVERRIDE_PATH for the locally built images."
 }
 
 function finishDownload() {
     local LOCAL_BUILD=$1
     if [ "$LOCAL_BUILD" == "true" ]; then
+        # Build the source of the release just installed, or the branch named.
+        local source_ref="hangar-$APP_RELEASE"
+        if [ -n "$BRANCH_REQUESTED" ]; then
+            source_ref=$BRANCH
+        fi
         export DOCKERHUB_USER="myplane"
         export APP_RELEASE="local"
         export PULL_POLICY="never"
         CUSTOM_BUILD="true"
 
-        buildYourOwnImage
+        buildYourOwnImage "$source_ref"
 
         if [ $? -ne 0 ]; then
             echo ""
             echo "Build failed. Exiting..."
             exit 1
         fi
+        writeLocalBuildOverride "$DOCKERHUB_USER" "$APP_RELEASE" || exit 1
         updateCustomVariables
     else
         CUSTOM_BUILD="false"
+        rm -f "$DOCKER_OVERRIDE_PATH"
         updateCustomVariables
-        /bin/bash -c "$COMPOSE_CMD -f $DOCKER_FILE_PATH --env-file=$DOCKER_ENV_PATH pull --policy always"
+        /bin/bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH pull --policy always"
 
         if [ $? -ne 0 ]; then
             echo ""
@@ -675,7 +872,7 @@ function startServices() {
         echo "(If this install uses external S3 storage instead, set SKIP_OBJECT_STORAGE_MIGRATION=1.)"
         exit 1
     fi
-    /bin/bash -c "$COMPOSE_CMD -f $DOCKER_FILE_PATH --env-file=$DOCKER_ENV_PATH up -d --pull if_not_present --quiet-pull"
+    /bin/bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH up -d --pull if_not_present --quiet-pull"
 
     local migrator_container_id=$(docker container ls -aq -f "name=$SERVICE_FOLDER-migrator")
     if [ -n "$migrator_container_id" ]; then
@@ -757,7 +954,7 @@ function startServices() {
 
 }
 function stopServices() {
-    /bin/bash -c "$COMPOSE_CMD -f $DOCKER_FILE_PATH --env-file=$DOCKER_ENV_PATH down"
+    /bin/bash -c "$COMPOSE_CMD $(composeFiles) --env-file=$DOCKER_ENV_PATH down"
 }
 function restartServices() {
     stopServices
@@ -823,13 +1020,13 @@ function upgrade() {
 function viewSpecificLogs(){
     local SERVICE_NAME=$1
 
-    if /bin/bash -c "$COMPOSE_CMD -f $DOCKER_FILE_PATH ps | grep -q '$SERVICE_NAME'"; then
+    if /bin/bash -c "$COMPOSE_CMD $(composeFiles) ps | grep -q '$SERVICE_NAME'"; then
         echo "Service '$SERVICE_NAME' is running."
     else
         echo "Service '$SERVICE_NAME' is not running."
     fi
 
-    /bin/bash -c "$COMPOSE_CMD -f $DOCKER_FILE_PATH logs -f $SERVICE_NAME"
+    /bin/bash -c "$COMPOSE_CMD $(composeFiles) logs -f $SERVICE_NAME"
 }
 function viewLogs(){
     
@@ -907,7 +1104,7 @@ function backup_container_dir() {
     local SERVICE_FOLDER=$4
 
     echo "Backing up $CONTAINER_NAME data..."
-    local CONTAINER_ID=$(/bin/bash -c "$COMPOSE_CMD -f $DOCKER_FILE_PATH ps -q $CONTAINER_NAME")
+    local CONTAINER_ID=$(/bin/bash -c "$COMPOSE_CMD $(composeFiles) ps -q $CONTAINER_NAME")
     if [ -z "$CONTAINER_ID" ]; then
         echo "Error: $CONTAINER_NAME container not found. Make sure the services are running."
         return 1
