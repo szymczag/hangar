@@ -19,7 +19,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, ParseError
 from rest_framework.generics import GenericAPIView
 
 # Module imports
@@ -31,6 +31,14 @@ from plane.utils.core.mixins import ReadReplicaControlMixin
 
 
 logger = logging.getLogger("plane.api")
+
+# Views call request.data.get()/.pop(). A scalar parses, then raises AttributeError.
+_NON_CONTAINER_BODY_ERROR = "Request body must be a JSON object or array."
+
+
+def _reject_non_container_body(request):
+    if request.method in ("POST", "PUT", "PATCH") and not isinstance(request.data, (dict, list)):
+        raise ParseError(_NON_CONTAINER_BODY_ERROR)
 
 
 class TimezoneMixin:
@@ -57,6 +65,7 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         self._enforce_token_workspace_scope(request)
+        _reject_non_container_body(request)
 
     def _enforce_token_workspace_scope(self, request):
         """Hold a token to the workspace it was issued for, when it names one.
@@ -193,6 +202,10 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
         IsAuthenticated,
     ]
     use_read_replica = False
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        _reject_non_container_body(request)
 
     def get_queryset(self):
         try:
