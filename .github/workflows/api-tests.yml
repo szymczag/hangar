@@ -87,6 +87,19 @@ jobs:
           cp apps/api/.env.example apps/api/.env
           printf '\nSECRET_KEY="%s"\n' "$(openssl rand -hex 32)" >> apps/api/.env
 
+      # Django's deployment checklist against the settings production loads.
+      # Warnings fail the step: anything the edge enforces instead is silenced
+      # in plane/settings/production.py with the reason beside it.
+      - name: Check production settings (manage.py check --deploy)
+        run: |
+          docker compose -f docker-compose-test.yml run --rm --build \
+            -e DJANGO_SETTINGS_MODULE=plane.settings.production \
+            -e DEBUG=0 \
+            -e WEB_URL=https://hangar.test \
+            -e ALLOWED_HOSTS=hangar.test \
+            -e SECRET_KEY="$(openssl rand -hex 50)" \
+            api-tests python manage.py check --deploy --fail-level WARNING
+
       - name: Run API test suite
         run: |
           docker compose -f docker-compose-test.yml run --rm --build \
