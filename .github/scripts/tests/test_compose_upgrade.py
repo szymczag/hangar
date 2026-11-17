@@ -4,6 +4,7 @@
 
 from pathlib import Path
 import os
+import re
 import subprocess
 import unittest
 
@@ -52,8 +53,11 @@ class ComposeUpgradeWorkflowTests(unittest.TestCase):
         self.assertIn(r'^(hangar-)?v[0-9]+\.[0-9]+\.[0-9]+$', self.workflow)
 
     def test_candidate_images_must_exist_before_the_run(self):
-        self.assertIn('TO_IMAGE_TAG="preview-sha-${GITHUB_SHA}"', self.workflow)
-        self.assertIn("TO_IMAGE_TAG=preview-preview", self.workflow)
+        self.assertIn('TO_IMAGE_TAG="preview-sha-${CANDIDATE_SHA}"', self.workflow)
+        self.assertIn("TO_IMAGE_TAG=${FROM_RELEASE#hangar-}", self.workflow)
+        self.assertIn("CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}", self.workflow)
+        # A moving preview tag can be older than the release it would upgrade.
+        self.assertNotIn("TO_IMAGE_TAG=preview-preview", self.workflow)
         self.assertIn('docker manifest inspect "${IMAGE_PREFIX}${image}:${TO_IMAGE_TAG}"', self.workflow)
 
     def test_failure_uploads_logs_but_not_the_backup(self):
@@ -132,6 +136,29 @@ class ComposeUpgradeScriptTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("--to", result.stdout)
         self.assertIn("--from", result.stdout)
+
+
+class RestoreScriptTests(unittest.TestCase):
+    def test_object_storage_is_restored_to_the_user_seaweedfs_runs_as(self):
+        compose = (REPOSITORY_ROOT / "deployments" / "cli" / "community" / "docker-compose.yml").read_text(
+            encoding="utf-8"
+        )
+        restore = (REPOSITORY_ROOT / "deployments" / "cli" / "community" / "restore.sh").read_text(encoding="utf-8")
+        minio = compose.split("\n  plane-minio:\n", maxsplit=1)[1].split("\n  proxy:\n", maxsplit=1)[0]
+        user = re.search(r'^    user: "([0-9]+:[0-9]+)"$', minio, re.MULTILINE)
+        self.assertIsNotNone(user)
+        self.assertIn("      - ALL\n", minio.split("cap_drop:", maxsplit=1)[1])
+        self.assertIn(
+            f'if [ "$restoreFile" == "object-storage" ]; then\n        owner="{user.group(1)}"', restore
+        )
+        self.assertIn('chown -R "$OWNER" /vol', restore)
+
+    def test_a_failed_volume_fails_the_restore(self):
+        restore = (REPOSITORY_ROOT / "deployments" / "cli" / "community" / "restore.sh").read_text(encoding="utf-8")
+        self.assertIn('restoreSingleVolume "$docVol" "$BACKUP_FOLDER" "$restoreFileName" || failed=1', restore)
+        self.assertLess(restore.index('if [ "$failed" -ne 0 ]; then'), restore.index("Restore completed successfully."))
+        # An empty archive (a Valkey volume with nothing saved) restores too.
+        self.assertIn('cp -a "/restore/${TAR_NAME}/." /vol/', restore)
 
 
 class ComposeSeedTests(unittest.TestCase):

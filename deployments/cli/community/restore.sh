@@ -37,11 +37,22 @@ function restoreSingleVolume() {
         return 1
     fi
 
+    # The backup copies each data directory out of its container, so the files
+    # in the archive belong to whoever took the backup. Postgres, Valkey and
+    # RabbitMQ take their files back when they start; SeaweedFS runs as
+    # 1000:1000 without capabilities (the plane-minio `user:` in
+    # docker-compose.yml) and cannot, so its volume is handed to that user here.
+    local owner=""
+    if [ "$restoreFile" == "object-storage" ]; then
+        owner="1000:1000"
+    fi
+
     docker run --rm \
         -e TAR_NAME="$restoreFile" \
+        -e OWNER="$owner" \
         -v "$selectedVolume":"/vol" \
         -v "$backupFolder":/backup \
-        busybox sh -c 'mkdir -p /restore && tar -xzf "/backup/${TAR_NAME}.tar.gz" -C /restore && cp -a "/restore/${TAR_NAME}/." /vol/'
+        busybox sh -c 'mkdir -p /restore && tar -xzf "/backup/${TAR_NAME}.tar.gz" -C /restore && cp -a "/restore/${TAR_NAME}/." /vol/ && { [ -z "$OWNER" ] || chown -R "$OWNER" /vol; }'
     
     if [ $? -ne 0 ]; then
         echo "Error: Failed to restore volume ${selectedVolume} from ${restoreFile}.tar.gz"

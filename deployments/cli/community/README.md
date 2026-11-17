@@ -826,7 +826,10 @@ When you want to restore the previously backed-up data, follow the instructions 
 1. Start the Hangar instance using `./setup.sh start`.
 
    `restore.sh` exits with an error, and does not report success, when any volume
-   fails to restore; do not start Hangar on that data.
+   fails to restore; do not start Hangar on that data. The archives hold files
+   owned by whoever took the backup, so `restore.sh` gives the object-storage
+   volume to `1000:1000`, the user SeaweedFS runs as; the database, Valkey and
+   RabbitMQ take their files back themselves when they start.
 
    A backup taken before the move to SeaweedFS contains `uploads.tar.gz` (MinIO
    format). It restores into `plane-app_uploads`; run
