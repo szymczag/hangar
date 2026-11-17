@@ -207,3 +207,21 @@ def test_get_asset_disposition_follows_allow_list(
     params = s3_client.generate_presigned_url.call_args.kwargs["Params"]
     assert params["ResponseContentDisposition"].split(";")[0] == expected_disposition
     assert params.get("ResponseContentType") == expected_type
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+@pytest.mark.parametrize("size", ["1e400", '"inf"', '"1024x"'])
+def test_post_with_unusable_size_is_400(api_key_client, workspace, size):
+    """A JSON size of 1e400 parses to float("inf"); int() then raised OverflowError (500)."""
+    body = '{"name": "report.pdf", "type": "application/pdf", "size": %s}' % size
+
+    with mock.patch("plane.api.views.asset.S3Storage") as mock_storage:
+        response = api_key_client.post(
+            f"/api/v1/workspaces/{workspace.slug}/assets/", data=body, content_type="application/json"
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST, f"Got {response.status_code}: {response.content!r}"
+    assert response.json()["code"] == "invalid_file_size"
+    mock_storage.return_value.generate_presigned_post.assert_not_called()
+    assert FileAsset.objects.filter(workspace=workspace).count() == 0
