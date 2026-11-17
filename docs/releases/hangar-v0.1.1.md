@@ -74,6 +74,10 @@ On Docker Compose and Swarm, upgrade with the `0.1.1` `setup.sh` or `swarm.sh`:
 - **Unattended and local builds.** Unattended upgrades can use `--yes` or
   `HANGAR_ASSUME_YES=1`. Building the images locally now uses a generated
   `docker-compose.override.yaml`.
+- **`restore.sh` restores object storage correctly.** It now gives the
+  restored object-storage volume to the user the store runs as, so uploads work
+  after a restore on Docker. It also reports a failure and exits with an error
+  when any volume cannot be restored, instead of reporting success.
 - **Do not start the `0.1.1` images with an old `plane.env` that still holds the
   template key** (for example by editing the image tag by hand): the API exits
   with code 64 and explains what to set.
