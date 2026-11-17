@@ -24,6 +24,31 @@ git merge upstream/preview       # merge, never rebase — fork history is publi
 
 After every sync, walk the ledger below and re-verify each touchpoint still applies.
 
+### Upstream maintenance loop
+
+Upstream security fixes reach Hangar through one loop, so none depends on someone
+remembering to look:
+
+1. **Watch.** The weekly `Upstream watch` workflow
+   (`.github/workflows/upstream-watch.yml`) compares upstream with `UPSTREAM_BASE.json`:
+   stable releases newer than `package_version` and repository security advisories
+   published on or after `synced_at`. It keeps exactly one open issue labelled
+   `upstream-sync` listing them, comments when the list changes, and closes the issue
+   once the baseline covers everything.
+2. **Assess.** For each advisory, decide whether Hangar is affected: the code may be
+   upstream-only, already fixed here, or reshaped by a fork touchpoint in the ledger
+   below. Record the reasoning on the issue.
+3. **Fix.** Either sync upstream (the merge above) or, when a full sync is not yet
+   practical, backport the targeted fix. A backport always lands with a regression test
+   that fails without it; per-advisory SSRF coverage, for example, is mapped in
+   `apps/api/plane/tests/unit/bg_tasks/test_ssrf_advisories.py`.
+4. **Record.** Name each addressed advisory in the "Security and privacy" section of
+   the next `docs/releases/<tag>.md`.
+5. **Move the baseline.** The sync pull request updates `UPSTREAM_BASE.json`
+   (`revision`, `package_version`, `synced_at`) to the merged upstream commit; the next
+   weekly run then closes the issue. A backport alone does not move the baseline, so
+   the issue stays open, with the assessment recorded on it, until a sync catches up.
+
 ## Commit conventions
 
 Conventional commits (`type(scope): message`). No attribution trailers.
@@ -153,3 +178,4 @@ Planned (added when the phase lands):
 | 89                            | `packages/csp/**`, `apps/{web,admin,space}/app/entry.client.tsx`, `apps/space/app/entry.server.tsx`, `apps/{web,admin}/nginx/nginx.conf`, `apps/{web,admin,space}/Dockerfile.*`, `packages/editor/src/core/helpers/attribute-guards.ts`, `packages/utils/src/inert-html.ts`, `apps/api/plane/web/views.py`, `apps/api/plane/middleware/content_security_policy.py`, `apps/visual-tests/security/**`, `scripts/vite-emoji-data.mjs`, `charts/hangar/**`                                                                                                                                                                                | Content-Security-Policy | each frontend generates and sends its own policy (hashes for the static builds, a per-request nonce for space), enforced by default, with a report endpoint in the API; Trusted Types policies ship alongside it, observing by default and sanitizing when enforced; the editor renders colour and alignment as data attributes so no inline style is needed, and every screen of the visual suite plus a security suite runs under the policy |
 | 90                            | `apps/api/plane/license/api/views/instance.py`, `apps/api/plane/ext/urls.py`, `apps/api/plane/authentication/views/{app,space}/password_management.py`, `apps/web/core/{services/instance.service.ts,store/instance.store.ts,store/user/index.ts}`                                                                                                                                                                                                                                                                                                                                                                                    | Anonymous surface       | `/api/instances/` answers a caller without a verified console session with only what the sign-in and failure pages render; the rest (version, instance identity, default workspace, integration identifiers, internal URLs) moves to `/api/users/me/instance-config/`, which the web app loads after sign-in. Forgot-password answers the same whether or not the account exists                                                               |
 | 91                            | `apps/api/Dockerfile.dev`, `apps/live/src/controllers/document.controller.ts`, `pnpm-workspace.yaml` (`zod`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Security scan           | pin the dev image to the production Python 3.12.12, and move zod to 4.6.7 (GHSA-mrhx-c7xc-m3w5) so the new pnpm audit gate starts green; zod 4 reports `issues` where 3 reported `errors`                                                                                                                                                                                                                                                      |
+| 92  | `SECURITY.md`, `.trivyignore` → `.trivyignore.yaml`, `AGENTS.md`                                                                                                                                                                                                                                                                                                                            | Security policy    | state the supported versions (latest stable only), the 7-day best-effort acknowledgement target and where to verify release images; replace the upstream Trivy ignore list with the YAML form whose entries carry a statement and an expiry, validated by `security_scan.py validate-ignores`; tell agents how the expiry job and the `upstream-sync` issue read |
