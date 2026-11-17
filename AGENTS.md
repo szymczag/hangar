@@ -71,6 +71,16 @@ release builds refresh the Alpine packages, and anything else needs its
 pinned version raised. Dependabot alerts cover only the npm and pip
 manifests.
 
+Accepted Trivy findings live in `.trivyignore.yaml`; each entry has a
+statement naming its evidence and an `expired_at` at most 180 days ahead. A
+red **Trivy exceptions (expiry)** job means an entry lapsed or is malformed:
+re-check its statement, then renew or remove it. Do not push the date out
+without re-checking.
+
+**Upstream watch** runs weekly and keeps one open issue labelled
+`upstream-sync` listing upstream releases and security advisories newer than
+`UPSTREAM_BASE.json`. FORK.md describes how that issue is worked off.
+
 Four render-time formatter warnings and two complexity warnings reached a
 release because both were read as pass/fail.
 

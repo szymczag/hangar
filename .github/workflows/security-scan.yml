@@ -18,6 +18,12 @@ name: Security scan
 # release image, downloading the vulnerability database) are retried, so a
 # transient outage of a download host does not read as either.
 #
+# Accepted findings live in .trivyignore.yaml. It is not the file Trivy reads
+# by default, so every Trivy invocation names it explicitly. Each entry
+# names its evidence and expires within 180 days; the `ignores` job checks
+# that on every change to the file and nightly, so an exception that has
+# lapsed turns the nightly run red instead of silently un-ignoring a finding.
+#
 # Every action is pinned to a full commit SHA and Trivy runs from its official
 # image pinned to a digest, whose Sigstore signature is verified once per run
 # before any job uses it: in March 2026 the trivy-action tags were moved to
@@ -42,7 +48,7 @@ on:
       - "pnpm-workspace.yaml"
       - "**/package.json"
       - "**/Dockerfile*"
-      - ".trivyignore"
+      - ".trivyignore.yaml"
       - ".github/workflows/security-scan.yml"
       - ".github/scripts/security_scan.py"
   pull_request:
@@ -54,7 +60,7 @@ on:
       - "pnpm-workspace.yaml"
       - "**/package.json"
       - "**/Dockerfile*"
-      - ".trivyignore"
+      - ".trivyignore.yaml"
       - ".github/workflows/security-scan.yml"
       - ".github/scripts/security_scan.py"
 
@@ -72,6 +78,18 @@ env:
   TRIVY_IMAGE: ghcr.io/aquasecurity/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
 
 jobs:
+  ignores:
+    name: Trivy exceptions (expiry)
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      # Standard library only: no package is installed for this gate.
+      - name: Validate .trivyignore.yaml
+        run: python3 .github/scripts/security_scan.py validate-ignores --file .trivyignore.yaml
+
   python:
     name: Python dependencies (pip-audit)
     if: github.event_name != 'workflow_run'
@@ -185,7 +203,7 @@ jobs:
             docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP:/out" \
               -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" -w /src "$TRIVY_IMAGE" \
               fs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
-              --skip-dirs node_modules "$@" .
+              --ignorefile .trivyignore.yaml --skip-dirs node_modules "$@" .
           }
           scan --format sarif --output /out/trivy-fs.sarif
           echo "sarif=true" >> "$GITHUB_OUTPUT"
@@ -239,7 +257,7 @@ jobs:
     env:
       IMAGE_REF: ghcr.io/szymczag/hangar-${{ matrix.image }}:${{ needs.release.outputs.version }}
     steps:
-      # .trivyignore and the summary script.
+      # .trivyignore.yaml and the summary script.
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
@@ -272,7 +290,7 @@ jobs:
             if docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP:/out" \
               -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" -w /src \
               "$TRIVY_IMAGE" image --severity HIGH,CRITICAL --ignore-unfixed \
-              --format json --output /out/trivy-image.json "$IMAGE_REF"; then
+              --ignorefile .trivyignore.yaml --format json --output /out/trivy-image.json "$IMAGE_REF"; then
               exit 0
             fi
             if [[ "$delay" -gt 0 ]]; then
@@ -282,12 +300,15 @@ jobs:
           done
           echo "::error::Trivy could not scan $IMAGE_REF"
           exit 1
+      # The SARIF and the table that the gate summarises are converted with the
+      # same exceptions as the scan, so code scanning and the gate agree.
       - name: Convert the report
         id: convert
         run: |
           set -euo pipefail
           convert() {
-            docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY_IMAGE" convert "$@" /out/trivy-image.json
+            docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP:/out" -w /src "$TRIVY_IMAGE" \
+              convert --ignorefile .trivyignore.yaml "$@" /out/trivy-image.json
           }
           convert --format sarif --output /out/trivy-image.sarif
           echo "sarif=true" >> "$GITHUB_OUTPUT"

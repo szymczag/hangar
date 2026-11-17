@@ -4,7 +4,10 @@
 
 from __future__ import annotations
 
+import contextlib
+import datetime
 import importlib.util
+import io
 import json
 from pathlib import Path
 import re
@@ -16,6 +19,7 @@ import unittest
 SCRIPTS_DIRECTORY = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "security-scan.yml"
+IGNORE_FILE_PATH = REPOSITORY_ROOT / ".trivyignore.yaml"
 SCRIPT_PATH = SCRIPTS_DIRECTORY / "security_scan.py"
 sys.path.insert(0, str(SCRIPTS_DIRECTORY))
 SPEC = importlib.util.spec_from_file_location("security_scan", SCRIPT_PATH)
@@ -239,6 +243,159 @@ class PlanReportTests(unittest.TestCase):
         self.assertEqual({(f.image, f.vulnerability) for f in parsed}, {("web", "CVE-1"), ("api", "CVE-2")})
 
 
+TODAY = datetime.date(2026, 11, 17)
+
+IGNORE_FILE = """\
+# Accepted findings.
+
+vulnerabilities:
+  # A comment between entries.
+  - id: CVE-2026-0001
+    paths:
+      - "apps/api/requirements.txt"
+      - apps/api/pyproject.toml # trailing comment
+    statement: >-
+      First line of the rationale,
+      second line: with a colon.
+
+      A second paragraph.
+    expired_at: 2027-01-31
+  - id: 'GHSA-aaaa-bbbb-cccc'
+    statement: "Quoted statement"
+    expired_at: "2027-05-16"
+"""
+
+
+def validate(text, today=TODAY):
+    return security_scan.validate_ignore_entries(security_scan.parse_ignore_file(text), today)
+
+
+class ParseIgnoreFileTests(unittest.TestCase):
+    def test_parses_the_supported_subset(self):
+        entries = security_scan.parse_ignore_file(IGNORE_FILE)
+        self.assertEqual(
+            entries,
+            [
+                {
+                    "id": "CVE-2026-0001",
+                    "paths": ["apps/api/requirements.txt", "apps/api/pyproject.toml"],
+                    "statement": "First line of the rationale, second line: with a colon.\nA second paragraph.",
+                    "expired_at": "2027-01-31",
+                },
+                {"id": "GHSA-aaaa-bbbb-cccc", "statement": "Quoted statement", "expired_at": "2027-05-16"},
+            ],
+        )
+
+    def test_matches_pyyaml_where_installed(self):
+        try:
+            import yaml
+        except ImportError:
+            self.skipTest("PyYAML is not installed")
+        for name, text in (("fixture", IGNORE_FILE), ("repository", IGNORE_FILE_PATH.read_text(encoding="utf-8"))):
+            with self.subTest(file=name):
+                loaded = yaml.safe_load(text)
+                self.assertEqual(set(loaded), {"vulnerabilities"})
+                expected = [
+                    {key: value if isinstance(value, list) else str(value) for key, value in entry.items()}
+                    for entry in loaded["vulnerabilities"]
+                ]
+                self.assertEqual(security_scan.parse_ignore_file(text), expected)
+
+    def test_rejects_what_it_does_not_understand(self):
+        cases = {
+            "other top-level key": "misconfigurations:\n  - id: AVD-1\n",
+            "second top-level key": "vulnerabilities:\n  - id: A\nsecrets:\n  - id: B\n",
+            "flow sequence": "vulnerabilities: []\n",
+            "literal block": "vulnerabilities:\n  - id: A\n    statement: |\n      text\n",
+            "anchor": "vulnerabilities:\n  - id: &a A\n",
+            "unquoted colon": "vulnerabilities:\n  - id: A\n    statement: reason: here\n",
+            "escape": 'vulnerabilities:\n  - id: A\n    statement: "a\\tb"\n',
+            "tab": "vulnerabilities:\n\t- id: A\n",
+            "duplicate key": "vulnerabilities:\n  - id: A\n    id: B\n",
+            "misindented key": "vulnerabilities:\n  - id: A\n      statement: x\n",
+            "nested mapping": "vulnerabilities:\n  - id: A\n    paths:\n      key: value\n",
+            "empty value": "vulnerabilities:\n  - id:\n",
+        }
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                with self.assertRaises(security_scan.IgnoreFileError):
+                    security_scan.parse_ignore_file(text)
+
+
+class ValidateIgnoreEntriesTests(unittest.TestCase):
+    def entry(self, **changes):
+        entry = {"id": "CVE-2026-0001", "statement": "Why.", "expired_at": "2027-01-31"}
+        entry.update(changes)
+        return {key: value for key, value in entry.items() if value is not None}
+
+    def test_valid_entries_pass(self):
+        self.assertEqual(validate(IGNORE_FILE), [])
+
+    def test_every_entry_needs_id_statement_and_expiry(self):
+        for key in ("id", "statement", "expired_at"):
+            with self.subTest(key=key):
+                problems = security_scan.validate_ignore_entries([self.entry(**{key: None})], TODAY)
+                self.assertTrue(any(f"missing {key}" in problem for problem in problems), problems)
+        problems = security_scan.validate_ignore_entries([self.entry(statement="  ")], TODAY)
+        self.assertIn("CVE-2026-0001: missing statement", problems)
+
+    def test_expiry_must_be_ahead_and_within_180_days(self):
+        def problems(expiry):
+            return security_scan.validate_ignore_entries([self.entry(expired_at=expiry)], TODAY)
+
+        self.assertEqual(problems("2026-11-18"), [])
+        self.assertEqual(problems("2027-05-16"), [])  # exactly 180 days ahead
+        self.assertIn("more than 180 days ahead", problems("2027-05-17")[0])
+        self.assertIn("expired on 2026-11-17", problems("2026-11-17")[0])
+        self.assertIn("expired on 2026-01-01", problems("2026-01-01")[0])
+        self.assertIn("is not a YYYY-MM-DD date", problems("31.01.2027")[0])
+        self.assertIn("is not a YYYY-MM-DD date", problems("2027-02-30")[0])
+
+    def test_rejects_unknown_keys_duplicates_and_an_empty_file(self):
+        self.assertIn(
+            "CVE-2026-0001: unsupported key 'expires'",
+            security_scan.validate_ignore_entries([self.entry(expires="2027-01-01")], TODAY),
+        )
+        self.assertIn(
+            "CVE-2026-0001: listed more than once",
+            security_scan.validate_ignore_entries([self.entry(), self.entry()], TODAY),
+        )
+        self.assertTrue(security_scan.validate_ignore_entries([], TODAY))
+
+    def test_command_reports_each_problem_and_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ".trivyignore.yaml"
+            path.write_text(
+                "vulnerabilities:\n  - id: CVE-2026-0001\n    expired_at: 2026-11-01\n", encoding="utf-8"
+            )
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = security_scan.main(["validate-ignores", "--file", str(path), "--today", "2026-11-17"])
+            self.assertEqual(status, 1)
+            self.assertIn("::error file=", output.getvalue())
+            self.assertIn("CVE-2026-0001: missing statement", output.getvalue())
+            self.assertIn("CVE-2026-0001: expired on 2026-11-01", output.getvalue())
+
+            path.write_text(IGNORE_FILE, encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    security_scan.main(["validate-ignores", "--file", str(path), "--today", "2026-11-17"]), 0
+                )
+                # A malformed file is an input error, not a pass.
+                path.write_text("vulnerabilities: []\n", encoding="utf-8")
+                self.assertEqual(security_scan.main(["validate-ignores", "--file", str(path)]), 2)
+
+    def test_repository_file_is_well_formed(self):
+        # Expiry against the real date is the nightly job's concern; here the
+        # file must parse and every entry must carry the required keys.
+        entries = security_scan.parse_ignore_file(IGNORE_FILE_PATH.read_text(encoding="utf-8"))
+        self.assertTrue(entries)
+        latest = max(datetime.date.fromisoformat(entry["expired_at"]) for entry in entries)
+        problems = security_scan.validate_ignore_entries(entries, latest - datetime.timedelta(days=1))
+        self.assertEqual(problems, [])
+        self.assertFalse((REPOSITORY_ROOT / ".trivyignore").exists(), "Trivy exceptions belong in .trivyignore.yaml")
+
+
 class SecurityScanWorkflowContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -254,7 +411,9 @@ class SecurityScanWorkflowContractTests(unittest.TestCase):
                 self.assertRegex(use, r"@[0-9a-f]{40}$")
 
     def test_trivy_signature_is_verified_once_with_retries(self):
-        self.assertEqual(set(self.jobs), {"python", "node", "trivy", "repository", "release", "images", "report"})
+        self.assertEqual(
+            set(self.jobs), {"ignores", "python", "node", "trivy", "repository", "release", "images", "report"}
+        )
         for name, job in self.jobs.items():
             with self.subTest(job=name):
                 if name == "trivy":
@@ -279,7 +438,7 @@ class SecurityScanWorkflowContractTests(unittest.TestCase):
         self.assertIn('workflows: ["Publish Hangar Containers"]', self.workflow)
         self.assertIn("github.event.workflow_run.conclusion == 'success'", self.jobs["release"])
         self.assertIn("github.event.workflow_run.event == 'push'", self.jobs["release"])
-        for name in ("python", "node", "repository"):
+        for name in ("ignores", "python", "node", "repository"):
             with self.subTest(job=name):
                 self.assertIn("if: github.event_name != 'workflow_run'", self.jobs[name])
 
@@ -287,6 +446,33 @@ class SecurityScanWorkflowContractTests(unittest.TestCase):
         matrix = re.search(r"image: \[(.*)\]", self.jobs["images"])[1].replace(" ", "").split(",")
         self.assertEqual(tuple(matrix), security_scan.IMAGE_NAMES)
         self.assertIn("--images " + ",".join(matrix), self.jobs["report"])
+
+    def test_every_trivy_run_reads_the_yaml_exceptions(self):
+        # Each `docker run ... "$TRIVY_IMAGE" <command> ...`, joined across its
+        # line continuations.
+        joined = re.sub(r"\\\n\s*", " ", self.workflow)
+        commands = {}
+        for line in joined.splitlines():
+            match = re.search(r'docker run .*"\$TRIVY_IMAGE" +(\S+)', line)
+            if match:
+                commands[match[1]] = line
+        self.assertEqual(set(commands), {"fs", "image", "convert"})
+        for subcommand, command in commands.items():
+            with self.subTest(subcommand=subcommand):
+                self.assertIn("--ignorefile .trivyignore.yaml", command)
+                self.assertIn("-v \"$PWD:/src:ro\"", command)
+                self.assertIn("-w /src", command)
+        self.assertNotRegex(self.workflow, r"\.trivyignore(?!\.yaml)")
+        for trigger in ("push", "pull_request"):
+            with self.subTest(trigger=trigger):
+                section = self.workflow.split(f"\n  {trigger}:\n", maxsplit=1)[1].split("\n\n", maxsplit=1)[0]
+                self.assertIn('- ".trivyignore.yaml"', section)
+
+    def test_exceptions_are_validated_on_change_and_nightly(self):
+        self.assertIn("security_scan.py validate-ignores --file .trivyignore.yaml", self.jobs["ignores"])
+        self.assertIn("schedule:", self.workflow)
+        self.assertNotIn("needs:", self.jobs["ignores"])
+        self.assertNotIn("pip install", self.jobs["ignores"])
 
     def test_only_the_report_writes_issues(self):
         for name, job in self.jobs.items():

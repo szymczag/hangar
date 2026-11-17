@@ -12,12 +12,17 @@ resolve    picks the newest published GitHub Release, whose images are
 summarize  turns one Trivy JSON report into a findings file, a job summary
            and, optionally, a failing exit status.
 report     keeps a single tracking issue in step with the latest scan.
+validate-ignores
+           checks that every accepted finding in .trivyignore.yaml carries an
+           id, a statement and an expiry no more than 180 days ahead, so an
+           exception cannot outlive its review.
 """
 
 from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import datetime
 import hashlib
 import json
 from pathlib import Path
@@ -35,6 +40,10 @@ ISSUE_TITLE = "Release image vulnerabilities"
 _MARKER_PREFIX = "<!-- security-scan:release-images"
 _MARKER_PATTERN = re.compile(r"<!-- security-scan:release-images fingerprint=([0-9a-f]+) -->")
 _STAGE_RANK = {"alpha": 0, "beta": 1, "rc": 2, None: 3}
+IGNORE_FILE = ".trivyignore.yaml"
+IGNORE_MAX_DAYS = 180
+_IGNORE_REQUIRED_KEYS = ("id", "statement", "expired_at")
+_IGNORE_LIST_KEYS = ("paths", "purls")
 
 
 class ScanError(ValueError):
@@ -319,6 +328,188 @@ def collect_results(findings_dir: Path, images: Sequence[str]) -> tuple[list[Fin
 
 
 # ---------------------------------------------------------------------------
+# validate-ignores
+#
+# .trivyignore.yaml is read with a strict parser for the small YAML subset the
+# file uses, not with PyYAML: the runners' system Python does not promise
+# PyYAML, and installing a package just to read one fixed-shape file would add
+# a download and a supply-chain input to a security gate. Anything outside the
+# subset is rejected with its line number instead of being guessed at, so the
+# validator never accepts a file that Trivy might read differently. The tests
+# compare the result with PyYAML where it is installed.
+#
+#   vulnerabilities:          the only top-level key
+#     - id: CVE-...           one mapping per accepted finding
+#       paths:                optional lists of plain or quoted scalars
+#         - apps/api/x.toml
+#       statement: >-         plain, quoted or folded (>, >-) scalars
+#         folded text
+#       expired_at: 2027-01-31
+
+
+class IgnoreFileError(ScanError):
+    """Raised when .trivyignore.yaml is outside the supported YAML subset."""
+
+
+_KEY_PATTERN = re.compile(r"^(?P<key>[a-z_]+):(?:[ ](?P<value>.*))?$")
+_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def _scalar(text: str, number: int) -> str:
+    """Parse a flow scalar: plain (with an optional ` #` comment) or quoted."""
+    text = text.strip()
+    if text[:1] in ('"', "'"):
+        quote = text[0]
+        end = text.find(quote, 1)
+        if end == -1 or "\\" in text[1:end] or (quote == "'" and text[end : end + 2] == "''"):
+            raise IgnoreFileError(f"line {number}: unsupported quoted scalar {text!r}")
+        rest = text[end + 1 :].strip()
+        if rest and not rest.startswith("#"):
+            raise IgnoreFileError(f"line {number}: unexpected text after the quoted scalar")
+        return text[1:end]
+    text = re.split(r"\s#", text, maxsplit=1)[0].strip()
+    if not text or text[0] in "&*!|>[]{}%@`,?-" or ": " in text or text.endswith(":"):
+        raise IgnoreFileError(f"line {number}: unsupported value {text!r}; quote it")
+    return text
+
+
+def parse_ignore_file(text: str) -> list[dict[str, Any]]:
+    """Parse the vulnerability exceptions of a .trivyignore.yaml."""
+    lines = [(number, line.rstrip()) for number, line in enumerate(text.splitlines(), start=1)]
+    for number, line in lines:
+        if "\t" in line:
+            raise IgnoreFileError(f"line {number}: tabs are not allowed")
+    content = [(n, l) for n, l in lines if l.strip() and not l.lstrip().startswith("#")]
+    if not content or content[0][1] != "vulnerabilities:":
+        raise IgnoreFileError("the file must start with the single top-level key `vulnerabilities:`")
+    entries: list[dict[str, Any]] = []
+    item_indent: int | None = None
+    position = 1
+    while position < len(content):
+        number, line = content[position]
+        indent = _indent(line)
+        stripped = line.strip()
+        if indent == 0:
+            raise IgnoreFileError(f"line {number}: only `vulnerabilities` is supported at the top level")
+        if stripped.startswith("- "):
+            # A list item opens a new exception; its first key sits after "- ".
+            item_indent = indent if item_indent is None else item_indent
+            if indent != item_indent:
+                raise IgnoreFileError(f"line {number}: inconsistent list indentation")
+            entries.append({})
+            stripped = stripped[2:].lstrip()
+        elif not entries or indent != item_indent + 2:
+            raise IgnoreFileError(f"line {number}: expected `- id: ...` or a key of the current exception")
+        key_indent = item_indent + 2
+        match = _KEY_PATTERN.match(stripped)
+        if match is None:
+            raise IgnoreFileError(f"line {number}: expected `key: value`")
+        key, value = match["key"], (match["value"] or "").strip()
+        entry = entries[-1]
+        if key in entry:
+            raise IgnoreFileError(f"line {number}: duplicate key {key!r}")
+        position += 1
+        # The lines that belong to this key are indented deeper than it.
+        block = []
+        while position < len(content) and _indent(content[position][1]) > key_indent:
+            block.append(content[position])
+            position += 1
+        if value in (">", ">-"):
+            entry[key] = _folded(key, number, block, lines, keep_newline=value == ">")
+        elif value == "":
+            if not block:
+                raise IgnoreFileError(f"line {number}: {key!r} has no value")
+            items = []
+            for item_number, item_line in block:
+                item = item_line.strip()
+                if not item.startswith("- "):
+                    raise IgnoreFileError(f"line {item_number}: expected a `- ` list item under {key!r}")
+                items.append(_scalar(item[2:], item_number))
+            entry[key] = items
+        elif block:
+            raise IgnoreFileError(f"line {block[0][0]}: unexpected indentation")
+        elif value.startswith(("|", ">")):
+            raise IgnoreFileError(f"line {number}: only `>` and `>-` block scalars are supported")
+        else:
+            entry[key] = _scalar(value, number)
+    return entries
+
+
+def _folded(
+    key: str,
+    number: int,
+    block: Sequence[tuple[int, str]],
+    lines: Sequence[tuple[int, str]],
+    *,
+    keep_newline: bool,
+) -> str:
+    if not block:
+        raise IgnoreFileError(f"line {number}: {key!r} has an empty block scalar")
+    first, last = block[0][0], block[-1][0]
+    # Re-read the raw lines so comment-looking text and blank lines inside the
+    # block stay part of it, as YAML reads them.
+    raw = [line for n, line in lines if first <= n <= last]
+    text_indent = _indent(raw[0])
+    paragraphs: list[list[str]] = [[]]
+    for offset, line in enumerate(raw):
+        if not line.strip():
+            paragraphs.append([])
+            continue
+        if _indent(line) != text_indent:
+            raise IgnoreFileError(f"line {first + offset}: folded text must keep one indentation")
+        paragraphs[-1].append(line.strip())
+    text = "\n".join(" ".join(paragraph) for paragraph in paragraphs if paragraph)
+    return text + ("\n" if keep_newline else "")
+
+
+def validate_ignore_entries(entries: Sequence[Mapping[str, Any]], today: datetime.date) -> list[str]:
+    """Return one message per problem; an empty list means the file is valid."""
+    problems = []
+    if not entries:
+        problems.append("no exceptions listed; delete the file instead of leaving it empty")
+    latest = today + datetime.timedelta(days=IGNORE_MAX_DAYS)
+    seen: set[str] = set()
+    for index, entry in enumerate(entries, start=1):
+        name = str(entry.get("id") or f"entry {index}")
+        for key in _IGNORE_REQUIRED_KEYS:
+            value = entry.get(key)
+            if not isinstance(value, str) or not value.strip():
+                problems.append(f"{name}: missing {key}")
+        for key in sorted(set(entry) - set(_IGNORE_REQUIRED_KEYS) - set(_IGNORE_LIST_KEYS)):
+            problems.append(f"{name}: unsupported key {key!r}")
+        for key in _IGNORE_LIST_KEYS:
+            if key in entry and not (isinstance(entry[key], list) and entry[key]):
+                problems.append(f"{name}: {key} must be a non-empty list")
+        if name in seen:
+            problems.append(f"{name}: listed more than once")
+        seen.add(name)
+        expiry = entry.get("expired_at")
+        if not isinstance(expiry, str) or not expiry.strip():
+            continue
+        try:
+            if not _DATE_PATTERN.match(expiry):
+                raise ValueError
+            expires = datetime.date.fromisoformat(expiry)
+        except ValueError:
+            problems.append(f"{name}: expired_at {expiry!r} is not a YYYY-MM-DD date")
+            continue
+        # Trivy stops honouring an exception once expired_at has passed, which
+        # for a date is from its first moment.
+        if expires <= today:
+            problems.append(f"{name}: expired on {expires.isoformat()}; review it, then renew or remove it")
+        elif expires > latest:
+            problems.append(
+                f"{name}: expired_at {expires.isoformat()} is more than {IGNORE_MAX_DAYS} days ahead "
+                f"(latest allowed {latest.isoformat()})"
+            )
+    return problems
+
+
+# ---------------------------------------------------------------------------
 # GitHub CLI layer
 
 
@@ -470,6 +661,23 @@ def _command_report(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _command_validate_ignores(arguments: argparse.Namespace) -> int:
+    path = Path(arguments.file)
+    today = datetime.date.fromisoformat(arguments.today) if arguments.today else datetime.datetime.now(datetime.timezone.utc).date()
+    entries = parse_ignore_file(path.read_text(encoding="utf-8"))
+    problems = validate_ignore_entries(entries, today)
+    for problem in problems:
+        # Workflow commands are read from stdout only.
+        print(f"::error file={path},title=Trivy exception::{problem}")
+    if problems:
+        print(f"{path}: {len(problems)} problem(s); see {path} for how exceptions are reviewed.")
+        return 1
+    for entry in entries:
+        print(f"{entry['id']}: accepted until {entry['expired_at']}")
+    print(f"{path}: {len(entries)} exception(s), each expiring within {IGNORE_MAX_DAYS} days.")
+    return 0
+
+
 def create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
@@ -494,6 +702,14 @@ def create_argument_parser() -> argparse.ArgumentParser:
     report.add_argument("--images", default=",".join(IMAGE_NAMES))
     report.add_argument("--step-summary", help="file to append the outcome to")
     report.set_defaults(handler=_command_report)
+
+    validate_ignores = commands.add_parser(
+        "validate-ignores",
+        help=f"check that every exception in {IGNORE_FILE} has an id, a statement and a near expiry",
+    )
+    validate_ignores.add_argument("--file", default=IGNORE_FILE)
+    validate_ignores.add_argument("--today", help="YYYY-MM-DD to validate against instead of the current UTC date")
+    validate_ignores.set_defaults(handler=_command_validate_ignores)
     return parser
 
 

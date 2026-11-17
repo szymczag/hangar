@@ -1,0 +1,53 @@
+name: Upstream watch
+
+# Weekly check of what upstream Plane has published since UPSTREAM_BASE.json:
+# stable releases newer than its package_version and repository security
+# advisories published on or after its synced_at date. One issue labelled
+# `upstream-sync` lists them; it is refreshed while anything is pending and
+# closed once a sync moves the baseline past everything. The maintenance loop
+# that follows from the issue is described in FORK.md.
+#
+# Every action is pinned to a full commit SHA.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 * * 1"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Check upstream releases and advisories
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      # --force makes this idempotent: it creates the label or resets it.
+      - name: Ensure the tracking label exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh label create upstream-sync
+          --repo "$GITHUB_REPOSITORY"
+          --color 1D76DB
+          --description "Tracked by the Upstream watch workflow"
+          --force
+      - name: Update the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: >-
+          python3 .github/scripts/upstream_watch.py
+          --baseline UPSTREAM_BASE.json
+          --repository "$GITHUB_REPOSITORY"
+          --run-url "$RUN_URL"
+          --step-summary "$GITHUB_STEP_SUMMARY"

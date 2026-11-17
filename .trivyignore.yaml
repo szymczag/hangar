@@ -1,0 +1,43 @@
+# Trivy findings accepted for Hangar.
+#
+# Every Trivy run in .github/workflows/security-scan.yml reads this file with
+# `--ignorefile .trivyignore.yaml`. Each entry needs:
+#
+#   id          the advisory, exactly as Trivy reports it
+#   statement   why the finding does not apply, naming the evidence (code and
+#               the test that proves it) so a reviewer can re-check it
+#   expired_at  YYYY-MM-DD, at most 180 days ahead; Trivy reports the finding
+#               again from that date
+#   paths       optional; limits the exception to where the finding was seen
+#
+# `python3 .github/scripts/security_scan.py validate-ignores` enforces this on
+# every change and nightly, so a lapsed exception turns the nightly scan red.
+# Renew an entry only after re-checking its statement; otherwise remove it.
+# Only the YAML subset shown here is accepted (plain, quoted or `>-` folded
+# scalars and simple lists).
+
+vulnerabilities:
+  - id: CVE-2026-30242
+    paths:
+      - "apps/api/pyproject.toml"
+    statement: >-
+      GHSA-fpx8-73gf-7x73, SSRF through incomplete IP validation in the webhook
+      URL serializer, filed for the pip package "plane" (<= 1.2.1, fixed in
+      1.2.3). Upstream added this exception when apps/api/pyproject.toml
+      declared the distribution "Plane" 0.24.0, the only name/version metadata
+      in the tree that resembles that package; it never described the deployed
+      code. Hangar's pyproject.toml declares "Hangar", the API image installs no
+      "plane" distribution, and on 2026-11-17 Trivy 0.76.1 reported this CVE
+      neither for the repository nor for ghcr.io/szymczag/hangar-api:v0.1.0
+      with exceptions disabled. The fix itself is present:
+      WebhookSerializer._validate_webhook_url
+      (apps/api/plane/app/serializers/webhook.py) calls
+      plane.utils.ip_address.validate_url on create and update, and
+      is_blocked_ip rejects private, loopback, link-local, reserved, multicast,
+      unspecified, CGNAT, 6to4 and IPv4-mapped targets. Regression tests:
+      TestWebhookUrlValidation in
+      apps/api/plane/tests/unit/bg_tasks/test_ssrf_advisories.py (169.254.169.254
+      proof of concept) and TestValidateUrlHardening in
+      apps/api/plane/tests/unit/bg_tasks/test_url_security.py. Remove this entry
+      at expiry unless a scan reports the CVE again.
+    expired_at: 2027-05-14
