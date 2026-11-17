@@ -115,6 +115,31 @@ class ComposeEnvironmentTests(unittest.TestCase):
         """
         self.assertNotIn("env_file", self.compose)
 
+    def test_the_tuning_settings_variables_env_offers_are_forwarded_from_it(self):
+        """GUNICORN_WORKERS was a constant and AUTHENTICATION_RATE_LIMIT was absent.
+
+        Both are listed in variables.env, so an operator who changed them saw no
+        effect. Each must reach the API from the environment, with the same
+        default variables.env ships (upstream makeplane/plane#10264).
+        """
+        variables = dict(
+            line.split("=", 1)
+            for line in self.variables.splitlines()
+            if "=" in line and not line.startswith("#")
+        )
+        for name in ("GUNICORN_WORKERS", "AUTHENTICATION_RATE_LIMIT"):
+            with self.subTest(name=name):
+                self.assertIn(name, variables)
+                forwarded = re.search(rf"^  {name}: (.+)$", self.compose, re.MULTILINE)
+                self.assertIsNotNone(forwarded, f"docker-compose.yml does not forward {name}")
+                self.assertEqual(forwarded.group(1), f"${{{name}:-{variables[name]}}}")
+
+    def test_the_authentication_rate_limit_is_the_one_the_api_reads(self):
+        rate_limit = (
+            REPOSITORY_ROOT / "apps" / "api" / "plane" / "authentication" / "rate_limit.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('os.environ.get("AUTHENTICATION_RATE_LIMIT"', rate_limit)
+
 
 if __name__ == "__main__":
     unittest.main()
