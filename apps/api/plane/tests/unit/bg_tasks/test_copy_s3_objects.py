@@ -21,7 +21,8 @@ class TestCopyS3Objects:
     def project(self, create_user, workspace):
         project = Project.objects.create(name="Test Project", identifier="test-project", workspace=workspace)
 
-        ProjectMember.objects.create(project=project, member=create_user)
+        # A project admin: the default role is GUEST, and the copy honours guest visibility.
+        ProjectMember.objects.create(project=project, member=create_user, role=20)
         return project
 
     @pytest.fixture

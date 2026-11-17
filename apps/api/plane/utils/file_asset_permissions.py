@@ -1,8 +1,8 @@
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
-from plane.app.permissions import ROLE
-from plane.db.models import FileAsset, ProjectMember, ProjectPage, WorkspaceMember
+from plane.app.permissions import ROLE, issue_hidden_from_user
+from plane.db.models import FileAsset, IssueComment, ProjectMember, ProjectPage, WorkspaceMember
 
 
 def is_workspace_asset_admin(*, user_id, workspace_id) -> bool:
@@ -47,8 +47,27 @@ def can_manage_project_cover(*, user_id, workspace_id, project_id) -> bool:
     )
 
 
+def _asset_issue_id(asset: FileAsset):
+    """The work item an asset belongs to: directly (attachments, description
+    images) or through the comment it is embedded in (comment images)."""
+
+    if asset.issue_id:
+        return asset.issue_id
+    if asset.comment_id:
+        # all_objects: a soft-deleted comment still belongs to its work item.
+        return IssueComment.all_objects.filter(pk=asset.comment_id).values_list("issue_id", flat=True).first()
+    return None
+
+
 def can_read_file_asset(*, user_id, asset: FileAsset) -> bool:
-    """Authorize private asset reads without treating project_id=NULL as public."""
+    """Authorize private asset reads without treating project_id=NULL as public.
+
+    A restricted guest (a GUEST of a project with ``guest_view_all_features``
+    off) only reads the assets of work items they created, together with those
+    work items' comments, the rule ``issue_hidden_from_guest`` applies to the
+    work item sub-resource endpoints. Every by-id read, check, duplicate and
+    copy path goes through this function.
+    """
 
     if asset.user_id:
         return asset.user_id == user_id
@@ -69,6 +88,15 @@ def can_read_file_asset(*, user_id, asset: FileAsset) -> bool:
             project_id=asset.project_id,
         )
         if not project_membership.exists():
+            return False
+
+        issue_id = _asset_issue_id(asset)
+        if issue_id and issue_hidden_from_user(
+            user_id=user_id,
+            project_id=asset.project_id,
+            issue_id=issue_id,
+            workspace_scope={"workspace_id": asset.workspace_id},
+        ):
             return False
 
     if asset.page_id:
