@@ -66,7 +66,7 @@ Installing Hangar is a very easy and minimal step process.
 
 Download the script from the newest release on the
 [Releases page](https://github.com/szymczag/hangar/releases); the commands below
-use `hangar-v0.1.0`. Whichever copy you run, `install` and `upgrade` look
+use `hangar-v0.1.1`. Whichever copy you run, `install` and `upgrade` look
 up the release themselves and fetch that release's compose file and settings.
 They take the newest stable release, and the newest pre-release only while no
 stable release has been published, so a release candidate never replaces a
@@ -82,7 +82,7 @@ cd plane-selfhost
 #### For _Docker Compose_ based setup
 
 ```
-curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0/setup.sh
+curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.1/setup.sh
 
 chmod +x setup.sh
 ```
@@ -90,7 +90,7 @@ chmod +x setup.sh
 #### For _Docker Swarm_ based setup
 
 ```
-curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0/swarm.sh
+curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.1/swarm.sh
 
 chmod +x setup.sh
 ```
@@ -118,6 +118,8 @@ anything in `plane-app`:
 Only when every check passes are the files moved into `plane-app`; otherwise
 the script stops with `ERROR: ...` and `Nothing in .../plane-app has been
 changed`, leaving the running deployment and its files as they were.
+`setup.sh upgrade` downloads and checks the new release before it stops the
+services, so an upgrade whose files do not verify leaves Hangar running.
 
 | Situation                                                  | Default                          | `HANGAR_REQUIRE_SIGNATURE=1` |
 | ---------------------------------------------------------- | -------------------------------- | ---------------------------- |
@@ -483,7 +485,7 @@ It is always advised to keep Hangar up to date with the latest release.
 > `HANGAR_ASSUME_YES=1` to skip the confirmation prompt and keep the screen. An
 > unattended run refuses, rather than starts, a local image build. Set
 > `HANGAR_RELEASE=vX.Y.Z` to install or upgrade to that release rather than the
-> latest one the GitHub API reports.
+> latest one the GitHub API reports; `swarm.sh` reads `HANGAR_RELEASE` too.
 > Add `HANGAR_REQUIRE_SIGNATURE=1` (and install Cosign) so an unattended upgrade
 > refuses files it cannot verify; see
 > [How `setup.sh` verifies what it downloads](#how-setupsh-verifies-what-it-downloads).
@@ -784,7 +786,7 @@ When you want to restore the previously backed-up data, follow the instructions 
 1. Download the restore script using the command below. We suggest downloading it in the same folder as `setup.sh`.
 
    ```bash
-   curl -fsSL -o restore.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.0/restore.sh
+   curl -fsSL -o restore.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.1.1/restore.sh
    chmod +x restore.sh
    ```
 

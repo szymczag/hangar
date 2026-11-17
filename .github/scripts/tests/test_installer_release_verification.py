@@ -223,6 +223,9 @@ class ReleaseCase:
         source_dir: str = "",
         omit_tools: tuple = (),
         release: str = VERSION,
+        functions: tuple = (),
+        body: str = 'download "false"\necho FINISHED\n',
+        extra_env: dict | None = None,
     ) -> Result:
         self.tools(cosign, omit_tools)
         install_dir = self.scratch / "plane-app"
@@ -232,7 +235,7 @@ class ReleaseCase:
         (install_dir / "plane.env").write_text("PREVIOUS=1\n")
         (install_dir / "migrate-object-storage.sh").write_text("# the previous helper\n")
         before = _snapshot(install_dir)
-        names = VERIFY_FUNCTIONS + (INSTALL_ONLY if script == INSTALL else ()) + ("download",)
+        names = VERIFY_FUNCTIONS + (INSTALL_ONLY if script == INSTALL else ()) + ("download",) + functions
         cosign_log = self.scratch / "cosign.args"
         environment = {
             "PATH": str(self.bin),
@@ -249,9 +252,10 @@ class ReleaseCase:
             "HANGAR_INSTALL_SOURCE_DIR": source_dir,
             "COSIGN_LOG": str(cosign_log),
             "COSIGN_EXIT": str(cosign_exit),
+            **(extra_env or {}),
         }
         completed = subprocess.run(
-            [shutil.which("bash"), "-c", _program(script, names, 'download "false"\necho FINISHED\n')],
+            [shutil.which("bash"), "-c", _program(script, names, body)],
             capture_output=True,
             check=False,
             text=True,
@@ -777,3 +781,49 @@ class LocalBuildTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UpgradeOrderTest(unittest.TestCase):
+    """An upgrade verifies the new release before it stops the running one."""
+
+    UPGRADE_STUBS = (
+        "function stopServices() { echo STOPPED >> \"$PLANE_INSTALL_DIR/../stopped\"; }\n"
+        "function install() { download \"false\"; }\n"
+        "function objectStorageMigrationPending() { return 1; }\n"
+    )
+
+    def _upgrade(self, case: ReleaseCase) -> tuple:
+        result = case.run(
+            INSTALL,
+            release="v0.0.1",
+            functions=("upgrade",),
+            body=self.UPGRADE_STUBS + "upgrade\necho FINISHED\n",
+            extra_env={"HANGAR_RELEASE": GIT_TAG, "HANGAR_ASSUME_YES": "1"},
+        )
+        stopped = (case.scratch / "stopped").exists()
+        return result, stopped
+
+    def test_a_release_that_does_not_verify_leaves_the_services_running(self):
+        case = ReleaseCase(self)
+        with (case.release / "docker-compose.yml").open("ab") as tampered:
+            tampered.write(b"# tampered\n")
+        result, stopped = self._upgrade(case)
+        self.assertNotEqual(result.returncode, 0, result.output)
+        self.assertFalse(stopped, result.output)
+        self.assertEqual(result.after, result.before)
+        self.assertIn("the services were not stopped", result.stdout)
+
+    def test_a_verified_release_stops_the_services_and_is_installed(self):
+        case = ReleaseCase(self)
+        result, stopped = self._upgrade(case)
+        self.assertEqual(result.returncode, 0, result.output)
+        self.assertTrue(stopped, result.output)
+        self.assertEqual(result.after["docker-compose.yaml"], case.files["docker-compose.yml"])
+        self.assertFalse([name for name in result.after if name.startswith(".download.")], result.after.keys())
+        self.assertLess(result.stdout.index("Verified"), result.stdout.index("STOPPING SERVICES"))
+
+    def test_both_installers_upgrade_to_a_pinned_release(self):
+        for script in SCRIPTS:
+            with self.subTest(script=script.name):
+                upgrade = _function(script.read_text(), "upgrade", script)
+                self.assertIn("latest_release=${HANGAR_RELEASE#hangar-}", upgrade)

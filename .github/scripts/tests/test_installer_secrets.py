@@ -20,6 +20,7 @@ These tests run the real functions from each script against a scratch
 """
 
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -483,10 +484,13 @@ class WiringTests(unittest.TestCase):
                     'function install() { echo INSTALLED; }\n'
                     'function download() { echo INSTALLED; }\n'
                     'function objectStorageMigrationPending() { return 1; }\n'
+                    'function stageDeploymentFiles() { :; }\n'
                     'function redeployStack() { :; }\n'
                     'function docker() { return 1; }\n'
                 )
                 program = upgrade + "\n" + stubs + 'stack_name=plane\nAPP_RELEASE=v0.0.1\nupgrade\n'
+                install_dir = tempfile.mkdtemp()
+                self.addCleanup(shutil.rmtree, install_dir, True)
                 for assume_yes, expected in (("1", True), ("0", False)):
                     result = subprocess.run(
                         ["bash", "-c", program],
@@ -496,6 +500,7 @@ class WiringTests(unittest.TestCase):
                         env={
                             "HANGAR_ASSUME_YES": assume_yes,
                             "DOCKER_ENV_PATH": "/nonexistent/plane.env",
+                            "PLANE_INSTALL_DIR": install_dir,
                             "PATH": "/usr/bin:/bin",
                         },
                     )
@@ -509,13 +514,21 @@ class WiringTests(unittest.TestCase):
             "function stopServices() { :; }\n"
             'function install() { echo "INSTALLING $APP_RELEASE"; }\n'
             "function objectStorageMigrationPending() { return 1; }\n"
+            "function stageDeploymentFiles() { :; }\n"
         )
+        install_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, install_dir, True)
         result = subprocess.run(
             ["bash", "-c", upgrade + "\n" + stubs + "APP_RELEASE=v0.0.1\nupgrade\n"],
             capture_output=True,
             text=True,
             stdin=subprocess.DEVNULL,
-            env={"HANGAR_ASSUME_YES": "1", "HANGAR_RELEASE": "hangar-v9.9.9", "PATH": "/usr/bin:/bin"},
+            env={
+                "HANGAR_ASSUME_YES": "1",
+                "HANGAR_RELEASE": "hangar-v9.9.9",
+                "PLANE_INSTALL_DIR": install_dir,
+                "PATH": "/usr/bin:/bin",
+            },
         )
         self.assertNotIn("ASKED-GITHUB", result.stdout)
         self.assertIn("INSTALLING v9.9.9", result.stdout)

@@ -43,6 +43,8 @@ HANGAR_ASSUME_YES=${HANGAR_ASSUME_YES:-0}
 HANGAR_INSTALL_SOURCE_DIR=${HANGAR_INSTALL_SOURCE_DIR:-}
 HANGAR_RELEASE=${HANGAR_RELEASE:-}
 HANGAR_REQUIRE_SIGNATURE=${HANGAR_REQUIRE_SIGNATURE:-0}
+# Set by upgrade: the directory holding the verified files of the new release.
+STAGED_DEPLOYMENT_DIR=""
 
 function print_header() {
 if [ "$HANGAR_ASSUME_YES" != "1" ] && [ -t 1 ]; then
@@ -722,12 +724,16 @@ function download() {
     checkSecretKeyRotation || exit 1
     cd "$SCRIPT_DIR" || exit 1
     # Fetched and verified in a scratch directory first, so a failed or
-    # tampered download leaves the deployment as it was.
-    staging=$(mktemp -d "$PLANE_INSTALL_DIR/.download.XXXXXX") || exit 1
-    if ! stageDeploymentFiles "$staging"; then
+    # tampered download leaves the deployment as it was. An upgrade stages
+    # them before it stops the services and hands the directory over here.
+    if [ -n "$STAGED_DEPLOYMENT_DIR" ] && [ -d "$STAGED_DEPLOYMENT_DIR" ]; then
+        staging=$STAGED_DEPLOYMENT_DIR
+    else
+        staging=$(mktemp -d "$PLANE_INSTALL_DIR/.download.XXXXXX") || exit 1
+    fi
+    if [ "$staging" != "$STAGED_DEPLOYMENT_DIR" ] && ! stageDeploymentFiles "$staging"; then
         rm -rf "$staging"
-        echo "Nothing in $PLANE_INSTALL_DIR has been changed. If an upgrade stopped the services,"
-        echo "'$0 start' starts the installed release again. Exiting..."
+        echo "Nothing in $PLANE_INSTALL_DIR has been changed. Exiting..."
         exit 1
     fi
 
@@ -999,6 +1005,17 @@ function upgrade() {
     echo "Upgrading Hangar to the latest release..."
     echo ""
 
+    # Download and verify the new release while the installed one keeps
+    # running, so a download that fails or does not verify leaves it running.
+    echo "***** DOWNLOADING AND VERIFYING RELEASE $latest_release ****"
+    STAGED_DEPLOYMENT_DIR=$(mktemp -d "$PLANE_INSTALL_DIR/.download.XXXXXX") || exit 1
+    trap 'rm -rf "$STAGED_DEPLOYMENT_DIR"' EXIT
+    if ! stageDeploymentFiles "$STAGED_DEPLOYMENT_DIR"; then
+        echo "Nothing in $PLANE_INSTALL_DIR has been changed, and the services were not stopped. Exiting..."
+        exit 1
+    fi
+
+    echo
     echo "***** STOPPING SERVICES ****"
     stopServices
 

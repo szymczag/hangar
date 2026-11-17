@@ -28,7 +28,10 @@ DOCKER_ENV_PATH=$PLANE_INSTALL_DIR/plane.env
 # with yes and does not clear the screen.
 # HANGAR_REQUIRE_SIGNATURE=1 refuses deployment files whose Cosign signature
 # cannot be checked: no cosign, a release without SHA256SUMS, or a branch.
+# HANGAR_RELEASE=vX.Y.Z deploys or upgrades to that release instead of asking
+# the GitHub API for the latest one, which rate-limits anonymous use.
 HANGAR_ASSUME_YES=${HANGAR_ASSUME_YES:-0}
+HANGAR_RELEASE=${HANGAR_RELEASE:-}
 HANGAR_REQUIRE_SIGNATURE=${HANGAR_REQUIRE_SIGNATURE:-0}
 
 function print_header() {
@@ -631,7 +634,11 @@ function deployStack() {
     if [ ! -f "$DOCKER_FILE_PATH" ] || [ ! -f "$DOCKER_ENV_PATH" ]; then
         echo "Configuration files not found"
         echo "Downloading it now......"
-        APP_RELEASE=$(checkLatestRelease) || exit 1
+        if [ -n "$HANGAR_RELEASE" ]; then
+            APP_RELEASE=${HANGAR_RELEASE#hangar-}
+        else
+            APP_RELEASE=$(checkLatestRelease) || exit 1
+        fi
         download
     fi
     if [ -z "$stack_name" ]; then
@@ -752,7 +759,11 @@ function upgrade() {
     
     checkSecretKeyRotation || exit 1
     local latest_release
-    latest_release=$(checkLatestRelease) || exit 1
+    if [ -n "$HANGAR_RELEASE" ]; then
+        latest_release=${HANGAR_RELEASE#hangar-}
+    else
+        latest_release=$(checkLatestRelease) || exit 1
+    fi
 
     echo ""
     echo "Current release: $APP_RELEASE"
