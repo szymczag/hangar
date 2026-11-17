@@ -152,3 +152,34 @@ class TestIssueTypeHierarchyAPI:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "parent_id" in response.data
+
+
+@pytest.mark.contract
+class TestIssueByIdentifier:
+    """GET /api/v1/workspaces/{slug}/issues/{project_identifier}-{issue_identifier}/
+
+    A non-numeric ``issue_identifier`` (e.g. the tail of a UUID) used to reach
+    ``sequence_id=<str>`` and raise ValueError (HTTP 500).
+    """
+
+    @pytest.mark.django_db
+    def test_non_numeric_identifier_returns_404(self, api_key_client, workspace, project, issue):
+        response = api_key_client.get(f"/api/v1/workspaces/{workspace.slug}/issues/{project.identifier}-5263003e54ee/")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.django_db
+    def test_non_decimal_digit_returns_404(self, api_key_client, workspace, project):
+        # "²".isdigit() is True but int("²") raises ValueError
+        response = api_key_client.get(f"/api/v1/workspaces/{workspace.slug}/issues/{project.identifier}-²/")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.django_db
+    def test_identifier_still_resolves(self, api_key_client, workspace, project, issue):
+        response = api_key_client.get(
+            f"/api/v1/workspaces/{workspace.slug}/issues/{project.identifier}-{issue.sequence_id}/"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert str(response.data["id"]) == str(issue.id)

@@ -409,7 +409,7 @@
   },
   "epic": {
     "new": "Nowy epik",
-    "label": "{count, plural, one {Epik} other {Epiki}}",
+    "label": "{count, plural, one {Epik} few {Epiki} many {Epików} other {Epika}}",
     "adding": "Dodawanie epiku",
     "create": {
       "success": "Epik utworzono pomyślnie"

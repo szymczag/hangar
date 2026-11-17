@@ -29,6 +29,7 @@ import { isStaleAssetError, recoverFromStaleAsset } from "@/lib/stale-asset-erro
 // Hangar extension
 import { MaintenanceBar } from "@/plane-web/components/instance/maintenance-bar";
 // local
+import { trailingSlashRedirectMiddleware } from "./compat/next/trailing-slash-redirect";
 import { CustomErrorComponent } from "./error";
 import { AppProvider } from "./provider";
 // fonts
@@ -39,6 +40,11 @@ import interVariableWoff2 from "@fontsource-variable/inter/files/inter-latin-wgh
 import "@fontsource/material-symbols-rounded";
 // oxlint-disable-next-line import/no-unassigned-import -- registers the bundled monospace font
 import "@fontsource/ibm-plex-mono";
+
+// Upstream makeplane/plane#9824 adds this to its pathless app/layout.tsx; Hangar's
+// root route plays that role. In SPA mode every non-root route loader runs on
+// hydration, so the root middleware also runs on a cold load.
+export const clientMiddleware: Route.ClientMiddlewareFunction[] = [trailingSlashRedirectMiddleware];
 
 const APP_TITLE = "Hangar | Simple, extensible, open-source project management tool.";
 

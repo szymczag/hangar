@@ -295,6 +295,12 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         This endpoint provides workspace-level access to work items.
         """
         if issue_identifier and project_identifier:
+            # The `<project_identifier>-<issue_identifier>` route also matches UUIDs;
+            # sequence_id is an integer, so anything else can't be a work item here.
+            # Raised rather than returned so the 404 matches a missing or
+            # guest-hidden work item.
+            if not issue_identifier.isdecimal():
+                raise Issue.DoesNotExist()
             issue = (
                 Issue.issue_objects.select_related("type")
                 .annotate(
