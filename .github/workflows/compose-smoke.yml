@@ -1,0 +1,184 @@
+name: Compose smoke test
+
+# Installs the Compose deployment the way an operator does -- setup.sh with
+# this pull request's docker-compose.yml and variables.env -- against the
+# latest published images, starts it, and checks it serves. It catches what
+# the unit tests cannot: a hardening option an image cannot run under, a
+# healthcheck that never passes, a secret the installer leaves on a template
+# value, a connection setting the API does not receive.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - preview
+    paths:
+      - "deployments/cli/community/**"
+      - "apps/api/bin/**"
+      - ".github/workflows/compose-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compose-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Install and start the Compose deployment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # setup.sh names the Compose project after this folder.
+      INSTALL_ROOT: ${{ runner.temp }}/hangar
+      HANGAR_ASSUME_YES: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install with this pull request's deployment files
+        env:
+          HANGAR_INSTALL_SOURCE_DIR: ${{ github.workspace }}/deployments/cli/community
+        run: |
+          set -euo pipefail
+          mkdir -p "$INSTALL_ROOT"
+          cd "$INSTALL_ROOT"
+          bash "$GITHUB_WORKSPACE/deployments/cli/community/install.sh" --yes install
+          # Off the privileged ports, so the check also covers the port settings.
+          sed -i 's/^LISTEN_HTTP_PORT=.*/LISTEN_HTTP_PORT=8080/; s/^LISTEN_HTTPS_PORT=.*/LISTEN_HTTPS_PORT=8443/' plane-app/plane.env
+
+      - name: Check that no secret is left on a published value
+        run: |
+          set -euo pipefail
+          env_file="$INSTALL_ROOT/plane-app/plane.env"
+          value() { grep "^$1=" "$env_file" | cut -d= -f2-; }
+          failed=0
+          for name in SECRET_KEY LIVE_SERVER_SECRET_KEY POSTGRES_PASSWORD RABBITMQ_PASSWORD AWS_SECRET_ACCESS_KEY; do
+            current=$(value "$name")
+            case "$current" in
+              ""|plane|secret-key|change-this-key-on-deployment)
+                echo "::error::$name is empty or a published template value"
+                failed=1
+                ;;
+            esac
+            if [ "${#current}" -lt 32 ]; then
+              echo "::error::$name is shorter than 32 characters"
+              failed=1
+            fi
+          done
+          for name in DATABASE_URL AMQP_URL; do
+            if [ -n "$(value "$name")" ]; then
+              echo "::error::$name is set; a new deployment connects with the generated passwords"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      - name: Check that Swarm accepts the Compose file
+        run: |
+          set -euo pipefail
+          # swarm.sh deploys this same file with docker stack deploy, which
+          # validates it against its own, older schema.
+          set -o allexport
+          source "$INSTALL_ROOT/plane-app/plane.env"
+          set +o allexport
+          docker stack config -c "$INSTALL_ROOT/plane-app/docker-compose.yaml" > /dev/null
+
+      - name: Start
+        run: |
+          set -euo pipefail
+          cd "$INSTALL_ROOT"
+          bash "$GITHUB_WORKSPACE/deployments/cli/community/install.sh" --yes start
+
+      - name: Wait for every healthcheck
+        run: |
+          set -euo pipefail
+          cd "$INSTALL_ROOT/plane-app"
+          compose() { docker compose -f docker-compose.yaml --env-file plane.env "$@"; }
+          deadline=$((SECONDS + 600))
+          while :; do
+            pending=""
+            for id in $(compose ps -q); do
+              name=$(docker inspect --format '{{.Name}}' "$id")
+              health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id")
+              state=$(docker inspect --format '{{.State.Status}}' "$id")
+              case "$health/$state" in
+                healthy/running|none/running) ;;
+                *) pending="$pending $name=$health/$state" ;;
+              esac
+            done
+            [ -z "$pending" ] && break
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::not healthy after 10 minutes:$pending"
+              exit 1
+            fi
+            sleep 10
+          done
+          compose ps
+
+      - name: Check the services through the proxy
+        run: |
+          set -euo pipefail
+          check() {
+            local path=$1 status
+            for _ in $(seq 1 30); do
+              status=$(curl -s -o /tmp/body -w '%{http_code}' "http://localhost:8080$path" || true)
+              if [ "$status" = 200 ]; then
+                echo "$path -> 200"
+                return 0
+              fi
+              sleep 5
+            done
+            echo "::error::$path returned $status"
+            head -c 2000 /tmp/body || true
+            return 1
+          }
+          check /
+          check /api/instances/
+          grep -q '"instance"' /tmp/body
+          check /god-mode/
+          check /spaces/
+
+      - name: Check that the containers run hardened
+        run: |
+          set -euo pipefail
+          cd "$INSTALL_ROOT/plane-app"
+          for id in $(docker compose -f docker-compose.yaml --env-file plane.env ps -q); do
+            name=$(docker inspect --format '{{.Name}}' "$id")
+            options=$(docker inspect --format '{{json .HostConfig.SecurityOpt}}' "$id")
+            case "$options" in
+              *no-new-privileges*) ;;
+              *) echo "::error::$name runs without no-new-privileges"; exit 1 ;;
+            esac
+          done
+
+      - name: Check that the entrypoints refuse a template SECRET_KEY
+        run: |
+          set -euo pipefail
+          release=$(grep '^APP_RELEASE=' "$INSTALL_ROOT/plane-app/plane.env" | cut -d= -f2-)
+          for key in "" change-this-key-on-deployment; do
+            status=0
+            docker run --rm -e SECRET_KEY="$key" \
+              -v "$GITHUB_WORKSPACE/apps/api/bin:/code/bin:ro" \
+              "ghcr.io/szymczag/hangar-api:$release" ./bin/docker-entrypoint-api.sh || status=$?
+            if [ "$status" != 64 ]; then
+              echo "::error::SECRET_KEY='$key' gave exit status $status, not 64"
+              exit 1
+            fi
+          done
+
+      - name: Show the deployment state
+        if: failure()
+        run: |
+          cd "$INSTALL_ROOT/plane-app" || exit 0
+          docker compose -f docker-compose.yaml --env-file plane.env ps -a || true
+          docker compose -f docker-compose.yaml --env-file plane.env logs --no-color --tail 200 || true
+
+      - name: Remove the deployment
+        if: always()
+        run: |
+          cd "$INSTALL_ROOT/plane-app" || exit 0
+          docker compose -f docker-compose.yaml --env-file plane.env down -v --remove-orphans || true
