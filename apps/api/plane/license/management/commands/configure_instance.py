@@ -38,3 +38,19 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"{obj.key} loaded with value from environment variable."))
             else:
                 self.stdout.write(self.style.WARNING(f"{obj.key} configuration already exists"))
+
+        self.reencrypt_legacy_values()
+
+    def reencrypt_legacy_values(self):
+        """Move values encrypted under a template SECRET_KEY to the current one."""
+        from plane.license.utils.encryption import reencrypt_from_legacy_key
+
+        for obj in (
+            InstanceConfiguration.objects.filter(is_encrypted=True).exclude(value__isnull=True).exclude(value="")
+        ):
+            value = reencrypt_from_legacy_key(obj.value)
+            if value is None:
+                continue
+            obj.value = value
+            obj.save()
+            self.stdout.write(self.style.SUCCESS(f"{obj.key} re-encrypted with the current SECRET_KEY."))
