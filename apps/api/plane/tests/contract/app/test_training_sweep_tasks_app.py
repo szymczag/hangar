@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from cryptography.fernet import Fernet
+from django.utils import timezone as django_timezone
 
 from plane.ext.capacity.crypto import encrypt_value
 from plane.ext.capacity.training_sync import (
@@ -170,6 +171,9 @@ def test_pruning_removes_only_what_the_sweep_retired(keys, workspace, create_use
 @pytest.mark.contract
 @pytest.mark.django_db
 def test_a_recently_retired_occurrence_is_kept_for_its_grace_period(keys, workspace, create_user):
+    # The task measures the grace period from the real clock, so "recent" has to
+    # be recent now, not on the fixed NOW the sweep tests use.
+    recent = django_timezone.now()
     profile = TrainerProfile.objects.create(workspace=workspace, user=create_user)
     rule = _rule(workspace)
     TrainingEventOccurrence.objects.create(
@@ -179,12 +183,12 @@ def test_a_recently_retired_occurrence_is_kept_for_its_grace_period(keys, worksp
         rule=rule,
         event_key="recent",
         calendar_id_hash="hash",
-        starts_at=NOW,
-        ends_at=NOW + timedelta(hours=2),
+        starts_at=recent,
+        ends_at=recent + timedelta(hours=2),
         status=TrainingEventOccurrence.Status.CONFIRMED,
         state=TrainingEventOccurrence.State.CANCELLED,
-        first_seen_at=NOW,
-        last_seen_at=NOW,
+        first_seen_at=recent,
+        last_seen_at=recent,
     )
 
     assert prune_training_event_occurrences() == 0
