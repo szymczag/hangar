@@ -134,10 +134,17 @@ jobs:
         run: corepack enable pnpm
       # Reads the lockfile; nothing is installed. Production dependencies only:
       # what ships in the images. Moderate and lower are reported, not gated.
+      #
+      # GHSA-fc5q-39xc-vjpf (picomatch ReDoS through repeated extglobs, HIGH)
+      # has no patched release: npm's newest picomatch is 4.0.7, which the
+      # advisory covers. The only production path is apps/live >
+      # @effect/platform-node > @parcel/watcher, and apps/live never starts a
+      # file watcher, so no pattern reaches picomatch. Drop the ignore once a fixed
+      # picomatch is published and raise the `picomatch` override to it.
       - name: Audit production dependencies
         run: |
           pnpm audit --prod || true
-          pnpm audit --prod --audit-level high
+          pnpm audit --prod --audit-level high --ignore GHSA-fc5q-39xc-vjpf
 
   trivy:
     name: Verify Trivy image
