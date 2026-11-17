@@ -6,7 +6,8 @@
 # affecting security updates, which the groups below batch into one pull
 # request per ecosystem.
 #
-# Container base images and GitHub Actions receive weekly version updates.
+# Container base images, the third-party images in the Compose deployment and
+# GitHub Actions receive weekly version updates.
 # Dependabot finds every file whose name contains "dockerfile" (Dockerfile.web,
 # Dockerfile.ce, Dockerfile.dev, ...). A bump of a base image that a test pins
 # (.github/scripts/tests/test_container_runtime_hardening.py,
@@ -69,6 +70,31 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "*python"
         versions: [">=3.13"]
+
+  # The Postgres, Valkey, RabbitMQ and SeaweedFS images the Compose deployment
+  # pins by tag and digest. A major version of a data service is a data
+  # migration, not a bump: Postgres needs pg_upgrade and RabbitMQ 4 needs its
+  # feature flags enabled first, so those stay manual.
+  - package-ecosystem: docker-compose
+    directory: /deployments/cli/community
+    target-branch: preview
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      compose-images:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*postgres"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "*rabbitmq"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "*valkey"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

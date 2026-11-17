@@ -149,40 +149,72 @@ x-app-env: &app-env
   ADMIN_2FA_CHALLENGE_TTL: ${ADMIN_2FA_CHALLENGE_TTL:-300}
   ADMIN_2FA_MAX_ATTEMPTS: ${ADMIN_2FA_MAX_ATTEMPTS:-5}
 
+# Hardening: every service runs with no-new-privileges. The application images
+# run as an unprivileged user and need no Linux capabilities; the proxy keeps
+# only the one that binds ports 80 and 443. Postgres, Valkey and RabbitMQ start
+# as root and switch to their own user, which needs the default set.
+#
+# Ordering: the API and the workers wait for healthy data services. Services
+# that follow the API wait only for it to start: its first start after an
+# upgrade runs the migrations, and gating the rest on its health would let a
+# long migration abort `up` before the proxy exists.
 services:
   web:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-web:${APP_RELEASE:-stable}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: ${WEB_REPLICAS:-1}
       restart_policy:
         condition: any
     depends_on:
-      - api
-      - worker
+      api:
+        condition: service_started
+      worker:
+        condition: service_started
 
   space:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-space:${APP_RELEASE:-stable}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: ${SPACE_REPLICAS:-1}
       restart_policy:
         condition: any
     depends_on:
-      - api
-      - worker
-      - web
+      api:
+        condition: service_started
+      worker:
+        condition: service_started
+      web:
+        condition: service_started
 
   admin:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-admin:${APP_RELEASE:-stable}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: ${ADMIN_REPLICAS:-1}
       restart_policy:
         condition: any
     depends_on:
-      - api
-      - web
+      api:
+        condition: service_started
+      web:
+        condition: service_started
 
   live:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-live:${APP_RELEASE:-stable}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       <<: [*live-env, *redis-env]
     deploy:
@@ -190,12 +222,18 @@ services:
       restart_policy:
         condition: any
     depends_on:
-      - api
-      - web
+      api:
+        condition: service_started
+      web:
+        condition: service_started
 
   api:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-api:${APP_RELEASE:-stable}
     command: ./bin/docker-entrypoint-api.sh
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: ${API_REPLICAS:-1}
       restart_policy:
@@ -204,14 +242,30 @@ services:
       - logs_api:/code/plane/logs
     environment:
       <<: [*app-env, *db-env, *redis-env, *aws-s3-env, *proxy-env, *mail-env]
+    # The same request setup.sh waits on. The long start period covers the
+    # migrations a first start after an upgrade waits for. A shell string rather
+    # than an exec array: podman-compose joins the array into one unquoted line.
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=5)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10m
     depends_on:
-      - plane-db
-      - plane-redis
-      - plane-mq
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
 
   worker:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-api:${APP_RELEASE:-stable}
     command: ./bin/docker-entrypoint-worker.sh
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: ${WORKER_REPLICAS:-1}
       restart_policy:
@@ -221,14 +275,22 @@ services:
     environment:
       <<: [*app-env, *db-env, *redis-env, *aws-s3-env, *proxy-env, *mail-env]
     depends_on:
-      - api
-      - plane-db
-      - plane-redis
-      - plane-mq
+      api:
+        condition: service_started
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
 
   import-worker:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-api:${APP_RELEASE:-stable}
     command: ./bin/docker-entrypoint-worker.sh
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: ${IMPORT_WORKER_REPLICAS:-1}
       restart_policy:
@@ -239,14 +301,22 @@ services:
       <<: [*app-env, *db-env, *redis-env, *aws-s3-env, *proxy-env, *mail-env]
       HANGAR_WORKER_QUEUE: imports
     depends_on:
-      - api
-      - plane-db
-      - plane-redis
-      - plane-mq
+      api:
+        condition: service_started
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
 
   mail-worker:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-api:${APP_RELEASE:-stable}
     command: ./bin/docker-entrypoint-worker.sh
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: ${MAIL_WORKER_REPLICAS:-1}
       restart_policy:
@@ -260,14 +330,22 @@ services:
       # encrypted notification is written to the outbox and never sent.
       HANGAR_WORKER_QUEUE: email
     depends_on:
-      - api
-      - plane-db
-      - plane-redis
-      - plane-mq
+      api:
+        condition: service_started
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
 
   beat-worker:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-api:${APP_RELEASE:-stable}
     command: ./bin/docker-entrypoint-beat.sh
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: ${BEAT_WORKER_REPLICAS:-1}
       restart_policy:
@@ -277,14 +355,22 @@ services:
     environment:
       <<: [*app-env, *db-env, *redis-env, *aws-s3-env, *proxy-env, *mail-env]
     depends_on:
-      - api
-      - plane-db
-      - plane-redis
-      - plane-mq
+      api:
+        condition: service_started
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
 
   migrator:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-api:${APP_RELEASE:-stable}
     command: ./bin/docker-entrypoint-migrator.sh
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: 1
       restart_policy:
@@ -294,13 +380,17 @@ services:
     environment:
       <<: [*app-env, *db-env, *redis-env, *aws-s3-env, *proxy-env, *mail-env]
     depends_on:
-      - plane-db
-      - plane-redis
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
 
   # Comment this if you already have a database running
   plane-db:
-    image: docker.io/library/postgres:15.7-alpine
+    image: docker.io/library/postgres:15.7-alpine@sha256:468d34fefd6338031787c7b8e94078975b3aaf4d66c7ead25c39cd3ba46a15c6
     command: postgres -c 'max_connections=1000'
+    security_opt:
+      - no-new-privileges:true
     deploy:
       replicas: 1
       restart_policy:
@@ -309,18 +399,33 @@ services:
       <<: *db-env
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   plane-redis:
-    image: docker.io/valkey/valkey:7.2.11-alpine
+    image: docker.io/valkey/valkey:7.2.11-alpine@sha256:10328d00120dc14fbc87b2ed61b7677ddbb0d011e705361b4788329a0ec69a93
+    security_opt:
+      - no-new-privileges:true
     deploy:
       replicas: 1
       restart_policy:
         condition: any
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   plane-mq:
-    image: docker.io/library/rabbitmq:3.13.6-management-alpine
+    image: docker.io/library/rabbitmq:3.13.6-management-alpine@sha256:611107e29cce05c2acd968325d5dcbde7e2fee404970f1ead75fdb22be2821b3
+    security_opt:
+      - no-new-privileges:true
     deploy:
       replicas: 1
       restart_policy:
@@ -329,6 +434,12 @@ services:
       <<: *mq-env
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   # Bundled object storage. With USE_MINIO=0 it stays idle and the proxy does not
   # route the bucket to it, so external S3 installs need not remove it.
@@ -340,6 +451,10 @@ services:
     # migrate-object-storage.sh once (setup.sh upgrade does this for you).
     image: docker.io/chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       replicas: 1
       restart_policy:
@@ -376,6 +491,13 @@ services:
   # Comment this if you already have a reverse proxy running
   proxy:
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-proxy:${APP_RELEASE:-stable}
+    # Caddy runs as root in this image to bind 80 and 443; it needs nothing else.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     deploy:
       replicas: 1
       restart_policy:
@@ -395,11 +517,16 @@ services:
       - proxy_config:/config
       - proxy_data:/data
     depends_on:
-      - web
-      - api
-      - space
-      - admin
-      - live
+      web:
+        condition: service_started
+      api:
+        condition: service_started
+      space:
+        condition: service_started
+      admin:
+        condition: service_started
+      live:
+        condition: service_started
 
 volumes:
   pgdata:
