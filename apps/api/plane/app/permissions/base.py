@@ -119,12 +119,27 @@ def issue_hidden_from_guest(request, slug, project_id, issue_id):
     Returns False for admins, members, unrestricted guests, and for the guest's
     own issues. Callers should translate a True result into a 403.
     """
+    return issue_hidden_from_user(
+        user_id=request.user.id,
+        project_id=project_id,
+        issue_id=issue_id,
+        workspace_scope={"workspace__slug": slug},
+    )
+
+
+def issue_hidden_from_user(*, user_id, project_id, issue_id, workspace_scope):
+    """The rule behind ``issue_hidden_from_guest``, for callers holding a user id
+    rather than a request, such as the file asset read check.
+
+    ``workspace_scope`` is the lookup that pins the workspace, for example
+    ``{"workspace__slug": slug}`` or ``{"workspace_id": workspace_id}``.
+    """
     from plane.db.models import Issue
 
     is_restricted_guest = ProjectMember.objects.filter(
-        workspace__slug=slug,
+        **workspace_scope,
         project_id=project_id,
-        member=request.user,
+        member_id=user_id,
         role=ROLE.GUEST.value,
         is_active=True,
         project__guest_view_all_features=False,
@@ -133,9 +148,9 @@ def issue_hidden_from_guest(request, slug, project_id, issue_id):
         return False
 
     owns_issue = Issue.objects.filter(
+        **workspace_scope,
         pk=issue_id,
-        workspace__slug=slug,
         project_id=project_id,
-        created_by=request.user,
+        created_by_id=user_id,
     ).exists()
     return not owns_issue
