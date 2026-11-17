@@ -30,8 +30,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      # setup.sh names the Compose project after this folder.
-      INSTALL_ROOT: ${{ runner.temp }}/hangar
       HANGAR_ASSUME_YES: "1"
     steps:
       - name: Check out repository
@@ -40,10 +38,12 @@ jobs:
           persist-credentials: false
 
       - name: Install with this pull request's deployment files
-        env:
-          HANGAR_INSTALL_SOURCE_DIR: ${{ github.workspace }}/deployments/cli/community
         run: |
           set -euo pipefail
+          # setup.sh installs into ./plane-app and names the Compose project after it.
+          INSTALL_ROOT="$RUNNER_TEMP/hangar"
+          echo "INSTALL_ROOT=$INSTALL_ROOT" >> "$GITHUB_ENV"
+          export HANGAR_INSTALL_SOURCE_DIR="$GITHUB_WORKSPACE/deployments/cli/community"
           mkdir -p "$INSTALL_ROOT"
           cd "$INSTALL_ROOT"
           bash "$GITHUB_WORKSPACE/deployments/cli/community/install.sh" --yes install
