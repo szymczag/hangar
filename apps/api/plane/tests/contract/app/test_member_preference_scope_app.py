@@ -12,6 +12,12 @@ preferences.
 
 The fix rejects any request where ``member_id != request.user.id`` (403);
 preferences are personal.
+
+The member-detail endpoint (``/members/<pk>/``) serialises the whole membership
+row, so it also carried another member's ``preferences``, ``view_props`` and
+``default_props``, and let a project admin overwrite them. It now omits those
+fields unless the row belongs to the caller and rejects (403) any write to them
+on another member's row.
 """
 
 from uuid import uuid4
@@ -23,6 +29,8 @@ from rest_framework.test import APIClient
 from plane.db.models import Project, ProjectMember, User, WorkspaceMember
 
 PREF_URL = "/api/workspaces/{slug}/projects/{project_id}/preferences/member/{member_id}/"
+MEMBER_URL = "/api/workspaces/{slug}/projects/{project_id}/members/{pk}/"
+PERSONAL_FIELDS = ("preferences", "view_props", "default_props")
 
 
 def _member(workspace, project, *, role):
@@ -119,3 +127,64 @@ class TestMemberPreferenceScope:
         # must survive. Pins that semantic against a wholesale-replace regression.
         for key, value in original.items():
             assert member_record.preferences[key] == value
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestMemberDetailPreferenceScope:
+    """The member-detail endpoint only exposes and accepts personal fields for the caller's own row."""
+
+    def test_member_detail_omits_other_members_personal_fields(self, workspace, project, create_user):
+        other = _member(workspace, project, role=15)
+        owner_member = ProjectMember.objects.get(project=project, member=create_user)
+
+        response = _client(other).get(MEMBER_URL.format(slug=workspace.slug, project_id=project.id, pk=owner_member.id))
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+        for field in PERSONAL_FIELDS:
+            assert field not in response.data
+
+    def test_member_detail_returns_own_preferences(self, workspace, project):
+        member = _member(workspace, project, role=15)
+        member_record = ProjectMember.objects.get(project=project, member=member)
+
+        response = _client(member).get(
+            MEMBER_URL.format(slug=workspace.slug, project_id=project.id, pk=member_record.id)
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["preferences"] == member_record.preferences
+
+    @pytest.mark.parametrize("field", PERSONAL_FIELDS)
+    def test_admin_cannot_update_other_members_personal_fields(self, workspace, project, create_user, field):
+        member = _member(workspace, project, role=15)
+        member_record = ProjectMember.objects.get(project=project, member=member)
+        original = getattr(member_record, field)
+
+        response = _client(create_user).patch(
+            MEMBER_URL.format(slug=workspace.slug, project_id=project.id, pk=member_record.id),
+            {field: {"pinned": ["changed"]}, "role": 5},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+        member_record.refresh_from_db()
+        assert getattr(member_record, field) == original
+        assert member_record.role == 15
+
+    def test_member_detail_update_omits_other_members_personal_fields(self, workspace, project, create_user):
+        member = _member(workspace, project, role=15)
+        member_record = ProjectMember.objects.get(project=project, member=member)
+
+        response = _client(create_user).patch(
+            MEMBER_URL.format(slug=workspace.slug, project_id=project.id, pk=member_record.id),
+            {"role": 5},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+        assert response.data["role"] == 5
+        for field in PERSONAL_FIELDS:
+            assert field not in response.data
