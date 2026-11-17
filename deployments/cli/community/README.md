@@ -778,6 +778,8 @@ Unattended: `./setup.sh backup`.
 When you want to restore the previously backed-up data, follow the instructions below.
 
 1. Make sure that Hangar-CE is installed, started, and then stopped. This ensures that the Docker volumes are created.
+   Put the `plane.env` saved with the backup back in `plane-app/` before you start it again: the restored
+   data only opens with the passwords and keys it was written with.
 
 1. Download the restore script using the command below. We suggest downloading it in the same folder as `setup.sh`.
 
@@ -823,10 +825,34 @@ When you want to restore the previously backed-up data, follow the instructions 
 
 1. Start the Hangar instance using `./setup.sh start`.
 
+   `restore.sh` exits with an error, and does not report success, when any volume
+   fails to restore; do not start Hangar on that data.
+
    A backup taken before the move to SeaweedFS contains `uploads.tar.gz` (MinIO
    format). It restores into `plane-app_uploads`; run
    `./setup.sh migrate-storage` afterwards to copy it into SeaweedFS (see
    [Object storage: MinIO to SeaweedFS](#object-storage-minio-to-seaweedfs)).
+
+**Restoring on a new host.** `setup.sh` generates new database and RabbitMQ
+passwords for a deployment that has no volumes yet, so restore the volumes
+before the installer runs, in this order:
+
+```bash
+mkdir -p plane-app
+cp /path/to/backup/plane.env plane-app/plane.env
+for volume in pgdata redisdata object-storage rabbitmq_data; do
+  docker volume create "plane-app_${volume}"
+done
+./restore.sh /path/to/backup
+./setup.sh --yes install   # keeps the passwords of the restored volumes
+./setup.sh --yes start
+```
+
+The install takes the release named by `APP_RELEASE` in the restored
+`plane.env`, the one the backup was taken on, which is what rolling back an
+upgrade needs. To restore onto a newer release instead, run the install with
+`HANGAR_RELEASE=vX.Y.Z`; its migrations then run on the restored data as they do
+on an upgrade. The qualification restores onto the new release this way.
 
 ---
 
