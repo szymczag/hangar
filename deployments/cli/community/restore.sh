@@ -41,7 +41,7 @@ function restoreSingleVolume() {
         -e TAR_NAME="$restoreFile" \
         -v "$selectedVolume":"/vol" \
         -v "$backupFolder":/backup \
-        busybox sh -c 'mkdir -p /restore && tar -xzf "/backup/${TAR_NAME}.tar.gz" -C /restore && mv /restore/${TAR_NAME}/* /vol'
+        busybox sh -c 'mkdir -p /restore && tar -xzf "/backup/${TAR_NAME}.tar.gz" -C /restore && cp -a "/restore/${TAR_NAME}/." /vol/'
     
     if [ $? -ne 0 ]; then
         echo "Error: Failed to restore volume ${selectedVolume} from ${restoreFile}.tar.gz"
@@ -68,6 +68,7 @@ function restoreData() {
 
     local volume_suffix
     volume_suffix="_pgdata|_redisdata|_object-storage|_uploads|_rabbitmq_data"
+    local failed=0
     local volumes
     volumes=$(docker volume ls -f "name=plane-app" --format "{{.Name}}" | grep -E "$volume_suffix")
     # Check if there are any matching volumes
@@ -95,7 +96,7 @@ function restoreData() {
                 echo "Skipping: No volume found with name $restoreVolName"
             else
                 echo ".....Restoring $docVol"
-                restoreSingleVolume "$docVol" "$BACKUP_FOLDER" "$restoreFileName"
+                restoreSingleVolume "$docVol" "$BACKUP_FOLDER" "$restoreFileName" || failed=1
             fi
         else
             echo "No .tar.gz files found in the current directory."
@@ -106,6 +107,11 @@ function restoreData() {
             exit 1
         fi
     done
+
+    if [ "$failed" -ne 0 ]; then
+        echo "Restore failed for at least one volume; do not start Hangar on this data."
+        exit 1
+    fi
 
     echo ""
     echo "Restore completed successfully."
