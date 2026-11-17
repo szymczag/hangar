@@ -28,6 +28,10 @@ on:
       - "apps/*/public/config.js"
       - "apps/space/app/issues/**"
       - "packages/constants/src/endpoints.ts"
+      - "apps/api/plane/settings/common.py"
+      - "apps/live/src/env.ts"
+      - "docker-compose.yml"
+      - ".github/dependabot.yml"
   push:
     branches:
       - preview
@@ -54,6 +58,10 @@ on:
       - "apps/*/public/config.js"
       - "apps/space/app/issues/**"
       - "packages/constants/src/endpoints.ts"
+      - "apps/api/plane/settings/common.py"
+      - "apps/live/src/env.ts"
+      - "docker-compose.yml"
+      - ".github/dependabot.yml"
 
 permissions:
   contents: read

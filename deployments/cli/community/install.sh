@@ -19,9 +19,25 @@ mkdir -p $PLANE_INSTALL_DIR/archive
 DOCKER_FILE_PATH=$PLANE_INSTALL_DIR/docker-compose.yaml
 DOCKER_ENV_PATH=$PLANE_INSTALL_DIR/plane.env
 MIGRATE_STORAGE_SCRIPT=$PLANE_INSTALL_DIR/migrate-object-storage.sh
+# The Compose project name, which prefixes the volume names.
+DEPLOYMENT_NAME=$SERVICE_FOLDER
+
+# Unattended use:
+#   HANGAR_ASSUME_YES=1 (or --yes) answers the upgrade prompt with yes, refuses
+#   to fall back to a local image build, and does not clear the screen.
+#   HANGAR_INSTALL_SOURCE_DIR=<dir> takes docker-compose.yml, variables.env and
+#   migrate-object-storage.sh from <dir> (deployments/cli/community in a
+#   checkout) instead of downloading them from the release.
+#   HANGAR_RELEASE=vX.Y.Z installs or upgrades to that release instead of
+#   asking the GitHub API for the latest one, which rate-limits anonymous use.
+HANGAR_ASSUME_YES=${HANGAR_ASSUME_YES:-0}
+HANGAR_INSTALL_SOURCE_DIR=${HANGAR_INSTALL_SOURCE_DIR:-}
+HANGAR_RELEASE=${HANGAR_RELEASE:-}
 
 function print_header() {
-clear
+if [ "$HANGAR_ASSUME_YES" != "1" ] && [ -t 1 ]; then
+    clear
+fi
 
 cat <<"EOF"
 ##+.    ##+    .##-                  
@@ -130,7 +146,8 @@ function getEnvValue() {
         grep -q "^$key=" "$file"
         if [ $? -eq 0 ]; then
             local value
-            value=$(grep "^$key=" "$file" | cut -d'=' -f2)
+            # -f2-: a value may itself contain '=' (URLs with a query string).
+            value=$(grep "^$key=" "$file" | cut -d'=' -f2-)
             echo "$value"
         else
             echo ""
@@ -154,11 +171,13 @@ function updateEnvFile() {
             echo "$key=$value" >> "$file"
             return
         else 
+            # Escape what sed treats specially in a replacement: the
+            # delimiter, '&' and the backslash.
             if [ "$OS_NAME" == "Darwin" ]; then
-                value=$(echo "$value" | sed 's/|/\\|/g')
+                value=$(printf '%s\n' "$value" | sed -e 's/[|&\\]/\\&/g')
                 sed -i '' "s|^$key=.*|$key=$value|g" "$file"
             else
-                value=$(echo "$value" | sed 's/\//\\\//g')
+                value=$(printf '%s\n' "$value" | sed -e 's/[\/&\\]/\\&/g')
                 sed -i "s/^$key=.*/$key=$value/g" "$file"
             fi
         fi
@@ -233,7 +252,10 @@ function install() {
     echo "Begin Installing Hangar"
     echo ""
 
-    if [ "$APP_RELEASE" == "stable" ]; then
+    if [ -n "$HANGAR_RELEASE" ]; then
+        APP_RELEASE=${HANGAR_RELEASE#hangar-}
+        export APP_RELEASE
+    elif [ "$APP_RELEASE" == "stable" ]; then
         # exit inside checkLatestRelease only leaves the $(...) subshell
         APP_RELEASE=$(checkLatestRelease) || exit 1
         export APP_RELEASE
@@ -242,6 +264,10 @@ function install() {
     local build_image=$(initialize)
 
     if [ "$build_image" == "build" ]; then
+        if [ "$HANGAR_ASSUME_YES" == "1" ]; then
+            echo "Images for this architecture are not published; not building them unattended. Exiting..."
+            exit 1
+        fi
         # ask for confirmation to continue building the images
         echo "Do you want to continue with building the Docker images locally?"
         read -p "Continue? [y/N]: " confirm
@@ -306,15 +332,226 @@ function generateStorageCredentials(){
     fi
 }
 
+function randomSecret() {
+    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$1"
+}
+
+function isListed() {
+    local value=$1 item
+    shift
+    for item in "$@"; do
+        if [ "$value" == "$item" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# The volumes on this host. A function of its own so tests can replace it.
+function listVolumes() {
+    docker volume ls -q 2>/dev/null
+}
+
+# Returns 0 when this deployment's volume with the given suffix exists, 1 when
+# it does not, and 2 when Docker could not be asked.
+function dataVolumeExists() {
+    local suffix=$1 project volumes
+    project=${COMPOSE_PROJECT_NAME:-$(getEnvValue "COMPOSE_PROJECT_NAME" "$DOCKER_ENV_PATH")}
+    project=${project:-$DEPLOYMENT_NAME}
+    volumes=$(listVolumes) || return 2
+    if printf '%s\n' "$volumes" | grep -qxF "${project}_${suffix}"; then
+        return 0
+    fi
+    return 1
+}
+
+# Older docker-compose.yml files connected the API with a fixed plane:plane URL
+# and ignored POSTGRES_* and RABBITMQ_*; the API now connects with those. A
+# deployment that changed them after its database or broker was created kept
+# working only because they were ignored, so it keeps the old URL in plane.env.
+function keepLegacyConnection() {
+    local url_name=$1 legacy_url=$2 expected=$3 actual=$4
+    if [ -z "$PREVIOUS_COMPOSE_PATH" ] || [ ! -f "$PREVIOUS_COMPOSE_PATH" ]; then
+        return 0
+    fi
+    if ! grep -qF "\${$url_name:-$legacy_url}" "$PREVIOUS_COMPOSE_PATH"; then
+        return 0
+    fi
+    if [ -n "$(getEnvValue "$url_name" "$DOCKER_ENV_PATH")" ] || [ "$actual" == "$expected" ]; then
+        return 0
+    fi
+    updateEnvFile "$url_name" "$legacy_url" "$DOCKER_ENV_PATH"
+    echo "WARNING: $url_name was set to $legacy_url in plane.env, the connection the previous release used whatever plane.env said. Rotate the password with the README procedure (Upgrading), then empty $url_name." >&2
+}
+
+function envSetting() {
+    local value
+    value=$(getEnvValue "$1" "$DOCKER_ENV_PATH")
+    value=${value//[\"\']/}
+    echo "${value:-$2}"
+}
+
+# The database and broker keep the password they were created with in their
+# volumes, so a password is generated only for a deployment that has no volume
+# yet. An existing deployment on the published default keeps it, with a warning.
+function generateServicePassword() {
+    local name=$1 url_name=$2 suffix=$3 current replacement
+    current=$(envSetting "$name" "")
+    # An explicit URL carries its own password; the two have to keep matching.
+    if [ -n "$(getEnvValue "$url_name" "$DOCKER_ENV_PATH")" ]; then
+        return 0
+    fi
+    if [ -n "$current" ] && [ "$current" != "plane" ]; then
+        return 0
+    fi
+    if isNewDeployment "$suffix"; then
+        replacement=$(randomSecret 32)
+        if [ ${#replacement} -ne 32 ]; then
+            echo "Failed to generate $name. Exiting..." >&2
+            exit 1
+        fi
+        updateEnvFile "$name" "$replacement" "$DOCKER_ENV_PATH"
+        echo "Generated $name in plane.env" >&2
+    else
+        echo "WARNING: $name is the published default 'plane'. It is kept because the existing ${suffix} volume was created with it; changing plane.env alone would lock the API out. Rotate it with the procedure in the README (Upgrading)." >&2
+    fi
+}
+
+# SECRET_KEY is also the HMAC key behind identifiers Google Calendar capacity
+# keeps: the hashes of each trainer's selected calendars and the keys that tie
+# trainings imported from Google to their occurrences and sessions. The keys
+# cannot be recomputed without Google's data, so replacing a template key on a
+# deployment that uses the feature is refused unless the operator says so.
+# Runs on the plane.env in place, before anything is downloaded or stopped.
+function checkSecretKeyRotation() {
+    local insecure_secret_keys="60gp0byfz2dvffa45cxl20p1scy9xbpf6d8c5y0geejgkyp1b5 change-this-key-on-deployment"
+    local current calendar
+    if [ ! -f "$DOCKER_ENV_PATH" ] || [ "${HANGAR_ROTATE_SECRET_KEY:-0}" == "1" ]; then
+        return 0
+    fi
+    calendar=$(envSetting ENABLE_GOOGLE_CALENDAR_CAPACITY 0)
+    if [ "$calendar" != "1" ]; then
+        return 0
+    fi
+    current=$(envSetting SECRET_KEY "")
+    # shellcheck disable=SC2086
+    if [ -n "$current" ] && ! isListed "$current" $insecure_secret_keys; then
+        return 0
+    fi
+    echo "ERROR: SECRET_KEY in plane.env is empty or a published template value, and ENABLE_GOOGLE_CALENDAR_CAPACITY=1." >&2
+    echo "This upgrade replaces SECRET_KEY, and Google Calendar capacity derives stored identifiers from it:" >&2
+    echo "trainers' calendar selections stop matching until they are saved again, and trainings imported from" >&2
+    echo "Google are seen as new occurrences, so their links to sessions have to be made again." >&2
+    echo "Read 'Replacing a template SECRET_KEY with Google Calendar capacity' in the README, then run the upgrade" >&2
+    echo "again with HANGAR_ROTATE_SECRET_KEY=1. Nothing has been changed." >&2
+    return 1
+}
+
+# Replaces secrets that are empty or a value a template shipped, after
+# syncEnvFile has carried the previous plane.env over. The two lists must match
+# _INSECURE_SECRET_KEYS in apps/api/plane/settings/common.py and the lists in
+# apps/api/bin/docker-entrypoint-common.sh and apps/live/src/env.ts.
+function generateSecrets() {
+    local insecure_secret_keys="60gp0byfz2dvffa45cxl20p1scy9xbpf6d8c5y0geejgkyp1b5 change-this-key-on-deployment"
+    local insecure_live_secret_keys="htbqvBJAgpm9bzvf3r4urJer0ENReatceh change-this-key-on-deployment secret-key"
+    local name list current replacement
+
+    # The API and Live refuse to start with these empty or on a template value,
+    # and a new value costs one sign-in, so they are replaced on every run.
+    for name in SECRET_KEY LIVE_SERVER_SECRET_KEY; do
+        list=$insecure_secret_keys
+        if [ "$name" == "LIVE_SERVER_SECRET_KEY" ]; then
+            list=$insecure_live_secret_keys
+        fi
+        current=$(envSetting "$name" "")
+        # shellcheck disable=SC2086
+        if [ -n "$current" ] && ! isListed "$current" $list; then
+            continue
+        fi
+        replacement=$(randomSecret 50)
+        if [ ${#replacement} -ne 50 ]; then
+            echo "Failed to generate $name. Exiting..." >&2
+            exit 1
+        fi
+        updateEnvFile "$name" "$replacement" "$DOCKER_ENV_PATH"
+        if [ -n "$current" ]; then
+            echo "NOTICE: $name was a published template value and has been replaced in plane.env. Everybody is signed out once and signs in again." >&2
+        else
+            echo "Generated $name in plane.env" >&2
+        fi
+    done
+
+    keepLegacyConnection DATABASE_URL "postgresql://plane:plane@plane-db/plane" \
+        "plane:plane@plane-db:5432/plane" \
+        "$(envSetting POSTGRES_USER plane):$(envSetting POSTGRES_PASSWORD plane)@$(envSetting PGHOST plane-db):$(envSetting POSTGRES_PORT 5432)/$(envSetting POSTGRES_DB plane)"
+    keepLegacyConnection AMQP_URL "amqp://plane:plane@plane-mq:5672/plane" \
+        "plane:plane@plane-mq:5672/plane" \
+        "$(envSetting RABBITMQ_USER plane):$(envSetting RABBITMQ_PASSWORD plane)@$(envSetting RABBITMQ_HOST plane-mq):$(envSetting RABBITMQ_PORT 5672)/$(envSetting RABBITMQ_VHOST plane)"
+
+    generateServicePassword POSTGRES_PASSWORD DATABASE_URL pgdata
+    generateServicePassword RABBITMQ_PASSWORD AMQP_URL rabbitmq_data
+}
+
+# A deployment is new when Docker reports no volume of that kind for it.
+function isNewDeployment() {
+    dataVolumeExists "$1"
+    [ $? -eq 1 ]
+}
+
+# Copies the deployment files from HANGAR_INSTALL_SOURCE_DIR instead of
+# downloading them.
+function copyLocalAssets() {
+    local name
+    for name in docker-compose.yml variables.env migrate-object-storage.sh; do
+        if [ ! -f "$HANGAR_INSTALL_SOURCE_DIR/$name" ]; then
+            echo "$name not found in $HANGAR_INSTALL_SOURCE_DIR"
+            return 1
+        fi
+    done
+    cp "$HANGAR_INSTALL_SOURCE_DIR/docker-compose.yml" "$PLANE_INSTALL_DIR/docker-compose.yaml" &&
+        cp "$HANGAR_INSTALL_SOURCE_DIR/variables.env" "$PLANE_INSTALL_DIR/variables-upgrade.env" &&
+        cp "$HANGAR_INSTALL_SOURCE_DIR/migrate-object-storage.sh" "$MIGRATE_STORAGE_SCRIPT" &&
+        chmod +x "$MIGRATE_STORAGE_SCRIPT"
+}
+
 function download() {
     local LOCAL_BUILD=$1
+    checkSecretKeyRotation || exit 1
     cd $SCRIPT_DIR
     TS=$(date +%s)
+    PREVIOUS_COMPOSE_PATH=""
     if [ -f "$PLANE_INSTALL_DIR/docker-compose.yaml" ]
     then
         mv $PLANE_INSTALL_DIR/docker-compose.yaml $PLANE_INSTALL_DIR/archive/$TS.docker-compose.yaml
+        PREVIOUS_COMPOSE_PATH=$PLANE_INSTALL_DIR/archive/$TS.docker-compose.yaml
     fi
 
+    if [ -n "$HANGAR_INSTALL_SOURCE_DIR" ]; then
+        if ! copyLocalAssets; then
+            if [ -n "$PREVIOUS_COMPOSE_PATH" ]; then
+                mv "$PREVIOUS_COMPOSE_PATH" $PLANE_INSTALL_DIR/docker-compose.yaml
+            fi
+            exit 1
+        fi
+    else
+        downloadReleaseAssets
+    fi
+
+    if [ -f "$DOCKER_ENV_PATH" ];
+    then
+        cp "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/archive/$TS.env"
+        cp "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/plane.env.bak"
+    fi
+
+    mv $PLANE_INSTALL_DIR/variables-upgrade.env $DOCKER_ENV_PATH
+
+    syncEnvFile
+    generateStorageCredentials
+    generateSecrets
+    finishDownload "$LOCAL_BUILD"
+}
+
+function downloadReleaseAssets() {
     RESPONSE=$(curl -sSL -H 'Cache-Control: no-cache, no-store' -w "HTTPSTATUS:%{http_code}" "$RELEASE_DOWNLOAD_URL/hangar-$APP_RELEASE/docker-compose.yml?$(date +%s)")
     BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
     STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
@@ -372,18 +609,10 @@ function download() {
     else
         echo "Warning: failed to download migrate-object-storage.sh (HTTP $STATUS)."
     fi
+}
 
-    if [ -f "$DOCKER_ENV_PATH" ];
-    then
-        cp "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/archive/$TS.env"
-        cp "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/plane.env.bak"
-    fi
-
-    mv $PLANE_INSTALL_DIR/variables-upgrade.env $DOCKER_ENV_PATH
-
-    syncEnvFile
-    generateStorageCredentials
-
+function finishDownload() {
+    local LOCAL_BUILD=$1
     if [ "$LOCAL_BUILD" == "true" ]; then
         export DOCKERHUB_USER="myplane"
         export APP_RELEASE="local"
@@ -536,7 +765,12 @@ function restartServices() {
 }
 function upgrade() {
     local latest_release
-    latest_release=$(checkLatestRelease) || exit 1
+    checkSecretKeyRotation || exit 1
+    if [ -n "$HANGAR_RELEASE" ]; then
+        latest_release=${HANGAR_RELEASE#hangar-}
+    else
+        latest_release=$(checkLatestRelease) || exit 1
+    fi
 
     echo ""
     echo "Current release: $APP_RELEASE"
@@ -551,12 +785,16 @@ function upgrade() {
     echo ""
 
     # Check for confirmation to upgrade
-    echo "Do you want to upgrade to the latest release ($latest_release)?"
-    read -p "Continue? [y/N]: " confirm
+    if [ "$HANGAR_ASSUME_YES" == "1" ]; then
+        echo "Upgrading to the latest release ($latest_release) without asking (HANGAR_ASSUME_YES=1)."
+    else
+        echo "Do you want to upgrade to the latest release ($latest_release)?"
+        read -p "Continue? [y/N]: " confirm
 
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        echo "Exiting..."
-        exit 0
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            echo "Exiting..."
+            exit 0
+        fi
     fi
 
     export APP_RELEASE=$latest_release
@@ -836,6 +1074,16 @@ if [ -f "$DOCKER_ENV_PATH" ]; then
         updateEnvFile "CUSTOM_BUILD" "$CUSTOM_BUILD" "$DOCKER_ENV_PATH"
     fi
 fi
+
+# --yes / -y may appear anywhere among the arguments.
+ACTION_ARGS=()
+for arg in "$@"; do
+    case "$arg" in
+        --yes|-y) HANGAR_ASSUME_YES=1 ;;
+        *) ACTION_ARGS+=("$arg") ;;
+    esac
+done
+set -- "${ACTION_ARGS[@]}"
 
 print_header
 askForAction "$@"

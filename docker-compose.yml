@@ -1,6 +1,13 @@
+# The same hardening as deployments/cli/community/docker-compose.yml: every
+# service runs with no-new-privileges, the application images drop every Linux
+# capability, and the proxy keeps only the one that binds ports 80 and 443.
 services:
   web:
     container_name: web
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: .
       dockerfile: ./apps/web/Dockerfile.web
@@ -12,6 +19,10 @@ services:
 
   admin:
     container_name: admin
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: .
       dockerfile: ./apps/admin/Dockerfile.admin
@@ -24,6 +35,10 @@ services:
 
   space:
     container_name: space
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: .
       dockerfile: ./apps/space/Dockerfile.space
@@ -36,6 +51,10 @@ services:
 
   api:
     container_name: api
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -51,6 +70,10 @@ services:
 
   worker:
     container_name: bgworker
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -67,6 +90,10 @@ services:
 
   mail-worker:
     container_name: mailworker
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -88,6 +115,10 @@ services:
 
   beat-worker:
     container_name: beatworker
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -104,6 +135,10 @@ services:
 
   migrator:
     container_name: plane-migrator
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -119,6 +154,10 @@ services:
 
   live:
     container_name: plane-live
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: .
       dockerfile: ./apps/live/Dockerfile.live
@@ -128,6 +167,8 @@ services:
 
   plane-db:
     container_name: plane-db
+    security_opt:
+      - no-new-privileges:true
     image: docker.io/library/postgres:15.7-alpine
     restart: always
     command: postgres -c 'max_connections=1000'
@@ -143,6 +184,8 @@ services:
 
   plane-redis:
     container_name: plane-redis
+    security_opt:
+      - no-new-privileges:true
     image: docker.io/valkey/valkey:7.2.11-alpine
     restart: always
     volumes:
@@ -150,6 +193,8 @@ services:
 
   plane-mq:
     container_name: plane-mq
+    security_opt:
+      - no-new-privileges:true
     image: docker.io/library/rabbitmq:3.13.6-management-alpine
     restart: always
     env_file:
@@ -168,6 +213,10 @@ services:
     # Installs that still hold uploads in the MinIO `uploads` volume must run
     # migrate-object-storage.sh once (setup.sh upgrade does this for you).
     container_name: plane-minio
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     image: docker.io/chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     restart: always
     user: "1000:1000"
@@ -203,6 +252,12 @@ services:
   # Comment this if you already have a reverse proxy running
   proxy:
     container_name: proxy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     build:
       context: ./apps/proxy
       dockerfile: Dockerfile.ce

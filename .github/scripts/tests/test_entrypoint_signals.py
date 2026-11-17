@@ -74,7 +74,8 @@ class EntrypointExecTests(unittest.TestCase):
             process = subprocess.Popen(
                 ["bash", str(BIN / "docker-entrypoint-beat.sh")],
                 cwd=REPOSITORY_ROOT / "apps" / "api",
-                env={"PATH": f"{stubs}:/usr/bin:/bin"},
+                # The entrypoints refuse to start without a real SECRET_KEY.
+                env={"PATH": f"{stubs}:/usr/bin:/bin", "SECRET_KEY": "unit-test-secret-key"},
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 start_new_session=True,

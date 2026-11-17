@@ -60,6 +60,11 @@ _INSECURE_SECRET_KEYS = {
     "60gp0byfz2dvffa45cxl20p1scy9xbpf6d8c5y0geejgkyp1b5",  # old publicly-known default
     "change-this-key-on-deployment",  # placeholder shipped in community templates
 }
+# The container entrypoints refuse these outright (apps/api/bin/
+# docker-entrypoint-common.sh keeps the same list), and the installers replace
+# them. God Mode settings encrypted under one of them before that are
+# re-encrypted under the new key by configure_instance.
+LEGACY_SECRET_KEYS = tuple(sorted(_INSECURE_SECRET_KEYS))
 if SECRET_KEY in _INSECURE_SECRET_KEYS:
     _logger.critical(
         "SECURITY: SECRET_KEY is set to a known insecure or placeholder value. "
