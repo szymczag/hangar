@@ -10,9 +10,9 @@
     "rationale": "Architecture and migration documentation may describe the upstream project historically."
   },
   {
-    "pathPattern": "^(CONTRIBUTING\\.md|UPSTREAM_BASE\\.json|\\.github/ISSUE_TEMPLATE/config\\.yaml|\\.github/scripts/release_(metadata|notes)\\.py)$",
+    "pathPattern": "^(CONTRIBUTING\\.md|UPSTREAM_BASE\\.json|\\.github/ISSUE_TEMPLATE/config\\.yaml|\\.github/scripts/(release_(metadata|notes)|upstream_watch)\\.py|\\.github/workflows/upstream-watch\\.yml|\\.trivyignore\\.yaml)$",
     "rules": ["product-name", "upstream-repository"],
-    "rationale": "Fork-routing guidance and release metadata must identify the approved upstream project accurately."
+    "rationale": "Fork-routing guidance, release metadata, upstream monitoring and the upstream advisory exceptions must identify the approved upstream project accurately."
   },
   {
     "pathPattern": "(^|/)tests?/|(^|/)__snapshots__/|\\.(test|spec)\\.",

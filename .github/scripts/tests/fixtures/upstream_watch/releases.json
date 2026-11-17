@@ -1,0 +1,114 @@
+[
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.5.0",
+    "name": "v1.5.0",
+    "prerelease": false,
+    "published_at": "2026-11-16T14:45:07Z",
+    "tag_name": "v1.5.0"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.5.0-rc2",
+    "name": "v1.5.0-rc2",
+    "prerelease": true,
+    "published_at": "2026-11-12T15:17:33Z",
+    "tag_name": "v1.5.0-rc2"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.5.0-rc1",
+    "name": "v1.5.0-rc1",
+    "prerelease": true,
+    "published_at": "2026-11-10T12:21:57Z",
+    "tag_name": "v1.5.0-rc1"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.3",
+    "name": "v1.4.3",
+    "prerelease": false,
+    "published_at": "2026-10-28T19:36:28Z",
+    "tag_name": "v1.4.3"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.3-rc2",
+    "name": "v1.4.3-rc2",
+    "prerelease": true,
+    "published_at": "2026-10-23T15:40:15Z",
+    "tag_name": "v1.4.3-rc2"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.3-rc1",
+    "name": "v1.4.3-rc1",
+    "prerelease": true,
+    "published_at": "2026-10-06T08:29:42Z",
+    "tag_name": "v1.4.3-rc1"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.2",
+    "name": "v1.4.2",
+    "prerelease": false,
+    "published_at": "2026-08-23T14:39:21Z",
+    "tag_name": "v1.4.2"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.2-rc1",
+    "name": "v1.4.2-rc1",
+    "prerelease": true,
+    "published_at": "2026-08-19T09:51:05Z",
+    "tag_name": "v1.4.2-rc1"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.1",
+    "name": "v1.4.1",
+    "prerelease": false,
+    "published_at": "2026-08-07T10:10:59Z",
+    "tag_name": "v1.4.1"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.1-rc2",
+    "name": "v1.4.1-rc2",
+    "prerelease": true,
+    "published_at": "2026-08-05T10:11:02Z",
+    "tag_name": "v1.4.1-rc2"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.1-rc1",
+    "name": "v1.4.1-rc1",
+    "prerelease": true,
+    "published_at": "2026-08-04T14:36:35Z",
+    "tag_name": "v1.4.1-rc1"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.0",
+    "name": "v1.4.0",
+    "prerelease": false,
+    "published_at": "2026-07-31T12:29:41Z",
+    "tag_name": "v1.4.0"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.0-rc2",
+    "name": "v1.4.0-rc2",
+    "prerelease": true,
+    "published_at": "2026-07-29T06:52:04Z",
+    "tag_name": "v1.4.0-rc2"
+  },
+  {
+    "draft": false,
+    "html_url": "https://github.com/makeplane/plane/releases/tag/v1.4.0-rc1",
+    "name": "v1.4.0-rc1",
+    "prerelease": true,
+    "published_at": "2026-07-29T05:33:32Z",
+    "tag_name": "v1.4.0-rc1"
+  }
+]

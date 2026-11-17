@@ -1,0 +1,97 @@
+[
+  {
+    "cve_id": null,
+    "ghsa_id": "GHSA-9382-fr89-xp7w",
+    "html_url": "https://github.com/makeplane/plane/security/advisories/GHSA-9382-fr89-xp7w",
+    "published_at": "2026-11-16T20:01:30Z",
+    "severity": "medium",
+    "state": "published",
+    "summary": "Any project member can make themselves a work item's creator through the API and then delete it",
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "other",
+          "name": "makeplane/plane"
+        },
+        "patched_versions": "1.5.0",
+        "vulnerable_version_range": "<= 1.4.3"
+      }
+    ]
+  },
+  {
+    "cve_id": "CVE-2026-104963",
+    "ghsa_id": "GHSA-wcc5-qgfr-8g9c",
+    "html_url": "https://github.com/makeplane/plane/security/advisories/GHSA-wcc5-qgfr-8g9c",
+    "published_at": "2026-09-28T06:50:49Z",
+    "severity": "medium",
+    "state": "published",
+    "summary": "Workspace cycle and module endpoints missing project-membership filter expose private project metadata to any workspace member",
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "other",
+          "name": "makeplane/plane"
+        },
+        "patched_versions": "1.4.0",
+        "vulnerable_version_range": "<= 1.3.1"
+      }
+    ]
+  },
+  {
+    "cve_id": "CVE-2026-105639",
+    "ghsa_id": "GHSA-4vj8-p63v-8p24",
+    "html_url": "https://github.com/makeplane/plane/security/advisories/GHSA-4vj8-p63v-8p24",
+    "published_at": "2026-08-03T07:04:44Z",
+    "severity": "critical",
+    "state": "published",
+    "summary": "Pre-auth workspace invitation hijack via email-squat and self-served invitation token leak in Plane",
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "other",
+          "name": "makeplane/plane"
+        },
+        "patched_versions": "1.4.0",
+        "vulnerable_version_range": "<= 1.3.1"
+      }
+    ]
+  },
+  {
+    "cve_id": "CVE-2026-46558",
+    "ghsa_id": "GHSA-qw87-v5w3-6vxx",
+    "html_url": "https://github.com/makeplane/plane/security/advisories/GHSA-qw87-v5w3-6vxx",
+    "published_at": "2026-05-15T07:43:40Z",
+    "severity": "high",
+    "state": "published",
+    "summary": "Cross-workspace asset authorization bypass lets any authenticated user read, copy, delete, and overwrite assets in other Plane workspaces",
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "",
+          "name": "makeplane/plane"
+        },
+        "patched_versions": "1.3.1",
+        "vulnerable_version_range": "v1.2.3"
+      }
+    ]
+  },
+  {
+    "cve_id": "CVE-2026-39843",
+    "ghsa_id": "GHSA-9fr2-pprw-pp9j",
+    "html_url": "https://github.com/makeplane/plane/security/advisories/GHSA-9fr2-pprw-pp9j",
+    "published_at": "2026-04-09T07:52:03Z",
+    "severity": "high",
+    "state": "published",
+    "summary": "Full Read Server-Side Request Forgery (SSRF) in Favicon Fetching using Redirection",
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "",
+          "name": "apps/api/plane/bgtasks/work_item_link_task.py"
+        },
+        "patched_versions": "1.3.0",
+        "vulnerable_version_range": ">=0.28.0"
+      }
+    ]
+  }
+]
