@@ -187,6 +187,23 @@ image digest is then:
 The publication workflow rejects lightweight tags, unverified annotated tags, and
 tags that do not point directly to the workflow commit.
 
+Every GitHub Release carries these assets alongside the installer, restore, Swarm,
+environment, and Helm chart files:
+
+| Asset                                                               | Content                                                                                                                                                                         |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker-compose.yml`                                                | Every Hangar image pinned to the digest the workflow published and signed (`ghcr.io/szymczag/hangar-<image>@sha256:<digest>`); the version tag is not used to select images.    |
+| `release-manifest.json`                                             | Version, Git tag, source commit, upstream baseline, each image's reference, digest, platforms and SBOM checksum, the chart digest and package checksum, and the signing policy. |
+| `hangar-<image>.spdx.json`                                          | The SPDX SBOM BuildKit attached to each of the seven images, checked for a minimum package count and the packages that identify the image.                                      |
+| `SHA256SUMS`                                                        | SHA-256 of every other release asset, in `sha256sum` format.                                                                                                                    |
+| `SHA256SUMS.sigstore.json`                                          | Cosign keyless signature bundle for `SHA256SUMS`, made and verified in the release job with the exact tag identity below.                                                       |
+| `hangar-<chart-version>.tgz`, its `.sha256`, `chart-oci-digest.txt` | The published Helm chart package, its checksum, and its OCI digest.                                                                                                             |
+
+The workflow resolves each image tag to its digest once, and the Compose pin, SBOM
+extraction, manifest, and release notes all use that one resolution. A missing or
+thin SBOM, an image without an attestation manifest, an unexpected platform, or a
+Hangar image the Compose rewrite cannot pin fails the release before it is created.
+
 The expected certificate identity includes the namespaced tag:
 
 ```text
@@ -219,7 +236,7 @@ Every release note contains these sections:
 4. migrations and compatibility notes;
 5. known limitations and rollback constraints;
 6. release assets and image families; and
-7. digest, provenance, SBOM, and Cosign verification instructions.
+7. digest, provenance, SBOM, checksum-signature, and Cosign verification instructions.
 
 Security/privacy, migration/compatibility, and limitation/rollback content is
 maintainer-reviewed in `docs/releases/<hangar-tag>.md` before the signed tag is
@@ -257,6 +274,8 @@ A release candidate is complete only when recorded test evidence demonstrates:
 - anonymous manifest and full-layer pulls;
 - correct OCI source, version, license, and upstream labels;
 - valid SBOM and GitHub provenance attestations;
+- a `SHA256SUMS` bundle that verifies with the exact tag identity, and a
+  `release-manifest.json` whose digests match the published images;
 - valid Cosign signatures with the exact tag identity;
 - no `stable` movement for a prerelease;
 - clean installation from release assets and pinned image digests;

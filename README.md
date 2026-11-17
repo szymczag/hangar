@@ -224,6 +224,49 @@ for stable releases, after publication succeeds, and moves with each one. Hangar
 publishes an SBOM and GitHub build-provenance attestation for every container
 image.
 
+### Verifying release assets
+
+Each GitHub Release also carries the evidence for the whole release:
+
+- `release-manifest.json` names the version, source commit, upstream Plane
+  baseline, every image digest and platform, the Helm chart digest and package
+  checksum, the SHA-256 of each SBOM, and the signing identity;
+- `hangar-<image>.spdx.json` is the SPDX SBOM BuildKit attached to each image;
+- `SHA256SUMS` lists the SHA-256 of every other asset, and
+  `SHA256SUMS.sigstore.json` is its Cosign keyless signature bundle; and
+- `docker-compose.yml` references every Hangar image by digest
+  (`ghcr.io/szymczag/hangar-<image>@sha256:...`), so `APP_RELEASE` and
+  `DOCKERHUB_USER` no longer choose which Hangar images it runs.
+
+Download the assets into one directory, verify the checksum signature, then the
+files:
+
+```sh
+GIT_TAG=hangar-vX.Y.Z # the release you downloaded
+
+cosign verify-blob \
+  --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/${GIT_TAG}" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+Take the certificate identity from this page. `release-manifest.json` repeats it
+for tooling, but a downloaded file cannot vouch for its own signer: an attacker
+who replaced the assets would replace that value too.
+
+Once `SHA256SUMS` verifies, the manifest is authentic. Compare the digests you
+deploy with it, and verify each one with `cosign verify` as above:
+
+```sh
+jq -r '.images[] | .ref' release-manifest.json
+grep -o 'ghcr.io/szymczag/hangar-[a-z]*@sha256:[0-9a-f]*' docker-compose.yml | sort -u
+```
+
+Releases up to and including `hangar-v0.1.0` predate these assets; verify their
+images with `cosign verify` alone.
+
 ## Development quick start
 
 ### Requirements
