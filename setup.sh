@@ -77,6 +77,28 @@ else
     success=false
 fi
 
+# Generate the secret the API and Live share. Live refuses to start without one,
+# and the two .env files must hold the same value.
+echo -e "\n${YELLOW}Generating LIVE_SERVER_SECRET_KEY...${NC}"
+live_secret_key=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c50)
+if [ ${#live_secret_key} -ne 50 ]; then
+    echo -e "${RED}Error: Failed to generate LIVE_SERVER_SECRET_KEY.${NC}"
+    success=false
+else
+    for env_file in ./apps/api/.env ./apps/live/.env; do
+        if [ ! -f "$env_file" ]; then
+            echo -e "${RED}✗${NC} $env_file not found. LIVE_SERVER_SECRET_KEY not added."
+            success=false
+        elif sed -i.bak -e "s/^LIVE_SERVER_SECRET_KEY=.*/LIVE_SERVER_SECRET_KEY=\"$live_secret_key\"/" "$env_file"; then
+            rm -f "$env_file.bak"
+            echo -e "${GREEN}✓${NC} Added LIVE_SERVER_SECRET_KEY to $env_file"
+        else
+            echo -e "${RED}✗${NC} Failed to set LIVE_SERVER_SECRET_KEY in $env_file"
+            success=false
+        fi
+    done
+fi
+
 # Generate object-storage credentials. The root .env feeds the local object
 # storage and apps/api/.env the API, so both get the same pair; a file whose
 # secret is no longer the template value keeps its own.
