@@ -211,7 +211,7 @@ for the legacy signature tag and report `no signatures found` for a correctly
 signed image. Check with `cosign version`.
 
 ```sh
-VERSION=v0.1.2
+VERSION=v0.1.3
 GIT_TAG=hangar-$VERSION
 DIGEST=sha256:replace-with-the-published-digest
 IMAGE=ghcr.io/szymczag/hangar-api

@@ -11,15 +11,16 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.2",
+  version: "0.1.3",
   highlights: [
-    "Project members can no longer read or change each other's personal settings.",
-    "Restricted guests can no longer reach files of work items hidden from them.",
-    "A failed upgrade download no longer leaves Hangar stopped.",
-    "The all-in-one image replaces every template Live key.",
+    "Every live collaboration connection now checks page access.",
+    "A workspace admin can no longer remove a project's only admin.",
+    "Restricted guests can no longer see links and subscribers of hidden work items.",
+    "Member lists return only the fields they are meant to.",
+    "Mentions search stays inside the project.",
   ],
   upstream: {
-    version: "1.4.0",
+    version: "1.4.3",
     revision: "917b23a6",
   },
 };
