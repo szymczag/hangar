@@ -472,6 +472,13 @@ class WiringTests(unittest.TestCase):
                     self.assertEqual(set(secret.split()), django)
                 self.assertEqual(set(live_secret), live_keys)
 
+        # The all-in-one image replaces template keys on start instead of refusing them.
+        start = (REPOSITORY_ROOT / "deployments" / "aio" / "community" / "start.sh").read_text()
+        aio_django = set(re.findall(r'local _(?:insecure|placeholder)_sk="([^"]+)"', start))
+        aio_live = set(re.findall(r'local _(?:insecure|placeholder|template)_lssk="([^"]+)"', start))
+        self.assertEqual(aio_django, django)
+        self.assertEqual(aio_live, live_keys)
+
     def test_an_unattended_upgrade_does_not_ask(self):
         for script in SCRIPTS:
             with self.subTest(script=script.name):
