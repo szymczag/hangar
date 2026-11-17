@@ -56,6 +56,11 @@ class WorkflowActionPinTests(unittest.TestCase):
                 with self.subTest(workflow=path.name, uses=use):
                     self.assertEqual(versions.setdefault(key, match["version"]), match["version"])
 
+    def test_no_tool_is_installed_at_its_latest_version(self):
+        for path in workflow_files():
+            with self.subTest(workflow=path.name):
+                self.assertNotIn("@latest", path.read_text(encoding="utf-8"))
+
     def test_pattern_rejects_floating_and_uncommented_references(self):
         for use in (
             "actions/checkout@v6",

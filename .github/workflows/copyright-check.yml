@@ -32,7 +32,8 @@ jobs:
 
             - name: Install addlicense
               run: |
-                  go install github.com/google/addlicense@latest
+                  # A fixed version; the Go checksum database verifies the module.
+                  go install github.com/google/addlicense@v1.2.0
                   echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
             - name: Check Copyright For Python Files

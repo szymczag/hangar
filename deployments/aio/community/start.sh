@@ -164,12 +164,15 @@ update_env_file(){
     update_env_value "SECRET_KEY" "$SECRET_KEY"
     update_env_value "FILE_SIZE_LIMIT" "${FILE_SIZE_LIMIT:-5242880}"
     # LIVE_SERVER_SECRET_KEY: same first-boot generation strategy.
+    # The same template values Live refuses (INSECURE_LIVE_SERVER_SECRET_KEYS in
+    # apps/live/src/env.ts).
     local _insecure_lssk="htbqvBJAgpm9bzvf3r4urJer0ENReatceh"
     local _placeholder_lssk="change-this-key-on-deployment"
-    if [ -z "$LIVE_SERVER_SECRET_KEY" ] || [ "$LIVE_SERVER_SECRET_KEY" = "$_insecure_lssk" ] || [ "$LIVE_SERVER_SECRET_KEY" = "$_placeholder_lssk" ]; then
+    local _template_lssk="secret-key"
+    if [ -z "$LIVE_SERVER_SECRET_KEY" ] || [ "$LIVE_SERVER_SECRET_KEY" = "$_insecure_lssk" ] || [ "$LIVE_SERVER_SECRET_KEY" = "$_placeholder_lssk" ] || [ "$LIVE_SERVER_SECRET_KEY" = "$_template_lssk" ]; then
         local _stored_lssk
         _stored_lssk=$(grep "^LIVE_SERVER_SECRET_KEY=" plane.env 2>/dev/null | cut -d'=' -f2-)
-        if [ -n "$_stored_lssk" ] && [ "$_stored_lssk" != "$_insecure_lssk" ] && [ "$_stored_lssk" != "$_placeholder_lssk" ]; then
+        if [ -n "$_stored_lssk" ] && [ "$_stored_lssk" != "$_insecure_lssk" ] && [ "$_stored_lssk" != "$_placeholder_lssk" ] && [ "$_stored_lssk" != "$_template_lssk" ]; then
             LIVE_SERVER_SECRET_KEY="$_stored_lssk"
         else
             LIVE_SERVER_SECRET_KEY=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c50)
