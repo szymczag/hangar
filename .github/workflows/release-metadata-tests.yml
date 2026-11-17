@@ -17,6 +17,8 @@ on:
       - ".github/scripts/tests/**"
       - ".github/workflows/build-branch.yml"
       - ".github/workflows/release-metadata-tests.yml"
+      # test_workflow_action_pins.py covers every workflow.
+      - ".github/workflows/**"
       - "apps/api/bin/**"
       - "docs/releases/**"
       - "docs/kubernetes/README.md"
@@ -40,6 +42,8 @@ on:
       - ".github/scripts/tests/**"
       - ".github/workflows/build-branch.yml"
       - ".github/workflows/release-metadata-tests.yml"
+      # test_workflow_action_pins.py covers every workflow.
+      - ".github/workflows/**"
       - "apps/api/bin/**"
       - "docs/releases/**"
       - "docs/kubernetes/README.md"
@@ -58,8 +62,9 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check out repository history
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Run release metadata unit tests

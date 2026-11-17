@@ -1,0 +1,20 @@
+# zizmor configuration for the workflow-lint workflow.
+#
+# Every entry here is a finding that was reviewed and kept on purpose. Each one
+# says why, so the next reviewer can check that the reason still holds.
+rules:
+  dangerous-triggers:
+    ignore:
+      # The workflow_run trigger only starts the release-image scan after
+      # "Publish Hangar Containers" succeeds on a push. Those jobs run on the
+      # default branch, never check out or download anything from the
+      # triggering run, and read only its conclusion and event name. The
+      # images they scan come from the latest published GitHub Release.
+      - security-scan.yml
+  self-repository:
+    ignore:
+      # The reusable Helm qualification workflow is called with the local
+      # `./.github/workflows/...` form, which actionlint and the action pin
+      # test (.github/scripts/tests/test_workflow_action_pins.py) both
+      # understand. It resolves to the same commit as the caller either way.
+      - build-branch.yml

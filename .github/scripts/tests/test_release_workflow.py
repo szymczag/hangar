@@ -147,7 +147,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
             'charts/hangar/scripts/prepare-release.sh "$chart_dir" "$VERSION"'
         )
         qualification_position = self.workflow.index(
-            'charts/hangar/tests/e2e-kind.sh "${{ steps.package_chart.outputs.chart_package }}"'
+            'charts/hangar/tests/e2e-kind.sh "$CHART_PACKAGE"'
         )
         publication_position = self.workflow.index(
             'helm push "$CHART_PACKAGE" oci://ghcr.io/szymczag/charts 2>&1'

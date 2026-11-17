@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12.x"
       # psycopg[c] builds from source while pip resolves the tree.
@@ -129,7 +129,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       - name: Enable Corepack and pnpm
         run: corepack enable pnpm
       # Reads the lockfile; nothing is installed. Production dependencies only:
@@ -210,7 +210,7 @@ jobs:
           scan --exit-code 1
       - name: Upload results to code scanning
         if: always() && steps.scan.outputs.sarif == 'true'
-        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: ${{ runner.temp }}/trivy-fs.sarif
           category: trivy-repository
@@ -264,6 +264,8 @@ jobs:
       # A published release whose image cannot be read is a real fault, not a
       # race, so after the retries this fails with that message.
       - name: Check the release image exists
+        env:
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
         run: |
           set -euo pipefail
           for delay in 15 45 0; do
@@ -275,7 +277,7 @@ jobs:
               sleep "$delay"
             fi
           done
-          echo "::error::Release ${{ needs.release.outputs.tag }} is published but $IMAGE_REF cannot be read"
+          echo "::error::Release $RELEASE_TAG is published but $IMAGE_REF cannot be read"
           exit 1
       # The release images are public, so no registry credentials are passed:
       # Trivy would offer them to every registry it contacts, including the
@@ -315,7 +317,7 @@ jobs:
           convert --format table
       - name: Upload results to code scanning
         if: always() && steps.convert.outputs.sarif == 'true'
-        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: ${{ runner.temp }}/trivy-image.sarif
           category: trivy-image-${{ matrix.image }}
