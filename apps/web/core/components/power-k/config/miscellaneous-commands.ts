@@ -20,13 +20,14 @@ import { usePowerK } from "@/hooks/store/use-power-k";
 export const usePowerKMiscellaneousCommands = (): TPowerKCommandConfig[] => {
   // store hooks
   const { toggleSidebar } = useAppTheme();
-  const { topNavInputRef, topNavSearchInputRef } = usePowerK();
+  const { topNavInputRef } = usePowerK();
   // translation
   const { t } = useTranslation();
 
   const copyCurrentPageUrlToClipboard = useCallback(() => {
     const url = new URL(window.location.href);
     copyTextToClipboard(url.href)
+      // oxlint-disable-next-line promise/always-return
       .then(() => {
         setToast({
           type: TOAST_TYPE.SUCCESS,
@@ -43,13 +44,11 @@ export const usePowerKMiscellaneousCommands = (): TPowerKCommandConfig[] => {
   }, []);
 
   const focusTopNavSearch = useCallback(() => {
-    // Focus PowerK input if available, otherwise focus regular search input
-    if (topNavSearchInputRef?.current) {
-      topNavSearchInputRef.current.focus();
-    } else if (topNavInputRef?.current) {
-      topNavInputRef.current.focus();
-    }
-  }, [topNavInputRef, topNavSearchInputRef]);
+    topNavInputRef?.current?.focus();
+  }, [topNavInputRef]);
+  // Without a mounted top-nav input the command has nothing to focus, and Cmd+F must fall
+  // through to the browser's Find
+  const hasTopNavInput = useCallback(() => Boolean(topNavInputRef?.current), [topNavInputRef]);
 
   return [
     {
@@ -84,8 +83,8 @@ export const usePowerKMiscellaneousCommands = (): TPowerKCommandConfig[] => {
       icon: SearchIcon,
       action: focusTopNavSearch,
       modifierShortcut: "cmd+f",
-      isEnabled: () => true,
-      isVisible: () => true,
+      isEnabled: hasTopNavInput,
+      isVisible: hasTopNavInput,
       closeOnSelect: true,
     },
   ];
