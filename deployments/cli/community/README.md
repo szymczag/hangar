@@ -95,6 +95,69 @@ curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hang
 chmod +x setup.sh
 ```
 
+#### How `setup.sh` verifies what it downloads
+
+`setup.sh` is the one file you download yourself, so check it before you run
+it the way [Verifying release assets](../../../README.md#verifying-release-assets)
+describes. From then on, `install` and `upgrade` (and `swarm.sh` deploy and
+upgrade) check every file they fetch from the release before it replaces
+anything in `plane-app`:
+
+1. They download `docker-compose.yml`, `variables.env` and, for Compose,
+   `migrate-object-storage.sh` from the release `hangar-vX.Y.Z` into a scratch
+   directory inside `plane-app`, and print the release and URL they use.
+2. They download the release's `SHA256SUMS`. If [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+   is installed, they also download `SHA256SUMS.sigstore.json` and run
+   `cosign verify-blob` with the certificate identity
+   `https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/hangar-vX.Y.Z`
+   and the issuer `https://token.actions.githubusercontent.com`. The identity
+   is written in the script, not read from any downloaded file.
+3. They compare each downloaded file with `SHA256SUMS` (`sha256sum`, or
+   `shasum -a 256` on macOS).
+
+Only when every check passes are the files moved into `plane-app`; otherwise
+the script stops with `ERROR: ...` and `Nothing in .../plane-app has been
+changed`, leaving the running deployment and its files as they were.
+
+| Situation                                                  | Default                          | `HANGAR_REQUIRE_SIGNATURE=1` |
+| ---------------------------------------------------------- | -------------------------------- | ---------------------------- |
+| Signature and checksums verify                             | installs                         | installs                     |
+| A file does not match `SHA256SUMS`, or is not listed in it | stops                            | stops                        |
+| Cosign installed, and the signature fails or is missing    | stops                            | stops                        |
+| Cosign is not installed                                    | checksums only, with a `WARNING` | stops                        |
+| Release up to `hangar-v0.1.0` (no `SHA256SUMS`)            | installs with a `WARNING`        | stops                        |
+| Newer release without `SHA256SUMS`                         | stops                            | stops                        |
+| Release cannot be downloaded, `BRANCH` not set             | stops                            | stops                        |
+| Release cannot be downloaded, `BRANCH` set                 | branch files, with a `WARNING`   | stops                        |
+| `HANGAR_INSTALL_SOURCE_DIR` set                            | that directory's files           | stops                        |
+
+Without Cosign, matching checksums only show that the files agree with a list
+downloaded from the same place; Cosign shows that the release workflow
+published that list. Install it, and set `HANGAR_REQUIRE_SIGNATURE=1` (for example `HANGAR_REQUIRE_SIGNATURE=1
+./setup.sh upgrade`) to refuse anything less.
+
+Earlier versions of the script quietly took the files from the `preview`
+branch whenever the release download failed. Now a failed release download is
+an error, and the branch is used only when you name it with `BRANCH=<branch>`;
+those files are not verified.
+
+#### Building the images locally
+
+Hangar publishes images for `linux/amd64`. On another architecture, `install`
+offers to build them on the host instead (it refuses under `--yes`). It clones
+the source of the release being installed (the `hangar-vX.Y.Z` tag, or the
+branch named in `BRANCH`), builds `myplane/hangar-<image>:local` with
+`deployments/cli/community/build.yml`, and sets `CUSTOM_BUILD=true`,
+`DOCKERHUB_USER=myplane` and `APP_RELEASE=local` in `plane.env`.
+
+The release's `docker-compose.yaml` names each Hangar image by digest, so
+`setup.sh` leaves that verified file as it is and writes
+`plane-app/docker-compose.override.yaml`, which points every Hangar service at
+the local image with `pull_policy: never`. `setup.sh start`, `stop`,
+`restart`, `logs` and `backup` pass both files to Compose; so does a plain
+`docker compose` run inside `plane-app`, which loads the override by name. An
+install or upgrade that pulls the published images removes the override.
+
 ---
 
 ### Proceed with setup
@@ -421,6 +484,9 @@ It is always advised to keep Hangar up to date with the latest release.
 > unattended run refuses, rather than starts, a local image build. Set
 > `HANGAR_RELEASE=vX.Y.Z` to install or upgrade to that release rather than the
 > latest one the GitHub API reports.
+> Add `HANGAR_REQUIRE_SIGNATURE=1` (and install Cosign) so an unattended upgrade
+> refuses files it cannot verify; see
+> [How `setup.sh` verifies what it downloads](#how-setupsh-verifies-what-it-downloads).
 
 Lets again run the `./setup.sh` command. You will again be prompted with the below options. This time select `5` to upgrade the release.
 
