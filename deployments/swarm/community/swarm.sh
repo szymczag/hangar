@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # BRANCH set by the operator is the only way deployment files may come from a
 # branch rather than a release, when the release cannot be downloaded. Without
@@ -1001,7 +1001,7 @@ function askForAction() {
         echo "   7) Exit"
         echo 
         read -p "Action [3]: " ACTION
-        until [[ -z "$ACTION" || "$ACTION" =~ ^[1-6]$ ]]; do
+        until [[ -z "$ACTION" || "$ACTION" =~ ^[1-7]$ ]]; do
             echo "$ACTION: invalid selection."
             read -p "Action [3]: " ACTION
         done

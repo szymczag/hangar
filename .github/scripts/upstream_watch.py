@@ -8,7 +8,8 @@
 
 Run weekly by .github/workflows/upstream-watch.yml. It reads UPSTREAM_BASE.json,
 lists the upstream releases newer than its package_version and the upstream
-repository security advisories published on or after its synced_at date, and
+repository security advisories published on or after its synced_at date or
+fixed only in a release newer than package_version, and
 keeps exactly one open issue labelled `upstream-sync` in step with that list:
 opened when something is pending, refreshed (with a comment only when the set
 changes), and closed once a sync has moved the baseline past everything.
@@ -124,19 +125,64 @@ def _date_of(timestamp: str) -> datetime.date:
         raise WatchError(f"unreadable timestamp {timestamp!r}") from error
 
 
-def pending_advisories(advisories: Iterable[Mapping[str, Any]], synced_at: str) -> list[Advisory]:
-    """Published upstream advisories dated on or after the sync day, oldest first.
+_VERSION_IN_TEXT = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 
-    The sync day itself is included: the baseline records a date, not a time,
-    so an advisory published that day may postdate the synced revision.
+
+def _earliest_patched_version(patched: Iterable[str]) -> tuple[int, int, int] | None:
+    """The lowest X.Y.Z named in an advisory's patched_versions, else None."""
+    versions = [
+        (int(major), int(minor), int(patch))
+        for text in patched
+        for major, minor, patch in _VERSION_IN_TEXT.findall(text)
+    ]
+    return min(versions) if versions else None
+
+
+def latest_stable_version(releases: Iterable[Mapping[str, Any]]) -> str | None:
+    """The newest stable upstream release as X.Y.Z, else None."""
+    versions = [
+        version
+        for release in releases
+        if not release.get("draft") and not release.get("prerelease")
+        for version in [stable_version(str(release.get("tag_name", "")))]
+        if version is not None
+    ]
+    return ".".join(map(str, max(versions))) if versions else None
+
+
+def pending_advisories(
+    advisories: Iterable[Mapping[str, Any]],
+    synced_at: str,
+    package_version: str | None = None,
+    latest_release: str | None = None,
+) -> list[Advisory]:
+    """Published upstream advisories not yet covered by the baseline, oldest first.
+
+    An advisory is pending when it was published on or after the sync day, or,
+    given package_version and latest_release, when its earliest patched release
+    is newer than the baseline and has been published. The sync day itself is
+    included: the baseline records a date, not a time, so an advisory published
+    that day may postdate the synced revision. The second rule keeps an advisory
+    published before a sync but fixed only in a later release from dropping off
+    the list when synced_at moves; bounding it by the latest release keeps a
+    patched version upstream mistyped (one no release carries) from pinning an
+    advisory to the list for good.
     """
     since = _date_of(synced_at)
+    baseline = latest = None
+    if package_version is not None and latest_release is not None:
+        baseline = stable_version(package_version)
+        if baseline is None:
+            raise WatchError(f"baseline package_version {package_version!r} is not X.Y.Z")
+        latest = stable_version(latest_release)
+        if latest is None:
+            raise WatchError(f"latest release {latest_release!r} is not X.Y.Z")
     pending = []
     for advisory in advisories:
         if advisory.get("state", "published") != "published":
             continue
         published_at = str(advisory.get("published_at") or "")
-        if not published_at or _date_of(published_at) < since:
+        if not published_at:
             continue
         patched = sorted(
             {
@@ -145,6 +191,10 @@ def pending_advisories(advisories: Iterable[Mapping[str, Any]], synced_at: str) 
                 if item.get("patched_versions")
             }
         )
+        if _date_of(published_at) < since:
+            earliest = _earliest_patched_version(patched)
+            if baseline is None or earliest is None or not baseline < earliest <= latest:
+                continue
         pending.append(
             Advisory(
                 ghsa_id=str(advisory.get("ghsa_id", "")),
@@ -212,7 +262,7 @@ def render_issue_body(
         parts.append("")
     if advisories:
         parts += [
-            f"### Security advisories published since {baseline.synced_at}",
+            f"### Security advisories published since {baseline.synced_at} or fixed after {baseline.package_version}",
             "",
             "| Advisory | CVE | Severity | Patched in | Summary |",
             "| --- | --- | --- | --- | --- |",
@@ -408,11 +458,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         slug = repository_slug(baseline.repository)
         raw_releases = _load_json(arguments.releases_json)
         raw_advisories = _load_json(arguments.advisories_json)
-        releases = pending_releases(
-            raw_releases if raw_releases is not None else fetch_releases(slug), baseline.package_version
-        )
+        if raw_releases is None:
+            raw_releases = fetch_releases(slug)
+        releases = pending_releases(raw_releases, baseline.package_version)
         advisories = pending_advisories(
-            raw_advisories if raw_advisories is not None else fetch_advisories(slug), baseline.synced_at
+            raw_advisories if raw_advisories is not None else fetch_advisories(slug),
+            baseline.synced_at,
+            baseline.package_version,
+            latest_stable_version(raw_releases),
         )
         open_issues = [] if arguments.dry_run else fetch_open_issues(arguments.repository)
         actions = plan_issue(
