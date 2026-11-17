@@ -163,6 +163,38 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("needs: [setup, signing_tools, components]", chart)
         self.assertNotIn("needs: [setup, signing_tools, components, aio]", chart)
 
+    def test_stable_releases_qualify_the_compose_upgrade_before_publication(self):
+        job = self.workflow.split("\n  compose_upgrade:\n", maxsplit=1)[1].split(
+            "\n  chart:\n", maxsplit=1
+        )[0]
+        self.assertIn(
+            "    if: needs.setup.outputs.is_release == 'true' && "
+            "needs.setup.outputs.is_prerelease != 'true'\n",
+            job,
+        )
+        self.assertIn("    needs: [setup, components, aio]\n", job)
+        self.assertIn("    permissions:\n      contents: read\n", job)
+        self.assertIn("    uses: ./.github/workflows/compose-upgrade.yml\n", job)
+        self.assertIn("      to_image_tag: ${{ needs.setup.outputs.version }}\n", job)
+
+        verify = self.workflow.split("\n  verify_publication:\n", maxsplit=1)[1].split(
+            "\n  release:\n", maxsplit=1
+        )[0]
+        self.assertIn("    needs: [setup, components, aio, chart, compose_upgrade]\n", verify)
+        self.assertIn("COMPOSE_UPGRADE_RESULT: ${{ needs.compose_upgrade.result }}", verify)
+        self.assertIn("IS_PRERELEASE: ${{ needs.setup.outputs.is_prerelease }}", verify)
+        self.assertIn(
+            'if [[ "$IS_RELEASE" == "true" && "$IS_PRERELEASE" != "true" ]]; then\n'
+            "            expected_compose_upgrade_result=success",
+            verify,
+        )
+        self.assertIn(
+            'if [[ "$COMPOSE_UPGRADE_RESULT" != "$expected_compose_upgrade_result" ]]; then',
+            verify,
+        )
+        # The GitHub Release waits for verify_publication.
+        self.assertIn("needs: [setup, signing_tools, verify_publication, chart]", self.release_job())
+
     def test_release_chart_is_signed_and_attached_as_evidence(self):
         self.assertIn('cosign sign --yes "$chart_ref"', self.workflow)
         self.assertIn('cosign verify \\', self.workflow)
