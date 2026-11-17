@@ -81,24 +81,25 @@ jobs:
       NODE_OPTIONS: "--max-old-space-size=4096"
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          persist-credentials: false
           # The churn check diffs against the base branch, and the default
           # shallow clone has no history to diff against.
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
 
       - name: Enable Corepack and pnpm
         run: corepack enable pnpm
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Cache pnpm store
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ env.STORE_PATH }}
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -121,11 +122,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           FALLBACK_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json body --jq .body > /tmp/pr-body.txt ||
             printf '%s' "$FALLBACK_BODY" > /tmp/pr-body.txt
           node apps/visual-tests/scripts/check-baseline-churn.mjs \
-            "origin/${{ github.event.pull_request.base.ref }}" /tmp/pr-body.txt
+            "origin/$BASE_REF" /tmp/pr-body.txt
 
       # Restoring the turbo cache, and only that.
       #
@@ -138,7 +140,7 @@ jobs:
       # twice. Roughly five minutes a run is worth having, but not on the
       # strength of an approach the numbers say does not work.
       - name: Restore Turbo cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-visual-${{ github.event.pull_request.base.sha || github.sha }}-${{ github.sha }}
@@ -170,13 +172,15 @@ jobs:
       # uses.
       - name: Soak the visual suite
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-        run: node scripts/vr.mjs --soak=${{ inputs.iterations || '5' }}
+        env:
+          ITERATIONS: ${{ inputs.iterations || '5' }}
+        run: node scripts/vr.mjs "--soak=$ITERATIONS"
 
       # Without this a red job says "some pixels changed" and nothing more, and
       # the suite is abandoned within a month.
       - name: Save Turbo cache
         if: always()
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-visual-${{ github.event.pull_request.base.sha || github.sha }}-${{ github.sha }}

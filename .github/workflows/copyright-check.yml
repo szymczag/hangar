@@ -12,34 +12,39 @@ on:
             - "review_requested"
             - "reopened"
 
+permissions:
+    contents: read
+
 jobs:
     license-check:
         name: Copy Right Check
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v6
+              uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+              with:
+                  persist-credentials: false
 
             - name: Set up Go
-              uses: actions/setup-go@v6
+              uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
               with:
                   go-version: "1.22"
 
             - name: Install addlicense
               run: |
                   go install github.com/google/addlicense@latest
-                  echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+                  echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
             - name: Check Copyright For Python Files
               run: |
                   set -e
                   echo "Running copyright check..."
-                  addlicense -check -f COPYRIGHT.txt -ignore "**/migrations/**" $(git ls-files '*.py')
+                  git ls-files -z '*.py' | xargs -0 addlicense -check -f COPYRIGHT.txt -ignore "**/migrations/**"
                   echo "Copyright check passed."
 
             - name: Check Copyright For TypeScript Files
               run: |
                   set -e
                   echo "Running copyright check..."
-                  addlicense -check -f COPYRIGHT.txt -ignore "**/*.config.ts" -ignore "**/*.d.ts" $(git ls-files '*.ts' '*.tsx')
+                  git ls-files -z '*.ts' '*.tsx' | xargs -0 addlicense -check -f COPYRIGHT.txt -ignore "**/*.config.ts" -ignore "**/*.d.ts"
                   echo "Copyright check passed."

@@ -46,7 +46,7 @@ jobs:
   react-doctor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           # React Doctor diffs the changed files against the merge base so it
           # only reports what the PR introduces. The default shallow checkout
@@ -58,15 +58,18 @@ jobs:
           # it needs, and it talks to the API through its own credentials.
           persist-credentials: false
 
-      - uses: millionco/react-doctor@v2
-        # Common configuration knobs — uncomment any to override the default.
+      - uses: millionco/react-doctor@695e46eee203a5d1855020191aa7e9c010a1250e # v2.4.0
+        with:
+          # The action defaults to "latest", which resolves a new react-doctor
+          # release on every run. Pin it so a scan only changes when this
+          # line does.
+          version: "0.9.23"
+        # Other configuration knobs — add any of these under `with:` to override the default.
         # Full reference: https://www.react.doctor/ci
-        # with:
         #   blocking: warning        # Gate level: "error" (default) | "warning" | "none" (advisory)
         #   scope: full              # On PRs, scan the whole project instead of just changed files
         #   comment: false           # Disable the sticky PR summary comment
         #   review-comments: false   # Disable inline review comments on changed lines
         #   commit-status: false     # Disable the commit status (score + counts, links to the run)
-        #   version: "0.4.0"         # Pin to a specific react-doctor version instead of "latest"
         #   directory: apps/web      # Scan a sub-directory (default: ".")
         #   project: "web,admin"     # In a monorepo, scan specific workspace project(s)
