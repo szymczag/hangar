@@ -1,0 +1,140 @@
+name: Compose upgrade and restore
+
+# Installs the previous stable release with its own setup.sh and release
+# assets, seeds it, backs it up, upgrades it with this checkout's installer and
+# Compose file to the candidate images, restores the backup into a fresh
+# install, and checks the data, a password sign-in and an API-key call after
+# each step. The work is in .github/scripts/compose-upgrade.sh, which also runs
+# on a workstation.
+#
+# Publish Hangar Containers calls it for every stable release before the
+# GitHub Release exists. Pull requests that change the installer, and a weekly
+# run, upgrade the latest stable release with this commit's installer and
+# Compose file, onto this commit's preview images when a preview build
+# published them; run it by hand for any other image tag.
+
+on:
+  workflow_call:
+    inputs:
+      from_release:
+        description: Release to upgrade from, such as hangar-v0.1.0; empty for the latest stable release
+        required: false
+        default: ""
+        type: string
+      to_image_tag:
+        description: Candidate image tag, such as v0.2.0; empty for this commit's preview images, else the from_release images
+        required: false
+        default: ""
+        type: string
+  workflow_dispatch:
+    inputs:
+      from_release:
+        description: Release to upgrade from, such as hangar-v0.1.0; empty for the latest stable release
+        required: false
+        default: ""
+        type: string
+      to_image_tag:
+        description: Candidate image tag, such as preview-my-branch; empty for this commit's preview images, else the from_release images
+        required: false
+        default: ""
+        type: string
+  # Installer, Compose and restore changes are checked against the latest
+  # preview images before they merge.
+  pull_request:
+    branches:
+      - preview
+    paths:
+      - "deployments/cli/community/install.sh"
+      - "deployments/cli/community/docker-compose.yml"
+      - "deployments/cli/community/variables.env"
+      - "deployments/cli/community/restore.sh"
+      - ".github/scripts/compose-upgrade.sh"
+      - ".github/scripts/compose_seed.py"
+      - ".github/workflows/compose-upgrade.yml"
+  schedule:
+    - cron: "23 5 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compose-upgrade-${{ github.ref }}-${{ inputs.to_image_tag }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE_PREFIX: ghcr.io/szymczag/hangar-
+
+jobs:
+  upgrade:
+    name: Upgrade from the latest stable release and restore its backup
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Choose the releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          FROM_RELEASE: ${{ inputs.from_release }}
+          TO_IMAGE_TAG: ${{ inputs.to_image_tag }}
+          # A pull request runs on its merge commit, which is never published.
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FROM_RELEASE" ]; then
+            # Without a tag, gh reports the latest release, never a prerelease.
+            FROM_RELEASE=$(gh release view --repo "$REPOSITORY" --json tagName --jq .tagName)
+          fi
+          if [[ ! "$FROM_RELEASE" =~ ^(hangar-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::from_release must be a stable release such as hangar-v0.1.0"
+            exit 1
+          fi
+          if [ -z "$TO_IMAGE_TAG" ]; then
+            # This commit's images when a preview build published them. Otherwise
+            # the release's own images: the installer and Compose file of this
+            # commit are still upgraded onto them. A moving preview tag such as
+            # preview-preview is never taken; it can be older than the release.
+            TO_IMAGE_TAG=${FROM_RELEASE#hangar-}
+            if docker manifest inspect "${IMAGE_PREFIX}api:preview-sha-${CANDIDATE_SHA}" > /dev/null 2>&1; then
+              TO_IMAGE_TAG="preview-sha-${CANDIDATE_SHA}"
+            fi
+          fi
+          if [[ ! "$TO_IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]]; then
+            echo "::error::to_image_tag is not a valid OCI image tag"
+            exit 1
+          fi
+          for image in web admin space live api proxy; do
+            docker manifest inspect "${IMAGE_PREFIX}${image}:${TO_IMAGE_TAG}" > /dev/null \
+              || { echo "::error::${IMAGE_PREFIX}${image}:${TO_IMAGE_TAG} is not published"; exit 1; }
+          done
+          echo "Upgrading from $FROM_RELEASE to images $TO_IMAGE_TAG"
+          {
+            echo "FROM_RELEASE=$FROM_RELEASE"
+            echo "TO_IMAGE_TAG=$TO_IMAGE_TAG"
+          } >> "$GITHUB_ENV"
+
+      - name: Upgrade, back up and restore
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          WORK_DIR="$RUNNER_TEMP/compose-upgrade" \
+            ARTIFACT_DIR="$RUNNER_TEMP/compose-upgrade-artifacts" \
+            HTTP_PORT=8080 \
+            .github/scripts/compose-upgrade.sh --from "$FROM_RELEASE" --to "$TO_IMAGE_TAG"
+
+      # Logs and fingerprints only: the backup and plane.env stay on the runner.
+      - name: Upload the deployment logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compose-upgrade-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/compose-upgrade-artifacts/logs
+            ${{ runner.temp }}/compose-upgrade-artifacts/fingerprint-*.json
+          if-no-files-found: warn
+          retention-days: 14
