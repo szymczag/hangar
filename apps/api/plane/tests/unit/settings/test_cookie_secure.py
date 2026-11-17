@@ -31,6 +31,14 @@ class TestCookiesSecure:
     def test_all_https_cors_origins_is_secure(self):
         assert _cookies_secure("http://localhost", ["https://plane.example.com"]) is True
 
+    def test_http_web_url_with_mixed_cors_origins_is_non_secure(self):
+        """One plain-http origin is enough to keep cookies usable over http."""
+        origins = ["https://plane.example.com", "http://plane.example.com"]
+        assert _cookies_secure("http://plane.example.com", origins) is False
+
+    def test_https_web_url_is_case_and_whitespace_insensitive(self):
+        assert _cookies_secure("  HTTPS://plane.example.com", ["http://localhost"]) is True
+
     def test_unset_web_url_falls_back_to_https_app_base_url(self):
         assert _cookies_secure(None, [], app_base_url="https://plane.example.com") is True
 

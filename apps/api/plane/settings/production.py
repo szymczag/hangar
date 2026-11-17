@@ -18,6 +18,25 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
+# Fork (see FORK.md): `manage.py check --deploy` runs in CI against these
+# settings. Two of its warnings are about work the edge does, not Django:
+#
+# - security.W008 (SECURE_SSL_REDIRECT): the HTTP-to-HTTPS redirect happens
+#   before a request reaches the API. Compose: Caddy's automatic HTTPS
+#   (apps/proxy/Caddyfile.ce) redirects whenever SITE_ADDRESS is a host name.
+#   Helm: the Gateway (charts/hangar/templates/gateway.yaml) has only an HTTPS
+#   listener, and the Ingress always declares TLS for the public host. Turning
+#   the redirect on here would also break plain-http installs, which the cookie
+#   settings in common.py still support, and in-cluster probes that speak http.
+# - security.W004 (SECURE_HSTS_SECONDS): the API shares its host with the web
+#   and admin front ends, whose nginx sends Strict-Transport-Security on every
+#   response (packages/csp/bin/nginx-headers.mjs), as the space app does
+#   (apps/space/app/root.tsx). HSTS applies to the whole host, so /api and
+#   /auth are covered by the policy the browser already holds. The all-in-one
+#   image is the exception: its Caddy serves the front ends itself
+#   (apps/proxy/Caddyfile.aio.ce) and sends no HSTS.
+SILENCED_SYSTEM_CHECKS = ["security.W004", "security.W008"]
+
 INSTALLED_APPS += ("scout_apm.django",)  # noqa
 
 
