@@ -1,7 +1,7 @@
 # Dependabot configuration.
 #
 # npm and pip receive security updates only. The application tree follows
-# upstream Plane, and routine version bumps there would collide with upstream
+# the upstream project, and routine version bumps there would collide with upstream
 # syncs; open-pull-requests-limit: 0 turns version updates off without
 # affecting security updates, which the groups below batch into one pull
 # request per ecosystem.

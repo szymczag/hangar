@@ -25,7 +25,7 @@ def normalize_origin(url):
 
 @lru_cache(maxsize=None)
 def allowed_origins():
-    """Origins of Plane's own apps: the configured base URLs, CORS origins and CSRF trusted origins."""
+    """Origins of Hangar's own apps: the configured base URLs, CORS origins and CSRF trusted origins."""
     urls = [
         getattr(settings, name, None)
         for name in ("WEB_URL", "APP_BASE_URL", "ADMIN_BASE_URL", "SPACE_BASE_URL", "LIVE_BASE_URL")
@@ -47,7 +47,7 @@ def is_allowed_origin(request):
         return False
     # Same origin as the request itself. Only host[:port] is compared: whether
     # Django sees https depends on the proxy forwarding X-Forwarded-Proto, which
-    # setups that terminate TLS in front of Plane's proxy do not always do.
+    # setups that terminate TLS in front of Hangar's proxy do not always do.
     if origin.split("://", 1)[1] == request.get_host().lower():
         return True
     return origin in allowed_origins()
@@ -55,7 +55,7 @@ def is_allowed_origin(request):
 
 class BaseSessionAuthentication(SessionAuthentication):
     # Django's CSRF token is not used by the SPAs; instead, cookie-authenticated
-    # writes must come from the request's own origin or a configured Plane origin.
+    # writes must come from the request's own origin or a configured Hangar origin.
     def enforce_csrf(self, request):
         if request.method in SAFE_METHODS:
             return

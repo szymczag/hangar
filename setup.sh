@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Hangar development setup script
 # This script prepares the local development environment by setting up all necessary .env files

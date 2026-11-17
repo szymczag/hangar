@@ -115,7 +115,11 @@ truth:
 
 The `revision` is authoritative. `package_version` is informational because Plane
 release tags may be created on a release lineage rather than directly on the
-`preview` lineage merged by Hangar.
+`preview` lineage merged by Hangar. An upstream release absorbed as a signed squash
+commit, which `preview`'s signed-commit rule requires, is never an ancestor of a
+Hangar commit: `revision` then stays at the last upstream commit merged into
+Hangar's history, and `package_version` and `synced_at` record the squashed release
+(see "Upstream maintenance loop" in `FORK.md`).
 
 The baseline file must be updated in the pull request that merges upstream. The
 release preflight must verify that:

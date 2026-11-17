@@ -7,6 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AxiosInstance, AxiosRequestConfig } from "axios";
 import { create } from "axios";
+import { normalizeAPIRequestURL } from "@plane/services";
 
 export abstract class APIService {
   protected baseURL: string;
@@ -23,12 +24,32 @@ export abstract class APIService {
   }
 
   private setupInterceptors() {
+    this.axiosInstance.interceptors.request.use((config) => {
+      try {
+        if (config.url) {
+          config.url = normalizeAPIRequestURL(config.url, this.baseURL);
+        }
+      } catch (error) {
+        // Never block a request because of slash normalization — fall back to the
+        // original URL and let the call proceed.
+        console.warn("[APIService] Failed to normalize trailing slash:", config.url, error);
+      }
+      return config;
+    });
+
     this.axiosInstance.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response && error.response.status === 401) {
           const currentPath = window.location.pathname;
-          window.location.replace(`/${currentPath ? `?next_path=${currentPath}` : ``}`);
+          // The entry page ("/") runs its own current-user request on mount;
+          // when the session is expired that request 401s too, and redirecting
+          // "/" to "/?next_path=/" reloads the page in an endless loop instead of
+          // letting the sign-in screen render. Only bounce away from private
+          // routes.
+          if (currentPath !== "/") {
+            window.location.replace(`/${currentPath ? `?next_path=${encodeURIComponent(currentPath)}` : ``}`);
+          }
         }
         return Promise.reject(error);
       }

@@ -284,7 +284,21 @@ Some endpoints are rate-limited per client IP. Two settings in `plane.env` contr
 - **Behind an additional load balancer or CDN:** add its ranges to `TRUSTED_PROXIES` (space-separated, e.g. `TRUSTED_PROXIES=private_ranges 203.0.113.0/24`) and raise `NUM_PROXIES` by one per extra hop (e.g. `NUM_PROXIES=2`).
 - **Leaving `NUM_PROXIES` empty and `TRUSTED_PROXIES` at its default (`0.0.0.0/0`)** keeps the current behaviour.
 
+`AUTHENTICATION_RATE_LIMIT` (default `10/minute`) is the per-IP limit for the
+anonymous sign-in, sign-up and magic-link endpoints, in DRF format
+`<count>/<second|minute|hour|day>`. `API_KEY_RATE_LIMIT` (default `60/minute`)
+limits requests made with an API key.
+
 Restart the services after changing these values.
+
+#### API worker processes
+
+`GUNICORN_WORKERS` (default `1`) sets how many Gunicorn worker processes each
+`api` container runs. Each worker holds its own memory and database connections,
+so raise it with the host's CPU and RAM. Before Hangar 0.1.3 the Compose file
+fixed it at `1` and `AUTHENTICATION_RATE_LIMIT` was not passed to the API, so
+changing either in `plane.env` had no effect; both now apply after a restart.
+Docker Swarm deploys the same file and reads the same values.
 
 ---
 

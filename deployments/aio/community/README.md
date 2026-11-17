@@ -59,6 +59,7 @@ docker run --name plane-aio --rm -it \
     -e AWS_ACCESS_KEY_ID=your-access-key \
     -e AWS_SECRET_ACCESS_KEY=your-secret-key \
     -e AWS_S3_BUCKET_NAME=your-bucket \
+    -v hangar-aio-data:/app/data \
     ghcr.io/szymczag/hangar-aio:v0.1.0
 ```
 
@@ -83,6 +84,7 @@ docker run --name myaio --rm -it \
     -e AWS_S3_BUCKET_NAME=plane-app \
     -e AWS_S3_ENDPOINT_URL=http://${MYIP}:19000 \
     -e FILE_SIZE_LIMIT=10485760 \
+    -v hangar-aio-data:/app/data \
     ghcr.io/szymczag/hangar-aio:v0.1.0
 ```
 
@@ -96,8 +98,28 @@ docker run --name myaio --rm -it \
 
 #### Security & Secrets
 
-- `SECRET_KEY`: Django secret key (auto-generated on first boot if not set)
-- `LIVE_SERVER_SECRET_KEY`: Live server secret (auto-generated on first boot if not set)
+- `SECRET_KEY`: Django secret key. It signs sessions and encrypts saved instance
+  settings, so it must stay the same for the life of the deployment. Generated on
+  first boot if not set.
+- `LIVE_SERVER_SECRET_KEY`: Live server secret. Generated on first boot if not set.
+
+A value passed with `-e` always wins and is not written to disk. A generated
+value is kept in `/app/data/secrets.env` (mode `600`), so **mount a named volume
+or a host directory at `/app/data`**, as the examples above do. The image
+declares `/app/data` as a volume, but without a mount `docker run --rm` or
+recreating the container gives it a new, empty anonymous volume: new keys are
+generated, everybody is signed out, and saved instance settings can no longer be
+decrypted. Back up `secrets.env` with the database.
+
+Images up to Hangar 0.1.2 kept the generated keys in `/app/plane.env` inside the
+container. The first start of a newer image in the same container copies them to
+`/app/data/secrets.env`. If you are about to replace such a container, read its
+keys first and pass them as `-e SECRET_KEY=...` and `-e LIVE_SERVER_SECRET_KEY=...`
+(or write them to `secrets.env` on the new data volume):
+
+```bash
+docker exec <old-container> grep -E '^(SECRET_KEY|LIVE_SERVER_SECRET_KEY)=' /app/plane.env
+```
 
 - `REDIS_SSL_CERT_REQS`: For a `rediss://` `REDIS_URL`, the Redis server certificate and hostname are verified by default (`required`). Set it to `none` to skip verification.
 - `REDIS_SSL_CA_CERTS`: Path inside the container to a CA bundle, for a Redis server whose certificate is issued by a private CA. Mount the file with `-v`, for example `-v /path/to/redis-ca.pem:/certs/redis-ca.pem:ro -e REDIS_SSL_CA_CERTS=/certs/redis-ca.pem`.
@@ -119,12 +141,19 @@ The following ports are exposed:
 
 ## Volume Mounts
 
-### Recommended Persistent Volumes
+### Persistent Volumes
+
+`/app/data` is required for a deployment you keep: it holds the generated
+secrets (see [Security & Secrets](#security--secrets)). `/app/logs` is
+recommended.
 
 ```bash
 -v /path/to/logs:/app/logs \
 -v /path/to/data:/app/data
 ```
+
+A host directory mounted at `/app/logs` may start empty: the container creates
+`access/` and `error/` in it on every start.
 
 ## Building the Image
 

@@ -234,7 +234,8 @@ def validate_upload_metadata(
 
     try:
         size = int(raw_size)
-    except (TypeError, ValueError):
+    # OverflowError: a JSON size such as 1e400 parses to float("inf").
+    except (TypeError, ValueError, OverflowError):
         raise UploadError("A valid file size is required.", "invalid_file_size") from None
 
     if size < 1 or size > settings.FILE_SIZE_LIMIT:
