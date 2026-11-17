@@ -225,6 +225,12 @@ jobs:
       - name: Check React runtime contracts
         run: pnpm test:react-runtime-contracts
 
+      # `pnpm check` runs this locally, but nothing ran it in CI, so upstream
+      # product naming in comments reached preview unnoticed. It reads the
+      # whole tracked tree, not only the affected packages.
+      - name: Check branding
+        run: pnpm check:branding
+
       # Source-level invariants for the God Mode forms, which have no test
       # runner of their own.
       - name: Check God Mode form contracts

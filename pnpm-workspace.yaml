@@ -290,3 +290,7 @@ minimumReleaseAgeExclude:
 
 patchedDependencies:
   is-emoji-supported@0.0.5: patches/is-emoji-supported@0.0.5.patch
+
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf

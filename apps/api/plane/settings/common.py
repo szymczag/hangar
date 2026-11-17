@@ -607,7 +607,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_SIZE_LIMIT", 5242880))
 
 def _cookies_secure(web_url, cors_allowed_origins, app_base_url=None):
     """
-    Cookies are Secure when Plane is served over https, or when every configured
+    Cookies are Secure when Hangar is served over https, or when every configured
     CORS origin is https. Plain-http installs keep non-Secure cookies.
 
     The serving URL is WEB_URL, falling back to APP_BASE_URL when WEB_URL is
