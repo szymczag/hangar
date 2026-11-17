@@ -1,0 +1,68 @@
+name: Workflow lint
+
+# Static checks for the GitHub Actions configuration itself.
+#
+# - actionlint checks workflow syntax, expressions, job wiring and, through the
+#   shellcheck bundled in its image, every `run:` script.
+# - zizmor audits for workflow security problems: template injection, token
+#   persistence, over-broad permissions, dangerous triggers and pins whose
+#   version comment no longer matches the commit. Reviewed exceptions live in
+#   .github/zizmor.yml, each with its reason.
+#
+# Both tools are pinned: actionlint by image digest, zizmor by the action's
+# commit and an exact zizmor version, which the action installs from a
+# hash-locked requirements file. Findings fail the job and are printed in the
+# log; nothing is uploaded, so neither job needs more than read access.
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - preview
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      # rhysd/actionlint:1.7.12 (multi-arch index digest).
+      - name: Run actionlint
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/repo:ro" \
+            --workdir /repo \
+            rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
+            -color
+
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        with:
+          version: "1.32.0"
+          # Print findings and fail instead of uploading SARIF, which would
+          # need security-events: write.
+          advanced-security: false
+          annotations: true
