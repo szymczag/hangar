@@ -126,6 +126,9 @@ The following ports are exposed:
 -v /path/to/data:/app/data
 ```
 
+A host directory mounted at `/app/logs` may start empty: the container creates
+`access/` and `error/` in it on every start.
+
 ## Building the Image
 
 To build the AIO image yourself:
