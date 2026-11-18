@@ -368,7 +368,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
 
         # Project Cover
         elif entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
-            project = Project.objects.filter(id=asset.project_id).first()
+            project = Project.objects.filter(id=asset.project_id, workspace_id=asset.workspace_id).first()
             if project is None:
                 return
             # Delete the previous cover image
@@ -406,7 +406,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
             return
         # Project Cover
         elif entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
-            project = Project.objects.filter(id=asset.project_id).first()
+            project = Project.objects.filter(id=asset.project_id, workspace_id=asset.workspace_id).first()
             if project is None:
                 return
             project.cover_image_asset_id = None

@@ -18,10 +18,7 @@ class UserFactory(factory.django.DjangoModelFactory):
 
     id = factory.LazyFunction(uuid4)
     email = factory.Sequence(lambda n: f"user{n}@plane.so")
-    # Unique, because the column is: left unset every user gets "" and the
-    # second one built in a test fails on the unique constraint, which reads
-    # like a bug in whatever the test was actually checking.
-    username = factory.Sequence(lambda n: f"user{n}")
+    username = factory.LazyFunction(lambda: uuid4().hex)  # unique; the conftest user has ""
     password = factory.PostGenerationMethodCall("set_password", "password")
     first_name = factory.Sequence(lambda n: f"First{n}")
     last_name = factory.Sequence(lambda n: f"Last{n}")

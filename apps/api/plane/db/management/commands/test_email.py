@@ -6,11 +6,11 @@ import uuid
 
 from django.core.management import BaseCommand, CommandError
 from django.template.loader import render_to_string
-from django.utils.html import strip_tags
 
 # Module imports
 from plane.db.models import User
 from plane.mailer.service import enqueue_rendered_email
+from plane.utils.email import generate_plain_text_from_html
 
 
 class Command(BaseCommand):
@@ -30,7 +30,7 @@ class Command(BaseCommand):
         subject = "Test email from Hangar"
 
         html_content = render_to_string("emails/test_email.html")
-        text_content = strip_tags(html_content)
+        text_content = generate_plain_text_from_html(html_content)
 
         self.stdout.write(self.style.SUCCESS("Trying to send test email..."))
 

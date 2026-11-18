@@ -63,7 +63,12 @@ class IssueRelationViewSet(BaseViewSet):
         # it a member of project A could list the relations of an issue in project B of
         # the same workspace and receive that issue's name, priority, assignees and
         # labels in the response.
-        if not issue_in_project(issue_id, slug, project_id):
+        #
+        # include_archived=True: this is a read, not a write, and the issue detail page
+        # fetches relations unconditionally for archived issues too. Scoping this lookup
+        # with the write-path's issue_objects (which excludes archived issues) would 404
+        # a legitimate same-project read instead of only closing the cross-project hole.
+        if not issue_in_project(issue_id, slug, project_id, include_archived=True):
             return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
         # A restricted guest may only see the relations of issues they created,
         # mirroring the issue-detail visibility rule.

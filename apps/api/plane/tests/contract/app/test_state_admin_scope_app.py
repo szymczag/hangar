@@ -8,8 +8,8 @@ State configuration (create, edit, delete, set default) is project-admin-only, m
 the project settings UI. ``partial_update`` used to allow [ADMIN, MEMBER, GUEST], and
 because ``default`` was writable it also let them switch the project's default state.
 
-The guest/member PATCH denial and the project-admin positive control live in
-``test_state_partial_update_admin_scope_app.py``; this module covers the rest.
+The guest/member PATCH denial lives in ``test_state_partial_update_admin_scope_app.py``;
+this module covers the rest.
 """
 
 from uuid import uuid4
@@ -57,6 +57,13 @@ def state(project):
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestStateWriteAdminScope:
+    def test_project_admin_can_patch_state(self, workspace, project, state):
+        client = _client_for(workspace, project, workspace_role=MEMBER, project_role=ADMIN)
+        response = client.patch(_state_url(workspace.slug, project.id, state.id), {"name": "Renamed"}, format="json")
+        assert response.status_code == status.HTTP_200_OK, response.data
+        state.refresh_from_db()
+        assert state.name == "Renamed"
+
     def test_workspace_admin_in_project_can_patch_state(self, workspace, project, state):
         client = _client_for(workspace, project, workspace_role=ADMIN, project_role=MEMBER)
         response = client.patch(_state_url(workspace.slug, project.id, state.id), {"name": "Renamed"}, format="json")

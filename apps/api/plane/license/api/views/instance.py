@@ -178,7 +178,6 @@ class InstanceEndpoint(BaseAPIView):
             ENABLE_MAGIC_LINK_LOGIN,
             ENABLE_EMAIL_PASSWORD,
             SLACK_CLIENT_ID,
-            POSTHOG_API_KEY,
             LLM_API_KEY,
         ) = get_configuration_value(
             [
@@ -226,10 +225,6 @@ class InstanceEndpoint(BaseAPIView):
                 {
                     "key": "SLACK_CLIENT_ID",
                     "default": os.environ.get("SLACK_CLIENT_ID", None),
-                },
-                {
-                    "key": "POSTHOG_API_KEY",
-                    "default": os.environ.get("POSTHOG_API_KEY", None),
                 },
                 {
                     "key": "LLM_API_KEY",
@@ -399,9 +394,6 @@ class InstanceEndpoint(BaseAPIView):
         # Slack client
         data["slack_client_id"] = SLACK_CLIENT_ID
 
-        # Posthog
-        data["posthog_api_key"] = POSTHOG_API_KEY
-        data["posthog_host"] = settings.POSTHOG_HOST
 
         # Open AI settings
         data["has_llm_configured"] = bool(LLM_API_KEY)

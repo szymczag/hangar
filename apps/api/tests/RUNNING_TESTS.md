@@ -2,7 +2,7 @@
 
 This guide covers running the Django/pytest suite for `apps/api` inside Docker via `docker-compose-test.yml` at the repo root. The compose file boots an isolated stack — Postgres, Valkey (Redis), RabbitMQ, SeaweedFS (S3-compatible object storage) — with tmpfs-backed data dirs, so every run begins from a clean slate and a single teardown command removes everything.
 
-For background on the test layout, markers, and fixtures, see [`TESTING_GUIDE.md`](./TESTING_GUIDE.md) and [`README.md`](./README.md).
+For background on the test layout, markers, and fixtures, see [`TESTING_GUIDE.md`](../plane/tests/TESTING_GUIDE.md) and [`README.md`](../plane/tests/README.md).
 
 ## Prerequisites
 
@@ -25,28 +25,28 @@ All commands are run from the repo root.
 docker compose -f docker-compose-test.yml run --rm --build api-tests pytest
 ```
 
-- `--build` rebuilds the `api-tests` image when `Dockerfile.dev`, `pyproject.toml` or `uv.lock` change. Without it, the container still runs `uv sync --locked --inexact` against the mounted lock before pytest, so a stale image catches up, only more slowly.
+- `--build` rebuilds the `api-tests` image when `Dockerfile.dev`, `pyproject.toml` or `uv.lock` change. Dependency changes also work without a rebuild: the entrypoint runs `uv sync --locked --inexact` against the mounted `uv.lock` before every run.
 - `--rm` removes the one-shot test container after pytest exits.
 - Compose propagates the one-shot container's exit code, so failures are reported correctly in CI without waiting for long-lived dependency services to stop.
 
 ### Filtered runs
 
-Pass pytest arguments after the service name to run a filtered selection.
+Use `docker compose run` to override the default `pytest` command. Anything you pass after the service name replaces that command, so start it with `pytest`.
 
 ```bash
 # Only unit tests (marker defined in pytest.ini)
 docker compose -f docker-compose-test.yml run --rm --build api-tests pytest -m unit
 
 # A single directory, filtered by name
-docker compose -f docker-compose-test.yml run --rm api-tests \
+docker compose -f docker-compose-test.yml run --rm --build api-tests \
   pytest plane/tests/unit -k "test_workspace"
 
 # Single file with verbose output
-docker compose -f docker-compose-test.yml run --rm api-tests \
-  pytest plane/tests/unit/models/test_workspace.py -vv
+docker compose -f docker-compose-test.yml run --rm --build api-tests \
+  pytest plane/tests/unit/models/test_workspace_model.py -vv
 ```
 
-The available markers (`unit`, `contract`, `smoke`, `slow`) are declared in `apps/api/pytest.ini`.
+The available markers (`unit`, `contract`, `smoke`, `slow`, and the fork's `runner_migrations`, `todoist_migrations` and `storage`) are declared in `apps/api/pytest.ini`.
 
 ### Migration-backed security invariants
 
@@ -71,7 +71,7 @@ database-enforced security properties cannot silently turn into skipped tests.
 docker compose -f docker-compose-test.yml down -v
 ```
 
-`-v` removes the ephemeral volumes and the `test_env` network. Because the data directories are tmpfs, no host state survives a teardown — every run starts clean. Run this between unrelated test sessions to free Docker resources.
+`down` removes the containers and the `test_env` network; `-v` also removes the anonymous volumes the service images create. Because the data directories are tmpfs, no host state survives a teardown — every run starts clean. Run this between unrelated test sessions to free Docker resources.
 
 ## How it works
 
@@ -90,13 +90,13 @@ publishes community images.
 
 All four dependencies expose health checks; `api-tests` waits for `service_healthy` on each via `depends_on`, so pytest only starts once the stack is ready.
 
-Test-time env overrides live in the compose file itself (`POSTGRES_HOST=test-db`, `REDIS_URL=redis://test-redis:6379/`, `AWS_S3_ENDPOINT_URL=http://test-minio:9000`, `DJANGO_SETTINGS_MODULE=plane.settings.test`). Everything else is inherited from `apps/api/.env`.
+Test-time env overrides live in the compose file itself (`DJANGO_SETTINGS_MODULE=plane.settings.test`, `POSTGRES_HOST=test-db`, `DATABASE_URL` pointing at `test-db`, `REDIS_HOST=test-redis`, `REDIS_URL=redis://test-redis:6379/`, `RABBITMQ_HOST=test-mq`, `AWS_S3_ENDPOINT_URL=http://test-minio:9000`, a placeholder `EMAIL_HOST=test-smtp.invalid` for the magic-link tests, and raised `AUTHENTICATION_RATE_LIMIT` / `API_KEY_RATE_LIMIT` so the single-IP suite does not trip the throttles). Everything else is inherited from `apps/api/.env`.
 
 ## Troubleshooting
 
 - **`./apps/api/.env: no such file or directory`** — run `./setup.sh` from the repo root.
 - **Port already in use** — none of the test services publish host ports; if you see this it's coming from a different compose stack. Stop the local stack (`docker compose -f docker-compose-local.yml down`).
-- **Stale image after dependency changes** — rebuild explicitly: `docker compose -f docker-compose-test.yml build --no-cache api-tests`.
+- **Stale image after `Dockerfile.dev` changes** — rebuild explicitly: `docker compose -f docker-compose-test.yml build --no-cache api-tests`.
 - **Object storage bucket missing** — `test-minio` creates the buckets named by `AWS_S3_BUCKET_NAME` (default `uploads`) and `IMPORT_S3_BUCKET_NAME` (default `uploads-imports`) at startup. Change the value in `apps/api/.env` and re-run.
 - **Podman: `test-db` exits with `invalid character in extension owner`** — podman-compose 1.3 does not expand `${VAR:-default}` for a variable that is also defined in an `env_file`, so Postgres receives the literal `${POSTGRES_USER:-plane}` (object storage gets literal credentials the same way). Export the values before running the stack, taking the object-storage pair that `./setup.sh` generated in `apps/api/.env`:
 
@@ -108,4 +108,4 @@ Test-time env overrides live in the compose file itself (`POSTGRES_HOST=test-db`
 
   Docker Compose expands them without this.
 
-- **Database state leaking between runs** — confirm you ran `down -v` (not just `down`). The tmpfs mounts are torn down with the container, but the network and any externally created volumes need `-v` to clear.
+- **Database state leaking between runs** — confirm you ran `down -v` (not just `down`). The tmpfs mounts are torn down with the container; `-v` also clears the anonymous volumes the images create.

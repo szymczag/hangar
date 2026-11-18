@@ -44,7 +44,6 @@ def test_only_pending_unexpired_invite_authorizes_signup():
 @pytest.mark.django_db(transaction=True)
 def test_accepted_invite_is_consumed_transactionally(mocker):
     mocker.patch("plane.authentication.utils.workspace_project_join.invalidate_cache_directly")
-    mocker.patch("plane.authentication.utils.workspace_project_join.track_event.delay")
     user = UserFactory(email="invitee@hangar.test")
     workspace = WorkspaceFactory()
     invite = create_invite(
@@ -103,7 +102,6 @@ def test_direct_accept_rejects_expired_invitation():
 
 @pytest.mark.django_db(transaction=True)
 def test_direct_accept_consumes_active_invitation(mocker):
-    mocker.patch("plane.app.views.workspace.invite.track_event.delay")
     user = UserFactory(email="direct-active@hangar.test", username="direct-active")
     workspace = WorkspaceFactory()
     invite = create_invite(workspace, user.email)
