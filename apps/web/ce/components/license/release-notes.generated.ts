@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.4",
+  version: "0.2.0-rc.1",
   highlights: [
-    "Accounts that sign in through SSO can no longer obtain a Hangar password.",
-    "The all-in-one image runs the API again.",
-    "The Helm chart can set the number of trusted proxies.",
-    "Live gets 30 seconds to save open pages when Docker Compose stops it.",
-    "The all-in-one image no longer trusts certificates outside the system store.",
+    "Guests can no longer send page events to everyone else on a page.",
+    "The editor moves to Tiptap 3, which clears GHSA-cp6q-959q-f8rh.",
+    "The live server converts page HTML without running scripts or loading resources.",
+    "Completing an upload through the external API now needs access to its project.",
+    "PostHog support is removed.",
   ],
   upstream: {
     version: "1.4.3",
