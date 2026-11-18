@@ -96,6 +96,8 @@ export enum EAuthenticationErrorCodes {
   // Reset Password
   INVALID_PASSWORD_TOKEN = "5125",
   EXPIRED_PASSWORD_TOKEN = "5130",
+  // Fork (see FORK.md): an account bound to an identity provider asked for a password.
+  PASSWORD_MANAGED_BY_IDENTITY_PROVIDER = "5132",
   // Change password
   INCORRECT_OLD_PASSWORD = "5135",
   MISSING_PASSWORD = "5138",
@@ -366,6 +368,11 @@ const errorCodeMessages: {
     title: `Expired password token`,
     message: () => `Expired password token. Please try again.`,
   },
+  [EAuthenticationErrorCodes.PASSWORD_MANAGED_BY_IDENTITY_PROVIDER]: {
+    title: `Password managed by your identity provider`,
+    message: () =>
+      `This account signs in through an identity provider and has no Hangar password, so it cannot be set or reset here. Sign in with your provider, and change your password there.`,
+  },
 
   // Change password
   [EAuthenticationErrorCodes.MISSING_PASSWORD]: {
@@ -499,6 +506,7 @@ export const authErrorHandler = (errorCode: EAuthenticationErrorCodes, email?: s
     EAuthenticationErrorCodes.GITLAB_OAUTH_PROVIDER_ERROR,
     EAuthenticationErrorCodes.INVALID_PASSWORD_TOKEN,
     EAuthenticationErrorCodes.EXPIRED_PASSWORD_TOKEN,
+    EAuthenticationErrorCodes.PASSWORD_MANAGED_BY_IDENTITY_PROVIDER,
     EAuthenticationErrorCodes.INCORRECT_OLD_PASSWORD,
     EAuthenticationErrorCodes.MISSING_PASSWORD,
     EAuthenticationErrorCodes.INVALID_NEW_PASSWORD,
