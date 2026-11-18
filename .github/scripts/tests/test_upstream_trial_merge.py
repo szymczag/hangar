@@ -60,7 +60,7 @@ FIXTURE = "\0".join(FIXTURE_FIELDS) + "\0"
 
 class AreaTests(unittest.TestCase):
     def test_apps_and_packages_are_split_by_their_child(self):
-        self.assertEqual(trial.area_for("apps/web/core/a.tsx"), "apps/web")
+        self.assertEqual(trial.area_for("apps/web/components/a.tsx"), "apps/web")
         self.assertEqual(trial.area_for("packages/editor/src/x.ts"), "packages/editor")
 
     def test_other_paths_use_their_top_directory(self):

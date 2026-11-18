@@ -39,22 +39,22 @@ The selected production transport is `ses_api`. It uses the SES v2 `SendEmail` o
 
 ## Code map
 
-| Area                                    | Location                                                   |
-| --------------------------------------- | ---------------------------------------------------------- |
-| Public enqueue API and rendering        | `apps/api/plane/mailer/service.py`                         |
-| Policy classes and decisions            | `apps/api/plane/mailer/policy.py`, `enums.py`              |
-| Allowlisted templates                   | `apps/api/plane/mailer/registry.py`                        |
-| Random receipt codes                    | `apps/api/plane/mailer/tokens.py`                          |
-| Clear and PGP/MIME construction         | `apps/api/plane/mailer/mime.py`                            |
-| Constrained GnuPG adapter               | `apps/api/plane/mailer/openpgp.py`                         |
-| SES API and SMTP transports             | `apps/api/plane/mailer/transports/`                        |
-| Delivery, recovery, feedback, retention | `apps/api/plane/bgtasks/email_delivery_task.py`            |
-| Durable models                          | `apps/api/plane/db/models/email.py`                        |
-| User key and receipt API                | `apps/api/plane/app/views/user/email_security.py`          |
-| Admin log and suppression API           | `apps/api/plane/license/api/views/email_delivery.py`       |
-| User UI                                 | `apps/web/core/components/settings/profile/content/pages/` |
-| Admin UI                                | `apps/admin/app/(all)/(dashboard)/email/`                  |
-| Kubernetes deployment                   | `charts/hangar/`                                           |
+| Area                                    | Location                                              |
+| --------------------------------------- | ----------------------------------------------------- |
+| Public enqueue API and rendering        | `apps/api/plane/mailer/service.py`                    |
+| Policy classes and decisions            | `apps/api/plane/mailer/policy.py`, `enums.py`         |
+| Allowlisted templates                   | `apps/api/plane/mailer/registry.py`                   |
+| Random receipt codes                    | `apps/api/plane/mailer/tokens.py`                     |
+| Clear and PGP/MIME construction         | `apps/api/plane/mailer/mime.py`                       |
+| Constrained GnuPG adapter               | `apps/api/plane/mailer/openpgp.py`                    |
+| SES API and SMTP transports             | `apps/api/plane/mailer/transports/`                   |
+| Delivery, recovery, feedback, retention | `apps/api/plane/bgtasks/email_delivery_task.py`       |
+| Durable models                          | `apps/api/plane/db/models/email.py`                   |
+| User key and receipt API                | `apps/api/plane/app/views/user/email_security.py`     |
+| Admin log and suppression API           | `apps/api/plane/license/api/views/email_delivery.py`  |
+| User UI                                 | `apps/web/components/settings/profile/content/pages/` |
+| Admin UI                                | `apps/admin/app/(all)/(dashboard)/email/`             |
+| Kubernetes deployment                   | `charts/hangar/`                                      |
 
 ## Policy invariants
 
@@ -186,8 +186,8 @@ helm lint charts/hangar
 
 ./node_modules/.bin/oxlint \
   apps/admin/app/\(all\)/\(dashboard\)/email \
-  apps/web/core/components/settings/profile/content/pages/email-security.tsx \
-  apps/web/core/components/settings/profile/content/pages/email-receipts.tsx
+  apps/web/components/settings/profile/content/pages/email-security.tsx \
+  apps/web/components/settings/profile/content/pages/email-receipts.tsx
 ```
 
 Run the full repository checks before merging. Production validation additionally requires the SES mailbox simulator, real controlled recipients, raw-source inspection, and the supported OpenPGP client matrix.

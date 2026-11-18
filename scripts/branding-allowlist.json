@@ -30,7 +30,7 @@
     "rationale": "The URL is part of an inherited proprietary license notice and must not be rewritten."
   },
   {
-    "pathPattern": "^apps/web/core/components/inbox/sidebar/inbox-list-item\\.tsx$",
+    "pathPattern": "^apps/web/components/inbox/sidebar/inbox-list-item\\.tsx$",
     "rules": ["plane-domain", "plane-email"],
     "rationale": "Legacy intake-bot email recognition is a compatibility identifier, not a public support address."
   },

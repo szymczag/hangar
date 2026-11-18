@@ -17,8 +17,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync(new URL("../core/components/projects/create/root.tsx", import.meta.url), "utf8");
-const defaults = readFileSync(new URL("../core/components/projects/create/utils.ts", import.meta.url), "utf8");
+const source = readFileSync(new URL("../components/projects/create/root.tsx", import.meta.url), "utf8");
+const defaults = readFileSync(new URL("../components/projects/create/utils.ts", import.meta.url), "utf8");
 
 test("a new project is still given a cover by default, which is what makes this reachable", () => {
   assert.match(
