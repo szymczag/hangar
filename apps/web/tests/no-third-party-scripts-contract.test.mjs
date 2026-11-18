@@ -21,8 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const APP = path.dirname(fileURLToPath(new URL("../app/root.tsx", import.meta.url)));
-const CORE = path.dirname(fileURLToPath(new URL("../core/lib/store-context.tsx", import.meta.url)));
+const WEB = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 
 // Hosts a page may fetch executable code or embed content from. Empty on
 // purpose: everything the application needs, it serves itself.
@@ -30,7 +29,7 @@ const ALLOWED_HOSTS = [];
 
 function* sources(directory) {
   for (const entry of readdirSync(directory)) {
-    if (entry === "node_modules" || entry === "build" || entry === "dist") continue;
+    if (["node_modules", "build", "dist", "public", "tests", ".react-router"].includes(entry)) continue;
     const full = path.join(directory, entry);
     if (statSync(full).isDirectory()) yield* sources(full);
     else if (/\.(tsx?|jsx?|mjs)$/.test(entry) && !entry.includes(".test.")) yield full;
@@ -38,7 +37,7 @@ function* sources(directory) {
 }
 
 function allSources() {
-  return [...sources(APP), ...sources(path.dirname(CORE))];
+  return [...sources(WEB)];
 }
 
 test("this test can see the files it is meant to check", () => {

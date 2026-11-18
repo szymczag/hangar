@@ -33,7 +33,7 @@ test("owners are npm packages or repository paths, never versions or chunk names
     "npm:@tiptap/core"
   );
   assert.equal(ownerOf("../../../../../packages/utils/dist/index.mjs", assets, root), "packages/utils");
-  assert.equal(ownerOf("../../../core/hooks/use-thing.ts", assets, root), "apps/web/core/hooks/use-thing.ts");
+  assert.equal(ownerOf("../../../hooks/use-thing.ts", assets, root), "apps/web/hooks/use-thing.ts");
   assert.equal(ownerOf(null, assets, root), "unmapped");
 });
 

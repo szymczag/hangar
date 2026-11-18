@@ -20,7 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const ROOTS = ["../core", "../app"].map((relative) => path.dirname(fileURLToPath(new URL(relative, import.meta.url))));
+const WEB = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 
 function* sources(directory) {
   for (const entry of readdirSync(directory)) {
@@ -32,11 +32,7 @@ function* sources(directory) {
 }
 
 function allSources() {
-  const files = [];
-  for (const root of ROOTS) {
-    for (const file of sources(path.join(root, path.basename(root) === "web" ? "" : ""))) files.push(file);
-  }
-  return files;
+  return [...sources(WEB)];
 }
 
 test("this test can see the components it is meant to check", () => {

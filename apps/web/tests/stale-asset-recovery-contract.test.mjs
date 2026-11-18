@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const helperSource = readFileSync(new URL("../core/lib/stale-asset-error.ts", import.meta.url), "utf8");
+const helperSource = readFileSync(new URL("../lib/stale-asset-error.ts", import.meta.url), "utf8");
 const entrySource = readFileSync(new URL("../app/entry.client.tsx", import.meta.url), "utf8");
 const rootSource = readFileSync(new URL("../app/root.tsx", import.meta.url), "utf8");
 

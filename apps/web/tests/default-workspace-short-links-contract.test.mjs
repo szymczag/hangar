@@ -27,5 +27,5 @@ test("links and imperative navigation share the same route policy", () => {
   assert.match(source("app/compat/next/link.tsx"), /normalizePath\(href\)/);
   const navigation = source("app/compat/next/navigation.ts");
   assert.match(navigation, /normalizePath\(to\)/);
-  assert.match(source("core/lib/wrappers/store-wrapper.tsx"), /normalizeDefaultWorkspacePath/);
+  assert.match(source("lib/wrappers/store-wrapper.tsx"), /normalizeDefaultWorkspacePath/);
 });

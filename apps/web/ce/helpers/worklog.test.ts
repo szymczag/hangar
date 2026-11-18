@@ -30,11 +30,11 @@ describe("canViewWorklogsForRole", () => {
     expect(canViewWorklogsForRole(-1)).toBe(false);
   });
 
-  it.each([
-    "../../core/components/issues/issue-detail/sidebar.tsx",
-    "../../core/components/issues/peek-overview/properties.tsx",
-  ])("%s gates worklogs on the helper", (file) => {
-    const source = readFileSync(path.join(here, file), "utf8");
-    expect(source).toMatch(/canViewWorklogs\s*=\s*canViewWorklogsForRole\(/);
-  });
+  it.each(["../../components/issues/issue-detail/sidebar.tsx", "../../components/issues/peek-overview/properties.tsx"])(
+    "%s gates worklogs on the helper",
+    (file) => {
+      const source = readFileSync(path.join(here, file), "utf8");
+      expect(source).toMatch(/canViewWorklogs\s*=\s*canViewWorklogsForRole\(/);
+    }
+  );
 });

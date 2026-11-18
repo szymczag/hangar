@@ -58,7 +58,9 @@ function* sources(directory) {
 }
 
 const allSources = () => [
-  ...sources(path.join(WEB, "core")),
+  ...["components", "hooks", "layouts", "lib", "services", "store"].flatMap((directory) => [
+    ...sources(path.join(WEB, directory)),
+  ]),
   ...sources(path.join(WEB, "app")),
   ...sources(path.join(WEB, "ce")),
 ];
@@ -117,7 +119,7 @@ test("every outbound link is either gated or the licence offer", () => {
 });
 
 test("the top-navigation help menu is hidden when outbound links are disabled", () => {
-  const helpMenu = readFileSync(path.join(WEB, "core/components/workspace/sidebar/help-section/root.tsx"), "utf8");
+  const helpMenu = readFileSync(path.join(WEB, "components/workspace/sidebar/help-section/root.tsx"), "utf8");
 
   assert.match(helpMenu, /import \{ showExternalLinks \} from "@\/helpers\/external-links"/);
   assert.match(helpMenu, /if \(!showExternalLinks\(config\)\) return null/);
