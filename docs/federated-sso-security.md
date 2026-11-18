@@ -351,12 +351,19 @@ python manage.py audit_user_identities --domain corp.com --provider google
 EMAIL                  STATUS         PASSWORD  SIGN-IN RECORDS
 adoptable@corp.com     adoptable      no        google
 bound@corp.com         federated      no        google:https://accounts.google.com
+escaped@corp.com       federated      yes!      google:https://accounts.google.com
 passwordonly@corp.com  needs-import   yes       -
 
-adoptable=1  federated=1  needs-import=1
+adoptable=1  federated=2  needs-import=1
+
+1 federated account(s) still hold a usable Hangar password (marked 'yes!'). ...
 
 1 account(s) would be refused after pinning this domain to 'google'. ...
 ```
+
+`PASSWORD` is `yes` only for a password the account can actually sign in with:
+an account the provider created has an unusable one, and an automatically set
+password is a random value nobody was told.
 
 | Status         | Meaning at cutover                                                          |
 | -------------- | --------------------------------------------------------------------------- |
@@ -370,6 +377,39 @@ to Google. Add `--csv` to produce a starting point for the import file, and
 `--include-inactive` to see deactivated accounts, which are hidden by default.
 
 Omit `--provider` for a general view of how everyone signs in today.
+
+### Federated accounts that still hold a password
+
+An account bound to an identity provider has no Hangar password and cannot
+obtain one: changing a password, setting a first one, asking for a reset link
+and using one are all refused for it (`PASSWORD_MANAGED_BY_IDENTITY_PROVIDER`;
+the forgot-password form answers as it does for any other address, so it does
+not reveal which accounts are federated). A local password would sign in without
+the provider, so its second factor, lockout and deprovisioning would no longer be
+the only way in.
+
+Those refusals do not remove a password an account already holds — one it had
+before its identity was linked, or one obtained before the refusals existed
+(Hangar 0.1.3 and earlier allowed setting one, and a reset link worked for these
+accounts). Password sign-in for such an account is unchanged, so find them and
+decide:
+
+```bash
+python manage.py audit_user_identities --federated-with-password
+```
+
+The report lists only accounts bound to a provider that hold a usable password
+(`yes!` in the table, `federated_with_password=True` with `--csv`). Unless an
+account is meant to keep a password alongside its provider, clear it:
+
+```bash
+python manage.py shell -c "from plane.db.models import User; \
+u = User.objects.get(email='escaped@corp.com'); \
+u.set_unusable_password(); u.is_password_autoset = True; u.save()"
+```
+
+The person then signs in through the provider as usual. Run the audit after
+upgrading, and again before pinning a domain with `SSO_ENFORCED_DOMAINS`.
 
 ### Order of operations
 
@@ -422,6 +462,7 @@ forward.
 
 The profile step is deliberately left open: it collects a display name, which
 nobody else can supply.
+
 ### Letting a provider own names and avatars
 
 `ENABLE_GOOGLE_SYNC` and its siblings make the provider authoritative for a
@@ -442,7 +483,9 @@ would be offering to lose the file. The instance reports which providers are in
 this state, so clients do not have to guess.
 
 Sign-in methods are also no longer offered where they cannot work: on an instance
-with password sign-in disabled, onboarding stops proposing that people set one.
+with password sign-in disabled, onboarding stops proposing that people set one,
+and it never proposes one to an account bound to a provider, which cannot have
+one.
 
 ### Authorising a link when you only have email addresses
 

@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.1.3",
+  version: "0.1.4",
   highlights: [
-    "Every live collaboration connection now checks page access.",
-    "A workspace admin can no longer remove a project's only admin.",
-    "Restricted guests can no longer see links and subscribers of hidden work items.",
-    "Member lists return only the fields they are meant to.",
-    "Mentions search stays inside the project.",
+    "Accounts that sign in through SSO can no longer obtain a Hangar password.",
+    "The all-in-one image runs the API again.",
+    "The Helm chart can set the number of trusted proxies.",
+    "Live gets 30 seconds to save open pages when Docker Compose stops it.",
+    "The all-in-one image no longer trusts certificates outside the system store.",
   ],
   upstream: {
     version: "1.4.3",

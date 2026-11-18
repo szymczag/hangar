@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.3`. It is a stable Hangar release for Docker
+The current release is `0.1.4`. It is a stable Hangar release for Docker
 Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
 for evaluation on AMD64 clusters only and is not yet a supported production
 release.
@@ -56,7 +56,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.3` qualification boundary is:
+The `0.1.4` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -179,16 +179,28 @@ the import worker, and the single Beat scheduler to be healthy together. See the
 [configuration reference](configuration.md#todoist-import-admission-and-worker)
 and [operations runbook](operations.md#operate-todoist-imports).
 
+## Client IP and rate limiting
+
+The API throttles anonymous sign-in, sign-up, and magic-link requests per client
+IP, which it reads from `X-Forwarded-For`. Set `application.numProxies` to the
+number of proxies that append to that header: `1` when clients reach the
+ingress controller or Gateway directly, plus one for each HTTP load balancer or
+CDN in front of it. The chart renders it as `NUM_PROXIES` in the API ConfigMap.
+The default, `null`, keeps the previous behaviour, in which the whole header is
+the client identity; behind a proxy that appends to a client-supplied header, a
+client can then change its throttle identity by sending its own `X-Forwarded-For`. See the
+[configuration reference](configuration.md#client-ip-for-rate-limits).
+
 ## Release identity
 
 The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                          |
 | ------------------ | -------------------------------------- |
-| Product version    | `v0.1.3`                               |
-| Helm chart version | `0.1.3`                                |
-| Git tag            | `hangar-v0.1.3`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.3` |
+| Product version    | `v0.1.4`                               |
+| Helm chart version | `0.1.4`                                |
+| Git tag            | `hangar-v0.1.4`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.4` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -197,10 +209,12 @@ Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
 installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
-`ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.2` is the
+`ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.3` is the
 immediately previous GitHub release and the supported rollback target for this
-one; rolling back to it needs no schema change (the `db.0136` index can stay), and neither does rolling back
-further, to `0.1.1`, `0.1.0`, `rc.72`, `rc.71`, `rc.70` or `rc.69`. Rolling back to `rc.68` needs migration
+one; rolling back to it needs no schema change, but `application.numProxies`
+must be removed from the values first because the `0.1.3` schema rejects it.
+Rolling back to `0.1.2` needs no schema change either (the `db.0136` index can
+stay), and neither does rolling back further, to `0.1.1`, `0.1.0`, `rc.72`, `rc.71`, `rc.70` or `rc.69`. Rolling back to `rc.68` needs migration
 `db.0135` reversed first, as described below. Rolling
 back to `rc.67` after that needs no other schema change.
 Rolling back to `rc.66` needs none either and restores the larger `space` and
@@ -231,7 +245,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.3` notes](../releases/hangar-v0.1.3.md) — review
+- [Release `v0.1.4` notes](../releases/hangar-v0.1.4.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -263,10 +277,23 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.2`, tag `hangar-v0.1.2`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.2`. Anybody still on rc.62 with
+The previous release is `0.1.3`, tag `hangar-v0.1.3`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.3`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
+
+Release 0.1.4 adds no migrations and changes nothing in the chart's Secrets.
+It adds one optional value, `application.numProxies`, rendered as `NUM_PROXIES`
+in the API ConfigMap; its default, `null`, keeps the previous behaviour, so an
+upgrade from 0.1.3 with `helm upgrade` needs no other action. Set it as
+[Client IP and rate limiting](#client-ip-and-rate-limiting) describes once you
+know how many proxies sit in front of the API. The release also stops accounts
+bound to an identity provider from obtaining a local password; run
+`python manage.py audit_user_identities --federated-with-password` in an API pod
+after the upgrade to find passwords such accounts obtained earlier. Rolling back
+to 0.1.3 needs no schema change, but remove `application.numProxies` from the
+values first, because the 0.1.3 schema does not accept it, and the rollback
+reopens those password paths.
 
 Release 0.1.3 adds one migration, `db.0136`, which builds an index on intake
 snooze times concurrently, without locking the table, and changes nothing in the

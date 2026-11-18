@@ -126,7 +126,9 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
   const isPasswordAlreadySetup = !user?.is_password_autoset;
   // Offering to set a password an instance will not accept is an invitation to
   // waste time: where password sign-in is off, the only way in is the provider.
-  const canSignInWithPassword = instanceConfig?.is_email_password_enabled !== false;
+  // An account bound to an identity provider has no Hangar password and the API
+  // refuses to set one, so the step is not offered to it either.
+  const canSignInWithPassword = instanceConfig?.is_email_password_enabled !== false && !user?.is_federated;
   // The provider overwrites these on every sign-in when attribute sync is on,
   // so editing them here would be undone by the next login without explanation.
   // Shared with profile settings, which asks the same question of the same two
