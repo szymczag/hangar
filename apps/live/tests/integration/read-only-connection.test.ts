@@ -6,7 +6,7 @@
 
 import { once } from "node:events";
 import { HocuspocusProvider } from "@hocuspocus/provider";
-import { Hocuspocus } from "@hocuspocus/server";
+import { Hocuspocus, OutgoingMessage } from "@hocuspocus/server";
 import { WebSocketServer } from "ws";
 import * as Y from "yjs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -22,7 +22,7 @@ vi.mock("@/services/user.service", () => ({
 }));
 
 import { onAuthenticate } from "@/lib/auth";
-import { onStateless } from "@/lib/stateless";
+import { beforeHandleMessage, onStateless } from "@/lib/stateless";
 
 const PAGE_ID = "22222222-2222-4222-8222-222222222222";
 
@@ -36,16 +36,16 @@ describe("a read-only connection on Hocuspocus 3", () => {
   const documents: Y.Doc[] = [];
   const stateless = new Map<string, string[]>();
 
-  const connect = (user: "editor" | "guest") => {
+  const connect = (user: "editor" | "guest", label: string = user) => {
     const document = new Y.Doc();
     documents.push(document);
-    stateless.set(user, []);
+    stateless.set(label, []);
     const provider = new HocuspocusProvider({
       url,
       name: PAGE_ID,
       document,
       token: JSON.stringify({ id: user, cookie: `session=${user}` }),
-      onStateless: ({ payload }) => stateless.get(user)!.push(payload),
+      onStateless: ({ payload }) => stateless.get(label)!.push(payload),
     });
     providers.push(provider);
     return { document, provider };
@@ -63,6 +63,7 @@ describe("a read-only connection on Hocuspocus 3", () => {
       quiet: true,
       onAuthenticate,
       onStateless,
+      beforeHandleMessage,
       // The page starts with one paragraph, as if loaded from the API.
       onLoadDocument: ({ document }) => {
         const paragraph = new Y.XmlElement("paragraph");
@@ -116,5 +117,31 @@ describe("a read-only connection on Hocuspocus 3", () => {
     await vi.waitFor(() => expect(stateless.get("guest")).toContain("unlocked"));
     expect(stateless.get("editor")).not.toContain("locked");
     expect(stateless.get("guest")).not.toContain("locked");
+  });
+
+  it("relays no client broadcast, from a guest or an editor, to any other client", async () => {
+    const observer = connect("editor", "observer");
+    const guest = connect("guest", "broadcasting guest");
+    const editor = connect("editor", "broadcasting editor");
+    await vi.waitFor(
+      () => expect(observer.provider.isSynced && guest.provider.isSynced && editor.provider.isSynced).toBe(true),
+      { timeout: 10_000 }
+    );
+
+    // The provider has no API for message type 6, so write it to the socket as a modified client would.
+    const forceClose = JSON.stringify({ type: "force_close", code: 4001, reason: "spoofed" });
+    for (const { provider } of [guest, editor]) {
+      provider.configuration.websocketProvider.send(
+        new OutgoingMessage(PAGE_ID).writeBroadcastStateless(forceClose).toUint8Array()
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // A page event sent afterwards still arrives, so the refused broadcasts had their turn.
+    providers[0].sendStateless("unlock");
+    await vi.waitFor(() => expect(stateless.get("observer")).toContain("unlocked"));
+    for (const [label, received] of stateless) {
+      expect(received, label).not.toContain(forceClose);
+    }
   });
 });
