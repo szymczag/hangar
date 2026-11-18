@@ -90,6 +90,35 @@ are renumbered onto Hangar's chain, so a sync must not bring upstream's copies b
   `Migration check` workflow runs `makemigrations --check` against the merged graph,
   so a reintroduced upstream file fails CI rather than a deployment.
 
+### Upstream changes not adopted
+
+Upstream changes Hangar has decided not to take. A sync resolves their conflicts as
+"ours" and keeps the reasons below current; reopening one is a separate decision.
+
+- **Caddy for the web and admin frontends** (upstream effd0c5719,
+  makeplane/plane#9716, in v1.5.0). Upstream replaced nginx with a Caddy build that
+  runs as root and serves no Content-Security-Policy and no HSTS. Hangar keeps
+  `nginx-unprivileged` (uid 101) with the generated CSP
+  (`15-hangar-csp.envsh`, `packages/csp/nginx`), the security headers and the
+  read-only-root Helm contract (ledger row 89); adopting Caddy would rewrite those
+  controls and the chart's paths, uid and writable directories for no operator
+  benefit. In a sync, resolve the modify/delete conflicts on
+  `apps/{web,admin}/nginx/nginx.conf` as ours (keep the files), delete
+  `apps/{web,admin}/caddy/`, and keep the Hangar `apps/{web,admin}/Dockerfile.*`
+  and the AIO `COPY --from=web-img /usr/share/nginx/html` paths.
+  Upstream's Caddyfile also limits each client IP to 300 static-file requests a
+  minute. It is not ported to nginx: the frontends sit behind the bundled proxy, an
+  ingress controller or a Gateway, so nginx sees the proxy's address, and keying on
+  the client would need `real_ip` trust of a per-deployment proxy range (Compose
+  network, Pod CIDR, Gateway data plane) that the image cannot know. Keyed on the
+  proxy, one bucket would be shared by every user, while a single cold load of the
+  code-split web app already fetches many chunks at once. Request rate limiting stays at
+  the API (DRF throttles, `NUM_PROXIES`) and at the operator's edge.
+- **Issue types on the issue templates** (upstream 1d0ee2482a,
+  makeplane/plane#9559). `type: Bug` / `type: Feature` need organization issue
+  types, which a user-owned repository does not have; the deployment and version
+  fields from the same change are taken in Hangar wording.
+
 ## Security invariants
 
 Upstream does not carry the fork's security controls, so a sync can delete one without
@@ -299,4 +328,8 @@ Planned (added when the phase lands):
 | 129 | `apps/api/plane/app/views/issue/link.py`, `apps/api/plane/app/views/issue/subscriber.py` | Security | backport of upstream 05dfe5d08e (makeplane/plane#10205): every action of the work-item link and subscriber viewsets (and so of their epic subclasses) refuses a restricted guest (`guest_view_all_features` off) on a work item they did not create with 403, through the existing `issue_hidden_from_guest` helper, as reactions, comments and attachments already did; the external API link endpoints already 404 such reads and refuse guest writes |
 | 130 | `apps/api/plane/app/views/search/base.py` | Security | backport of upstream 63d5265af9 (makeplane/plane#10213): a project-scoped workspace search (`?project_id=`) returns empty results for every requested type unless the caller is an active member of that project, so a workspace member can no longer list the members of a project they do not belong to through `user_mention` (the other entity types were already filtered by membership) |
 | 131 | `apps/api/plane/app/serializers/project.py`, `apps/api/plane/api/serializers/project.py` | Security | after upstream f08bc5e603 (makeplane/plane#10214), ported by hand: the app `ProjectSerializer.validate` refuses a `project_lead` or `default_assignee` who is not an active member of the workspace (400 under the field's key), except when an unchanged assignment is resent; the external API create/update serializers also require an active membership for `default_assignee` (its `project_lead` check was already active-only in Hangar) |
-| 132 | `apps/api/migrations_lockfile.txt`, `apps/api/plane/db/management/commands/makemigrations.py`, `apps/api/plane/tests/unit/db/test_migrations_lockfile.py`, `.github/workflows/migration-check.yml` (all new, from upstream) | Migrations | port of upstream d8dc816d94 (makeplane/plane#9847) and f6a136fd60 (makeplane/plane#10189): the `makemigrations` override keeps a lockfile naming each app's latest migration, so two PRs adding a migration to one app conflict in Git. The lockfile carries Hangar's leaves (`db` 0136, `ext` 0039, `license` 0024) instead of upstream's, and its header names Hangar; the test also checks the committed lockfile against the real migration graph, one leaf per app and no shared number in an app. The workflow installs `requirements.txt` with pip instead of uv, pins actions to commits, drops the checkout token, passes `base_ref` through `env:`, targets `preview` only, and leaves out upstream's labelling job and its `pull-requests: write` token |
+| 132 | `deployments/cli/community/{docker-compose.yml,README.md}` | Deployment convergence | converge with upstream v1.5.0: the Compose `live` service gets upstream's `stop_grace_period: 30s` (from b4b48c95da, makeplane/plane#10101) so the SIGTERM handler can close collaboration connections and store open documents before Docker kills it; the README takes the corrections of upstream 763115c85c (makeplane/plane#10263) in Hangar wording: Docker Desktop links point at the Docker docs, `setup.sh` exits after one action and accepts it as an argument (Hangar's list includes `migrate-storage`), Swarm needs `docker swarm init`, asks for a stack name, deploys at once and keeps `plane.env.bak` on upgrade, `APP_DOMAIN`, HTTPS and external-service settings, SMTP in God Mode, backup needs running services, restore needs `jq`, the `admin`/`live` log commands, and the fixed `migration-0.13-0.14.sh` URL. Upstream's image names, MinIO image and `restore-airgapped.sh` text are not taken |
+| 133 | `deployments/aio/community/{Dockerfile,README.md}` | Deployment convergence | converge with upstream v1.5.0: the AIO runner sets `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` to the system CA bundle, so grpcio (OTLP gRPC exporter) no longer trusts the emSign ECC Root CA - G3 from its own `roots.pem` (upstream f7dbd74578, makeplane/plane#10094), and removes pip after installing supervisor, dropping its vendored certifi (GHSA-6q48-6c7w-9gw2; upstream 92054a2746, makeplane/plane#10120). Hangar's newer `APK_SECURITY_PATCH`, digest/registry choices and the nginx `COPY` paths stay (upstream copies from Caddy paths). The README takes upstream's service list with internal ports and the Migrator, the S3 endpoint default, `SITE_ADDRESS`/`APP_PROTOCOL`, the 443 condition and the environment-precedence note (763115c85c, makeplane/plane#10263); Hangar's generated, persisted secrets stay instead of upstream's required-secret exit |
+| 134 | `.github/ISSUE_TEMPLATE/--bug-report.yaml` | Issue templates | after upstream 1d0ee2482a (makeplane/plane#9559): the bug report asks for the deployment method (Compose, Swarm, AIO, Helm, local) instead of upstream's edition list, and the version field explains where to read the Hangar release. Issue types are not set (see Upstream changes not adopted); labels, assignees and the Hangar contact links stay |
+| 135 | `.github/workflows/pull-request-build-lint-web-apps.yml`, `.node-version` | CI | from upstream 1a76f29c79 (makeplane/plane#9530): every `setup-node` step reads `.node-version` (22.22.0, the `engines` floor) instead of the runner's default Node. Hangar's pinned action SHAs, permissions and extra jobs stay |
+| 136 | `apps/api/migrations_lockfile.txt`, `apps/api/plane/db/management/commands/makemigrations.py`, `apps/api/plane/tests/unit/db/test_migrations_lockfile.py`, `.github/workflows/migration-check.yml` (all new, from upstream) | Migrations | port of upstream d8dc816d94 (makeplane/plane#9847) and f6a136fd60 (makeplane/plane#10189): the `makemigrations` override keeps a lockfile naming each app's latest migration, so two PRs adding a migration to one app conflict in Git. The lockfile carries Hangar's leaves (`db` 0136, `ext` 0039, `license` 0024) instead of upstream's, and its header names Hangar; the test also checks the committed lockfile against the real migration graph, one leaf per app and no shared number in an app. The workflow installs `requirements.txt` with pip instead of uv, pins actions to commits, drops the checkout token, passes `base_ref` through `env:`, targets `preview` only, and leaves out upstream's labelling job and its `pull-requests: write` token |

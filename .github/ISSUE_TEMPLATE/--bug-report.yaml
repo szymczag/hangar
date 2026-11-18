@@ -55,19 +55,23 @@ body:
         - Safari
         - Other
   - type: dropdown
-    id: variant
+    id: deployment
     attributes:
-      label: Variant
+      label: Deployment
+      description: How is this Hangar instance deployed?
       options:
-        - Cloud
-        - Self-hosted
-        - Local
+        - Docker Compose (setup.sh)
+        - Docker Swarm (swarm.sh)
+        - All-in-one image
+        - Kubernetes (Helm chart)
+        - Local development
     validations:
       required: true
   - type: input
     id: version
     attributes:
       label: Version
-      placeholder: v0.17.0-dev
+      description: Which Hangar release are you running? The build identity dialog and the image tag show it.
+      placeholder: v0.1.3
     validations:
       required: true
