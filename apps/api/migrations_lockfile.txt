@@ -1,0 +1,11 @@
+# Latest migration of every Plane app. `python manage.py makemigrations` rewrites
+# this file; never edit it by hand.
+#
+# A merge conflict here means another PR added a migration to the same app first:
+# merge preview, delete your migration, and run makemigrations again.
+
+db: 0136_intakeissue_intake_issue_snoozed_till_idx
+
+ext: 0039_default_working_hours
+
+license: 0024_remove_unsplash_access_key
