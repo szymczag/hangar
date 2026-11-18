@@ -7,7 +7,7 @@
 import type { Editor } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
-import { ySyncPluginKey } from "y-prosemirror";
+import { ySyncPluginKey } from "@tiptap/y-tiptap";
 // constants
 import { CORE_EDITOR_META } from "@/constants/meta";
 // plane editor imports

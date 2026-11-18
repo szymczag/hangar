@@ -8,7 +8,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 // helpers
 import { Controller, Middleware, Post } from "@plane/decorators";
-import { convertHTMLDocumentToAllFormats } from "@plane/editor";
+import { convertHTMLDocumentToAllFormats } from "@plane/editor/server";
 // logger
 import { logger } from "@plane/logger";
 import { requireSecretKey } from "@/lib/auth-middleware";

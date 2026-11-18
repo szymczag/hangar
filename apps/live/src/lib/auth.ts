@@ -6,7 +6,6 @@
 
 // plane imports
 import type { IncomingHttpHeaders } from "http";
-import type { ConnectionConfiguration } from "@hocuspocus/server";
 import type { TUserDetails } from "@plane/editor";
 import { logger } from "@plane/logger";
 import { AppError } from "@/lib/errors";
@@ -31,16 +30,14 @@ export const onAuthenticate = async ({
   context,
   token,
   documentName,
-  connection,
+  connectionConfig,
 }: {
   requestHeaders: IncomingHttpHeaders;
   context: HocusPocusServerContext;
   requestParameters: URLSearchParams;
   token: string;
   documentName: string;
-  // Hocuspocus 2.x names the per-socket ConnectionConfiguration `connection` (v3 renames it `connectionConfig`).
-  // Setting readOnly here makes the server drop this socket's document updates.
-  connection: Pick<ConnectionConfiguration, "readOnly">;
+  connectionConfig: { readOnly: boolean };
 }) => {
   let cookie: string | undefined = undefined;
   let userId: string | undefined = undefined;
@@ -91,7 +88,7 @@ export const onAuthenticate = async ({
   // first loader's fetch checks no one else: every connection must prove its own access to the page. The project
   // comes from the checked page, never from the socket.
   const access = await authorizePage(context, documentName);
-  connection.readOnly = access.read_only;
+  connectionConfig.readOnly = access.read_only;
   context.projectId = access.project_id;
 
   return authenticated;
