@@ -102,3 +102,17 @@ test("the generated template keeps Trusted Types out of the main policy", () => 
     /trusted-types/
   );
 });
+
+test("the generated template sends the transport and framing headers on every response", () => {
+  const headers = new Map(
+    [...generate(BUILT_HTML).matchAll(/^add_header (\S+) "([^"]*)" always;$/gm)].map(([, name, value]) => [name, value])
+  );
+  const hsts = headers.get("Strict-Transport-Security") ?? "";
+  assert.ok(Number(/max-age=(\d+)/.exec(hsts)?.[1]) >= 31536000, `HSTS too short or missing: ${hsts}`);
+  assert.match(hsts, /includeSubDomains/);
+  assert.equal(headers.get("X-Content-Type-Options"), "nosniff");
+  assert.equal(headers.get("X-Frame-Options"), "DENY");
+  assert.equal(headers.get("Referrer-Policy"), "strict-origin-when-cross-origin");
+  assert.ok(headers.has("${HANGAR_CSP_HEADER}"), "the policy header is missing");
+  assert.match(headers.get("${HANGAR_CSP_HEADER}"), /frame-ancestors 'none'/);
+});
