@@ -21,6 +21,11 @@ FROM docker.io/library/python:3.12.12-alpine AS runner
 
 WORKDIR /app
 
+# grpcio (pulled in by the OTLP gRPC exporter) ships its own roots.pem, which
+# still trusts emSign ECC Root CA - G3 (eMudhra incident); point it at the system
+# bundle, which the OS update below keeps current.
+ENV GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt
+
 # OS security updates. --available forces reinstall from the current repos;
 # bump APK_SECURITY_PATCH to bust buildx's cached layer (keyed on this command
 # string), otherwise a rebuild silently re-ships the old packages. Release
@@ -69,6 +74,13 @@ COPY --from=backend-img /usr/local/lib/python3.12/site-packages/ /usr/local/lib/
 COPY --from=backend-img /usr/local/bin/ /usr/local/bin/
 
 RUN pip install supervisor
+
+# pip is only needed for the install above. The runner base's own pip vendors a
+# certifi that still trusts the compromised emSign G3 root (GHSA-6q48-6c7w-9gw2),
+# so drop it before the image ships.
+RUN rm -rf /usr/local/lib/python3.12/site-packages/pip \
+           /usr/local/lib/python3.12/site-packages/pip-*.dist-info \
+           /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.12
 RUN mkdir -p /etc/supervisor/conf.d
 
 COPY start.sh /app/start.sh
