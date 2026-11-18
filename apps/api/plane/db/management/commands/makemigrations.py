@@ -14,7 +14,7 @@ from django.db.migrations.loader import MigrationLoader
 LOCKFILE = Path(settings.BASE_DIR).parent / "migrations_lockfile.txt"
 
 HEADER = """\
-# Latest migration of every Plane app. `python manage.py makemigrations` rewrites
+# Latest migration of every Hangar app. `python manage.py makemigrations` rewrites
 # this file; never edit it by hand.
 #
 # A merge conflict here means another PR added a migration to the same app first:
