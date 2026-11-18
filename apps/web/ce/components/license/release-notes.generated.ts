@@ -11,7 +11,7 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.2.0-rc.1",
+  version: "0.2.0-rc.2",
   highlights: [
     "Guests can no longer send page events to everyone else on a page.",
     "The editor moves to Tiptap 3, which clears GHSA-cp6q-959q-f8rh.",
