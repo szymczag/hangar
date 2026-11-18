@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.2.0-rc.1`. It is a release candidate for `0.2.0`;
+The current release is `0.2.0-rc.2`. It is a release candidate for `0.2.0`;
 the current stable Hangar release for Docker Compose, Docker Swarm and the
 all-in-one image remains `0.1.4`. Helm installs a release candidate only when
 you name its version. On Kubernetes, both are qualified for evaluation on AMD64
@@ -57,7 +57,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.2.0-rc.1` qualification boundary is:
+The `0.2.0-rc.2` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -201,10 +201,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                               |
 | ------------------ | ------------------------------------------- |
-| Product version    | `v0.2.0-rc.1`                               |
-| Helm chart version | `0.2.0-rc.1`                                |
-| Git tag            | `hangar-v0.2.0-rc.1`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.2.0-rc.1` |
+| Product version    | `v0.2.0-rc.2`                               |
+| Helm chart version | `0.2.0-rc.2`                                |
+| Git tag            | `hangar-v0.2.0-rc.2`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.2.0-rc.2` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -216,7 +216,7 @@ upgrade targets for a deployment that holds a Workshop**: their migration
 `ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.4` is the
 immediately previous GitHub release and the supported rollback target for this
 one; rolling back to it needs no schema change, and pages edited on
-`0.2.0-rc.1` stay readable there because the stored Yjs documents do not
+`0.2.0-rc.2` stay readable there because the stored Yjs documents do not
 change. Rolling back further, to `0.1.3`, needs no schema change either, but
 `application.numProxies` must be removed from the values first because the
 `0.1.3` schema rejects it. Rolling back to `0.1.2` needs no schema change either (the `db.0136` index can
@@ -251,7 +251,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.2.0-rc.1` notes](../releases/hangar-v0.2.0-rc.1.md) — review
+- [Release `v0.2.0-rc.2` notes](../releases/hangar-v0.2.0-rc.2.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -288,9 +288,14 @@ The previous release is `0.1.4`, tag `hangar-v0.1.4`, and chart
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
-Release 0.2.0-rc.1 adds no database or license migration and changes nothing
+Chart `0.2.0-rc.1` and its images exist in the registry, but that candidate
+has no GitHub Release because a workflow bug skipped the release job. It is
+superseded by `0.2.0-rc.2`, which carries the same changes plus the workflow
+fix; do not install or upgrade to `0.2.0-rc.1`.
+
+Release 0.2.0-rc.2 adds no database or license migration and changes nothing
 in the chart, its values or its Secrets. Upgrade from 0.1.4 with `helm upgrade`
-and `--version 0.2.0-rc.1`; Helm does not select a release candidate otherwise.
+and `--version 0.2.0-rc.2`; Helm does not select a release candidate otherwise.
 No other action is required. The `live` image moves to Tiptap 3 and Hocuspocus
 3.4. Stored page documents do not change, and browser tabs opened before the
 upgrade keep syncing, but should be reloaded. During the rolling update the old
