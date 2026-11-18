@@ -34,12 +34,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const UNTRUSTED_HTML_HELPERS = [
   // Reads the `text/plane-editor-html` clipboard flavour, which any page can
   // set on a copy event.
-  path.join(here, "../src/core/helpers/paste-asset.ts"),
+  path.join(here, "../src/helpers/paste-asset.ts"),
   // Exported from the utils barrel, so its input cannot be assumed trusted.
   path.join(here, "../../utils/src/editor/common.ts"),
   // Inspects the `text/html` flavour of every paste to decide whether to
   // take the markdown in `text/plain` instead.
-  path.join(here, "../src/core/plugins/markdown-paste.ts"),
+  path.join(here, "../src/plugins/markdown-paste.ts"),
 ];
 
 /** `x.innerHTML = …`, ignoring reads such as `nodesArray.push(div.innerHTML)`. */

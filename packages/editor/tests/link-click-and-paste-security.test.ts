@@ -7,9 +7,9 @@
 import type { EditorView } from "@tiptap/pm/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clickHandler } from "../src/core/extensions/custom-link/helpers/clickHandler";
-import { isNavigableHref } from "../src/core/extensions/custom-link/url-security";
-import { processAssetDuplication } from "../src/core/helpers/paste-asset";
+import { clickHandler } from "../src/extensions/custom-link/helpers/clickHandler";
+import { isNavigableHref } from "../src/extensions/custom-link/url-security";
+import { processAssetDuplication } from "../src/helpers/paste-asset";
 
 type TFakeElement = {
   nodeName: string;
