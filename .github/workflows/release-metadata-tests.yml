@@ -34,6 +34,19 @@ on:
       - "apps/live/src/env.ts"
       - "docker-compose.yml"
       - ".github/dependabot.yml"
+      - ".github/scripts/upstream_trial_merge.py"
+      # test_security_invariants.py guards the images, the chart and the
+      # frontend sources (FORK.md, "Security invariants"), so a change to any
+      # of them has to run it.
+      - "apps/*/Dockerfile.*"
+      - "apps/*/nginx/**"
+      - "apps/web/**"
+      - "apps/admin/**"
+      - "apps/space/**"
+      - "apps/live/**"
+      - "packages/**"
+      - "deployments/**"
+      - "charts/hangar/**"
   push:
     branches:
       - preview
@@ -66,6 +79,19 @@ on:
       - "apps/live/src/env.ts"
       - "docker-compose.yml"
       - ".github/dependabot.yml"
+      - ".github/scripts/upstream_trial_merge.py"
+      # test_security_invariants.py guards the images, the chart and the
+      # frontend sources (FORK.md, "Security invariants"), so a change to any
+      # of them has to run it.
+      - "apps/*/Dockerfile.*"
+      - "apps/*/nginx/**"
+      - "apps/web/**"
+      - "apps/admin/**"
+      - "apps/space/**"
+      - "apps/live/**"
+      - "packages/**"
+      - "deployments/**"
+      - "charts/hangar/**"
 
 permissions:
   contents: read
@@ -81,8 +107,13 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Run release metadata unit tests
-        run: python3 -m unittest discover -s .github/scripts/tests -p "test_*.py" -v
+      - name: Run release metadata and security invariant unit tests
+        run: |
+          set -euo pipefail
+          # HelmSecurityContextTests renders the chart; fail rather than skip
+          # if the runner image ever stops shipping Helm.
+          helm version --short
+          python3 -m unittest discover -s .github/scripts/tests -p "test_*.py" -v
 
       - name: Validate the repository upstream baseline
         env:
