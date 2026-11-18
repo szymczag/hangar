@@ -58,6 +58,7 @@ data:
   SIGNED_URL_EXPIRATION: {{ printf "%d" (int64 .Values.application.signedUrlExpiration) | quote }}
   HARD_DELETE_AFTER_DAYS: {{ printf "%d" (int64 .Values.application.hardDeleteAfterDays) | quote }}
   API_KEY_RATE_LIMIT: {{ .Values.application.apiKeyRateLimit | quote }}
+  NUM_PROXIES: {{ if kindIs "invalid" .Values.application.numProxies }}""{{ else }}{{ printf "%d" (int64 .Values.application.numProxies) | quote }}{{ end }}
   WEBHOOK_ALLOWED_HOSTS: {{ join "," .Values.application.webhookAllowedHosts | quote }}
   WEBHOOK_ALLOWED_IPS: {{ join "," .Values.application.webhookAllowedCIDRs | quote }}
   WEBHOOK_DISALLOWED_DOMAINS: {{ join "," .Values.application.webhookDisallowedDomains | quote }}

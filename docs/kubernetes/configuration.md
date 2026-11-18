@@ -91,12 +91,38 @@ with the canonical HTTPS origin.
 | `application.signedUrlExpiration`      | `3600`      | Seconds, from 60 through 86400                             |
 | `application.hardDeleteAfterDays`      | `60`        | Days, from 1 through 3650                                  |
 | `application.apiKeyRateLimit`          | `60/minute` | Positive count per second, minute, hour, or day            |
+| `application.numProxies`               | `null`      | Proxy hops in front of the API, 0 through 10; see below    |
 | `application.webhookAllowedHosts`      | `[]`        | Explicit outbound webhook hostname allowlist               |
 | `application.webhookAllowedCIDRs`      | `[]`        | Explicit outbound webhook network allowlist                |
 | `application.webhookDisallowedDomains` | `[]`        | Explicit domain denylist                                   |
 
 Coordinate the ingress controller's request-body limit with
 `application.fileSizeLimit`. The lower limit wins.
+
+### Client IP for rate limits
+
+The API's per-IP throttles (anonymous sign-in, sign-up, and magic-link requests)
+pick the client address from `X-Forwarded-For`. `application.numProxies` renders
+as `NUM_PROXIES` and tells them how many trusted proxies appended to that header:
+
+- `null` (default) keeps the API default: the whole header is the client
+  identity. Behind a controller or load balancer that appends to a
+  client-supplied header (Envoy Gateway does by default), a client that varies
+  the header it sends gets a fresh throttle bucket each time.
+- `1` when clients reach the ingress controller or Gateway directly, or through
+  a layer-4 load balancer that does not add HTTP headers. The API then uses the
+  address the controller appended and ignores anything the client supplied.
+- One more per HTTP load balancer or CDN in front of the controller that appends
+  to `X-Forwarded-For`, for example `2` behind a cloud HTTP load balancer.
+- `0` ignores the header and uses the connecting Pod address, which is the
+  controller's for every request; avoid it unless the API is never behind a proxy.
+
+Too high a value lets a client choose its throttle identity again; too low a
+value throttles every user behind the same edge proxy together. The controller
+must see the real client address: with a layer-4 load balancer, use
+`externalTrafficPolicy: Local` or the PROXY protocol on the controller Service.
+The value affects rate limiting only; audit logs and login records keep their
+own client-address handling.
 
 ## Live PDF asset egress
 
