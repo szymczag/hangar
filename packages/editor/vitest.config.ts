@@ -6,8 +6,8 @@
 
 export default {
   resolve: {
-    // The editor source imports through the tsconfig aliases (`@/...`,
-    // `@/plane-editor/...`); tests that load extensions need them resolved.
+    // The editor source imports through the tsconfig alias (`@/...`); tests
+    // that load extensions need it resolved.
     tsconfigPaths: true,
   },
   test: {

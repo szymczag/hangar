@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { isDangerousHref } from "../src/core/extensions/custom-link/url-security";
+import { isDangerousHref } from "../src/extensions/custom-link/url-security";
 
 describe("isDangerousHref", () => {
   it.each([

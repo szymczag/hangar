@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { hasRenderableEmoji } from "../src/core/extensions/emoji/emoji-support";
+import { hasRenderableEmoji } from "../src/extensions/emoji/emoji-support";
 
 describe("hasRenderableEmoji", () => {
   it("accepts an emoji item with a native Unicode representation", () => {
