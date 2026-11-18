@@ -6,13 +6,14 @@ The Hangar Community All-In-One Docker image packages all Hangar services into a
 
 The AIO image contains the following services:
 
+- **Proxy** (Port 80, 443): Caddy reverse proxy, the only exposed entry point
 - **Web App**: Main Hangar web interface, served as static files by the proxy at `/`
-- **Space** (Port 3002): Public project spaces
-- **Admin**: Administrative interface, served as static files by the proxy at `/god-mode`
-- **API Server** (Port 3004): Backend API
-- **Live Server** (Port 3005): Real-time collaboration
-- **Proxy** (Port 80, 443): Caddy reverse proxy
+- **Admin**: Instance admin (God mode), served as static files by the proxy at `/god-mode`
+- **Space** (internal port 3002): Public project spaces at `/spaces`
+- **API Server** (internal port 3004): Backend API at `/api` and `/auth`
+- **Live Server** (internal port 3005): Real-time collaboration at `/live`
 - **Worker & Beat**: Background task processing
+- **Migrator**: Runs database migrations at startup
 
 ## Prerequisites
 
@@ -42,7 +43,7 @@ You must provide these environment variables:
 - `AWS_ACCESS_KEY_ID`: S3 access key
 - `AWS_SECRET_ACCESS_KEY`: S3 secret key
 - `AWS_S3_BUCKET_NAME`: S3 bucket name
-- `AWS_S3_ENDPOINT_URL`: S3 endpoint (optional, defaults to AWS)
+- `AWS_S3_ENDPOINT_URL`: S3 endpoint (optional, defaults to `https://s3.${AWS_REGION}.amazonaws.com`)
 
 ## Quick Start
 
@@ -94,7 +95,8 @@ docker run --name myaio --rm -it \
 
 #### Network & Protocol
 
-- `SITE_ADDRESS`: Server bind address (default: `:80`)
+- `SITE_ADDRESS`: Server bind address (default: `:80`). Set it to your domain (e.g. `hangar.example.com`) to have Caddy serve HTTPS on 443 with an automatic certificate.
+- `APP_PROTOCOL`: `http` or `https` (default: `http`). Used to build `WEB_URL` from `DOMAIN_NAME`.
 
 #### Security & Secrets
 
@@ -137,7 +139,7 @@ docker exec <old-container> grep -E '^(SECRET_KEY|LIVE_SERVER_SECRET_KEY)=' /app
 The following ports are exposed:
 
 - `80`: Main web interface (HTTP)
-- `443`: HTTPS (if SSL configured)
+- `443`: HTTPS (only when `SITE_ADDRESS` is set to a domain)
 
 ## Volume Mounts
 
@@ -200,6 +202,10 @@ docker exec -it <container-name> supervisorctl status
 
 The container will validate required environment variables on startup and display helpful error messages if any are missing.
 
+### Environment variable precedence
+
+At startup the container writes the variables above into `/app/plane.env` and then exports every line of that file. Variables that the start script does not manage (for example `CERT_EMAIL`, `CERT_ACME_CA`, `CERT_ACME_DNS`, `DEBUG`, `GUNICORN_WORKERS`, `AUTHENTICATION_RATE_LIMIT`, `MINIO_ENDPOINT_SSL`, `WEBHOOK_ALLOWED_IPS`, `WEBHOOK_ALLOWED_HOSTS`, `API_BASE_URL`) keep the value from `/app/plane.env`, even if you pass them with `-e`. To change them, mount your own copy of the file: `-v /path/to/plane.env:/app/plane.env`.
+
 ## Production Considerations
 
 - Use proper SSL certificates for HTTPS
@@ -211,4 +217,4 @@ The container will validate required environment variables on startup and displa
 
 ## Support
 
-For issues and support, please refer to the official Hangar documentation.
+For issues and support, see the [Hangar documentation](../../../README.md) or open a [GitHub issue](https://github.com/szymczag/hangar/issues). Report security issues privately through [GitHub security advisories](https://github.com/szymczag/hangar/security/advisories/new).

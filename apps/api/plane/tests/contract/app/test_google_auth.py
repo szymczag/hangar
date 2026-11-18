@@ -81,8 +81,14 @@ def initiate(client, *, space=False):
     return client.session[transaction_key], response
 
 
-def run_callback(client, *, space=False, token_overrides=None, userinfo_overrides=None):
+def run_callback(client, *, space=False, token_overrides=None, userinfo_overrides=None, transaction_age=None):
     transaction, _ = initiate(client, space=space)
+    if transaction_age is not None:
+        session = client.session
+        session[GOOGLE_TRANSACTION_SPACE if space else GOOGLE_TRANSACTION_APP]["created_at"] = (
+            time.time() - transaction_age
+        )
+        session.save()
     now = int(time.time())
     claims = {
         "iss": "https://accounts.google.com",
@@ -219,6 +225,18 @@ class TestGoogleAuthentication:
         second = django_client.get(reverse("google-callback"), {"code": "bad", "state": transaction["state"]})
         assert first.status_code == 302
         assert error_code_of(second) == AUTHENTICATION_ERROR_CODES["GOOGLE_OAUTH_PROVIDER_ERROR"]
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("space", [False, True])
+    def test_an_expired_transaction_is_refused(self, django_client, setup_instance, google_config, space):
+        # Ten minutes is the window; the same callback inside it signs in.
+        response = run_callback(django_client, space=space, transaction_age=60 * 10 + 5)
+        assert error_code_of(response) == AUTHENTICATION_ERROR_CODES["GOOGLE_OAUTH_PROVIDER_ERROR"]
+        assert not User.objects.filter(email="google-user@hangar.test").exists()
+
+        fresh = run_callback(django_client, space=space, transaction_age=60 * 10 - 30)
+        assert error_code_of(fresh) is None
+        assert User.objects.filter(email="google-user@hangar.test").exists()
 
     @pytest.mark.django_db
     def test_disabled_provider_blocks_initiation_and_in_flight_callback(

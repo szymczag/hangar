@@ -72,6 +72,7 @@ helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_versi
     --set application.fileSizeLimit=1073741824 \
     --set application.signedUrlExpiration=86400 \
     --set application.hardDeleteAfterDays=3650 \
+    --set application.numProxies=10 \
     --set-string 'live.pdfAssetAllowedHosts[0]=storage.internal' >"$boundary_render"
 helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" \
     --set gateway.enabled=true \
@@ -120,6 +121,7 @@ for render in "$production_render" "$evaluation_render" "$imports_render"; do
     assert_present '^  FILE_SIZE_LIMIT: "5242880"$' "$render" "file-size limit must render as an exact decimal integer"
     assert_present '^  SIGNED_URL_EXPIRATION: "3600"$' "$render" "signed-URL expiration must render as an exact decimal integer"
     assert_present '^  HARD_DELETE_AFTER_DAYS: "60"$' "$render" "hard-delete retention must render as an exact decimal integer"
+    assert_present '^  NUM_PROXIES: ""$' "$render" "an unset proxy hop count must keep the API default"
     assert_present '^  IMPORT_S3_BUCKET_NAME: "hangar-imports"$' "$render" "private import bucket must be configured"
     assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$render" "integer application settings must not use exponent notation"
     redis_url_consumers="$(grep -Ec '^[[:space:]]+- name: REDIS_URL$' "$render")"
@@ -150,6 +152,7 @@ assert_absent '^[[:space:]]+- name: CALENDAR_TOKEN_ENCRYPTION_KEYS$' "$productio
 assert_present '^  FILE_SIZE_LIMIT: "1073741824"$' "$boundary_render" "maximum file-size limit must render as an exact decimal integer"
 assert_present '^  SIGNED_URL_EXPIRATION: "86400"$' "$boundary_render" "maximum signed-URL expiration must render as an exact decimal integer"
 assert_present '^  HARD_DELETE_AFTER_DAYS: "3650"$' "$boundary_render" "maximum hard-delete retention must render as an exact decimal integer"
+assert_present '^  NUM_PROXIES: "10"$' "$boundary_render" "maximum proxy hop count must render as an exact decimal integer"
 assert_absent '^[[:space:]]+(FILE_SIZE_LIMIT|SIGNED_URL_EXPIRATION|HARD_DELETE_AFTER_DAYS): "?[-+0-9.]+[eE][-+0-9]+' "$boundary_render" "maximum integer application settings must not use exponent notation"
 assert_present '^  PDF_ASSET_ALLOWED_HOSTS: "storage.internal"$' "$boundary_render" "Live PDF asset hostname allowlist must render exactly"
 live_secret_consumers="$(grep -Ec '^[[:space:]]+- name: LIVE_SERVER_SECRET_KEY$' "$production_render")"
@@ -243,6 +246,9 @@ assert_invalid "zero Todoist active-user limit" --set todoistImports.maxActivePe
 assert_invalid "excessive Todoist import worker concurrency" --set todoistImports.worker.concurrency=33
 assert_invalid "multiple beat workers" --set beatWorker.replicas=2
 assert_invalid "zero upload limit" --set application.fileSizeLimit=0
+assert_invalid "negative proxy hop count" --set application.numProxies=-1
+assert_invalid "excessive proxy hop count" --set application.numProxies=11
+assert_invalid "non-integer proxy hop count" --set-string application.numProxies=one
 assert_invalid "short migrator database wait" --set migrator.databaseWaitSeconds=29
 assert_invalid "migrator wait exceeding Job deadline" --set migrator.activeDeadlineSeconds=300 --set migrator.databaseWaitSeconds=300
 assert_invalid "reserved Pod label override" --set-string global.podLabels.app\\.kubernetes\\.io/component=attacker
