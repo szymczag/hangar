@@ -38,12 +38,22 @@ RUN echo "apk-security-patch ${APK_SECURITY_PATCH}" && apk update && apk upgrade
 # overwrote the libraries upgraded above (libcrypto, libssl, libz, libapk) with
 # node's copies from a different Alpine release, shipping unpatched versions
 # and breaking /sbin/apk.
+#
+# The backend's site-packages are copied from the api image below, so every
+# runtime package apps/api/Dockerfile.api installs is needed here too:
+# libmagic (python-magic loads it to validate uploads, and it ships the magic
+# database) and gnupg (the mailer runs gpg for OpenPGP email). A test keeps the
+# two lists in step.
 RUN apk add --no-cache \
     "libstdc++" \
     "libgcc" \
     "libpq" \
+    "libmagic" \
     "libxslt" \
     "xmlsec" \
+    "gnupg" \
+    "ca-certificates" \
+    "openssl" \
     "nss-tools" \
     "bash" \
     "curl" \
