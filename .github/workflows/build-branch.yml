@@ -733,7 +733,16 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    if: needs.setup.outputs.is_release == 'true'
+    # A prerelease skips compose_upgrade. Without always(), that skip would
+    # skip this job too, even though verify_publication accepts it, so every
+    # needed job's result is checked explicitly instead.
+    if: >-
+      always() &&
+      needs.setup.outputs.is_release == 'true' &&
+      needs.setup.result == 'success' &&
+      needs.signing_tools.result == 'success' &&
+      needs.verify_publication.result == 'success' &&
+      needs.chart.result == 'success'
     needs: [setup, signing_tools, verify_publication, chart]
     runs-on: ubuntu-22.04
     permissions:
