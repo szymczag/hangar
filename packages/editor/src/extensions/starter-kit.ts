@@ -47,7 +47,7 @@ export const CustomStarterKitExtension = (args: TArgs) => {
       class:
         "text-tertiary transition-all motion-reduce:transition-none motion-reduce:hover:transform-none duration-200 ease-[cubic-bezier(0.165, 0.84, 0.44, 1)]",
     },
-    // v3 bundles these; Plane registers its own versions
+    // v3 bundles these; the editor registers its own versions
     link: false,
     underline: false,
     listKeymap: false,
