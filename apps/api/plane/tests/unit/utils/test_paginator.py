@@ -147,7 +147,7 @@ class TestCursorBounds:
     a huge value fetches far more than max_per_page rows per group (cap bypass / DoS).
     cursor.offset must be non-negative."""
 
-    @pytest.mark.parametrize("cursor", ["-1:0:0", "1000000:0:0", "20:-1:0"])
+    @pytest.mark.parametrize("cursor", ["-1:0:0", "1001:0:0", "1000000:0:0", "20:-1:0"])
     def test_out_of_bounds_cursor_rejected_before_paginator(self, cursor):
         request = _make_request(cursor=cursor)
         with pytest.raises(ParseError):

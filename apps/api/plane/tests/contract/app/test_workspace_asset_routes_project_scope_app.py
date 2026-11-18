@@ -17,8 +17,9 @@ Workspace-level assets (workspace logo, user avatar/cover) carry
 ``project_id=None`` and stay reachable by any workspace member.
 
 Hangar refuses with 404, so the response does not confirm that the asset or
-project exists. Duplication also needs a valid ``entity_id``; Hangar's own
-asset tests cover its positive paths.
+project exists. Duplication also needs a valid ``entity_id`` and a
+server-validated source, and an issue attachment copy needs an explicit
+destination ``project_id``.
 """
 
 from unittest import mock
@@ -29,7 +30,8 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from plane.db.models import FileAsset, Project, ProjectMember, User, WorkspaceMember
+from plane.db.models import FileAsset, Issue, Project, ProjectMember, User, WorkspaceMember
+from plane.utils.file_asset_upload import UPLOAD_VALIDATION_VERSION
 
 S3_STORAGE_PATH = "plane.app.views.asset.v2.S3Storage"
 
@@ -61,6 +63,23 @@ def _user(prefix):
     user.set_password("test-password")
     user.save()
     return user
+
+
+def _copyable(asset):
+    """Mark ``asset`` server-validated so only the scope rules can stop a copy of it."""
+    asset.upload_validation_version = UPLOAD_VALIDATION_VERSION
+    asset.save(update_fields=["upload_validation_version"])
+    return asset
+
+
+def _stub_copy(mock_storage, asset):
+    """Storage answers for a copy that succeeds: source and copy metadata, then the copy."""
+    metadata = {"ContentType": asset.attributes["type"], "ContentLength": asset.size}
+    mock_storage.return_value.get_object_metadata.side_effect = [
+        {**metadata, "ETag": '"source"'},
+        {**metadata, "ETag": '"copy"'},
+    ]
+    mock_storage.return_value.copy_object.return_value = {"CopyObjectResult": {}}
 
 
 @pytest.fixture
@@ -275,6 +294,54 @@ class TestDuplicateAssetProjectScope:
                 },
                 format="json",
             )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+        mock_storage.return_value.copy_object.assert_not_called()
+        assert FileAsset.objects.count() == before
+
+    @pytest.mark.django_db
+    def test_duplicate_allowed_within_own_project(self, session_client, workspace, project, project_asset):
+        issue = Issue.objects.create(name="Destination", project=project, workspace=workspace)
+        _copyable(project_asset)
+        before = FileAsset.objects.count()
+        with mock.patch(S3_STORAGE_PATH) as mock_storage:
+            _stub_copy(mock_storage, project_asset)
+            response = session_client.post(
+                duplicate_url(workspace.slug, project_asset.id),
+                {
+                    "entity_type": FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+                    "project_id": str(project.id),
+                    "entity_id": str(issue.id),
+                },
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+        assert FileAsset.objects.count() == before + 1
+        duplicated_asset = FileAsset.objects.get(id=response.data["asset_id"])
+        assert duplicated_asset.project_id == project.id
+        assert duplicated_asset.issue_id == issue.id
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("project_id", ["omitted", None])
+    def test_duplicate_without_project_id_is_refused(
+        self, session_client, workspace, project, project_asset, project_id
+    ):
+        """Hangar does not infer the destination project from the source asset: an issue
+        attachment copy without ``project_id`` is refused, so it can never land project-less."""
+        issue = Issue.objects.create(name="Destination", project=project, workspace=workspace)
+        _copyable(project_asset)
+        payload = {"entity_type": FileAsset.EntityTypeContext.ISSUE_ATTACHMENT, "entity_id": str(issue.id)}
+        if project_id != "omitted":
+            payload["project_id"] = project_id
+        before = FileAsset.objects.count()
+        with mock.patch(S3_STORAGE_PATH) as mock_storage:
+            _stub_copy(mock_storage, project_asset)
+            response = session_client.post(duplicate_url(workspace.slug, project_asset.id), payload, format="json")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND, (
             f"Got {response.status_code}: {getattr(response, 'data', None)!r}"

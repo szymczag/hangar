@@ -198,6 +198,28 @@ class TestGenericAssetPatchProjectScope:
         foreign_asset.refresh_from_db()
         assert foreign_asset.is_uploaded is True
 
+    @pytest.mark.django_db
+    def test_patch_allowed_for_project_member(self, api_key_client, workspace, joined_asset, create_user):
+        """The uploader, a member of the asset's project, gets 204.
+
+        Hangar ignores a client-sent ``is_uploaded``: completion is decided by the
+        server-side upload validation, so an uploaded asset stays uploaded.
+        """
+        # Hangar's patch only finds the caller's own uploads; save() would reset created_by.
+        FileAsset.objects.filter(pk=joined_asset.pk).update(created_by=create_user)
+        with mock.patch(S3_STORAGE_PATH, autospec=True):
+            response = api_key_client.patch(
+                asset_detail_url(workspace.slug, joined_asset.id),
+                {"is_uploaded": False},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+        joined_asset.refresh_from_db()
+        assert joined_asset.is_uploaded is True
+
 
 @pytest.mark.contract
 class TestGenericAssetPostProjectScope:
@@ -247,6 +269,23 @@ class TestGenericAssetPostProjectScope:
         )
         assert FileAsset.objects.count() == before + 1
 
+    @pytest.mark.django_db
+    def test_post_without_project_id_creates_an_unbound_upload(self, api_key_client, workspace, create_user):
+        """Upstream answers 400 here; Hangar accepts the upload and binds it to its creator."""
+        before = FileAsset.objects.count()
+        payload = {"name": "upload.png", "type": "image/png", "size": 16}
+        with mock.patch(S3_STORAGE_PATH, autospec=True) as mock_storage:
+            mock_storage.return_value.generate_presigned_post.return_value = {"url": "https://x"}
+            response = api_key_client.post(asset_list_url(workspace.slug), payload, format="json")
+
+        assert response.status_code == status.HTTP_200_OK, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+        assert FileAsset.objects.count() == before + 1
+        asset = FileAsset.objects.get(id=response.data["asset_id"])
+        assert asset.project_id is None
+        assert asset.created_by_id == create_user.id
+
 
 @pytest.mark.contract
 class TestGenericAssetExternalIdDedup:
@@ -287,3 +326,36 @@ class TestGenericAssetExternalIdDedup:
 
         assert response.status_code == status.HTTP_409_CONFLICT, response.data
         assert response.data["asset_id"] == str(joined_asset.id)
+
+    @pytest.mark.django_db
+    def test_unbound_pair_of_another_member_does_not_match(self, api_key_client, workspace):
+        """Without a ``project_id`` the lookup only sees the caller's own uploads.
+
+        Upstream refuses such a post with 400 before the lookup; Hangar accepts it,
+        so another member's unbound asset must not leak through the 409.
+        """
+        peer = _user("peer")
+        WorkspaceMember.objects.create(workspace=workspace, member=peer, role=15, is_active=True)
+        peer_asset = _asset(workspace, peer, None, name="peer.png")
+        self._tag(peer_asset)
+        # save() resets created_by, so pin the uploader the lookup filters on.
+        FileAsset.objects.filter(pk=peer_asset.pk).update(created_by=peer)
+
+        response = self._post(api_key_client, workspace)
+
+        assert response.status_code == status.HTTP_200_OK, response.data
+        assert response.data["asset_id"] != str(peer_asset.id)
+        assert FileAsset.objects.get(id=response.data["asset_id"]).project_id is None
+
+    @pytest.mark.django_db
+    def test_unbound_pair_of_the_caller_returns_conflict(
+        self, api_key_client, workspace, workspace_level_asset, create_user
+    ):
+        self._tag(workspace_level_asset)
+        # save() resets created_by, so pin the uploader the lookup filters on.
+        FileAsset.objects.filter(pk=workspace_level_asset.pk).update(created_by=create_user)
+
+        response = self._post(api_key_client, workspace)
+
+        assert response.status_code == status.HTTP_409_CONFLICT, response.data
+        assert response.data["asset_id"] == str(workspace_level_asset.id)

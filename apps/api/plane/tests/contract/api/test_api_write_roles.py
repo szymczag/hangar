@@ -7,7 +7,11 @@
 * Comment PATCH/DELETE require the comment's creator or a project admin. Hangar
   keeps this stricter than upstream, which also admits a workspace admin.
 * Attachment DELETE requires the attachment's creator or an admin. Hangar's asset
-  rule (``can_mutate_file_asset``) treats any workspace admin as an admin.
+  rule (``can_mutate_file_asset``) treats any workspace admin who is an active
+  project member as an admin.
+* Unlike upstream, admins do not skip the guest visibility gate: a project GUEST
+  without ``guest_view_all_features`` gets 404 for another user's work item,
+  whatever their workspace role.
 * Project-member role assignment requires an active workspace membership and
   cannot exceed the target's workspace role.
 """
@@ -160,6 +164,41 @@ class TestCommentEditDelete:
             resp = api_key_client.delete(url)
             assert resp.status_code == status.HTTP_204_NO_CONTENT
 
+    @pytest.mark.parametrize("project_role", [MEMBER, GUEST])
+    def test_workspace_admin_without_project_admin_role_denied(
+        self, client_for, workspace, project, issue, create_user, project_role
+    ):
+        """Upstream lets a workspace admin edit and delete any comment; Hangar requires
+        the project ADMIN role."""
+        workspace_admin = _make_user(workspace, project, ADMIN, project_role)
+        comment = _comment(workspace, project, issue, create_user)
+        url = _comment_url(workspace, project, issue, comment)
+        client = client_for(workspace_admin)
+        resp = client.patch(url, {"comment_html": "<p>mod</p>"}, format="json")
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        resp = client.delete(url)
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        comment.refresh_from_db()
+        assert comment.comment_html == "<p>hi</p>"
+
+    @pytest.mark.parametrize("ws_role", [ADMIN, MEMBER])
+    def test_project_guest_without_view_all_features(
+        self, client_for, workspace, project, issue, create_user, ws_role
+    ):
+        """With guest_view_all_features off, a project GUEST gets 404 for another
+        user's comment on another user's work item, workspace admin or not
+        (upstream admits the workspace admin)."""
+        Project.objects.filter(pk=project.pk).update(guest_view_all_features=False)
+        user = _make_user(workspace, project, ws_role, GUEST)
+        comment = _comment(workspace, project, issue, create_user)
+        url = _comment_url(workspace, project, issue, comment)
+        client = client_for(user)
+        resp = client.patch(url, {"comment_html": "<p>mod</p>"}, format="json")
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        resp = client.delete(url)
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        assert IssueComment.objects.filter(pk=comment.pk).exists()
+
     @pytest.mark.parametrize("fixture_name", ["member_user", "guest_user"])
     def test_creator_with_revoked_membership_denied(self, request, client_for, workspace, project, issue, fixture_name):
         user = request.getfixturevalue(fixture_name)
@@ -230,6 +269,32 @@ class TestAttachmentDelete:
             resp = client_for(workspace_admin).delete(_attachment_url(workspace, project, issue, asset))
         assert resp.status_code == status.HTTP_204_NO_CONTENT
 
+    @pytest.mark.parametrize("ws_role", [ADMIN, MEMBER])
+    def test_project_guest_without_view_all_features(
+        self, client_for, workspace, project, issue, create_user, ws_role
+    ):
+        """With guest_view_all_features off, a project GUEST gets 404 for another
+        user's attachment on another user's work item, workspace admin or not
+        (upstream admits the workspace admin)."""
+        Project.objects.filter(pk=project.pk).update(guest_view_all_features=False)
+        user = _make_user(workspace, project, ws_role, GUEST)
+        asset = _attachment(workspace, project, issue, create_user)
+        resp = client_for(user).delete(_attachment_url(workspace, project, issue, asset))
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        asset.refresh_from_db()
+        assert asset.is_deleted is False
+
+    def test_workspace_admin_without_project_membership_denied(
+        self, client_for, workspace, project, issue, create_user
+    ):
+        workspace_admin = _make_user(workspace, project, ADMIN, MEMBER)
+        ProjectMember.objects.filter(project=project, member=workspace_admin).update(is_active=False)
+        asset = _attachment(workspace, project, issue, create_user)
+        resp = client_for(workspace_admin).delete(_attachment_url(workspace, project, issue, asset))
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        asset.refresh_from_db()
+        assert asset.is_deleted is False
+
     @pytest.mark.parametrize("fixture_name", ["member_user", "guest_user"])
     def test_creator_with_revoked_membership_denied(self, request, client_for, workspace, project, issue, fixture_name):
         user = request.getfixturevalue(fixture_name)
@@ -258,6 +323,10 @@ class TestAttachmentDelete:
         asset.refresh_from_db()
         assert asset.is_uploaded is False
         assert asset.created_by_id == create_user.id
+        resp = client.delete(url)
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        asset.refresh_from_db()
+        assert asset.is_deleted is False
 
 
 def _members_url(ws, project):
