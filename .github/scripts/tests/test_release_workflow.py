@@ -195,6 +195,17 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         # The GitHub Release waits for verify_publication.
         self.assertIn("needs: [setup, signing_tools, verify_publication, chart]", self.release_job())
 
+    def test_prereleases_still_publish_the_github_release(self):
+        # compose_upgrade is skipped for a prerelease; a job without a status
+        # function is skipped when any job it depends on was skipped, so the
+        # release job must use always() and check each needed result itself.
+        release = self.release_job()
+        self.assertIn("      always() &&\n", release)
+        self.assertIn("      needs.setup.outputs.is_release == 'true' &&\n", release)
+        for job in ("setup", "signing_tools", "verify_publication", "chart"):
+            self.assertIn(f"needs.{job}.result == 'success'", release)
+        self.assertNotIn("    if: needs.setup.outputs.is_release == 'true'\n", release)
+
     def test_release_chart_is_signed_and_attached_as_evidence(self):
         self.assertIn('cosign sign --yes "$chart_ref"', self.workflow)
         self.assertIn('cosign verify \\', self.workflow)
