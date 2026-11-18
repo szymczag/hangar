@@ -72,6 +72,24 @@ commit (v1.4.3 arrived as `eca57c46d1`, #348), not as a merge. Two things follow
   git merge-tree --write-tree --merge-base "$base" HEAD v1.5.0
   ```
 
+**Migrations keep Hangar's numbers.** Upstream migrations that Hangar already carries
+are renumbered onto Hangar's chain, so a sync must not bring upstream's copies back:
+
+- Converging with upstream v1.5.0, drop upstream's `db` migrations
+  `0123_remove_apitoken_is_service_and_allowed_rate_limit`,
+  `0124_intakeissue_intake_issue_snoozed_till_idx` and
+  `0125_reset_project_deploy_board_identity`. Hangar ships them as `0135`, `0136` and
+  `0134` (and upstream's `0122_alter_draftissue_…` as `0129`, dropped at the v1.4.3
+  sync). Upstream migrations that Hangar does not carry yet are renumbered after
+  Hangar's latest leaf, with their dependencies rewritten, never added under
+  upstream's number.
+- `apps/api/migrations_lockfile.txt` names the latest migration of every app with
+  migrations (`db`, `ext`, `license`); `python manage.py makemigrations` rewrites it.
+  `apps/api/plane/tests/unit/db/test_migrations_lockfile.py` fails on a stale lockfile,
+  a second leaf in an app, or two migrations of one app sharing a number, and the
+  `Migration check` workflow runs `makemigrations --check` against the merged graph,
+  so a reintroduced upstream file fails CI rather than a deployment.
+
 ## Commit conventions
 
 Conventional commits (`type(scope): message`). No attribution trailers.
@@ -241,3 +259,4 @@ Planned (added when the phase lands):
 | 129 | `apps/api/plane/app/views/issue/link.py`, `apps/api/plane/app/views/issue/subscriber.py` | Security | backport of upstream 05dfe5d08e (makeplane/plane#10205): every action of the work-item link and subscriber viewsets (and so of their epic subclasses) refuses a restricted guest (`guest_view_all_features` off) on a work item they did not create with 403, through the existing `issue_hidden_from_guest` helper, as reactions, comments and attachments already did; the external API link endpoints already 404 such reads and refuse guest writes |
 | 130 | `apps/api/plane/app/views/search/base.py` | Security | backport of upstream 63d5265af9 (makeplane/plane#10213): a project-scoped workspace search (`?project_id=`) returns empty results for every requested type unless the caller is an active member of that project, so a workspace member can no longer list the members of a project they do not belong to through `user_mention` (the other entity types were already filtered by membership) |
 | 131 | `apps/api/plane/app/serializers/project.py`, `apps/api/plane/api/serializers/project.py` | Security | after upstream f08bc5e603 (makeplane/plane#10214), ported by hand: the app `ProjectSerializer.validate` refuses a `project_lead` or `default_assignee` who is not an active member of the workspace (400 under the field's key), except when an unchanged assignment is resent; the external API create/update serializers also require an active membership for `default_assignee` (its `project_lead` check was already active-only in Hangar) |
+| 132 | `apps/api/migrations_lockfile.txt`, `apps/api/plane/db/management/commands/makemigrations.py`, `apps/api/plane/tests/unit/db/test_migrations_lockfile.py`, `.github/workflows/migration-check.yml` (all new, from upstream) | Migrations | port of upstream d8dc816d94 (makeplane/plane#9847) and f6a136fd60 (makeplane/plane#10189): the `makemigrations` override keeps a lockfile naming each app's latest migration, so two PRs adding a migration to one app conflict in Git. The lockfile carries Hangar's leaves (`db` 0136, `ext` 0039, `license` 0024) instead of upstream's; the test also checks the committed lockfile against the real migration graph, one leaf per app and no shared number in an app. The workflow installs `requirements.txt` with pip instead of uv, pins actions to commits, drops the checkout token, passes `base_ref` through `env:`, targets `preview` only, and leaves out upstream's labelling job and its `pull-requests: write` token |
