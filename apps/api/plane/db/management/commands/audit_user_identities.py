@@ -9,6 +9,13 @@ two groups that behave differently at the cutover — one is adopted on the next
 sign-in, the other is refused until its subject is imported — and there is no
 way to tell them apart from the user list alone.
 
+It also flags federated accounts that hold a usable password. Setting,
+changing and resetting a password are refused for an account bound to an
+identity provider, but a password obtained before those refusals existed -- or
+one the account had before its identity was linked -- still signs in, and is a
+way in that the provider's second factor, lockout and deprovisioning do not
+govern. `--federated-with-password` lists only those accounts.
+
 Read-only: it never writes, so it is safe to run against production.
 """
 
@@ -26,7 +33,11 @@ STATUS_NO_SSO = "password-only"
 
 
 class Command(BaseCommand):
-    help = "Report the sign-in methods and federated bindings held by each user"
+    help = (
+        "Report the sign-in methods and federated bindings held by each user, and flag "
+        "accounts bound to an identity provider that still hold a usable Hangar password "
+        "(PASSWORD column 'yes!', CSV column federated_with_password). Read-only."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -39,6 +50,12 @@ class Command(BaseCommand):
             "account counts as adoptable or as needing an import.",
         )
         parser.add_argument("--csv", action="store_true", help="Emit CSV instead of a table")
+        parser.add_argument(
+            "--federated-with-password",
+            action="store_true",
+            help="Only report accounts bound to an identity provider that still hold a usable "
+            "Hangar password, which signs in around the provider",
+        )
         parser.add_argument(
             "--include-inactive",
             action="store_true",
@@ -89,15 +106,24 @@ class Command(BaseCommand):
             else:
                 status = STATUS_NO_SSO
 
+            # A password the account can actually sign in with. An account the
+            # provider created has an unusable one, and an auto-set password is a
+            # random value nobody was told; neither is a way in.
+            has_password = not user.is_password_autoset and user.has_usable_password()
+            federated_with_password = bool(bound) and has_password
+            if options["federated_with_password"] and not federated_with_password:
+                continue
+
             rows.append(
                 {
                     "user_id": str(user.id),
                     "email": user.email,
                     "is_active": user.is_active,
-                    "has_password": not user.is_password_autoset,
+                    "has_password": has_password,
                     "oauth_accounts": ",".join(oauth_providers),
                     "federated_identities": ",".join(f"{identity.provider}:{identity.issuer}" for identity in bound),
                     "status": status,
+                    "federated_with_password": federated_with_password,
                 }
             )
 
@@ -122,16 +148,28 @@ class Command(BaseCommand):
         self.stdout.write(f"{'EMAIL'.ljust(width)}  {'STATUS'.ljust(13)}  PASSWORD  SIGN-IN RECORDS")
         for row in rows:
             records = row["federated_identities"] or row["oauth_accounts"] or "-"
-            self.stdout.write(
-                f"{row['email'].ljust(width)}  {row['status'].ljust(13)}  "
-                f"{'yes' if row['has_password'] else 'no '}       {records}"
-            )
+            if row["federated_with_password"]:
+                password = "yes!"
+            else:
+                password = "yes " if row["has_password"] else "no  "
+            self.stdout.write(f"{row['email'].ljust(width)}  {row['status'].ljust(13)}  {password}      {records}")
 
         counts = {}
         for row in rows:
             counts[row["status"]] = counts.get(row["status"], 0) + 1
         self.stdout.write("")
         self.stdout.write("  ".join(f"{status}={count}" for status, count in sorted(counts.items())))
+
+        federated_with_password = sum(1 for row in rows if row["federated_with_password"])
+        if federated_with_password:
+            self.stdout.write("")
+            self.stdout.write(
+                self.style.WARNING(
+                    f"{federated_with_password} federated account(s) still hold a usable Hangar password "
+                    f"(marked 'yes!'). It signs in without the identity provider; clear it unless "
+                    f"the account is meant to keep one."
+                )
+            )
 
         needs_import = counts.get(STATUS_NEEDS_IMPORT, 0)
         if provider and needs_import:

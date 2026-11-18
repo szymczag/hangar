@@ -324,6 +324,11 @@ const errorCodeMessages: {
     title: `Expired password token`,
     message: () => `Expired password token. Please try again.`,
   },
+  [EAuthErrorCodes.PASSWORD_MANAGED_BY_IDENTITY_PROVIDER]: {
+    title: `Password managed by your identity provider`,
+    message: () =>
+      `This account signs in through an identity provider and has no Hangar password, so it cannot be set or reset here. Sign in with your provider, and change your password there.`,
+  },
   // Change password
   [EAuthErrorCodes.MISSING_PASSWORD]: {
     title: `Password required`,
@@ -429,6 +434,7 @@ export const authErrorHandler = (errorCode: EAuthErrorCodes, email?: string): TA
     EAuthErrorCodes.GITLAB_OAUTH_PROVIDER_ERROR,
     EAuthErrorCodes.INVALID_PASSWORD_TOKEN,
     EAuthErrorCodes.EXPIRED_PASSWORD_TOKEN,
+    EAuthErrorCodes.PASSWORD_MANAGED_BY_IDENTITY_PROVIDER,
     EAuthErrorCodes.INCORRECT_OLD_PASSWORD,
     EAuthErrorCodes.INVALID_NEW_PASSWORD,
     EAuthErrorCodes.PASSWORD_ALREADY_SET,

@@ -171,6 +171,8 @@ export enum EAuthErrorCodes {
   // Reset Password
   INVALID_PASSWORD_TOKEN = "5125",
   EXPIRED_PASSWORD_TOKEN = "5130",
+  // Fork (see FORK.md): an account bound to an identity provider asked for a password.
+  PASSWORD_MANAGED_BY_IDENTITY_PROVIDER = "5132",
   // Change password
   INCORRECT_OLD_PASSWORD = "5135",
   MISSING_PASSWORD = "5138",
