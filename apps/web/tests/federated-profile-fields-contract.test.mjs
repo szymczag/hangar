@@ -23,8 +23,8 @@ import test from "node:test";
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 const helper = read("../helpers/provider-managed-profile.ts");
-const settings = read("../core/components/settings/profile/content/pages/general/form.tsx");
-const onboarding = read("../core/components/onboarding/steps/profile/root.tsx");
+const settings = read("../components/settings/profile/content/pages/general/form.tsx");
+const onboarding = read("../components/onboarding/steps/profile/root.tsx");
 
 test("both places decide it with the same helper", () => {
   for (const [name, source] of [

@@ -8,8 +8,8 @@ import { getSchema } from "@tiptap/core";
 import { generateJSON } from "@tiptap/html";
 import { describe, expect, it } from "vitest";
 
-import { CoreEditorExtensionsWithoutProps } from "../src/core/extensions/core-without-props";
-import { isDangerousHref, isNavigableHref } from "../src/core/extensions/custom-link/url-security";
+import { CoreEditorExtensionsWithoutProps } from "../src/extensions/core-without-props";
+import { isDangerousHref, isNavigableHref } from "../src/extensions/custom-link/url-security";
 
 /**
  * Malicious markup through the paths pasted or stored HTML takes into the

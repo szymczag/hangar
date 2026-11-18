@@ -6,7 +6,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 
 const repoRoot = new URL("../", import.meta.url);
-const billingComponents = new URL("../apps/web/core/components/workspace/billing/", import.meta.url);
+const billingComponents = new URL("../apps/web/components/workspace/billing/", import.meta.url);
 const billingRoot = readFileSync(new URL("root.tsx", billingComponents), "utf8");
 
 // The edition name is defined once, in the dialog that is named after it. Read

@@ -11,9 +11,9 @@ import type { Mark, Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { generateJSON } from "@tiptap/html";
 import { describe, expect, it } from "vitest";
 
-import { COLORS_LIST } from "../src/core/constants/common";
-import { CoreEditorExtensionsWithoutProps } from "../src/core/extensions/core-without-props";
-import { normalizeDocumentJSON, sanitizeColorKey, sanitizeTextAlign } from "../src/core/helpers/attribute-guards";
+import { COLORS_LIST } from "../src/constants/common";
+import { CoreEditorExtensionsWithoutProps } from "../src/extensions/core-without-props";
+import { normalizeDocumentJSON, sanitizeColorKey, sanitizeTextAlign } from "../src/helpers/attribute-guards";
 
 const OVERLAY = "position:fixed;inset:0;z-index:99999;background:url(https://attacker.example/px)";
 

@@ -6,7 +6,7 @@
 
 import { Effect } from "effect";
 import sharp from "sharp";
-import { getAllDocumentFormatsFromDocumentEditorBinaryData } from "@plane/editor/lib";
+import { getAllDocumentFormatsFromDocumentEditorBinaryData } from "@plane/editor/server";
 import type { PDFExportMetadata, TipTapDocument } from "@/lib/pdf";
 import { renderPlaneDocToPdfBuffer } from "@/lib/pdf";
 import {

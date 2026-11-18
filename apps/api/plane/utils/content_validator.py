@@ -158,8 +158,8 @@ ATTRIBUTES = {
 # Attribute values. nh3 checks attribute names and URL schemes but not
 # values, and several of these values are turned into CSS, classes or URLs by
 # whoever renders the HTML. Keep in step with the editor's
-# packages/editor/src/core/helpers/attribute-guards.ts and COLORS_LIST
-# (packages/editor/src/core/constants/common.ts); a test checks the keys.
+# packages/editor/src/helpers/attribute-guards.ts and COLORS_LIST
+# (packages/editor/src/constants/common.ts); a test checks the keys.
 EDITOR_COLOR_KEYS = frozenset({"gray", "peach", "pink", "orange", "green", "light-blue", "dark-blue", "purple"})
 EDITOR_TEXT_ALIGNMENTS = frozenset({"left", "center", "right"})
 _EDITOR_COLOR_VARIABLE = re.compile(r"^var\(--editor-colors-([a-z-]+)-(?:text|background)\)$")

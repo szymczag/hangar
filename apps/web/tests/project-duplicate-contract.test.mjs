@@ -21,9 +21,9 @@ function read(relativePath) {
   return readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
-const service = read("apps/web/core/services/project/project.service.ts");
-const store = read("apps/web/core/store/project/project.store.ts");
-const modal = read("apps/web/core/components/project/duplicate-project-modal.tsx");
+const service = read("apps/web/services/project/project.service.ts");
+const store = read("apps/web/store/project/project.store.ts");
+const modal = read("apps/web/components/project/duplicate-project-modal.tsx");
 
 test("the source project is named in the path, never the request body", () => {
   const call = service.match(/duplicateProject\([\s\S]*?\n {2}}/);
@@ -103,9 +103,9 @@ test("access-granting copy options stay off until they are asked for", () => {
 test("the create modal starts from a source instead of creating an empty project", () => {
   // `templateId` was declared and threaded through this path upstream but never
   // read, so the picker silently did nothing. Guard against it going dead again.
-  const form = read("apps/web/core/components/projects/create/root.tsx");
-  const createModal = read("apps/web/core/components/project/create-project-modal.tsx");
-  const header = read("apps/web/core/components/project/create/header.tsx");
+  const form = read("apps/web/components/projects/create/root.tsx");
+  const createModal = read("apps/web/components/project/create-project-modal.tsx");
+  const header = read("apps/web/components/project/create/header.tsx");
 
   assert.match(form, /templateId[,\s}]/, "the create form must destructure templateId, not just declare it");
   assert.match(
@@ -125,15 +125,15 @@ test("the create modal starts from a source instead of creating an empty project
 test("only projects the user administers can be copied from", () => {
   // The API requires ADMIN on the source, because duplication re-links shared
   // work item types. The picker must not offer projects it would refuse.
-  const picker = read("apps/web/core/components/project/create/source-picker.tsx");
+  const picker = read("apps/web/components/project/create/source-picker.tsx");
   assert.match(picker, /member_role === EUserPermissions\.ADMIN/);
 });
 
 test("every entry point opens the one shared modal", () => {
   const entryPoints = [
-    "apps/web/core/components/workspace/sidebar/projects-list-item.tsx",
-    "apps/web/core/components/project/card.tsx",
-    "apps/web/core/components/project/settings/control-section.tsx",
+    "apps/web/components/workspace/sidebar/projects-list-item.tsx",
+    "apps/web/components/project/card.tsx",
+    "apps/web/components/project/settings/control-section.tsx",
   ];
 
   for (const entryPoint of entryPoints) {

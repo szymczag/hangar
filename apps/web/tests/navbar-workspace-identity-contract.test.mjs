@@ -12,9 +12,9 @@ const WEB = path.dirname(path.dirname(fileURLToPath(new URL("../tests/x", import
 const source = (relativePath) => readFileSync(path.join(WEB, relativePath), "utf8");
 
 test("the top navigation gives the workspace identity room without crowding narrow screens", () => {
-  const navigation = source("core/components/navigation/top-navigation-root.tsx");
-  const workspaceMenu = source("core/components/workspace/sidebar/workspace-menu-root.tsx");
-  const commandSearch = source("core/components/navigation/top-nav-power-k.tsx");
+  const navigation = source("components/navigation/top-navigation-root.tsx");
+  const workspaceMenu = source("components/workspace/sidebar/workspace-menu-root.tsx");
+  const commandSearch = source("components/navigation/top-nav-power-k.tsx");
 
   assert.match(navigation, /h-12 min-h-12/);
   assert.match(workspaceMenu, /sm:max-w-48 md:max-w-60 xl:max-w-72/);

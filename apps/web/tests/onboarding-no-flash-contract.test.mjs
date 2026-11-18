@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync(new URL("../core/components/onboarding/root.tsx", import.meta.url), "utf8");
+const source = readFileSync(new URL("../components/onboarding/root.tsx", import.meta.url), "utf8");
 
 test("no step is assumed before one is chosen", () => {
   assert.doesNotMatch(

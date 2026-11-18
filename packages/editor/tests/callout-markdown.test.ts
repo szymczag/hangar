@@ -4,11 +4,11 @@
  * See the LICENSE file for details.
  */
 
-import type { MarkdownSerializerState } from "@tiptap/pm/markdown";
+import type { MarkdownSerializerState } from "prosemirror-markdown";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { describe, expect, it } from "vitest";
 
-import { CustomCalloutExtensionConfig } from "../src/core/extensions/callout/extension-config";
+import { CustomCalloutExtensionConfig } from "../src/extensions/callout/extension-config";
 
 /** Records what the serializer writes, without a real document. */
 function serialize(attrs: Record<string, unknown>): string {

@@ -2,6 +2,7 @@
   "$comment": "Trusted Types sinks in the space bundle and why each is acceptable. Checked by packages/csp/bin/bundle-sinks.mjs; see docs/trusted-types-plan.md.",
   "sinks": {
     "DOMParser.parseFromString npm:@tiptap/core": "elementFromString (setContent, insertContent): an inert document; the plain string goes through the default policy.",
+    "DOMParser.parseFromString npm:@tiptap/html": "generateJSON in the browser document codecs (Tiptap 3 dropped its zeed-dom parser): an inert document whose nodes are only read into the editor schema; the plain string goes through the default policy.",
     "DOMParser.parseFromString npm:dompurify": "DOMPurify's own parse, given TrustedHTML from its own 'dompurify' policy, which the header allows.",
     "DOMParser.parseFromString npm:tiptap-markdown": "elementFromString for HTML rendered from markdown: an inert document; the plain string goes through the default policy.",
     "DOMParser.parseFromString packages/csp/src/trusted-types.mjs": "The default policy's comparison parse, given TrustedHTML from hangar-inert.",

@@ -4,7 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import type { onStatelessPayload } from "@hocuspocus/server";
+import { IncomingMessage, MessageType } from "@hocuspocus/server";
+import type { beforeHandleMessagePayload, onStatelessPayload } from "@hocuspocus/server";
 import { DocumentCollaborativeEvents } from "@plane/editor/lib";
 import type { TDocumentEventsServer } from "@plane/editor/lib";
 
@@ -17,5 +18,22 @@ export const onStateless = async ({ payload, document, connection }: onStateless
   // A read-only connection may not announce page events to the other clients.
   if (response && !connection.readOnly) {
     document.broadcastStateless(response);
+  }
+};
+
+/**
+ * Hocuspocus relays a client's BroadcastStateless message to every connection on the document, read-only ones
+ * included, with no hook to veto the payload. Clients have no use for it: page events go through onStateless above,
+ * and server notices (force_close, Redis broadcasts) are sent by the server itself. Refusing it here also stops a
+ * guest from telling other clients to stop reconnecting. A refused message closes that connection.
+ */
+export const beforeHandleMessage = async ({ update }: beforeHandleMessagePayload) => {
+  const message = new IncomingMessage(update);
+  message.readVarString(); // document name, already matched by the connection
+  if (message.readVarUint() === MessageType.BroadcastStateless) {
+    throw Object.assign(new Error("Clients may not broadcast stateless messages"), {
+      code: 4403,
+      reason: "broadcast-stateless-refused",
+    });
   }
 };

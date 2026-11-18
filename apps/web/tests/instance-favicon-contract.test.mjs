@@ -15,7 +15,7 @@ const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const read = (relativePath) => readFileSync(path.join(repoRoot, relativePath), "utf8");
 
 const helper = read("apps/web/helpers/instance-favicon.ts");
-const wrapper = read("apps/web/core/lib/wrappers/instance-wrapper.tsx");
+const wrapper = read("apps/web/lib/wrappers/instance-wrapper.tsx");
 
 test("the built-in icon is detached rather than merely overridden", () => {
   // Several browsers prefer `shortcut icon` or the first icon they parsed, so

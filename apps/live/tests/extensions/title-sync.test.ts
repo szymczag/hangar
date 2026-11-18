@@ -14,13 +14,14 @@ const updatePageProperties = vi.fn().mockResolvedValue({});
 const getPageService = vi.hoisted(() => vi.fn());
 vi.mock("@/services/page/handler", () => ({ getPageService }));
 // the built editor package is not needed to exercise title routing
-vi.mock("@plane/editor", () => ({
+vi.mock("@plane/editor/server", () => ({
   TITLE_EDITOR_EXTENSIONS: [],
   createRealtimeEvent: vi.fn(),
   extractTextFromHTML: (html: string) => html,
   generateTitleProsemirrorJson: vi.fn(),
 }));
-vi.mock("@hocuspocus/transformer", () => ({ TiptapTransformer: { toYdoc: vi.fn() } }));
+// the title schema is built from the (mocked) title extensions when the module loads
+vi.mock("@tiptap/core", () => ({ getSchema: vi.fn() }));
 vi.mock("@/utils/broadcast-message", () => ({ broadcastMessageToPage: vi.fn() }));
 
 import { TitleSyncExtension } from "@/extensions/title-sync";

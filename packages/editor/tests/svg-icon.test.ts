@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ADD_ICON, SPARKLES_ICON, VERTICAL_ELLIPSIS_ICON, createSvgIcon } from "../src/core/helpers/svg-icon";
+import { ADD_ICON, SPARKLES_ICON, VERTICAL_ELLIPSIS_ICON, createSvgIcon } from "../src/helpers/svg-icon";
 import previous from "./fixtures-previous-icon-markup.json";
 
 type TNode = { namespace: string; tag: string; attributes: Record<string, string>; children: TNode[] };

@@ -12,7 +12,7 @@ import { env } from "@/env";
 import { getExtensions } from "@/extensions";
 // lib
 import { onAuthenticate } from "@/lib/auth";
-import { onStateless } from "@/lib/stateless";
+import { beforeHandleMessage, onStateless } from "@/lib/stateless";
 
 export class HocusPocusServerManager {
   private static instance: HocusPocusServerManager | null = null;
@@ -46,6 +46,7 @@ export class HocusPocusServerManager {
       name: this.serverName,
       onAuthenticate,
       onStateless,
+      beforeHandleMessage,
       extensions: getExtensions(),
       debounce: 10000,
     });

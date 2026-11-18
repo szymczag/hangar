@@ -23,6 +23,6 @@ test("Live collaboration has a runtime path and a safe image fallback", () => {
 });
 
 test("the editor appends collaboration below the configured Live path", () => {
-  const editor = source("apps/web/core/components/pages/editor/editor-body.tsx");
+  const editor = source("apps/web/components/pages/editor/editor-body.tsx");
   assert.match(editor, /WS_LIVE_URL\.pathname = `\$\{LIVE_BASE_PATH\}\/collaboration`/);
 });
