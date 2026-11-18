@@ -14,8 +14,6 @@ from plane.db.models import (
     WorkspaceMemberInvite,
 )
 from plane.utils.cache import invalidate_cache_directly
-from plane.bgtasks.event_tracking_task import track_event
-from plane.utils.analytics_events import USER_JOINED_WORKSPACE
 from plane.authentication.services.invitations import accepted_membership_invitations
 
 
@@ -45,19 +43,6 @@ def _process_workspace_project_invitations(user):
             "multiple": True,
         }
         transaction.on_commit(lambda kwargs=cache_kwargs: invalidate_cache_directly(**kwargs))
-        event_kwargs = {
-            "user_id": user.id,
-            "event_name": USER_JOINED_WORKSPACE,
-            "slug": workspace_member_invite.workspace.slug,
-            "event_properties": {
-                "user_id": user.id,
-                "workspace_id": workspace_member_invite.workspace.id,
-                "workspace_slug": workspace_member_invite.workspace.slug,
-                "role": workspace_member_invite.role,
-                "joined_at": str(timezone.now().isoformat()),
-            },
-        }
-        transaction.on_commit(lambda kwargs=event_kwargs: track_event.delay(**kwargs))
 
     # Check if user has any project invites
     project_member_invites = ProjectMemberInvite.objects.filter(email=user.email, accepted=True)

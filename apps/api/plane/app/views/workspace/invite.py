@@ -32,12 +32,10 @@ from plane.authentication.utils.sso_domain_policy import (
     invitation_policy_snapshot,
     invitation_rejection_reason,
 )
-from plane.bgtasks.event_tracking_task import track_event
 from plane.bgtasks.workspace_invitation_task import workspace_invitation
 from plane.db.models import Profile, Workspace, WorkspaceMember, WorkspaceMemberInvite
 from plane.utils.cache import invalidate_cache, invalidate_cache_directly
 from plane.utils.host import base_host
-from plane.utils.analytics_events import USER_JOINED_WORKSPACE, USER_INVITED_TO_WORKSPACE
 from .. import BaseViewSet
 
 
@@ -154,19 +152,6 @@ class WorkspaceInvitationsViewset(BaseViewSet):
                 invitation.token,
                 current_site,
                 request.user.email,
-            )
-            track_event.delay(
-                user_id=request.user.id,
-                event_name=USER_INVITED_TO_WORKSPACE,
-                slug=slug,
-                event_properties={
-                    "user_id": request.user.id,
-                    "workspace_id": workspace.id,
-                    "workspace_slug": workspace.slug,
-                    "invitee_role": invitation.role,
-                    "invited_at": str(timezone.now()),
-                    "invitee_email": invitation.email,
-                },
             )
 
         return Response({"message": "Emails sent successfully"}, status=status.HTTP_200_OK)
@@ -285,20 +270,6 @@ class WorkspaceJoinEndpoint(BaseAPIView):
             workspace_invite.deleted_at = now
             workspace_invite.save(update_fields=["accepted", "responded_at", "consumed_at", "deleted_at", "updated_at"])
 
-            event_kwargs = {
-                "user_id": request.user.id,
-                "event_name": USER_JOINED_WORKSPACE,
-                "slug": slug,
-                "event_properties": {
-                    "user_id": request.user.id,
-                    "workspace_id": workspace_invite.workspace.id,
-                    "workspace_slug": workspace_invite.workspace.slug,
-                    "role": workspace_invite.role,
-                    "joined_at": str(now),
-                },
-            }
-            transaction.on_commit(lambda: track_event.delay(**event_kwargs))
-
         return Response(
             {"message": "Workspace Invitation Accepted"},
             status=status.HTTP_200_OK,
@@ -370,20 +341,7 @@ class UserWorkspaceInvitationsViewSet(BaseViewSet):
                     "request": request,
                     "multiple": True,
                 }
-                event_kwargs = {
-                    "user_id": request.user.id,
-                    "event_name": USER_JOINED_WORKSPACE,
-                    "slug": invitation.workspace.slug,
-                    "event_properties": {
-                        "user_id": request.user.id,
-                        "workspace_id": invitation.workspace.id,
-                        "workspace_slug": invitation.workspace.slug,
-                        "role": invitation.role,
-                        "joined_at": str(now),
-                    },
-                }
                 transaction.on_commit(lambda kwargs=cache_kwargs: invalidate_cache_directly(**kwargs))
-                transaction.on_commit(lambda kwargs=event_kwargs: track_event.delay(**kwargs))
 
             WorkspaceMemberInvite.objects.filter(pk__in=[invite.pk for invite in workspace_invitations]).update(
                 accepted=True,

@@ -50,8 +50,6 @@ dependencies = [
     "python-json-logger==4.0.0",
     # html parser
     "beautifulsoup4==4.12.3",
-    # analytics (plane/bgtasks/event_tracking_task.py still imports it)
-    "posthog==3.5.0",
     # crypto
     "cryptography==50.0.0",
     # html validator
