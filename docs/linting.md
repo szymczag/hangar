@@ -101,37 +101,40 @@ If the commit fails due to lint errors, fix them before committing.
 pycodestyle (`E`) and Pyflakes (`F`) are enabled, at a line length of 120.
 
 ```bash
-# from the repo root
-ruff check apps/api
+cd apps/api
+uv sync --only-group dev   # or plain `uv sync` for the whole dev and test setup
+uv run ruff check .
 ```
 
 ### The version is pinned in one place
 
-`apps/api/requirements/local.txt` holds the pin, and the CI workflow reads it
-from there rather than repeating it:
+The `dev` dependency group in `apps/api/pyproject.toml` holds the pin
+(`ruff==…`), and `apps/api/uv.lock` locks it. The CI workflow installs that
+group rather than naming a version of its own:
 
 ```yaml
-run: python -m pip install "$(grep '^ruff==' apps/api/requirements/local.txt)"
+run: uv sync --locked --only-group dev
 ```
 
-Change the version in that file and CI follows. Installing ruff unpinned means a
-ruff release can change the result of a check nobody re-ran, and it means CI and
-your machine can disagree about whether the code is clean.
+Change the version in `pyproject.toml`, run `uv lock`, and CI follows. Installing
+ruff unpinned means a ruff release can change the result of a check nobody
+re-ran, and it means CI and your machine can disagree about whether the code is
+clean.
 
 ### The check has to be able to fail
 
-The workflow runs `ruff check apps/api` — deliberately **without** `--fix`. With
+The workflow runs `ruff check` over `apps/api` — deliberately **without** `--fix`. With
 `--fix`, ruff repairs what it finds and exits zero, so the job reports success
 whatever it found, and the repair is thrown away with the runner. A check that
 cannot fail is not a check.
 
-If ruff reports something, fix it in your branch. `ruff check --fix apps/api` is
+If ruff reports something, fix it in your branch. `uv run ruff check --fix .` is
 fine to run locally, where the result is kept.
 
 ### Formatting is checked for fork-owned code only
 
 ```bash
-ruff format --check apps/api/plane/ext
+cd apps/api && uv run ruff format --check plane/ext
 ```
 
 `apps/api/plane/ext` holds Hangar's own API code, it is already formatted, and CI
@@ -173,4 +176,3 @@ tree is therefore held to the same rules as the rest of the code.
 
 This is left as it is on purpose. Widening the glob would weaken the check across
 hundreds of files to accommodate a pattern the codebase does not currently need.
-

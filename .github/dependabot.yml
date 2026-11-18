@@ -1,10 +1,10 @@
 # Dependabot configuration.
 #
-# npm and pip receive security updates only. The application tree follows
-# the upstream project, and routine version bumps there would collide with upstream
-# syncs; open-pull-requests-limit: 0 turns version updates off without
-# affecting security updates, which the groups below batch into one pull
-# request per ecosystem.
+# npm and uv (the API's Python packages) receive security updates only. The
+# application tree follows the upstream project, and routine version bumps there
+# would collide with upstream syncs; open-pull-requests-limit: 0 turns version
+# updates off without affecting security updates, which the groups below batch
+# into one pull request per ecosystem.
 #
 # Container base images, the third-party images in the Compose deployment and
 # GitHub Actions receive weekly version updates.
@@ -37,8 +37,10 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
-  - package-ecosystem: pip
-    directory: /apps/api/requirements
+  # apps/api is managed by uv: pyproject.toml declares the dependencies and
+  # uv.lock pins every package with its hashes.
+  - package-ecosystem: uv
+    directory: /apps/api
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
@@ -50,7 +52,7 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
-      pip-security:
+      uv-security:
         applies-to: security-updates
         patterns: ["*"]
 
@@ -80,6 +82,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "*python"
         versions: [">=3.13"]
+      # The uv build image must match [tool.uv] required-version in
+      # apps/api/pyproject.toml, which Dependabot does not edit; a lone image
+      # bump fails the build. Move both together by hand.
+      - dependency-name: "*astral-sh/uv"
 
   # The Postgres, Valkey, RabbitMQ and SeaweedFS images the Compose deployment
   # pins by tag and digest. A major version of a data service is a data

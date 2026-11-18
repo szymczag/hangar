@@ -23,6 +23,8 @@ from typing import ClassVar
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 API_DOCKERFILE = REPOSITORY_ROOT / "apps" / "api" / "Dockerfile.api"
+API_DEV_DOCKERFILE = REPOSITORY_ROOT / "apps" / "api" / "Dockerfile.dev"
+API_PYPROJECT = REPOSITORY_ROOT / "apps" / "api" / "pyproject.toml"
 WEB_DOCKERFILE = REPOSITORY_ROOT / "apps" / "web" / "Dockerfile.web"
 ADMIN_DOCKERFILE = REPOSITORY_ROOT / "apps" / "admin" / "Dockerfile.admin"
 SPACE_DOCKERFILE = REPOSITORY_ROOT / "apps" / "space" / "Dockerfile.space"
@@ -58,7 +60,8 @@ def final_user(dockerfile: Path) -> str | None:
 
 
 class ApiImageTests(unittest.TestCase):
-    """S1: the API image runs as uid 10001 and nothing is world-writable."""
+    """S1: the API image runs as uid 10001, nothing is world-writable, and it
+    installs only the locked production dependencies and ships no installer."""
 
     def test_runs_as_the_dedicated_unprivileged_user(self):
         source = API_DOCKERFILE.read_text()
@@ -76,6 +79,37 @@ class ApiImageTests(unittest.TestCase):
 
     def test_the_code_tree_is_not_writable_by_group_or_others(self):
         self.assertRegex(API_DOCKERFILE.read_text(), r"chmod -R u=rwX,g=rX,o=rX /code")
+
+    def test_installs_only_the_locked_production_dependencies(self):
+        body = stages(API_DOCKERFILE)[-1][1]
+        self.assertIn("uv sync --locked --inexact --no-default-groups --group production", body)
+        self.assertNotRegex(body, r"\bpip3? install\b")
+
+    def test_runtime_image_ships_neither_pip_nor_uv(self):
+        body = stages(API_DOCKERFILE)[-1][1]
+        # uv is bind-mounted for the install step only, never copied in.
+        self.assertIn("--mount=from=uv,source=/uv,target=/bin/uv", body)
+        self.assertNotRegex(body, r"COPY\s+--from=uv\b")
+        for path in ("site-packages/pip ", "site-packages/pip-*.dist-info", "/usr/local/bin/pip "):
+            self.assertIn(path, body)
+
+    def test_grpc_trusts_the_system_bundle(self):
+        for dockerfile in (API_DOCKERFILE, AIO_DOCKERFILE):
+            with self.subTest(dockerfile=dockerfile.relative_to(REPOSITORY_ROOT)):
+                self.assertIn(
+                    "ENV GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt",
+                    stages(dockerfile)[-1][1],
+                )
+
+    def test_uv_image_matches_the_required_version(self):
+        required = re.search(r'^required-version = "==([0-9.]+)"$', API_PYPROJECT.read_text(), re.MULTILINE)
+        self.assertIsNotNone(required, "apps/api/pyproject.toml no longer pins uv exactly")
+        for dockerfile in (API_DOCKERFILE, API_DEV_DOCKERFILE):
+            with self.subTest(dockerfile=dockerfile.name):
+                self.assertRegex(
+                    dockerfile.read_text(),
+                    rf"(?m)^FROM ghcr\.io/astral-sh/uv:{re.escape(required.group(1))}@sha256:[0-9a-f]{{64}} AS uv$",
+                )
 
 
 class NginxImageTests(unittest.TestCase):

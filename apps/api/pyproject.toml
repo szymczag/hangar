@@ -2,6 +2,140 @@
 name = "Hangar"
 version = "0.24.0"
 description = "Open-source project management for self-hosted teams"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # django
+    "Django==5.2.17",
+    # rest framework
+    "djangorestframework==3.18.3",
+    # postgres (the psycopg implementation comes from a group: psycopg-c in
+    # production, psycopg-binary in dev/test)
+    "psycopg==3.3.4",
+    "dj-database-url==3.0.1",
+    # redis
+    "redis==5.0.4",
+    "django-redis==7.0.0",
+    # cors
+    "django-cors-headers==4.9.0",
+    # celery
+    "celery==5.5.3",
+    "django_celery_beat==2.9.0",
+    "django-celery-results==2.6.0",
+    # file serve
+    "whitenoise==6.12.0",
+    # fake data
+    "faker==25.0.0",
+    # filters
+    "django-filter==25.2",
+    # json model
+    "jsonmodels==2.7.0",
+    # storage
+    "django-storages==1.14.6",
+    "python-magic==0.4.27",
+    # user management
+    "django-crum==0.7.9",
+    # web server
+    "uvicorn==0.29.0",
+    # sockets
+    "channels==4.3.2",
+    # ai
+    "openai==1.63.2",
+    # slack
+    "slack-sdk==3.27.1",
+    # apm
+    "scout-apm==3.5.3",
+    # xlsx generation
+    "openpyxl==3.1.2",
+    # logging
+    "python-json-logger==4.0.0",
+    # html parser
+    "beautifulsoup4==4.12.3",
+    # analytics (plane/bgtasks/event_tracking_task.py still imports it)
+    "posthog==3.5.0",
+    # crypto
+    "cryptography==50.0.0",
+    # html validator
+    "lxml==6.1.0",
+    # s3
+    "boto3==1.34.96",
+    # http client (pinned to address CVE-2026-44431 and CVE-2026-44432)
+    "urllib3>=2.8.0",
+    # certifi arrives transitively via requests/httpx; floor at the bundle that
+    # drops the compromised emSign ECC Root CA - G3 (GHSA-6q48-6c7w-9gw2)
+    "certifi>=2026.10.19",
+    # requests — used directly for webhook delivery & link unfurling; pinned to
+    # >=2.32 for the get_connection_with_tls_context adapter hook (SSRF IP pinning)
+    "requests==2.33.0",
+    # password validator
+    "zxcvbn==4.4.28",
+    # timezone
+    "pytz==2024.1",
+    # jwt
+    "PyJWT==2.15.1",
+    # OpenTelemetry
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
+    "opentelemetry-instrumentation-django==0.66b2",
+    "opentelemetry-exporter-otlp==1.45.2",
+    "opentelemetry-exporter-otlp-proto-grpc==1.45.2",
+    # OpenAPI Specification
+    "drf-spectacular==0.29.0",
+    # html sanitizer
+    "nh3==0.2.18",
+    # Fork requirements (see FORK.md, "Security invariants", S7). The tests in
+    # plane/tests/unit/test_security_dependencies.py fail if one goes missing.
+    # SAML 2.0 service-provider support
+    "python3-saml==1.16.0",
+    "xmlsec==1.3.17",
+    # Markdown conversion for imported task descriptions and comments.
+    "mistune==3.3.3",
+    # WebAuthn second factor for the instance-admin console.
+    "webauthn==2.7.0",
+]
+
+[dependency-groups]
+# Installed only by the production image (Dockerfile.api):
+#   uv sync --no-default-groups --group production
+production = [
+    # server
+    "gunicorn==23.0.0",
+    # postgres C implementation, built from source (needs pg_config and a compiler)
+    "psycopg-c==3.3.4",
+]
+dev = [
+    # postgres prebuilt wheel, so local setups never compile psycopg-c
+    "psycopg-binary==3.3.4",
+    # debug toolbar
+    "django-debug-toolbar==6.0.0",
+    # formatter and linter; CI installs this group to lint
+    "ruff==0.16.4",
+]
+test = [
+    # postgres prebuilt wheel (also in dev, so either group works on its own)
+    "psycopg-binary==3.3.4",
+    # test framework
+    "pytest==9.0.3",
+    "pytest-django==4.12.0",
+    "pytest-cov==4.1.0",
+    "pytest-xdist==3.3.1",
+    "pytest-mock==3.11.1",
+    "factory-boy==3.3.0",
+    "freezegun==1.2.2",
+    "coverage==7.2.7",
+    # 0.28.1, not 0.24.1: with one lock for every group, the old pin would hold
+    # production (httpx via openai, h11 via uvicorn) at h11 0.14.0 (CVE-2025-43859)
+    "httpx==0.28.1",
+]
+
+[tool.uv]
+# Every uv that touches uv.lock is this exact version: CI reads it via
+# setup-uv's version-file, and the Dockerfiles pin the same image. Bump all together.
+required-version = "==0.12.21"
+# The API is a Django app, not an installable package: uv only manages its
+# environment and never builds or installs the project itself.
+package = false
+# A plain `uv sync` sets up everything needed to develop and run the tests.
+default-groups = ["dev", "test"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
