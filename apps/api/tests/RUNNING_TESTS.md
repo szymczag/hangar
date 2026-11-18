@@ -25,7 +25,7 @@ All commands are run from the repo root.
 docker compose -f docker-compose-test.yml run --rm --build api-tests pytest
 ```
 
-- `--build` rebuilds the `api-tests` image when `Dockerfile.dev` or `requirements/*.txt` change.
+- `--build` rebuilds the `api-tests` image when `Dockerfile.dev`, `pyproject.toml` or `uv.lock` change. Without it, the container still runs `uv sync --locked --inexact` against the mounted lock before pytest, so a stale image catches up, only more slowly.
 - `--rm` removes the one-shot test container after pytest exits.
 - Compose propagates the one-shot container's exit code, so failures are reported correctly in CI without waiting for long-lived dependency services to stop.
 
@@ -75,13 +75,13 @@ docker compose -f docker-compose-test.yml down -v
 
 ## How it works
 
-| Service      | Image                                                   | Purpose                                       |
-| ------------ | ------------------------------------------------------- | --------------------------------------------- |
-| `test-db`    | `docker.io/library/postgres:15.7-alpine`                | Application database                          |
-| `test-redis` | `docker.io/valkey/valkey:7.2.11-alpine`                 | Cache / Celery broker                         |
-| `test-mq`    | `docker.io/library/rabbitmq:3.13.6-management-alpine`   | Task queue                                    |
-| `test-minio` | `docker.io/chrislusf/seaweedfs:4.48` (SeaweedFS, `mini`) | S3-compatible object storage                  |
-| `api-tests`  | built from `apps/api/Dockerfile.dev`                    | Installs `requirements/test.txt`, runs pytest |
+| Service      | Image                                                    | Purpose                                 |
+| ------------ | -------------------------------------------------------- | --------------------------------------- |
+| `test-db`    | `docker.io/library/postgres:15.7-alpine`                 | Application database                    |
+| `test-redis` | `docker.io/valkey/valkey:7.2.11-alpine`                  | Cache / Celery broker                   |
+| `test-mq`    | `docker.io/library/rabbitmq:3.13.6-management-alpine`    | Task queue                              |
+| `test-minio` | `docker.io/chrislusf/seaweedfs:4.48` (SeaweedFS, `mini`) | S3-compatible object storage            |
+| `api-tests`  | built from `apps/api/Dockerfile.dev`                     | `uv sync`s the locked deps, runs pytest |
 
 Image references are fully qualified, so Podman pulls them without an
 `unqualified-search-registries` entry. The `test-minio` service keeps its
@@ -107,4 +107,5 @@ Test-time env overrides live in the compose file itself (`POSTGRES_HOST=test-db`
   ```
 
   Docker Compose expands them without this.
+
 - **Database state leaking between runs** — confirm you ran `down -v` (not just `down`). The tmpfs mounts are torn down with the container, but the network and any externally created volumes need `-v` to clear.
