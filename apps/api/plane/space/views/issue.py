@@ -97,6 +97,12 @@ def _comment_in_board_scope(comment_id, project_deploy_board):
     ).exists()
 
 
+def _public_comment_content(data):
+    """Only a comment's content is writable from a public board; actor, access,
+    parent and the other system fields stay server-controlled."""
+    return {key: data[key] for key in ("comment_html", "comment_json") if key in data}
+
+
 class ProjectIssuesPublicEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
@@ -242,17 +248,6 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
             )
 
 
-# A published board lets anyone signed in comment, through the app's comment
-# serializer. That serializer also accepts fields a project member may set
-# (access, external_source, external_id, parent, ...); from a public board
-# only the comment body is taken, and the view sets the rest.
-PUBLIC_COMMENT_FIELDS = ("comment_html", "comment_json")
-
-
-def _public_comment_data(data):
-    return {key: data[key] for key in PUBLIC_COMMENT_FIELDS if key in data}
-
-
 class IssueCommentPublicViewSet(BaseViewSet):
     serializer_class = IssueCommentSerializer
     model = IssueComment
@@ -314,7 +309,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
         if not _issue_in_board_scope(issue_id, project_deploy_board):
             return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = IssueCommentSerializer(data=_public_comment_data(request.data))
+        serializer = IssueCommentSerializer(data=_public_comment_content(request.data))
         if serializer.is_valid():
             serializer.save(
                 project_id=project_deploy_board.project_id,
@@ -361,7 +356,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
             access="EXTERNAL",
             actor=request.user,
         )
-        data = _public_comment_data(request.data)
+        data = _public_comment_content(request.data)
         current_instance = json.dumps(IssueCommentSerializer(comment).data, cls=DjangoJSONEncoder)
         serializer = IssueCommentSerializer(comment, data=data, partial=True)
         if serializer.is_valid():

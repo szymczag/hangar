@@ -123,12 +123,9 @@ class ProjectSerializer(BaseSerializer):
             # an unchanged assignment may be resent after the user left the workspace
             if user is not None and self.instance and getattr(self.instance, f"{field}_id") == user.pk:
                 continue
-            if (
-                user is not None
-                and not WorkspaceMember.objects.filter(
-                    workspace_id=self.context["workspace_id"], member=user, is_active=True
-                ).exists()
-            ):
+            if user is not None and not WorkspaceMember.objects.filter(
+                workspace_id=self.context["workspace_id"], member=user, is_active=True
+            ).exists():
                 raise serializers.ValidationError({field: "The provided user is not a member of this workspace."})
 
         # Validate description content for security

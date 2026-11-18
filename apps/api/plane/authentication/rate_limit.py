@@ -6,13 +6,13 @@
 import os
 from functools import wraps
 
-# Django imports
-from django.http import HttpResponseRedirect
-
 # Third party imports
 from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle, UserRateThrottle
 from rest_framework import status
 from rest_framework.response import Response
+
+# Django imports
+from django.http import HttpResponseRedirect
 
 # Module imports
 from plane.authentication.adapter.error import (

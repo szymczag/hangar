@@ -197,13 +197,13 @@ class SavedAnalyticEndpoint(BaseAPIView):
     def get(self, request, slug, analytic_id):
         analytic_view = AnalyticView.objects.get(pk=analytic_id, workspace__slug=slug)
 
-        filters = analytic_view.query
+        filter = analytic_view.query
         queryset = Issue.issue_objects.filter(
             workspace__slug=slug,
             project__project_projectmember__member=request.user,
             project__project_projectmember__is_active=True,
             project__project_projectmember__deleted_at__isnull=True,
-            **filters,
+            **filter,
         )
 
         x_axis = analytic_view.query_dict.get("x_axis", False)

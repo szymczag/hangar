@@ -28,12 +28,12 @@ from plane.db.models import User
 from plane.license.utils.instance_value import get_configuration_value
 from plane.mailer.configuration import is_email_delivery_configured
 from plane.authentication.utils.host import base_host
+from plane.authentication.utils.password import is_password_strong
 from plane.authentication.adapter.error import (
     AuthenticationException,
     AUTHENTICATION_ERROR_CODES,
 )
 from plane.authentication.rate_limit import AuthenticationThrottle
-from plane.authentication.utils.password import is_password_strong
 from plane.authentication.utils.federated_password import (
     federated_password_exception,
     is_password_managed_by_provider,
@@ -148,6 +148,7 @@ class ResetPasswordSpaceEndpoint(View):
                 url = f"{base_host(request=request, is_space=True)}/accounts/reset-password/?{urlencode(exc.get_error_dict())}"  # noqa: E501
                 return HttpResponseRedirect(url)
 
+            # Check the password complexity
             if not is_password_strong(password):
                 exc = AuthenticationException(
                     error_code=AUTHENTICATION_ERROR_CODES["PASSWORD_TOO_WEAK"],

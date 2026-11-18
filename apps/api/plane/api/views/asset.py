@@ -658,6 +658,14 @@ class GenericAssetEndpoint(BaseAPIView):
                 created_by=request.user,
                 is_deleted=False,
             )
+
+            # A project-bound asset requires active membership of its project.
+            if not asset.is_project_accessible_to(request.user):
+                return Response(
+                    {"error": "You don't have access to this asset."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             complete_asset_upload(
                 asset_id=asset.id,
                 storage=S3Storage(request=request, is_server=True),
