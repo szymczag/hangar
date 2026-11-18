@@ -80,3 +80,12 @@ test("a federated account is not offered an address it cannot change", () => {
   );
   assert.match(settings, /Boolean\(currentUser\?\.is_federated\)/);
 });
+
+test("a federated account is not offered a password it cannot set", () => {
+  assert.match(
+    onboarding,
+    /canSignInWithPassword = [^;]*!user\?\.is_federated/,
+    "the API refuses a password for a federated account, so onboarding must not ask for one"
+  );
+  assert.match(onboarding, /showPasswordSetup = [^;]*canSignInWithPassword/);
+});

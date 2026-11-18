@@ -15,6 +15,10 @@ from rest_framework.views import APIView
 from plane.app.serializers import UserSerializer
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.password import is_password_strong
+from plane.authentication.utils.federated_password import (
+    federated_password_refusal,
+    is_password_managed_by_provider,
+)
 from plane.db.models import User
 from plane.authentication.adapter.error import (
     AuthenticationException,
@@ -59,17 +63,10 @@ class ChangePasswordEndpoint(APIView):
         # provider's own controls -- its second factor, its lockout, its
         # deprovisioning -- stop being the only way in. The address check in
         # `user/base.py` refuses an email change for the same accounts and for
-        # the same underlying reason.
-        if user.federated_identities.exists():
-            return Response(
-                {
-                    "error": (
-                        "This account signs in through an identity provider and has no Hangar "
-                        "password. Change it with your provider instead."
-                    )
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # the same underlying reason. Setting and resetting a password ask the
+        # same helper.
+        if is_password_managed_by_provider(user):
+            return federated_password_refusal()
 
         # If the user password is not autoset then we need to check the old passwords
         if not user.is_password_autoset:
@@ -122,6 +119,12 @@ class SetUserPasswordEndpoint(APIView):
     def post(self, request):
         user = User.objects.get(pk=request.user.id)
         password = request.data.get("password", False)
+
+        # Fork (see FORK.md): `is_password_autoset` is true for an account created
+        # through a provider, so the check below would let it set a first password.
+        # Same refusal as ChangePasswordEndpoint, for the same reason.
+        if is_password_managed_by_provider(user):
+            return federated_password_refusal()
 
         # If the user password is not autoset then return error
         if not user.is_password_autoset:

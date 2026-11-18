@@ -55,6 +55,9 @@ AUTHENTICATION_ERROR_CODES = {
     "FEDERATED_IDENTITY_INVALID": 5128,
     "GOOGLE_WORKSPACE_TENANT_NOT_ALLOWED": 5129,
     "SSO_PROVIDER_NOT_ALLOWED_FOR_DOMAIN": 5131,
+    # Fork (see FORK.md): an account bound to an identity provider asked for a
+    # local password -- by setting, changing or resetting one.
+    "PASSWORD_MANAGED_BY_IDENTITY_PROVIDER": 5132,
     # Reset Password
     "INVALID_PASSWORD_TOKEN": 5125,
     "EXPIRED_PASSWORD_TOKEN": 5130,
