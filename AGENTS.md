@@ -112,6 +112,17 @@ release because both were read as pass/fail.
   or unrelated edits. A Kubernetes chart or release change is incomplete until the
   documentation describes the resulting operator-visible behavior accurately.
 
+## Backend dependencies (uv)
+
+`apps/api` dependencies are managed with [uv](https://docs.astral.sh/uv/): declared in `apps/api/pyproject.toml`, pinned with hashes in `apps/api/uv.lock` (commit both). Groups: `dev` and `test` (installed by default; they use `psycopg-binary`), `production` (gunicorn and the source-built `psycopg-c`; production image only). The fork's own dependencies (python3-saml, xmlsec, webauthn, python-magic, mistune) are project dependencies; `plane/tests/unit/test_security_dependencies.py` fails if one is dropped. Lint config stays in `apps/api/pyproject.toml`.
+
+- uv must be exactly the `required-version` in `apps/api/pyproject.toml` (`uv self update <version>`); bump it together with the digest-pinned uv image in both API Dockerfiles
+- Set up a local env: `cd apps/api && uv sync`
+- Inside the dev/test containers, always pass `--inexact` (`uv sync --inexact`): uv targets the image's system Python there, and an exact sync would uninstall pip
+- Add or upgrade a dependency: `uv add <pkg>==<version>` (or `--group test`/`--group dev`), or edit `pyproject.toml` and run `uv lock`
+- Run tools: `uv run python manage.py ...`, `uv run ruff check .`
+- The production image has no pip: uv installs the production group at build time and is not shipped
+
 ## Backend tests (Docker)
 
 The Django/pytest suite for `apps/api` runs in an isolated stack defined by `docker-compose-test.yml` at the repo root.

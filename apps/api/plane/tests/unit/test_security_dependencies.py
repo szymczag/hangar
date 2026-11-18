@@ -4,20 +4,22 @@
 
 """Libraries the fork's security controls are built on (FORK.md, S7).
 
-Each must be declared in the requirement manifests the production image
-installs, and importable in the image the tests run in. A sync that rewrites a
-manifest and drops one would otherwise fail only when the feature is first used.
+Each must be pinned in the project dependencies the production image installs
+(pyproject.toml, locked in uv.lock), and importable in the image the tests run
+in. A sync that rewrites the manifest and drops one would otherwise fail only
+when the feature is first used.
 """
 
 import importlib
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
 
 pytestmark = pytest.mark.unit
 
-REQUIREMENTS = Path(__file__).resolve().parents[3] / "requirements"
+API_ROOT = Path(__file__).resolve().parents[3]
 
 # distribution name -> import name -> what depends on it
 DEPENDENCIES = {
@@ -30,27 +32,42 @@ DEPENDENCIES = {
 }
 
 
-def _production_requirements(name="production.txt", seen=None):
-    """Return the pinned distributions production.txt installs, following -r."""
-    seen = set() if seen is None else seen
-    if name in seen:
-        return {}
-    seen.add(name)
+def _normalise(name):
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _production_pins():
+    """Return the exact pins the production image installs: the project
+    dependencies plus the `production` group (`uv sync --no-default-groups
+    --group production`)."""
+    project = tomllib.loads((API_ROOT / "pyproject.toml").read_text())
+    specifiers = list(project["project"]["dependencies"])
+    specifiers += project["dependency-groups"]["production"]
     pins = {}
-    for line in (REQUIREMENTS / name).read_text().splitlines():
-        line = line.split("#", 1)[0].strip()
-        if line.startswith("-r "):
-            pins.update(_production_requirements(line[3:].strip(), seen))
-        elif match := re.match(r"([A-Za-z0-9_.\-]+)(\[[^\]]*\])?==(\S+)", line):
-            pins[match.group(1).lower()] = match.group(3)
+    for specifier in specifiers:
+        if match := re.match(r"([A-Za-z0-9_.\-]+)(\[[^\]]*\])?==([^\s;]+)", specifier):
+            pins[_normalise(match.group(1))] = match.group(3)
     return pins
 
 
+def _locked_versions():
+    lock = tomllib.loads((API_ROOT / "uv.lock").read_text())
+    return {_normalise(package["name"]): package.get("version") for package in lock["package"]}
+
+
 @pytest.mark.parametrize("distribution", sorted(DEPENDENCIES))
-def test_is_pinned_in_the_production_requirements(distribution):
-    assert distribution in _production_requirements(), (
-        f"{distribution} ({DEPENDENCIES[distribution][1]}) is not pinned in requirements/production.txt "
-        "or a file it includes"
+def test_is_pinned_in_the_production_dependencies(distribution):
+    assert distribution in _production_pins(), (
+        f"{distribution} ({DEPENDENCIES[distribution][1]}) is not pinned in the [project] dependencies "
+        "or the production group of pyproject.toml"
+    )
+
+
+@pytest.mark.parametrize("distribution", sorted(DEPENDENCIES))
+def test_is_locked_at_the_pinned_version(distribution):
+    pinned = _production_pins().get(distribution)
+    assert _locked_versions().get(distribution) == pinned, (
+        f"uv.lock does not hold {distribution}=={pinned}; run `uv lock`"
     )
 
 
