@@ -1,5 +1,5 @@
 /*
- * Base ProseMirror/TipTap rules, copied from @tiptap/core 2.27.3.
+ * Base ProseMirror/TipTap rules, copied from @tiptap/core 3.31.3 (`src/style.ts`).
  *
  * TipTap injects these as a <style> element unless the editor is created with
  * `injectCSS: false`. A Content-Security-Policy without 'unsafe-inline' in
@@ -77,8 +77,4 @@ img.ProseMirror-separator {
 
 .ProseMirror-focused .ProseMirror-gapcursor {
   display: block;
-}
-
-.tippy-box[data-animation="fade"][data-state="hidden"] {
-  opacity: 0;
 }

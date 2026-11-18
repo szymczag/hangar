@@ -26,12 +26,11 @@ catalog:
   "@fontsource/inter": "5.2.8"
   "@fontsource/material-symbols-rounded": "5.2.30"
   "@headlessui/react": "2.2.10"
-  "@hocuspocus/extension-database": "2.15.2"
-  "@hocuspocus/extension-logger": "2.15.2"
-  "@hocuspocus/extension-redis": "2.15.2"
-  "@hocuspocus/provider": "2.15.2"
-  "@hocuspocus/server": "2.15.2"
-  "@hocuspocus/transformer": "2.15.2"
+  "@hocuspocus/extension-database": "3.4.4"
+  "@hocuspocus/extension-logger": "3.4.4"
+  "@hocuspocus/extension-redis": "3.4.4"
+  "@hocuspocus/provider": "3.4.4"
+  "@hocuspocus/server": "3.4.4"
   "@hypermod/utils": "^0.7.1"
   "@popperjs/core": "^2.11.8"
   "@radix-ui/react-scroll-area": "^1.2.3"
@@ -41,6 +40,7 @@ catalog:
   "@react-router/dev": "8.3.0"
   "@react-router/node": "8.3.0"
   "@react-router/serve": "8.3.0"
+  "@sesamecare-oss/redlock": "1.4.0"
   "@storybook/addon-designs": "11.1.3"
   "@storybook/addon-docs": "10.6.5"
   "@storybook/addon-links": "10.6.5"
@@ -55,30 +55,28 @@ catalog:
   "@tanstack/react-table": "^8.21.3"
   "@tanstack/react-virtual": "^3.13.12"
   "@tanstack/virtual-core": "^3.13.12"
-  # 2.27.3 contains the upstream __proto__ hardening backport while preserving
-  # the v2 editor API; keep it exact until the coordinated Tiptap v3 migration.
-  "@tiptap/core": "2.27.3"
-  "@tiptap/extension-blockquote": "^2.22.3"
-  "@tiptap/extension-character-count": "^2.22.3"
-  "@tiptap/extension-collaboration": "^2.22.3"
-  "@tiptap/extension-document": "^2.22.3"
-  "@tiptap/extension-emoji": "^2.22.3"
-  "@tiptap/extension-heading": "^2.22.3"
-  "@tiptap/extension-image": "^2.22.3"
-  "@tiptap/extension-list-item": "^2.22.3"
-  "@tiptap/extension-mention": "^2.22.3"
-  "@tiptap/extension-placeholder": "^2.22.3"
-  "@tiptap/extension-task-item": "^2.22.3"
-  "@tiptap/extension-task-list": "^2.22.3"
-  "@tiptap/extension-text": "^2.22.3"
-  "@tiptap/extension-text-align": "^2.22.3"
-  "@tiptap/extension-text-style": "^2.22.3"
-  "@tiptap/extension-underline": "^2.22.3"
-  "@tiptap/html": "^2.22.3"
-  "@tiptap/pm": "^2.22.3"
-  "@tiptap/react": "^2.22.3"
-  "@tiptap/starter-kit": "^2.22.3"
-  "@tiptap/suggestion": "^2.22.3"
+  "@tiptap/core": "3.31.3"
+  "@tiptap/extension-blockquote": "3.31.3"
+  "@tiptap/extension-collaboration": "3.31.3"
+  "@tiptap/extension-document": "3.31.3"
+  "@tiptap/extension-emoji": "3.31.3"
+  "@tiptap/extension-heading": "3.31.3"
+  "@tiptap/extension-image": "3.31.3"
+  "@tiptap/extension-list-item": "3.31.3"
+  "@tiptap/extension-mention": "3.31.3"
+  "@tiptap/extension-task-item": "3.31.3"
+  "@tiptap/extension-task-list": "3.31.3"
+  "@tiptap/extension-text": "3.31.3"
+  "@tiptap/extension-text-align": "3.31.3"
+  "@tiptap/extension-text-style": "3.31.3"
+  "@tiptap/extension-underline": "3.31.3"
+  "@tiptap/extensions": "3.31.3"
+  "@tiptap/html": "3.31.3"
+  "@tiptap/pm": "3.31.3"
+  "@tiptap/react": "3.31.3"
+  "@tiptap/starter-kit": "3.31.3"
+  "@tiptap/suggestion": "3.31.3"
+  "@tiptap/y-tiptap": "3.0.9"
   "@types/chroma-js": "^3.1.2"
   "@types/compression": "1.8.1"
   "@types/cors": "^2.8.17"
@@ -121,6 +119,8 @@ catalog:
   "file-type": "^21.3.1"
   "framer-motion": "^12.23.0"
   "frimousse": "^0.3.0"
+  # EXACT pin. CVE-2026-115895 covers every 17.x-21.0.3, so there is no 20.x fix.
+  "happy-dom": "21.0.4"
   "hast": "^1.0.0"
   "hast-util-to-mdast": "^10.1.2"
   "helmet": "^7.1.0"
@@ -133,7 +133,7 @@ catalog:
   "isbot": "^5.1.31"
   "jscodeshift": "^17.3.0"
   "jsx-dom-cjs": "^8.0.3"
-  "linkifyjs": "^4.3.2"
+  "linkifyjs": "^4.3.3"
   "lint-staged": "16.2.7"
   "lodash-es": "4.18.1"
   "lowlight": "^3.0.0"
@@ -150,6 +150,7 @@ catalog:
   "postcss-cli": "^11.0.0"
   "postcss-nested": "^6.0.1"
   "prosemirror-codemark": "^0.4.2"
+  "prosemirror-markdown": "1.13.4"
   "react": "19.2.8"
   "react-color": "^2.19.3"
   "react-day-picker": "9.5.0"
@@ -178,8 +179,7 @@ catalog:
   "swr": "2.4.2"
   "tailwind-merge": "3.4.0"
   "tailwindcss": "4.1.17"
-  "tippy.js": "^6.3.7"
-  "tiptap-markdown": "^0.8.10"
+  "tiptap-markdown": "0.9.0"
   "tsdown": "0.16.0"
   "tsx": "4.20.6"
   "turbo": "2.10.11"
@@ -193,7 +193,6 @@ catalog:
   "winston": "^3.17.0"
   "ws": "8.21.0"
   "y-indexeddb": "^9.0.12"
-  "y-prosemirror": "^1.3.7"
   "y-protocols": "^1.0.6"
   "yjs": "^13.6.20"
   "zod": "4.6.7"
@@ -212,13 +211,19 @@ overrides:
   "@babel/helpers": 7.29.7
   "@babel/runtime": 7.29.7
   chokidar: 3.6.0
-  # Paste-handling XSS (GHSA-c8x8-7fp4-3x9w), fixed 1.42.3. @tiptap/pm 2.27.3
-  # itself asks for ^1.42.3; this matches upstream's pin.
+  # Paste-handling XSS (GHSA-c8x8-7fp4-3x9w), fixed 1.42.3; this matches upstream's pin.
   prosemirror-view: 1.42.6
   # prosemirror-view 1.42 needs prosemirror-model ^1.25.12 while the rest of the
   # tree resolved 1.25.11. Two copies in one bundle make every Fragment check
   # fail ("multiple versions of prosemirror-model"), which broke pasting.
   prosemirror-model: 1.25.12
+  # All editor consumers must share the same ProseMirror class and plugin identities.
+  prosemirror-state: 1.4.4
+  prosemirror-transform: 1.12.3
+  # EXACT pin, bump with the @tiptap/* catalog. @tiptap/react's optional menu deps use ^
+  # ranges and would otherwise resolve ahead of @tiptap/core, leaving their peer unmet.
+  "@tiptap/extension-bubble-menu": 3.31.3
+  "@tiptap/extension-floating-menu": 3.31.3
   "@types/express": 4.17.23
   typescript: "catalog:"
   vite: "catalog:"

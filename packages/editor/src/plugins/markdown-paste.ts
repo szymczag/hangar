@@ -127,7 +127,12 @@ export const MarkdownPastePlugin = (props: Props): Plugin => {
         if (!isPlainishHtml(html, plainText)) return false;
         if (!looksLikeMarkdown(plainText)) return false;
 
-        const parsed = editor.storage.markdown?.parser?.parse(plainText);
+        // tiptap-markdown sets `parser` on its storage at runtime but leaves it out of
+        // the declared `MarkdownStorage` type.
+        const markdownStorage = editor.storage.markdown as
+          | { parser?: { parse: (markdown: string) => unknown } }
+          | undefined;
+        const parsed = markdownStorage?.parser?.parse(plainText);
         if (typeof parsed !== "string" || !parsed.trim()) return false;
 
         event.preventDefault();

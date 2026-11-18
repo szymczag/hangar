@@ -26,7 +26,7 @@ const connect = (
   user: { id: string; cookie: string } = { id: "user-1", cookie: "session=abc" }
 ) => {
   const context = {} as HocusPocusServerContext;
-  const connection = { readOnly: false };
+  const connectionConfig = { readOnly: false };
   const result = onAuthenticate({
     requestHeaders: {},
     // a hostile client picks any projectId it likes
@@ -38,9 +38,9 @@ const connect = (
     context,
     token: JSON.stringify(user),
     documentName,
-    connection,
+    connectionConfig,
   });
-  return { result, context, connection };
+  return { result, context, connection: connectionConfig };
 };
 
 describe("onAuthenticate page authorization", () => {
@@ -84,7 +84,7 @@ describe("onAuthenticate page authorization", () => {
   });
 
   it("checks every connection to an already-open page, so a second user without access is refused", async () => {
-    // Hocuspocus 2.x runs onAuthenticate once per socket and document, but loads the document only for the first
+    // Hocuspocus runs onAuthenticate once per socket and document, but loads the document only for the first
     // socket; the check must not depend on the document already being open.
     currentUser.mockImplementation(async (cookie: string) =>
       cookie === "session=owner" ? { id: "owner", display_name: "Owner" } : { id: "outsider", display_name: "Out" }
