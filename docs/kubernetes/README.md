@@ -6,10 +6,11 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.1.4`. It is a stable Hangar release for Docker
-Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
-for evaluation on AMD64 clusters only and is not yet a supported production
-release.
+The current release is `0.2.0-rc.1`. It is a release candidate for `0.2.0`;
+the current stable Hangar release for Docker Compose, Docker Swarm and the
+all-in-one image remains `0.1.4`. Helm installs a release candidate only when
+you name its version. On Kubernetes, both are qualified for evaluation on AMD64
+clusters only and are not yet a supported production release.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -56,7 +57,7 @@ only to review and help qualify the production profile.
 
 ## Compatibility
 
-The `0.1.4` qualification boundary is:
+The `0.2.0-rc.1` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -68,6 +69,9 @@ The `0.1.4` qualification boundary is:
 | Ingress                | TLS-enabled controller with WebSocket support                    |
 | Networking             | A CNI that enforces `NetworkPolicy`                              |
 | Storage                | A default `StorageClass`, or explicit evaluation storage classes |
+
+The backend, the editor and the live server are also converged with upstream
+`v1.5.0`; the interface is still the `v1.4` design.
 
 The chart does not install an ingress controller, cert-manager, a CNI, a CSI
 driver, an external secret operator, or observability infrastructure.
@@ -195,12 +199,12 @@ client can then change its throttle identity by sending its own `X-Forwarded-For
 
 The product, chart, and Git identifiers are deliberately different:
 
-| Identifier         | Current value                          |
-| ------------------ | -------------------------------------- |
-| Product version    | `v0.1.4`                               |
-| Helm chart version | `0.1.4`                                |
-| Git tag            | `hangar-v0.1.4`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.1.4` |
+| Identifier         | Current value                               |
+| ------------------ | ------------------------------------------- |
+| Product version    | `v0.2.0-rc.1`                               |
+| Helm chart version | `0.2.0-rc.1`                                |
+| Git tag            | `hangar-v0.2.0-rc.1`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.2.0-rc.1` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -209,11 +213,13 @@ Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
 installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
-`ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.3` is the
+`ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.4` is the
 immediately previous GitHub release and the supported rollback target for this
-one; rolling back to it needs no schema change, but `application.numProxies`
-must be removed from the values first because the `0.1.3` schema rejects it.
-Rolling back to `0.1.2` needs no schema change either (the `db.0136` index can
+one; rolling back to it needs no schema change, and pages edited on
+`0.2.0-rc.1` stay readable there because the stored Yjs documents do not
+change. Rolling back further, to `0.1.3`, needs no schema change either, but
+`application.numProxies` must be removed from the values first because the
+`0.1.3` schema rejects it. Rolling back to `0.1.2` needs no schema change either (the `db.0136` index can
 stay), and neither does rolling back further, to `0.1.1`, `0.1.0`, `rc.72`, `rc.71`, `rc.70` or `rc.69`. Rolling back to `rc.68` needs migration
 `db.0135` reversed first, as described below. Rolling
 back to `rc.67` after that needs no other schema change.
@@ -245,7 +251,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.1.4` notes](../releases/hangar-v0.1.4.md) — review
+- [Release `v0.2.0-rc.1` notes](../releases/hangar-v0.2.0-rc.1.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -277,10 +283,23 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.3`, tag `hangar-v0.1.3`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.3`. Anybody still on rc.62 with
+The previous release is `0.1.4`, tag `hangar-v0.1.4`, and chart
+`ghcr.io/szymczag/charts/hangar:0.1.4`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
+
+Release 0.2.0-rc.1 adds no database or license migration and changes nothing
+in the chart, its values or its Secrets. Upgrade from 0.1.4 with `helm upgrade`
+and `--version 0.2.0-rc.1`; Helm does not select a release candidate otherwise.
+No other action is required. The `live` image moves to Tiptap 3 and Hocuspocus
+3.4. Stored page documents do not change, and browser tabs opened before the
+upgrade keep syncing, but should be reloaded. During the rolling update the old
+and new `live` pods share Valkey for a short time; their channels and message
+format are the same, but that mix is not tested upstream, so a page edited in
+that window may need a reload. The `api` image is now built from a hash-locked
+uv environment and contains no `pip`; it removes PostHog support, so
+`POSTHOG_API_KEY` and `POSTHOG_HOST` are ignored. Rolling back to 0.1.4 needs no
+schema change and no change to the values.
 
 Release 0.1.4 adds no migrations and changes nothing in the chart's Secrets.
 It adds one optional value, `application.numProxies`, rendered as `NUM_PROXIES`
