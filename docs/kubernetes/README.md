@@ -179,6 +179,18 @@ the import worker, and the single Beat scheduler to be healthy together. See the
 [configuration reference](configuration.md#todoist-import-admission-and-worker)
 and [operations runbook](operations.md#operate-todoist-imports).
 
+## Client IP and rate limiting
+
+The API throttles anonymous sign-in, sign-up, and magic-link requests per client
+IP, which it reads from `X-Forwarded-For`. Set `application.numProxies` to the
+number of proxies that append to that header: `1` when clients reach the
+ingress controller or Gateway directly, plus one for each HTTP load balancer or
+CDN in front of it. The chart renders it as `NUM_PROXIES` in the API ConfigMap.
+The default, `null`, keeps the previous behaviour, in which the whole header is
+the client identity; behind a proxy that appends to a client-supplied header, a
+client can then change its throttle identity by sending its own `X-Forwarded-For`. See the
+[configuration reference](configuration.md#client-ip-for-rate-limits).
+
 ## Release identity
 
 The product, chart, and Git identifiers are deliberately different:

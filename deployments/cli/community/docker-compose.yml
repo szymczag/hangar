@@ -211,6 +211,9 @@ services:
         condition: service_started
 
   live:
+    # On SIGTERM Live closes its collaboration connections, which stores open
+    # documents through the API; give it time before Docker sends SIGKILL.
+    stop_grace_period: 30s
     image: ${DOCKERHUB_USER:-ghcr.io/szymczag}/hangar-live:${APP_RELEASE:-stable}
     security_opt:
       - no-new-privileges:true

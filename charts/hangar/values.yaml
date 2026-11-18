@@ -18,6 +18,11 @@ application:
   signedUrlExpiration: 3600
   hardDeleteAfterDays: 60
   apiKeyRateLimit: 60/minute
+  # Reverse proxies between clients and the API: the ingress controller or
+  # Gateway counts as one, plus one per load balancer or CDN that appends to
+  # X-Forwarded-For. DRF throttles take the client IP from that position.
+  # null keeps DRF's default, which uses the whole X-Forwarded-For header.
+  numProxies: null
   webhookAllowedHosts: []
   webhookAllowedCIDRs: []
   webhookDisallowedDomains: []
