@@ -12,6 +12,7 @@ export default {
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    // src/** holds unit tests that sit beside their module (markdown-paste).
+    include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
   },
 };

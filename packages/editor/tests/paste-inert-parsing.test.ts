@@ -37,6 +37,9 @@ const UNTRUSTED_HTML_HELPERS = [
   path.join(here, "../src/core/helpers/paste-asset.ts"),
   // Exported from the utils barrel, so its input cannot be assumed trusted.
   path.join(here, "../../utils/src/editor/common.ts"),
+  // Inspects the `text/html` flavour of every paste to decide whether to
+  // take the markdown in `text/plain` instead.
+  path.join(here, "../src/core/plugins/markdown-paste.ts"),
 ];
 
 /** `x.innerHTML = …`, ignoring reads such as `nodesArray.push(div.innerHTML)`. */
