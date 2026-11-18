@@ -34,6 +34,10 @@ from plane.authentication.adapter.error import (
 )
 from plane.authentication.rate_limit import AuthenticationThrottle
 from plane.authentication.utils.password import is_password_strong
+from plane.authentication.utils.federated_password import (
+    federated_password_exception,
+    is_password_managed_by_provider,
+)
 
 
 def generate_password_token(user):
@@ -81,7 +85,10 @@ class ForgotPasswordEndpoint(APIView):
         # Fork (see FORK.md): the answer is the same whether or not an account
         # exists, so this form cannot be used to find out who has one.
         user = User.objects.filter(email=email).first()
-        if user:
+        # Fork (see FORK.md): an account bound to an identity provider has no
+        # Hangar password, so no reset link is issued for it. The answer below
+        # stays the same, so this does not reveal which accounts are federated.
+        if user and not is_password_managed_by_provider(user):
             # Get the reset token for user
             uidb64, token = generate_password_token(user=user)
             current_site = base_host(request=request, is_app=True)
@@ -122,6 +129,18 @@ class ResetPasswordEndpoint(View):
                 url = urljoin(
                     base_host(request=request, is_app=True),
                     "accounts/reset-password?" + urlencode(params),
+                )
+                return HttpResponseRedirect(url)
+
+            # Fork (see FORK.md): a valid link is not enough for an account bound
+            # to an identity provider -- one may have been issued before the
+            # identity was linked. Checked after the token, so only the holder of
+            # a valid link learns that the account is federated.
+            if is_password_managed_by_provider(user):
+                exc = federated_password_exception()
+                url = urljoin(
+                    base_host(request=request, is_app=True),
+                    "accounts/reset-password?" + urlencode(exc.get_error_dict()),
                 )
                 return HttpResponseRedirect(url)
 
