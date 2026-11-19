@@ -1,6 +1,6 @@
 # Install Hangar for evaluation
 
-This tutorial installs Hangar `0.1.0` in a dedicated namespace with bundled,
+This tutorial installs Hangar `0.1.4` in a dedicated namespace with bundled,
 persistent PostgreSQL, Valkey, RabbitMQ, and object storage. When complete, you
 will have a TLS-enabled Hangar instance suitable for evaluation and compatibility
 testing.
@@ -26,7 +26,7 @@ You need:
 Set the release parameters used throughout this tutorial:
 
 ```bash
-export CHART_VERSION=0.1.0
+export CHART_VERSION=0.1.4
 export RELEASE_NAME=hangar
 export NAMESPACE=hangar-evaluation
 export HANGAR_HOST=hangar-evaluation.example.com
@@ -43,8 +43,8 @@ helm show chart oci://ghcr.io/szymczag/charts/hangar \
   --version "$CHART_VERSION"
 ```
 
-Confirm the output reports chart version `0.1.0`, application version
-`v0.1.0`, and the expected Kubernetes version constraint.
+Confirm the output reports chart version `0.1.4`, application version
+`v0.1.4`, and the expected Kubernetes version constraint.
 
 For higher-assurance environments, complete [artifact verification](security.md#verify-a-release)
 before installation.
@@ -82,7 +82,7 @@ Download the release-matched Secret structure into a private local file:
 umask 077
 curl --fail --location --silent --show-error \
   --output evaluation-secrets.yaml \
-  https://raw.githubusercontent.com/szymczag/hangar/hangar-v0.1.0/charts/hangar/examples/evaluation-secrets.example.yaml
+  https://raw.githubusercontent.com/szymczag/hangar/hangar-v0.1.4/charts/hangar/examples/evaluation-secrets.example.yaml
 ```
 
 Replace every `CHANGE_ME` value with a unique, randomly generated credential.
@@ -159,9 +159,17 @@ SeaweedFS. Do not add a competing Ingress or HTTPRoute for that path.
 
 Render the exact public package before installing it:
 
+`helm template` checks the chart's `kubeVersion` range against a built-in
+default when it does not talk to the cluster, and newer Helm releases default
+to a Kubernetes version newer than the chart supports. Pass the version of the
+target cluster, as shown by `kubectl version`, with `--kube-version`.
+
 ```bash
+export KUBE_VERSION=REPLACE_ME   # the cluster's server version, e.g. 1.34.2
+
 helm template "$RELEASE_NAME" oci://ghcr.io/szymczag/charts/hangar \
   --version "$CHART_VERSION" \
+  --kube-version "$KUBE_VERSION" \
   --namespace "$NAMESPACE" \
   --values evaluation-values.yaml \
   > rendered.yaml

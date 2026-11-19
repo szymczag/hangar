@@ -1147,18 +1147,25 @@ Hangar recovery point.
 
 ```bash
 export TARGET_CHART_VERSION=REPLACE_ME
+export KUBE_VERSION=REPLACE_ME   # the cluster's server version; see below
 
 helm --namespace "$NAMESPACE" get manifest "$RELEASE_NAME" \
   > current-rendered.yaml
 
 helm template "$RELEASE_NAME" oci://ghcr.io/szymczag/charts/hangar \
   --version "$TARGET_CHART_VERSION" \
+  --kube-version "$KUBE_VERSION" \
   --namespace "$NAMESPACE" \
   --values production-values.yaml \
   > target-rendered.yaml
 
 diff --unified current-rendered.yaml target-rendered.yaml
 ```
+
+`helm template` checks the chart's `kubeVersion` range against a built-in
+default when it does not talk to the cluster, and newer Helm releases default
+to a Kubernetes version newer than the chart supports. Pass the version of the
+target cluster, as shown by `kubectl version`, with `--kube-version`.
 
 Review workload images and digests, environment sources, Ingress, Services,
 NetworkPolicies, security contexts, resource changes, and migration settings.

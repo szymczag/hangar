@@ -25,7 +25,9 @@ export const onStateless = async ({ payload, document, connection }: onStateless
  * Hocuspocus relays a client's BroadcastStateless message to every connection on the document, read-only ones
  * included, with no hook to veto the payload. Clients have no use for it: page events go through onStateless above,
  * and server notices (force_close, Redis broadcasts) are sent by the server itself. Refusing it here also stops a
- * guest from telling other clients to stop reconnecting. A refused message closes that connection.
+ * guest from telling other clients to stop reconnecting. A refused message closes the sender's connection to this
+ * document: Hocuspocus sends it a CLOSE for the document with this code and reason, and nothing more is synced to it
+ * until it authenticates again (still read-only for a guest). The WebSocket itself stays open.
  */
 export const beforeHandleMessage = async ({ update }: beforeHandleMessagePayload) => {
   const message = new IncomingMessage(update);

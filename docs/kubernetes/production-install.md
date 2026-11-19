@@ -166,9 +166,17 @@ resources, scheduling, PDBs, application policy, or observability settings.
 
 ## 7. Render and review
 
+`helm template` checks the chart's `kubeVersion` range against a built-in
+default when it does not talk to the cluster, and newer Helm releases default
+to a Kubernetes version newer than the chart supports. Pass the version of the
+target cluster, as shown by `kubectl version`, with `--kube-version`.
+
 ```bash
+export KUBE_VERSION=REPLACE_ME   # the cluster's server version, e.g. 1.34.2
+
 helm template "$RELEASE_NAME" oci://ghcr.io/szymczag/charts/hangar \
   --version "$CHART_VERSION" \
+  --kube-version "$KUBE_VERSION" \
   --namespace "$NAMESPACE" \
   --values production-values.yaml \
   > rendered.yaml
