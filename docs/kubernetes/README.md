@@ -6,11 +6,11 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.2.0-rc.3`. It is a release candidate for `0.2.0`;
-the current stable Hangar release for Docker Compose, Docker Swarm and the
-all-in-one image remains `0.1.4`. Helm installs a release candidate only when
-you name its version. On Kubernetes, both are qualified for evaluation on AMD64
-clusters only and are not yet a supported production release.
+The current release is `0.2.0`. It is a stable Hangar release for Docker
+Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
+for evaluation on AMD64 clusters only and is not yet a supported production
+release. It supersedes the release candidates `0.2.0-rc.1`, `0.2.0-rc.2` and
+`0.2.0-rc.3`.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -55,7 +55,7 @@ Start with the [evaluation installation tutorial](evaluation-install.md) to
 exercise the released chart. Use the [production installation guide](production-install.md)
 only to review and help qualify the production profile.
 
-The tutorial installs stable `0.1.4`; the [chart README](../../charts/hangar/README.md)
+The tutorial installs stable `0.2.0`; the [chart README](../../charts/hangar/README.md)
 names the same versions and rollback targets. Each guide renders the chart with
 `helm template` before installing it and passes the target cluster's version with
 `--kube-version`: without a cluster connection Helm checks the chart's
@@ -64,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.2.0-rc.3` qualification boundary is:
+The `0.2.0` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -223,12 +223,12 @@ client can then change its throttle identity by sending its own `X-Forwarded-For
 
 The product, chart, and Git identifiers are deliberately different:
 
-| Identifier         | Current value                               |
-| ------------------ | ------------------------------------------- |
-| Product version    | `v0.2.0-rc.3`                               |
-| Helm chart version | `0.2.0-rc.3`                                |
-| Git tag            | `hangar-v0.2.0-rc.3`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.2.0-rc.3` |
+| Identifier         | Current value                          |
+| ------------------ | -------------------------------------- |
+| Product version    | `v0.2.0`                               |
+| Helm chart version | `0.2.0`                                |
+| Git tag            | `hangar-v0.2.0`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.2.0` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -237,10 +237,11 @@ Releases `rc.31` through `rc.38` are retired
 after a repository-history privacy correction and are not supported
 installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
-`ext.0037` fails there, so upgrade to `rc.68` or later instead. `0.1.4` is the
-immediately previous GitHub release and the supported rollback target for this
-one; rolling back to it needs no schema change, and pages edited on
-`0.2.0-rc.3` stay readable there because the stored Yjs documents do not
+`ext.0037` fails there, so upgrade to `rc.68` or later instead. The `0.2.0`
+release candidates are superseded by `0.2.0` and are not rollback targets.
+`0.1.4` is the previous stable release and the supported rollback target for
+this one; rolling back to it needs no schema change, and pages edited on
+`0.2.0` stay readable there because the stored Yjs documents do not
 change. Rolling back to it also brings back the `0.1.4` collaboration bug, in
 which concurrent edits to one page are lost, so roll back only when you need to. Rolling back further, to `0.1.3`, needs no schema change either, but
 `application.numProxies` must be removed from the values first because the
@@ -276,7 +277,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.2.0-rc.3` notes](../releases/hangar-v0.2.0-rc.3.md) — review
+- [Release `v0.2.0` notes](../releases/hangar-v0.2.0.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -313,20 +314,20 @@ The previous release is `0.1.4`, tag `hangar-v0.1.4`, and chart
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
-Chart `0.2.0-rc.1` and its images exist in the registry, but that candidate
-has no GitHub Release because a workflow bug skipped the release job. Chart
-`0.2.0-rc.2` is superseded by `0.2.0-rc.3`, which carries the same changes plus
-the fixes from the `0.2.0-rc.2` deployment test; do not install or upgrade to
-`0.2.0-rc.1` or `0.2.0-rc.2`.
+Charts `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3` were release candidates
+for `0.2.0` and are superseded by it; do not install them. `0.2.0-rc.1` and its
+images exist in the registry, but that candidate has no GitHub Release because
+a workflow bug skipped the release job. `0.2.0` is built from the `0.2.0-rc.3`
+source, so an installation on any of the candidates upgrades to it with
+`helm upgrade` and `--version 0.2.0` and no other action.
 
-Release 0.2.0-rc.3 adds no database or license migration and changes nothing
-in the chart's values or Secrets. Its only template change is the object-storage
+Release 0.2.0 adds no database or license migration compared with 0.1.4 and
+changes nothing in the chart's values or Secrets. Its only template change is the object-storage
 origins of the frontends' Content-Security-Policy described in
 [Content-Security-Policy](#content-security-policy): a production install with
 `pathStyle: false` now allows the endpoint origin the API signs, so browser
-uploads and stored images load. Upgrade from 0.1.4 or 0.2.0-rc.2 with
-`helm upgrade` and `--version 0.2.0-rc.3`; Helm does not select a release
-candidate otherwise. No other action is required. The `live` image moves to
+uploads and stored images load. Upgrade from 0.1.4 with `helm upgrade` and
+`--version 0.2.0`; no other action is required. The `live` image moves to
 Tiptap 3 and Hocuspocus 3.4, which also repairs real-time collaboration: on
 0.1.3 and 0.1.4 the live server could not load or store a page, so concurrent
 edits by two people were lost and pages were saved only by the browser's

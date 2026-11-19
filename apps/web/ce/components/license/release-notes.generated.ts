@@ -11,7 +11,7 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.2.0-rc.3",
+  version: "0.2.0",
   highlights: [
     "Real-time collaboration works again; on 0.1.3 and 0.1.4 concurrent edits were lost.",
     "God Mode stays locked when its only security key has been disabled.",
