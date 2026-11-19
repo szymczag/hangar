@@ -303,6 +303,20 @@ browser-facing presigned URLs; leave it empty only when it is identical to
 provider. The production profile requires HTTPS for both endpoints. Credentials
 come from the object-storage Secret, not this block.
 
+Browsers fetch presigned URLs directly from object storage, so the chart adds
+its origins to the frontends' Content-Security-Policy (`img-src`, `connect-src`
+and `media-src`). Because the API always presigns against an endpoint, the
+published API image signs path-style URLs on the `publicEndpoint` (else
+`endpoint`) origin whatever `pathStyle` says, and that origin is always allowed.
+With `pathStyle: false` the bucket's virtual-hosted origin is allowed as well,
+unless the host is an IP address or the bucket is not a single DNS label. For
+the example above both `https://s3.example.com` and
+`https://hangar.s3.example.com` are allowed; with `pathStyle: true` only
+`https://s3.example.com` is. Check the rendered `HANGAR_CSP_CONNECT_SRC` of the
+web, admin and space Deployments before rollout. Add further storage origins,
+such as a CDN in front of the bucket, with `contentSecurityPolicy.imgSrc` and
+`contentSecurityPolicy.connectSrc`.
+
 Server-side HEAD, GET, COPY, upload, and delete operations always use
 `endpoint`; only local presigning uses `publicEndpoint`. Hangar never derives
 either destination from an inbound request `Host` header. Treat both values as

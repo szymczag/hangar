@@ -129,6 +129,23 @@ Two rules decide whether a deployment needs anything else:
   must be the origins users actually open, or the form is refused and sign-in
   silently does nothing.
 
+The object-storage origins the chart adds follow how the API presigns, not
+only `externalServices.objectStorage.pathStyle`. The API always presigns
+against an endpoint (`publicEndpoint`, else `endpoint`), and with an endpoint
+the published API image's botocore 1.34 signs path-style URLs on that
+endpoint's origin, for example `https://s3.example.com/hangar/...`, even when
+`pathStyle` is `false`. The chart therefore always allows the endpoint origin
+in `img-src`, `connect-src` and `media-src`. While `pathStyle` is `false` it
+also allows the bucket's virtual-hosted origin, `https://hangar.s3.example.com`,
+so a change to virtual-hosted addressing does not break uploads; that second
+origin is left out when the endpoint host is an IP address or the bucket name is
+not a single DNS label (for example, it contains a dot). Before this fix a
+production install with `pathStyle: false` allowed only the virtual-hosted
+origin, so browser uploads and stored images were blocked by the policy. Both
+origins belong to the configured bucket's storage; nothing else is added.
+Evaluation mode is unchanged and allows the application's own origin, which
+routes the bucket path.
+
 Trusted Types keep their own switch, `contentSecurityPolicy.trustedTypes`, which
 stays at `report`. See
 [content-security-policy.md](../content-security-policy.md).

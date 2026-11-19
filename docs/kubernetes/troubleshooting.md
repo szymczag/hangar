@@ -50,6 +50,7 @@ Never collect or share:
 | Frontend returns 404/503             | Ingress class, route, Service, or readiness | Ingress events, endpoints, controller logs                |
 | `/live` disconnects                  | WebSocket forwarding or Live readiness      | controller WebSocket settings, Live logs, endpoints       |
 | Presigned upload returns 404/405     | Object-storage bucket route or backend      | rendered bucket path, storage Service, policy, proxy logs |
+| Upload or image blocked by CSP       | Storage origin missing from the policy      | presigned URL origin vs. frontend `HANGAR_CSP_*_SRC` env  |
 | SeaweedFS filer answers 401          | Expected: unsigned filer access is refused  | use the S3 port `8333` with the object-storage Secret     |
 | Dependency timeout                   | DNS, NetworkPolicy, firewall, or TLS        | selectors, CIDRs, service endpoints, provider firewall    |
 | Read-only filesystem error           | Application writes outside allowed paths    | Container log and image version; do not disable hardening |
