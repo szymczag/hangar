@@ -12,8 +12,10 @@ challenge single use, session binding, attempt limits — actually hold.
 
 import uuid
 from datetime import timedelta
+from io import StringIO
 
 import pytest
+from django.core.management import call_command
 from django.test import Client, override_settings
 from django.utils import timezone
 
@@ -33,7 +35,12 @@ setup_instance = _google_auth.setup_instance
 SIGN_IN = "/api/instances/admins/sign-in/"
 ME = "/api/instances/admins/me/"
 SESSION = "/api/instances/admins/session/"
+REG_OPTIONS = "/api/instances/admins/webauthn/registration/options/"
+REG_VERIFY = "/api/instances/admins/webauthn/registration/verify/"
+AUTH_OPTIONS = "/api/instances/admins/webauthn/authentication/options/"
 PASSWORD = "correct-horse-battery-staple-42"
+CREDENTIAL_DISABLED = 5198
+SESSION_EXPIRED = 5192
 
 
 @pytest.fixture
@@ -110,13 +117,144 @@ def test_an_administrator_with_a_key_is_sent_to_the_assertion_step(admin_user, c
 
 @pytest.mark.unit
 @pytest.mark.django_db
-def test_a_disabled_credential_does_not_count_as_enrolled(admin_user, client):
-    """A cloned key is disabled, and must not leave the account unprotected."""
+def test_a_disabled_key_still_counts_as_enrolled(admin_user, client):
+    """A key disabled as cloned must not turn the password into an enrollment ticket.
+
+    Treating "no active key" as "never enrolled" sent the next password sign-in
+    to enrollment, so whoever held only the password could register their own
+    key the moment the real one was flagged.
+    """
     _credential(admin_user, disabled_at=timezone.now())
 
-    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    response = client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
 
+    assert response.status_code == 302
+    assert "2fa" not in response.url
+    assert f"error_code={CREDENTIAL_DISABLED}" in response.url
+    session = admin_session(client)
+    assert session.get(pending.PENDING_KEY) is None
+    assert "_auth_user_id" not in session
+    assert client.get(SESSION).json() == {"is_authenticated": False}
+    assert client.get(ME).status_code in (401, 403)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_a_disabled_key_beside_an_active_one_still_leads_to_the_challenge(admin_user, client):
+    _credential(admin_user, disabled_at=timezone.now())
+    _credential(admin_user)
+
+    response = client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+
+    assert response.url.endswith("2fa/")
+    assert client.get(SESSION).json()["requires_enrollment"] is False
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_a_wrong_password_does_not_reveal_a_disabled_key(admin_user, client):
+    """The lockout answer comes only after the password is proved."""
+    _credential(admin_user, disabled_at=timezone.now())
+
+    response = client.post(SIGN_IN, {"email": admin_user.email, "password": "not-the-password-at-all"})
+
+    assert f"error_code={CREDENTIAL_DISABLED}" not in response.url
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@pytest.mark.parametrize("endpoint", [REG_OPTIONS, REG_VERIFY])
+def test_a_pending_enrollment_is_refused_once_the_only_key_is_disabled(admin_user, client, endpoint):
+    """The enrollment endpoints hold the line on their own, not only the redirect.
+
+    A pending enrollment can outlive the moment it was granted: here the
+    administrator had no key when the password was proved, and has only a
+    disabled one now.
+    """
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    assert admin_session(client)[pending.PENDING_KEY]["stage"] == pending.STAGE_ENROLL
+    _credential(admin_user, disabled_at=timezone.now())
+
+    response = client.post(endpoint, {}, content_type="application/json")
+
+    assert response.status_code == 409
+    assert response.json()["error_code"] == CREDENTIAL_DISABLED
+    assert admin_session(client).get(pending.PENDING_KEY) is None
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@pytest.mark.parametrize("endpoint", [REG_OPTIONS, REG_VERIFY])
+def test_a_pending_enrollment_only_ever_registers_the_first_key(admin_user, client, endpoint):
+    """A key registered meanwhile, from another session, must be presented instead."""
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    _credential(admin_user)
+
+    response = client.post(endpoint, {}, content_type="application/json")
+
+    assert response.status_code == 409
+    assert response.json()["error_code"] == SESSION_EXPIRED
+    assert admin_session(client).get(pending.PENDING_KEY) is None
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@pytest.mark.parametrize("endpoint", [REG_OPTIONS, REG_VERIFY])
+def test_a_signed_in_session_cannot_add_a_key_once_every_key_is_disabled(admin_user, client, endpoint):
+    """That session may itself have been opened with the cloned key."""
+    _credential(admin_user, disabled_at=timezone.now())
+    authenticate_admin(client, admin_user, verified=True)
+
+    response = client.post(endpoint, {}, content_type="application/json")
+
+    assert response.status_code == 409
+    assert response.json()["error_code"] == CREDENTIAL_DISABLED
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_assertion_options_explain_a_key_disabled_mid_sign_in(admin_user, client):
+    """Pointing at enrollment here would be wrong: enrollment stays shut."""
+    key = _credential(admin_user)
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    key.disabled_at = timezone.now()
+    key.save(update_fields=["disabled_at"])
+
+    response = client.post(AUTH_OPTIONS, {}, content_type="application/json")
+
+    assert response.status_code == 409
+    assert response.json()["error_code"] == CREDENTIAL_DISABLED
+    assert admin_session(client).get(pending.PENDING_KEY) is None
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_the_reset_listing_shows_which_keys_are_disabled(admin_user):
+    """The operator reviewing a lockout needs to see the disabled key."""
+    _credential(admin_user, nickname="copied", disabled_at=timezone.now())
+    _credential(admin_user, nickname="spare")
+    out = StringIO()
+
+    call_command("disable_instance_admin_2fa", email=admin_user.email, list=True, stdout=out)
+
+    lines = {line.split("'")[1]: line for line in out.getvalue().splitlines()}
+    assert "disabled=no" not in lines["copied"] and "disabled=" in lines["copied"]
+    assert "disabled=no" in lines["spare"]
+    assert InstanceAdminWebAuthnCredential.objects.filter(user=admin_user).count() == 2
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_the_shell_reset_reopens_enrollment(admin_user, client):
+    """The management command is the one way out, and it has to work."""
+    _credential(admin_user, disabled_at=timezone.now())
+
+    call_command("disable_instance_admin_2fa", email=admin_user.email, yes=True, stdout=StringIO())
+
+    response = client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    assert response.url.endswith("2fa/enroll/")
     assert client.get(SESSION).json()["requires_enrollment"] is True
+    assert client.post(REG_OPTIONS, {}, content_type="application/json").status_code == 200
 
 
 @pytest.mark.unit

@@ -16,6 +16,34 @@ records who proved a password and sends the browser to the second factor. An
 administrator with no key registered is sent to enrollment instead and cannot
 open the console until they register one.
 
+Enrollment is open only to an administrator who has **never** had a key. Once a
+key exists, a password alone can never register another one: a further key is
+added from a signed-in console session, or after a shell reset.
+
+### When a key is disabled
+
+Hangar disables a key whose signature counter goes backwards, because that is
+what a copied authenticator looks like (see [What is enforced](#what-is-enforced)).
+A disabled key still counts as enrolled. If it was the administrator's only
+active key:
+
+- the next password sign-in is refused with `ADMIN_2FA_CREDENTIAL_DISABLED`
+  (5198), and the console says the key was disabled and has to be reset from a
+  shell on the server. It does **not** offer enrollment, so whoever holds only
+  the password cannot replace the key that was just flagged;
+- a sign-in already waiting for its key gets the same answer from the
+  assertion step, and its pending state is discarded;
+- the registration endpoints refuse with the same code, both for a pending
+  enrollment and for a console session that was already signed in — that
+  session may be the one opened with the copy.
+
+An administrator who still has another active key signs in with it as usual and
+is unaffected. The way back for one who does not is the reset under
+[Recovery](#recovery), which removes the disabled key together with the others.
+Treat a disabled key as a possible compromise: check who signed in recently
+(`--list` shows each key's last use) before resetting, and consider changing
+the password, since the copy was presented together with it.
+
 **Deploying this signs every administrator out.** Existing sessions carry no
 second-factor marker, so they stop being accepted. That is intended.
 
@@ -33,16 +61,16 @@ deploying, while you still have a shell open.
 
 ## Configuration
 
-| Setting | Default | Meaning |
-| --- | --- | --- |
-| `WEBAUTHN_RP_ID` | derived | Relying-party ID. Derived from `ADMIN_BASE_URL`, else `WEB_URL` |
-| `WEBAUTHN_RP_NAME` | `Hangar` | Name shown by the authenticator |
-| `WEBAUTHN_ALLOWED_ORIGINS` | derived | Comma-separated exact origins an assertion may come from |
-| `ADMIN_WEBAUTHN_REQUIRED` | `1` | Set to `0` only to recover a locked-out instance |
-| `ADMIN_2FA_PENDING_ASSERT_WINDOW` | `300` | Seconds a password-verified sign-in may wait for its key |
-| `ADMIN_2FA_PENDING_ENROLL_WINDOW` | `900` | The same, for enrollment |
-| `ADMIN_2FA_CHALLENGE_TTL` | `300` | Seconds a challenge stays valid |
-| `ADMIN_2FA_MAX_ATTEMPTS` | `5` | Failures before the pending state is discarded |
+| Setting                           | Default  | Meaning                                                         |
+| --------------------------------- | -------- | --------------------------------------------------------------- |
+| `WEBAUTHN_RP_ID`                  | derived  | Relying-party ID. Derived from `ADMIN_BASE_URL`, else `WEB_URL` |
+| `WEBAUTHN_RP_NAME`                | `Hangar` | Name shown by the authenticator                                 |
+| `WEBAUTHN_ALLOWED_ORIGINS`        | derived  | Comma-separated exact origins an assertion may come from        |
+| `ADMIN_WEBAUTHN_REQUIRED`         | `1`      | Set to `0` only to recover a locked-out instance                |
+| `ADMIN_2FA_PENDING_ASSERT_WINDOW` | `300`    | Seconds a password-verified sign-in may wait for its key        |
+| `ADMIN_2FA_PENDING_ENROLL_WINDOW` | `900`    | The same, for enrollment                                        |
+| `ADMIN_2FA_CHALLENGE_TTL`         | `300`    | Seconds a challenge stays valid                                 |
+| `ADMIN_2FA_MAX_ATTEMPTS`          | `5`      | Failures before the pending state is discarded                  |
 
 ### Getting the relying-party ID right
 
@@ -53,15 +81,15 @@ calls `navigator.credentials` — the admin panel, not the API. It must be the
 panel's host, or a parent domain of it. Anything else fails inside the browser
 with a `SecurityError`, before a request reaches Hangar.
 
-| Deployment | Panel origin | Correct `WEBAUTHN_RP_ID` |
-| --- | --- | --- |
-| Panel under the app (default) | `https://hangar.example.com` | derived — leave unset |
-| Local development | `http://localhost:3001` | derived — leave unset |
+| Deployment                     | Panel origin                                                           | Correct `WEBAUTHN_RP_ID`              |
+| ------------------------------ | ---------------------------------------------------------------------- | ------------------------------------- |
+| Panel under the app (default)  | `https://hangar.example.com`                                           | derived — leave unset                 |
+| Local development              | `http://localhost:3001`                                                | derived — leave unset                 |
 | **Panel on its own subdomain** | `https://admin.example.com` while the app is `https://app.example.com` | **`example.com`** — set it explicitly |
 
 In the third case the derived value would be `admin.example.com`, which stops
 working the moment the app origin is also allowed. Use the shared parent. That
-is safe because the *server* still pins the acceptable origins exactly, so an
+is safe because the _server_ still pins the acceptable origins exactly, so an
 assertion obtained by another subdomain fails verification here.
 
 Hangar refuses to issue options for a configuration the browser would reject and
@@ -70,7 +98,8 @@ letting it fail silently in the console.
 
 ## Recovery
 
-There are no recovery codes. A lost key is reset from a shell:
+There are no recovery codes. A lost key, or one disabled as copied, is reset
+from a shell:
 
 ```bash
 python manage.py disable_instance_admin_2fa --email admin@example.com --list
@@ -90,16 +119,18 @@ failure away from needing server access.
 
 ## What is enforced
 
-| Property | How |
-| --- | --- |
-| A password alone opens nothing | The password step never creates a session; `request.user` stays anonymous |
-| A half-authenticated session grants nothing | `InstanceAdminPermission` additionally requires a completion marker |
-| A challenge is used once | Conditional `UPDATE`, not read-then-write, so concurrent verifies cannot both win |
-| A challenge belongs to one session | Bound to the issuing session key |
-| Registration cannot authenticate | Challenges carry a purpose |
-| A cloned authenticator is caught | Signature-counter regression disables the credential |
-| A key cannot be claimed twice | `credential_id` is unique instance-wide, at the database level |
-| Guessing is bounded | Dedicated throttles plus a per-session attempt cap |
+| Property                                    | How                                                                                                              |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| A password alone opens nothing              | The password step never creates a session; `request.user` stays anonymous                                        |
+| A half-authenticated session grants nothing | `InstanceAdminPermission` additionally requires a completion marker                                              |
+| A challenge is used once                    | Conditional `UPDATE`, not read-then-write, so concurrent verifies cannot both win                                |
+| A challenge belongs to one session          | Bound to the issuing session key                                                                                 |
+| Registration cannot authenticate            | Challenges carry a purpose                                                                                       |
+| A cloned authenticator is caught            | Signature-counter regression disables the credential                                                             |
+| A disabled key is not a way back in         | A disabled key counts as enrolled: password sign-in is refused and registration stays shut until the shell reset |
+| A password enrolls only the first key       | A pending enrollment is refused once any key exists                                                              |
+| A key cannot be claimed twice               | `credential_id` is unique instance-wide, at the database level                                                   |
+| Guessing is bounded                         | Dedicated throttles plus a per-session attempt cap                                                               |
 
 Every cryptographic failure answers the same error code, so the response cannot
 distinguish an unknown credential from a bad signature.

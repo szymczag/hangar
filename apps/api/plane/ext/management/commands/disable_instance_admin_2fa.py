@@ -51,9 +51,12 @@ class Command(BaseCommand):
                 return
             for item in credentials:
                 last_used = f"{item.last_used_at:%Y-%m-%d}" if item.last_used_at else "never"
+                # A disabled key still blocks enrollment until this command
+                # removes it, so the listing has to show which ones are.
+                disabled = f"{item.disabled_at:%Y-%m-%d}" if item.disabled_at else "no"
                 self.stdout.write(
                     f"{item.id}  {item.nickname!r}  aaguid={item.aaguid or '-'}  "
-                    f"created={item.created_at:%Y-%m-%d}  last_used={last_used}"
+                    f"created={item.created_at:%Y-%m-%d}  last_used={last_used}  disabled={disabled}"
                 )
             return
 

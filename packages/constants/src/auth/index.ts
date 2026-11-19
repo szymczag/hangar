@@ -102,6 +102,7 @@ export enum EAdminAuthErrorCodes {
   ADMIN_2FA_NOT_CONFIGURED = "5195",
   ADMIN_2FA_ATTEMPTS_EXHAUSTED = "5196",
   ADMIN_2FA_LAST_CREDENTIAL = "5197",
+  ADMIN_2FA_CREDENTIAL_DISABLED = "5198",
 }
 
 export type TAdminAuthErrorInfo = {
