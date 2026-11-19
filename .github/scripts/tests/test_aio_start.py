@@ -53,6 +53,41 @@ class LogDirectoryTests(unittest.TestCase):
         self.assertEqual(directories - created, set())
 
 
+class SupervisorCommandTests(unittest.TestCase):
+    """supervisord looks a program's command up before it changes to directory=.
+
+    space's relative `./node_modules/.bin/react-router-serve` was therefore never
+    found (spawnerr, FATAL), and /spaces/ answered 502 in the all-in-one image.
+    """
+
+    def programs(self) -> dict:
+        programs = {}
+        for name, body in re.findall(r"^\[program:([^\]]+)\]\n(.*?)(?=^\[|\Z)", SUPERVISOR.read_text(), re.DOTALL | re.MULTILINE):
+            command = re.search(r"^command=(.+)$", body, re.MULTILINE)
+            self.assertIsNotNone(command, name)
+            programs[name] = command.group(1).split()[0]
+        return programs
+
+    def test_every_command_is_absolute_or_found_on_path(self):
+        programs = self.programs()
+        self.assertIn("space", programs)
+        for name, executable in programs.items():
+            with self.subTest(program=name):
+                self.assertTrue(
+                    executable.startswith("/") or "/" not in executable,
+                    f"{name}: {executable} is relative to directory=, which supervisord applies after the lookup",
+                )
+
+    def test_space_runs_the_binary_its_image_runs(self):
+        self.assertEqual(
+            self.programs()["space"], "/app/space/apps/space/node_modules/.bin/react-router-serve"
+        )
+        dockerfile = (REPOSITORY_ROOT / "apps" / "space" / "Dockerfile.space").read_text()
+        self.assertIn("WORKDIR /app/apps/space", dockerfile)
+        self.assertIn('CMD ["./node_modules/.bin/react-router-serve", "./build/server/index.js"]', dockerfile)
+        self.assertIn("COPY --from=space-img /app /app/space", (AIO / "Dockerfile").read_text())
+
+
 TEMPLATE = (AIO / "variables.env").read_text()
 
 REQUIRED = {
