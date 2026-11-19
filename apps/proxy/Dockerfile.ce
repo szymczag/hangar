@@ -1,6 +1,17 @@
 # Keep the readable patch version and immutable AMD64 manifest digest together.
 # The release workflow currently publishes linux/amd64 only.
-FROM docker.io/library/caddy:2.11.7-builder-alpine@sha256:420db7c0f6927c7e8140c666628915fb4a9141282fc5c344716ebf3879fe8f9b AS caddy-builder
+# Caddy is built with the Go toolchain of this image rather than the official
+# caddy builder image, which can lag behind Go security releases: caddy
+# 2.11.7 and 2.11.8 builders ship Go 1.27.3, and CVE-2026-97054 is fixed in Go
+# 1.27.4. xcaddy and the Caddy version below match the caddy:2.11.7 builder.
+FROM docker.io/library/golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS caddy-builder
+
+ENV CADDY_VERSION=v2.11.7 \
+    XCADDY_VERSION=v0.4.7 \
+    GOTOOLCHAIN=local \
+    CGO_ENABLED=0
+RUN apk add --no-cache git ca-certificates && \
+    go install github.com/caddyserver/xcaddy/cmd/xcaddy@${XCADDY_VERSION}
 
 RUN XCADDY_SKIP_CLEANUP=1 xcaddy build \
         --with github.com/caddy-dns/cloudflare@v0.2.1 \
@@ -30,7 +41,7 @@ RUN go version -m /usr/bin/caddy | grep -qE 'golang.org/x/crypto[[:space:]]+v0.5
     go version -m /usr/bin/caddy | grep -qE 'golang.org/x/text[[:space:]]+v0.43.0[[:space:]]' && \
     go version -m /usr/bin/caddy | grep -qE 'google.golang.org/grpc[[:space:]]+v1.83.2[[:space:]]' && \
     go version -m /usr/bin/caddy | grep -qE 'github.com/go-jose/go-jose/v4[[:space:]]+v4.1.6[[:space:]]' && \
-    go version /usr/bin/caddy | grep -qE ': go1\.(27\.([3-9]|[1-9][0-9])|(2[89]|[3-9][0-9])\.[0-9]+)$'
+    go version /usr/bin/caddy | grep -qE ': go1\.(27\.([4-9]|[1-9][0-9])|(2[89]|[3-9][0-9])\.[0-9]+)$'
 
 FROM docker.io/library/caddy:2.11.7-alpine@sha256:04913b1da43339a40ad1ea87827d70a576ac5aa6cf674c6e24fdca675887533a
 
