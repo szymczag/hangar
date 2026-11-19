@@ -7,8 +7,9 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest published chart is `0.1.0` (`appVersion: v0.1.0`), part of the first
-stable Hangar release. Its evaluation profile is live-qualified on AMD64. The
+The latest stable chart is `0.1.4` (`appVersion: v0.1.4`). Release candidate
+`0.2.0-rc.2` is also published; Helm installs it only when you name its version.
+Do not use `0.2.0-rc.1`: it was superseded before its GitHub Release was published. Its evaluation profile is live-qualified on AMD64. The
 chart is qualified for evaluation only and is not yet supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
 
@@ -36,7 +37,7 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.1.0
+  --version 0.1.4
 ```
 
 Do not use `0.1.0-rc.1`, `0.1.0-rc.2`, `0.1.0-rc.20`, `0.1.0-rc.24`,
@@ -49,9 +50,11 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.1.0`. `0.1.0-rc.72` is the immediately previous retained GitHub release and
-the supported rollback target; rolling back to it, or further to `rc.71`, `rc.70`
-and `rc.69`, needs no schema change. Rolling
+Use `0.1.4`. `0.1.3` is the immediately previous release and the supported
+rollback target; rolling back to it needs no schema change. Rolling back past
+`0.1.3` needs migration `db.0136` (an index) reversed first. From `0.1.0`,
+rolling back to `0.1.0-rc.72`, or further to `rc.71`, `rc.70` and `rc.69`, needs
+no schema change. Rolling
 back past `rc.69` needs migration `db.0135` reversed first. The
 [Kubernetes documentation](../../docs/kubernetes/README.md) lists the full rollback
 chain and its limits.
@@ -130,8 +133,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.1.0` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.0)
+Release `0.1.4` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.1.4)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
