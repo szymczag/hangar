@@ -1,14 +1,23 @@
 # Trivy findings accepted for Hangar.
 #
 # Every Trivy run in .github/workflows/security-scan.yml reads this file with
-# `--ignorefile .trivyignore.yaml`. Each entry needs:
+# `--ignorefile .trivyignore.yaml`. Two top-level lists are accepted:
+# `vulnerabilities:` (advisories) and `secrets:` (secret-scanner rules). Each
+# entry needs:
 #
-#   id          the advisory, exactly as Trivy reports it
+#   id          the advisory, or for a secret the Trivy rule id (e.g.
+#               private-key), exactly as Trivy reports it
 #   statement   why the finding does not apply, naming the evidence (code and
 #               the test that proves it) so a reviewer can re-check it
 #   expired_at  YYYY-MM-DD, at most 180 days ahead; Trivy reports the finding
 #               again from that date
-#   paths       optional; limits the exception to where the finding was seen
+#   paths       optional for vulnerabilities; limits the exception to where the
+#               finding was seen. REQUIRED for secrets: one or more exact file
+#               paths, absolute as Trivy reports image files
+#               (/app/apps/...), never a glob or a directory. Trivy matches a
+#               secret exception by rule id and file only, so it covers that
+#               rule anywhere in the file: say so in the statement, and keep
+#               the expiry short.
 #
 # `python3 .github/scripts/security_scan.py validate-ignores` enforces this on
 # every change and nightly, so a lapsed exception turns the nightly scan red.
@@ -41,3 +50,32 @@ vulnerabilities:
       apps/api/plane/tests/unit/bg_tasks/test_url_security.py. Remove this entry
       at expiry unless a scan reports the CVE again.
     expired_at: 2027-05-14
+
+secrets:
+  - id: private-key
+    paths:
+      - "/app/apps/space/build/server/index.js"
+    statement: >-
+      Code scanning alert 181: rule private-key in the space SSR bundle,
+      lines 202183-202208 of ghcr.io/szymczag/hangar-space:v0.2.0-rc.2
+      (category trivy-image-space). The key is the test key that the public
+      npm package happy-dom 21.0.4 ships in
+      lib/fetch/certificate/FetchHTTPSCertificate.js, identical in every
+      happy-dom install and not a Hangar secret. Evidence, 2026-11-19: the
+      bundle's module comment names that happy-dom file, and the SHA-256 of
+      the base64 body of the PRIVATE KEY block in the image,
+      e410f1faa842cf4f505190ced5ecdf023d5fb8e350cddcedcb0d976f6722acda, and of
+      the CERTIFICATE block beside it,
+      f47ce02c89c1fabae29e0c43dbf0ac97435fb79d576b2b2c430a2000490717b4, equal
+      those in the npm tarball happy-dom-21.0.4.tgz, whose sha512 matches the
+      integrity in pnpm-lock.yaml. It is bundled because apps/space imports
+      the root entry of @plane/editor, which re-exports the document codecs of
+      packages/editor/src/helpers/yjs-utils.ts; they import @tiptap/html,
+      whose Node export condition is its server entry built on happy-dom
+      (since the Tiptap 3 move, PR 435). Space never calls those codecs.
+      Limitation: Trivy matches a secret exception by rule id and file only,
+      so this also hides any other private-key match in this one bundle file;
+      the 180-day expiry bounds that. Re-check when happy-dom or @tiptap/html
+      changes, and remove the entry once happy-dom no longer reaches the space
+      server bundle.
+    expired_at: 2027-05-18

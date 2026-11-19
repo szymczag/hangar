@@ -71,11 +71,18 @@ release builds refresh the Alpine packages, and anything else needs its
 pinned version raised. Dependabot alerts cover only the npm and pip
 manifests.
 
-Accepted Trivy findings live in `.trivyignore.yaml`; each entry has a
-statement naming its evidence and an `expired_at` at most 180 days ahead. A
-red **Trivy exceptions (expiry)** job means an entry lapsed or is malformed:
-re-check its statement, then renew or remove it. Do not push the date out
-without re-checking.
+Accepted Trivy findings live in `.trivyignore.yaml`, vulnerabilities under
+`vulnerabilities:` and secret-scanner findings under `secrets:`; each entry has
+a statement naming its evidence and an `expired_at` at most 180 days ahead. A
+secret entry names the Trivy rule id (e.g. `private-key`) and must list the
+exact file paths it covers, absolute as Trivy reports image files
+(`/app/apps/...`); globs, directories and repository-wide secret exceptions are
+rejected. Trivy matches a secret exception by rule and file only, so it hides
+that rule anywhere in the file: say so in the statement. Secret findings from
+the image scan reach code scanning only, not the gate or the `security-scan`
+issue. A red **Trivy exceptions (expiry)** job means an entry lapsed or is
+malformed: re-check its statement, then renew or remove it. Do not push the
+date out without re-checking.
 
 **Upstream watch** runs weekly and keeps one open issue labelled
 `upstream-sync` listing upstream releases and security advisories newer than
