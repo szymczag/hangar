@@ -77,5 +77,7 @@ secrets:
       so this also hides any other private-key match in this one bundle file;
       the 180-day expiry bounds that. Re-check when happy-dom or @tiptap/html
       changes, and remove the entry once happy-dom no longer reaches the space
-      server bundle.
+      server bundle. PR 446 takes the codecs off the root entry so happy-dom
+      no longer reaches it; remove this entry once the image of a release
+      built after PR 446 scans clean.
     expired_at: 2027-05-18

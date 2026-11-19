@@ -17,7 +17,10 @@ export * from "@/constants/common";
 
 // helpers
 export * from "@/helpers/common";
-export * from "@/helpers/yjs-utils";
+// The document codecs are not exported here: they import @tiptap/html, whose Node
+// condition is its happy-dom server entry, and an SSR bundle of this entry would
+// inline happy-dom. Import them from `@plane/editor/lib` (browser) or
+// `@plane/editor/server` (Node).
 
 export { CORE_EXTENSIONS } from "@/constants/extension";
 export { ADDITIONAL_EXTENSIONS } from "@/constants/extensions";
