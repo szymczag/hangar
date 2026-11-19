@@ -33,9 +33,8 @@ from plane.utils.cache import cache_response, invalidate_cache
 from django.conf import settings
 
 from plane.authentication.rate_limit import authentication_throttle_allows
-from plane.ext.auth.webauthn import pending
+from plane.ext.auth.webauthn import enrollment, pending
 from plane.utils.exception_logger import log_exception
-from plane.ext.models import InstanceAdminWebAuthnCredential
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.password import is_password_strong
 from plane.authentication.utils.host import base_host, user_ip
@@ -454,9 +453,24 @@ class InstanceAdminSignInEndpoint(View):
         # state and stops. Nothing stamps last_login_* here either — a
         # half-finished sign-in is not a login; that happens on completion.
         if settings.ADMIN_WEBAUTHN_REQUIRED:
-            has_credential = InstanceAdminWebAuthnCredential.objects.filter(
-                user=user, disabled_at__isnull=True
-            ).exists()
+            credential_state = enrollment.state_for(user)
+            # A disabled key still counts as enrolled. Sending this caller to
+            # enrollment would let a password alone register a new key right
+            # after the old one was flagged as cloned; only a shell reset
+            # (enrollment.RESET_COMMAND) re-opens enrollment. Reached only
+            # after the password and the admin check, so it tells nobody who
+            # lacks the password anything.
+            if credential_state == enrollment.LOCKED:
+                exc = AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["ADMIN_2FA_CREDENTIAL_DISABLED"],
+                    error_message="ADMIN_2FA_CREDENTIAL_DISABLED",
+                )
+                url = urljoin(
+                    base_host(request=request, is_admin=True),
+                    "?" + urlencode(exc.get_error_dict()),
+                )
+                return HttpResponseRedirect(url)
+            has_credential = credential_state == enrollment.ACTIVE
             stage = pending.STAGE_ASSERT if has_credential else pending.STAGE_ENROLL
             pending.start(request, user, stage)
             url = urljoin(

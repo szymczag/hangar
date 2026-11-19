@@ -87,6 +87,9 @@ AUTHENTICATION_ERROR_CODES = {
     "ADMIN_2FA_NOT_CONFIGURED": 5195,
     "ADMIN_2FA_ATTEMPTS_EXHAUSTED": 5196,
     "ADMIN_2FA_LAST_CREDENTIAL": 5197,
+    # Every key the administrator registered has been disabled (signature
+    # counter regression). Only a shell reset re-opens enrollment.
+    "ADMIN_2FA_CREDENTIAL_DISABLED": 5198,
     # Rate limit
     "RATE_LIMIT_EXCEEDED": 5900,
     # Unknown

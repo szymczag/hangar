@@ -103,6 +103,11 @@ const errorCodeMessages: {
     title: `Cannot remove your only key`,
     message: () => `Register a second security key before removing this one.`,
   },
+  [EAdminAuthErrorCodes.ADMIN_2FA_CREDENTIAL_DISABLED]: {
+    title: `Security key disabled`,
+    message: (email) =>
+      `Your security key was disabled because it looked copied, so this console stays locked. A new key can only be registered after a reset from a shell on the server: python manage.py disable_instance_admin_2fa --email ${email || "<your email>"}`,
+  },
 };
 
 export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string): TAdminAuthErrorInfo | undefined => {
@@ -124,6 +129,7 @@ export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string
     EAdminAuthErrorCodes.ADMIN_2FA_NOT_CONFIGURED,
     EAdminAuthErrorCodes.ADMIN_2FA_ATTEMPTS_EXHAUSTED,
     EAdminAuthErrorCodes.ADMIN_2FA_LAST_CREDENTIAL,
+    EAdminAuthErrorCodes.ADMIN_2FA_CREDENTIAL_DISABLED,
   ];
 
   if (bannerAlertErrorCodes.includes(errorCode))

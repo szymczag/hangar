@@ -53,7 +53,7 @@ from plane.authentication.rate_limit import (
 )
 from plane.authentication.utils.host import base_host
 from plane.authentication.utils.login import user_login
-from plane.ext.auth.webauthn import config, pending
+from plane.ext.auth.webauthn import config, enrollment, pending
 from plane.ext.models import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCredential
 from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.models import InstanceAdmin
@@ -174,6 +174,13 @@ class AdminWebAuthnAuthenticationOptionsEndpoint(_WebAuthnBase):
 
         credentials = InstanceAdminWebAuthnCredential.objects.filter(user=user, disabled_at__isnull=True)
         if not credentials.exists():
+            # The only key was disabled after this sign-in started. Say so
+            # rather than pointing at enrollment, which stays shut (see
+            # enrollment.LOCKED), and drop the pending state: nothing this
+            # session can do will complete it.
+            if enrollment.state_for(user) == enrollment.LOCKED:
+                pending.clear(request)
+                return _error("ADMIN_2FA_CREDENTIAL_DISABLED", status.HTTP_409_CONFLICT)
             return _error("ADMIN_2FA_ENROLLMENT_REQUIRED", status.HTTP_409_CONFLICT)
 
         raw, _ = self._issue_challenge(request, user, InstanceAdminWebAuthnChallenge.Purpose.AUTHENTICATION)
@@ -264,14 +271,40 @@ def _may_register(request):
     Returns (user, error_response). An already-verified administrator may add a
     key without a second password prompt, because the session already proved
     both factors.
+
+    A pending enrollment only ever registers the first key. Neither path may
+    register a key for an administrator whose every key is disabled
+    (enrollment.LOCKED). For a pending enrollment that state means the
+    blob predates the disabling; for a signed-in session it means the session
+    may itself have been opened with the cloned key. Either way only the shell
+    reset re-opens enrollment.
     """
+    from_pending = True
     try:
-        return pending.load(request, expected_stage=pending.STAGE_ENROLL)[0], None
+        user = pending.load(request, expected_stage=pending.STAGE_ENROLL)[0]
     except pending.PendingError as error:
-        if request.user.is_authenticated and pending.is_verified(request.session):
-            if InstanceAdmin.objects.filter(user=request.user).exists():
-                return request.user, None
-        return None, _error(error.code, status.HTTP_409_CONFLICT)
+        signed_in = (
+            request.user.is_authenticated
+            and pending.is_verified(request.session)
+            and InstanceAdmin.objects.filter(user=request.user).exists()
+        )
+        if not signed_in:
+            return None, _error(error.code, status.HTTP_409_CONFLICT)
+        user = request.user
+        from_pending = False
+
+    state = enrollment.state_for(user)
+    if state == enrollment.LOCKED:
+        if from_pending:
+            pending.clear(request)
+        return None, _error("ADMIN_2FA_CREDENTIAL_DISABLED", status.HTTP_409_CONFLICT)
+    if from_pending and state != enrollment.NONE:
+        # A password alone only ever enrolls the first key. A key registered
+        # since this pending state began (from another session) means the
+        # next sign-in has to present it, so this state is stale.
+        pending.clear(request)
+        return None, _error("ADMIN_2FA_SESSION_EXPIRED", status.HTTP_409_CONFLICT)
+    return user, None
 
 
 @method_decorator(csrf_protect, name="dispatch")

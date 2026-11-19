@@ -19,9 +19,11 @@ DNS, not of this code.
 
 import json
 import uuid
+from io import StringIO
 
 import pytest
 from django.core.cache import cache
+from django.core.management import call_command
 from django.test import Client, override_settings
 
 from plane.db.models import User
@@ -247,3 +249,50 @@ def test_a_cloned_authenticator_is_detected_and_disabled(admin_user, client, dev
     assert response.status_code == 400
     assert credential.disabled_at is not None
     assert client.get(ME).status_code in (401, 403)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_cloned_key_keeps_the_console_locked_until_a_shell_reset(admin_user, client, device):
+    """After clone detection the password alone must not enroll a replacement.
+
+    The whole path a deployment hit: the only key is disabled by a regressed
+    counter, the next password sign-in is refused rather than sent to
+    enrollment, nobody can register a key in its place, and the shell reset is
+    what lets the administrator enroll again.
+    """
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    _register(client, device)
+    client.post("/api/instances/admins/sign-out/")
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    _assert_with_key(client, device)
+    client.post("/api/instances/admins/sign-out/")
+    stored = InstanceAdminWebAuthnCredential.objects.get(user=admin_user).sign_count
+    assert stored > 0, "this authenticator does not use counters; the test proves nothing"
+
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    _assert_with_key(client, device, sign_count=stored - 1)
+    assert InstanceAdminWebAuthnCredential.objects.get(user=admin_user).disabled_at is not None
+    client.post("/api/instances/admins/sign-out/")
+
+    # The next password sign-in is refused, not sent to enrollment.
+    response = client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    assert "2fa" not in response.url
+    assert "error_code=5198" in response.url
+    assert read_admin_session(client).get(pending.PENDING_KEY) is None
+
+    # And a replacement key cannot be registered around the refusal.
+    new_key = SoftwareAuthenticator()
+    refused = client.post(REG_OPTIONS, {}, content_type="application/json")
+    assert refused.status_code == 409
+    assert InstanceAdminWebAuthnCredential.objects.filter(user=admin_user).count() == 1
+    assert client.get(ME).status_code in (401, 403)
+
+    call_command("disable_instance_admin_2fa", email=admin_user.email, yes=True, stdout=StringIO())
+
+    response = client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    assert response.url.endswith("2fa/enroll/")
+    enrolled = _register(client, new_key)
+    assert enrolled.status_code == 200, enrolled.content
+    assert client.get(ME).status_code == 200
