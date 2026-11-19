@@ -39,10 +39,15 @@ app.kubernetes.io/part-of: hangar
 {{- end -}}
 
 {{/*
-The origin browsers load uploads from, for the frontends' Content-Security-Policy.
-Matches how the API signs URLs: the public endpoint when set, path-style or
-virtual-hosted (bucket as a subdomain), and the application's own origin in
-evaluation mode, where object storage is routed under it.
+The origins browsers load uploads from, space separated, for the frontends'
+Content-Security-Policy source lists. In evaluation mode object storage is
+routed under the application's own origin. Otherwise the API presigns against
+the public endpoint when set, else the endpoint, and with an endpoint the API
+image's botocore (1.34) signs path-style URLs on that endpoint's origin, which
+is therefore always allowed. Unless pathStyle is set, a DNS-label bucket on a
+named (non-IP) host is also allowed as its virtual-hosted subdomain, so a
+library or configuration change that switches to virtual-hosted addressing does
+not break uploads. Both origins name only the configured bucket's storage.
 */}}
 {{- define "hangar.objectStoragePublicOrigin" -}}
 {{- if .Values.evaluation.enabled -}}
@@ -50,11 +55,14 @@ evaluation mode, where object storage is routed under it.
 {{- else -}}
 {{- $storage := .Values.externalServices.objectStorage -}}
 {{- $url := urlParse (default $storage.endpoint $storage.publicEndpoint) -}}
-{{- if $storage.pathStyle -}}
-{{- printf "%s://%s" $url.scheme $url.host -}}
-{{- else -}}
-{{- printf "%s://%s.%s" $url.scheme $storage.bucket $url.host -}}
+{{- $host := lower $url.host -}}
+{{- $origins := list (printf "%s://%s" $url.scheme $host) -}}
+{{- $hostname := regexReplaceAll ":[0-9]+$" $host "" -}}
+{{- $isIP := or (hasPrefix "[" $hostname) (regexMatch "^[0-9]+(\\.[0-9]+){3}$" $hostname) -}}
+{{- if and (not $storage.pathStyle) (regexMatch "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$" $storage.bucket) (not $isIP) -}}
+{{- $origins = append $origins (printf "%s://%s.%s" $url.scheme $storage.bucket $host) -}}
 {{- end -}}
+{{- join " " $origins -}}
 {{- end -}}
 {{- end -}}
 

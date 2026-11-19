@@ -207,6 +207,47 @@ assert_absent '^[[:space:]]+- path: "/hangar-imports"$' "$evaluation_render" "pr
 assert_absent '^[[:space:]]+value: /hangar-imports$' "$evaluation_gateway_render" "private import bucket must not have a public HTTPRoute"
 assert_present '^  name: hangar-hangar-evaluation-object-storage-ingress$' "$evaluation_render" "evaluation object storage must allow ingress-controller traffic"
 assert_absent '^[[:space:]]+- path: "/hangar"$' "$production_render" "production must not proxy object storage through the Hangar origin"
+
+# The frontends' CSP must allow the origins the API actually presigns. With an
+# endpoint, the API image's botocore signs path-style URLs on the endpoint's
+# origin whatever pathStyle says; the bucket's virtual-hosted subdomain is
+# allowed as well unless pathStyle is set, the host is an IP address, or the
+# bucket is not a single DNS label.
+assert_storage_csp() {
+    local description="$1"
+    local expected="$2"
+    shift 2
+    local render="$tmp_dir/storage-csp.yaml"
+    local variable values
+
+    helm template hangar "$chart_dir" --namespace hangar --kube-version "$kube_version" "$@" >"$render"
+    for variable in HANGAR_CSP_IMG_SRC HANGAR_CSP_CONNECT_SRC HANGAR_CSP_MEDIA_SRC; do
+        values="$(grep -A1 -E "^[[:space:]]+- name: ${variable}$" "$render" | sed -nE 's/^[[:space:]]+value: (.*)$/\1/p' | sort -u)"
+        [[ "$values" == "\"$expected\"" ]] ||
+            fail "$description: $variable must be \"$expected\" in every frontend, got: ${values//$'\n'/ | }"
+    done
+}
+
+assert_storage_csp "virtual-hosted default storage CSP" \
+    "https://s3.example.com https://hangar.s3.example.com"
+assert_storage_csp "path-style storage CSP" \
+    "https://s3.example.com" \
+    --set externalServices.objectStorage.pathStyle=true
+assert_storage_csp "public-endpoint storage CSP" \
+    "https://files.example.com:8443 https://hangar.files.example.com:8443" \
+    --set-string externalServices.objectStorage.publicEndpoint=https://files.example.com:8443
+assert_storage_csp "IPv4 endpoint storage CSP" \
+    "https://192.0.2.10:9000" \
+    --set-string externalServices.objectStorage.endpoint=https://192.0.2.10:9000
+assert_storage_csp "IPv6 endpoint storage CSP" \
+    "https://[2001:db8::1]:9000" \
+    --set-string 'externalServices.objectStorage.endpoint=https://[2001:db8::1]:9000'
+assert_storage_csp "dotted bucket storage CSP" \
+    "https://s3.example.com" \
+    --set-string externalServices.objectStorage.bucket=hangar.uploads
+assert_storage_csp "evaluation storage CSP" \
+    "https://hangar-evaluation.example.com" \
+    --values "$chart_dir/ci/evaluation-values.yaml"
 valkey_probe_auth_uses="$(grep -Ec '^[[:space:]]+- VALKEYCLI_AUTH="\$VALKEY_PASSWORD" valkey-cli --no-auth-warning --user hangar -h$' "$evaluation_render")"
 valkey_probe_loopback_uses="$(grep -Ec '^[[:space:]]+127\.0\.0\.1 -p 6379 ping \| grep -qx PONG$' "$evaluation_render")"
 [[ "$valkey_probe_auth_uses" -eq 3 && "$valkey_probe_loopback_uses" -eq 3 ]] || fail "every evaluation Valkey probe must authenticate over loopback"
