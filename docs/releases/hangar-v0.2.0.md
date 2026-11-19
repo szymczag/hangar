@@ -202,8 +202,8 @@ Other known limitations:
   `--email <your email>` instead of the administrator's address. Substitute the
   address yourself; the message is otherwise correct.
 - The all-in-one container does not shut down gracefully. Its start script
-  does not `exec` supervisord, so the stop signal does not reach it: `docker
-stop` waits its 10-second timeout and then kills the container.
+  does not `exec` supervisord, so the stop signal does not reach it, and
+  `docker stop` waits its 10-second timeout and then kills the container.
 - On the all-in-one image, `/spaces` without a trailing slash serves the web app
   instead of space. Use `/spaces/` with the trailing slash.
 
@@ -217,9 +217,9 @@ unless you need to. If you do, ask users not to edit the same page at the same
 time, because concurrent edits are lost again. The rollback itself needs no
 schema change and no change to the Helm values: only the images change. An
 all-in-one installation that follows the `stable` tag has to name `v0.1.4`
-to roll back, because `stable` now points to `0.2.0`. Pages edited on this release still open
-on `0.1.4`; the `0.2.0-rc.2` deployment test verified this by rolling back on
-the same volumes, with only the images changed. Tiptap 3 and Hocuspocus 3 store
+to roll back, because `stable` now points to `0.2.0`. Pages edited on this
+release still open on `0.1.4`; the `0.2.0-rc.2` deployment test verified this
+by rolling back on the same volumes, with only the images changed. Tiptap 3 and Hocuspocus 3 store
 the same Yjs document: `@tiptap/y-tiptap` 3.0.9 encodes nodes, marks and
 attributes with the same code as `y-prosemirror` 1.3.7, both use `yjs`
 13.6.27, and upstream opened pages saved by Tiptap 3 in a Tiptap 2 build before
