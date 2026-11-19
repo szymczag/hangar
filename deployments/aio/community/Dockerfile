@@ -79,6 +79,15 @@ RUN rm -rf /app/space/apps/space/.next/cache
 COPY --from=proxy-img /usr/bin/caddy /usr/bin/caddy
 COPY dist/Caddyfile /app/proxy/Caddyfile
 
+# Security headers for web and God Mode: each image's header template, which
+# @plane/csp generated from that build (inline-script hashes included), and the
+# start-up hook that gives its variables their values. start.sh renders them
+# into the Caddy snippets the Caddyfile imports.
+COPY --from=web-img /etc/nginx/templates/security-headers.conf.template /app/proxy/security-headers/web.conf.template
+COPY --from=admin-img /etc/nginx/templates/security-headers.conf.template /app/proxy/security-headers/admin.conf.template
+COPY --from=web-img /docker-entrypoint.d/15-hangar-csp.envsh /app/proxy/security-headers/15-hangar-csp.envsh
+COPY render-security-headers.py /app/proxy/render-security-headers.py
+
 COPY --from=backend-img /code /app/backend
 COPY --from=backend-img /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
 COPY --from=backend-img /usr/local/bin/ /usr/local/bin/

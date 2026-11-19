@@ -290,6 +290,46 @@ update_env_file(){
     echo ""
 }
 
+# Join the non-empty arguments with single spaces.
+join_sources(){
+    local joined="" source
+    for source in "$@"; do
+        [ -n "$source" ] && joined="${joined:+$joined }$source"
+    done
+    printf '%s' "$joined"
+}
+
+# Web and God Mode are served here by Caddy from the static builds of the web
+# and admin images, so the security headers those images' nginx sends are
+# rendered from the same generated templates and start-up hook
+# (render-security-headers.py). The object-storage origin is added to the
+# policy like the Helm chart does, because uploads are not proxied through this
+# origin; space reads the same variables. A failure stops the container.
+configure_security_headers(){
+    local dir="${HANGAR_SECURITY_HEADERS_DIR:-/app/proxy/security-headers}"
+    local renderer="${HANGAR_SECURITY_HEADERS_RENDERER:-/app/proxy/render-security-headers.py}"
+    local web_root="${HANGAR_WEB_ROOT:-/app/web}"
+    local admin_root="${HANGAR_ADMIN_ROOT:-/app/admin}"
+    local storage
+    storage=$(python3 "$renderer" storage-origin)
+
+    HANGAR_CSP_IMG_SRC=$(join_sources "$storage" "${HANGAR_CSP_IMG_SRC-}")
+    HANGAR_CSP_CONNECT_SRC=$(join_sources "$storage" "${HANGAR_CSP_CONNECT_SRC-}")
+    HANGAR_CSP_MEDIA_SRC=$(join_sources "$storage" "${HANGAR_CSP_MEDIA_SRC-}")
+    export HANGAR_CSP_IMG_SRC HANGAR_CSP_CONNECT_SRC HANGAR_CSP_MEDIA_SRC
+
+    (
+        # The hook also creates nginx's output directory, which nothing reads here.
+        . "$dir/15-hangar-csp.envsh"
+        python3 "$renderer" render --template "$dir/web.conf.template" --out "$dir/web.caddy" \
+            --root "$web_root" --pristine "$dir/pristine/web"
+        python3 "$renderer" render --template "$dir/admin.conf.template" --out "$dir/admin.caddy" \
+            --root "$admin_root" --pristine "$dir/pristine/admin"
+    )
+    echo "✅ Security headers rendered for web and God Mode"
+    echo ""
+}
+
 main(){
     print_header
     check_pre_requisites
@@ -297,6 +337,8 @@ main(){
 
     # load plane.env as exported variables
     export_env_file
+
+    configure_security_headers
 
     # Recreate log dirs at boot. A host bind of /app/logs replaces the
     # directories baked into the image, and supervisord refuses to start
