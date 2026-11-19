@@ -84,8 +84,12 @@ class ContainerRuntimeHardeningTests(unittest.TestCase):
             with self.subTest(module=module):
                 self.assertIn(module, dockerfile)
         self.assertEqual(dockerfile.count("go version -m /usr/bin/caddy"), 5)
-        # The toolchain floor: Go 1.27.3 carries the stdlib advisory fixes.
-        self.assertIn("go version /usr/bin/caddy | grep -qE ': go1\\.(27\\.", dockerfile)
+        # The toolchain floor: Go 1.27.4 carries the stdlib advisory fixes
+        # (CVE-2026-97054), and the builder image must provide at least that.
+        self.assertIn("go version /usr/bin/caddy | grep -qE ': go1\\.(27\\.([4-9]", dockerfile)
+        self.assertIn("FROM docker.io/library/golang:1.27.4-alpine@sha256:", dockerfile)
+        self.assertIn("go install github.com/caddyserver/xcaddy/cmd/xcaddy@${XCADDY_VERSION}", dockerfile)
+        self.assertIn("CADDY_VERSION=v2.11.7", dockerfile)
 
 
 if __name__ == "__main__":
