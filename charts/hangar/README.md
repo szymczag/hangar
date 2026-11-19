@@ -8,8 +8,9 @@ oci://ghcr.io/szymczag/charts/hangar
 ```
 
 The latest stable chart is `0.1.4` (`appVersion: v0.1.4`). Release candidate
-`0.2.0-rc.2` is also published; Helm installs it only when you name its version.
-Do not use `0.2.0-rc.1`: it was superseded before its GitHub Release was published. Its evaluation profile is live-qualified on AMD64. The
+`0.2.0-rc.3` is also published; Helm installs it only when you name its version.
+Do not use `0.2.0-rc.1`, which was superseded before its GitHub Release was
+published, or `0.2.0-rc.2`, which `0.2.0-rc.3` supersedes. The chart's evaluation profile is live-qualified on AMD64. The
 chart is qualified for evaluation only and is not yet supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
 
