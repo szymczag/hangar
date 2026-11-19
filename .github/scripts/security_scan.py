@@ -15,7 +15,8 @@ report     keeps a single tracking issue in step with the latest scan.
 validate-ignores
            checks that every accepted finding in .trivyignore.yaml carries an
            id, a statement and an expiry no more than 180 days ahead, so an
-           exception cannot outlive its review.
+           exception cannot outlive its review, and that every accepted secret
+           names the exact files it covers.
 """
 
 from __future__ import annotations
@@ -42,8 +43,15 @@ _MARKER_PATTERN = re.compile(r"<!-- security-scan:release-images fingerprint=([0
 _STAGE_RANK = {"alpha": 0, "beta": 1, "rc": 2, None: 3}
 IGNORE_FILE = ".trivyignore.yaml"
 IGNORE_MAX_DAYS = 180
-_IGNORE_REQUIRED_KEYS = ("id", "statement", "expired_at")
-_IGNORE_LIST_KEYS = ("paths", "purls")
+# The top-level keys of .trivyignore.yaml that Hangar accepts, with the keys
+# each entry needs and the list keys it may carry. Secrets must name their
+# files: a secret exception without `paths` would hide that rule everywhere.
+IGNORE_SECTIONS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "vulnerabilities": (("id", "statement", "expired_at"), ("paths", "purls")),
+    "secrets": (("id", "paths", "statement", "expired_at"), ("paths",)),
+}
+# Trivy's built-in secret rule ids, e.g. `private-key` or `aws-access-key-id`.
+_SECRET_RULE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 class ScanError(ValueError):
@@ -338,12 +346,18 @@ def collect_results(findings_dir: Path, images: Sequence[str]) -> tuple[list[Fin
 # validator never accepts a file that Trivy might read differently. The tests
 # compare the result with PyYAML where it is installed.
 #
-#   vulnerabilities:          the only top-level key
-#     - id: CVE-...           one mapping per accepted finding
+#   vulnerabilities:          top-level keys: `vulnerabilities` and
+#     - id: CVE-...           `secrets`, each at most once, in any order
 #       paths:                optional lists of plain or quoted scalars
 #         - apps/api/x.toml
 #       statement: >-         plain, quoted or folded (>, >-) scalars
 #         folded text
+#       expired_at: 2027-01-31
+#   secrets:
+#     - id: private-key       a Trivy secret rule id
+#       paths:                required: exact file paths as Trivy reports
+#         - "/app/x/index.js" the target, absolute inside an image
+#       statement: ...
 #       expired_at: 2027-01-31
 
 
@@ -377,24 +391,36 @@ def _scalar(text: str, number: int) -> str:
     return text
 
 
-def parse_ignore_file(text: str) -> list[dict[str, Any]]:
-    """Parse the vulnerability exceptions of a .trivyignore.yaml."""
+def parse_ignore_file(text: str) -> dict[str, list[dict[str, Any]]]:
+    """Parse a .trivyignore.yaml into its sections, each a list of exceptions."""
     lines = [(number, line.rstrip()) for number, line in enumerate(text.splitlines(), start=1)]
     for number, line in lines:
         if "\t" in line:
             raise IgnoreFileError(f"line {number}: tabs are not allowed")
     content = [(n, l) for n, l in lines if l.strip() and not l.lstrip().startswith("#")]
-    if not content or content[0][1] != "vulnerabilities:":
-        raise IgnoreFileError("the file must start with the single top-level key `vulnerabilities:`")
+    supported = ", ".join(f"`{name}`" for name in IGNORE_SECTIONS)
+    if not content or _indent(content[0][1]) != 0:
+        raise IgnoreFileError(f"the file must start with a top-level key: {supported}")
+    sections: dict[str, list[dict[str, Any]]] = {}
     entries: list[dict[str, Any]] = []
     item_indent: int | None = None
-    position = 1
+    position = 0
     while position < len(content):
         number, line = content[position]
         indent = _indent(line)
         stripped = line.strip()
         if indent == 0:
-            raise IgnoreFileError(f"line {number}: only `vulnerabilities` is supported at the top level")
+            section = stripped[:-1] if stripped.endswith(":") else ""
+            if section not in IGNORE_SECTIONS:
+                raise IgnoreFileError(f"line {number}: only {supported} are supported at the top level")
+            if section in sections:
+                raise IgnoreFileError(f"line {number}: `{section}` is listed more than once")
+            if sections and not entries:
+                raise IgnoreFileError(f"line {number}: the previous section has no exceptions")
+            entries = sections.setdefault(section, [])
+            item_indent = None
+            position += 1
+            continue
         if stripped.startswith("- "):
             # A list item opens a new exception; its first key sits after "- ".
             item_indent = indent if item_indent is None else item_indent
@@ -436,7 +462,9 @@ def parse_ignore_file(text: str) -> list[dict[str, Any]]:
             raise IgnoreFileError(f"line {number}: only `>` and `>-` block scalars are supported")
         else:
             entry[key] = _scalar(value, number)
-    return entries
+    if not entries:
+        raise IgnoreFileError("the last section has no exceptions")
+    return sections
 
 
 def _folded(
@@ -466,27 +494,54 @@ def _folded(
     return text + ("\n" if keep_newline else "")
 
 
-def validate_ignore_entries(entries: Sequence[Mapping[str, Any]], today: datetime.date) -> list[str]:
-    """Return one message per problem; an empty list means the file is valid."""
+def _secret_path_problem(path: str) -> str | None:
+    """Explain why `path` is not an exact file path inside an image, or None."""
+    # Trivy matches `paths` as doublestar globs against the result target,
+    # which for an image is the file's absolute path. Without any glob
+    # character a pattern matches only that one string.
+    if not path.startswith("/"):
+        return "must be absolute, as Trivy reports image files (e.g. /app/...)"
+    if re.search(r"[*?\[\]{}\\]", path):
+        return "must be an exact file path, not a glob"
+    if path.endswith("/") or any(part in ("", ".", "..") for part in path[1:].split("/")):
+        return "must be a normalised path to a file, not a directory"
+    return None
+
+
+def validate_ignore_entries(
+    entries: Sequence[Mapping[str, Any]], today: datetime.date, section: str = "vulnerabilities"
+) -> list[str]:
+    """Return one message per problem in one section; an empty list means it is valid."""
+    required, list_keys = IGNORE_SECTIONS[section]
     problems = []
     if not entries:
-        problems.append("no exceptions listed; delete the file instead of leaving it empty")
+        problems.append(f"no exceptions listed under {section}; delete the file instead of leaving it empty")
     latest = today + datetime.timedelta(days=IGNORE_MAX_DAYS)
     seen: set[str] = set()
     for index, entry in enumerate(entries, start=1):
         name = str(entry.get("id") or f"entry {index}")
-        for key in _IGNORE_REQUIRED_KEYS:
+        if section != "vulnerabilities":
+            name = f"{section}/{name}"
+        for key in required:
             value = entry.get(key)
-            if not isinstance(value, str) or not value.strip():
+            if value is None or (key not in list_keys and not (isinstance(value, str) and value.strip())):
                 problems.append(f"{name}: missing {key}")
-        for key in sorted(set(entry) - set(_IGNORE_REQUIRED_KEYS) - set(_IGNORE_LIST_KEYS)):
+        for key in sorted(set(entry) - set(required) - set(list_keys)):
             problems.append(f"{name}: unsupported key {key!r}")
-        for key in _IGNORE_LIST_KEYS:
+        for key in list_keys:
             if key in entry and not (isinstance(entry[key], list) and entry[key]):
                 problems.append(f"{name}: {key} must be a non-empty list")
         if name in seen:
             problems.append(f"{name}: listed more than once")
         seen.add(name)
+        if section == "secrets":
+            rule = entry.get("id")
+            if isinstance(rule, str) and rule and not _SECRET_RULE_PATTERN.match(rule):
+                problems.append(f"{name}: id must be a Trivy secret rule id such as `private-key`")
+            for path in entry.get("paths") if isinstance(entry.get("paths"), list) else []:
+                problem = _secret_path_problem(path)
+                if problem:
+                    problems.append(f"{name}: path {path!r} {problem}")
         expiry = entry.get("expired_at")
         if not isinstance(expiry, str) or not expiry.strip():
             continue
@@ -506,6 +561,16 @@ def validate_ignore_entries(entries: Sequence[Mapping[str, Any]], today: datetim
                 f"{name}: expired_at {expires.isoformat()} is more than {IGNORE_MAX_DAYS} days ahead "
                 f"(latest allowed {latest.isoformat()})"
             )
+    return problems
+
+
+def validate_ignore_file(sections: Mapping[str, Sequence[Mapping[str, Any]]], today: datetime.date) -> list[str]:
+    """Validate every section of a parsed .trivyignore.yaml."""
+    if not any(sections.values()):
+        return ["no exceptions listed; delete the file instead of leaving it empty"]
+    problems = []
+    for section, entries in sections.items():
+        problems.extend(validate_ignore_entries(entries, today, section))
     return problems
 
 
@@ -664,17 +729,20 @@ def _command_report(arguments: argparse.Namespace) -> int:
 def _command_validate_ignores(arguments: argparse.Namespace) -> int:
     path = Path(arguments.file)
     today = datetime.date.fromisoformat(arguments.today) if arguments.today else datetime.datetime.now(datetime.timezone.utc).date()
-    entries = parse_ignore_file(path.read_text(encoding="utf-8"))
-    problems = validate_ignore_entries(entries, today)
+    sections = parse_ignore_file(path.read_text(encoding="utf-8"))
+    problems = validate_ignore_file(sections, today)
     for problem in problems:
         # Workflow commands are read from stdout only.
         print(f"::error file={path},title=Trivy exception::{problem}")
     if problems:
         print(f"{path}: {len(problems)} problem(s); see {path} for how exceptions are reviewed.")
         return 1
-    for entry in entries:
-        print(f"{entry['id']}: accepted until {entry['expired_at']}")
-    print(f"{path}: {len(entries)} exception(s), each expiring within {IGNORE_MAX_DAYS} days.")
+    count = 0
+    for section, entries in sections.items():
+        for entry in entries:
+            count += 1
+            print(f"{section}/{entry['id']}: accepted until {entry['expired_at']}")
+    print(f"{path}: {count} exception(s), each expiring within {IGNORE_MAX_DAYS} days.")
     return 0
 
 

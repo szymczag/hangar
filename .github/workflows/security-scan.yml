@@ -299,6 +299,12 @@ jobs:
       # Trivy would offer them to every registry it contacts, including the
       # vulnerability-database mirror. The scan itself never fails on
       # findings; a non-zero exit is a tool or download error and is retried.
+      #
+      # Both scanners run, as Trivy's default for images: vulnerabilities and
+      # secrets. Secret findings reach code scanning through the SARIF only;
+      # the gate and the tracking issue count vulnerabilities. Accepted secrets
+      # are listed under `secrets:` in .trivyignore.yaml, by rule id and exact
+      # file path.
       - name: Scan the image
         run: |
           set -euo pipefail
@@ -307,7 +313,7 @@ jobs:
           for delay in 20 60 0; do
             if docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP:/out" \
               -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" -w /src \
-              "$TRIVY_IMAGE" image --severity HIGH,CRITICAL --ignore-unfixed \
+              "$TRIVY_IMAGE" image --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed \
               --ignorefile .trivyignore.yaml --format json --output /out/trivy-image.json "$IMAGE_REF"; then
               exit 0
             fi
@@ -319,7 +325,8 @@ jobs:
           echo "::error::Trivy could not scan $IMAGE_REF"
           exit 1
       # The SARIF and the table that the gate summarises are converted with the
-      # same exceptions as the scan, so code scanning and the gate agree.
+      # same exceptions as the scan, so code scanning and the gate agree. That
+      # includes accepted secrets: `convert` drops them from the SARIF too.
       - name: Convert the report
         id: convert
         run: |

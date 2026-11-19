@@ -263,28 +263,62 @@ vulnerabilities:
   - id: 'GHSA-aaaa-bbbb-cccc'
     statement: "Quoted statement"
     expired_at: "2027-05-16"
+
+secrets:
+  - id: private-key
+    paths:
+      - "/app/apps/space/build/server/index.js"
+    statement: >-
+      Public test key of a bundled npm package.
+    expired_at: 2027-05-16
 """
+
+SECRET_PATH = "/app/apps/space/build/server/index.js"
 
 
 def validate(text, today=TODAY):
-    return security_scan.validate_ignore_entries(security_scan.parse_ignore_file(text), today)
+    return security_scan.validate_ignore_file(security_scan.parse_ignore_file(text), today)
+
+
+def secret_file(paths=(SECRET_PATH,), rule="private-key", expiry="2027-01-31"):
+    lines = ["secrets:", f"  - id: {rule}"]
+    if paths is not None:
+        lines.append("    paths:")
+        lines.extend(f'      - "{path}"' for path in paths)
+    lines += ["    statement: Why.", f"    expired_at: {expiry}", ""]
+    return "\n".join(lines)
 
 
 class ParseIgnoreFileTests(unittest.TestCase):
     def test_parses_the_supported_subset(self):
-        entries = security_scan.parse_ignore_file(IGNORE_FILE)
+        sections = security_scan.parse_ignore_file(IGNORE_FILE)
         self.assertEqual(
-            entries,
-            [
-                {
-                    "id": "CVE-2026-0001",
-                    "paths": ["apps/api/requirements.txt", "apps/api/pyproject.toml"],
-                    "statement": "First line of the rationale, second line: with a colon.\nA second paragraph.",
-                    "expired_at": "2027-01-31",
-                },
-                {"id": "GHSA-aaaa-bbbb-cccc", "statement": "Quoted statement", "expired_at": "2027-05-16"},
-            ],
+            sections,
+            {
+                "vulnerabilities": [
+                    {
+                        "id": "CVE-2026-0001",
+                        "paths": ["apps/api/requirements.txt", "apps/api/pyproject.toml"],
+                        "statement": "First line of the rationale, second line: with a colon.\nA second paragraph.",
+                        "expired_at": "2027-01-31",
+                    },
+                    {"id": "GHSA-aaaa-bbbb-cccc", "statement": "Quoted statement", "expired_at": "2027-05-16"},
+                ],
+                "secrets": [
+                    {
+                        "id": "private-key",
+                        "paths": [SECRET_PATH],
+                        "statement": "Public test key of a bundled npm package.",
+                        "expired_at": "2027-05-16",
+                    }
+                ],
+            },
         )
+
+    def test_secrets_may_stand_alone_or_come_first(self):
+        self.assertEqual(list(security_scan.parse_ignore_file(secret_file())), ["secrets"])
+        text = secret_file() + "vulnerabilities:\n  - id: CVE-1\n    statement: x\n    expired_at: 2027-01-01\n"
+        self.assertEqual(list(security_scan.parse_ignore_file(text)), ["secrets", "vulnerabilities"])
 
     def test_matches_pyyaml_where_installed(self):
         try:
@@ -294,17 +328,24 @@ class ParseIgnoreFileTests(unittest.TestCase):
         for name, text in (("fixture", IGNORE_FILE), ("repository", IGNORE_FILE_PATH.read_text(encoding="utf-8"))):
             with self.subTest(file=name):
                 loaded = yaml.safe_load(text)
-                self.assertEqual(set(loaded), {"vulnerabilities"})
-                expected = [
-                    {key: value if isinstance(value, list) else str(value) for key, value in entry.items()}
-                    for entry in loaded["vulnerabilities"]
-                ]
+                self.assertLessEqual(set(loaded), set(security_scan.IGNORE_SECTIONS))
+                expected = {
+                    section: [
+                        {key: value if isinstance(value, list) else str(value) for key, value in entry.items()}
+                        for entry in entries
+                    ]
+                    for section, entries in loaded.items()
+                }
                 self.assertEqual(security_scan.parse_ignore_file(text), expected)
 
     def test_rejects_what_it_does_not_understand(self):
         cases = {
             "other top-level key": "misconfigurations:\n  - id: AVD-1\n",
-            "second top-level key": "vulnerabilities:\n  - id: A\nsecrets:\n  - id: B\n",
+            "unknown key after a section": "vulnerabilities:\n  - id: A\nlicenses:\n  - id: B\n",
+            "repeated section": "secrets:\n  - id: a\nsecrets:\n  - id: b\n",
+            "empty section": "secrets:\nvulnerabilities:\n  - id: A\n",
+            "empty last section": "vulnerabilities:\n  - id: A\nsecrets:\n",
+            "top-level value": "secrets: none\n",
             "flow sequence": "vulnerabilities: []\n",
             "literal block": "vulnerabilities:\n  - id: A\n    statement: |\n      text\n",
             "anchor": "vulnerabilities:\n  - id: &a A\n",
@@ -361,6 +402,51 @@ class ValidateIgnoreEntriesTests(unittest.TestCase):
             security_scan.validate_ignore_entries([self.entry(), self.entry()], TODAY),
         )
         self.assertTrue(security_scan.validate_ignore_entries([], TODAY))
+        self.assertTrue(security_scan.validate_ignore_file({}, TODAY))
+
+    def test_valid_secret_entry_passes(self):
+        self.assertEqual(validate(secret_file()), [])
+        self.assertEqual(validate(secret_file(paths=(SECRET_PATH, "/usr/lib/node_modules/x/key.js"))), [])
+
+    def test_secret_needs_paths(self):
+        self.assertIn("secrets/private-key: missing paths", validate(secret_file(paths=None)))
+
+    def test_secret_paths_must_be_exact_files(self):
+        for path in (
+            "/app/apps/space/build/server/*.js",
+            "/app/**/index.js",
+            "/app/apps/space/build/server/index.[jt]s",
+            "/app/apps/space/build/server/index.{js,mjs}",
+            "/app/apps/space/build/server/index.j?",
+        ):
+            with self.subTest(path=path):
+                problems = validate(secret_file(paths=(path,)))
+                self.assertIn(f"secrets/private-key: path {path!r} must be an exact file path, not a glob", problems)
+        for path in ("/app/apps/space/build/server/", "/app//index.js", "/app/../etc/key.pem", "/app/./index.js", "/"):
+            with self.subTest(path=path):
+                problems = validate(secret_file(paths=(path,)))
+                message = f"secrets/private-key: path {path!r} must be a normalised path to a file, not a directory"
+                self.assertIn(message, problems)
+        problems = validate(secret_file(paths=("app/apps/space/build/server/index.js",)))
+        self.assertIn("must be absolute", problems[0])
+
+    def test_secret_id_must_be_a_trivy_rule_id(self):
+        self.assertEqual(validate(secret_file(rule="aws-access-key-id")), [])
+        for rule in ("Private-Key", "private_key", "CVE-2026-0001", "private-key-"):
+            with self.subTest(rule=rule):
+                self.assertTrue(any("id must be a Trivy secret rule id" in p for p in validate(secret_file(rule=rule))))
+
+    def test_secret_expiry_follows_the_same_rules(self):
+        self.assertIn("secrets/private-key: expired on 2026-11-01", validate(secret_file(expiry="2026-11-01"))[0])
+        self.assertIn("more than 180 days ahead", validate(secret_file(expiry="2027-05-17"))[0])
+        self.assertEqual(validate(secret_file(expiry="2027-05-16")), [])
+
+    def test_secret_rejects_purls_and_unknown_keys(self):
+        entry = {"id": "private-key", "paths": [SECRET_PATH], "statement": "Why.", "expired_at": "2027-01-31"}
+        problems = security_scan.validate_ignore_entries([{**entry, "purls": ["pkg:npm/x"]}], TODAY, "secrets")
+        self.assertEqual(problems, ["secrets/private-key: unsupported key 'purls'"])
+        problems = security_scan.validate_ignore_entries([{**entry, "paths": []}], TODAY, "secrets")
+        self.assertEqual(problems, ["secrets/private-key: paths must be a non-empty list"])
 
     def test_command_reports_each_problem_and_fails(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -388,10 +474,12 @@ class ValidateIgnoreEntriesTests(unittest.TestCase):
     def test_repository_file_is_well_formed(self):
         # Expiry against the real date is the nightly job's concern; here the
         # file must parse and every entry must carry the required keys.
-        entries = security_scan.parse_ignore_file(IGNORE_FILE_PATH.read_text(encoding="utf-8"))
+        sections = security_scan.parse_ignore_file(IGNORE_FILE_PATH.read_text(encoding="utf-8"))
+        entries = [entry for section in sections.values() for entry in section]
         self.assertTrue(entries)
-        latest = max(datetime.date.fromisoformat(entry["expired_at"]) for entry in entries)
-        problems = security_scan.validate_ignore_entries(entries, latest - datetime.timedelta(days=1))
+        # Every entry must be inside the window on one shared day.
+        latest = min(datetime.date.fromisoformat(entry["expired_at"]) for entry in entries)
+        problems = security_scan.validate_ignore_file(sections, latest - datetime.timedelta(days=1))
         self.assertEqual(problems, [])
         self.assertFalse((REPOSITORY_ROOT / ".trivyignore").exists(), "Trivy exceptions belong in .trivyignore.yaml")
 
@@ -463,6 +551,9 @@ class SecurityScanWorkflowContractTests(unittest.TestCase):
                 self.assertIn("-v \"$PWD:/src:ro\"", command)
                 self.assertIn("-w /src", command)
         self.assertNotRegex(self.workflow, r"\.trivyignore(?!\.yaml)")
+        # The image scan reports secrets, so accepted ones in the `secrets:`
+        # section must be read both by the scan and by the SARIF conversion.
+        self.assertIn("--scanners vuln,secret", commands["image"])
         for trigger in ("push", "pull_request"):
             with self.subTest(trigger=trigger):
                 section = self.workflow.split(f"\n  {trigger}:\n", maxsplit=1)[1].split("\n\n", maxsplit=1)[0]
