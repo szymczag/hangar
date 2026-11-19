@@ -32,7 +32,7 @@ You must provide these environment variables:
 
 #### Core Configuration
 
-- `DOMAIN_NAME`: Your domain name or IP address
+- `DOMAIN_NAME`: Your domain name or IP address, with `:port` when the instance is published on a port other than 80 or 443 (e.g. `hangar.example.com:8443`), so `WEB_URL`, redirects and allowed origins keep the port
 - `DATABASE_URL`: PostgreSQL connection string
 - `REDIS_URL`: Redis connection string
 - `AMQP_URL`: RabbitMQ connection string

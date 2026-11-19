@@ -215,6 +215,17 @@ check_pre_requisites(){
 
 validate_domain_name() {
     local domain="$1"
+
+    # An optional :port, for an instance published on another port than 80 or
+    # 443; WEB_URL and CORS_ALLOWED_ORIGINS then carry it.
+    if [[ "$domain" =~ ^(.+):([0-9]{1,5})$ ]]; then
+        domain="${BASH_REMATCH[1]}"
+        local port=$((10#${BASH_REMATCH[2]}))
+        if (( port < 1 || port > 65535 )); then
+            echo "INVALID"
+            return 1
+        fi
+    fi
     
     # Check if it's an IP address first
     if [[ "$domain" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -242,7 +253,7 @@ update_env_file(){
     # check if DOMAIN_NAME is valid IP address
     local domain_type=$(validate_domain_name "$DOMAIN_NAME")
     if [ "$domain_type" == "INVALID" ]; then
-        echo "DOMAIN_NAME is not a valid FQDN or IP address"
+        echo "DOMAIN_NAME is not a valid FQDN or IP address, optionally followed by :port"
         exit 1
     fi
 

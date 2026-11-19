@@ -216,6 +216,46 @@ class SecretPersistenceTests(unittest.TestCase):
         self.assertIn("Could not write", result.stderr)
 
 
+class DomainNameTests(unittest.TestCase):
+    """DOMAIN_NAME may carry a port, so WEB_URL and redirects keep it."""
+
+    def boot(self, domain: str) -> subprocess.CompletedProcess:
+        functions = re.sub(r'^main "\$@"\s*$', "", START.read_text(), flags=re.MULTILINE)
+        layer = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, layer, True)
+        (layer / "plane.env").write_text(TEMPLATE)
+        result = subprocess.run(
+            ["bash", "-e", "-c", functions + "\nupdate_env_file\n"],
+            cwd=layer,
+            env={
+                "PATH": os.environ["PATH"],
+                "HANGAR_SECRETS_FILE": str(layer / "secrets.env"),
+                **REQUIRED,
+                "DOMAIN_NAME": domain,
+            },
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        result.env = _env(layer / "plane.env")
+        return result
+
+    def test_a_host_with_a_port_is_kept_in_the_urls(self):
+        for domain in ("hangar.example.com:8443", "192.168.1.10:18490", "localhost:8080"):
+            with self.subTest(domain=domain):
+                result = self.boot(domain)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(result.env["WEB_URL"], f"http://{domain}")
+                self.assertEqual(result.env["CORS_ALLOWED_ORIGINS"], f"http://{domain},https://{domain}")
+
+    def test_invalid_domains_and_ports_are_refused(self):
+        for domain in ("hangar.example.com:0", "hangar.example.com:65536", "hangar.example.com:", "bad_host:80", ":80", "a:b:80"):
+            with self.subTest(domain=domain):
+                result = self.boot(domain)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("not a valid FQDN or IP address", result.stdout)
+
+
 class EnvFileQuotingTests(unittest.TestCase):
     """Values reach plane.env and the services verbatim (sed and xargs altered them)."""
 
