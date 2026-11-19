@@ -55,6 +55,13 @@ Start with the [evaluation installation tutorial](evaluation-install.md) to
 exercise the released chart. Use the [production installation guide](production-install.md)
 only to review and help qualify the production profile.
 
+The tutorial installs stable `0.1.4`; the [chart README](../../charts/hangar/README.md)
+names the same versions and rollback targets. Each guide renders the chart with
+`helm template` before installing it and passes the target cluster's version with
+`--kube-version`: without a cluster connection Helm checks the chart's
+`kubeVersion` range (`>=1.30.0-0 <1.37.0-0`) against its own default, and Helm
+4.3 defaults to Kubernetes 1.37, which is outside that range.
+
 ## Compatibility
 
 The `0.2.0-rc.2` qualification boundary is:
