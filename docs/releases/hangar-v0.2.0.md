@@ -89,6 +89,13 @@ along with the `posthog`, `backoff` and `monotonic` packages. Those two
 variables are now ignored, and the API still refuses a stored PostHog
 destination.
 
+**The proxy's Caddy is built with Go 1.27.4.** The image scan of
+`0.2.0-rc.3` found CVE-2026-97054 (HIGH) in the Go standard library compiled
+into the proxy's `caddy` binary, which the all-in-one image also uses. The
+official Caddy builder images still ship Go 1.27.3, so the proxy is now built
+with the Go 1.27.4 toolchain; Caddy itself (v2.11.7), its plugins and its
+configuration are unchanged.
+
 The API image no longer contains `pip`, `uv` or `psycopg-binary`; it installs
 only the hash-locked production dependencies, still runs as uid 10001, and its
 gRPC client reads the system CA bundle. In development settings, the Django
@@ -160,8 +167,8 @@ Upgrade from `0.1.4`. The installers now pick `0.2.0` on their own: run
 `v0.2.0` all-in-one image, which the `stable` tag now also points to, or run
 `helm upgrade` with `--version 0.2.0` on Kubernetes. No other operator action is
 required. An installation on any `0.2.0` release candidate upgrades the same
-way; `0.2.0` is built from the `0.2.0-rc.3` source and adds only its release
-notes and version. An upgrade from `0.1.4` to this release, followed by a
+way; `0.2.0` is built from the `0.2.0-rc.3` source plus its release notes,
+its version and the Go 1.27.4 rebuild of the proxy described above. An upgrade from `0.1.4` to this release, followed by a
 restore of its backup into a new installation, is tested as part of the
 release.
 
