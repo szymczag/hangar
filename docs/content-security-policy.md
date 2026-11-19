@@ -69,6 +69,14 @@ have required `'wasm-unsafe-eval'`.
   on a read-only root filesystem). `nginx.conf` includes it in every block that
   sets headers, because nginx does not inherit `add_header` into a block that
   has its own.
+- **all-in-one image:** Caddy serves the same web and admin builds, so the image
+  copies both header templates and the hook from the web and admin images, and
+  `start.sh` renders them into Caddy snippets
+  (`deployments/aio/community/render-security-headers.py`) that
+  `Caddyfile.aio.ce` imports for `/` and `/god-mode/`. The hook's variables
+  apply unchanged; `Strict-Transport-Security` is left out, and the object
+  storage origin is added because uploads are not proxied through the
+  instance's origin.
 - **space (server-rendered):** `apps/space/app/entry.server.tsx` generates a nonce
   per request, passes it to React Router and next-themes, and sets the header.
 
@@ -94,6 +102,7 @@ All variables are optional.
 The Helm chart sets these from `contentSecurityPolicy.*` in `values.yaml` and adds
 the object-storage origin itself. With Caddy (`apps/proxy/Caddyfile.ce`)
 everything, object storage included, is same-origin and nothing needs to be set.
+The all-in-one image adds its object-storage origin itself, as the chart does.
 
 A reverse proxy in front of Hangar should not add a Content-Security-Policy of
 its own. A browser enforces every policy it receives, so a second one can only

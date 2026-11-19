@@ -53,6 +53,41 @@ class LogDirectoryTests(unittest.TestCase):
         self.assertEqual(directories - created, set())
 
 
+class SupervisorCommandTests(unittest.TestCase):
+    """supervisord looks a program's command up before it changes to directory=.
+
+    space's relative `./node_modules/.bin/react-router-serve` was therefore never
+    found (spawnerr, FATAL), and /spaces/ answered 502 in the all-in-one image.
+    """
+
+    def programs(self) -> dict:
+        programs = {}
+        for name, body in re.findall(r"^\[program:([^\]]+)\]\n(.*?)(?=^\[|\Z)", SUPERVISOR.read_text(), re.DOTALL | re.MULTILINE):
+            command = re.search(r"^command=(.+)$", body, re.MULTILINE)
+            self.assertIsNotNone(command, name)
+            programs[name] = command.group(1).split()[0]
+        return programs
+
+    def test_every_command_is_absolute_or_found_on_path(self):
+        programs = self.programs()
+        self.assertIn("space", programs)
+        for name, executable in programs.items():
+            with self.subTest(program=name):
+                self.assertTrue(
+                    executable.startswith("/") or "/" not in executable,
+                    f"{name}: {executable} is relative to directory=, which supervisord applies after the lookup",
+                )
+
+    def test_space_runs_the_binary_its_image_runs(self):
+        self.assertEqual(
+            self.programs()["space"], "/app/space/apps/space/node_modules/.bin/react-router-serve"
+        )
+        dockerfile = (REPOSITORY_ROOT / "apps" / "space" / "Dockerfile.space").read_text()
+        self.assertIn("WORKDIR /app/apps/space", dockerfile)
+        self.assertIn('CMD ["./node_modules/.bin/react-router-serve", "./build/server/index.js"]', dockerfile)
+        self.assertIn("COPY --from=space-img /app /app/space", (AIO / "Dockerfile").read_text())
+
+
 TEMPLATE = (AIO / "variables.env").read_text()
 
 REQUIRED = {
@@ -179,6 +214,46 @@ class SecretPersistenceTests(unittest.TestCase):
         result = self.boot(self.new_container())
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Could not write", result.stderr)
+
+
+class DomainNameTests(unittest.TestCase):
+    """DOMAIN_NAME may carry a port, so WEB_URL and redirects keep it."""
+
+    def boot(self, domain: str) -> subprocess.CompletedProcess:
+        functions = re.sub(r'^main "\$@"\s*$', "", START.read_text(), flags=re.MULTILINE)
+        layer = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, layer, True)
+        (layer / "plane.env").write_text(TEMPLATE)
+        result = subprocess.run(
+            ["bash", "-e", "-c", functions + "\nupdate_env_file\n"],
+            cwd=layer,
+            env={
+                "PATH": os.environ["PATH"],
+                "HANGAR_SECRETS_FILE": str(layer / "secrets.env"),
+                **REQUIRED,
+                "DOMAIN_NAME": domain,
+            },
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        result.env = _env(layer / "plane.env")
+        return result
+
+    def test_a_host_with_a_port_is_kept_in_the_urls(self):
+        for domain in ("hangar.example.com:8443", "192.168.1.10:18490", "localhost:8080"):
+            with self.subTest(domain=domain):
+                result = self.boot(domain)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(result.env["WEB_URL"], f"http://{domain}")
+                self.assertEqual(result.env["CORS_ALLOWED_ORIGINS"], f"http://{domain},https://{domain}")
+
+    def test_invalid_domains_and_ports_are_refused(self):
+        for domain in ("hangar.example.com:0", "hangar.example.com:65536", "hangar.example.com:", "bad_host:80", ":80", "a:b:80"):
+            with self.subTest(domain=domain):
+                result = self.boot(domain)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("not a valid FQDN or IP address", result.stdout)
 
 
 class EnvFileQuotingTests(unittest.TestCase):

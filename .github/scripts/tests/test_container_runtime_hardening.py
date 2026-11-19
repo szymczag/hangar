@@ -45,7 +45,8 @@ class ContainerRuntimeHardeningTests(unittest.TestCase):
             self._read("apps/space/Dockerfile.space"),
         )
         self.assertIn(
-            "command=./node_modules/.bin/react-router-serve ./build/server/index.js",
+            # Absolute: supervisord looks the command up before applying directory=.
+            "command=/app/space/apps/space/node_modules/.bin/react-router-serve ./build/server/index.js",
             self._read("deployments/aio/community/supervisor.conf"),
         )
 

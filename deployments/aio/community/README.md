@@ -32,7 +32,7 @@ You must provide these environment variables:
 
 #### Core Configuration
 
-- `DOMAIN_NAME`: Your domain name or IP address
+- `DOMAIN_NAME`: Your domain name or IP address, with `:port` when the instance is published on a port other than 80 or 443 (e.g. `hangar.example.com:8443`), so `WEB_URL`, redirects and allowed origins keep the port
 - `DATABASE_URL`: PostgreSQL connection string
 - `REDIS_URL`: Redis connection string
 - `AMQP_URL`: RabbitMQ connection string
@@ -125,6 +125,25 @@ docker exec <old-container> grep -E '^(SECRET_KEY|LIVE_SERVER_SECRET_KEY)=' /app
 
 - `REDIS_SSL_CERT_REQS`: For a `rediss://` `REDIS_URL`, the Redis server certificate and hostname are verified by default (`required`). Set it to `none` to skip verification.
 - `REDIS_SSL_CA_CERTS`: Path inside the container to a CA bundle, for a Redis server whose certificate is issued by a private CA. Mount the file with `-v`, for example `-v /path/to/redis-ca.pem:/certs/redis-ca.pem:ro -e REDIS_SSL_CA_CERTS=/certs/redis-ca.pem`.
+
+#### Content-Security-Policy and Security Headers
+
+Web and God Mode send the same security headers as the web and admin images of
+a Compose or Helm installation: the Content-Security-Policy generated from each
+build (with `frame-ancestors 'none'`), the Trusted Types policy (report-only by
+default), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and
+`Referrer-Policy: strict-origin-when-cross-origin`. The container renders them
+from those images' templates when it starts and refuses to start if it cannot.
+Space sends its own policy. `Strict-Transport-Security` is not sent; put the
+container behind a proxy that adds it if you need it.
+
+Uploads go straight to object storage, so the origin of
+`AWS_S3_PUBLIC_ENDPOINT_URL` (else `AWS_S3_ENDPOINT_URL`), and the bucket's
+virtual-hosted subdomain of it, are added to `img-src`, `connect-src` and
+`media-src`. The `HANGAR_CSP_*` variables described in
+[content-security-policy.md](../../../docs/content-security-policy.md#configuration)
+(`HANGAR_CSP_REPORT_ONLY`, `HANGAR_CSP_TRUSTED_TYPES`, extra origins) work here
+too; a value with a quote, backslash, backtick or brace stops the container.
 
 #### File Handling
 

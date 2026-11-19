@@ -18,12 +18,18 @@
         reverse_proxy localhost:3004
     }
 
+	# Web and God Mode are the static builds of the web and admin images.
+	# Their nginx sends security headers generated from each build by
+	# @plane/csp; start.sh renders the same headers into these snippets
+	# (render-security-headers.py), and Caddy refuses to start without them.
 	handle_path /god-mode* {
+        import /app/proxy/security-headers/admin.caddy
         root * /app/admin
         try_files {path} {path}/ /index.html
         file_server
     }
     handle_path /* {
+        import /app/proxy/security-headers/web.caddy
         root * /app/web
         try_files {path} {path}/ /index.html
         file_server
