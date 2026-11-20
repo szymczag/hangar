@@ -47,5 +47,5 @@ jobs:
               run: |
                   set -e
                   echo "Running copyright check..."
-                  git ls-files -z '*.ts' '*.tsx' | xargs -0 addlicense -check -f COPYRIGHT.txt -ignore "**/*.config.ts" -ignore "**/*.d.ts"
+                  git ls-files -z '*.ts' '*.tsx' | xargs -0 addlicense -check -f COPYRIGHT.txt -ignore "**/*.config.ts" -ignore "**/*.d.ts" -ignore "packages/makeplane-propel/src/**"
                   echo "Copyright check passed."

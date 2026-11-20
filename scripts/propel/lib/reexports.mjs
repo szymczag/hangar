@@ -394,8 +394,14 @@ export function rebuildTypeModule({ dtsPath, dtsText }) {
     })
     .join("\n")
     .replace(/\n*$/, "\n");
+  const declared = new Set(
+    source
+      .split("\n")
+      .map((line) => /^export (?:type|interface) ([A-Za-z_$][\w$]*)/.exec(line)?.[1])
+      .filter(Boolean)
+  );
   for (const name of exported) {
-    if (!new RegExp(String.raw`^export (type|interface) ${name.replace(/\$/g, "\\$")}\b`, "m").test(source)) {
+    if (!declared.has(name)) {
       throw new RecoveryError(`${dtsPath}: exported ${name} is not declared in the module`);
     }
   }
