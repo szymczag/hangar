@@ -14,7 +14,8 @@ import logging
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from plane.db.models import Session, User
+from plane.db.models import User
+from plane.ext.auth.sessions import end_user_sessions
 from plane.ext.models import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCredential
 from plane.license.models import InstanceAdmin
 
@@ -31,7 +32,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--keep-sessions",
             action="store_true",
-            help="Leave the administrator's live console sessions alone",
+            help="Leave every live session of this user alone (application and console alike)",
         )
 
     def handle(self, *args, **options):
@@ -81,10 +82,9 @@ class Command(BaseCommand):
         cleared = 0
         if not options["keep_sessions"]:
             # If the key was lost with the laptop, leaving the thief's live
-            # session alive would defeat the point of resetting it.
-            for session in Session.objects.filter(user_id=str(user.id)):
-                session.delete()
-                cleared += 1
+            # session alive would defeat the point of resetting it. This ends
+            # every session of the user, not only the console's.
+            cleared = end_user_sessions(user)
 
         logger.warning("Instance admin 2FA reset for %s (%s credentials, %s sessions)", email, count, cleared)
         self.stdout.write(

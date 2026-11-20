@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Mint a signed-in session for a user, without going through sign-in.
+"""Mint and end signed-in sessions for a user, without going through sign-in.
 
 Two callers need this and they must agree: the test suite, which asserts what a
 console session has to contain before an endpoint will accept it, and the visual
@@ -10,7 +10,10 @@ fixture seed, which hands a browser a cookie. Kept apart, the seed's idea of a
 session would drift from the one the tests validate, and the day
 ``VERIFIED_AT_KEY`` changes shape it would be found through a screenshot.
 
-Nothing here is reachable from a request path; it exists for fixtures.
+The minting helpers are not reachable from a request path; they exist for
+fixtures. ``end_user_sessions`` is the exception: it is what a compromise
+response calls -- the shell reset and clone detection on the console's second
+factor -- so both end exactly the same set of sessions.
 """
 
 from importlib import import_module
@@ -18,6 +21,7 @@ from importlib import import_module
 from django.conf import settings
 from django.utils import timezone
 
+from plane.db.models import Session
 from plane.ext.auth.webauthn import pending
 
 
@@ -53,4 +57,21 @@ def mint_admin_session(user, *, verified: bool = True) -> str:
     return session.session_key
 
 
-__all__ = ["mint_admin_session", "mint_app_session"]
+def end_user_sessions(user) -> int:
+    """Delete every session signed in as ``user`` and return how many there were.
+
+    Every session, not only the console's: application and instance-console
+    sessions share one table, and an account whose second factor is known to be
+    compromised has nothing worth keeping in either. A session that has not
+    signed in yet (a pending second-factor step) carries no user id and is not
+    touched; the caller clears its own.
+
+    One queryset delete rather than a loop over SessionStore: Session is not a
+    soft-delete model, so nothing is dispatched to Celery and this works with
+    the broker down.
+    """
+    deleted, _ = Session.objects.filter(user_id=str(user.id)).delete()
+    return deleted
+
+
+__all__ = ["end_user_sessions", "mint_admin_session", "mint_app_session"]

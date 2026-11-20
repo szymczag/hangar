@@ -24,6 +24,16 @@ added from a signed-in console session, or after a shell reset.
 
 Hangar disables a key whose signature counter goes backwards, because that is
 what a copied authenticator looks like (see [What is enforced](#what-is-enforced)).
+In the same step it ends **every session of that administrator** — console and
+application alike — and discards the sign-in that presented the regressed
+counter. The copy only works together with the password, so whoever used it
+first may already be signed in, and the same password opens the application;
+disabling the key on its own would stop only the next sign-in. The client still
+receives the generic `ADMIN_2FA_VERIFICATION_FAILED`, so the caller cannot tell
+that it was recognised as a copy. The server logs the event to the
+`plane.security` logger with the credential id and the number of sessions
+ended.
+
 A disabled key still counts as enrolled. If it was the administrator's only
 active key:
 
@@ -34,12 +44,14 @@ active key:
 - a sign-in already waiting for its key gets the same answer from the
   assertion step, and its pending state is discarded;
 - the registration endpoints refuse with the same code, both for a pending
-  enrollment and for a console session that was already signed in — that
-  session may be the one opened with the copy.
+  enrollment and for a console session that was already signed in. Detection
+  has already ended such sessions; the refusal is the second line of defence
+  for one that completes its sign-in concurrently.
 
-An administrator who still has another active key signs in with it as usual and
-is unaffected. The way back for one who does not is the reset under
-[Recovery](#recovery), which removes the disabled key together with the others.
+An administrator who still has another active key signs in again with it as
+usual; their earlier sessions were ended at detection. The way back for one who
+does not is the reset under [Recovery](#recovery), which removes the disabled
+key together with the others.
 Treat a disabled key as a possible compromise: check who signed in recently
 (`--list` shows each key's last use) before resetting, and consider changing
 the password, since the copy was presented together with it.
@@ -107,9 +119,12 @@ python manage.py disable_instance_admin_2fa --email admin@example.com
 ```
 
 `--list` is read-only. The reset removes that administrator's credentials and,
-unless `--keep-sessions` is passed, their live console sessions — if the key was
-lost together with the laptop, leaving the thief's session alive would defeat
-the point. They enroll a new key at the next sign-in.
+unless `--keep-sessions` is passed, every live session of that user —
+application and console alike — if the key was lost together with the laptop,
+leaving the thief's session alive would defeat the point. They enroll a new key
+at the next sign-in. After clone detection the sessions are already gone (see
+[When a key is disabled](#when-a-key-is-disabled)); the reset ends any opened
+since.
 
 The command works when the message broker is down, which is deliberate: recovery
 must not depend on a healthy instance.
@@ -119,18 +134,18 @@ failure away from needing server access.
 
 ## What is enforced
 
-| Property                                    | How                                                                                                              |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| A password alone opens nothing              | The password step never creates a session; `request.user` stays anonymous                                        |
-| A half-authenticated session grants nothing | `InstanceAdminPermission` additionally requires a completion marker                                              |
-| A challenge is used once                    | Conditional `UPDATE`, not read-then-write, so concurrent verifies cannot both win                                |
-| A challenge belongs to one session          | Bound to the issuing session key                                                                                 |
-| Registration cannot authenticate            | Challenges carry a purpose                                                                                       |
-| A cloned authenticator is caught            | Signature-counter regression disables the credential                                                             |
-| A disabled key is not a way back in         | A disabled key counts as enrolled: password sign-in is refused and registration stays shut until the shell reset |
-| A password enrolls only the first key       | A pending enrollment is refused once any key exists                                                              |
-| A key cannot be claimed twice               | `credential_id` is unique instance-wide, at the database level                                                   |
-| Guessing is bounded                         | Dedicated throttles plus a per-session attempt cap                                                               |
+| Property                                    | How                                                                                                                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A password alone opens nothing              | The password step never creates a session; `request.user` stays anonymous                                                                                                                                                             |
+| A half-authenticated session grants nothing | `InstanceAdminPermission` additionally requires a completion marker                                                                                                                                                                   |
+| A challenge is used once                    | Conditional `UPDATE`, not read-then-write, so concurrent verifies cannot both win                                                                                                                                                     |
+| A challenge belongs to one session          | Bound to the issuing session key                                                                                                                                                                                                      |
+| Registration cannot authenticate            | Challenges carry a purpose                                                                                                                                                                                                            |
+| A cloned authenticator is caught            | Signature-counter regression disables the credential and ends every session of its administrator, atomically. The counter is checked and advanced under a row lock, so a copy used at the same moment as the real key is still caught |
+| A disabled key is not a way back in         | A disabled key counts as enrolled: password sign-in is refused and registration stays shut until the shell reset                                                                                                                      |
+| A password enrolls only the first key       | A pending enrollment is refused once any key exists                                                                                                                                                                                   |
+| A key cannot be claimed twice               | `credential_id` is unique instance-wide, at the database level                                                                                                                                                                        |
+| Guessing is bounded                         | Dedicated throttles plus a per-session attempt cap                                                                                                                                                                                    |
 
 Every cryptographic failure answers the same error code, so the response cannot
 distinguish an unknown credential from a bad signature.

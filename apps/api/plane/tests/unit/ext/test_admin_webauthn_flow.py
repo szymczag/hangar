@@ -20,7 +20,8 @@ from django.core.management import call_command
 from django.test import Client, override_settings
 from django.utils import timezone
 
-from plane.db.models import User
+from plane.db.models import Session, User
+from plane.ext.auth.sessions import end_user_sessions, mint_admin_session, mint_app_session
 from plane.ext.auth.webauthn import pending
 from plane.ext.models import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCredential
 from plane.license.models import InstanceAdmin
@@ -273,6 +274,64 @@ def test_the_shell_reset_reopens_enrollment(admin_user, client):
     assert response.url.endswith("2fa/enroll/")
     assert client.get(SESSION).json()["requires_enrollment"] is True
     assert client.post(REG_OPTIONS, {}, content_type="application/json").status_code == 200
+
+
+def _session_keys(user):
+    return set(Session.objects.filter(user_id=str(user.id)).values_list("session_key", flat=True))
+
+
+@pytest.fixture
+def bystander(db, setup_instance):
+    user = User.objects.create(email="bystander@corp.com", username=uuid.uuid4().hex)
+    InstanceAdmin.objects.create(instance=setup_instance, user=user, role=20)
+    return user
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_the_shell_reset_ends_every_session_of_the_administrator(admin_user, bystander):
+    """Application and console alike: a lost key may have left either behind."""
+    _credential(admin_user)
+    mint_app_session(admin_user)
+    mint_admin_session(admin_user)
+    kept = {mint_app_session(bystander), mint_admin_session(bystander)}
+    out = StringIO()
+
+    call_command("disable_instance_admin_2fa", email=admin_user.email, yes=True, stdout=out)
+
+    assert _session_keys(admin_user) == set()
+    assert _session_keys(bystander) == kept
+    assert "2 session(s)" in out.getvalue()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_the_shell_reset_can_keep_the_sessions(admin_user):
+    _credential(admin_user)
+    keys = {mint_app_session(admin_user), mint_admin_session(admin_user)}
+    out = StringIO()
+
+    call_command("disable_instance_admin_2fa", email=admin_user.email, yes=True, keep_sessions=True, stdout=out)
+
+    assert _session_keys(admin_user) == keys
+    assert "0 session(s)" in out.getvalue()
+    assert not InstanceAdminWebAuthnCredential.objects.filter(user=admin_user).exists()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_ending_a_users_sessions_counts_only_theirs(admin_user, bystander, client):
+    mint_app_session(admin_user)
+    mint_admin_session(admin_user, verified=False)
+    mint_admin_session(admin_user)
+    kept = {mint_app_session(bystander)}
+    # A pending sign-in carries no user id yet, so it is not the user's session.
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+
+    assert end_user_sessions(admin_user) == 3
+    assert end_user_sessions(admin_user) == 0
+    assert _session_keys(bystander) == kept
+    assert admin_session(client).get(pending.PENDING_KEY) is not None
 
 
 @pytest.mark.unit

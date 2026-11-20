@@ -18,17 +18,25 @@ DNS, not of this code.
 """
 
 import json
+import threading
 import uuid
 from io import StringIO
+from unittest import mock
 
 import pytest
+from django.conf import settings
 from django.core.cache import cache
 from django.core.management import call_command
+from django.db import connection, transaction
 from django.test import Client, override_settings
+from django.test.utils import CaptureQueriesContext
 
-from plane.db.models import User
+from plane.authentication.adapter.error import AUTHENTICATION_ERROR_CODES
+from plane.db.models import Session, User
+from plane.ext.auth.sessions import mint_admin_session, mint_app_session
 from plane.ext.auth.webauthn import pending
 from plane.ext.models import InstanceAdminWebAuthnCredential
+from plane.ext.views import instance_webauthn
 from plane.license.models import InstanceAdmin
 from plane.tests.contract.app import test_google_auth as _google_auth
 from plane.tests.support.admin_session import read_admin_session
@@ -44,6 +52,7 @@ REG_VERIFY = "/api/instances/admins/webauthn/registration/verify/"
 AUTH_OPTIONS = "/api/instances/admins/webauthn/authentication/options/"
 AUTH_VERIFY = "/api/instances/admins/webauthn/authentication/verify/"
 PASSWORD = "correct-horse-battery-staple-42"
+APP_ME = "/api/users/me/"
 
 
 RP_ID = "localhost"
@@ -296,3 +305,262 @@ def test_a_cloned_key_keeps_the_console_locked_until_a_shell_reset(admin_user, c
     enrolled = _register(client, new_key)
     assert enrolled.status_code == 200, enrolled.content
     assert client.get(ME).status_code == 200
+
+
+# --- Clone detection ends the administrator's sessions ----------------------
+#
+# Whoever presents the copy also holds the password, and if they used it first
+# they are signed in already. Disabling the key alone would only stop the next
+# sign-in, so detection has to end what is open now.
+
+
+def _new_client():
+    return Client(HTTP_USER_AGENT="Mozilla/5.0 test", HTTP_HOST="localhost:8000")
+
+
+def _sign_in_with_key(client, user, device, sign_count=None):
+    client.post(SIGN_IN, {"email": user.email, "password": PASSWORD})
+    return _assert_with_key(client, device, sign_count=sign_count)
+
+
+def _enroll_and_advance(user, device):
+    """Enroll the key and use it once, so the stored counter is above zero."""
+    enrolling = _new_client()
+    enrolling.post(SIGN_IN, {"email": user.email, "password": PASSWORD})
+    _register(enrolling, device)
+    enrolling.post("/api/instances/admins/sign-out/")
+    first = _new_client()
+    assert _sign_in_with_key(first, user, device).status_code == 200
+    stored = InstanceAdminWebAuthnCredential.objects.get(user=user).sign_count
+    assert stored > 0, "this authenticator does not use counters; the test proves nothing"
+    return first, stored
+
+
+def _sessions_of(user):
+    return Session.objects.filter(user_id=str(user.id))
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_cloned_key_ends_the_console_session_opened_before_it(admin_user, device):
+    """The session already signed in -- typically the copy's holder -- is ended."""
+    signed_in, stored = _enroll_and_advance(admin_user, device)
+    assert signed_in.get(ME).status_code == 200
+
+    clone = _new_client()
+    response = _sign_in_with_key(clone, admin_user, device, sign_count=stored - 1)
+
+    assert response.status_code == 400
+    assert response.json()["error_code"] == AUTHENTICATION_ERROR_CODES["ADMIN_2FA_VERIFICATION_FAILED"]
+    assert signed_in.get(ME).status_code in (401, 403)
+    assert clone.get(ME).status_code in (401, 403)
+    assert not _sessions_of(admin_user).exists()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_cloned_key_ends_the_administrators_application_sessions(admin_user, device):
+    """The same password opens the application, so its sessions are suspect too."""
+    _, stored = _enroll_and_advance(admin_user, device)
+    app_key = mint_app_session(admin_user)
+    app = _new_client()
+    app.cookies[settings.SESSION_COOKIE_NAME] = app_key
+    assert app.get(APP_ME).status_code == 200
+
+    _sign_in_with_key(_new_client(), admin_user, device, sign_count=stored - 1)
+
+    assert not Session.objects.filter(session_key=app_key).exists()
+    assert app.get(APP_ME).status_code in (401, 403)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_cloned_key_leaves_other_users_sessions_alone(admin_user, device, setup_instance):
+    bystander = User.objects.create(email="bystander@corp.com", username=uuid.uuid4().hex)
+    InstanceAdmin.objects.create(instance=setup_instance, user=bystander, role=20)
+    kept = {mint_app_session(bystander), mint_admin_session(bystander)}
+    _, stored = _enroll_and_advance(admin_user, device)
+
+    _sign_in_with_key(_new_client(), admin_user, device, sign_count=stored - 1)
+
+    assert set(_sessions_of(bystander).values_list("session_key", flat=True)) == kept
+    assert not _sessions_of(admin_user).exists()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_cloned_key_discards_the_pending_sign_in_that_presented_it(admin_user, device):
+    """The same pending state must not be able to try again."""
+    _, stored = _enroll_and_advance(admin_user, device)
+    clone = _new_client()
+
+    _sign_in_with_key(clone, admin_user, device, sign_count=stored - 1)
+
+    assert read_admin_session(clone).get(pending.PENDING_KEY) is None
+    # Without a pending state there is nothing to ask a challenge for.
+    retry = clone.post(AUTH_OPTIONS, {}, content_type="application/json")
+    assert retry.status_code == 409
+    assert clone.get(ME).status_code in (401, 403)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_cloned_key_is_logged_with_the_sessions_it_ended(admin_user, device):
+    _, stored = _enroll_and_advance(admin_user, device)
+    mint_app_session(admin_user)
+    credential = InstanceAdminWebAuthnCredential.objects.get(user=admin_user)
+
+    with mock.patch.object(instance_webauthn.security_logger, "warning") as warning:
+        _sign_in_with_key(_new_client(), admin_user, device, sign_count=stored - 1)
+
+    warning.assert_called_once()
+    message, *args = warning.call_args.args
+    assert "regressed" in message
+    assert args == [credential.id, 2]
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_normal_sign_in_with_the_key_ends_no_session(admin_user, device):
+    signed_in, _ = _enroll_and_advance(admin_user, device)
+    app_key = mint_app_session(admin_user)
+
+    second = _new_client()
+    response = _sign_in_with_key(second, admin_user, device)
+
+    assert response.status_code == 200
+    assert signed_in.get(ME).status_code == 200
+    assert second.get(ME).status_code == 200
+    assert Session.objects.filter(session_key=app_key).exists()
+    assert InstanceAdminWebAuthnCredential.objects.get(user=admin_user).disabled_at is None
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_key_without_a_counter_ends_no_session(admin_user, device):
+    """A counter stuck at zero is not a clone, so nothing is ended."""
+    enrolling = _new_client()
+    enrolling.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    _register(enrolling, device)
+    enrolling.post("/api/instances/admins/sign-out/")
+    first = _new_client()
+    assert _sign_in_with_key(first, admin_user, device, sign_count=0).status_code == 200
+    app_key = mint_app_session(admin_user)
+
+    second = _new_client()
+    response = _sign_in_with_key(second, admin_user, device, sign_count=0)
+
+    assert response.status_code == 200
+    assert first.get(ME).status_code == 200
+    assert Session.objects.filter(session_key=app_key).exists()
+    credential = InstanceAdminWebAuthnCredential.objects.get(user=admin_user)
+    assert credential.sign_count == 0
+    assert credential.disabled_at is None
+
+
+# --- The counter check is serialized -----------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_second_assertion_with_the_same_counter_is_a_clone(admin_user, device):
+    """Two holders of one key presenting the same counter: the second is the copy."""
+    signed_in, stored = _enroll_and_advance(admin_user, device)
+    first, second = _new_client(), _new_client()
+    first.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    second.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+
+    accepted = _assert_with_key(first, device, sign_count=stored + 1)
+    refused = _assert_with_key(second, device, sign_count=stored + 1)
+
+    assert accepted.status_code == 200
+    assert refused.status_code == 400
+    credential = InstanceAdminWebAuthnCredential.objects.get(user=admin_user)
+    assert credential.sign_count == stored + 1
+    assert credential.disabled_at is not None
+    # Including the session the first assertion opened a moment earlier.
+    assert first.get(ME).status_code in (401, 403)
+    assert signed_in.get(ME).status_code in (401, 403)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_the_counter_is_read_under_a_row_lock(admin_user, device):
+    _, stored = _enroll_and_advance(admin_user, device)
+    client = _new_client()
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+
+    with CaptureQueriesContext(connection) as queries:
+        assert _assert_with_key(client, device).status_code == 200
+
+    locking = [q["sql"] for q in queries if "FOR UPDATE" in q["sql"]]
+    assert any(InstanceAdminWebAuthnCredential._meta.db_table in sql for sql in locking), locking
+
+
+@pytest.mark.unit
+@pytest.mark.django_db(transaction=True)
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_concurrent_assertion_waits_for_the_first_and_is_caught(admin_user, device):
+    """The race itself: a copy presented while the real key's sign-in is in flight.
+
+    One thread stands in for the real key's request: it locks the credential
+    row, as the endpoint does, and stores the next counter value. The copy's
+    request, carrying that same value, has to wait for it rather than compare
+    against the stale counter both read before -- and then it is a regression.
+    """
+    _, stored = _enroll_and_advance(admin_user, device)
+    credential_pk = InstanceAdminWebAuthnCredential.objects.get(user=admin_user).pk
+    clone = _new_client()
+    clone.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    body = clone.post(AUTH_OPTIONS, {}, content_type="application/json").json()
+    challenge = _challenge_of(body)
+    payload = {
+        "credential": device.get(rp_id=RP_ID, challenge=challenge, origin=ORIGIN, sign_count=stored + 1),
+        "challenge": challenge,
+    }
+
+    locked, release = threading.Event(), threading.Event()
+    results = {}
+
+    def real_key():
+        try:
+            with transaction.atomic():
+                row = InstanceAdminWebAuthnCredential.objects.select_for_update().get(pk=credential_pk)
+                locked.set()
+                release.wait(10)
+                row.sign_count = stored + 1
+                row.save(update_fields=["sign_count"])
+        finally:
+            connection.close()
+
+    def copy():
+        try:
+            results["copy"] = clone.post(AUTH_VERIFY, payload, content_type="application/json")
+        finally:
+            connection.close()
+
+    holder = threading.Thread(target=real_key)
+    holder.start()
+    assert locked.wait(10)
+    contender = threading.Thread(target=copy)
+    contender.start()
+    contender.join(1.0)
+    still_waiting = contender.is_alive()
+    release.set()
+    holder.join(10)
+    contender.join(10)
+
+    assert still_waiting, "the copy's verification did not wait for the row lock"
+    assert results["copy"].status_code == 400
+    credential = InstanceAdminWebAuthnCredential.objects.get(pk=credential_pk)
+    assert credential.sign_count == stored + 1
+    assert credential.disabled_at is not None
