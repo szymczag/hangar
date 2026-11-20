@@ -131,6 +131,7 @@ temp/
 !scripts/community-modal.test.mjs
 !scripts/generate-release-notes.mjs
 !scripts/vr.mjs
+!scripts/propel/
 !packages/i18n/scripts/
 !.github/scripts/
 !.github/scripts/release_metadata.py

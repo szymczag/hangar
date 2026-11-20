@@ -31,7 +31,8 @@
     "coverage/**",
     "dist/**",
     "**/public/**",
-    "storybook-static/**"
+    "storybook-static/**",
+    "packages/makeplane-propel/src/**"
   ],
   "rules": {
     "react/react-in-jsx-scope": "off",

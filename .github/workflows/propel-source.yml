@@ -1,0 +1,110 @@
+name: Propel source
+
+# Keeps packages/makeplane-propel honest: the committed source must be exactly
+# what scripts/propel/recover.mjs recovers from the published npm tarball, and
+# building it must give output equivalent to that tarball's dist/.
+#
+# 1. Download @makeplane/propel 0.9.7 from the npm registry and check its sha512
+#    against the integrity recorded in RECOVERY.json (the value upstream's
+#    v1.5.0 lockfile pins).
+# 2. Recover into a temporary directory and diff the result against the
+#    committed src/, LICENSE and RECOVERY.json: any hand edit fails here.
+# 3. Install the package's pinned toolchain, run the recovery and comparison
+#    unit tests and the package's hash test.
+# 4. Type-check and build the package.
+# 5. Compare the build with the tarball's dist/; the report goes to the job
+#    summary and the job fails on any unexplained difference.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "packages/makeplane-propel/**"
+      - "scripts/propel/**"
+      - ".github/workflows/propel-source.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: propel-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Recover, build and compare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PROPEL_VERSION: "0.9.7"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .node-version
+
+      - name: Enable Corepack and pnpm
+        run: corepack enable pnpm
+
+      - name: Fetch and verify the published tarball
+        run: |
+          set -euo pipefail
+          expected="$(node -p 'require("./packages/makeplane-propel/RECOVERY.json").integrity')"
+          recorded_version="$(node -p 'require("./packages/makeplane-propel/RECOVERY.json").version')"
+          test "$recorded_version" = "$PROPEL_VERSION"
+          mkdir -p "$RUNNER_TEMP/propel"
+          tarball="$RUNNER_TEMP/propel/makeplane-propel-$PROPEL_VERSION.tgz"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output "$tarball" \
+            "https://registry.npmjs.org/@makeplane/propel/-/propel-$PROPEL_VERSION.tgz"
+          actual="sha512-$(openssl dgst -sha512 -binary "$tarball" | base64 -w0)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::tarball integrity $actual does not match RECOVERY.json $expected"
+            exit 1
+          fi
+          {
+            echo "PROPEL_TARBALL=$tarball"
+            echo "PROPEL_INTEGRITY=$expected"
+          } >> "$GITHUB_ENV"
+
+      - name: Recover into a temporary directory and diff with the committed tree
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/propel/recovered"
+          node scripts/propel/recover.mjs --tarball "$PROPEL_TARBALL" --integrity "$PROPEL_INTEGRITY" --out "$out"
+          node scripts/propel/recover.mjs --tarball "$PROPEL_TARBALL" --integrity "$PROPEL_INTEGRITY" --out "$out" --check
+          diff -r "$out/src" packages/makeplane-propel/src
+          diff "$out/LICENSE" packages/makeplane-propel/LICENSE
+          diff "$out/RECOVERY.json" packages/makeplane-propel/RECOVERY.json
+
+      - name: Install the package's toolchain
+        run: pnpm install --frozen-lockfile --filter @makeplane/propel
+
+      - name: Run the unit tests
+        run: node --test scripts/propel/tests/*.test.mjs packages/makeplane-propel/tests/*.test.mjs
+
+      - name: Type-check and build
+        run: |
+          set -euo pipefail
+          pnpm --filter @makeplane/propel check:types
+          pnpm --filter @makeplane/propel build
+
+      - name: Compare with the published dist
+        run: |
+          set -euo pipefail
+          status=0
+          node scripts/propel/compare-dist.mjs \
+            --built packages/makeplane-propel/dist \
+            --tarball "$PROPEL_TARBALL" \
+            --integrity "$PROPEL_INTEGRITY" \
+            --report "$RUNNER_TEMP/propel/report.md" > /dev/null || status=$?
+          cat "$RUNNER_TEMP/propel/report.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/propel/report.md"
+          exit "$status"

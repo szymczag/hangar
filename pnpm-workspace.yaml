@@ -226,6 +226,17 @@ overrides:
   "@tiptap/extension-floating-menu": 3.31.3
   "@types/express": 4.17.23
   typescript: "catalog:"
+  # packages/makeplane-propel rebuilds the published @makeplane/propel 0.9.7 from
+  # its recovered source; these three pins reproduce that release's toolchain and
+  # reach nothing else. TypeScript 6 (the repo stays on the catalog version) emits
+  # its declarations; rolldown 1.2.0 is the release tsdown 0.22.14 resolved when
+  # it was current, and the only 1.2.x whose output matches (1.2.1 stopped inlining
+  # single-use constants, 1.2.13 changed re-export output); Base UI 1.8.0 is the
+  # newest release before 0.9.7 was published and the one upstream v1.5.0 resolves.
+  # See packages/makeplane-propel/README.md.
+  "@makeplane/propel>typescript": 6.0.3
+  "tsdown@0.22.14>rolldown": 1.2.0
+  "@makeplane/propel>@base-ui/react": 1.8.0
   vite: "catalog:"
   qs: 6.16.2
   diff: 5.2.2

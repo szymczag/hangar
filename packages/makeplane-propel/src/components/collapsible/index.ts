@@ -1,0 +1,2 @@
+export { CollapsibleHeader, type CollapsibleHeaderProps, CollapsiblePanel, CollapsiblePanelContent, type CollapsiblePanelContentProps, type CollapsiblePanelProps, CollapsibleTrigger, type CollapsibleTriggerProps, CollapsibleTriggerTitle, type CollapsibleTriggerTitleProps, CollapsibleTriggerTrailing, type CollapsibleTriggerTrailingProps } from "../../elements/collapsible";
+export * from "./collapsible";

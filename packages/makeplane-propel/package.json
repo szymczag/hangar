@@ -1,0 +1,84 @@
+{
+  "name": "@makeplane/propel",
+  "version": "0.9.7",
+  "private": true,
+  "description": "Source of the published @makeplane/propel 0.9.7 package, recovered from its npm tarball (see README.md).",
+  "license": "AGPL-3.0-only",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    "./base/*": {
+      "types": "./dist/base/*/index.d.ts",
+      "import": "./dist/base/*/index.js"
+    },
+    "./elements/*": {
+      "types": "./dist/elements/*/index.d.ts",
+      "import": "./dist/elements/*/index.js"
+    },
+    "./components/*": {
+      "types": "./dist/components/*/index.d.ts",
+      "import": "./dist/components/*/index.js"
+    },
+    "./components/logo-spinner/*.gif": "./dist/components/logo-spinner/*.gif",
+    "./components/logo-spinner/*.png": "./dist/components/logo-spinner/*.png",
+    "./hooks/*": {
+      "types": "./dist/hooks/*/index.d.ts",
+      "import": "./dist/hooks/*/index.js"
+    },
+    "./icons": {
+      "types": "./dist/icons/index.d.ts",
+      "import": "./dist/icons/index.js"
+    },
+    "./styles": "./dist/styles/propel.css",
+    "./styles/*": "./dist/styles/*.css",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:types": "tsgo --noEmit && tsc --noEmit",
+    "check:lint": "oxlint .",
+    "check:format": "oxfmt --check .",
+    "fix:lint": "oxlint --fix .",
+    "fix:format": "oxfmt .",
+    "test": "node --test tests/*.test.mjs",
+    "clean": "rm -rf .turbo node_modules dist"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@tanstack/react-virtual": "^3.14.13",
+    "class-variance-authority": "^0.7.1",
+    "react-day-picker": "^10.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@typescript/native-preview": "7.0.0-dev.20260701.1",
+    "acorn": "8.16.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tsdown": "0.22.14",
+    "typescript": "6.0.3"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0"
+  },
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 128",
+    "safari >= 16.4",
+    "ios_saf >= 16.4"
+  ],
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

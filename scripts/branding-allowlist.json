@@ -25,6 +25,11 @@
     "rationale": "Agent guidance and inherited package attribution are compatibility or attribution metadata."
   },
   {
+    "pathPattern": "^packages/makeplane-propel/(src/|NOTICE\\.md$|README\\.md$)",
+    "rules": ["product-name"],
+    "rationale": "The recovered @makeplane/propel source is upstream code kept byte for byte (enforced by RECOVERY.json); its comments name the upstream product, and the package notice must name the rightsholder."
+  },
+  {
     "pathPattern": "^apps/api/plane/utils/email\\.py$",
     "rules": ["plane-domain"],
     "rationale": "The URL is part of an inherited proprietary license notice and must not be rewritten."
