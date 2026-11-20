@@ -11,12 +11,10 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.2.1",
+  version: "0.2.2",
   highlights: [
-    "Markdown rendering no longer lets a crafted text tie up an API worker.",
-    "The God Mode reset hint names the administrator's address.",
-    "The all-in-one container stops gracefully.",
-    "On the all-in-one image, /spaces now redirects to /spaces/.",
+    "A cloned God Mode security key now ends every session of its administrator.",
+    "A copied key used at the same moment as the real one is caught.",
   ],
   upstream: {
     version: "1.4.3",
