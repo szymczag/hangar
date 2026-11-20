@@ -41,6 +41,7 @@ export default function AdminSecondFactorPage(_props: Route.ComponentProps) {
         if (data?.is_2fa_pending !== true) replace("/");
         else if (data?.requires_enrollment === true) replace("/2fa/enroll");
         else setEmail(data?.email ?? "");
+        return undefined;
       })
       .catch(() => replace("/"));
   }, [replace]);
@@ -67,7 +68,7 @@ export default function AdminSecondFactorPage(_props: Route.ComponentProps) {
         setError("This site is not allowed to use your security key. Check WEBAUTHN_RP_ID for this deployment.");
       else {
         const code = (caught as { error_code?: string })?.error_code;
-        const known = code ? authErrorHandler(code as never) : undefined;
+        const known = code ? authErrorHandler(code as never, email) : undefined;
         // message is already resolved to a node; the second-factor copy is
         // plain text, so anything else falls back rather than rendering oddly.
         setError(typeof known?.message === "string" ? known.message : "That key could not be verified.");

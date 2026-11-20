@@ -60,3 +60,69 @@ test("the disabled-key message names the real reset command", () => {
     `${command[1]} is not a management command`
   );
 });
+
+// The disabled-key message is a command an operator pastes into a shell on the
+// server, so the address in it must be theirs and must not be able to carry
+// anything else. The address reaches the console through the sign-in redirect,
+// which anyone can craft as a link.
+const SIGN_IN_FORM = read("apps/admin/app/(all)/(home)/sign-in-form.tsx");
+const BANNER = read("apps/admin/app/(all)/(home)/auth-banner.tsx");
+const ADMIN_VIEW = read("apps/api/plane/license/api/views/admin.py");
+
+function resetCommandEmail() {
+  const pattern = HELPERS.match(/const RESET_COMMAND_EMAIL = \/(.+)\/;\n/);
+  assert.ok(pattern, "the address filter must be a single regular expression literal");
+  const regex = new RegExp(pattern[1]);
+  return (email) => (email && email.length <= 254 && regex.test(email) ? email : "<your email>");
+}
+
+test("the API sends the account's address with the disabled-key code", () => {
+  const start = ADMIN_VIEW.indexOf('AUTHENTICATION_ERROR_CODES["ADMIN_2FA_CREDENTIAL_DISABLED"]');
+  assert.notEqual(start, -1);
+  const call = ADMIN_VIEW.slice(start, ADMIN_VIEW.indexOf(")", start));
+  assert.match(call, /payload=\{"email": user\.email\}/);
+});
+
+test("the sign-in form passes the redirect's address to the error copy", () => {
+  assert.match(SIGN_IN_FORM, /authErrorHandler\(errorCode\?\.toString\(\) as EAdminAuthErrorCodes, emailParam\)/);
+  assert.match(SIGN_IN_FORM, /\}, \[errorCode, emailParam\]\);/);
+});
+
+test("the disabled-key message prints the address only through the filter", () => {
+  const entry = HELPERS.slice(HELPERS.indexOf("EAdminAuthErrorCodes.ADMIN_2FA_CREDENTIAL_DISABLED]"));
+  const message = entry.slice(0, entry.indexOf("},"));
+  assert.match(message, /--email \$\{resetCommandEmail\(email\)\}/);
+  assert.doesNotMatch(message, /\$\{email/);
+});
+
+test("a plain address is printed and anything shell-like keeps the placeholder", () => {
+  const filter = resetCommandEmail();
+  for (const email of ["admin@corp.com", "first.last+ops@mail.example.co.uk", "a_b-c@x-y.io"]) {
+    assert.equal(filter(email), email);
+  }
+  for (const email of [
+    undefined,
+    "",
+    "admin",
+    "admin@corp.com; rm -rf /",
+    "$(id)@corp.com",
+    "`id`@corp.com",
+    "admin@corp.com && curl x",
+    "a'b@corp.com",
+    'a"b@corp.com',
+    "a b@corp.com",
+    "admin@corp.com\nid",
+    "admin@corp.com|id",
+    "-rf@corp.com",
+    "admin@corp",
+    `${"a".repeat(65)}@corp.com`,
+  ]) {
+    assert.equal(filter(email), "<your email>", JSON.stringify(email));
+  }
+});
+
+test("the banner shows second-factor titles", () => {
+  assert.match(BANNER, /showsBannerTitle\(bannerData\.code\) && <p[^>]*>\{bannerData\.title\}<\/p>/);
+  const codes = HELPERS.slice(HELPERS.indexOf("const SECOND_FACTOR_CODES"));
+  assert.match(codes.slice(0, codes.indexOf("];")), /EAdminAuthErrorCodes\.ADMIN_2FA_CREDENTIAL_DISABLED,/);
+});

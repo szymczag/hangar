@@ -459,11 +459,14 @@ class InstanceAdminSignInEndpoint(View):
             # after the old one was flagged as cloned; only a shell reset
             # (enrollment.RESET_COMMAND) re-opens enrollment. Reached only
             # after the password and the admin check, so it tells nobody who
-            # lacks the password anything.
+            # lacks the password anything. The account's own address rides
+            # along so the console can print the exact reset command; the
+            # caller has just proved the password for it.
             if credential_state == enrollment.LOCKED:
                 exc = AuthenticationException(
                     error_code=AUTHENTICATION_ERROR_CODES["ADMIN_2FA_CREDENTIAL_DISABLED"],
                     error_message="ADMIN_2FA_CREDENTIAL_DISABLED",
+                    payload={"email": user.email},
                 )
                 url = urljoin(
                     base_host(request=request, is_admin=True),

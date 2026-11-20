@@ -13,6 +13,7 @@ challenge single use, session binding, attempt limits — actually hold.
 import uuid
 from datetime import timedelta
 from io import StringIO
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from django.core.management import call_command
@@ -136,6 +137,23 @@ def test_a_disabled_key_still_counts_as_enrolled(admin_user, client):
     assert "_auth_user_id" not in session
     assert client.get(SESSION).json() == {"is_authenticated": False}
     assert client.get(ME).status_code in (401, 403)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_the_disabled_key_answer_names_the_account_for_the_reset_command(admin_user, client):
+    """The console prints `disable_instance_admin_2fa --email <address>`.
+
+    The address is the account's own, sent only after the password was proved,
+    so the operator gets a command they can paste instead of a placeholder.
+    """
+    _credential(admin_user, disabled_at=timezone.now())
+
+    response = client.post(SIGN_IN, {"email": "  Admin@Corp.com ", "password": PASSWORD})
+
+    query = parse_qs(urlparse(response.url).query)
+    assert query["error_code"] == [str(CREDENTIAL_DISABLED)]
+    assert query["email"] == [admin_user.email]
 
 
 @pytest.mark.unit
