@@ -43,10 +43,11 @@ export const EXPLAINED = {
     reason:
       "Same import declarations with the same bindings, in a different order; the module bodies are " +
       "identical syntax trees. The order follows the bundler's global execution order, which depends " +
-      "on statement order inside the re-export barrels that the build did not publish. Every module " +
-      'is free of side effects (package.json `"sideEffects": ["**/*.css"]` and no top-level effects ' +
-      "in the code), so the order in which its dependencies are evaluated cannot change behaviour, " +
-      "and consuming bundlers reorder modules anyway.",
+      "on statement order inside the re-export barrels that the build did not publish. No module in the " +
+      "package does anything at load time beyond creating its own values (cva class builders, React " +
+      "contexts, `displayName` on its own components), and the package declares " +
+      '`"sideEffects": ["**/*.css"]`, so the order in which a module\'s dependencies are evaluated ' +
+      "cannot change behaviour; consuming bundlers reorder modules anyway.",
   },
   "union-order": {
     kind: "dts",

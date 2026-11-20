@@ -125,9 +125,10 @@ else:
 - **Import order (8 component modules).** The same import declarations with
   the same bindings in a different order; the module bodies are identical. The
   order follows the bundler's execution order across the whole build, which
-  depends on statement order inside barrels that were never published. Every
-  module is free of side effects, so the order its dependencies are evaluated in
-  cannot change behaviour.
+  depends on statement order inside barrels that were never published. No
+  module does anything at load time beyond creating its own values (cva class
+  builders, React contexts, `displayName` on its own components), so the order
+  its dependencies are evaluated in cannot change behaviour.
 - **Literal union order (5 to 28 declaration files, varying by run).** For example
   `"sm" | "md" | "xs"` printed as `"xs" | "sm" | "md"`. TypeScript prints a union
   in the order it first created each literal type, and the declaration plugin
