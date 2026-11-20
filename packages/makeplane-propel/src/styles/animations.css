@@ -1,0 +1,266 @@
+@theme {
+  /* slide up */
+  --animate-slide-up: slide-up 0.3s ease-out forwards;
+  @keyframes slide-up {
+    from {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* slide in from bottom */
+  --animate-slide-in-from-bottom: slide-in-from-bottom 0.25s ease-out forwards;
+  @keyframes slide-in-from-bottom {
+    0% {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* slide in from top */
+  --animate-slide-in-from-top: slide-in-from-top 0.25s ease-out forwards;
+  @keyframes slide-in-from-top {
+    0% {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* slide out */
+  --animate-slide-out: slide-out 0.25s ease-out forwards;
+  @keyframes slide-out {
+    0% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+  }
+
+  /* slide out down */
+  --animate-slide-out-down: slide-out-down 0.25s ease-out forwards;
+  @keyframes slide-out-down {
+    0% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+  }
+
+  /* fade out */
+  --animate-fade-out: fade-out 0.25s ease-out forwards;
+  @keyframes fade-out {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* fade in */
+  --animate-fade-in: fade-in 0.25s ease-out forwards;
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  /* spinner reveal: a loader slot growing from zero to its glyph width while fading in, so the
+     control it sits in (button, pill) widens smoothly into its loading state instead of snapping */
+  --animate-spinner-reveal: spinner-reveal 0.2s ease-out forwards;
+  @keyframes spinner-reveal {
+    0% {
+      opacity: 0;
+      width: 0;
+    }
+    100% {
+      opacity: 1;
+      width: var(--node-size);
+    }
+  }
+  /* spinner conceal: the reverse of the reveal, played while a control leaves its loading state so
+     it narrows back smoothly instead of snapping; `Spinner` unmounts on its `animationend`, with a
+     timeout fallback so it can never get stuck if the animation never fires */
+  --animate-spinner-conceal: spinner-conceal 0.2s ease-in forwards;
+  @keyframes spinner-conceal {
+    0% {
+      opacity: 1;
+      width: var(--node-size);
+    }
+    100% {
+      opacity: 0;
+      width: 0;
+    }
+  }
+
+  /* tour carousel animations */
+  --animate-tour-carousel-slide-in-right: tour-carousel-slide-in-right 0.4s
+    cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  @keyframes tour-carousel-slide-in-right {
+    0% {
+      opacity: 0;
+      transform: translateX(40px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  --animate-tour-carousel-slide-in-left: tour-carousel-slide-in-left 0.4s
+    cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  @keyframes tour-carousel-slide-in-left {
+    0% {
+      opacity: 0;
+      transform: translateX(-40px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  --animate-tour-carousel-slide-out-right: tour-carousel-slide-out-right 0.4s
+    cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  @keyframes tour-carousel-slide-out-right {
+    0% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(40px);
+    }
+  }
+
+  --animate-tour-carousel-slide-out-left: tour-carousel-slide-out-left 0.4s
+    cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  @keyframes tour-carousel-slide-out-left {
+    0% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-40px);
+    }
+  }
+
+  --animate-tour-carousel-fade-in: tour-carousel-fade-in 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+    forwards;
+  @keyframes tour-carousel-fade-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  --animate-tour-popover-enter: tour-popover-enter 0.2s cubic-bezier(0.21, 1.02, 0.48, 1) forwards;
+  @keyframes tour-popover-enter {
+    0% {
+      opacity: 0;
+      transform: translateY(8px) scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  --animate-tour-popover-exit: tour-popover-exit 0.15s ease-in forwards;
+  @keyframes tour-popover-exit {
+    0% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(8px) scale(0.95);
+    }
+  }
+
+  /* progress indeterminate: slide a 1/3-width bar across the track and back */
+  --animate-progress-indeterminate: progress-indeterminate 1.4s ease-in-out infinite;
+  @keyframes progress-indeterminate {
+    0% {
+      inset-inline-start: -33.333%;
+    }
+    50% {
+      inset-inline-start: 100%;
+    }
+    100% {
+      inset-inline-start: -33.333%;
+    }
+  }
+
+  /* this '--animate-notification-bell-ring' used for workspace notifications for reminders */
+  --animate-notification-bell-ring: notification-bell-ring 2.2s cubic-bezier(0.45, 0.05, 0.55, 0.95)
+    infinite;
+  @keyframes notification-bell-ring {
+    /* burst ~0–18%: damped rotation around top center */
+    0% {
+      transform-origin: top center;
+      transform: rotate(0deg);
+    }
+    2% {
+      transform-origin: top center;
+      transform: rotate(-8deg);
+    }
+    4% {
+      transform-origin: top center;
+      transform: rotate(8deg);
+    }
+    6% {
+      transform-origin: top center;
+      transform: rotate(-6deg);
+    }
+    8% {
+      transform-origin: top center;
+      transform: rotate(6deg);
+    }
+    10% {
+      transform-origin: top center;
+      transform: rotate(-4deg);
+    }
+    12% {
+      transform-origin: top center;
+      transform: rotate(4deg);
+    }
+    14% {
+      transform-origin: top center;
+      transform: rotate(-2deg);
+    }
+    16% {
+      transform-origin: top center;
+      transform: rotate(2deg);
+    }
+    18%,
+    100% {
+      transform-origin: top center;
+      transform: rotate(0deg);
+    }
+  }
+}

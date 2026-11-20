@@ -2,6 +2,11 @@
   "printWidth": 120,
   "tabWidth": 2,
   "trailingComma": "es5",
+  "ignorePatterns": [
+    "packages/makeplane-propel/src/**",
+    "packages/makeplane-propel/dist/**",
+    "packages/makeplane-propel/RECOVERY.json"
+  ],
   "sortTailwindcss": {
     "stylesheet": "packages/tailwind-config/index.css",
     "functions": ["cn", "clsx", "cva"]

@@ -24,6 +24,7 @@
     "check:release-notes": "node scripts/generate-release-notes.mjs --check",
     "generate:release-notes": "node scripts/generate-release-notes.mjs",
     "test:branding": "node --test scripts/check-branding.test.mjs",
+    "test:propel": "node --test scripts/propel/tests/*.test.mjs packages/makeplane-propel/tests/*.test.mjs",
     "test:community-billing": "node --test scripts/community-billing-page.test.mjs",
     "test:community-modal": "node scripts/community-modal.test.mjs",
     "test:react-runtime-contracts": "node --test apps/web/tests/*-contract.test.mjs",
