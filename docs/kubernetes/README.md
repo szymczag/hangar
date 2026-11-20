@@ -6,11 +6,10 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.2.0`. It is a stable Hangar release for Docker
+The current release is `0.2.1`. It is a stable Hangar release for Docker
 Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
 for evaluation on AMD64 clusters only and is not yet a supported production
-release. It supersedes the release candidates `0.2.0-rc.1`, `0.2.0-rc.2` and
-`0.2.0-rc.3`.
+release.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -55,7 +54,7 @@ Start with the [evaluation installation tutorial](evaluation-install.md) to
 exercise the released chart. Use the [production installation guide](production-install.md)
 only to review and help qualify the production profile.
 
-The tutorial installs stable `0.2.0`; the [chart README](../../charts/hangar/README.md)
+The tutorial installs stable `0.2.1`; the [chart README](../../charts/hangar/README.md)
 names the same versions and rollback targets. Each guide renders the chart with
 `helm template` before installing it and passes the target cluster's version with
 `--kube-version`: without a cluster connection Helm checks the chart's
@@ -64,7 +63,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.2.0` qualification boundary is:
+The `0.2.1` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -225,10 +224,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                          |
 | ------------------ | -------------------------------------- |
-| Product version    | `v0.2.0`                               |
-| Helm chart version | `0.2.0`                                |
-| Git tag            | `hangar-v0.2.0`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.2.0` |
+| Product version    | `v0.2.1`                               |
+| Helm chart version | `0.2.1`                                |
+| Git tag            | `hangar-v0.2.1`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.2.1` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -239,11 +238,13 @@ installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
 `ext.0037` fails there, so upgrade to `rc.68` or later instead. The `0.2.0`
 release candidates are superseded by `0.2.0` and are not rollback targets.
-`0.1.4` is the previous stable release and the supported rollback target for
-this one; rolling back to it needs no schema change, and pages edited on
-`0.2.0` stay readable there because the stored Yjs documents do not
-change. Rolling back to it also brings back the `0.1.4` collaboration bug, in
-which concurrent edits to one page are lost, so roll back only when you need to. Rolling back further, to `0.1.3`, needs no schema change either, but
+`0.2.0` is the previous stable release and the supported rollback target for
+this one; rolling back to it needs no schema change and no change to the
+values, only the images change. Rolling back further, to `0.1.4`, needs no
+schema change either, and pages edited on `0.2.0` or `0.2.1` stay readable
+there because the stored Yjs documents do not change. It brings back the
+`0.1.4` collaboration bug, in which concurrent edits to one page are lost, so
+roll back that far only when you need to. Rolling back further, to `0.1.3`, needs no schema change either, but
 `application.numProxies` must be removed from the values first because the
 `0.1.3` schema rejects it. Rolling back to `0.1.2` needs no schema change either (the `db.0136` index can
 stay), and neither does rolling back further, to `0.1.1`, `0.1.0`, `rc.72`, `rc.71`, `rc.70` or `rc.69`. Rolling back to `rc.68` needs migration
@@ -277,7 +278,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.2.0` notes](../releases/hangar-v0.2.0.md) — review
+- [Release `v0.2.1` notes](../releases/hangar-v0.2.1.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -309,8 +310,8 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.1.4`, tag `hangar-v0.1.4`, and chart
-`ghcr.io/szymczag/charts/hangar:0.1.4`. Anybody still on rc.62 with
+The previous release is `0.2.0`, tag `hangar-v0.2.0`, and chart
+`ghcr.io/szymczag/charts/hangar:0.2.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
@@ -318,8 +319,20 @@ Charts `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3` were release candidates
 for `0.2.0` and are superseded by it; do not install them. `0.2.0-rc.1` and its
 images exist in the registry, but that candidate has no GitHub Release because
 a workflow bug skipped the release job. `0.2.0` is built from the `0.2.0-rc.3`
-source, so an installation on any of the candidates upgrades to it with
-`helm upgrade` and `--version 0.2.0` and no other action.
+source, so an installation on any of the candidates upgrades to `0.2.1` with
+`helm upgrade` and `--version 0.2.1` and no other action.
+
+Release 0.2.1 adds no database or license migration compared with 0.2.0 and
+changes nothing in the chart's templates, values or Secrets; upgrade from
+0.2.0 or 0.1.4 with `helm upgrade` and `--version 0.2.1` and no other action. Its
+`api` image moves to mistune 3.3.4, which fixes two quadratic-time denials of
+service in Markdown parsing (GHSA-phmp-hrw4-r36r and GHSA-ww7q-mxrj-5ffg) that
+let a signed-in user tie up an API worker's CPU. The God Mode `5198` reset hint
+now names the administrator's address. The other changes concern only the
+all-in-one image, which Kubernetes does not use. An upgrade from 0.1.4 also
+brings everything 0.2.0 changed, described below. Rolling back to 0.2.0 needs
+no schema change and no change to the values, but brings the mistune denial of
+service back.
 
 Release 0.2.0 adds no database or license migration compared with 0.1.4 and
 changes nothing in the chart's values or Secrets. Its only template change is the object-storage

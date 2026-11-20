@@ -11,13 +11,12 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.2.0",
+  version: "0.2.1",
   highlights: [
-    "Real-time collaboration works again; on 0.1.3 and 0.1.4 concurrent edits were lost.",
-    "God Mode stays locked when its only security key has been disabled.",
-    "The all-in-one image now sends the frontend security headers.",
-    "Guests can no longer send page events to everyone else on a page.",
-    "The editor moves to Tiptap 3, which clears GHSA-cp6q-959q-f8rh.",
+    "Markdown rendering no longer lets a crafted text tie up an API worker.",
+    "The God Mode reset hint names the administrator's address.",
+    "The all-in-one container stops gracefully.",
+    "On the all-in-one image, /spaces now redirects to /spaces/.",
   ],
   upstream: {
     version: "1.4.3",
