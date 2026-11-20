@@ -16,6 +16,7 @@ makeplane/plane#9987, adapted). The tests run start.sh's own functions against a
 temporary plane.env and data directory.
 """
 
+import configparser
 import os
 import re
 import shutil
@@ -86,6 +87,109 @@ class SupervisorCommandTests(unittest.TestCase):
         self.assertIn("WORKDIR /app/apps/space", dockerfile)
         self.assertIn('CMD ["./node_modules/.bin/react-router-serve", "./build/server/index.js"]', dockerfile)
         self.assertIn("COPY --from=space-img /app /app/space", (AIO / "Dockerfile").read_text())
+
+
+class ShutdownTests(unittest.TestCase):
+    """`docker stop` must reach supervisord, and supervisord must stop its programs cleanly.
+
+    start.sh used to start supervisord as a child of bash. Bash as PID 1 ignores
+    SIGTERM, so the runtime waited out its timeout and then SIGKILLed every
+    program, live included, with documents still open in memory.
+    """
+
+    def setUp(self):
+        self.config = configparser.RawConfigParser(inline_comment_prefixes=(";",))
+        self.config.read_string(SUPERVISOR.read_text())
+        self.programs = {
+            section.split(":", 1)[1]: self.config[section]
+            for section in self.config.sections()
+            if section.startswith("program:")
+        }
+        self.assertIn("live", self.programs)
+
+    def test_start_sh_replaces_itself_with_supervisord(self):
+        main = _shell_function(START.read_text(), "main")
+        statements = [
+            line.strip() for line in main.splitlines()[1:-1] if line.strip() and not line.strip().startswith("#")
+        ]
+        self.assertEqual(
+            statements[-1], "exec /usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisor.conf"
+        )
+        self.assertEqual(START.read_text().count("/usr/local/bin/supervisord"), 1)
+
+    def test_supervisord_stays_in_the_foreground(self):
+        self.assertEqual(self.config["supervisord"]["nodaemon"], "true")
+
+    def test_every_program_is_stopped_with_sigterm_and_a_deadline(self):
+        for name, program in self.programs.items():
+            with self.subTest(program=name):
+                self.assertEqual(program.get("stopsignal"), "TERM")
+                self.assertGreaterEqual(int(program.get("stopwaitsecs", "0")), 10)
+
+    def test_live_gets_as_long_to_store_documents_as_under_compose(self):
+        compose = (REPOSITORY_ROOT / "deployments" / "cli" / "community" / "docker-compose.yml").read_text()
+        live = compose[compose.index("\n  live:\n") :]
+        grace = re.search(r"^    stop_grace_period: (\d+)s$", live, re.MULTILINE)
+        self.assertIsNotNone(grace, "Compose no longer sets live's stop_grace_period")
+        self.assertGreaterEqual(int(self.programs["live"]["stopwaitsecs"]), int(grace.group(1)))
+
+    def test_live_stops_while_the_api_still_serves(self):
+        # supervisord stops the highest priority first; live stores documents through the API.
+        self.assertGreater(int(self.programs["live"]["priority"]), int(self.programs["api"]["priority"]))
+
+    def test_programs_are_their_own_process_not_a_shell_wrapper(self):
+        # `sh -c "<one command>"` execs that command, and every entrypoint script
+        # ends in exec, so SIGTERM reaches the server itself. A compound command
+        # would leave sh in between, and sh does not forward the signal.
+        for name, program in self.programs.items():
+            command = program["command"]
+            if command.startswith("sh -c "):
+                with self.subTest(program=name):
+                    self.assertNotRegex(command, r"[;&|]")
+
+
+class ControlSocketTests(unittest.TestCase):
+    """`supervisorctl status`, which the README documents, needs a control socket.
+
+    It is a unix socket in a root-only directory; supervisord must never listen
+    on TCP, where every container on the same network could stop the services.
+    """
+
+    def setUp(self):
+        self.config = configparser.RawConfigParser(inline_comment_prefixes=(";",))
+        self.config.read_string(SUPERVISOR.read_text())
+
+    def test_the_socket_is_unix_and_root_only(self):
+        self.assertNotIn("inet_http_server", self.config.sections())
+        server = self.config["unix_http_server"]
+        socket = Path(server["file"])
+        self.assertEqual(socket.parent, Path("/run/supervisor"))
+        self.assertEqual(server["chmod"], "0700")
+        self.assertEqual(server["chown"], "root:root")
+        self.assertEqual(self.config["supervisorctl"]["serverurl"], f"unix://{socket}")
+        self.assertIn("rpcinterface:supervisor", self.config.sections())
+
+    def test_start_sh_creates_the_socket_directory_root_only_before_supervisord(self):
+        main = _shell_function(START.read_text(), "main")
+        before = main.split("exec /usr/local/bin/supervisord", 1)[0]
+        self.assertIn("mkdir -p /run/supervisor", before)
+        self.assertIn("chmod 0700 /run/supervisor", before)
+
+    def test_supervisorctl_finds_the_configuration(self):
+        dockerfile = (AIO / "Dockerfile").read_text()
+        self.assertIn("RUN ln -s /etc/supervisor/conf.d/supervisor.conf /etc/supervisord.conf", dockerfile)
+
+
+class ProxyRouteTests(unittest.TestCase):
+    """/spaces without its slash matched no space route and served the web app."""
+
+    def test_spaces_redirects_to_its_slash_like_compose(self):
+        line = "redir /spaces /spaces/ permanent"
+        aio = (REPOSITORY_ROOT / "apps" / "proxy" / "Caddyfile.aio.ce").read_text()
+        compose = (REPOSITORY_ROOT / "apps" / "proxy" / "Caddyfile.ce").read_text()
+        self.assertIn(line, compose)
+        self.assertIn(line, aio)
+        self.assertLess(aio.index(line), aio.index("handle_path /* {"))
 
 
 TEMPLATE = (AIO / "variables.env").read_text()

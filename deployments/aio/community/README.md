@@ -211,6 +211,24 @@ The container runs multiple services managed by Supervisor. Check service status
 docker exec -it <container-name> supervisorctl status
 ```
 
+`supervisorctl` talks to supervisord over a unix socket inside the container
+(`/run/supervisor/supervisor.sock`, reachable by root only); nothing listens on
+a network port for it.
+
+### Stopping the container
+
+supervisord runs as the container's main process, so `docker stop` reaches it
+and it stops the services in two steps: first the proxy, the workers and
+`live`, which stores the open documents through the still-running API, then
+the API and `space`. This normally takes a few seconds. Each service may take up to 30 seconds if it is busy, so allow more
+than Docker's default 10-second timeout before it kills the container:
+
+```bash
+docker stop -t 60 <container-name>
+```
+
+or start it with `docker run --stop-timeout 60 ...`.
+
 ### Common Issues
 
 1. **Database Connection Failed**: Ensure PostgreSQL is accessible and credentials are correct

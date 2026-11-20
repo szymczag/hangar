@@ -17,6 +17,30 @@ export enum EErrorAlertType {
   INLINE_EMAIL_CODE = "INLINE_EMAIL_CODE",
 }
 
+// Fork (see FORK.md): the disabled-key message prints a shell command for the
+// operator to paste. The address comes from the sign-in redirect, so a crafted
+// link could put anything there; only a plain address with no shell
+// metacharacters is spliced in, and anything else keeps the placeholder.
+const RESET_COMMAND_EMAIL = /^[A-Za-z0-9_%+][A-Za-z0-9._%+-]{0,63}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
+
+export const resetCommandEmail = (email?: string): string =>
+  email && email.length <= 254 && RESET_COMMAND_EMAIL.test(email) ? email : "<your email>";
+
+// Fork (see FORK.md): second-factor titles say something the message does not
+// repeat, so the banner shows them; upstream messages restate their title.
+const SECOND_FACTOR_CODES = [
+  EAdminAuthErrorCodes.ADMIN_2FA_REQUIRED,
+  EAdminAuthErrorCodes.ADMIN_2FA_SESSION_EXPIRED,
+  EAdminAuthErrorCodes.ADMIN_2FA_VERIFICATION_FAILED,
+  EAdminAuthErrorCodes.ADMIN_2FA_ENROLLMENT_REQUIRED,
+  EAdminAuthErrorCodes.ADMIN_2FA_NOT_CONFIGURED,
+  EAdminAuthErrorCodes.ADMIN_2FA_ATTEMPTS_EXHAUSTED,
+  EAdminAuthErrorCodes.ADMIN_2FA_LAST_CREDENTIAL,
+  EAdminAuthErrorCodes.ADMIN_2FA_CREDENTIAL_DISABLED,
+];
+
+export const showsBannerTitle = (errorCode: EAdminAuthErrorCodes): boolean => SECOND_FACTOR_CODES.includes(errorCode);
+
 const errorCodeMessages: {
   [key in EAdminAuthErrorCodes]: { title: string; message: (email?: string) => React.ReactNode };
 } = {
@@ -106,7 +130,7 @@ const errorCodeMessages: {
   [EAdminAuthErrorCodes.ADMIN_2FA_CREDENTIAL_DISABLED]: {
     title: `Security key disabled`,
     message: (email) =>
-      `Your security key was disabled because it looked copied, so this console stays locked. A new key can only be registered after a reset from a shell on the server: python manage.py disable_instance_admin_2fa --email ${email || "<your email>"}`,
+      `Your security key was disabled because it looked copied, so this console stays locked. A new key can only be registered after a reset from a shell on the server: python manage.py disable_instance_admin_2fa --email ${resetCommandEmail(email)}`,
   },
 };
 
@@ -122,14 +146,7 @@ export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string
     EAdminAuthErrorCodes.ADMIN_USER_DOES_NOT_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DEACTIVATED,
     // Fork (see FORK.md): second-factor codes surface the same way.
-    EAdminAuthErrorCodes.ADMIN_2FA_REQUIRED,
-    EAdminAuthErrorCodes.ADMIN_2FA_SESSION_EXPIRED,
-    EAdminAuthErrorCodes.ADMIN_2FA_VERIFICATION_FAILED,
-    EAdminAuthErrorCodes.ADMIN_2FA_ENROLLMENT_REQUIRED,
-    EAdminAuthErrorCodes.ADMIN_2FA_NOT_CONFIGURED,
-    EAdminAuthErrorCodes.ADMIN_2FA_ATTEMPTS_EXHAUSTED,
-    EAdminAuthErrorCodes.ADMIN_2FA_LAST_CREDENTIAL,
-    EAdminAuthErrorCodes.ADMIN_2FA_CREDENTIAL_DISABLED,
+    ...SECOND_FACTOR_CODES,
   ];
 
   if (bannerAlertErrorCodes.includes(errorCode))

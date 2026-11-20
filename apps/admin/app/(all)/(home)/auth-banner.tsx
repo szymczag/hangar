@@ -9,6 +9,8 @@ import { Info } from "lucide-react";
 import type { TAdminAuthErrorInfo } from "@plane/constants";
 // icons
 import { CloseIcon } from "@plane/propel/icons";
+// helpers
+import { showsBannerTitle } from "./auth-helpers";
 
 type TAuthBanner = {
   bannerData: TAdminAuthErrorInfo | undefined;
@@ -24,7 +26,10 @@ export function AuthBanner(props: TAuthBanner) {
       <div className="relative flex h-4 w-4 flex-shrink-0 items-center justify-center">
         <Info size={16} className="text-accent-primary" />
       </div>
-      <div className="w-full text-13 font-medium text-accent-primary">{bannerData?.message}</div>
+      <div className="w-full text-13 font-medium text-accent-primary">
+        {showsBannerTitle(bannerData.code) && <p className="font-semibold">{bannerData.title}</p>}
+        <div className="break-words">{bannerData.message}</div>
+      </div>
       <button
         type="button"
         aria-label="Dismiss banner"

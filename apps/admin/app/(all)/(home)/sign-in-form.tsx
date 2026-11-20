@@ -95,18 +95,20 @@ export function InstanceSignInForm() {
   }, [errorCode, errorMessage]);
 
   const isButtonDisabled = useMemo(
-    () => (!isSubmitting && formData.email && formData.password ? false : true),
+    () => isSubmitting || !formData.email || !formData.password,
     [formData.email, formData.password, isSubmitting]
   );
 
   useEffect(() => {
     if (errorCode) {
-      const errorDetail = authErrorHandler(errorCode?.toString() as EAdminAuthErrorCodes);
+      // The API echoes the address that was signed in with; the helper only
+      // prints it when it is a plain address.
+      const errorDetail = authErrorHandler(errorCode?.toString() as EAdminAuthErrorCodes, emailParam);
       if (errorDetail) {
         setErrorInfo(errorDetail);
       }
     }
-  }, [errorCode]);
+  }, [errorCode, emailParam]);
 
   return (
     <>
@@ -145,6 +147,7 @@ export function InstanceSignInForm() {
                 value={formData.email}
                 onChange={(e) => handleFormChange("email", e.target.value)}
                 autoComplete="off"
+                // oxlint-disable-next-line jsx-a11y/no-autofocus -- the sign-in page exists for this form
                 autoFocus
               />
             </div>
