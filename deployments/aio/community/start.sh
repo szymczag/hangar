@@ -356,7 +356,14 @@ main(){
     # if stdout_logfile's parent path is missing.
     mkdir -p /app/logs/access /app/logs/error
 
-    /usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisor.conf
+    # supervisord's control socket lives here; only root may reach it.
+    mkdir -p /run/supervisor
+    chmod 0700 /run/supervisor
+
+    # Replace this shell so supervisord becomes PID 1 and receives the
+    # runtime's SIGTERM. Bash as PID 1 ignores it, so `docker stop` used to
+    # wait out its timeout and SIGKILL every program mid-flight.
+    exec /usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisor.conf
 }
 
 main "$@"

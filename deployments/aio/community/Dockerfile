@@ -105,6 +105,8 @@ RUN mkdir -p /etc/supervisor/conf.d
 COPY start.sh /app/start.sh
 COPY dist/plane.env /app/plane.env
 COPY supervisor.conf /etc/supervisor/conf.d/supervisor.conf
+# supervisorctl looks for /etc/supervisord.conf, not the conf.d path above.
+RUN ln -s /etc/supervisor/conf.d/supervisor.conf /etc/supervisord.conf
 
 RUN mkdir -p /app/logs/access && \
     mkdir -p /app/logs/error && \

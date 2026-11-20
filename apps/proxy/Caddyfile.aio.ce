@@ -3,6 +3,9 @@
 		max_size {$FILE_SIZE_LIMIT}
 	}
 
+    # Without the slash, /spaces would fall through to the web app; Compose
+    # redirects it the same way (Caddyfile.ce).
+    redir /spaces /spaces/ permanent
     handle /spaces/* {
         reverse_proxy localhost:3002
     }
