@@ -18,6 +18,7 @@ DNS, not of this code.
 """
 
 import json
+import threading
 import uuid
 from io import StringIO
 from unittest import mock
@@ -26,7 +27,9 @@ import pytest
 from django.conf import settings
 from django.core.cache import cache
 from django.core.management import call_command
+from django.db import connection, transaction
 from django.test import Client, override_settings
+from django.test.utils import CaptureQueriesContext
 
 from plane.authentication.adapter.error import AUTHENTICATION_ERROR_CODES
 from plane.db.models import Session, User
@@ -460,3 +463,104 @@ def test_a_key_without_a_counter_ends_no_session(admin_user, device):
     credential = InstanceAdminWebAuthnCredential.objects.get(user=admin_user)
     assert credential.sign_count == 0
     assert credential.disabled_at is None
+
+
+# --- The counter check is serialized -----------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_second_assertion_with_the_same_counter_is_a_clone(admin_user, device):
+    """Two holders of one key presenting the same counter: the second is the copy."""
+    signed_in, stored = _enroll_and_advance(admin_user, device)
+    first, second = _new_client(), _new_client()
+    first.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    second.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+
+    accepted = _assert_with_key(first, device, sign_count=stored + 1)
+    refused = _assert_with_key(second, device, sign_count=stored + 1)
+
+    assert accepted.status_code == 200
+    assert refused.status_code == 400
+    credential = InstanceAdminWebAuthnCredential.objects.get(user=admin_user)
+    assert credential.sign_count == stored + 1
+    assert credential.disabled_at is not None
+    # Including the session the first assertion opened a moment earlier.
+    assert first.get(ME).status_code in (401, 403)
+    assert signed_in.get(ME).status_code in (401, 403)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_the_counter_is_read_under_a_row_lock(admin_user, device):
+    _, stored = _enroll_and_advance(admin_user, device)
+    client = _new_client()
+    client.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+
+    with CaptureQueriesContext(connection) as queries:
+        assert _assert_with_key(client, device).status_code == 200
+
+    locking = [q["sql"] for q in queries if "FOR UPDATE" in q["sql"]]
+    assert any(InstanceAdminWebAuthnCredential._meta.db_table in sql for sql in locking), locking
+
+
+@pytest.mark.unit
+@pytest.mark.django_db(transaction=True)
+@override_settings(**WEBAUTHN_SETTINGS)
+def test_a_concurrent_assertion_waits_for_the_first_and_is_caught(admin_user, device):
+    """The race itself: a copy presented while the real key's sign-in is in flight.
+
+    One thread stands in for the real key's request: it locks the credential
+    row, as the endpoint does, and stores the next counter value. The copy's
+    request, carrying that same value, has to wait for it rather than compare
+    against the stale counter both read before -- and then it is a regression.
+    """
+    _, stored = _enroll_and_advance(admin_user, device)
+    credential_pk = InstanceAdminWebAuthnCredential.objects.get(user=admin_user).pk
+    clone = _new_client()
+    clone.post(SIGN_IN, {"email": admin_user.email, "password": PASSWORD})
+    body = clone.post(AUTH_OPTIONS, {}, content_type="application/json").json()
+    challenge = _challenge_of(body)
+    payload = {
+        "credential": device.get(rp_id=RP_ID, challenge=challenge, origin=ORIGIN, sign_count=stored + 1),
+        "challenge": challenge,
+    }
+
+    locked, release = threading.Event(), threading.Event()
+    results = {}
+
+    def real_key():
+        try:
+            with transaction.atomic():
+                row = InstanceAdminWebAuthnCredential.objects.select_for_update().get(pk=credential_pk)
+                locked.set()
+                release.wait(10)
+                row.sign_count = stored + 1
+                row.save(update_fields=["sign_count"])
+        finally:
+            connection.close()
+
+    def copy():
+        try:
+            results["copy"] = clone.post(AUTH_VERIFY, payload, content_type="application/json")
+        finally:
+            connection.close()
+
+    holder = threading.Thread(target=real_key)
+    holder.start()
+    assert locked.wait(10)
+    contender = threading.Thread(target=copy)
+    contender.start()
+    contender.join(1.0)
+    still_waiting = contender.is_alive()
+    release.set()
+    holder.join(10)
+    contender.join(10)
+
+    assert still_waiting, "the copy's verification did not wait for the row lock"
+    assert results["copy"].status_code == 400
+    credential = InstanceAdminWebAuthnCredential.objects.get(pk=credential_pk)
+    assert credential.sign_count == stored + 1
+    assert credential.disabled_at is not None

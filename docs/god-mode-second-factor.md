@@ -134,18 +134,18 @@ failure away from needing server access.
 
 ## What is enforced
 
-| Property                                    | How                                                                                                              |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| A password alone opens nothing              | The password step never creates a session; `request.user` stays anonymous                                        |
-| A half-authenticated session grants nothing | `InstanceAdminPermission` additionally requires a completion marker                                              |
-| A challenge is used once                    | Conditional `UPDATE`, not read-then-write, so concurrent verifies cannot both win                                |
-| A challenge belongs to one session          | Bound to the issuing session key                                                                                 |
-| Registration cannot authenticate            | Challenges carry a purpose                                                                                       |
-| A cloned authenticator is caught            | Signature-counter regression disables the credential and ends every session of its administrator, atomically     |
-| A disabled key is not a way back in         | A disabled key counts as enrolled: password sign-in is refused and registration stays shut until the shell reset |
-| A password enrolls only the first key       | A pending enrollment is refused once any key exists                                                              |
-| A key cannot be claimed twice               | `credential_id` is unique instance-wide, at the database level                                                   |
-| Guessing is bounded                         | Dedicated throttles plus a per-session attempt cap                                                               |
+| Property                                    | How                                                                                                                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A password alone opens nothing              | The password step never creates a session; `request.user` stays anonymous                                                                                                                                                             |
+| A half-authenticated session grants nothing | `InstanceAdminPermission` additionally requires a completion marker                                                                                                                                                                   |
+| A challenge is used once                    | Conditional `UPDATE`, not read-then-write, so concurrent verifies cannot both win                                                                                                                                                     |
+| A challenge belongs to one session          | Bound to the issuing session key                                                                                                                                                                                                      |
+| Registration cannot authenticate            | Challenges carry a purpose                                                                                                                                                                                                            |
+| A cloned authenticator is caught            | Signature-counter regression disables the credential and ends every session of its administrator, atomically. The counter is checked and advanced under a row lock, so a copy used at the same moment as the real key is still caught |
+| A disabled key is not a way back in         | A disabled key counts as enrolled: password sign-in is refused and registration stays shut until the shell reset                                                                                                                      |
+| A password enrolls only the first key       | A pending enrollment is refused once any key exists                                                                                                                                                                                   |
+| A key cannot be claimed twice               | `credential_id` is unique instance-wide, at the database level                                                                                                                                                                        |
+| Guessing is bounded                         | Dedicated throttles plus a per-session attempt cap                                                                                                                                                                                    |
 
 Every cryptographic failure answers the same error code, so the response cannot
 distinguish an unknown credential from a bad signature.

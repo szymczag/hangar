@@ -252,25 +252,54 @@ class AdminWebAuthnAuthenticationVerifyEndpoint(_WebAuthnBase):
         except (InvalidAuthenticationResponse, ValueError, KeyError):
             return _error("ADMIN_2FA_VERIFICATION_FAILED")
 
-        # A counter that goes backwards means the authenticator was cloned.
-        # Only meaningful when the device uses counters at all: many report 0
-        # forever, and treating 0 <= 0 as a clone would lock those out.
-        #
-        # Whoever holds the copy also holds the password, and if they used it
-        # first they are signed in now. Disabling the key only stops the next
-        # sign-in, so every session of this account ends with it -- the
-        # application's too, since the same password opens it. The pending
-        # state of this request is not one of them (it has no user id yet) and
-        # is cleared separately, so it cannot be retried.
-        #
-        # The answer stays the generic failure: the caller may be the clone,
-        # and must not learn that it was recognised as one.
-        if credential.sign_count > 0 and verification.new_sign_count <= credential.sign_count:
-            with transaction.atomic():
+        # The counter is compared and advanced under a row lock, so two
+        # assertions with the same key serialize: the second waits for the
+        # first to commit and then compares against the counter it stored.
+        # Without the lock both read the same stored value and both pass,
+        # which is exactly how a clone used at the same moment as the real key
+        # would go unnoticed. The sign-in is completed inside the same
+        # transaction, so a clone detected by the next holder of the lock also
+        # finds -- and ends -- the session this one opened.
+        with transaction.atomic():
+            credential = (
+                InstanceAdminWebAuthnCredential.objects.select_for_update()
+                .filter(pk=credential.pk, user=user, disabled_at__isnull=True)
+                .first()
+            )
+            # Disabled while this request waited: the same generic answer as
+            # for any other unusable credential.
+            if credential is None:
+                return _error("ADMIN_2FA_VERIFICATION_FAILED")
+
+            # A counter that goes backwards means the authenticator was
+            # cloned. Only meaningful when the device uses counters at all:
+            # many report 0 forever, and treating 0 <= 0 as a clone would lock
+            # those out.
+            #
+            # Whoever holds the copy also holds the password, and if they used
+            # it first they are signed in now. Disabling the key only stops the
+            # next sign-in, so every session of this account ends with it --
+            # the application's too, since the same password opens it. The
+            # pending state of this request is not one of them (it has no user
+            # id yet) and is cleared separately, so it cannot be retried.
+            #
+            # The answer stays the generic failure: the caller may be the
+            # clone, and must not learn that it was recognised as one.
+            cloned = credential.sign_count > 0 and verification.new_sign_count <= credential.sign_count
+            if cloned:
                 credential.disabled_at = timezone.now()
                 credential.save(update_fields=["disabled_at", "updated_at"])
                 ended = end_user_sessions(user)
                 pending.clear(request)
+            else:
+                credential.sign_count = verification.new_sign_count
+                credential.last_used_at = timezone.now()
+                credential.last_used_ip = get_client_ip(request=request) or ""
+                credential.last_uv = bool(getattr(verification, "user_verified", False))
+                credential.save(update_fields=["sign_count", "last_used_at", "last_used_ip", "last_uv", "updated_at"])
+                response = self._complete_login(request, user, credential)
+
+        if cloned:
             security_logger.warning(
                 "WebAuthn signature counter regressed for instance admin credential %s; "
                 "credential disabled and %s session(s) of its administrator ended",
@@ -278,14 +307,7 @@ class AdminWebAuthnAuthenticationVerifyEndpoint(_WebAuthnBase):
                 ended,
             )
             return _error("ADMIN_2FA_VERIFICATION_FAILED")
-
-        credential.sign_count = verification.new_sign_count
-        credential.last_used_at = timezone.now()
-        credential.last_used_ip = get_client_ip(request=request) or ""
-        credential.last_uv = bool(getattr(verification, "user_verified", False))
-        credential.save(update_fields=["sign_count", "last_used_at", "last_used_ip", "last_uv", "updated_at"])
-
-        return self._complete_login(request, user, credential)
+        return response
 
 
 def _may_register(request):
