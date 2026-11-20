@@ -17,11 +17,13 @@ happened yet.
 
 # Python imports
 import base64
+import logging
 import secrets
 from datetime import timedelta
 
 # Django imports
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -53,12 +55,15 @@ from plane.authentication.rate_limit import (
 )
 from plane.authentication.utils.host import base_host
 from plane.authentication.utils.login import user_login
+from plane.ext.auth.sessions import end_user_sessions
 from plane.ext.auth.webauthn import config, enrollment, pending
 from plane.ext.models import InstanceAdminWebAuthnChallenge, InstanceAdminWebAuthnCredential
 from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.models import InstanceAdmin
 from plane.utils.exception_logger import log_exception
 from plane.utils.ip_address import get_client_ip
+
+security_logger = logging.getLogger("plane.security")
 
 
 def _b64(raw):
@@ -250,10 +255,28 @@ class AdminWebAuthnAuthenticationVerifyEndpoint(_WebAuthnBase):
         # A counter that goes backwards means the authenticator was cloned.
         # Only meaningful when the device uses counters at all: many report 0
         # forever, and treating 0 <= 0 as a clone would lock those out.
+        #
+        # Whoever holds the copy also holds the password, and if they used it
+        # first they are signed in now. Disabling the key only stops the next
+        # sign-in, so every session of this account ends with it -- the
+        # application's too, since the same password opens it. The pending
+        # state of this request is not one of them (it has no user id yet) and
+        # is cleared separately, so it cannot be retried.
+        #
+        # The answer stays the generic failure: the caller may be the clone,
+        # and must not learn that it was recognised as one.
         if credential.sign_count > 0 and verification.new_sign_count <= credential.sign_count:
-            credential.disabled_at = timezone.now()
-            credential.save(update_fields=["disabled_at", "updated_at"])
-            log_exception(Exception(f"WebAuthn signature counter regressed for credential {credential.id}"))
+            with transaction.atomic():
+                credential.disabled_at = timezone.now()
+                credential.save(update_fields=["disabled_at", "updated_at"])
+                ended = end_user_sessions(user)
+                pending.clear(request)
+            security_logger.warning(
+                "WebAuthn signature counter regressed for instance admin credential %s; "
+                "credential disabled and %s session(s) of its administrator ended",
+                credential.id,
+                ended,
+            )
             return _error("ADMIN_2FA_VERIFICATION_FAILED")
 
         credential.sign_count = verification.new_sign_count
