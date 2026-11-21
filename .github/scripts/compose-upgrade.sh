@@ -338,8 +338,7 @@ BACKUP_DIR="$ARTIFACT_DIR/backup"
 mkdir -p "$BACKUP_DIR"
 cp "$backup_source"/*.tar.gz "$BACKUP_DIR/"
 # The volumes hold data written with these passwords and keys; a restore needs both.
-cp "$FROM_DIR/$PROJECT/plane.env" "$BACKUP_DIR/plane.env"
-chmod 600 "$BACKUP_DIR/plane.env"
+install -m 600 "$FROM_DIR/$PROJECT/plane.env" "$BACKUP_DIR/plane.env"
 for archive in pgdata object-storage rabbitmq_data redisdata; do
     [ -s "$BACKUP_DIR/$archive.tar.gz" ] || fail "the backup has no $archive.tar.gz"
 done
@@ -397,7 +396,7 @@ log "Restoring the backup into a fresh directory"
 RESTORE_DIR="$WORK_DIR/restore"
 mkdir -p "$RESTORE_DIR/$PROJECT"
 CURRENT_DEPLOYMENT=$RESTORE_DIR
-cp "$BACKUP_DIR/plane.env" "$RESTORE_DIR/$PROJECT/plane.env"
+install -m 600 "$BACKUP_DIR/plane.env" "$RESTORE_DIR/$PROJECT/plane.env"
 cp "$SOURCE_DIR/restore.sh" "$RESTORE_DIR/restore.sh"
 # restore.sh fills existing volumes only. They are restored before the
 # installer runs, so it sees an existing database and keeps its password.

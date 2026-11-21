@@ -232,10 +232,22 @@ Below are the most import keys you must refer to. _<span style="color: #fcba03">
 > **Secrets are generated for you.** The template ships `SECRET_KEY`,
 > `LIVE_SERVER_SECRET_KEY`, `POSTGRES_PASSWORD` and `RABBITMQ_PASSWORD` empty, and
 > `setup.sh` writes random values into `plane.env` on install (with the
-> object-storage pair, see [Upgrading](#upgrading-hangar-version)). Keep `plane.env`
-> private, for example with `chmod 600 plane-app/plane.env`. The API and Live refuse
+> object-storage pair, see [Upgrading](#upgrading-hangar-version)). The API and Live refuse
 > to start while `SECRET_KEY` or `LIVE_SERVER_SECRET_KEY` is empty or a value a
 > template once shipped, and exit with status 64 saying which.
+>
+> **Only the owner can read `plane.env` and its copies.** `setup.sh` (Compose and
+> Swarm) writes `plane.env`, the `plane.env.bak` and `archive/<timestamp>.env`
+> copies an upgrade keeps, and the backup archives with mode `600`, and the
+> `archive/` and `backup/` folders with mode `700`, whatever the umask. Releases up
+> to and including hangar-v0.3.0-rc.1 left those files at the umask's mode, often
+> `664` or `644`, so any local user could read every secret in them. The first run
+> of a newer `setup.sh`, whatever the action, removes group and other access from
+> `plane.env`, `plane.env.bak`, `archive/*.env`, `archive/` and `backup/`, and prints
+> one `NOTICE: restricted to the owner, ...` line naming what it changed. Run
+> `setup.sh` and `restore.sh` as the user that owns `plane-app/`, or as root. If
+> those files were readable on a shared host, treat the secrets in them as exposed
+> and rotate them ([Rotating the database and RabbitMQ passwords](#rotating-the-database-and-rabbitmq-passwords)).
 >
 > `DATABASE_URL` and `AMQP_URL` stay empty: the API connects with the `POSTGRES_*`
 > and `RABBITMQ_*` settings, which are what the bundled database and broker were
@@ -787,7 +799,9 @@ Backup completed successfully. Backup files are stored in /....../plane-app/back
 Unattended: `./setup.sh backup`.
 
 > **Keep `plane.env` with the backup.** Copy `plane-app/plane.env` into the backup
-> folder and store them together, protected like a password: the archives hold
+> folder with `install -m 600 plane-app/plane.env plane-app/backup/<folder>/plane.env`
+> (a plain `cp` gives the copy the umask's mode) and store them together, protected
+> like a password. The backup folder is mode `700` and each archive `600`: the archives hold
 > data written with its database and RabbitMQ passwords, its object-storage key
 > pair, and its `SECRET_KEY`, which encrypts settings saved in God Mode. A new
 > install generates new values, which cannot open the restored data.
@@ -866,7 +880,7 @@ before the installer runs, in this order:
 
 ```bash
 mkdir -p plane-app
-cp /path/to/backup/plane.env plane-app/plane.env
+install -m 600 /path/to/backup/plane.env plane-app/plane.env
 for volume in pgdata redisdata object-storage rabbitmq_data; do
   docker volume create "plane-app_${volume}"
 done

@@ -160,6 +160,16 @@ class RestoreScriptTests(unittest.TestCase):
         # An empty archive (a Valkey volume with nothing saved) restores too.
         self.assertIn('cp -a "/restore/${TAR_NAME}/." /vol/', restore)
 
+    def test_the_archive_is_streamed_rather_than_mounted(self):
+        # S28: setup.sh backup writes the archives 0600 in a 0700 folder, which
+        # the container's root cannot read under user-namespace remapping.
+        restore = (REPOSITORY_ROOT / "deployments" / "cli" / "community" / "restore.sh").read_text(encoding="utf-8")
+        single = restore.split("function restoreSingleVolume()", maxsplit=1)[1].split("\nfunction ", maxsplit=1)[0]
+        self.assertIn("docker run --rm -i \\\n", single)
+        self.assertIn("tar -xzf - -C /restore", single)
+        self.assertIn('< "$backupFolder/${restoreFile}.tar.gz"', single)
+        self.assertNotIn(":/backup", single)
+
 
 class ComposeSeedTests(unittest.TestCase):
     @classmethod

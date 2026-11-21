@@ -550,7 +550,7 @@ class WiringTests(unittest.TestCase):
             with self.subTest(script=script.name):
                 source = script.read_text()
                 self.assertIn("--yes|-y) HANGAR_ASSUME_YES=1 ;;", source)
-                self.assertRegex(source, r'set -- "\$\{ACTION_ARGS\[@\]\}"\n\nprint_header\naskForAction "\$@"\n')
+                self.assertRegex(source, r'set -- "\$\{ACTION_ARGS\[@\]\}"\n\nprint_header\nprotectEnvFiles\naskForAction "\$@"\n')
 
 
 if __name__ == "__main__":
