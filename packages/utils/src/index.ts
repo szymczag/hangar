@@ -24,6 +24,7 @@ export * from "./inert-html";
 export * from "./intake";
 export * from "./loader";
 export * from "./math";
+export * from "./measure-text";
 export * from "./module";
 export * from "./notification";
 export * from "./page";
