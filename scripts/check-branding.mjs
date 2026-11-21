@@ -2,13 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { readFileSync } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 const RULES = [
   { name: "product-name", pattern: /\bPlane\b/g },
   { name: "plane-domain", pattern: /(?:[\w.-]+\.)?plane\.so\b/gi },
   { name: "upstream-repository", pattern: /github\.com\/makeplane(?:\/|\b)/gi },
   { name: "plane-email", pattern: /[\w.+-]+@plane\.so\b/gi },
+  // Upstream copy that names the product in lower case after "sign up to",
+  // which product-name cannot see without matching every `plane` identifier.
+  {
+    name: "product-name-lowercase",
+    pattern:
+      /\b(?:[Ss]ign(?:ed)?[ -]?(?:up|in) (?:to|for|with)|[Ll]og(?:ged)?[ -]?in (?:to|with)|[Ww]elcome to|[Bb]ack to|[Uu]sing) plane\b/g,
+  },
 ];
 
 const TEXT_FILE = /(?:^|\/)(?:[^/.]+|.*\.(?:cjs|css|env|html|js|json|jsx|md|mjs|py|sh|svg|ts|tsx|txt|yaml|yml))$/i;
