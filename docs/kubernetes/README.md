@@ -6,10 +6,11 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.2.2`. It is a stable Hangar release for Docker
-Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
-for evaluation on AMD64 clusters only and is not yet a supported production
-release.
+The current release is `0.3.0-rc.1`. It is a release candidate for `0.3.0`;
+the current stable Hangar release for Docker Compose, Docker Swarm and the
+all-in-one image remains `0.2.2`. Helm installs a release candidate only when
+you name its version. On Kubernetes, both are qualified for evaluation on AMD64
+clusters only and are not yet a supported production release.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -63,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.2.2` qualification boundary is:
+The `0.3.0-rc.1` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -77,7 +78,8 @@ The `0.2.2` qualification boundary is:
 | Storage                | A default `StorageClass`, or explicit evaluation storage classes |
 
 The backend, the editor and the live server are also converged with upstream
-`v1.5.0`; the interface is still the `v1.4` design.
+`v1.5.0`. God Mode, the instance admin console, uses the upstream `v1.5.0`
+design; the web app and Spaces are still the `v1.4` design.
 
 The chart does not install an ingress controller, cert-manager, a CNI, a CSI
 driver, an external secret operator, or observability infrastructure.
@@ -222,12 +224,12 @@ client can then change its throttle identity by sending its own `X-Forwarded-For
 
 The product, chart, and Git identifiers are deliberately different:
 
-| Identifier         | Current value                          |
-| ------------------ | -------------------------------------- |
-| Product version    | `v0.2.2`                               |
-| Helm chart version | `0.2.2`                                |
-| Git tag            | `hangar-v0.2.2`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.2.2` |
+| Identifier         | Current value                               |
+| ------------------ | ------------------------------------------- |
+| Product version    | `v0.3.0-rc.1`                               |
+| Helm chart version | `0.3.0-rc.1`                                |
+| Git tag            | `hangar-v0.3.0-rc.1`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.3.0-rc.1` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -238,11 +240,14 @@ installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
 `ext.0037` fails there, so upgrade to `rc.68` or later instead. The `0.2.0`
 release candidates are superseded by `0.2.0` and are not rollback targets.
-`0.2.1` is the previous stable release and the supported rollback target for
+`0.2.2` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
-values, only the images change. Rolling back further, to `0.2.0`, needs no
+values, only the images change, and it brings back the previous God Mode
+design. Rolling back further, to `0.2.1`, needs no schema change or values
+change either, but brings back the God Mode sessions that survive clone
+detection. Rolling back further, to `0.2.0`, needs no
 schema change or values change either. Rolling back further, to `0.1.4`, needs no
-schema change either, and pages edited on `0.2.0`, `0.2.1` or `0.2.2` stay readable
+schema change either, and pages edited on `0.2.0` or later stay readable
 there because the stored Yjs documents do not change. It brings back the
 `0.1.4` collaboration bug, in which concurrent edits to one page are lost, so
 roll back that far only when you need to. Rolling back further, to `0.1.3`, needs no schema change either, but
@@ -279,7 +284,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.2.2` notes](../releases/hangar-v0.2.2.md) — review
+- [Release `v0.3.0-rc.1` notes](../releases/hangar-v0.3.0-rc.1.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -311,8 +316,8 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.2.1`, tag `hangar-v0.2.1`, and chart
-`ghcr.io/szymczag/charts/hangar:0.2.1`. Anybody still on rc.62 with
+The previous release is `0.2.2`, tag `hangar-v0.2.2`, and chart
+`ghcr.io/szymczag/charts/hangar:0.2.2`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
@@ -322,6 +327,16 @@ images exist in the registry, but that candidate has no GitHub Release because
 a workflow bug skipped the release job. `0.2.0` is built from the `0.2.0-rc.3`
 source, so an installation on any of the candidates upgrades to `0.2.2` with
 `helm upgrade` and `--version 0.2.2` and no other action.
+
+Release 0.3.0-rc.1 adds no database or license migration compared with 0.2.2
+and changes nothing in the chart's templates, values or Secrets. Upgrade from
+0.2.2 with `helm upgrade` and `--version 0.3.0-rc.1`; Helm does not select a
+release candidate otherwise. No other action is required. Only God Mode, served
+by the `admin` image, changes: it moves to the upstream Plane 1.5.0 design on
+the Propel component library, with its secrets still write-only and its
+Content-Security-Policy unchanged. The `api`, `web`, `space` and `live`
+application code is unchanged. Rolling back to 0.2.2 needs no schema change and
+no change to the values, and brings back the previous God Mode design.
 
 Release 0.2.2 adds no database or license migration compared with 0.2.1 and
 changes nothing in the chart's templates, values or Secrets; upgrade from
