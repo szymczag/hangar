@@ -8,10 +8,11 @@ oci://ghcr.io/szymczag/charts/hangar
 ```
 
 The latest stable chart is `0.2.2` (`appVersion: v0.2.2`). Release candidate
-`0.3.0-rc.1` is also published; Helm installs it only when you name its version.
-The release candidates `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3` are
-superseded; do not install those, and upgrade an installation on any of them to
-`0.2.2`. The chart's evaluation profile is live-qualified on AMD64. The
+`0.3.0-rc.2` is also published; Helm installs it only when you name its version.
+It supersedes `0.3.0-rc.1`; do not install that, and upgrade an installation on
+it to `0.3.0-rc.2`. The release candidates `0.2.0-rc.1`, `0.2.0-rc.2` and
+`0.2.0-rc.3` are superseded; do not install those, and upgrade an installation
+on any of them to `0.2.2`. The chart's evaluation profile is live-qualified on AMD64. The
 chart is qualified for evaluation only and is not yet supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
 
@@ -52,8 +53,8 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.2.2`, or name `0.3.0-rc.1` to test the release candidate; rolling
-back from `0.3.0-rc.1` to `0.2.2` needs no schema change and no values change.
+Use `0.2.2`, or name `0.3.0-rc.2` to test the release candidate; rolling
+back from `0.3.0-rc.2` to `0.2.2` needs no schema change and no values change.
 `0.2.1` is the previous stable release and the supported rollback target from
 `0.2.2`; rolling back to it needs no schema change and no values change,
 but brings back the God Mode sessions that survive clone detection and the

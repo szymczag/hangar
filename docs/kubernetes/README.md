@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.3.0-rc.1`. It is a release candidate for `0.3.0`;
+The current release is `0.3.0-rc.2`. It is a release candidate for `0.3.0`;
 the current stable Hangar release for Docker Compose, Docker Swarm and the
 all-in-one image remains `0.2.2`. Helm installs a release candidate only when
 you name its version. On Kubernetes, both are qualified for evaluation on AMD64
@@ -64,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.3.0-rc.1` qualification boundary is:
+The `0.3.0-rc.2` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -226,10 +226,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                               |
 | ------------------ | ------------------------------------------- |
-| Product version    | `v0.3.0-rc.1`                               |
-| Helm chart version | `0.3.0-rc.1`                                |
-| Git tag            | `hangar-v0.3.0-rc.1`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.3.0-rc.1` |
+| Product version    | `v0.3.0-rc.2`                               |
+| Helm chart version | `0.3.0-rc.2`                                |
+| Git tag            | `hangar-v0.3.0-rc.2`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.3.0-rc.2` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -240,6 +240,7 @@ installation, upgrade, or rollback targets. `rc.64` through `rc.67` are **not
 upgrade targets for a deployment that holds a Workshop**: their migration
 `ext.0037` fails there, so upgrade to `rc.68` or later instead. The `0.2.0`
 release candidates are superseded by `0.2.0` and are not rollback targets.
+`0.3.0-rc.1` is superseded by `0.3.0-rc.2` and is not a rollback target.
 `0.2.2` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
 values, only the images change, and it brings back the previous God Mode
@@ -284,7 +285,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.3.0-rc.1` notes](../releases/hangar-v0.3.0-rc.1.md) — review
+- [Release `v0.3.0-rc.2` notes](../releases/hangar-v0.3.0-rc.2.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -328,15 +329,26 @@ a workflow bug skipped the release job. `0.2.0` is built from the `0.2.0-rc.3`
 source, so an installation on any of the candidates upgrades to `0.2.2` with
 `helm upgrade` and `--version 0.2.2` and no other action.
 
-Release 0.3.0-rc.1 adds no database or license migration compared with 0.2.2
-and changes nothing in the chart's templates, values or Secrets. Upgrade from
-0.2.2 with `helm upgrade` and `--version 0.3.0-rc.1`; Helm does not select a
-release candidate otherwise. No other action is required. Only God Mode, served
-by the `admin` image, changes: it moves to the upstream Plane 1.5.0 design on
-the Propel component library, with its secrets still write-only and its
-Content-Security-Policy unchanged. The `api`, `web`, `space` and `live`
-application code is unchanged. Rolling back to 0.2.2 needs no schema change and
-no change to the values, and brings back the previous God Mode design.
+Chart `0.3.0-rc.1` was the first release candidate for `0.3.0`. It is
+superseded by `0.3.0-rc.2`; do not install it, and upgrade an installation on
+it to `0.3.0-rc.2` with `helm upgrade` and `--version 0.3.0-rc.2` and no other
+action.
+
+Release 0.3.0-rc.2 adds no database or license migration compared with 0.2.2
+or 0.3.0-rc.1 and changes nothing in the chart's templates, values or Secrets.
+Upgrade from 0.2.2 or 0.3.0-rc.1 with `helm upgrade` and
+`--version 0.3.0-rc.2`; Helm does not select a release candidate otherwise. No
+other action is required. Only God Mode, served by the `admin` image, changes
+visibly: it moves to the upstream Plane 1.5.0 design on the Propel component library, with
+its secrets still write-only and its Content-Security-Policy unchanged, and
+this candidate fixes its toasts, dialog close buttons and repeat-load hydration
+error found in `0.3.0-rc.1`. The `web` and `space` images are rebuilt with
+Tailwind 4.2.4 without a visible change; the `api` and `live` application code
+is unchanged. The installer fix in this release, which keeps `plane.env` and
+its copies readable by the owner only, concerns Docker Compose and Swarm; on
+Kubernetes the secrets are Kubernetes Secrets and nothing changes. Rolling back
+to 0.2.2 needs no schema change and no change to the values, and brings back
+the previous God Mode design.
 
 Release 0.2.2 adds no database or license migration compared with 0.2.1 and
 changes nothing in the chart's templates, values or Secrets; upgrade from

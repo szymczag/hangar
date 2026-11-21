@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.3.0-rc.1",
+  version: "0.3.0-rc.2",
   highlights: [
+    "The installers now keep plane.env and its copies readable by the owner only; every earlier release left them readable by all local users.",
+    "The object-storage migration no longer puts S3 keys on container command lines.",
     "God Mode moves to the new upstream 1.5.0 design, with its security rules kept.",
     "God Mode secret fields no longer take a browser's saved password.",
     "God Mode sign-in and setup wait for their CSRF token.",
-    "Hangar builds the Propel component library from its own source.",
-    "Nothing changes in the web app, Spaces, the API or the live server.",
   ],
   upstream: {
     version: "1.4.3",
