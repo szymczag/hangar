@@ -639,7 +639,8 @@
       "enable": "Bật",
       "disable": "Tắt",
       "copy_markdown": "Sao chép markdown",
-      "reply": "Trả lời"
+      "reply": "Trả lời",
+      "add_reaction": "Thêm biểu cảm"
     },
     "name": "Tên",
     "discard": "Hủy bỏ",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Không thể sao chép vào bảng tạm",
+    "tooltip": {
+      "copy_to_clipboard": "Sao chép vào bảng tạm"
+    }
   },
   "chart": {
     "x_axis": "Trục X",
@@ -887,5 +892,6 @@
       "description": "Xuất mục công việc thành tệp JSON.",
       "short_description": "Xuất sang JSON"
     }
-  }
+  },
+  "searching": "Đang tìm kiếm..."
 }

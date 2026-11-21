@@ -29,6 +29,15 @@
       "hide_password": "Skryť heslo",
       "close_alert": "Zavrieť upozornenie",
       "close_popover": "Zavrieť vyskakovacie okno"
+    },
+    "breadcrumb": {
+      "show_more": "Zobraziť ďalšie položky navigačnej cesty",
+      "trail": "Navigačná cesta"
+    },
+    "color_picker": {
+      "hex_input": "Hexadecimálna farba",
+      "open": "Otvoriť výber farby",
+      "swatches": "Prednastavené farby"
     }
   }
 }

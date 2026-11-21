@@ -29,6 +29,15 @@
       "hide_password": "Ukryj hasło",
       "close_alert": "Zamknij alert",
       "close_popover": "Zamknij popover"
+    },
+    "breadcrumb": {
+      "show_more": "Pokaż więcej elementów ścieżki nawigacji",
+      "trail": "Ścieżka nawigacji"
+    },
+    "color_picker": {
+      "hex_input": "Kolor szesnastkowy",
+      "open": "Otwórz próbnik kolorów",
+      "swatches": "Kolory predefiniowane"
     }
   }
 }

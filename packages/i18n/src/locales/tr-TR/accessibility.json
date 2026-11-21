@@ -29,6 +29,15 @@
       "hide_password": "Şifreyi gizle",
       "close_alert": "Uyarıyı kapat",
       "close_popover": "Açılır pencereyi kapat"
+    },
+    "breadcrumb": {
+      "show_more": "Daha fazla gezinti yolu öğesi göster",
+      "trail": "Gezinti yolu"
+    },
+    "color_picker": {
+      "hex_input": "Hex renk",
+      "open": "Renk seçiciyi aç",
+      "swatches": "Hazır renkler"
     }
   }
 }

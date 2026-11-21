@@ -639,7 +639,8 @@
       "enable": "Activer",
       "disable": "Désactiver",
       "copy_markdown": "Copier le markdown",
-      "reply": "Répondre"
+      "reply": "Répondre",
+      "add_reaction": "Ajouter une réaction"
     },
     "name": "Nom",
     "discard": "Abandonner",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Impossible de copier dans le presse-papiers",
+    "tooltip": {
+      "copy_to_clipboard": "Copier dans le presse-papiers"
+    }
   },
   "chart": {
     "x_axis": "Axe X",
@@ -887,5 +892,6 @@
       "description": "Exportez les éléments de travail vers un fichier JSON.",
       "short_description": "Exporter en json"
     }
-  }
+  },
+  "searching": "Recherche en cours..."
 }

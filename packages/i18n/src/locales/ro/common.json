@@ -639,7 +639,8 @@
       "enable": "Activează",
       "disable": "Dezactivează",
       "copy_markdown": "Copiază markdown",
-      "reply": "Răspunde"
+      "reply": "Răspunde",
+      "add_reaction": "Adaugă o reacție"
     },
     "name": "Nume",
     "discard": "Renunță",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Nu s-a putut copia în clipboard",
+    "tooltip": {
+      "copy_to_clipboard": "Copiază în clipboard"
+    }
   },
   "chart": {
     "x_axis": "axa-X",
@@ -887,5 +892,6 @@
       "description": "Exportă activitățile într-un fișier JSON.",
       "short_description": "Exportă ca JSON"
     }
-  }
+  },
+  "searching": "Se caută..."
 }

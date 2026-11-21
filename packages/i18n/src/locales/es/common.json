@@ -639,7 +639,8 @@
       "enable": "Habilitar",
       "disable": "Deshabilitar",
       "copy_markdown": "Copiar markdown",
-      "reply": "Responder"
+      "reply": "Responder",
+      "add_reaction": "Agregar una reacción"
     },
     "name": "Nombre",
     "discard": "Descartar",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "No se pudo copiar al portapapeles",
+    "tooltip": {
+      "copy_to_clipboard": "Copiar al portapapeles"
+    }
   },
   "chart": {
     "x_axis": "Eje X",
@@ -887,5 +892,6 @@
       "description": "Exporta elementos de trabajo a un archivo JSON.",
       "short_description": "Exportar como json"
     }
-  }
+  },
+  "searching": "Buscando..."
 }

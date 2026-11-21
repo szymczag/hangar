@@ -639,7 +639,8 @@
       "enable": "Увімкнути",
       "disable": "Вимкнути",
       "copy_markdown": "Скопіювати markdown",
-      "reply": "Відповісти"
+      "reply": "Відповісти",
+      "add_reaction": "Додати реакцію"
     },
     "name": "Назва",
     "discard": "Скасувати",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Не вдалося скопіювати в буфер обміну",
+    "tooltip": {
+      "copy_to_clipboard": "Скопіювати в буфер обміну"
+    }
   },
   "chart": {
     "x_axis": "Вісь X",
@@ -887,5 +892,6 @@
       "description": "Експортуйте одиниці у формат JSON.",
       "short_description": "Експортувати як JSON"
     }
-  }
+  },
+  "searching": "Пошук..."
 }

@@ -29,6 +29,15 @@
       "hide_password": "Ocultar contraseña",
       "close_alert": "Cerrar alerta",
       "close_popover": "Cerrar ventana emergente"
+    },
+    "breadcrumb": {
+      "show_more": "Mostrar más elementos de la ruta de navegación",
+      "trail": "Ruta de navegación"
+    },
+    "color_picker": {
+      "hex_input": "Color hexadecimal",
+      "open": "Abrir selector de color",
+      "swatches": "Colores predefinidos"
     }
   }
 }

@@ -639,7 +639,8 @@
       "enable": "Etkinleştir",
       "disable": "Devre dışı bırak",
       "copy_markdown": "Markdown'ı kopyala",
-      "reply": "Yanıtla"
+      "reply": "Yanıtla",
+      "add_reaction": "Tepki ekle"
     },
     "name": "Ad",
     "discard": "Vazgeç",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Panoya kopyalanamadı",
+    "tooltip": {
+      "copy_to_clipboard": "Panoya kopyala"
+    }
   },
   "chart": {
     "x_axis": "X ekseni",
@@ -887,5 +892,6 @@
       "description": "İş öğelerini JSON dosyasına aktarın.",
       "short_description": "JSON olarak aktar"
     }
-  }
+  },
+  "searching": "Aranıyor..."
 }

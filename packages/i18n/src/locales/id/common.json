@@ -639,7 +639,8 @@
       "enable": "Aktifkan",
       "disable": "Nonaktifkan",
       "copy_markdown": "Salin markdown",
-      "reply": "Balas"
+      "reply": "Balas",
+      "add_reaction": "Tambah reaksi"
     },
     "name": "Nama",
     "discard": "Buang",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Gagal menyalin ke clipboard",
+    "tooltip": {
+      "copy_to_clipboard": "Salin ke clipboard"
+    }
   },
   "chart": {
     "x_axis": "Sumbu-X",
@@ -887,5 +892,6 @@
       "description": "Ekspor item kerja ke file JSON.",
       "short_description": "Ekspor sebagai json"
     }
-  }
+  },
+  "searching": "Mencari..."
 }

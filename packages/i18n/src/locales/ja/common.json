@@ -639,7 +639,8 @@
       "enable": "有効化",
       "disable": "無効化",
       "copy_markdown": "マークダウンをコピー",
-      "reply": "返信"
+      "reply": "返信",
+      "add_reaction": "リアクションを追加"
     },
     "name": "名前",
     "discard": "破棄",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "クリップボードにコピーできませんでした",
+    "tooltip": {
+      "copy_to_clipboard": "クリップボードにコピー"
+    }
   },
   "chart": {
     "x_axis": "エックス アクシス",
@@ -887,5 +892,6 @@
       "description": "作業項目をJSONファイルにエクスポートします。",
       "short_description": "JSONとしてエクスポート"
     }
-  }
+  },
+  "searching": "検索中…"
 }

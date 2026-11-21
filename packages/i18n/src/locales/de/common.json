@@ -639,7 +639,8 @@
       "enable": "Aktivieren",
       "disable": "Deaktivieren",
       "copy_markdown": "Markdown kopieren",
-      "reply": "Antworten"
+      "reply": "Antworten",
+      "add_reaction": "Reaktion hinzufügen"
     },
     "name": "Name",
     "discard": "Verwerfen",
@@ -737,7 +738,11 @@
     "developer": "Entwickler",
     "work_structure": "Arbeitsstruktur",
     "execution": "Ausführung",
-    "administration": "Verwaltung"
+    "administration": "Verwaltung",
+    "clipboard_copy_failed": "Kopieren in die Zwischenablage fehlgeschlagen",
+    "tooltip": {
+      "copy_to_clipboard": "In die Zwischenablage kopieren"
+    }
   },
   "chart": {
     "x_axis": "X-Achse",
@@ -887,5 +892,6 @@
       "description": "Arbeitselemente in JSON exportieren.",
       "short_description": "Als JSON exportieren"
     }
-  }
+  },
+  "searching": "Wird gesucht..."
 }
