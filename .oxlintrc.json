@@ -32,7 +32,10 @@
     "dist/**",
     "**/public/**",
     "storybook-static/**",
-    "packages/makeplane-propel/src/**"
+    "packages/makeplane-propel/src/**",
+    "packages/blocks/src/**",
+    "!packages/blocks/src/auth/password/**",
+    "!packages/blocks/src/portal/dialog-dismissal.test.tsx"
   ],
   "rules": {
     "react/react-in-jsx-scope": "off",
