@@ -8,6 +8,9 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // Hangar: the keyboard-walk Select tests take about 2 s locally but exceeded the 5 s default on CI runners,
+    // where turbo runs every package's tests at once.
+    testTimeout: 20_000,
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
