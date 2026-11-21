@@ -639,7 +639,8 @@
       "enable": "启用",
       "disable": "禁用",
       "copy_markdown": "复制Markdown",
-      "reply": "回复"
+      "reply": "回复",
+      "add_reaction": "添加表情回应"
     },
     "name": "名称",
     "discard": "放弃",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "无法复制到剪贴板",
+    "tooltip": {
+      "copy_to_clipboard": "复制到剪贴板"
+    }
   },
   "chart": {
     "x_axis": "X轴",
@@ -887,5 +892,6 @@
       "description": "将工作项导出为 JSON 文件。",
       "short_description": "导出为 JSON"
     }
-  }
+  },
+  "searching": "搜索中…"
 }

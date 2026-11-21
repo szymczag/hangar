@@ -17,6 +17,15 @@
       "options": {
         "printWidth": 80
       }
+    },
+    {
+      "files": ["packages/blocks/**/*"],
+      "options": {
+        "sortTailwindcss": {
+          "stylesheet": "packages/tailwind-config/propel.css",
+          "functions": ["cn", "clsx", "cva"]
+        }
+      }
     }
   ]
 }

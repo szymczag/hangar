@@ -29,6 +29,15 @@
       "hide_password": "비밀번호 숨기기",
       "close_alert": "알림 닫기",
       "close_popover": "팝오버 닫기"
+    },
+    "breadcrumb": {
+      "show_more": "탐색 경로 더 보기",
+      "trail": "탐색 경로"
+    },
+    "color_picker": {
+      "hex_input": "16진수 색상",
+      "open": "색상 선택기 열기",
+      "swatches": "기본 색상"
     }
   }
 }

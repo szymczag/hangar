@@ -10,9 +10,11 @@
   "main": "tailwind.config.js",
   "exports": {
     "./index.css": "./index.css",
+    "./propel.css": "./propel.css",
     "./postcss.config.js": "./postcss.config.js"
   },
   "dependencies": {
+    "@makeplane/propel": "workspace:*",
     "@tailwindcss/postcss": "catalog:",
     "postcss": "catalog:"
   },

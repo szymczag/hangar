@@ -639,7 +639,8 @@
       "enable": "Povolit",
       "disable": "Zakázat",
       "copy_markdown": "Kopírovat markdown",
-      "reply": "Odpovědět"
+      "reply": "Odpovědět",
+      "add_reaction": "Přidat reakci"
     },
     "name": "Název",
     "discard": "Zahodit",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Kopírování do schránky se nezdařilo",
+    "tooltip": {
+      "copy_to_clipboard": "Kopírovat do schránky"
+    }
   },
   "chart": {
     "x_axis": "Osa X",
@@ -887,5 +892,6 @@
       "description": "Exportujte položky do JSON.",
       "short_description": "Exportovat jako JSON"
     }
-  }
+  },
+  "searching": "Hledání..."
 }

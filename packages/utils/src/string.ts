@@ -56,7 +56,7 @@ export const truncateText = (str: string, length: number) => {
 export const createSimilarString = (str: string) => {
   const shuffled = str
     .split("")
-    .sort(() => Math.random() - 0.5)
+    .toSorted(() => Math.random() - 0.5)
     .join("");
 
   return shuffled;
@@ -92,6 +92,25 @@ export const getFirstCharacters = (str: string) => {
   } else {
     return words[0].charAt(0) + words[1].charAt(0);
   }
+};
+
+const PARENTHETICAL_TOKEN_RE = /^\(.*\)$/;
+
+/**
+ * Name to feed Avatar `alt` (and therefore Propel's derived initials). Drops standalone
+ * parenthetical tokens such as "(you)" so they are not treated as a last name ("S(").
+ *
+ * @example
+ * getAvatarName("sibira.gopal (you)") // "sibira.gopal"
+ * getAvatarName("Jane Doe") // "Jane Doe"
+ */
+export const getAvatarName = (label: string | null | undefined): string => {
+  if (!label) return "";
+  return label
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 0 && !PARENTHETICAL_TOKEN_RE.test(token))
+    .join(" ");
 };
 
 /**
@@ -153,7 +172,7 @@ export const checkEmailValidity = (email: string): boolean => {
   if (!email) return false;
 
   const isEmailValid =
-    /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(
+    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(
       email
     );
 
@@ -236,7 +255,7 @@ export const isCommentEmpty = (comment: Content | undefined): boolean => {
 
   // Handle JSONContent[] (array)
   if (Array.isArray(comment)) {
-    return comment.length === 0 || comment.every(isJSONContentEmpty);
+    return comment.every(isJSONContentEmpty);
   }
 
   // Handle JSONContent (object)

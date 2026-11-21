@@ -639,7 +639,8 @@
       "enable": "Włącz",
       "disable": "Wyłącz",
       "copy_markdown": "Kopiuj markdown",
-      "reply": "Odpowiedz"
+      "reply": "Odpowiedz",
+      "add_reaction": "Dodaj reakcję"
     },
     "name": "Nazwa",
     "discard": "Odrzuć",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Nie udało się skopiować do schowka",
+    "tooltip": {
+      "copy_to_clipboard": "Kopiuj do schowka"
+    }
   },
   "chart": {
     "x_axis": "Oś X",
@@ -887,5 +892,6 @@
       "description": "Eksportuj elementy do pliku JSON.",
       "short_description": "Eksportuj jako JSON"
     }
-  }
+  },
+  "searching": "Wyszukiwanie..."
 }

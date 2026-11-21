@@ -29,6 +29,15 @@
       "hide_password": "Nascondi password",
       "close_alert": "Chiudi avviso",
       "close_popover": "Chiudi popover"
+    },
+    "breadcrumb": {
+      "show_more": "Mostra altri elementi del percorso di navigazione",
+      "trail": "Percorso di navigazione"
+    },
+    "color_picker": {
+      "hex_input": "Colore esadecimale",
+      "open": "Apri il selettore colore",
+      "swatches": "Colori predefiniti"
     }
   }
 }

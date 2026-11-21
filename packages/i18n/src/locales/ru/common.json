@@ -639,7 +639,8 @@
       "enable": "Включить",
       "disable": "Отключить",
       "copy_markdown": "Копировать markdown",
-      "reply": "Ответить"
+      "reply": "Ответить",
+      "add_reaction": "Добавить реакцию"
     },
     "name": "Название",
     "discard": "Отменить",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Не удалось скопировать в буфер обмена",
+    "tooltip": {
+      "copy_to_clipboard": "Копировать в буфер обмена"
+    }
   },
   "chart": {
     "x_axis": "Ось X",
@@ -887,5 +892,6 @@
       "description": "Экспорт рабочих элементов в JSON-файл.",
       "short_description": "Экспорт в json"
     }
-  }
+  },
+  "searching": "Поиск..."
 }

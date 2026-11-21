@@ -29,6 +29,15 @@
       "hide_password": "Passwort verbergen",
       "close_alert": "Warnung schließen",
       "close_popover": "Popover schließen"
+    },
+    "breadcrumb": {
+      "show_more": "Weitere Elemente der Brotkrümelnavigation anzeigen",
+      "trail": "Brotkrümelnavigation"
+    },
+    "color_picker": {
+      "hex_input": "Hex-Farbe",
+      "open": "Farbwähler öffnen",
+      "swatches": "Voreingestellte Farben"
     }
   }
 }

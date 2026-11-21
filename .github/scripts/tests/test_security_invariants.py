@@ -12,6 +12,7 @@ says which S-id it guards.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -468,6 +469,97 @@ class TelemetryDefaultTests(unittest.TestCase):
         self.assertRegex(defaults.group(1), r"\bis_telemetry_enabled: false,")
         # Only an explicit "True" (the API's own redirect after a failed submit) turns it on.
         self.assertIn('telemetryParam === "True"', source)
+
+
+PROPEL_PACKAGE = "@makeplane/propel"
+DEPENDENCY_SECTIONS = ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies")
+
+
+def propel_registry_specifiers(manifest: dict) -> list[str]:
+    """Every @makeplane/propel specifier in a package.json that is not the workspace link."""
+    return [
+        f"{section}: {manifest[section][PROPEL_PACKAGE]}"
+        for section in DEPENDENCY_SECTIONS
+        if PROPEL_PACKAGE in manifest.get(section, {}) and manifest[section][PROPEL_PACKAGE] != "workspace:*"
+    ]
+
+
+def workspace_yaml_propel_pins(text: str) -> list[str]:
+    """Catalog or override entries that would resolve @makeplane/propel itself (not its dependencies)."""
+    return re.findall(r'^\s+["\']?@makeplane/propel["\']?\s*:.*$', text, re.MULTILINE)
+
+
+def lockfile_propel_registry_entries(text: str) -> list[str]:
+    """Lockfile package entries for @makeplane/propel, which exist only for a registry tarball."""
+    return re.findall(r"^  '?@makeplane/propel@[^:]*'?:$", text, re.MULTILINE)
+
+
+class PropelWorkspaceSourceTests(unittest.TestCase):
+    """S27: @makeplane/propel is built from packages/makeplane-propel, never fetched from npm.
+
+    The published package is the recovered source's origin, not something the build may
+    pull: a registry specifier, a catalog entry or an override would swap the reviewed
+    workspace source for an unreviewed tarball.
+    """
+
+    def manifests(self):
+        for root in ("apps", "packages"):
+            for manifest in (REPOSITORY_ROOT / root).glob("**/package.json"):
+                if SKIPPED_DIRECTORIES & set(manifest.relative_to(REPOSITORY_ROOT).parts):
+                    continue
+                yield manifest
+
+    def test_the_workspace_package_is_the_source(self):
+        source = json.loads((REPOSITORY_ROOT / "packages" / "makeplane-propel" / "package.json").read_text())
+        self.assertEqual(source["name"], PROPEL_PACKAGE)
+        self.assertTrue(source.get("private"), "packages/makeplane-propel must stay unpublishable")
+
+    def test_consumers_depend_on_the_workspace_link_only(self):
+        consumers = []
+        for manifest in self.manifests():
+            data = json.loads(manifest.read_text())
+            if data.get("name") == PROPEL_PACKAGE:
+                continue
+            relative = str(manifest.relative_to(REPOSITORY_ROOT))
+            if any(PROPEL_PACKAGE in data.get(section, {}) for section in DEPENDENCY_SECTIONS):
+                consumers.append(relative)
+            with self.subTest(manifest=relative):
+                self.assertEqual(propel_registry_specifiers(data), [])
+        # The sweep has to see the packages that already consume it.
+        self.assertIn("packages/blocks/package.json", consumers)
+        self.assertIn("packages/tailwind-config/package.json", consumers)
+
+    def test_no_catalog_or_override_resolves_it(self):
+        self.assertEqual(workspace_yaml_propel_pins((REPOSITORY_ROOT / "pnpm-workspace.yaml").read_text()), [])
+
+    def test_the_lockfile_links_it(self):
+        lockfile = (REPOSITORY_ROOT / "pnpm-lock.yaml").read_text()
+        self.assertIn("version: link:../makeplane-propel", lockfile)
+        self.assertEqual(lockfile_propel_registry_entries(lockfile), [])
+
+    def test_the_checks_catch_a_registry_source(self):
+        self.assertEqual(propel_registry_specifiers({"dependencies": {PROPEL_PACKAGE: "workspace:*"}}), [])
+        for specifier in ("0.9.7", "^0.9.7", "catalog:", "npm:@makeplane/propel@0.9.7", "workspace:^", "latest"):
+            for section in DEPENDENCY_SECTIONS:
+                with self.subTest(section=section, specifier=specifier):
+                    self.assertEqual(
+                        propel_registry_specifiers({section: {PROPEL_PACKAGE: specifier}}),
+                        [f"{section}: {specifier}"],
+                    )
+        self.assertEqual(
+            workspace_yaml_propel_pins(
+                'catalog:\n  "@makeplane/propel": "0.9.7"\noverrides:\n  "@makeplane/propel>typescript": 6.0.3\n'
+            ),
+            ['  "@makeplane/propel": "0.9.7"'],
+        )
+        self.assertEqual(
+            workspace_yaml_propel_pins("overrides:\n  '@makeplane/propel': 0.9.7\n"),
+            ["  '@makeplane/propel': 0.9.7"],
+        )
+        self.assertEqual(
+            lockfile_propel_registry_entries("packages:\n\n  '@makeplane/propel@0.9.7':\n    resolution: {}\n"),
+            ["  '@makeplane/propel@0.9.7':"],
+        )
 
 
 if __name__ == "__main__":

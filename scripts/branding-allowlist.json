@@ -30,6 +30,18 @@
     "rationale": "The recovered @makeplane/propel source is upstream code kept byte for byte (enforced by RECOVERY.json); its comments name the upstream product, and the package notice must name the rightsholder."
   },
   {
+    "pathPattern": "^packages/blocks/src/",
+    "linePattern": "^\\s*(\\*|//|/\\*)",
+    "rules": ["product-name"],
+    "rationale": "@plane/blocks is upstream v1.5.0 code taken whole (FORK.md, Vendored upstream packages); only its code comments name the upstream product. User-facing strings in the package are still checked."
+  },
+  {
+    "pathPattern": "^packages/blocks/package\\.json$",
+    "linePattern": "^\\s*\"description\":",
+    "rules": ["product-name"],
+    "rationale": "Inherited package metadata of the vendored @plane/blocks; never shown to users."
+  },
+  {
     "pathPattern": "^apps/api/plane/utils/email\\.py$",
     "rules": ["plane-domain"],
     "rationale": "The URL is part of an inherited proprietary license notice and must not be rewritten."

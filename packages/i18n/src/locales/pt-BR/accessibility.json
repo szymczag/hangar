@@ -29,6 +29,15 @@
       "hide_password": "Ocultar senha",
       "close_alert": "Fechar alerta",
       "close_popover": "Fechar popover"
+    },
+    "breadcrumb": {
+      "show_more": "Mostrar mais itens da trilha de navegação",
+      "trail": "Trilha de navegação"
+    },
+    "color_picker": {
+      "hex_input": "Cor hexadecimal",
+      "open": "Abrir seletor de cor",
+      "swatches": "Cores predefinidas"
     }
   }
 }

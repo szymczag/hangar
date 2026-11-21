@@ -639,7 +639,8 @@
       "enable": "활성화",
       "disable": "비활성화",
       "copy_markdown": "마크다운 복사",
-      "reply": "답글"
+      "reply": "답글",
+      "add_reaction": "반응 추가"
     },
     "name": "이름",
     "discard": "폐기",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "클립보드에 복사하지 못했습니다",
+    "tooltip": {
+      "copy_to_clipboard": "클립보드에 복사"
+    }
   },
   "chart": {
     "x_axis": "X축",
@@ -887,5 +892,6 @@
       "description": "작업 항목을 JSON 파일로 내보냅니다.",
       "short_description": "JSON으로 내보내기"
     }
-  }
+  },
+  "searching": "검색 중..."
 }

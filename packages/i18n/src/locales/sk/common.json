@@ -639,7 +639,8 @@
       "enable": "Povoliť",
       "disable": "Zakázať",
       "copy_markdown": "Kopírovať markdown",
-      "reply": "Odpovedať"
+      "reply": "Odpovedať",
+      "add_reaction": "Pridať reakciu"
     },
     "name": "Názov",
     "discard": "Zahodiť",
@@ -737,7 +738,11 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "clipboard_copy_failed": "Kopírovanie do schránky zlyhalo",
+    "tooltip": {
+      "copy_to_clipboard": "Kopírovať do schránky"
+    }
   },
   "chart": {
     "x_axis": "Os X",
@@ -887,5 +892,6 @@
       "description": "Exportujte položky do JSON.",
       "short_description": "Exportovať ako JSON"
     }
-  }
+  },
+  "searching": "Vyhľadávanie..."
 }
