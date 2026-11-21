@@ -244,6 +244,16 @@ its secret.
 The field is still required the first time, while nothing is stored, so a
 provider cannot be enabled without one.
 
+The same holds for every secret God Mode edits: the OAuth and OIDC client
+secrets, the SMTP password and the AI provider's API key. A secret field always
+opens empty, with "Leave blank to keep the current secret" (or password) as its
+placeholder once one is stored, and is emptied again after a successful save;
+the form never takes a value from the server's answer. The SMTP password is
+never required, since SMTP authentication is optional. Since the God Mode
+redesign on the upstream component library (Propel), the OAuth, OIDC and SAML
+pages share one form; the rule lives in its hook and is checked by
+`apps/admin/tests/secret-field-contract.test.mjs`.
+
 #### Automatically start Google sign-in
 
 `GOOGLE_AUTO_REDIRECT` defaults to `0` and is also editable under
