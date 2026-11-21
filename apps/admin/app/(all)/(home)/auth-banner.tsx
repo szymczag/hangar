@@ -8,7 +8,7 @@
 import type { TAdminAuthErrorInfo } from "@plane/constants";
 import { Banner } from "@makeplane/propel/components/banner";
 // helpers
-import { showsBannerTitle } from "./auth-helpers";
+import { authBannerVariant, showsBannerTitle } from "./auth-helpers";
 
 type TAuthBanner = {
   bannerData: TAdminAuthErrorInfo | undefined;
@@ -22,7 +22,7 @@ export function AuthBanner(props: TAuthBanner) {
   return (
     <Banner
       placement="inline"
-      variant="info"
+      variant={authBannerVariant(bannerData.code)}
       // A second-factor lockout says what happened in its title and how to
       // recover in its message; the message alone reads as a generic error.
       title={showsBannerTitle(bannerData.code) ? bannerData.title : undefined}

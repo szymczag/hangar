@@ -126,3 +126,16 @@ test("the banner shows second-factor titles", () => {
   const codes = HELPERS.slice(HELPERS.indexOf("const SECOND_FACTOR_CODES"));
   assert.match(codes.slice(0, codes.indexOf("];")), /EAdminAuthErrorCodes\.ADMIN_2FA_CREDENTIAL_DISABLED,/);
 });
+
+// A second-factor refusal is an error. The info style made the locked-console
+// message (5198) read as a notice, unlike the danger banners on the 2FA pages.
+test("second-factor banners are styled as errors, the disabled key as danger", () => {
+  assert.match(BANNER, /variant=\{authBannerVariant\(bannerData\.code\)\}/);
+  assert.doesNotMatch(BANNER, /variant="info"/);
+  const danger = HELPERS.slice(HELPERS.indexOf("const SECOND_FACTOR_DANGER_CODES"));
+  assert.match(danger.slice(0, danger.indexOf("]);")), /EAdminAuthErrorCodes\.ADMIN_2FA_CREDENTIAL_DISABLED,/);
+  const variant = HELPERS.slice(HELPERS.indexOf("export const authBannerVariant"));
+  const body = variant.slice(0, variant.indexOf("};"));
+  assert.match(body, /SECOND_FACTOR_DANGER_CODES\.has\(errorCode\)\) return "danger"/);
+  assert.match(body, /SECOND_FACTOR_CODES\.includes\(errorCode\)\) return "warning"/);
+});

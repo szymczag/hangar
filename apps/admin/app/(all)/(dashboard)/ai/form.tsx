@@ -117,7 +117,7 @@ export function InstanceAIForm(props: IInstanceAIForm) {
           <div className="pb-1 text-h6-medium text-primary">OpenAI</div>
           <div className="text-body-sm-regular text-tertiary">If you use ChatGPT, this is for you.</div>
         </div>
-        <div className="grid-col grid w-full grid-cols-1 items-center justify-between gap-x-12 gap-y-8 lg:grid-cols-3">
+        <div className="grid-col grid w-full max-w-4xl grid-cols-1 items-start justify-between gap-10 lg:grid-cols-2">
           {aiFormFields.map((field) => (
             <ControllerInput
               key={field.key}

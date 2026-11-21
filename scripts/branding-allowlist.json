@@ -1,12 +1,12 @@
 [
   {
     "pathPattern": "^(README\\.md|FORK\\.md|SECURITY\\.md|COPYRIGHT.*|LICENSE.*)$",
-    "rules": ["product-name", "plane-domain", "upstream-repository", "plane-email"],
+    "rules": ["product-name", "product-name-lowercase", "plane-domain", "upstream-repository", "plane-email"],
     "rationale": "License, attribution, fork, and upstream security references must remain factually accurate."
   },
   {
     "pathPattern": "^(docs/|deployments/kubernetes/community/|charts/hangar/README\\.md)",
-    "rules": ["product-name", "plane-domain", "upstream-repository", "plane-email"],
+    "rules": ["product-name", "product-name-lowercase", "plane-domain", "upstream-repository", "plane-email"],
     "rationale": "Architecture and migration documentation may describe the upstream project historically."
   },
   {
@@ -16,7 +16,7 @@
   },
   {
     "pathPattern": "(^|/)tests?/|(^|/)__snapshots__/|\\.(test|spec)\\.",
-    "rules": ["product-name", "plane-domain", "upstream-repository", "plane-email"],
+    "rules": ["product-name", "product-name-lowercase", "plane-domain", "upstream-repository", "plane-email"],
     "rationale": "Compatibility fixtures and tests intentionally retain upstream-shaped sample data."
   },
   {

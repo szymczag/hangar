@@ -12,12 +12,34 @@ test("rejects public Plane product and support references", () => {
     'const message = "Contact Plane at help@plane.so or github.com/makeplane/plane";'
   );
 
-  assert.deepEqual([...new Set(violations.map(({ rule }) => rule))].sort(), [
+  assert.deepEqual([...new Set(violations.map(({ rule }) => rule))].toSorted(), [
     "plane-domain",
     "plane-email",
     "product-name",
     "upstream-repository",
   ]);
+});
+
+test("rejects the product named in lower case in sign-in copy", () => {
+  for (const copy of [
+    "Allow members to log in or sign up to plane with their GitLab accounts.",
+    "Allow members to login or sign up to plane with their Gitea accounts.",
+    "Welcome to plane",
+  ]) {
+    const violations = findViolationsInText("apps/admin/example.tsx", copy);
+    assert.deepEqual(
+      violations.map(({ rule }) => rule),
+      ["product-name-lowercase"],
+      copy
+    );
+  }
+});
+
+test("does not flag lower-case plane identifiers", () => {
+  assert.deepEqual(
+    findViolationsInText("apps/web/example.tsx", 'import { cn } from "@plane/utils"; const plane = usePlane();'),
+    []
+  );
 });
 
 test("accepts Hangar product copy", () => {

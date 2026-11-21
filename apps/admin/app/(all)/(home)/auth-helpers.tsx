@@ -41,6 +41,25 @@ const SECOND_FACTOR_CODES = [
 
 export const showsBannerTitle = (errorCode: EAdminAuthErrorCodes): boolean => SECOND_FACTOR_CODES.includes(errorCode);
 
+// Fork (see FORK.md): a second-factor banner is an error, styled like the ones
+// the 2FA pages show. A refusal that locks the console or cannot be retried as
+// is reads as danger; one that only asks for the next step reads as a warning.
+// Upstream's admin codes keep the info style they always had.
+export type TAuthBannerVariant = "info" | "warning" | "danger";
+
+const SECOND_FACTOR_DANGER_CODES = new Set([
+  EAdminAuthErrorCodes.ADMIN_2FA_VERIFICATION_FAILED,
+  EAdminAuthErrorCodes.ADMIN_2FA_NOT_CONFIGURED,
+  EAdminAuthErrorCodes.ADMIN_2FA_ATTEMPTS_EXHAUSTED,
+  EAdminAuthErrorCodes.ADMIN_2FA_CREDENTIAL_DISABLED,
+]);
+
+export const authBannerVariant = (errorCode: EAdminAuthErrorCodes): TAuthBannerVariant => {
+  if (SECOND_FACTOR_DANGER_CODES.has(errorCode)) return "danger";
+  if (SECOND_FACTOR_CODES.includes(errorCode)) return "warning";
+  return "info";
+};
+
 const errorCodeMessages: {
   [key in EAdminAuthErrorCodes]: { title: string; message: (email?: string) => React.ReactNode };
 } = {

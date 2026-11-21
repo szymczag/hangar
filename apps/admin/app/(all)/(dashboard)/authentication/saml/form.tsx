@@ -199,6 +199,7 @@ export function InstanceSAMLConfigForm(props: Props) {
   return (
     <OAuthProviderForm
       providerName="IdP"
+      recipientName="your IdP"
       control={control}
       formFields={SAML_FORM_FIELDS}
       onSave={handleSubmit(onSubmit)}

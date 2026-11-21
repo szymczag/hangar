@@ -13,6 +13,8 @@ import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
 import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
 import faviconIco from "@/app/assets/favicon/favicon.ico?url";
 import { LogoSpinner } from "@/components/common/logo-spinner";
+import { PlaneToastProvider } from "@plane/blocks/toast";
+import { TranslationProvider } from "@plane/i18n";
 import globalStyles from "@/styles/globals.css?url";
 import { AppProviders } from "@/providers";
 import type { Route } from "./+types/root";
@@ -85,10 +87,21 @@ export const meta: Route.MetaFunction = () => [
   },
 ];
 
+// Fork (see FORK.md): TranslationProvider renders nothing until i18n is
+// initialised. Above Layout's children it also hid the HydrateFallback, so the
+// SPA prerender of index.html had no loader while a cached load, with i18n
+// already initialised, hydrated the loader into that empty body (React #418).
+// Mounted here, it gates only the routes; the prerendered fallback and the
+// first client render agree. The toast viewport calls `useTranslation`, so it
+// sits under it.
 export default function Root() {
   return (
     <div className="min-h-screen bg-canvas">
-      <Outlet />
+      <TranslationProvider>
+        <PlaneToastProvider>
+          <Outlet />
+        </PlaneToastProvider>
+      </TranslationProvider>
     </div>
   );
 }

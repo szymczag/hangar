@@ -23,6 +23,8 @@ import { CopyField } from "@/components/common/copy-field";
 
 type Props<T extends FieldValues> = {
   providerName: string;
+  // who the service details are for, when that reads differently from the provider's name ("your IdP")
+  recipientName?: string;
   control: Control<T>;
   formFields: TControllerInputFormField<T>[];
   // OIDC has no attribute-sync switch
@@ -40,6 +42,7 @@ type Props<T extends FieldValues> = {
 export function OAuthProviderForm<T extends FieldValues>(props: Props<T>) {
   const {
     providerName,
+    recipientName = providerName,
     control,
     formFields,
     switchField,
@@ -112,7 +115,7 @@ export function OAuthProviderForm<T extends FieldValues>(props: Props<T>) {
             </div>
           </div>
           <div className="col-span-2 flex flex-col gap-y-6 md:col-span-1">
-            <div className="text-h6-medium text-primary">Hangar-provided details for {providerName}</div>
+            <div className="text-h6-medium text-primary">Hangar-provided details for {recipientName}</div>
             <div className="flex flex-col gap-y-4">
               <div className="flex flex-col gap-y-4 rounded-lg bg-layer-1 px-6 py-4">
                 {serviceDetails.map((field) => (

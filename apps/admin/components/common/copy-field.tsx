@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useId } from "react";
+import { Fragment, useId } from "react";
 import type { ReactNode } from "react";
 // plane internal packages
 import { Icon } from "@makeplane/propel/components/icon";
@@ -26,6 +26,12 @@ export type TCopyField = {
   url: string;
   description: string | ReactNode;
 };
+
+// Break opportunities after each path separator, so a long callback or metadata
+// URL wraps between its segments instead of mid-word. The scheme's "//" stays
+// with the host. A segment longer than the line still wraps (overflow-wrap) so
+// the value never overflows the card.
+const urlSegments = (url: string): string[] => url.split(/(?<=[^:/]\/)(?=[^/])/);
 
 export function CopyField(props: Props) {
   const { label, url, description } = props;
@@ -51,8 +57,15 @@ export function CopyField(props: Props) {
         {label}
       </span>
       <div className="flex w-full min-w-0 items-start gap-2 rounded-lg border border-subtle bg-layer-2 px-3 py-2">
-        <code id={valueId} className="min-w-0 flex-1 text-body-xs-regular break-all text-primary">
-          {url}
+        <code id={valueId} className="min-w-0 flex-1 text-body-xs-regular wrap-break-word text-primary">
+          {urlSegments(url).map((segment, index) => (
+            // segments of one fixed string, so the index is a stable key
+            // oxlint-disable-next-line react/no-array-index-key
+            <Fragment key={index}>
+              {index > 0 && <wbr />}
+              {segment}
+            </Fragment>
+          ))}
         </code>
         <IconButton
           type="button"
