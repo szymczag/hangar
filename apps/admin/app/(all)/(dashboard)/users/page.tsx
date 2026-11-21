@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 // plane internal packages
@@ -14,6 +14,9 @@ import { Banner } from "@makeplane/propel/components/banner";
 import { CheckboxField } from "@makeplane/propel/components/checkbox-field";
 import { InputField } from "@makeplane/propel/components/input-field";
 import { Select, SelectContent, SelectItem, SelectList, SelectTrigger } from "@makeplane/propel/components/select";
+import { TextButton } from "@makeplane/propel/components/text-button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { KeyOutline } from "@makeplane/propel/icons";
 import { InstanceService } from "@plane/services";
 import type { TInstanceUser, TInstanceUserSignInStatus } from "@plane/types";
 import { Skeleton } from "@plane/blocks/skeleton";
@@ -21,7 +24,7 @@ import { cn } from "@plane/utils";
 // components
 import { PageWrapper } from "@/components/common/page-wrapper";
 // local
-import { OpenPGPControl } from "./openpgp-control";
+import { OpenPGPPanel } from "./openpgp-control";
 // types
 import type { Route } from "./+types/page";
 
@@ -80,6 +83,9 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
   const [provider, setProvider] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
   const providerLabelId = useId();
+  // the account whose encryption-key panel is open, in a row of its own under it
+  const [keyPanelUserId, setKeyPanelUserId] = useState<string | null>(null);
+  const keyPanelId = useId();
 
   const { data, isLoading } = useSWR(["INSTANCE_USERS", search, provider, includeInactive], () =>
     instanceService.users({
@@ -179,23 +185,41 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
             <tbody>
               {users.map((user) => {
                 const copy = STATUS_COPY[user.status];
+                const isKeyPanelOpen = keyPanelUserId === user.id;
                 return (
-                  <tr key={user.id} className="border-b border-subtle/60 align-top">
-                    <td className="py-2 pr-4">
-                      <div className={cn(!user.is_active && "text-tertiary line-through")}>{user.email}</div>
-                      {!user.is_active && <div className="text-caption-md-regular text-tertiary">deactivated</div>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <Badge variant={copy.variant} size="sm" label={copy.label} title={copy.hint} />
-                    </td>
-                    <td className="py-2 pr-4">{user.has_password ? "yes" : "no"}</td>
-                    <td className="py-2 pr-4">
-                      <SignInRecords user={user} />
-                    </td>
-                    <td className="py-2 pr-4">
-                      <OpenPGPControl userId={user.id} email={user.email} />
-                    </td>
-                  </tr>
+                  <Fragment key={user.id}>
+                    <tr className={cn("align-top", !isKeyPanelOpen && "border-b border-subtle/60")}>
+                      <td className="py-2 pr-4">
+                        <div className={cn(!user.is_active && "text-tertiary line-through")}>{user.email}</div>
+                        {!user.is_active && <div className="text-caption-md-regular text-tertiary">deactivated</div>}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <Badge variant={copy.variant} size="sm" label={copy.label} title={copy.hint} />
+                      </td>
+                      <td className="py-2 pr-4">{user.has_password ? "yes" : "no"}</td>
+                      <td className="py-2 pr-4">
+                        <SignInRecords user={user} />
+                      </td>
+                      <td className="py-2 pr-4">
+                        <TextButton
+                          variant="primary"
+                          size="md"
+                          icon={<Icon icon={KeyOutline} />}
+                          aria-expanded={isKeyPanelOpen}
+                          aria-controls={isKeyPanelOpen ? `${keyPanelId}-${user.id}` : undefined}
+                          onClick={() => setKeyPanelUserId(isKeyPanelOpen ? null : user.id)}
+                          label="Manage key"
+                        />
+                      </td>
+                    </tr>
+                    {isKeyPanelOpen && (
+                      <tr id={`${keyPanelId}-${user.id}`} className="border-b border-subtle/60">
+                        <td colSpan={5} className="pb-4">
+                          <OpenPGPPanel userId={user.id} email={user.email} onClose={() => setKeyPanelUserId(null)} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
               {users.length === 0 && (

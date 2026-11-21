@@ -126,6 +126,7 @@ export function InstanceOIDCConfigForm(props: Props) {
   return (
     <OAuthProviderForm
       providerName="IdP"
+      recipientName="your IdP"
       control={control}
       formFields={OIDC_FORM_FIELDS}
       onSave={onSave}

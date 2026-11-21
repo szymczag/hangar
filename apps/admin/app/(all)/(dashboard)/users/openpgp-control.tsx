@@ -24,6 +24,7 @@ const openPGPService = new InstanceOpenPGPService();
 type Props = {
   userId: string;
   email: string;
+  onClose: () => void;
 };
 
 /**
@@ -34,25 +35,26 @@ type Props = {
  * the private half. An administrator who sets a key they hold can read that
  * person's mail, which is the point when keys are escrowed and a problem when it
  * is not understood. The server records every action and emails the owner.
+ *
+ * The users table opens this panel in a row of its own under the account, so the
+ * table's columns keep their width while it is open.
  */
-export function OpenPGPControl(props: Props) {
-  const { userId, email } = props;
+export function OpenPGPPanel(props: Props) {
+  const { userId, email, onClose } = props;
   // states
   const [csrfToken, setCsrfToken] = useState<string | undefined>(undefined);
   const [state, setState] = useState<TUserOpenPGPState | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
   const [certificate, setCertificate] = useState("");
   const [note, setNote] = useState("");
   const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
     authService.requestCSRFToken().then((data) => data?.csrf_token && setCsrfToken(data.csrf_token));
     openPGPService
       .state(userId)
       .then(setState)
       .catch(() => setState(null));
-  }, [isOpen, userId]);
+  }, [userId]);
 
   const report = (error: unknown, title: string) =>
     setToast({
@@ -91,12 +93,8 @@ export function OpenPGPControl(props: Props) {
     }
   };
 
-  if (!isOpen) {
-    return <TextButton variant="secondary" size="md" onClick={() => setIsOpen(true)} label="Manage key" />;
-  }
-
   return (
-    <div className="mt-2 flex max-w-xl flex-col gap-3 rounded-lg border border-subtle bg-layer-1 p-3">
+    <div className="flex max-w-2xl flex-col gap-3 rounded-lg border border-subtle bg-layer-1 p-3">
       <div className="flex items-center gap-2 text-caption-md-regular text-tertiary">
         <KeyOutline className="size-3.5" />
         {state?.active_key ? (
@@ -150,7 +148,7 @@ export function OpenPGPControl(props: Props) {
           icon={<Icon icon={state?.is_locked ? UnlockedOutline : LockOutline} />}
           label={state?.is_locked ? "Allow self-service" : "Lock self-service"}
         />
-        <TextButton variant="secondary" size="md" onClick={() => setIsOpen(false)} label="Close" />
+        <TextButton variant="secondary" size="md" onClick={onClose} label="Close" />
       </div>
     </div>
   );
