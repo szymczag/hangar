@@ -36,7 +36,7 @@ export function ControllerSwitch<T extends FieldValues>(props: Props<T>) {
         </span>
         {/* Said plainly, because the consequence is destructive and the label
             alone reads like a harmless sync. */}
-        <p id={descriptionId} className="text-caption-sm-regular text-tertiary">
+        <p id={descriptionId} className="text-body-xs-regular text-tertiary">
           Every sign-in overwrites the person&apos;s display name and avatar with whatever {label} reports. Anything
           they changed in Hangar is replaced, each time they sign in. Leave this off to let people keep their own.
         </p>

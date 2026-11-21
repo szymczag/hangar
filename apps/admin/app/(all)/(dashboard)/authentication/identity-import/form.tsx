@@ -4,11 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 // plane internal packages
 import { Button } from "@makeplane/propel/components/button";
 import { Icon } from "@makeplane/propel/components/icon";
 import { InputField } from "@makeplane/propel/components/input-field";
+import { Select, SelectContent, SelectItem, SelectList, SelectTrigger } from "@makeplane/propel/components/select";
 import { TickCircleOutline, UploadOutline, WarningTriangleOutline } from "@makeplane/propel/icons";
 import { setToast } from "@plane/blocks/toast";
 import { AuthService, InstanceIdentityImportService } from "@plane/services";
@@ -51,6 +52,7 @@ export function InstanceIdentityImportForm(props: Props) {
   const [csrfToken, setCsrfToken] = useState<string | undefined>(undefined);
   const [providers, setProviders] = useState<string[]>([]);
   const [provider, setProvider] = useState("google");
+  const providerLabelId = useId();
   const [issuer, setIssuer] = useState(suggestedIssuer("google", config));
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<TIdentityImportPreview | null>(null);
@@ -138,21 +140,23 @@ export function InstanceIdentityImportForm(props: Props) {
     <div className="flex max-w-4xl flex-col gap-8">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label className="text-body-xs-medium text-primary" htmlFor="identity-import-provider">
+          <span id={providerLabelId} className="text-body-xs-medium text-primary">
             Identity provider
-          </label>
-          <select
-            id="identity-import-provider"
-            className="text-sm rounded-md border border-subtle bg-layer-2 px-3 py-2"
+          </span>
+          <Select
+            items={Object.fromEntries(providers.map((value) => [value, value]))}
             value={provider}
-            onChange={(event) => onProviderChange(event.target.value)}
+            onValueChange={(value) => onProviderChange(value as string)}
           >
-            {providers.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger variant="secondary" size="lg" aria-labelledby={providerLabelId} />
+            <SelectContent>
+              <SelectList>
+                {providers.map((value) => (
+                  <SelectItem key={value} value={value} label={value} size="lg" />
+                ))}
+              </SelectList>
+            </SelectContent>
+          </Select>
         </div>
 
         <InputField
@@ -188,7 +192,7 @@ export function InstanceIdentityImportForm(props: Props) {
           ref={fileInput}
           type="file"
           accept=".csv,text/csv"
-          className="text-sm"
+          className="text-body-xs-regular text-secondary file:mr-3 file:rounded-md file:border file:border-subtle file:bg-layer-2 file:px-3 file:py-1 file:text-body-xs-medium file:text-primary"
           onChange={onFileChange}
         />
         <p className="text-caption-md-regular text-tertiary">
@@ -234,8 +238,8 @@ export function InstanceIdentityImportForm(props: Props) {
           )}
 
           <div className="max-h-80 overflow-auto">
-            <table className="text-sm w-full text-left">
-              <thead className="text-xs text-tertiary uppercase">
+            <table className="w-full text-left text-body-xs-regular">
+              <thead className="text-caption-md-regular text-tertiary uppercase">
                 <tr>
                   <th className="py-1 pr-4">Line</th>
                   <th className="py-1 pr-4">{preview.valid ? "Account" : "Problem"}</th>
@@ -249,8 +253,8 @@ export function InstanceIdentityImportForm(props: Props) {
                       <tr key={row.line} className="border-t border-subtle">
                         <td className="py-1 pr-4 text-tertiary">{row.line}</td>
                         <td className="py-1 pr-4">{row.email}</td>
-                        <td className="font-mono text-xs py-1 pr-4">{row.subject}</td>
-                        <td className="text-xs py-1">
+                        <td className="font-mono py-1 pr-4 text-caption-md-regular">{row.subject}</td>
+                        <td className="py-1 text-caption-md-regular">
                           {row.action === "link" ? "will be linked" : "already linked — no change"}
                         </td>
                       </tr>
@@ -258,8 +262,8 @@ export function InstanceIdentityImportForm(props: Props) {
                   : preview.report.errors.map((error) => (
                       <tr key={`${error.line}-${error.code}`} className="border-t border-subtle">
                         <td className="py-1 pr-4 text-tertiary">{error.line}</td>
-                        <td className="font-mono text-xs py-1 pr-4">{error.code}</td>
-                        <td className="text-xs py-1 pr-4">
+                        <td className="font-mono py-1 pr-4 text-caption-md-regular">{error.code}</td>
+                        <td className="py-1 pr-4 text-caption-md-regular">
                           {REFUSAL_REASONS[error.code] ?? "This row cannot be imported."}
                           {error.first_line ? ` First seen on line ${error.first_line}.` : ""}
                         </td>
@@ -271,7 +275,7 @@ export function InstanceIdentityImportForm(props: Props) {
 
           {preview.valid && (
             <div className="flex flex-col gap-3 border-t border-subtle pt-4">
-              <p className="text-sm text-secondary">
+              <p className="text-body-sm-regular text-secondary">
                 Applying this grants each listed account the ability to sign in through {provider}. Re-enter your
                 password to confirm — your security key proved this session, this proves it is still you.
               </p>

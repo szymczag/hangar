@@ -61,11 +61,11 @@ function SettingSelect({ label, value, options, disabled, onChange, className }:
   const labelId = useId();
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <span id={labelId} className="text-caption-sm-medium text-tertiary">
+      <span id={labelId} className="text-body-xs-medium text-primary">
         {label}
       </span>
       <Select items={options} value={value} onValueChange={(next) => onChange(next as string)} disabled={disabled}>
-        <SelectTrigger variant="secondary" size="md" aria-labelledby={labelId} />
+        <SelectTrigger variant="secondary" size="md" width="fit" aria-labelledby={labelId} />
         <SelectContent>
           <SelectList>
             {Object.entries(options).map(([key, optionLabel]) => (
@@ -187,7 +187,6 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
             <div className="flex flex-wrap items-end gap-4">
               <SettingSelect
                 label="First day of the week"
-                className="w-44"
                 value={defaultStartOfWeek}
                 options={START_OF_WEEK_OPTIONS}
                 disabled={isControlDisabled}
@@ -195,7 +194,6 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
               />
               <SettingSelect
                 label="Theme"
-                className="w-44"
                 value={defaultTheme}
                 options={THEME_OPTIONS}
                 disabled={isControlDisabled}
@@ -267,7 +265,7 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
             </div>
             <SettingSelect
               label="Minimum role"
-              className={cn("w-48 shrink-0", { "opacity-70": isSubmitting })}
+              className={cn("shrink-0", { "opacity-70": isSubmitting })}
               value={apiTokenMinimumRole}
               options={API_TOKEN_ROLE_OPTIONS}
               disabled={isControlDisabled}

@@ -216,7 +216,7 @@ export function InstanceGoogleConfigForm(props: Props) {
               </SelectList>
             </SelectContent>
           </Select>
-          <div className="text-caption-sm-regular text-tertiary">
+          <div className="text-body-xs-regular text-tertiary">
             {value === "workspace" ? (
               <>
                 Checked against the signed <CodeBlock darkerShade>hd</CodeBlock> claim, so a matching email suffix is
@@ -247,7 +247,7 @@ export function InstanceGoogleConfigForm(props: Props) {
               <span id={autoRedirectLabelId} className="text-body-sm-medium text-primary">
                 Automatically start Google sign-in
               </span>
-              <p className="text-caption-sm-regular text-tertiary">
+              <p className="text-body-xs-regular text-tertiary">
                 Skip the sign-in chooser when Google is the only enabled login method. OAuth errors and an explicit
                 sign-out still show the Google button so people can recover or switch accounts.
               </p>

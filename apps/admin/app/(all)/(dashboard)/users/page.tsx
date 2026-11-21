@@ -112,7 +112,7 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
             placeholder="Search by email"
           />
         </div>
-        <div className="flex w-56 flex-col gap-1">
+        <div className="flex flex-col gap-1">
           <span id={providerLabelId} className="text-body-xs-medium text-primary">
             Cutover check
           </span>
@@ -121,7 +121,7 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
             value={provider || "none"}
             onValueChange={(value) => setProvider(value === "none" ? "" : (value as string))}
           >
-            <SelectTrigger variant="secondary" size="md" aria-labelledby={providerLabelId} />
+            <SelectTrigger variant="secondary" size="md" width="fit" aria-labelledby={providerLabelId} />
             <SelectContent>
               <SelectList>
                 {Object.entries(PROVIDER_CHECK_OPTIONS).map(([key, label]) => (
