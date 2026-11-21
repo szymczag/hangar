@@ -19,7 +19,9 @@ CPU_ARCH=$(uname -m)
 OS_NAME=$(uname)
 UPPER_CPU_ARCH=$(tr '[:lower:]' '[:upper:]' <<< "$CPU_ARCH")
 
-mkdir -p $PLANE_INSTALL_DIR/archive
+mkdir -p "$PLANE_INSTALL_DIR"
+# Holds earlier copies of plane.env: owner only, like plane.env itself.
+( umask 077 && mkdir -p "$PLANE_INSTALL_DIR/archive" )
 DOCKER_FILE_PATH=$PLANE_INSTALL_DIR/docker-compose.yaml
 # Written after a local image build; points the Hangar services at those images.
 DOCKER_OVERRIDE_PATH=$PLANE_INSTALL_DIR/docker-compose.override.yaml
@@ -145,6 +147,60 @@ function initialize(){
         return 1
     fi
 }
+
+# plane.env holds SECRET_KEY and the database, broker, cache and object-storage
+# credentials. It, every copy kept of it (plane.env.bak and
+# archive/<timestamp>.env) and the directories holding those copies are
+# readable by the owner only, whatever the umask. The same in install.sh and
+# swarm.sh. Env files are copied and moved only through copyEnvFile and
+# moveEnvFile; a bare cp or mv would give the copy the umask's mode instead.
+
+# Copies env file $1 to $2 with mode 600, also when $2 already exists.
+function copyEnvFile() {
+    local src=$1 dest=$2
+    rm -f "$dest" || return 1
+    ( umask 077 && cp "$src" "$dest" ) && chmod 600 "$dest"
+}
+
+# Moves env file $1 to $2 with mode 600. The mode is set first, so the file
+# never sits at $2 readable by others.
+function moveEnvFile() {
+    chmod 600 "$1" && mv "$1" "$2"
+}
+
+# Prints the permission bits of $1 in octal: GNU stat, or BSD stat on macOS.
+function fileMode() {
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null
+}
+
+# Removes group and other access from each existing path given that has any,
+# and says so in one line.
+function restrictToOwner() {
+    local path mode tightened=()
+    for path in "$@"; do
+        [ -e "$path" ] || continue
+        mode=$(fileMode "$path")
+        [ -n "$mode" ] || continue
+        if [ $((8#$mode & 8#077)) -ne 0 ] && chmod go-rwx "$path"; then
+            tightened+=("${path#"$PLANE_INSTALL_DIR"/}")
+        fi
+    done
+    if [ ${#tightened[@]} -gt 0 ]; then
+        echo "NOTICE: restricted to the owner, because other local users could read them: ${tightened[*]}" >&2
+    fi
+}
+
+# Releases before this check kept plane.env, plane.env.bak and archive/*.env
+# at the umask's mode, often 664 or 644. Tightens what an earlier release left.
+function protectEnvFiles() {
+    local archived=()
+    if [ -d "$PLANE_INSTALL_DIR/archive" ]; then
+        archived=("$PLANE_INSTALL_DIR"/archive/*.env)
+    fi
+    restrictToOwner "$PLANE_INSTALL_DIR/archive" "$PLANE_INSTALL_DIR/backup" "$DOCKER_ENV_PATH" \
+        "$PLANE_INSTALL_DIR/plane.env.bak" "${archived[@]}"
+}
+
 function getEnvValue() {
     local key=$1
     local file=$2
@@ -745,7 +801,7 @@ function download() {
         PREVIOUS_COMPOSE_PATH=$PLANE_INSTALL_DIR/archive/$TS.docker-compose.yaml
     fi
     mv "$staging/docker-compose.yml" "$PLANE_INSTALL_DIR/docker-compose.yaml"
-    mv "$staging/variables.env" "$PLANE_INSTALL_DIR/variables-upgrade.env"
+    moveEnvFile "$staging/variables.env" "$PLANE_INSTALL_DIR/variables-upgrade.env"
     if [ -f "$staging/migrate-object-storage.sh" ]; then
         mv "$staging/migrate-object-storage.sh" "$MIGRATE_STORAGE_SCRIPT"
         chmod +x "$MIGRATE_STORAGE_SCRIPT"
@@ -754,11 +810,11 @@ function download() {
 
     if [ -f "$DOCKER_ENV_PATH" ];
     then
-        cp "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/archive/$TS.env"
-        cp "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/plane.env.bak"
+        copyEnvFile "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/archive/$TS.env" || exit 1
+        copyEnvFile "$DOCKER_ENV_PATH" "$PLANE_INSTALL_DIR/plane.env.bak" || exit 1
     fi
 
-    mv $PLANE_INSTALL_DIR/variables-upgrade.env $DOCKER_ENV_PATH
+    moveEnvFile "$PLANE_INSTALL_DIR/variables-upgrade.env" "$DOCKER_ENV_PATH" || exit 1
 
     syncEnvFile
     generateStorageCredentials
@@ -1161,7 +1217,12 @@ function backup_container_dir() {
 function backupData() {
     local datetime=$(date +"%Y%m%d-%H%M")
     local BACKUP_FOLDER=$PLANE_INSTALL_DIR/backup/$datetime
-    mkdir -p "$BACKUP_FOLDER"
+    # The archives hold the database, uploads and broker state, so they and
+    # their directories are for the owner only. Backup is the last action
+    # of this run, so the umask is not restored.
+    umask 077
+    mkdir -p "$BACKUP_FOLDER" || exit 1
+    restrictToOwner "$PLANE_INSTALL_DIR/backup"
 
     # Check if docker-compose.yml exists
     if [ ! -f "$DOCKER_FILE_PATH" ]; then
@@ -1300,4 +1361,5 @@ done
 set -- "${ACTION_ARGS[@]}"
 
 print_header
+protectEnvFiles
 askForAction "$@"

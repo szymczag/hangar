@@ -65,6 +65,8 @@ VERIFY_FUNCTIONS = (
     "downloadReleaseAssets",
 )
 INSTALL_ONLY = ("copyLocalAssets", "stageDeploymentFiles")
+# download copies and moves plane.env only through these (S28).
+ENV_FILE_HELPERS = ("copyEnvFile", "moveEnvFile")
 STUBS = (
     "function checkSecretKeyRotation() { :; }\n"
     "function syncEnvFile() { :; }\n"
@@ -235,7 +237,13 @@ class ReleaseCase:
         (install_dir / "plane.env").write_text("PREVIOUS=1\n")
         (install_dir / "migrate-object-storage.sh").write_text("# the previous helper\n")
         before = _snapshot(install_dir)
-        names = VERIFY_FUNCTIONS + (INSTALL_ONLY if script == INSTALL else ()) + ("download",) + functions
+        names = (
+            VERIFY_FUNCTIONS
+            + (INSTALL_ONLY if script == INSTALL else ())
+            + ENV_FILE_HELPERS
+            + ("download",)
+            + functions
+        )
         cosign_log = self.scratch / "cosign.args"
         environment = {
             "PATH": str(self.bin),

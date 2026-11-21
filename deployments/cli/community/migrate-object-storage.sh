@@ -167,17 +167,23 @@ done
 "$CLI" network create "$NETWORK" >/dev/null
 volume_exists "$TARGET_VOLUME" || "$CLI" volume create "$TARGET_VOLUME" >/dev/null
 
+# Credentials reach the containers by name only (-e NAME): the value comes from
+# the environment of that one command, set by a prefix assignment, so it never
+# appears in argv, where any local user could read it in ps or
+# /proc/<pid>/cmdline while the migration runs.
 log "Starting the legacy reader"
+MINIO_ROOT_USER="$LEGACY_ACCESS_KEY" MINIO_ROOT_PASSWORD="$LEGACY_SECRET_KEY" \
 "$CLI" run -d --name "$SRC" --network "$NETWORK" \
-    -e MINIO_ROOT_USER="$LEGACY_ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$LEGACY_SECRET_KEY" \
+    -e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD \
     -v "$LEGACY_VOLUME:/export" \
     "$LEGACY_IMAGE" server /export >/dev/null
 
 log "Starting SeaweedFS"
 # Same hardening as the compose service: per-start JWT keys close the filer and
 # volume HTTP ports, leaving only the authenticated S3 API.
+AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
 "$CLI" run -d --name "$DST" --network "$NETWORK" --user 1000:1000 \
-    -e AWS_ACCESS_KEY_ID="$ACCESS_KEY" -e AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+    -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
     -v "$TARGET_VOLUME:/data" \
     --entrypoint /bin/sh "$SEAWEEDFS_IMAGE" -c '
         for key in WEED_JWT_SIGNING_KEY WEED_JWT_SIGNING_READ_KEY WEED_JWT_FILER_SIGNING_KEY WEED_JWT_FILER_SIGNING_READ_KEY; do
@@ -187,13 +193,15 @@ log "Starting SeaweedFS"
           -master.telemetry=false -admin.ui=false -webdav=false' >/dev/null
 
 rclone() {
+    RCLONE_CONFIG_SRC_ACCESS_KEY_ID="$LEGACY_ACCESS_KEY" RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY="$LEGACY_SECRET_KEY" \
+    RCLONE_CONFIG_DST_ACCESS_KEY_ID="$ACCESS_KEY" RCLONE_CONFIG_DST_SECRET_ACCESS_KEY="$SECRET_KEY" \
     "$CLI" run --rm --network "$NETWORK" -e RCLONE_CONFIG=/dev/null \
         -e RCLONE_CONFIG_SRC_TYPE=s3 -e RCLONE_CONFIG_SRC_PROVIDER=Minio \
         -e RCLONE_CONFIG_SRC_ENDPOINT="http://$SRC:9000" \
-        -e RCLONE_CONFIG_SRC_ACCESS_KEY_ID="$LEGACY_ACCESS_KEY" -e RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY="$LEGACY_SECRET_KEY" \
+        -e RCLONE_CONFIG_SRC_ACCESS_KEY_ID -e RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY \
         -e RCLONE_CONFIG_DST_TYPE=s3 -e RCLONE_CONFIG_DST_PROVIDER=SeaweedFS \
         -e RCLONE_CONFIG_DST_ENDPOINT="http://$DST:9000" \
-        -e RCLONE_CONFIG_DST_ACCESS_KEY_ID="$ACCESS_KEY" -e RCLONE_CONFIG_DST_SECRET_ACCESS_KEY="$SECRET_KEY" \
+        -e RCLONE_CONFIG_DST_ACCESS_KEY_ID -e RCLONE_CONFIG_DST_SECRET_ACCESS_KEY \
         "$RCLONE_IMAGE" "$@"
 }
 

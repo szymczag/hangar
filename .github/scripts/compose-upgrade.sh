@@ -131,6 +131,8 @@ SEED_PASSWORD="Up-$(random_value 29)"
 SEED_API_TOKEN="plane_api_$(random_value 32)"
 export SEED_PASSWORD SEED_API_TOKEN
 printf '%s' "$SEED_PASSWORD" > "$SECRETS_DIR/password"
+# curl reads the header from a file, so the token stays off its command line.
+printf 'X-API-Key: %s\n' "$SEED_API_TOKEN" > "$SECRETS_DIR/api-key-header"
 
 echo "Upgrade from: $FROM_RELEASE (images $FROM_VERSION)"
 echo "Upgrade to:   images $TO_IMAGE_TAG with $SOURCE_DIR"
@@ -267,11 +269,11 @@ check_http() {
         || fail "the signed-in session is not the seeded admin ($label)"
     echo "Password sign-in works ($label)"
 
-    project_id=$(curl -fsS -H "X-API-Key: $SEED_API_TOKEN" \
+    project_id=$(curl -fsS -H "@$SECRETS_DIR/api-key-header" \
         "$BASE_URL/api/v1/workspaces/upgrade-alpha/projects/" \
         | jq -r '.results[] | select(.identifier == "UPG") | .id')
     [ -n "$project_id" ] || fail "the API key does not list the seeded project ($label)"
-    curl -fsS -H "X-API-Key: $SEED_API_TOKEN" \
+    curl -fsS -H "@$SECRETS_DIR/api-key-header" \
         "$BASE_URL/api/v1/workspaces/upgrade-alpha/projects/$project_id/issues/" \
         | jq -e '[.results[].name] == ["Upgrade survives with its data"]' > /dev/null \
         || fail "the API key does not list the seeded work item ($label)"
@@ -338,8 +340,7 @@ BACKUP_DIR="$ARTIFACT_DIR/backup"
 mkdir -p "$BACKUP_DIR"
 cp "$backup_source"/*.tar.gz "$BACKUP_DIR/"
 # The volumes hold data written with these passwords and keys; a restore needs both.
-cp "$FROM_DIR/$PROJECT/plane.env" "$BACKUP_DIR/plane.env"
-chmod 600 "$BACKUP_DIR/plane.env"
+install -m 600 "$FROM_DIR/$PROJECT/plane.env" "$BACKUP_DIR/plane.env"
 for archive in pgdata object-storage rabbitmq_data redisdata; do
     [ -s "$BACKUP_DIR/$archive.tar.gz" ] || fail "the backup has no $archive.tar.gz"
 done
@@ -397,7 +398,7 @@ log "Restoring the backup into a fresh directory"
 RESTORE_DIR="$WORK_DIR/restore"
 mkdir -p "$RESTORE_DIR/$PROJECT"
 CURRENT_DEPLOYMENT=$RESTORE_DIR
-cp "$BACKUP_DIR/plane.env" "$RESTORE_DIR/$PROJECT/plane.env"
+install -m 600 "$BACKUP_DIR/plane.env" "$RESTORE_DIR/$PROJECT/plane.env"
 cp "$SOURCE_DIR/restore.sh" "$RESTORE_DIR/restore.sh"
 # restore.sh fills existing volumes only. They are restored before the
 # installer runs, so it sees an existing database and keeps its password.
