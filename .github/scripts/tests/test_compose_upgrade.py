@@ -114,7 +114,9 @@ class ComposeUpgradeScriptTests(unittest.TestCase):
         for label in ('"$FROM_VERSION"', "upgraded", "restored"):
             self.assertIn(f"check_http {label}\n", self.script)
         self.assertIn('"$BASE_URL/auth/sign-in/"', self.script)
-        self.assertIn('-H "X-API-Key: $SEED_API_TOKEN"', self.script)
+        self.assertIn('-H "@$SECRETS_DIR/api-key-header"', self.script)
+        # The token stays off curl's command line.
+        self.assertNotIn('-H "X-API-Key: $SEED_API_TOKEN"', self.script)
 
     def test_refuses_to_touch_an_existing_deployment(self):
         self.assertIn("refusing to touch it", self.script)

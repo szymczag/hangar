@@ -14,6 +14,10 @@ These tests run the real upgrade and backup actions of `install.sh` against a
 scratch install directory under `umask 002`, with Docker replaced, run the
 `download` step of both installers, and scan every script under
 `deployments/` for an env file copied or moved past the safe helpers.
+
+They also run `migrate-object-storage.sh` with the container CLI replaced and
+check that no credential reaches a container on its command line, which every
+local user can read in ps or /proc/<pid>/cmdline.
 """
 
 import os
@@ -395,6 +399,119 @@ class NoBareEnvCopyTests(unittest.TestCase):
             with self.subTest(script=relative):
                 lines = [line.strip() for line in (REPOSITORY_ROOT / relative).read_text().splitlines()]
                 self.assertIn(command, lines)
+
+
+MIGRATE = COMMUNITY / "migrate-object-storage.sh"
+
+# Records every container command line, and the credentials the container
+# would receive from this process's environment for each -e NAME, then plays a
+# legacy volume with no buckets and no migration marker.
+FAKE_CLI = """#!/usr/bin/env bash
+printf 'ARGV %s\\n' "$*" >> "$CLI_LOG"
+if [ "$1" == "run" ]; then
+    for name in MINIO_ROOT_USER MINIO_ROOT_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY \\
+        RCLONE_CONFIG_SRC_ACCESS_KEY_ID RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY \\
+        RCLONE_CONFIG_DST_ACCESS_KEY_ID RCLONE_CONFIG_DST_SECRET_ACCESS_KEY; do
+        printf 'ENV %s=%s\\n' "$name" "${!name}" >> "$CLI_LOG"
+    done
+fi
+case "$1 $2" in
+    "volume inspect") [ "$3" == "plane-app_uploads" ]; exit $? ;;
+esac
+exit 0
+"""
+
+
+class SecretArgvTests(unittest.TestCase):
+    """S28: no credential is passed to a container on its command line, where
+    every local user can read it in ps or /proc/<pid>/cmdline."""
+
+    def test_the_storage_migration_passes_credentials_by_name_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            scratch = Path(directory)
+            (scratch / "bin").mkdir()
+            cli = scratch / "bin" / "docker"
+            cli.write_text(FAKE_CLI)
+            cli.chmod(0o755)
+            env_file = scratch / "plane.env"
+            env_file.write_text(
+                "AWS_ACCESS_KEY_ID=NewAccessKeyValue1\n"
+                "AWS_SECRET_ACCESS_KEY=NewSecretValue1\n"
+                "LEGACY_MINIO_ROOT_USER=OldAccessKeyValue1\n"
+                "LEGACY_MINIO_ROOT_PASSWORD=OldSecretValue1\n"
+            )
+            log = scratch / "cli.log"
+            result = subprocess.run(
+                ["bash", str(MIGRATE), "--project", "plane-app", "--env-file", str(env_file), "--yes"],
+                env={"PATH": f"{scratch / 'bin'}:/usr/bin:/bin", "CLI_LOG": str(log)},
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Migration finished", result.stdout)
+            lines = log.read_text().splitlines()
+            arguments = "\n".join(line for line in lines if not line.startswith("ENV "))
+            self.assertIn(" run -d ", arguments)
+            for secret in ("NewAccessKeyValue1", "NewSecretValue1", "OldAccessKeyValue1", "OldSecretValue1"):
+                self.assertNotIn(secret, arguments)
+            # One block per container run: its command line, then the environment.
+            runs = []
+            for line in lines:
+                if line.startswith("ARGV "):
+                    runs.append({"argv": line, "env": {}})
+                elif line.startswith("ENV "):
+                    name, value = line[len("ENV ") :].split("=", 1)
+                    runs[-1]["env"][name] = value
+                else:
+                    # The SeaweedFS start script spans several lines.
+                    runs[-1]["argv"] += "\n" + line
+            legacy = next(run for run in runs if "server /export" in run["argv"])
+            self.assertEqual(legacy["env"]["MINIO_ROOT_USER"], "OldAccessKeyValue1")
+            self.assertEqual(legacy["env"]["MINIO_ROOT_PASSWORD"], "OldSecretValue1")
+            seaweed = next(run for run in runs if "weed -logtostderr" in run["argv"])
+            self.assertEqual(seaweed["env"]["AWS_ACCESS_KEY_ID"], "NewAccessKeyValue1")
+            self.assertEqual(seaweed["env"]["AWS_SECRET_ACCESS_KEY"], "NewSecretValue1")
+            rclone = next(run for run in runs if " lsf " in run["argv"])
+            self.assertEqual(rclone["env"]["RCLONE_CONFIG_SRC_ACCESS_KEY_ID"], "OldAccessKeyValue1")
+            self.assertEqual(rclone["env"]["RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY"], "OldSecretValue1")
+            self.assertEqual(rclone["env"]["RCLONE_CONFIG_DST_ACCESS_KEY_ID"], "NewAccessKeyValue1")
+            self.assertEqual(rclone["env"]["RCLONE_CONFIG_DST_SECRET_ACCESS_KEY"], "NewSecretValue1")
+            # Each value is set for its own command only, not exported to the
+            # rest of the script.
+            self.assertEqual(rclone["env"]["AWS_SECRET_ACCESS_KEY"], "")
+            self.assertEqual(rclone["env"]["MINIO_ROOT_PASSWORD"], "")
+            marker = next(run for run in runs if "date -u" in run["argv"])
+            self.assertEqual(set(marker["env"].values()), {""})
+
+    # -e NAME=value, --env NAME=value or --env=NAME=value whose name looks like
+    # a credential, or a --password argument.
+    SECRET_ON_ARGV = re.compile(
+        r"(?:-e\s+|--env[=\s]+)[A-Z0-9_]*(?:KEY|SECRET|PASSWORD|PASS|TOKEN)[A-Z0-9_]*=|--password[=\s]"
+    )
+
+    def test_no_deployment_script_puts_a_credential_on_a_command_line(self):
+        offending = []
+        for path in sorted((REPOSITORY_ROOT / "deployments").rglob("*.sh")):
+            for number, line in enumerate(path.read_text().splitlines(), 1):
+                command = line.strip()
+                if not command.startswith("#") and self.SECRET_ON_ARGV.search(command):
+                    offending.append(f"{path.relative_to(REPOSITORY_ROOT)}:{number}: {command}")
+        self.assertEqual(offending, [], "pass credentials as -e NAME with the value in the environment")
+
+    def test_the_scan_finds_a_credential_on_a_command_line(self):
+        for command in (
+            '-e MINIO_ROOT_PASSWORD="$LEGACY_SECRET_KEY" \\',
+            '-e RCLONE_CONFIG_SRC_ACCESS_KEY_ID="$LEGACY_ACCESS_KEY"',
+            "--env=API_TOKEN=$TOKEN",
+            'rabbitmqctl --password "$PW"',
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(self.SECRET_ON_ARGV.search(command))
+        for command in ("-e MINIO_ROOT_PASSWORD \\", '-e TAR_NAME="$restoreFile"', "-e RCLONE_CONFIG=/dev/null"):
+            with self.subTest(command=command):
+                self.assertIsNone(self.SECRET_ON_ARGV.search(command))
 
 
 if __name__ == "__main__":

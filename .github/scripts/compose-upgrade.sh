@@ -131,6 +131,8 @@ SEED_PASSWORD="Up-$(random_value 29)"
 SEED_API_TOKEN="plane_api_$(random_value 32)"
 export SEED_PASSWORD SEED_API_TOKEN
 printf '%s' "$SEED_PASSWORD" > "$SECRETS_DIR/password"
+# curl reads the header from a file, so the token stays off its command line.
+printf 'X-API-Key: %s\n' "$SEED_API_TOKEN" > "$SECRETS_DIR/api-key-header"
 
 echo "Upgrade from: $FROM_RELEASE (images $FROM_VERSION)"
 echo "Upgrade to:   images $TO_IMAGE_TAG with $SOURCE_DIR"
@@ -267,11 +269,11 @@ check_http() {
         || fail "the signed-in session is not the seeded admin ($label)"
     echo "Password sign-in works ($label)"
 
-    project_id=$(curl -fsS -H "X-API-Key: $SEED_API_TOKEN" \
+    project_id=$(curl -fsS -H "@$SECRETS_DIR/api-key-header" \
         "$BASE_URL/api/v1/workspaces/upgrade-alpha/projects/" \
         | jq -r '.results[] | select(.identifier == "UPG") | .id')
     [ -n "$project_id" ] || fail "the API key does not list the seeded project ($label)"
-    curl -fsS -H "X-API-Key: $SEED_API_TOKEN" \
+    curl -fsS -H "@$SECRETS_DIR/api-key-header" \
         "$BASE_URL/api/v1/workspaces/upgrade-alpha/projects/$project_id/issues/" \
         | jq -e '[.results[].name] == ["Upgrade survives with its data"]' > /dev/null \
         || fail "the API key does not list the seeded work item ($label)"

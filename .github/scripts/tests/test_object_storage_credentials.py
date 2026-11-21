@@ -191,10 +191,12 @@ class ObjectStorageCredentialRotationTests(unittest.TestCase):
 
     def test_the_storage_migration_reads_the_legacy_volume_with_the_old_pair(self):
         source = MIGRATE_PATH.read_text()
+        # By name only (-e NAME), the values set for that one command (S28).
         self.assertIn(
-            '-e MINIO_ROOT_USER="$LEGACY_ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$LEGACY_SECRET_KEY"',
+            'MINIO_ROOT_USER="$LEGACY_ACCESS_KEY" MINIO_ROOT_PASSWORD="$LEGACY_SECRET_KEY" \\\n',
             source,
         )
+        self.assertIn("-e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD \\\n", source)
         self.assertIn('RCLONE_CONFIG_SRC_ACCESS_KEY_ID="$LEGACY_ACCESS_KEY"', source)
         self.assertIn('RCLONE_CONFIG_DST_ACCESS_KEY_ID="$ACCESS_KEY"', source)
 

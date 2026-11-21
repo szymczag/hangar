@@ -618,8 +618,10 @@ NEW_MQ_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)
 
 # 2. Change them inside Postgres and RabbitMQ.
 # psql over the local socket, which needs no password; the container's PGHOST
-# would otherwise send it over TCP, which does.
-compose exec plane-db psql -h /var/run/postgresql -U plane -d plane -c "ALTER ROLE plane WITH PASSWORD '$NEW_DB_PASSWORD';"
+# would otherwise send it over TCP, which does. The statement goes in on stdin
+# (printf is a shell builtin), so the password is on no command line.
+printf "ALTER ROLE plane WITH PASSWORD '%s';\n" "$NEW_DB_PASSWORD" \
+  | compose exec -T plane-db psql -h /var/run/postgresql -U plane -d plane
 compose exec plane-mq rabbitmqctl change_password plane "$NEW_MQ_PASSWORD"
 
 # 3. Write them to plane.env. If the upgrade pinned DATABASE_URL or AMQP_URL to
