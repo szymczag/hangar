@@ -38,3 +38,26 @@ test("the console not-found screen", async ({ page }) => {
   const message = page.getByText("Sorry, the page you are looking for cannot be found.");
   await capture(page, "console-not-found", { ready: message });
 });
+
+/**
+ * God Mode 0.3.0-rc.1 threw React error #418 on every load after the first:
+ * its prerendered index.html had an empty body (the HydrateFallback loader was
+ * gated on i18n), and with the chunks cached i18n was ready at hydration, so
+ * the first client render did not match. The deterministic guard for that is
+ * `apps/admin/tests/built-assets.build.test.mjs`, which checks the prerendered
+ * loader; this story only reproduces the timing when the repeat load is served
+ * from cache, which the VR edge does not promise (it sends no cache headers).
+ * What it does hold is that neither load raises a page error. No screenshot.
+ */
+test("the console hydrates cleanly on a repeat load", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  const signIn = page.getByRole("button", { name: "Sign in" });
+  await page.goto("/god-mode/");
+  await expect(signIn).toBeVisible();
+  await page.goto("/god-mode/");
+  await expect(signIn).toBeVisible();
+
+  expect(errors).toEqual([]);
+});

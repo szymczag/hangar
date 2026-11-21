@@ -6,8 +6,6 @@
 
 import { ThemeProvider } from "next-themes";
 import { SWRConfig } from "swr";
-import { PlaneToastProvider } from "@plane/blocks/toast";
-import { TranslationProvider } from "@plane/i18n";
 import { AppProgressBar } from "@/lib/b-progress";
 // local imports
 import { StoreProvider } from "./store.provider";
@@ -27,19 +25,15 @@ export function CoreProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider themes={["light", "dark"]} defaultTheme="system" enableSystem>
       <AppProgressBar />
-      {/* The toast viewport is a provider that calls `useTranslation`. Admin had no i18n provider,
-          so TranslationProvider is mounted here for it. */}
-      <TranslationProvider>
-        <PlaneToastProvider>
-          <SWRConfig value={DEFAULT_SWR_CONFIG}>
-            <StoreProvider>
-              <InstanceProvider>
-                <UserProvider>{children}</UserProvider>
-              </InstanceProvider>
-            </StoreProvider>
-          </SWRConfig>
-        </PlaneToastProvider>
-      </TranslationProvider>
+      {/* Translation and the toast viewport are mounted by the root route, under the
+          prerendered HydrateFallback: see `Root` in app/root.tsx. */}
+      <SWRConfig value={DEFAULT_SWR_CONFIG}>
+        <StoreProvider>
+          <InstanceProvider>
+            <UserProvider>{children}</UserProvider>
+          </InstanceProvider>
+        </StoreProvider>
+      </SWRConfig>
     </ThemeProvider>
   );
 }
