@@ -159,6 +159,14 @@ jobs:
               --inventory "packages/csp/bundle-sinks/$app.json"
           done
 
+      # Checks on the built God Mode that no source-level test can make: every
+      # utility the vendored Propel variants use has a rule in the built CSS
+      # (Tailwind drops a class it does not know without a warning), and the
+      # prerendered index.html keeps its HydrateFallback loader. Uses the
+      # admin build from the step above.
+      - name: Check the built God Mode
+        run: pnpm test:admin-build
+
       # Nothing had ever run either Storybook -- no workflow, no turbo task, no
       # chromatic -- which is why `packages/ui`'s could sit broken indefinitely,
       # importing a stylesheet that no longer existed. Repairing it without
