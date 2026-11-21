@@ -12,6 +12,10 @@
  * the existing secret", so there is nothing to gain by demanding it.
  *
  * All five OAuth and OIDC forms shipped that way while the email form did not.
+ *
+ * Nor may a secret field start with, or be reset to, a value from the server.
+ * Whatever the configuration endpoint hands back for a secret key is at best a
+ * mask, and submitting it again would overwrite the stored secret with it.
  */
 
 import assert from "node:assert/strict";
@@ -20,6 +24,8 @@ import test from "node:test";
 
 const AUTHENTICATION = new URL("../app/(all)/(dashboard)/authentication/", import.meta.url);
 const EMAIL_FORM = new URL("../app/(all)/(dashboard)/email/email-config-form.tsx", import.meta.url);
+const AI_FORM = new URL("../app/(all)/(dashboard)/ai/form.tsx", import.meta.url);
+const SHARED_FORM_HOOK = new URL("../hooks/use-oauth-provider-config-form.ts", import.meta.url);
 
 /** Every field literal declaring `type: "password"`, with its key. */
 function passwordFields(source) {
@@ -35,13 +41,16 @@ function passwordFields(source) {
 }
 
 function formSources() {
-  const sources = [["email-config-form.tsx", readFileSync(EMAIL_FORM, "utf8")]];
+  const sources = [
+    ["email-config-form.tsx", readFileSync(EMAIL_FORM, "utf8")],
+    ["ai/form.tsx", readFileSync(AI_FORM, "utf8")],
+  ];
   for (const entry of readdirSync(AUTHENTICATION, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     try {
       sources.push([entry.name, readFileSync(new URL(`${entry.name}/form.tsx`, AUTHENTICATION), "utf8")]);
     } catch {
-      // Not every provider directory has a form; saml and domains do not.
+      // Not every provider directory has a form; identity-import does not.
     }
   }
   return sources;
@@ -83,4 +92,48 @@ test("a secret that is not stored yet is still required", () => {
     [],
     `these could be saved with no secret at all, leaving the provider unusable: ${withoutGuard.join(", ")}`
   );
+});
+
+test("no secret field is filled from the stored configuration", () => {
+  const prefilled = [];
+  for (const [form, source] of formSources()) {
+    for (const { key } of passwordFields(source)) {
+      if (new RegExp(`${key}: config\\[`).test(source)) prefilled.push(`${form}: ${key}`);
+      if (!new RegExp(`${key}: "",`).test(source)) prefilled.push(`${form}: ${key} (no empty default)`);
+    }
+  }
+
+  assert.deepEqual(prefilled, [], `these start from a value the server sent back: ${prefilled.join(", ")}`);
+});
+
+test("no form is reset with values from the save response", () => {
+  const fromResponse = [];
+  for (const [form, source] of [
+    ...formSources(),
+    ["use-oauth-provider-config-form.ts", readFileSync(SHARED_FORM_HOOK, "utf8")],
+  ]) {
+    if (/reset\([^;]*response/s.test(source)) fromResponse.push(form);
+  }
+
+  assert.deepEqual(fromResponse, [], `these refill the form from the response: ${fromResponse.join(", ")}`);
+});
+
+test("the shared provider form hook empties every secret it is given", () => {
+  const hook = readFileSync(SHARED_FORM_HOOK, "utf8");
+  // Both the initial values and the values after a save go through the same filter.
+  assert.match(hook, /useForm<T>\(\{ defaultValues: withEmptySecrets\(defaultValues, secretKeys\) \}\)/);
+  assert.match(hook, /form\.reset\(withEmptySecrets\(formData, secretKeys\)\)/);
+  assert.match(hook, /for \(const key of secretKeys\) next\[key\] = "";/);
+});
+
+test("every provider form built on the shared hook names its secret", () => {
+  const missing = [];
+  for (const [form, source] of formSources()) {
+    if (!source.includes("useOAuthProviderConfigForm<")) continue;
+    for (const { key } of passwordFields(source)) {
+      if (!new RegExp(`\\[\\s*"${key}"\\s*\\]`).test(source)) missing.push(`${form}: ${key}`);
+    }
+  }
+
+  assert.deepEqual(missing, [], `the hook would keep these secrets after a save: ${missing.join(", ")}`);
 });

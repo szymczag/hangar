@@ -8,11 +8,11 @@ import { useEffect, useState } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useRouter } from "next/navigation";
 // plane internal packages
-import { Button } from "@plane/propel/button";
+import { Banner } from "@makeplane/propel/components/banner";
+import { Button } from "@makeplane/propel/components/button";
+import { InputField } from "@makeplane/propel/components/input-field";
 import { AuthService, InstanceWebAuthnService } from "@plane/services";
 import { GOD_MODE_URL } from "@plane/constants";
-// components
-import { Banner } from "@/components/common/banner";
 // helpers
 import { authErrorHandler } from "../../auth-helpers";
 // types
@@ -39,6 +39,7 @@ export default function AdminSecondFactorEnrollPage(_props: Route.ComponentProps
       .then((data) => {
         if (data?.is_2fa_pending !== true) replace("/");
         else if (data?.requires_enrollment === false) replace("/2fa");
+        return undefined;
       })
       .catch(() => replace("/"));
   }, [replace]);
@@ -80,31 +81,40 @@ export default function AdminSecondFactorEnrollPage(_props: Route.ComponentProps
   return (
     <div className="mx-auto w-full max-w-md space-y-6 py-16">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Register a security key</h1>
-        <p className="text-sm text-tertiary">
+        <h1 className="text-h4-semibold text-primary">Register a security key</h1>
+        <p className="text-body-sm-regular text-tertiary">
           This console requires a security key in addition to your password. Register one now to continue — a lost key
           can only be reset from a shell on the server, so a second key is worth adding afterwards.
         </p>
       </div>
 
-      {error && <Banner type="error" message={error} />}
+      {error && <Banner placement="inline" variant="danger" description={error} />}
 
       {supported ? (
         <>
-          <input
+          <InputField
+            size="lg"
+            orientation="vertical"
+            label="Key name"
             value={nickname}
             onChange={(event) => setNickname(event.target.value)}
             placeholder="Name this key, e.g. YubiKey 5C"
-            className="text-sm w-full rounded-sm border border-strong bg-surface-1 px-3 py-2 outline-none"
           />
-          <Button variant="primary" onClick={register} loading={isBusy} disabled={!csrfToken || isBusy}>
-            {isBusy ? "Waiting for your key..." : "Register security key"}
-          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            stretch="full"
+            onClick={() => void register()}
+            loading={isBusy}
+            disabled={!csrfToken || isBusy}
+            label={isBusy ? "Waiting for your key..." : "Register security key"}
+          />
         </>
       ) : (
         <Banner
-          type="error"
-          message="This browser does not support security keys. Open the console in a browser that does."
+          placement="inline"
+          variant="danger"
+          description="This browser does not support security keys. Open the console in a browser that does."
         />
       )}
     </div>

@@ -6,10 +6,12 @@
 
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Trash2 } from "lucide-react";
 // plane internal packages
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { CheckboxField } from "@makeplane/propel/components/checkbox-field";
+import { Icon } from "@makeplane/propel/components/icon";
+import { DeleteOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { AuthService, InstanceBrandingService } from "@plane/services";
 import type { TBrandingImage } from "@plane/services";
 import type { IFormattedInstanceConfiguration, TInstanceBrandingConfigurationKeys } from "@plane/types";
@@ -49,31 +51,38 @@ function ImageField(props: ImageFieldProps) {
   const { label, hint, emptyLabel, url, onUpload, onClear, disabled } = props;
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-primary">{label}</span>
+      <span className="text-body-sm-medium text-primary">{label}</span>
       <div className="flex items-center gap-4">
-        <div className="flex h-14 w-44 items-center justify-center overflow-hidden rounded-md border border-strong bg-surface-1">
+        <div className="flex h-14 w-44 items-center justify-center overflow-hidden rounded-lg border border-subtle bg-layer-1">
           {url ? (
             <img src={url} alt={label} className="max-h-full max-w-full object-contain" />
           ) : (
-            <span className="text-11 text-tertiary">{emptyLabel}</span>
+            <span className="text-caption-md-regular text-tertiary">{emptyLabel}</span>
           )}
         </div>
         <div className="flex flex-col gap-2">
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif"
-            className="text-sm"
+            aria-label={`Upload ${label.toLowerCase()}`}
+            className="text-body-xs-regular text-secondary file:mr-3 file:rounded-md file:border file:border-subtle file:bg-layer-2 file:px-3 file:py-1 file:text-body-xs-medium file:text-primary"
             onChange={onUpload}
             disabled={disabled}
           />
           {url && (
-            <Button variant="secondary" size="sm" onClick={onClear} disabled={disabled}>
-              <Trash2 className="h-3.5 w-3.5" /> Remove
-            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              stretch="auto"
+              icon={<Icon icon={DeleteOutline} />}
+              onClick={onClear}
+              disabled={disabled}
+              label="Remove"
+            />
           )}
         </div>
       </div>
-      <span className="text-11 text-tertiary">
+      <span className="text-caption-md-regular text-tertiary">
         {hint} Served to anyone who opens the sign-in page, so it is validated as an image server-side rather than
         trusted from the upload.
       </span>
@@ -200,7 +209,7 @@ export function InstanceBrandingForm(props: Props) {
         INSTANCE_SHOW_LICENSE_NOTICE: showLicenseNotice ? "1" : "0",
         INSTANCE_SHOW_EXTERNAL_LINKS: showExternalLinks ? "1" : "0",
       });
-      setToast({ type: TOAST_TYPE.SUCCESS, title: "Saved", message: "Branding updated." });
+      setToast({ type: "success", title: "Saved", message: "Branding updated." });
       reset({
         INSTANCE_BRANDING_NAME: response.find((item) => item.key === "INSTANCE_BRANDING_NAME")?.value ?? "",
         INSTANCE_SIGN_IN_HEADER: response.find((item) => item.key === "INSTANCE_SIGN_IN_HEADER")?.value ?? "",
@@ -211,7 +220,7 @@ export function InstanceBrandingForm(props: Props) {
         INSTANCE_SUPPORT_TEXT: response.find((item) => item.key === "INSTANCE_SUPPORT_TEXT")?.value ?? "",
       });
     } catch (error) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error", message: configurationErrorMessage(error) });
+      setToast({ type: "error", title: "Error", message: configurationErrorMessage(error) });
     }
   };
 
@@ -222,9 +231,9 @@ export function InstanceBrandingForm(props: Props) {
     try {
       const result = await brandingService.uploadImage(csrfToken, kind, file);
       setImages((previous) => ({ ...previous, [kind]: result.asset_url }));
-      setToast({ type: TOAST_TYPE.SUCCESS, title: "Image updated", message: "The sign-in page now shows it." });
+      setToast({ type: "success", title: "Image updated", message: "The sign-in page now shows it." });
     } catch (error) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Image not updated", message: configurationErrorMessage(error) });
+      setToast({ type: "error", title: "Image not updated", message: configurationErrorMessage(error) });
     } finally {
       setIsUploading(false);
       event.target.value = "";
@@ -238,7 +247,7 @@ export function InstanceBrandingForm(props: Props) {
       await brandingService.clearImage(csrfToken, kind);
       setImages((previous) => ({ ...previous, [kind]: "" }));
     } catch (error) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Image not cleared", message: configurationErrorMessage(error) });
+      setToast({ type: "error", title: "Image not cleared", message: configurationErrorMessage(error) });
     } finally {
       setIsUploading(false);
     }
@@ -295,63 +304,55 @@ export function InstanceBrandingForm(props: Props) {
         </div>
         <div>
           <Button
+            type="submit"
             variant="primary"
-            onClick={handleSubmit(onSubmit)}
+            size="md"
+            stretch="auto"
             loading={isSubmitting}
             disabled={(!isDirty && !isLicenseNoticeDirty) || isSubmitting || !isConfigurationEditable}
-          >
-            {isSubmitting ? "Saving" : "Save changes"}
-          </Button>
+            label={isSubmitting ? "Saving" : "Save changes"}
+          />
         </div>
       </form>
 
-      <div className="flex flex-col gap-2 rounded-md border border-subtle p-4 text-13">
-        <label className="flex items-start gap-3" htmlFor="show-license-notice">
-          <input
-            id="show-license-notice"
-            type="checkbox"
-            aria-label="Show the licence notice on the sign-in page"
-            className="mt-1"
-            checked={showLicenseNotice}
-            onChange={(event) => {
-              setShowLicenseNotice(event.target.checked);
-              setIsLicenseNoticeDirty(true);
-            }}
-            disabled={!isConfigurationEditable}
-          />
-          <span>
-            <span className="font-medium text-secondary">Show the licence notice on the sign-in page</span>
-            <span className="block text-11 text-tertiary">
+      <div className="flex flex-col gap-4 rounded-lg border border-subtle p-4">
+        <CheckboxField
+          size="md"
+          id="show-license-notice"
+          label="Show the licence notice on the sign-in page"
+          description={
+            <>
               Hangar is AGPL-3.0. Section 13 requires that people using it over a network be offered its source, so
               turning this off moves the offer rather than removing it: the source command stays in the in-app command
               menu, where every signed-in person reaches it. That command is not configurable, deliberately — point
               HANGAR_SOURCE_URL at your own mirror to keep it inside your network.
-            </span>
-          </span>
-        </label>
-
-        <label className="flex items-start gap-3" htmlFor="show-external-links">
-          <input
-            id="show-external-links"
-            type="checkbox"
-            aria-label="Allow links to sites this instance does not run"
-            className="mt-1"
-            checked={showExternalLinks}
-            onChange={(event) => {
-              setShowExternalLinks(event.target.checked);
-              setIsLicenseNoticeDirty(true);
-            }}
-            disabled={!isConfigurationEditable}
-          />
-          <span>
-            <span className="font-medium text-secondary">Allow links to sites this instance does not run</span>
-            <span className="block text-11 text-tertiary">
+            </>
+          }
+          checked={showLicenseNotice}
+          onCheckedChange={(checked) => {
+            setShowLicenseNotice(checked);
+            setIsLicenseNoticeDirty(true);
+          }}
+          disabled={!isConfigurationEditable}
+        />
+        <CheckboxField
+          size="md"
+          id="show-external-links"
+          label="Allow links to sites this instance does not run"
+          description={
+            <>
               Off by default. Hides &ldquo;Star us on GitHub&rdquo;, the release notes and documentation buttons, and
               the help icon and issue-tracker links — every one of which sends whoever clicks it, and their address, to
               somebody else&apos;s server. The source offer above is not affected and remains in the command menu.
-            </span>
-          </span>
-        </label>
+            </>
+          }
+          checked={showExternalLinks}
+          onCheckedChange={(checked) => {
+            setShowExternalLinks(checked);
+            setIsLicenseNoticeDirty(true);
+          }}
+          disabled={!isConfigurationEditable}
+        />
       </div>
     </div>
   );

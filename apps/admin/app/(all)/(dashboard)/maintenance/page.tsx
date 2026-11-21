@@ -7,11 +7,11 @@
 import { useState } from "react";
 import useSWR from "swr";
 // icons
-import { Megaphone } from "lucide-react";
+import { UpdatesOutline } from "@makeplane/propel/icons";
 // plane internal packages
 import { InstanceMaintenanceService } from "@plane/services";
 import type { TMaintenanceNoticeAdmin } from "@plane/services";
-import { Loader } from "@plane/ui";
+import { Skeleton } from "@plane/blocks/skeleton";
 // components
 import { AuthenticationMethodCard } from "@/components/authentication/authentication-method-card";
 import { PageWrapper } from "@/components/common/page-wrapper";
@@ -35,7 +35,7 @@ export default function InstanceMaintenancePage() {
         <AuthenticationMethodCard
           name="Maintenance notice"
           description="Announce planned downtime, or say something is wrong, in a strip above the whole application."
-          icon={<Megaphone className="h-6 w-6 p-0.5 text-tertiary" />}
+          icon={<UpdatesOutline className="size-6 p-0.5 text-tertiary" />}
           config={<></>}
           disabled={!notice}
           withBorder={false}
@@ -45,11 +45,11 @@ export default function InstanceMaintenancePage() {
       {notice ? (
         <InstanceMaintenanceForm notice={notice} onSaved={setSaved} />
       ) : (
-        <Loader className="space-y-8">
-          <Loader.Item height="90px" />
-          <Loader.Item height="70px" />
-          <Loader.Item height="50px" width="40%" />
-        </Loader>
+        <Skeleton className="space-y-8">
+          <Skeleton.Item height="90px" />
+          <Skeleton.Item height="70px" />
+          <Skeleton.Item height="50px" width="40%" />
+        </Skeleton>
       )}
     </PageWrapper>
   );

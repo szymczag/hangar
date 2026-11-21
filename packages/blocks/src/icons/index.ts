@@ -13,6 +13,7 @@ export { BlockedIcon } from "./blocked-icon";
 export { BlockerIcon } from "./blocker-icon";
 export { AccentureLogo } from "./brand/accenture-logo";
 export { DolbyLogo } from "./brand/dolby-logo";
+export { HangarLogo, HangarMark } from "./brand/hangar-logo";
 export { PlaneLockup } from "./brand/plane-lockup";
 export { PlaneLogo } from "./brand/plane-logo";
 export { SonyLogo } from "./brand/sony-logo";

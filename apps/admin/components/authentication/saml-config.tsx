@@ -7,12 +7,13 @@
 import { observer } from "mobx-react";
 import Link from "next/link";
 // icons
-import { Settings2 } from "lucide-react";
+import { PreferencesOutline } from "@makeplane/propel/icons";
 // plane internal packages
-import { getButtonStyling } from "@plane/propel/button";
+import { AnchorButton } from "@makeplane/propel/components/anchor-button";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { Switch } from "@makeplane/propel/components/switch";
 import type { TInstanceAuthenticationMethodKeys } from "@plane/types";
-import { ToggleSwitch } from "@plane/ui";
-import { cn } from "@plane/utils";
 // hooks
 import { useInstance } from "@/hooks/store";
 
@@ -47,12 +48,11 @@ export const SAMLConfiguration = observer(function SAMLConfiguration(props: Prop
     <>
       {samlConfigured ? (
         <div className="flex items-center gap-4">
-          <Link href="/authentication/saml" className={cn(getButtonStyling("link", "base"), "font-medium")}>
-            Edit
-          </Link>
-          <ToggleSwitch
-            value={Boolean(parseInt(samlConfig))}
-            onChange={() => {
+          <AnchorButton variant="primary" size="sm" render={<Link href="/authentication/saml" />} label="Edit" />
+          <Switch
+            aria-label="Enable SAML"
+            checked={Boolean(parseInt(samlConfig))}
+            onCheckedChange={() => {
               updateConfig("IS_SAML_ENABLED", parseInt(samlConfig) ? "0" : "1");
             }}
             size="sm"
@@ -60,10 +60,15 @@ export const SAMLConfiguration = observer(function SAMLConfiguration(props: Prop
           />
         </div>
       ) : (
-        <Link href="/authentication/saml" className={cn(getButtonStyling("secondary", "base"), "text-tertiary")}>
-          <Settings2 className="h-4 w-4 p-0.5 text-tertiary" />
-          Configure
-        </Link>
+        <Button
+          variant="secondary"
+          size="sm"
+          stretch="auto"
+          nativeButton={false}
+          render={<Link href="/authentication/saml" />}
+          icon={<Icon icon={PreferencesOutline} tint="tertiary" />}
+          label="Configure"
+        />
       )}
     </>
   );

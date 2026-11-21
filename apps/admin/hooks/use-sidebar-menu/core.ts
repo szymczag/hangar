@@ -4,9 +4,17 @@
  * See the LICENSE file for details.
  */
 
-import { BrainCog, Cog, Mail, Megaphone, Palette, Users } from "lucide-react";
 // plane imports
-import { LockIcon, WorkspaceIcon } from "@plane/propel/icons";
+import {
+  AiStarFourOutline,
+  LockOutline,
+  MailOutline,
+  MembersOutline,
+  PaletteOutline,
+  SettingsOutline,
+  UpdatesOutline,
+  WorkspaceOutline,
+} from "@makeplane/propel/icons";
 // types
 import type { TSidebarMenuItem } from "./types";
 
@@ -22,49 +30,49 @@ export type TCoreSidebarMenuKey =
 
 export const coreSidebarMenuLinks: Record<TCoreSidebarMenuKey, TSidebarMenuItem> = {
   general: {
-    Icon: Cog,
+    Icon: SettingsOutline,
     name: "General",
     description: "Identify your instances and get key details.",
     href: `/general/`,
   },
   email: {
-    Icon: Mail,
+    Icon: MailOutline,
     name: "Email",
     description: "Configure your SMTP controls.",
     href: `/email/`,
   },
   workspace: {
-    Icon: WorkspaceIcon,
+    Icon: WorkspaceOutline,
     name: "Workspaces",
     description: "Manage all workspaces on this instance.",
     href: `/workspace/`,
   },
   users: {
-    Icon: Users,
+    Icon: MembersOutline,
     name: "Users",
     description: "See who has an account and how they sign in.",
     href: `/users/`,
   },
   authentication: {
-    Icon: LockIcon,
+    Icon: LockOutline,
     name: "Authentication",
     description: "Configure authentication modes.",
     href: `/authentication/`,
   },
   branding: {
-    Icon: Palette,
+    Icon: PaletteOutline,
     name: "Branding",
     description: "Your logo and wording on the sign-in page.",
     href: `/branding/`,
   },
   maintenance: {
-    Icon: Megaphone,
+    Icon: UpdatesOutline,
     name: "Maintenance notice",
     description: "Announce downtime across the instance.",
     href: `/maintenance/`,
   },
   ai: {
-    Icon: BrainCog,
+    Icon: AiStarFourOutline,
     name: "Artificial intelligence",
     description: "Configure your OpenAI creds.",
     href: `/ai/`,

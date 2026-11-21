@@ -5,10 +5,14 @@
  */
 
 import { useEffect, useState } from "react";
-import { KeyRound, Lock, LockOpen } from "lucide-react";
 // plane internal packages
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { TextAreaField } from "@makeplane/propel/components/text-area-field";
+import { TextButton } from "@makeplane/propel/components/text-button";
+import { KeyOutline, LockOutline, UnlockedOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { AuthService, InstanceOpenPGPService } from "@plane/services";
 import type { TUserOpenPGPState } from "@plane/services";
 // helpers
@@ -52,7 +56,7 @@ export function OpenPGPControl(props: Props) {
 
   const report = (error: unknown, title: string) =>
     setToast({
-      type: TOAST_TYPE.ERROR,
+      type: "error",
       title,
       message: configurationErrorMessage(error, "The change was not applied."),
     });
@@ -64,7 +68,7 @@ export function OpenPGPControl(props: Props) {
       setState(await openPGPService.setKey(csrfToken, userId, { certificate, note }));
       setCertificate("");
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Key set",
         message: `${email} has been notified that an administrator set their encryption key.`,
       });
@@ -88,17 +92,13 @@ export function OpenPGPControl(props: Props) {
   };
 
   if (!isOpen) {
-    return (
-      <button type="button" className="text-11 text-tertiary underline" onClick={() => setIsOpen(true)}>
-        Manage key
-      </button>
-    );
+    return <TextButton variant="secondary" size="md" onClick={() => setIsOpen(true)} label="Manage key" />;
   }
 
   return (
-    <div className="mt-2 flex max-w-xl flex-col gap-3 rounded-md border border-strong p-3">
-      <div className="flex items-center gap-2 text-11 text-tertiary">
-        <KeyRound className="size-3.5" />
+    <div className="mt-2 flex max-w-xl flex-col gap-3 rounded-lg border border-subtle bg-layer-1 p-3">
+      <div className="flex items-center gap-2 text-caption-md-regular text-tertiary">
+        <KeyOutline className="size-3.5" />
         {state?.active_key ? (
           <span className="font-mono">{state.active_key.primary_fingerprint}</span>
         ) : (
@@ -106,47 +106,51 @@ export function OpenPGPControl(props: Props) {
         )}
         {state?.is_locked && (
           <span className="flex items-center gap-1 text-warning-primary">
-            <Lock className="size-3.5" /> self-service locked
+            <LockOutline className="size-3.5" /> self-service locked
           </span>
         )}
       </div>
 
-      <textarea
-        className="font-mono h-24 w-full rounded-md border border-strong bg-surface-1 p-2 text-11"
+      <TextAreaField
+        size="lg"
+        label="Public key"
         placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"
         value={certificate}
         onChange={(event) => setCertificate(event.target.value)}
       />
-      <input
-        className="w-full rounded-md border border-strong bg-surface-1 px-2 py-1 text-11"
+      <InputField
+        size="md"
+        orientation="vertical"
+        label="Reason"
         placeholder="Why (recorded, and not editable afterwards)"
         value={note}
         onChange={(event) => setNote(event.target.value)}
       />
-      <p className="text-11 text-tertiary">
+      <p className="text-caption-md-regular text-tertiary">
         A key set here is activated without the email challenge that normally proves the account holder controls the
         private key — you are vouching for it instead. Whoever holds that private key can read {email}&apos;s
         notifications. The action is recorded permanently and {email} is emailed.
       </p>
 
       <div className="flex items-center gap-2">
-        <Button variant="primary" size="sm" onClick={applyKey} disabled={!certificate.trim() || isBusy}>
-          Set key
-        </Button>
-        <Button variant="secondary" size="sm" onClick={toggleLock} disabled={isBusy || !state}>
-          {state?.is_locked ? (
-            <>
-              <LockOpen className="size-3.5" /> Allow self-service
-            </>
-          ) : (
-            <>
-              <Lock className="size-3.5" /> Lock self-service
-            </>
-          )}
-        </Button>
-        <button type="button" className="text-11 text-tertiary underline" onClick={() => setIsOpen(false)}>
-          Close
-        </button>
+        <Button
+          variant="primary"
+          size="sm"
+          stretch="auto"
+          onClick={() => void applyKey()}
+          disabled={!certificate.trim() || isBusy}
+          label="Set key"
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          stretch="auto"
+          onClick={() => void toggleLock()}
+          disabled={isBusy || !state}
+          icon={<Icon icon={state?.is_locked ? UnlockedOutline : LockOutline} />}
+          label={state?.is_locked ? "Allow self-service" : "Lock self-service"}
+        />
+        <TextButton variant="secondary" size="md" onClick={() => setIsOpen(false)} label="Close" />
       </div>
     </div>
   );
