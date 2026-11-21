@@ -6,18 +6,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
-import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
 // plane internal packages
-import { setPromiseToast, setToast, TOAST_TYPE } from "@plane/propel/toast";
+import { Switch } from "@makeplane/propel/components/switch";
+import { ChevronRightOutline } from "@makeplane/propel/icons";
 import type { TInstanceConfigurationKeys, TInstanceAuthenticationModes } from "@plane/types";
-import { Loader, ToggleSwitch } from "@plane/ui";
 import { cn, resolveGeneralTheme } from "@plane/utils";
 // components
 import { PageWrapper } from "@/components/common/page-wrapper";
 import { AuthenticationMethodCard } from "@/components/authentication/authentication-method-card";
+import { Skeleton } from "@plane/blocks/skeleton";
+import { setPromiseToast, setToast } from "@plane/blocks/toast";
 // helpers
 import { canDisableAuthMethod } from "@/helpers/authentication";
 // hooks
@@ -58,7 +59,7 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
 
           if (!canDisable) {
             setToast({
-              type: TOAST_TYPE.ERROR,
+              type: "error",
               title: "Cannot disable authentication",
               message:
                 "At least one authentication method must remain enabled. Please enable another method before disabling this one.",
@@ -122,22 +123,25 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
     >
       {formattedConfig ? (
         <div className="space-y-3">
-          <div className={cn("flex w-full items-center gap-14 rounded-sm")}>
-            <div className="flex grow items-center gap-4">
-              <div className="grow">
-                <div className="pb-1 text-16 font-medium">Allow anyone to sign up even without an invite</div>
-                <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
+          <div className="flex w-full items-start justify-between gap-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 md:items-center md:gap-8">
+            <div className="flex min-w-0 grow items-center gap-4">
+              <div className="min-w-0 grow">
+                <div className="pb-1 text-body-sm-medium text-primary">
+                  Allow anyone to sign up even without an invite
+                </div>
+                <div className="text-body-xs-regular leading-5 text-tertiary">
                   Leaving this on lets anyone who can reach this instance create an account. They join no workspace and
                   see no content until invited, but they can sign in and create their own workspace unless that is also
                   disabled. Toggling it off requires an invitation to sign up.
                 </div>
               </div>
             </div>
-            <div className={`shrink-0 pr-4 ${isSubmitting && "opacity-70"}`}>
+            <div className={cn("shrink-0", { "opacity-70": isSubmitting })}>
               <div className="flex items-center gap-4">
-                <ToggleSwitch
-                  value={Boolean(parseInt(enableSignUpConfig))}
-                  onChange={() => {
+                <Switch
+                  aria-label="Allow anyone to sign up even without an invite"
+                  checked={Boolean(parseInt(enableSignUpConfig))}
+                  onCheckedChange={() => {
                     if (Boolean(parseInt(enableSignUpConfig)) === true) {
                       updateConfig("ENABLE_SIGNUP", "0");
                     } else {
@@ -150,44 +154,34 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
               </div>
             </div>
           </div>
-          <div className="text-lg pt-6 font-medium">Domain policy</div>
+          <h3 className="pt-3 text-h6-medium text-primary">Domain policy</h3>
           <Link
             href="/authentication/domains"
-            className={cn("hover:bg-layout-bg-hover -mx-2 flex w-full items-center gap-14 rounded-sm px-2 py-1")}
+            className="flex w-full items-center justify-between gap-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 hover:bg-layer-2-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-strong focus-visible:outline-solid md:gap-8"
           >
-            <div className="flex grow items-center gap-4">
-              <div className="grow">
-                <div className="pb-1 text-16 font-medium">Pin email domains to a provider</div>
-                <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
-                  Decide which provider owns each domain, so nobody can claim a colleague&apos;s address through a
-                  weaker sign-in method, and choose the workspace its users join automatically.
-                </div>
+            <div className="min-w-0 grow">
+              <div className="pb-1 text-body-sm-medium text-primary">Pin email domains to a provider</div>
+              <div className="text-body-xs-regular leading-5 text-tertiary">
+                Decide which provider owns each domain, so nobody can claim a colleague&apos;s address through a weaker
+                sign-in method, and choose the workspace its users join automatically.
               </div>
             </div>
-            <div className="shrink-0 pr-4 text-tertiary">
-              <ChevronRight className="h-4 w-4" />
-            </div>
+            <ChevronRightOutline className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
           </Link>
-
           <Link
             href="/authentication/identity-import"
-            className={cn("hover:bg-layout-bg-hover -mx-2 flex w-full items-center gap-14 rounded-sm px-2 py-1")}
+            className="flex w-full items-center justify-between gap-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 hover:bg-layer-2-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-strong focus-visible:outline-solid md:gap-8"
           >
-            <div className="flex grow items-center gap-4">
-              <div className="grow">
-                <div className="pb-1 text-16 font-medium">Import identities for existing accounts</div>
-                <div className={cn("text-11 leading-5 font-regular text-tertiary")}>
-                  Link the accounts you already have to the subjects your provider asserts, so pinning a domain does not
-                  lock them out. Requires your password at the point of use.
-                </div>
+            <div className="min-w-0 grow">
+              <div className="pb-1 text-body-sm-medium text-primary">Import identities for existing accounts</div>
+              <div className="text-body-xs-regular leading-5 text-tertiary">
+                Link the accounts you already have to the subjects your provider asserts, so pinning a domain does not
+                lock them out. Requires your password at the point of use.
               </div>
             </div>
-            <div className="shrink-0 pr-4 text-tertiary">
-              <ChevronRight className="h-4 w-4" />
-            </div>
+            <ChevronRightOutline className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
           </Link>
-
-          <div className="text-lg pt-6 font-medium">Available authentication modes</div>
+          <h3 className="pt-3 text-h6-medium text-primary">Available authentication modes</h3>
           {authenticationModes.map((method) => (
             <AuthenticationMethodCard
               key={method.key}
@@ -201,13 +195,13 @@ const InstanceAuthenticationPage = observer(function InstanceAuthenticationPage(
           ))}
         </div>
       ) : (
-        <Loader className="space-y-10">
-          <Loader.Item height="50px" width="75%" />
-          <Loader.Item height="50px" width="75%" />
-          <Loader.Item height="50px" width="40%" />
-          <Loader.Item height="50px" width="40%" />
-          <Loader.Item height="50px" width="20%" />
-        </Loader>
+        <Skeleton className="space-y-10">
+          <Skeleton.Item height="50px" width="75%" />
+          <Skeleton.Item height="50px" width="75%" />
+          <Skeleton.Item height="50px" width="40%" />
+          <Skeleton.Item height="50px" width="40%" />
+          <Skeleton.Item height="50px" width="20%" />
+        </Skeleton>
       )}
     </PageWrapper>
   );

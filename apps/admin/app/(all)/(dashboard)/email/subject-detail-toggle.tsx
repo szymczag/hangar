@@ -6,8 +6,8 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { ToggleSwitch } from "@plane/ui";
+import { Switch } from "@makeplane/propel/components/switch";
+import { setToast } from "@plane/blocks/toast";
 // hooks
 import { useInstance } from "@/hooks/store";
 
@@ -38,13 +38,13 @@ export const SubjectDetailToggle = observer(function SubjectDetailToggle() {
           next === "1"
             ? "Encrypted notifications name the work item, its title and the commenter in the Subject header."
             : "Encrypted notifications use a generic Subject that reveals nothing.",
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
       });
     } catch (_error) {
       setToast({
         title: "Could not change the Subject setting",
         message: "The instance configuration was not updated. Please try again.",
-        type: TOAST_TYPE.ERROR,
+        type: "error",
       });
     } finally {
       setIsSubmitting(false);
@@ -54,22 +54,28 @@ export const SubjectDetailToggle = observer(function SubjectDetailToggle() {
   if (!formattedConfig) return null;
 
   return (
-    <section className="mt-6 max-w-4xl rounded-md border border-subtle bg-layer-2 p-5">
+    <section className="mt-6 max-w-4xl rounded-lg border border-subtle bg-layer-2 p-5">
       <div className="flex items-start justify-between gap-6">
         <div>
-          <div className="text-13 font-medium text-primary">Describe encrypted notifications in the Subject</div>
-          <p className="mt-1 text-12 leading-5 text-secondary">
+          <div className="text-body-sm-medium text-primary">Describe encrypted notifications in the Subject</div>
+          <p className="mt-1 text-body-xs-regular leading-5 text-secondary">
             Off, every encrypted notification is sent as &ldquo;Encrypted Hangar notification&rdquo;. On, the Subject
             names the work item, its title and who commented &mdash; for example{" "}
             <span className="font-mono text-primary">INFRA-3 updates: Broken login flow - new comment from Ada L</span>.
           </p>
-          <p className="mt-2 text-12 leading-5 text-tertiary">
+          <p className="mt-2 text-body-xs-regular leading-5 text-tertiary">
             The Subject is the only part of an encrypted message that is not encrypted. It is visible to the mail
             provider, in its logs and backups, and to anyone who can see the mailbox list. The body, comments and
             attachments stay protected either way.
           </p>
         </div>
-        <ToggleSwitch value={isEnabled} onChange={handleToggle} size="sm" disabled={isSubmitting} />
+        <Switch
+          aria-label="Describe encrypted notifications in the Subject"
+          checked={isEnabled}
+          onCheckedChange={() => void handleToggle()}
+          size="sm"
+          disabled={isSubmitting}
+        />
       </div>
     </section>
   );

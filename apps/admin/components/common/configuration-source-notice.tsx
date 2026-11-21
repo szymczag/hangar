@@ -6,10 +6,9 @@
 
 import { observer } from "mobx-react";
 import useSWR from "swr";
-// icons
-import { Lock } from "lucide-react";
 // plane internal packages
-import { cn } from "@plane/utils";
+import { Banner } from "@makeplane/propel/components/banner";
+import { LockOutline } from "@makeplane/propel/icons";
 // hooks
 import { useInstance } from "@/hooks/store";
 
@@ -29,20 +28,20 @@ export const ConfigurationSourceNotice = observer(function ConfigurationSourceNo
   if (formattedConfig?.CONFIGURATION_SOURCE !== "environment") return null;
 
   return (
-    <div
-      className={cn(
-        "border-amber-500/40 bg-amber-500/10 mx-auto mt-6 flex max-w-6xl items-start gap-3 rounded-sm border px-4 py-3"
-      )}
-    >
-      <Lock className="text-amber-600 mt-0.5 h-4 w-4 shrink-0" />
-      <div className="text-13 leading-5">
-        <div className="font-medium">Settings on this instance come from environment variables</div>
-        <div className="text-tertiary">
-          This deployment runs with <span className="font-mono">SKIP_ENV_VAR=0</span>, so values saved here are never
-          read back and saving is refused. Change the deployment environment instead, or remove that variable to manage
-          configuration from this panel.
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[1000px] shrink-0 px-4 pt-6 md:px-8 2xl:max-w-[1200px]">
+      <Banner
+        placement="inline"
+        variant="warning"
+        icon={<LockOutline />}
+        title="Settings on this instance come from environment variables"
+        description={
+          <>
+            This deployment runs with <span className="font-mono">SKIP_ENV_VAR=0</span>, so values saved here are never
+            read back and saving is refused. Change the deployment environment instead, or remove that variable to
+            manage configuration from this panel.
+          </>
+        }
+      />
     </div>
   );
 });

@@ -122,7 +122,7 @@ test("a plain address is printed and anything shell-like keeps the placeholder",
 });
 
 test("the banner shows second-factor titles", () => {
-  assert.match(BANNER, /showsBannerTitle\(bannerData\.code\) && <p[^>]*>\{bannerData\.title\}<\/p>/);
+  assert.match(BANNER, /title=\{showsBannerTitle\(bannerData\.code\) \? bannerData\.title : undefined\}/);
   const codes = HELPERS.slice(HELPERS.indexOf("const SECOND_FACTOR_CODES"));
   assert.match(codes.slice(0, codes.indexOf("];")), /EAdminAuthErrorCodes\.ADMIN_2FA_CREDENTIAL_DISABLED,/);
 });

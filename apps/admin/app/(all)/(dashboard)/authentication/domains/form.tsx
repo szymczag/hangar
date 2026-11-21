@@ -8,12 +8,14 @@ import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
 // plane internal packages
-import { Button, getButtonStyling } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { DeleteOutline, PlusCircleOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import type { IFormattedInstanceConfiguration } from "@plane/types";
-import { Loader } from "@plane/ui";
+import { Skeleton } from "@plane/blocks/skeleton";
 // components
 import { CodeBlock } from "@/components/common/code-block";
 // helpers
@@ -109,13 +111,13 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
         RESTRICT_INVITES_TO_SSO_DOMAINS: restrictInvites ? "1" : "0",
       });
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Done!",
         message: "Domain policy saved. Test a sign-in from a pinned domain now.",
       });
       setIsDirty(false);
     } catch (error) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error", message: configurationErrorMessage(error) });
+      setToast({ type: "error", title: "Error", message: configurationErrorMessage(error) });
     } finally {
       setIsSubmitting(false);
     }
@@ -131,7 +133,7 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
       <div key={grant.id} className="flex flex-wrap items-start gap-2">
         <select
           aria-label="Workspace to join"
-          className="w-44 rounded-md border border-strong bg-surface-1 px-2 py-1"
+          className="w-44 rounded-md border border-subtle bg-layer-2 px-2 py-1"
           value={grant.workspaceSlug}
           onChange={(event) => updateGrant(row.id, grant.id, { workspaceSlug: event.target.value })}
           disabled={!isConfigurationEditable}
@@ -147,7 +149,7 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
 
         <select
           aria-label="Workspace role"
-          className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1"
+          className="w-28 rounded-md border border-subtle bg-layer-2 px-2 py-1"
           value={grant.workspaceRole}
           onChange={(event) => updateGrant(row.id, grant.id, { workspaceRole: event.target.value as TRoleName })}
           disabled={!isConfigurationEditable || !grant.workspaceSlug}
@@ -161,7 +163,7 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
 
         <input
           aria-label="Project identifier"
-          className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1 uppercase"
+          className="w-28 rounded-md border border-subtle bg-layer-2 px-2 py-1 uppercase"
           placeholder="PLAT"
           value={grant.projectIdentifier}
           onChange={(event) => updateGrant(row.id, grant.id, { projectIdentifier: event.target.value })}
@@ -170,7 +172,7 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
 
         <select
           aria-label="Project role"
-          className="w-28 rounded-md border border-strong bg-surface-1 px-2 py-1"
+          className="w-28 rounded-md border border-subtle bg-layer-2 px-2 py-1"
           value={grant.projectRole}
           onChange={(event) => updateGrant(row.id, grant.id, { projectRole: event.target.value as TRoleName })}
           disabled={!isConfigurationEditable || !grant.projectIdentifier}
@@ -182,40 +184,40 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
           ))}
         </select>
 
-        <button
+        <IconButton
           type="button"
+          variant="ghost"
+          size="sm"
           aria-label="Remove workspace"
-          className="mt-1 text-tertiary hover:text-danger-primary"
+          icon={<Icon icon={DeleteOutline} />}
           onClick={() => updateRow(row.id, { grants: row.grants.filter((candidate) => candidate.id !== grant.id) })}
           disabled={!isConfigurationEditable}
-        >
-          <Trash2 className="size-4" />
-        </button>
+        />
       </div>
     );
   };
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="max-w-3xl text-13 text-tertiary">
+      <p className="max-w-3xl text-body-xs-regular text-tertiary">
         One row per email domain. A pinned domain accepts only the providers you tick — password sign-in and magic codes
         are refused for it, on both sign-up and sign-in, so nobody can claim a colleague&apos;s address through a weaker
         route. Matching is exact, so <CodeBlock darkerShade>sub.corp.com</CodeBlock> needs its own row.
       </p>
 
       {isLoadingWorkspaces ? (
-        <Loader className="space-y-3">
-          <Loader.Item height="40px" />
-          <Loader.Item height="40px" />
-        </Loader>
+        <Skeleton className="space-y-3">
+          <Skeleton.Item height="40px" />
+          <Skeleton.Item height="40px" />
+        </Skeleton>
       ) : (
         <div className="flex flex-col gap-4">
           {rows.map((row) => (
-            <div key={row.id} className="flex flex-col gap-3 rounded-md border border-subtle p-4">
+            <div key={row.id} className="flex flex-col gap-3 rounded-lg border border-subtle p-4">
               <div className="flex flex-wrap items-center gap-4">
                 <input
                   aria-label="Email domain"
-                  className="w-56 rounded-md border border-strong bg-surface-1 px-2 py-1"
+                  className="w-56 rounded-md border border-subtle bg-layer-2 px-2 py-1"
                   placeholder="corp.com"
                   value={row.domain}
                   onChange={(event) => updateRow(row.id, { domain: event.target.value })}
@@ -234,18 +236,20 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
                     </label>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  aria-label="Remove domain"
-                  className="ml-auto text-tertiary hover:text-danger-primary"
-                  onClick={() => {
-                    setRows((previous) => previous.filter((candidate) => candidate.id !== row.id));
-                    markDirty();
-                  }}
-                  disabled={!isConfigurationEditable}
-                >
-                  <Trash2 className="size-4" />
-                </button>
+                <div className="ml-auto">
+                  <IconButton
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Remove domain"
+                    icon={<Icon icon={DeleteOutline} />}
+                    onClick={() => {
+                      setRows((previous) => previous.filter((candidate) => candidate.id !== row.id));
+                      markDirty();
+                    }}
+                    disabled={!isConfigurationEditable}
+                  />
+                </div>
               </div>
 
               {row.providers.length === 0 && (
@@ -263,11 +267,12 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
                   <Button
                     variant="secondary"
                     size="sm"
+                    stretch="auto"
+                    icon={<Icon icon={PlusCircleOutline} />}
                     onClick={() => updateRow(row.id, { grants: [...row.grants, emptyGrant()] })}
                     disabled={!isConfigurationEditable}
-                  >
-                    <Plus className="size-4" /> Add a workspace
-                  </Button>
+                    label="Add a workspace"
+                  />
                 </div>
               </div>
             </div>
@@ -285,17 +290,18 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
         <Button
           variant="secondary"
           size="sm"
+          stretch="auto"
+          icon={<Icon icon={PlusCircleOutline} />}
           onClick={() => {
             setRows((previous) => [...previous, emptyRow()]);
             markDirty();
           }}
           disabled={!isConfigurationEditable}
-        >
-          <Plus className="size-4" /> Add a domain
-        </Button>
+          label="Add a domain"
+        />
       </div>
 
-      <div className="flex flex-col gap-2 rounded-md border border-subtle p-4">
+      <div className="flex flex-col gap-2 rounded-lg border border-subtle p-4">
         <label className="flex items-start gap-2 text-13">
           <input
             type="checkbox"
@@ -329,7 +335,7 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
         </span>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-md border border-subtle p-4 text-11 text-tertiary">
+      <div className="flex flex-col gap-2 rounded-lg border border-subtle p-4 text-11 text-tertiary">
         <span>
           A domain may join more than one workspace — add as many as you need.{" "}
           <strong className="text-secondary">Project identifier</strong> is the short code on a project&apos;s work
@@ -349,16 +355,21 @@ export const InstanceSSODomainPolicyForm = observer(function InstanceSSODomainPo
       <div className="flex items-center gap-4">
         <Button
           variant="primary"
-          size="lg"
-          onClick={onSubmit}
+          size="md"
+          stretch="auto"
+          onClick={() => void onSubmit()}
           loading={isSubmitting}
           disabled={!isDirty || isSubmitting || !isConfigurationEditable}
-        >
-          {isSubmitting ? "Saving" : "Save changes"}
-        </Button>
-        <Link href="/authentication" className={getButtonStyling("secondary", "lg")}>
-          Go back
-        </Link>
+          label={isSubmitting ? "Saving" : "Save changes"}
+        />
+        <Button
+          variant="secondary"
+          size="md"
+          stretch="auto"
+          nativeButton={false}
+          render={<Link href="/authentication" />}
+          label="Go back"
+        />
       </div>
     </div>
   );

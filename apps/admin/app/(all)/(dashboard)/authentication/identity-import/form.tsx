@@ -4,11 +4,14 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Upload } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 // plane internal packages
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { Select, SelectContent, SelectItem, SelectList, SelectTrigger } from "@makeplane/propel/components/select";
+import { TickCircleOutline, UploadOutline, WarningTriangleOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { AuthService, InstanceIdentityImportService } from "@plane/services";
 import type { TIdentityImportPreview } from "@plane/services";
 import type { IFormattedInstanceConfiguration } from "@plane/types";
@@ -49,6 +52,7 @@ export function InstanceIdentityImportForm(props: Props) {
   const [csrfToken, setCsrfToken] = useState<string | undefined>(undefined);
   const [providers, setProviders] = useState<string[]>([]);
   const [provider, setProvider] = useState("google");
+  const providerLabelId = useId();
   const [issuer, setIssuer] = useState(suggestedIssuer("google", config));
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<TIdentityImportPreview | null>(null);
@@ -92,7 +96,7 @@ export function InstanceIdentityImportForm(props: Props) {
       setPreview(await importService.preview(csrfToken, { file, provider, issuer }));
     } catch (error) {
       const message = (error as { error?: { message?: string } })?.error?.message;
-      setToast({ type: TOAST_TYPE.ERROR, title: "Preview failed", message: message ?? "The file could not be read." });
+      setToast({ type: "error", title: "Preview failed", message: message ?? "The file could not be read." });
     } finally {
       setIsBusy(false);
     }
@@ -113,7 +117,7 @@ export function InstanceIdentityImportForm(props: Props) {
         password,
       });
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Import applied",
         message: `${result.report.imported_count} identities linked, ${result.report.existing_count} already present.`,
       });
@@ -123,7 +127,7 @@ export function InstanceIdentityImportForm(props: Props) {
     } catch (error) {
       const message = (error as { error?: { message?: string } })?.error?.message;
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Import not applied",
         message: message ?? "Nothing was changed.",
       });
@@ -136,38 +140,37 @@ export function InstanceIdentityImportForm(props: Props) {
     <div className="flex max-w-4xl flex-col gap-8">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-primary" htmlFor="identity-import-provider">
+          <span id={providerLabelId} className="text-body-xs-medium text-primary">
             Identity provider
-          </label>
-          <select
-            id="identity-import-provider"
-            className="text-sm rounded-md border border-strong bg-surface-1 px-3 py-2"
+          </span>
+          <Select
+            items={Object.fromEntries(providers.map((value) => [value, value]))}
             value={provider}
-            onChange={(event) => onProviderChange(event.target.value)}
+            onValueChange={(value) => onProviderChange(value as string)}
           >
-            {providers.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger variant="secondary" size="lg" aria-labelledby={providerLabelId} />
+            <SelectContent>
+              <SelectList>
+                {providers.map((value) => (
+                  <SelectItem key={value} value={value} label={value} size="lg" />
+                ))}
+              </SelectList>
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-primary" htmlFor="identity-import-issuer">
-            Issuer
-          </label>
-          <input
-            id="identity-import-issuer"
-            className="text-sm rounded-md border border-strong bg-surface-1 px-3 py-2"
-            value={issuer}
-            onChange={(event) => {
-              setIssuer(event.target.value);
-              resetPreview();
-            }}
-          />
-          <p className="text-xs text-tertiary">
-            {suggestion && issuer !== suggestion ? (
+        <InputField
+          id="identity-import-issuer"
+          size="lg"
+          orientation="vertical"
+          label="Issuer"
+          value={issuer}
+          onChange={(event) => {
+            setIssuer(event.target.value);
+            resetPreview();
+          }}
+          hint={
+            suggestion && issuer !== suggestion ? (
               <>
                 This does not match the configured issuer <CodeBlock darkerShade>{suggestion}</CodeBlock>. An issuer
                 that no sign-in ever asserts produces identities nothing will match — the import reports success and
@@ -175,13 +178,13 @@ export function InstanceIdentityImportForm(props: Props) {
               </>
             ) : (
               <>Must match the issuer the provider asserts, exactly.</>
-            )}
-          </p>
-        </div>
+            )
+          }
+        />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-primary" htmlFor="identity-import-file">
+        <label className="text-body-xs-medium text-primary" htmlFor="identity-import-file">
           Mapping CSV
         </label>
         <input
@@ -189,10 +192,10 @@ export function InstanceIdentityImportForm(props: Props) {
           ref={fileInput}
           type="file"
           accept=".csv,text/csv"
-          className="text-sm"
+          className="text-body-xs-regular text-secondary file:mr-3 file:rounded-md file:border file:border-subtle file:bg-layer-2 file:px-3 file:py-1 file:text-body-xs-medium file:text-primary"
           onChange={onFileChange}
         />
-        <p className="text-xs text-tertiary">
+        <p className="text-caption-md-regular text-tertiary">
           Columns: <CodeBlock darkerShade>subject</CodeBlock>, <CodeBlock darkerShade>subject_format</CodeBlock>, and{" "}
           <CodeBlock darkerShade>email</CodeBlock> or <CodeBlock darkerShade>user_id</CodeBlock>. Up to 5 MiB; larger
           exports belong in the CLI.
@@ -200,20 +203,27 @@ export function InstanceIdentityImportForm(props: Props) {
       </div>
 
       <div>
-        <Button variant="primary" onClick={runPreview} disabled={!file || !issuer || isBusy} loading={isBusy}>
-          <Upload className="h-4 w-4" /> Preview import
-        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          stretch="auto"
+          icon={<Icon icon={UploadOutline} />}
+          onClick={() => void runPreview()}
+          disabled={!file || !issuer || isBusy}
+          loading={isBusy}
+          label="Preview import"
+        />
       </div>
 
       {preview && (
-        <div className="flex flex-col gap-4 rounded-md border border-strong p-4">
+        <div className="flex flex-col gap-4 rounded-lg border border-subtle p-4">
           <div className="flex items-center gap-2">
             {preview.valid ? (
-              <CheckCircle2 className="text-success h-5 w-5" />
+              <TickCircleOutline className="size-5 text-success-primary" />
             ) : (
-              <AlertTriangle className="text-danger h-5 w-5" />
+              <WarningTriangleOutline className="size-5 text-danger-primary" />
             )}
-            <span className="text-sm font-medium text-primary">
+            <span className="text-body-xs-medium text-primary">
               {preview.valid
                 ? `${preview.report.imported_count} to link, ${preview.report.existing_count} already linked, of ${preview.report.row_count} rows`
                 : `Refused: ${preview.report.errors.length} of ${preview.report.row_count} rows cannot be imported`}
@@ -221,15 +231,15 @@ export function InstanceIdentityImportForm(props: Props) {
           </div>
 
           {!preview.valid && (
-            <p className="text-xs text-tertiary">
+            <p className="text-caption-md-regular text-tertiary">
               Nothing was written. A file is imported whole or not at all, so one unusable row stops all of them — there
               is no half-applied import to reconcile afterwards.
             </p>
           )}
 
           <div className="max-h-80 overflow-auto">
-            <table className="text-sm w-full text-left">
-              <thead className="text-xs text-tertiary uppercase">
+            <table className="w-full text-left text-body-xs-regular">
+              <thead className="text-caption-md-regular text-tertiary uppercase">
                 <tr>
                   <th className="py-1 pr-4">Line</th>
                   <th className="py-1 pr-4">{preview.valid ? "Account" : "Problem"}</th>
@@ -243,8 +253,8 @@ export function InstanceIdentityImportForm(props: Props) {
                       <tr key={row.line} className="border-t border-subtle">
                         <td className="py-1 pr-4 text-tertiary">{row.line}</td>
                         <td className="py-1 pr-4">{row.email}</td>
-                        <td className="font-mono text-xs py-1 pr-4">{row.subject}</td>
-                        <td className="text-xs py-1">
+                        <td className="font-mono py-1 pr-4 text-caption-md-regular">{row.subject}</td>
+                        <td className="py-1 text-caption-md-regular">
                           {row.action === "link" ? "will be linked" : "already linked — no change"}
                         </td>
                       </tr>
@@ -252,8 +262,8 @@ export function InstanceIdentityImportForm(props: Props) {
                   : preview.report.errors.map((error) => (
                       <tr key={`${error.line}-${error.code}`} className="border-t border-subtle">
                         <td className="py-1 pr-4 text-tertiary">{error.line}</td>
-                        <td className="font-mono text-xs py-1 pr-4">{error.code}</td>
-                        <td className="text-xs py-1 pr-4">
+                        <td className="font-mono py-1 pr-4 text-caption-md-regular">{error.code}</td>
+                        <td className="py-1 pr-4 text-caption-md-regular">
                           {REFUSAL_REASONS[error.code] ?? "This row cannot be imported."}
                           {error.first_line ? ` First seen on line ${error.first_line}.` : ""}
                         </td>
@@ -265,22 +275,32 @@ export function InstanceIdentityImportForm(props: Props) {
 
           {preview.valid && (
             <div className="flex flex-col gap-3 border-t border-subtle pt-4">
-              <p className="text-sm text-secondary">
+              <p className="text-body-sm-regular text-secondary">
                 Applying this grants each listed account the ability to sign in through {provider}. Re-enter your
                 password to confirm — your security key proved this session, this proves it is still you.
               </p>
-              <input
-                type="password"
-                autoComplete="current-password"
-                className="text-sm max-w-sm rounded-md border border-strong bg-surface-1 px-3 py-2"
-                placeholder="Your password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
+              <div className="max-w-sm">
+                <InputField
+                  size="lg"
+                  orientation="vertical"
+                  label="Your password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Your password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </div>
               <div>
-                <Button variant="primary" onClick={runConfirm} disabled={!password || isBusy} loading={isBusy}>
-                  Apply import
-                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  stretch="auto"
+                  onClick={() => void runConfirm()}
+                  disabled={!password || isBusy}
+                  loading={isBusy}
+                  label="Apply import"
+                />
               </div>
             </div>
           )}

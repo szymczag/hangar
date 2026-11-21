@@ -5,13 +5,15 @@
  */
 
 import { useForm } from "react-hook-form";
-import { Lightbulb } from "lucide-react";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { ThoughtsOutline } from "@makeplane/propel/icons";
+import { Button } from "@makeplane/propel/components/button";
 import type { IFormattedInstanceConfiguration, TInstanceAIConfigurationKeys } from "@plane/types";
 // components
 import type { TControllerInputFormField } from "@/components/common/controller-input";
 import { ControllerInput } from "@/components/common/controller-input";
+import { setToast } from "@plane/blocks/toast";
+// helpers
+import { configurationErrorMessage } from "@/helpers/configuration-error";
 // hooks
 import { useInstance } from "@/hooks/store";
 
@@ -24,15 +26,20 @@ type AIFormValues = Record<TInstanceAIConfigurationKeys, string>;
 export function InstanceAIForm(props: IInstanceAIForm) {
   const { config } = props;
   // store
-  const { updateInstanceConfigurations } = useInstance();
+  const { updateInstanceConfigurations, configuredSecrets } = useInstance();
+  // The API never returns a stored secret, so an empty field means either
+  // "never set" or "set and unreadable". Only the first should block saving:
+  // an empty value is understood server-side as "keep the existing secret".
+  const isSecretConfigured = configuredSecrets.has("LLM_API_KEY");
   // form data
   const {
     handleSubmit,
     control,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<AIFormValues>({
     defaultValues: {
-      LLM_API_KEY: config["LLM_API_KEY"],
+      LLM_API_KEY: "",
       LLM_MODEL: config["LLM_MODEL"],
     },
   });
@@ -78,32 +85,37 @@ export function InstanceAIForm(props: IInstanceAIForm) {
           </a>
         </>
       ),
-      placeholder: "sk-asddassdfasdefqsdfasd23das3dasdcasd",
+      placeholder: isSecretConfigured
+        ? "Leave blank to keep the current secret"
+        : "sk-asddassdfasdefqsdfasd23das3dasdcasd",
       error: Boolean(errors.LLM_API_KEY),
-      required: false,
+      required: !isSecretConfigured,
     },
   ];
 
   const onSubmit = async (formData: AIFormValues) => {
     const payload: Partial<AIFormValues> = { ...formData };
 
-    await updateInstanceConfigurations(payload)
-      .then(() =>
-        setToast({
-          type: TOAST_TYPE.SUCCESS,
-          title: "Success",
-          message: "AI Settings updated successfully",
-        })
-      )
-      .catch((err) => console.error(err));
+    try {
+      await updateInstanceConfigurations(payload);
+      // the key is not kept in the form, since the API never shows it back either
+      reset({ ...formData, LLM_API_KEY: "" });
+      setToast({
+        type: "success",
+        title: "Success",
+        message: "AI Settings updated successfully",
+      });
+    } catch (error) {
+      setToast({ type: "error", title: "Error", message: configurationErrorMessage(error) });
+    }
   };
 
   return (
     <div className="space-y-8">
       <div className="space-y-3">
         <div>
-          <div className="pb-1 text-18 font-medium text-primary">OpenAI</div>
-          <div className="text-13 font-regular text-tertiary">If you use ChatGPT, this is for you.</div>
+          <div className="pb-1 text-h6-medium text-primary">OpenAI</div>
+          <div className="text-body-sm-regular text-tertiary">If you use ChatGPT, this is for you.</div>
         </div>
         <div className="grid-col grid w-full grid-cols-1 items-center justify-between gap-x-12 gap-y-8 lg:grid-cols-3">
           {aiFormFields.map((field) => (
@@ -123,12 +135,17 @@ export function InstanceAIForm(props: IInstanceAIForm) {
       </div>
 
       <div className="flex flex-col items-start gap-4">
-        <Button variant="primary" size="lg" onClick={handleSubmit(onSubmit)} loading={isSubmitting}>
-          {isSubmitting ? "Saving" : "Save changes"}
-        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          stretch="auto"
+          onClick={handleSubmit(onSubmit)}
+          loading={isSubmitting}
+          label={isSubmitting ? "Saving" : "Save changes"}
+        />
 
         <div className="relative inline-flex items-center gap-1.5 rounded-sm border border-accent-subtle bg-accent-subtle px-4 py-2 text-caption-sm-regular text-accent-secondary">
-          <Lightbulb className="size-4" />
+          <ThoughtsOutline className="size-4" />
           <div>
             To request another AI model provider, open a{" "}
             <a className="font-medium underline" href="https://github.com/szymczag/hangar/issues">

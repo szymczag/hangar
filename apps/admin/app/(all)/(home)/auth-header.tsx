@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { HangarLogo } from "@plane/propel/icons";
+import { HangarLogo } from "@plane/blocks/icons";
 
 export function AuthHeader() {
   return (

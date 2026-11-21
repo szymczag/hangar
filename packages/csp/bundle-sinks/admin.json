@@ -6,7 +6,6 @@
     "dangerouslySetInnerHTML npm:next-themes": "The anti-flash script. The copy that runs is the one served in the document, allowed by hash or nonce; React's client re-render does not execute and the default policy recognises it (KNOWN_LIBRARY_SCRIPTS).",
     "dangerouslySetInnerHTML npm:react-dom": "React's implementation of the prop; its callers are the other dangerouslySetInnerHTML entries here.",
     "dangerouslySetInnerHTML npm:react-router": "<Scripts>' inline context and module loader: served in the document and allowed by hash (web, admin) or nonce (space); client re-renders go through the default policy.",
-    "eval npm:lodash": "Function('return this') global detection, never reached in a browser (globalThis exists); refused anyway by script-src, which has no 'unsafe-eval'.",
     "eval npm:lodash-es": "Function('return this') global detection, never reached in a browser (globalThis exists); refused anyway by script-src, which has no 'unsafe-eval'.",
     "innerHTML npm:@bprogress/core": "The progress bar's constant template; goes through the default policy, which DOMPurify leaves unchanged.",
     "innerHTML npm:dompurify": "DOMPurify's own parse, given TrustedHTML from its own 'dompurify' policy.",

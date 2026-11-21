@@ -7,7 +7,7 @@
 // Fork (see FORK.md): extended authentication modes merged into the list in
 // ./index.ts alongside upstream's core map.
 
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyOutline, ShieldOutline } from "@makeplane/propel/icons";
 // types
 import type {
   TExtendedInstanceAuthenticationModeKeys,
@@ -25,7 +25,7 @@ export const getExtendedAuthenticationModesMap: (
     key: "oidc",
     name: "OIDC",
     description: "Allow members to log in or sign up with any OpenID Connect identity provider.",
-    icon: <KeyRound className="h-6 w-6 p-0.5 text-tertiary" />,
+    icon: <KeyOutline className="size-6 p-0.5 text-tertiary" />,
     config: <OIDCConfiguration disabled={disabled} updateConfig={updateConfig} />,
     enabledConfigKey: "IS_OIDC_ENABLED",
   },
@@ -33,7 +33,7 @@ export const getExtendedAuthenticationModesMap: (
     key: "saml",
     name: "SAML 2.0",
     description: "Allow members to log in or sign up through your SAML 2.0 identity provider.",
-    icon: <ShieldCheck className="h-6 w-6 p-0.5 text-tertiary" />,
+    icon: <ShieldOutline className="size-6 p-0.5 text-tertiary" />,
     config: <SAMLConfiguration disabled={disabled} updateConfig={updateConfig} />,
     enabledConfigKey: "IS_SAML_ENABLED",
   },

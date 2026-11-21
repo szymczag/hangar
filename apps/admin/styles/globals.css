@@ -1,4 +1,7 @@
-@import "@plane/tailwind-config/index.css";
+/* Hangar: admin is on Propel, so it takes the Propel entry point (upstream v1.5.0's
+   index.css). It already imports the @makeplane/propel styles barrel. Web and space
+   stay on index.css. See FORK.md, "Vendored upstream packages". */
+@import "@plane/tailwind-config/propel.css";
 
 .shadow-custom {
   box-shadow: 2px 2px 8px 2px rgba(234, 231, 250, 0.3); /* Convert #EAE7FA4D to rgba */

@@ -6,10 +6,10 @@
 
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AlertOctagon, AlertTriangle, Eye, Info } from "lucide-react";
 // plane internal packages
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { AlertOctagonOutline, InfoOutline, ShowOutline, WarningTriangleOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { AuthService, InstanceMaintenanceService } from "@plane/services";
 import type { TMaintenanceNoticeAdmin, TMaintenanceSeverity } from "@plane/services";
 import { cn } from "@plane/utils";
@@ -19,10 +19,10 @@ const maintenanceService = new InstanceMaintenanceService();
 
 const MESSAGE_MAX_LENGTH = 500;
 
-const SEVERITIES: { value: TMaintenanceSeverity; label: string; hint: string; Icon: typeof Info }[] = [
-  { value: "info", label: "Info", hint: "Something people should know.", Icon: Info },
-  { value: "warning", label: "Warning", hint: "Work is planned or under way.", Icon: AlertTriangle },
-  { value: "critical", label: "Critical", hint: "Something is broken now.", Icon: AlertOctagon },
+const SEVERITIES: { value: TMaintenanceSeverity; label: string; hint: string; Icon: typeof InfoOutline }[] = [
+  { value: "info", label: "Info", hint: "Something people should know.", Icon: InfoOutline },
+  { value: "warning", label: "Warning", hint: "Work is planned or under way.", Icon: WarningTriangleOutline },
+  { value: "critical", label: "Critical", hint: "Something is broken now.", Icon: AlertOctagonOutline },
 ];
 
 /** `datetime-local` needs "YYYY-MM-DDTHH:mm" in local time; the API speaks ISO. */
@@ -95,13 +95,13 @@ export const InstanceMaintenanceForm = ({ notice, onSaved }: Props) => {
       });
       onSaved(saved);
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Saved",
         message: saved.is_active ? "The notice is showing now." : "Saved. The notice is not showing.",
       });
     } catch (error) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Not saved",
         message: (error as { error?: string })?.error ?? "Something went wrong. Try again.",
       });
@@ -141,7 +141,7 @@ export const InstanceMaintenanceForm = ({ notice, onSaved }: Props) => {
               aria-pressed={severity === value}
               className={cn(
                 "flex flex-col gap-1 rounded-md border border-subtle bg-surface-1 p-3 text-left transition-colors",
-                severity === value ? "border-accent-strong bg-accent-subtle" : "hover:bg-surface-2"
+                severity === value ? "border-accent-strong bg-accent-subtle" : "hover:bg-layer-1-hover"
               )}
             >
               <span className="flex items-center gap-2 text-13 font-medium text-primary">
@@ -195,7 +195,7 @@ export const InstanceMaintenanceForm = ({ notice, onSaved }: Props) => {
 
       {publishedToSignIn && (
         <div className="flex items-start gap-3 rounded-md border border-warning-subtle bg-warning-subtle p-4">
-          <Eye className="mt-0.5 size-4 shrink-0 text-secondary" aria-hidden="true" />
+          <ShowOutline className="mt-0.5 size-4 shrink-0 text-secondary" aria-hidden="true" />
           <p className="text-12 leading-5 text-secondary">
             <span className="font-medium">Anyone who can reach your sign-in page can read this</span>, including people
             outside your network. Keep it free of detail you would not publish — hostnames, ticket numbers, or what
@@ -216,9 +216,15 @@ export const InstanceMaintenanceForm = ({ notice, onSaved }: Props) => {
       </label>
 
       <div className="flex items-center gap-3">
-        <Button type="submit" variant="primary" loading={isSubmitting} disabled={!csrfToken}>
-          {isSubmitting ? "Saving" : "Save"}
-        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          stretch="auto"
+          loading={isSubmitting}
+          disabled={!csrfToken}
+          label={isSubmitting ? "Saving" : "Save"}
+        />
         <span className="text-12 text-tertiary">{notice.is_active ? "Showing now." : "Not showing."}</span>
       </div>
     </form>

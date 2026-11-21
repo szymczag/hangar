@@ -4,34 +4,34 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useId } from "react";
 import { isEmpty } from "lodash-es";
-import Link from "next/link";
-import { Controller, useForm } from "react-hook-form";
-import { Monitor } from "lucide-react";
+import { Controller } from "react-hook-form";
 // plane internal packages
+import { Select, SelectContent, SelectItem, SelectList, SelectTrigger } from "@makeplane/propel/components/select";
+import { Switch } from "@makeplane/propel/components/switch";
 import { API_BASE_URL } from "@plane/constants";
-import { Button, getButtonStyling } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { IFormattedInstanceConfiguration, TInstanceGoogleAuthenticationConfigurationKeys } from "@plane/types";
-import { ToggleSwitch } from "@plane/ui";
 // components
+import { OAuthProviderForm } from "@/components/authentication/oauth-provider-form";
 import { CodeBlock } from "@/components/common/code-block";
-import { ConfirmDiscardModal } from "@/components/common/confirm-discard-modal";
 import type { TControllerInputFormField } from "@/components/common/controller-input";
 import type { TControllerSwitchFormField } from "@/components/common/controller-switch";
-import { ControllerSwitch } from "@/components/common/controller-switch";
-import { ControllerInput } from "@/components/common/controller-input";
 import type { TCopyField } from "@/components/common/copy-field";
-import { CopyField } from "@/components/common/copy-field";
 // hooks
 import { useInstance } from "@/hooks/store";
+import { useOAuthProviderConfigForm } from "@/hooks/use-oauth-provider-config-form";
 
 type Props = {
   config: IFormattedInstanceConfiguration;
 };
 
 type GoogleConfigFormValues = Record<TInstanceGoogleAuthenticationConfigurationKeys, string>;
+
+const GOOGLE_AUTH_MODE_OPTIONS: Record<string, string> = {
+  generic: "Any Google account",
+  workspace: "Only accounts in the Workspace domains listed below",
+};
 
 const GOOGLE_FORM_SWITCH_FIELD: TControllerSwitchFormField<GoogleConfigFormValues> = {
   name: "ENABLE_GOOGLE_SYNC",
@@ -40,10 +40,11 @@ const GOOGLE_FORM_SWITCH_FIELD: TControllerSwitchFormField<GoogleConfigFormValue
 
 export function InstanceGoogleConfigForm(props: Props) {
   const { config } = props;
-  // states
-  const [isDiscardChangesModalOpen, setIsDiscardChangesModalOpen] = useState(false);
+  // ids
+  const authModeLabelId = useId();
+  const autoRedirectLabelId = useId();
   // store hooks
-  const { updateInstanceConfigurations, configuredSecrets } = useInstance();
+  const { configuredSecrets } = useInstance();
   // The API never returns a stored secret, so an empty field means either
   // "never set" or "set and unreadable". Only the first should block saving:
   // an empty value is understood server-side as "keep the existing secret",
@@ -52,20 +53,21 @@ export function InstanceGoogleConfigForm(props: Props) {
   const isSecretConfigured = configuredSecrets.has("GOOGLE_CLIENT_SECRET");
   // form data
   const {
-    handleSubmit,
     control,
-    reset,
-    formState: { errors, isDirty, isSubmitting },
-  } = useForm<GoogleConfigFormValues>({
-    defaultValues: {
+    formState: { errors },
+    onSave,
+  } = useOAuthProviderConfigForm<GoogleConfigFormValues>(
+    "Google",
+    {
       GOOGLE_CLIENT_ID: config["GOOGLE_CLIENT_ID"],
-      GOOGLE_CLIENT_SECRET: config["GOOGLE_CLIENT_SECRET"],
+      GOOGLE_CLIENT_SECRET: "",
       ENABLE_GOOGLE_SYNC: config["ENABLE_GOOGLE_SYNC"] || "0",
       GOOGLE_AUTO_REDIRECT: config["GOOGLE_AUTO_REDIRECT"] || "0",
       GOOGLE_AUTH_MODE: config["GOOGLE_AUTH_MODE"] || "generic",
       GOOGLE_WORKSPACE_DOMAINS: config["GOOGLE_WORKSPACE_DOMAINS"] || "",
     },
-  });
+    ["GOOGLE_CLIENT_SECRET"]
+  );
 
   const originURL = !isEmpty(API_BASE_URL) ? API_BASE_URL : typeof window !== "undefined" ? window.location.origin : "";
 
@@ -188,159 +190,91 @@ export function InstanceGoogleConfigForm(props: Props) {
     },
   ];
 
-  const onSubmit = async (formData: GoogleConfigFormValues) => {
-    const payload: Partial<GoogleConfigFormValues> = { ...formData };
-
-    try {
-      const response = await updateInstanceConfigurations(payload);
-      setToast({
-        type: TOAST_TYPE.SUCCESS,
-        title: "Done!",
-        message: "Your Google authentication is configured. You should test it now.",
-      });
-      reset({
-        GOOGLE_CLIENT_ID: response.find((item) => item.key === "GOOGLE_CLIENT_ID")?.value,
-        GOOGLE_CLIENT_SECRET: response.find((item) => item.key === "GOOGLE_CLIENT_SECRET")?.value,
-        ENABLE_GOOGLE_SYNC: response.find((item) => item.key === "ENABLE_GOOGLE_SYNC")?.value,
-        GOOGLE_AUTO_REDIRECT: response.find((item) => item.key === "GOOGLE_AUTO_REDIRECT")?.value,
-        GOOGLE_AUTH_MODE: response.find((item) => item.key === "GOOGLE_AUTH_MODE")?.value,
-        GOOGLE_WORKSPACE_DOMAINS: response.find((item) => item.key === "GOOGLE_WORKSPACE_DOMAINS")?.value,
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleGoBack = (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
-    if (isDirty) {
-      e.preventDefault();
-      setIsDiscardChangesModalOpen(true);
-    }
-  };
-
-  return (
-    <>
-      <ConfirmDiscardModal
-        isOpen={isDiscardChangesModalOpen}
-        onDiscardHref="/authentication"
-        handleClose={() => setIsDiscardChangesModalOpen(false)}
-      />
-      <div className="flex flex-col gap-8">
-        <div className="grid w-full grid-cols-2 gap-x-12 gap-y-8">
-          <div className="col-span-2 flex flex-col gap-y-4 pt-1 md:col-span-1">
-            <div className="pt-2.5 text-18 font-medium">Google-provided details for Hangar</div>
-            <Controller
-              control={control}
-              name="GOOGLE_AUTH_MODE"
-              render={({ field: { value, onChange } }) => (
-                <div className="flex flex-col gap-1">
-                  <h4 className="text-13 text-secondary">Who may sign in with Google</h4>
-                  {/* Two accepted values, spelled exactly. Typing them by hand
-                      meant a typo fell back to admitting every Google account,
-                      which is the opposite of what the operator intended. */}
-                  <select
-                    className="rounded-md border border-strong bg-surface-1 px-3 py-2 text-14"
-                    value={value || "generic"}
-                    onChange={(event) => onChange(event.target.value)}
-                  >
-                    <option value="generic">Any Google account</option>
-                    <option value="workspace">Only accounts in the Workspace domains listed below</option>
-                  </select>
-                  <div className="text-11 text-tertiary">
-                    {value === "workspace" ? (
-                      <>
-                        Checked against the signed <CodeBlock darkerShade>hd</CodeBlock> claim, so a matching email
-                        suffix is not enough. It admits <em>every</em> account in a listed domain — Google issues no
-                        organizational-unit or group claim, so it cannot be narrowed further here. Narrow it with
-                        invites, or with Domain policy.
-                      </>
-                    ) : (
-                      <>
-                        Anyone with a Google account can sign in, including personal gmail.com addresses. Choose the
-                        other option to limit sign-in to your own Workspace domains.
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            />
-            {GOOGLE_FORM_FIELDS.map((field) => (
-              <ControllerInput
-                key={field.key}
-                control={control}
-                type={field.type}
-                name={field.key}
-                label={field.label}
-                description={field.description}
-                placeholder={field.placeholder}
-                error={field.error}
-                required={field.required}
-              />
-            ))}
-            <ControllerSwitch control={control} field={GOOGLE_FORM_SWITCH_FIELD} />
-            <Controller
-              control={control}
-              name="GOOGLE_AUTO_REDIRECT"
-              render={({ field: { value, onChange } }) => {
-                const isEnabled = value === "1";
-                return (
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex flex-col gap-1">
-                      <h4 className="text-sm text-custom-text-300">Automatically start Google sign-in</h4>
-                      <p className="text-11 text-tertiary">
-                        Skip the sign-in chooser when Google is the only enabled login method. OAuth errors and an
-                        explicit sign-out still show the Google button so people can recover or switch accounts.
-                      </p>
-                    </div>
-                    <ToggleSwitch value={isEnabled} onChange={() => onChange(isEnabled ? "0" : "1")} size="sm" />
-                  </div>
-                );
-              }}
-            />
-            <div className="flex flex-col gap-1 pt-4">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={(e) => void handleSubmit(onSubmit)(e)}
-                  loading={isSubmitting}
-                  disabled={!isDirty}
-                >
-                  {isSubmitting ? "Saving" : "Save changes"}
-                </Button>
-                <Link href="/authentication" className={getButtonStyling("secondary", "lg")} onClick={handleGoBack}>
-                  Go back
-                </Link>
-              </div>
-            </div>
-          </div>
-          <div className="col-span-2 flex flex-col gap-y-6 md:col-span-1">
-            <div className="pt-2 text-18 font-medium">Hangar-provided details for Google</div>
-
-            <div className="flex flex-col gap-y-4">
-              {/* common service details */}
-              <div className="flex flex-col gap-y-4 rounded-lg bg-layer-1 px-6 py-4">
-                {GOOGLE_COMMON_SERVICE_DETAILS.map((field) => (
-                  <CopyField key={field.key} label={field.label} url={field.url} description={field.description} />
+  const GOOGLE_AUTH_MODE_CONTROL = (
+    <Controller
+      control={control}
+      name="GOOGLE_AUTH_MODE"
+      render={({ field: { value, onChange } }) => (
+        <div className="flex flex-col gap-1">
+          <span id={authModeLabelId} className="text-body-xs-medium text-primary">
+            Who may sign in with Google
+          </span>
+          {/* Two accepted values, spelled exactly. Typing them by hand
+              meant a typo fell back to admitting every Google account,
+              which is the opposite of what the operator intended. */}
+          <Select
+            items={GOOGLE_AUTH_MODE_OPTIONS}
+            value={value || "generic"}
+            onValueChange={(next) => onChange(next as string)}
+          >
+            <SelectTrigger variant="secondary" size="lg" aria-labelledby={authModeLabelId} />
+            <SelectContent>
+              <SelectList>
+                {Object.entries(GOOGLE_AUTH_MODE_OPTIONS).map(([key, label]) => (
+                  <SelectItem key={key} value={key} label={label} size="lg" />
                 ))}
-              </div>
-
-              {/* web service details */}
-              <div className="flex flex-col overflow-hidden rounded-lg">
-                <div className="flex items-center gap-x-3 bg-layer-3 px-6 py-3 text-11 font-medium text-secondary uppercase">
-                  <Monitor className="h-3 w-3" />
-                  Web
-                </div>
-                <div className="flex flex-col gap-y-4 bg-layer-1 px-6 py-4">
-                  {GOOGLE_SERVICE_DETAILS.map((field) => (
-                    <CopyField key={field.key} label={field.label} url={field.url} description={field.description} />
-                  ))}
-                </div>
-              </div>
-            </div>
+              </SelectList>
+            </SelectContent>
+          </Select>
+          <div className="text-body-xs-regular text-tertiary">
+            {value === "workspace" ? (
+              <>
+                Checked against the signed <CodeBlock darkerShade>hd</CodeBlock> claim, so a matching email suffix is
+                not enough. It admits <em>every</em> account in a listed domain — Google issues no organizational-unit
+                or group claim, so it cannot be narrowed further here. Narrow it with invites, or with Domain policy.
+              </>
+            ) : (
+              <>
+                Anyone with a Google account can sign in, including personal gmail.com addresses. Choose the other
+                option to limit sign-in to your own Workspace domains.
+              </>
+            )}
           </div>
         </div>
-      </div>
-    </>
+      )}
+    />
+  );
+
+  const GOOGLE_AUTO_REDIRECT_CONTROL = (
+    <Controller
+      control={control}
+      name="GOOGLE_AUTO_REDIRECT"
+      render={({ field: { value, onChange } }) => {
+        const isEnabled = value === "1";
+        return (
+          <div className="flex items-start justify-between gap-4 py-1">
+            <div className="flex min-w-0 flex-col gap-1">
+              <span id={autoRedirectLabelId} className="text-body-sm-medium text-primary">
+                Automatically start Google sign-in
+              </span>
+              <p className="text-body-xs-regular text-tertiary">
+                Skip the sign-in chooser when Google is the only enabled login method. OAuth errors and an explicit
+                sign-out still show the Google button so people can recover or switch accounts.
+              </p>
+            </div>
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={() => onChange(isEnabled ? "0" : "1")}
+              size="sm"
+              aria-labelledby={autoRedirectLabelId}
+            />
+          </div>
+        );
+      }}
+    />
+  );
+
+  return (
+    <OAuthProviderForm
+      providerName="Google"
+      control={control}
+      formFields={GOOGLE_FORM_FIELDS}
+      switchField={GOOGLE_FORM_SWITCH_FIELD}
+      onSave={onSave}
+      serviceDetails={GOOGLE_COMMON_SERVICE_DETAILS}
+      webServiceDetails={GOOGLE_SERVICE_DETAILS}
+      leadingControls={GOOGLE_AUTH_MODE_CONTROL}
+      trailingControls={GOOGLE_AUTO_REDIRECT_CONTROL}
+    />
   );
 }

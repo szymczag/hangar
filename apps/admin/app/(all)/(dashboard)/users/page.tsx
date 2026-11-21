@@ -4,13 +4,19 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 // plane internal packages
+import { Badge } from "@makeplane/propel/components/badge";
+import type { BadgeVariant } from "@makeplane/propel/components/badge";
+import { Banner } from "@makeplane/propel/components/banner";
+import { CheckboxField } from "@makeplane/propel/components/checkbox-field";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { Select, SelectContent, SelectItem, SelectList, SelectTrigger } from "@makeplane/propel/components/select";
 import { InstanceService } from "@plane/services";
 import type { TInstanceUser, TInstanceUserSignInStatus } from "@plane/types";
-import { Loader } from "@plane/ui";
+import { Skeleton } from "@plane/blocks/skeleton";
 import { cn } from "@plane/utils";
 // components
 import { PageWrapper } from "@/components/common/page-wrapper";
@@ -21,27 +27,34 @@ import type { Route } from "./+types/page";
 
 const instanceService = new InstanceService();
 
-const STATUS_COPY: Record<TInstanceUserSignInStatus, { label: string; hint: string; tone: string }> = {
+const STATUS_COPY: Record<TInstanceUserSignInStatus, { label: string; hint: string; variant: BadgeVariant }> = {
   federated: {
     label: "Federated",
     hint: "Signs in through an identity provider.",
-    tone: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
+    variant: "success",
   },
   adoptable: {
     label: "Adoptable",
     hint: "Has used this provider before; adopted automatically on the next sign-in.",
-    tone: "bg-sky-500/10 text-sky-600 border-sky-500/30",
+    variant: "info",
   },
   "needs-import": {
     label: "Needs import",
     hint: "Nothing links this account to the provider. Sign-in would be refused until its subject is imported.",
-    tone: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+    variant: "warning",
   },
   "password-only": {
     label: "Password only",
     hint: "No identity provider linked.",
-    tone: "bg-layer-3 text-tertiary border-transparent",
+    variant: "neutral",
   },
+};
+
+const PROVIDER_CHECK_OPTIONS: Record<string, string> = {
+  none: "No cutover check",
+  google: "Check against Google",
+  oidc: "Check against OIDC",
+  saml: "Check against SAML",
 };
 
 function SignInRecords({ user }: { user: TInstanceUser }) {
@@ -49,7 +62,7 @@ function SignInRecords({ user }: { user: TInstanceUser }) {
     return (
       <div className="flex flex-col gap-0.5">
         {user.federated_identities.map((identity) => (
-          <span key={`${identity.provider}-${identity.issuer}`} className="font-mono text-11">
+          <span key={`${identity.provider}-${identity.issuer}`} className="font-mono text-caption-md-regular">
             {identity.provider} · {identity.issuer}
           </span>
         ))}
@@ -57,7 +70,7 @@ function SignInRecords({ user }: { user: TInstanceUser }) {
     );
   }
   if (user.oauth_accounts.length > 0) {
-    return <span className="font-mono text-11">{user.oauth_accounts.join(", ")}</span>;
+    return <span className="font-mono text-caption-md-regular">{user.oauth_accounts.join(", ")}</span>;
   }
   return <span className="text-tertiary">—</span>;
 }
@@ -66,6 +79,7 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
   const [search, setSearch] = useState("");
   const [provider, setProvider] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
+  const providerLabelId = useId();
 
   const { data, isLoading } = useSWR(["INSTANCE_USERS", search, provider, includeInactive], () =>
     instanceService.users({
@@ -86,53 +100,73 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
         description: "Who has an account and how they sign in. Read-only — accounts are managed from their workspace.",
       }}
     >
-      <div className="flex flex-wrap items-center gap-3 pb-4">
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by email"
-          className="rounded-sm border border-strong bg-surface-1 px-3 py-1.5 text-13 outline-none"
-        />
-        <select
-          value={provider}
-          onChange={(event) => setProvider(event.target.value)}
-          className="rounded-sm border border-strong bg-surface-1 px-3 py-1.5 text-13 outline-none"
-        >
-          <option value="">No cutover check</option>
-          <option value="google">Check against Google</option>
-          <option value="oidc">Check against OIDC</option>
-          <option value="saml">Check against SAML</option>
-        </select>
-        <label className="flex items-center gap-2 text-13 text-tertiary">
-          <input
-            type="checkbox"
-            checked={includeInactive}
-            onChange={(event) => setIncludeInactive(event.target.checked)}
+      <div className="flex flex-wrap items-end gap-3 pb-4">
+        <div className="w-64">
+          <InputField
+            size="md"
+            orientation="vertical"
+            label="Search"
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by email"
           />
-          Include deactivated
-        </label>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span id={providerLabelId} className="text-body-xs-medium text-primary">
+            Cutover check
+          </span>
+          <Select
+            items={PROVIDER_CHECK_OPTIONS}
+            value={provider || "none"}
+            onValueChange={(value) => setProvider(value === "none" ? "" : (value as string))}
+          >
+            <SelectTrigger variant="secondary" size="md" width="fit" aria-labelledby={providerLabelId} />
+            <SelectContent>
+              <SelectList>
+                {Object.entries(PROVIDER_CHECK_OPTIONS).map(([key, label]) => (
+                  <SelectItem key={key} value={key} label={label} />
+                ))}
+              </SelectList>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="pb-1.5">
+          <CheckboxField
+            size="md"
+            label="Include deactivated"
+            checked={includeInactive}
+            onCheckedChange={(checked) => setIncludeInactive(checked)}
+          />
+        </div>
       </div>
 
       {provider && needsImport > 0 && (
-        <div className="border-amber-500/40 bg-amber-500/10 mb-4 rounded-sm border px-4 py-3 text-13 leading-5">
-          <span className="font-medium">
-            {needsImport} account{needsImport === 1 ? "" : "s"} would be refused
-          </span>{" "}
-          if you pinned their domain to {provider}. Import each one&apos;s subject with{" "}
-          <span className="font-mono">import_federated_identities</span> before setting{" "}
-          <span className="font-mono">SSO_ENFORCED_DOMAINS</span>.
+        <div className="mb-4">
+          <Banner
+            placement="inline"
+            variant="warning"
+            title={`${needsImport} account${needsImport === 1 ? "" : "s"} would be refused`}
+            description={
+              <>
+                if you pinned their domain to {provider}. Import each one&apos;s subject with{" "}
+                <span className="font-mono">import_federated_identities</span> before setting{" "}
+                <span className="font-mono">SSO_ENFORCED_DOMAINS</span>.
+              </>
+            }
+          />
         </div>
       )}
 
       {isLoading ? (
-        <Loader className="space-y-4">
-          <Loader.Item height="40px" />
-          <Loader.Item height="40px" />
-          <Loader.Item height="40px" />
-        </Loader>
+        <Skeleton className="space-y-4">
+          <Skeleton.Item height="40px" />
+          <Skeleton.Item height="40px" />
+          <Skeleton.Item height="40px" />
+        </Skeleton>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-13">
+          <table className="w-full text-body-xs-regular">
             <thead className="text-tertiary">
               <tr className="border-b border-subtle text-left">
                 <th className="py-2 pr-4 font-medium">Email</th>
@@ -149,12 +183,10 @@ const InstanceUsersPage = observer(function InstanceUsersPage(_props: Route.Comp
                   <tr key={user.id} className="border-b border-subtle/60 align-top">
                     <td className="py-2 pr-4">
                       <div className={cn(!user.is_active && "text-tertiary line-through")}>{user.email}</div>
-                      {!user.is_active && <div className="text-11 text-tertiary">deactivated</div>}
+                      {!user.is_active && <div className="text-caption-md-regular text-tertiary">deactivated</div>}
                     </td>
                     <td className="py-2 pr-4">
-                      <span className={cn("rounded-sm border px-2 py-0.5 text-11", copy.tone)} title={copy.hint}>
-                        {copy.label}
-                      </span>
+                      <Badge variant={copy.variant} size="sm" label={copy.label} title={copy.hint} />
                     </td>
                     <td className="py-2 pr-4">{user.has_password ? "yes" : "no"}</td>
                     <td className="py-2 pr-4">

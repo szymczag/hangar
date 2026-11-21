@@ -7,9 +7,9 @@
 import { observer } from "mobx-react";
 import useSWR from "swr";
 // icons
-import { Globe } from "lucide-react";
+import { GlobeOutline } from "@makeplane/propel/icons";
 // plane internal packages
-import { Loader } from "@plane/ui";
+import { Skeleton } from "@plane/blocks/skeleton";
 // components
 import { AuthenticationMethodCard } from "@/components/authentication/authentication-method-card";
 import { PageWrapper } from "@/components/common/page-wrapper";
@@ -32,7 +32,7 @@ const InstanceDomainPolicyPage = observer(function InstanceDomainPolicyPage() {
         <AuthenticationMethodCard
           name="Domain policy"
           description="Decide which provider owns each email domain, and where its users land after signing in."
-          icon={<Globe className="h-6 w-6 p-0.5 text-tertiary" />}
+          icon={<GlobeOutline className="size-6 p-0.5 text-tertiary" />}
           config={<></>}
           disabled={!formattedConfig}
           withBorder={false}
@@ -42,11 +42,11 @@ const InstanceDomainPolicyPage = observer(function InstanceDomainPolicyPage() {
       {formattedConfig ? (
         <InstanceSSODomainPolicyForm config={formattedConfig} />
       ) : (
-        <Loader className="space-y-8">
-          <Loader.Item height="50px" width="25%" />
-          <Loader.Item height="50px" />
-          <Loader.Item height="50px" />
-        </Loader>
+        <Skeleton className="space-y-8">
+          <Skeleton.Item height="50px" width="25%" />
+          <Skeleton.Item height="50px" />
+          <Skeleton.Item height="50px" />
+        </Skeleton>
       )}
     </PageWrapper>
   );

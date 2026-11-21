@@ -8,10 +8,10 @@ import { useEffect, useState } from "react";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { useRouter } from "next/navigation";
 // plane internal packages
-import { Button } from "@plane/propel/button";
+import { Banner } from "@makeplane/propel/components/banner";
+import { Button } from "@makeplane/propel/components/button";
+import { TextButton } from "@makeplane/propel/components/text-button";
 import { AuthService, InstanceWebAuthnService } from "@plane/services";
-// components
-import { Banner } from "@/components/common/banner";
 // helpers
 import { authErrorHandler } from "../auth-helpers";
 // types
@@ -80,30 +80,35 @@ export default function AdminSecondFactorPage(_props: Route.ComponentProps) {
   return (
     <div className="mx-auto w-full max-w-md space-y-6 py-16">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Confirm it is you</h1>
-        <p className="text-sm text-tertiary">
+        <h1 className="text-h4-semibold text-primary">Confirm it is you</h1>
+        <p className="text-body-sm-regular text-tertiary">
           {email ? `Signed in as ${email}. ` : ""}This console requires a security key in addition to your password.
         </p>
       </div>
 
-      {error && <Banner type="error" message={error} />}
+      {error && <Banner placement="inline" variant="danger" description={error} />}
 
       {supported ? (
-        <Button variant="primary" onClick={unlock} loading={isBusy} disabled={!csrfToken || isBusy}>
-          {isBusy ? "Waiting for your key..." : "Unlock with your security key"}
-        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          stretch="full"
+          onClick={() => void unlock()}
+          loading={isBusy}
+          disabled={!csrfToken || isBusy}
+          label={isBusy ? "Waiting for your key..." : "Unlock with your security key"}
+        />
       ) : (
         <Banner
-          type="error"
-          message="This browser does not support security keys. Open the console in a browser that does."
+          placement="inline"
+          variant="danger"
+          description="This browser does not support security keys. Open the console in a browser that does."
         />
       )}
 
       <form method="POST" action={`${window.location.origin}/api/instances/admins/sign-out/`}>
         <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-        <button type="submit" className="text-sm text-tertiary underline">
-          Start over
-        </button>
+        <TextButton type="submit" variant="secondary" size="md" label="Start over" />
       </form>
     </div>
   );

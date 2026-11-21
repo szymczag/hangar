@@ -31,13 +31,13 @@ export function PrivateNetworkNotice(props: Props) {
 
   return (
     <div className="flex flex-col gap-y-2 rounded-lg bg-layer-3 px-6 py-4">
-      <div className="text-16 font-medium">Self-hosted {label} on a private network</div>
-      <div className="text-13 leading-5 text-tertiary">
+      <div className="text-body-sm-medium text-primary">Self-hosted {label} on a private network</div>
+      <div className="text-body-xs-regular leading-5 text-tertiary">
         Requests to {label} may only reach public addresses. A self-managed instance on an internal address is refused
         until the deployment names it, using <CodeBlock darkerShade>{provider}_ALLOWED_IPS</CodeBlock> (comma-separated
         CIDRs) or <CodeBlock darkerShade>{provider}_ALLOWED_HOSTS</CodeBlock> (comma-separated hostnames).
       </div>
-      <div className="text-13 leading-5 text-tertiary">
+      <div className="text-body-xs-regular leading-5 text-tertiary">
         These are environment variables on purpose and cannot be set here: they permit outbound authentication traffic,
         carrying a client secret, to addresses inside your network. That belongs to whoever owns the deployment rather
         than to anyone with access to this panel. Allowlisting widens which addresses are acceptable; the connection is

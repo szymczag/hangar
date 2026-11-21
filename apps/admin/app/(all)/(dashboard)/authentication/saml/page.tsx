@@ -7,11 +7,11 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
-// icons
-import { ShieldCheck } from "lucide-react";
 // plane internal packages
-import { setPromiseToast } from "@plane/propel/toast";
-import { Loader, ToggleSwitch } from "@plane/ui";
+import { Switch } from "@makeplane/propel/components/switch";
+import { ShieldOutline } from "@makeplane/propel/icons";
+import { setPromiseToast } from "@plane/blocks/toast";
+import { Skeleton } from "@plane/blocks/skeleton";
 // components
 import { AuthenticationMethodCard } from "@/components/authentication/authentication-method-card";
 import { PageWrapper } from "@/components/common/page-wrapper";
@@ -87,11 +87,12 @@ const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticat
         <AuthenticationMethodCard
           name="SAML 2.0"
           description="Allow members to log in or sign up through your SAML 2.0 identity provider."
-          icon={<ShieldCheck className="h-6 w-6 p-0.5 text-tertiary" />}
+          icon={<ShieldOutline className="size-6 p-0.5 text-tertiary" />}
           config={
-            <ToggleSwitch
-              value={isSAMLEnabled}
-              onChange={() => {
+            <Switch
+              aria-label="Enable SAML authentication"
+              checked={isSAMLEnabled}
+              onCheckedChange={() => {
                 updateConfig("IS_SAML_ENABLED", isSAMLEnabled ? "0" : "1");
               }}
               size="sm"
@@ -108,13 +109,13 @@ const InstanceSAMLAuthenticationPage = observer(function InstanceSAMLAuthenticat
       {formattedConfig ? (
         <InstanceSAMLConfigForm config={formattedConfig} />
       ) : (
-        <Loader className="space-y-8">
-          <Loader.Item height="50px" width="25%" />
-          <Loader.Item height="50px" />
-          <Loader.Item height="50px" />
-          <Loader.Item height="50px" />
-          <Loader.Item height="50px" width="50%" />
-        </Loader>
+        <Skeleton className="space-y-8">
+          <Skeleton.Item height="50px" width="25%" />
+          <Skeleton.Item height="50px" />
+          <Skeleton.Item height="50px" />
+          <Skeleton.Item height="50px" />
+          <Skeleton.Item height="50px" width="50%" />
+        </Skeleton>
       )}
     </PageWrapper>
   );

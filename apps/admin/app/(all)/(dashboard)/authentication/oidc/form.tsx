@@ -4,24 +4,18 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
 import { isEmpty } from "lodash-es";
-import Link from "next/link";
-import { useForm } from "react-hook-form";
 // plane internal packages
 import { API_BASE_URL } from "@plane/constants";
-import { Button, getButtonStyling } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { IFormattedInstanceConfiguration, TInstanceOIDCAuthenticationConfigurationKeys } from "@plane/types";
 // components
+import { OAuthProviderForm } from "@/components/authentication/oauth-provider-form";
 import { CodeBlock } from "@/components/common/code-block";
-import { ConfirmDiscardModal } from "@/components/common/confirm-discard-modal";
 import type { TControllerInputFormField } from "@/components/common/controller-input";
-import { ControllerInput } from "@/components/common/controller-input";
 import type { TCopyField } from "@/components/common/copy-field";
-import { CopyField } from "@/components/common/copy-field";
 // hooks
 import { useInstance } from "@/hooks/store";
+import { useOAuthProviderConfigForm } from "@/hooks/use-oauth-provider-config-form";
 
 type Props = {
   config: IFormattedInstanceConfiguration;
@@ -31,10 +25,8 @@ type OIDCConfigFormValues = Record<TInstanceOIDCAuthenticationConfigurationKeys,
 
 export function InstanceOIDCConfigForm(props: Props) {
   const { config } = props;
-  // states
-  const [isDiscardChangesModalOpen, setIsDiscardChangesModalOpen] = useState(false);
   // store hooks
-  const { updateInstanceConfigurations, configuredSecrets } = useInstance();
+  const { configuredSecrets } = useInstance();
   // The API never returns a stored secret, so an empty field means either
   // "never set" or "set and unreadable". Only the first should block saving:
   // an empty value is understood server-side as "keep the existing secret",
@@ -43,18 +35,19 @@ export function InstanceOIDCConfigForm(props: Props) {
   const isSecretConfigured = configuredSecrets.has("OIDC_CLIENT_SECRET");
   // form data
   const {
-    handleSubmit,
     control,
-    reset,
-    formState: { errors, isDirty, isSubmitting },
-  } = useForm<OIDCConfigFormValues>({
-    defaultValues: {
+    formState: { errors },
+    onSave,
+  } = useOAuthProviderConfigForm<OIDCConfigFormValues>(
+    "OIDC",
+    {
       OIDC_ISSUER: config["OIDC_ISSUER"],
       OIDC_CLIENT_ID: config["OIDC_CLIENT_ID"],
-      OIDC_CLIENT_SECRET: config["OIDC_CLIENT_SECRET"],
+      OIDC_CLIENT_SECRET: "",
       OIDC_PROVIDER_NAME: config["OIDC_PROVIDER_NAME"] || "OIDC",
     },
-  });
+    ["OIDC_CLIENT_SECRET"]
+  );
 
   const originURL = !isEmpty(API_BASE_URL) ? API_BASE_URL : typeof window !== "undefined" ? window.location.origin : "";
 
@@ -130,85 +123,13 @@ export function InstanceOIDCConfigForm(props: Props) {
     },
   ];
 
-  const onSubmit = async (formData: OIDCConfigFormValues) => {
-    const payload: Partial<OIDCConfigFormValues> = { ...formData };
-
-    try {
-      const response = await updateInstanceConfigurations(payload);
-      setToast({
-        type: TOAST_TYPE.SUCCESS,
-        title: "Done!",
-        message: "Your OIDC authentication is configured. You should test it now.",
-      });
-      reset({
-        OIDC_ISSUER: response.find((item) => item.key === "OIDC_ISSUER")?.value,
-        OIDC_CLIENT_ID: response.find((item) => item.key === "OIDC_CLIENT_ID")?.value,
-        OIDC_CLIENT_SECRET: response.find((item) => item.key === "OIDC_CLIENT_SECRET")?.value,
-        OIDC_PROVIDER_NAME: response.find((item) => item.key === "OIDC_PROVIDER_NAME")?.value,
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleGoBack = (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
-    if (isDirty) {
-      e.preventDefault();
-      setIsDiscardChangesModalOpen(true);
-    }
-  };
-
   return (
-    <>
-      <ConfirmDiscardModal
-        isOpen={isDiscardChangesModalOpen}
-        onDiscardHref="/authentication"
-        handleClose={() => setIsDiscardChangesModalOpen(false)}
-      />
-      <div className="flex flex-col gap-8">
-        <div className="grid w-full grid-cols-2 gap-x-12 gap-y-8">
-          <div className="col-span-2 flex flex-col gap-y-4 pt-1 md:col-span-1">
-            <div className="pt-2.5 text-18 font-medium">IdP-provided details for Hangar</div>
-            {OIDC_FORM_FIELDS.map((field) => (
-              <ControllerInput
-                key={field.key}
-                control={control}
-                type={field.type}
-                name={field.key}
-                label={field.label}
-                description={field.description}
-                placeholder={field.placeholder}
-                error={field.error}
-                required={field.required}
-              />
-            ))}
-            <div className="flex flex-col gap-1 pt-4">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={(e) => void handleSubmit(onSubmit)(e)}
-                  loading={isSubmitting}
-                  disabled={!isDirty}
-                >
-                  {isSubmitting ? "Saving" : "Save changes"}
-                </Button>
-                <Link href="/authentication" className={getButtonStyling("secondary", "lg")} onClick={handleGoBack}>
-                  Go back
-                </Link>
-              </div>
-            </div>
-          </div>
-          <div className="col-span-2 md:col-span-1">
-            <div className="flex flex-col gap-y-4 rounded-lg bg-layer-1 px-6 pt-1.5 pb-4">
-              <div className="pt-2 text-18 font-medium">Hangar-provided details for your IdP</div>
-              {OIDC_SERVICE_FIELD.map((field) => (
-                <CopyField key={field.key} label={field.label} url={field.url} description={field.description} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+    <OAuthProviderForm
+      providerName="IdP"
+      control={control}
+      formFields={OIDC_FORM_FIELDS}
+      onSave={onSave}
+      serviceDetails={OIDC_SERVICE_FIELD}
+    />
   );
 }
