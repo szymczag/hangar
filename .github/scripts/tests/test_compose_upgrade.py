@@ -114,7 +114,9 @@ class ComposeUpgradeScriptTests(unittest.TestCase):
         for label in ('"$FROM_VERSION"', "upgraded", "restored"):
             self.assertIn(f"check_http {label}\n", self.script)
         self.assertIn('"$BASE_URL/auth/sign-in/"', self.script)
-        self.assertIn('-H "X-API-Key: $SEED_API_TOKEN"', self.script)
+        self.assertIn('-H "@$SECRETS_DIR/api-key-header"', self.script)
+        # The token stays off curl's command line.
+        self.assertNotIn('-H "X-API-Key: $SEED_API_TOKEN"', self.script)
 
     def test_refuses_to_touch_an_existing_deployment(self):
         self.assertIn("refusing to touch it", self.script)
@@ -159,6 +161,16 @@ class RestoreScriptTests(unittest.TestCase):
         self.assertLess(restore.index('if [ "$failed" -ne 0 ]; then'), restore.index("Restore completed successfully."))
         # An empty archive (a Valkey volume with nothing saved) restores too.
         self.assertIn('cp -a "/restore/${TAR_NAME}/." /vol/', restore)
+
+    def test_the_archive_is_streamed_rather_than_mounted(self):
+        # S28: setup.sh backup writes the archives 0600 in a 0700 folder, which
+        # the container's root cannot read under user-namespace remapping.
+        restore = (REPOSITORY_ROOT / "deployments" / "cli" / "community" / "restore.sh").read_text(encoding="utf-8")
+        single = restore.split("function restoreSingleVolume()", maxsplit=1)[1].split("\nfunction ", maxsplit=1)[0]
+        self.assertIn("docker run --rm -i \\\n", single)
+        self.assertIn("tar -xzf - -C /restore", single)
+        self.assertIn('< "$backupFolder/${restoreFile}.tar.gz"', single)
+        self.assertNotIn(":/backup", single)
 
 
 class ComposeSeedTests(unittest.TestCase):

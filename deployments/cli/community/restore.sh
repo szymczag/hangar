@@ -47,12 +47,15 @@ function restoreSingleVolume() {
         owner="1000:1000"
     fi
 
-    docker run --rm \
+    # The archive is read here and streamed in: setup.sh keeps backups readable
+    # by their owner only (mode 600 in a 700 folder), which the container's
+    # root cannot read under user-namespace remapping.
+    docker run --rm -i \
         -e TAR_NAME="$restoreFile" \
         -e OWNER="$owner" \
         -v "$selectedVolume":"/vol" \
-        -v "$backupFolder":/backup \
-        busybox sh -c 'mkdir -p /restore && tar -xzf "/backup/${TAR_NAME}.tar.gz" -C /restore && cp -a "/restore/${TAR_NAME}/." /vol/ && { [ -z "$OWNER" ] || chown -R "$OWNER" /vol; }'
+        busybox sh -c 'mkdir -p /restore && tar -xzf - -C /restore && cp -a "/restore/${TAR_NAME}/." /vol/ && { [ -z "$OWNER" ] || chown -R "$OWNER" /vol; }' \
+        < "$backupFolder/${restoreFile}.tar.gz"
     
     if [ $? -ne 0 ]; then
         echo "Error: Failed to restore volume ${selectedVolume} from ${restoreFile}.tar.gz"
