@@ -68,6 +68,10 @@ export function ControllerInput<TFieldValues extends FieldValues = FieldValues>(
           hint={description}
           placeholder={placeholder}
           maxLength={maxLength}
+          // A secret field must never receive a saved login: autofilled into an
+          // empty secret, it would be saved over the stored one. "new-password"
+          // is the value browsers honour where "off" is ignored for passwords.
+          autoComplete={type === "password" ? "new-password" : undefined}
           endIcon={
             type === "password" ? (
               <IconButton

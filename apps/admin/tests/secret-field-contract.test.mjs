@@ -137,3 +137,29 @@ test("every provider form built on the shared hook names its secret", () => {
 
   assert.deepEqual(missing, [], `the hook would keep these secrets after a save: ${missing.join(", ")}`);
 });
+
+// A browser offers a saved login to any empty password field it is allowed to
+// fill. Accepted into a secret field, that login would be saved over the stored
+// secret on the next save. "new-password" is the token browsers honour for
+// password fields ("off" is ignored there), so every secret renders with it.
+const CONTROLLER_INPUT = new URL("../components/common/controller-input.tsx", import.meta.url);
+
+test("secret fields render with autocomplete new-password", () => {
+  const input = readFileSync(CONTROLLER_INPUT, "utf8");
+  assert.match(input, /autoComplete=\{type === "password" \? "new-password" : undefined\}/);
+  // The prop has to reach the rendered InputField, not a wrapper around it.
+  const field = input.slice(input.indexOf("<InputField"), input.indexOf("/>", input.indexOf("endIcon=")));
+  assert.match(field, /autoComplete=/);
+});
+
+test("secret fields are only rendered through ControllerInput", () => {
+  const direct = [];
+  for (const [form, source] of formSources()) {
+    // The identity import asks for the administrator's own password to confirm
+    // the import; that is a login, filled as the current password, not a secret.
+    const withoutReauth = source.replace(/type="password"\s*\n\s*autoComplete="current-password"/g, "");
+    if (/type="password"|type=\{[^}]*"password"/.test(withoutReauth)) direct.push(form);
+  }
+
+  assert.deepEqual(direct, [], `these render a password input outside ControllerInput: ${direct.join(", ")}`);
+});
