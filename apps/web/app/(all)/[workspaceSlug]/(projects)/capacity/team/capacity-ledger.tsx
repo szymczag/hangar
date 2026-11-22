@@ -211,7 +211,7 @@ export function CapacityLedger({
               {capacityError ? (
                 <div
                   role="status"
-                  className="bg-warning-secondary border-b border-subtle px-5 py-2 text-11 text-secondary"
+                  className="border-b border-subtle bg-warning-secondary px-5 py-2 text-11 text-secondary"
                 >
                   Availability is being refreshed. The last request was rate limited or temporarily unavailable.
                 </div>
