@@ -799,6 +799,11 @@ jobs:
           cp deployments/cli/community/docker-compose.yml release-assets/
           cp deployments/cli/community/variables.env release-assets/
           cp deployments/swarm/community/swarm.sh release-assets/
+          # Each published installer names its release, so it can refuse to
+          # upgrade to a newer one whose own script it is not.
+          python3 .github/scripts/release_evidence.py stamp-scripts \
+            --git-tag "$GIT_TAG" \
+            release-assets/setup.sh release-assets/swarm.sh
 
           # Resolve every image once; the compose pin, the SBOMs, the manifest
           # and the release notes all read these digests. The images file

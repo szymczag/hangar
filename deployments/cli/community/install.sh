@@ -14,6 +14,12 @@ export PULL_POLICY=${PULL_POLICY:-if_not_present}
 export GH_REPO=szymczag/hangar
 export RELEASE_DOWNLOAD_URL="https://github.com/$GH_REPO/releases/download"
 export FALLBACK_DOWNLOAD_URL="https://raw.githubusercontent.com/$GH_REPO/$BRANCH/deployments/cli/community"
+# The release this copy of the script was published with. The release
+# workflow replaces "unreleased" with it (release_evidence.py stamp-scripts);
+# see checkScriptRelease. The asset it is published as, and its path here.
+SCRIPT_RELEASE=unreleased
+SCRIPT_ASSET=setup.sh
+SCRIPT_PATH=${BASH_SOURCE[0]:-$SCRIPT_ASSET}
 
 CPU_ARCH=$(uname -m)
 OS_NAME=$(uname)
@@ -41,10 +47,14 @@ DEPLOYMENT_NAME=$SERVICE_FOLDER
 #   HANGAR_REQUIRE_SIGNATURE=1 refuses deployment files whose Cosign signature
 #   cannot be checked: no cosign, a release without SHA256SUMS, a branch, or
 #   HANGAR_INSTALL_SOURCE_DIR.
+#   HANGAR_ALLOW_OLD_SCRIPT=1 (or --allow-old-script) lets install and upgrade
+#   go to a release newer than this script, which they otherwise refuse.
+HANGAR_ALLOW_OLD_SCRIPT=${HANGAR_ALLOW_OLD_SCRIPT:-0}
 HANGAR_ASSUME_YES=${HANGAR_ASSUME_YES:-0}
 HANGAR_INSTALL_SOURCE_DIR=${HANGAR_INSTALL_SOURCE_DIR:-}
 HANGAR_RELEASE=${HANGAR_RELEASE:-}
 HANGAR_REQUIRE_SIGNATURE=${HANGAR_REQUIRE_SIGNATURE:-0}
+SCRIPT_RELEASE_WARNED=0
 # Set by upgrade: the directory holding the verified files of the new release.
 STAGED_DEPLOYMENT_DIR=""
 
@@ -334,6 +344,7 @@ function install() {
         APP_RELEASE=$(checkLatestRelease) || exit 1
         export APP_RELEASE
     fi
+    checkScriptRelease "$APP_RELEASE" install || exit 1
 
     local build_image=$(initialize)
 
@@ -775,6 +786,202 @@ function stageDeploymentFiles() {
     downloadReleaseAssets "$dir" docker-compose.yml variables.env "migrate-object-storage.sh?"
 }
 
+# Script release check, the same in install.sh and swarm.sh. The script does
+# not update itself: install and upgrade fetch a release's deployment files,
+# never a newer copy of the script, so a fix that lives in the script reaches
+# a deployment only when its operator runs the new script. A published script
+# knows its own release (SCRIPT_RELEASE, stamped by the release workflow); one
+# from a branch or a checkout says "unreleased" and is not checked.
+
+# Compares releases $1 and $2 (vX.Y.Z, or vX.Y.Z-<pre-release>) and prints -1,
+# 0 or 1 as $1 is older than, the same as, or newer than $2. A pre-release
+# precedes its release. Prints nothing and returns 1 when either is not a
+# release version.
+function compareReleases() {
+    local pattern='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-([0-9A-Za-z.]+))?$'
+    local left=() right=() left_pre right_pre i a b
+    [[ "$1" =~ $pattern ]] || return 1
+    left=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")
+    left_pre=${BASH_REMATCH[5]}
+    [[ "$2" =~ $pattern ]] || return 1
+    right=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")
+    right_pre=${BASH_REMATCH[5]}
+    for i in 0 1 2; do
+        a=$((10#${left[i]}))
+        b=$((10#${right[i]}))
+        if [ "$a" -lt "$b" ]; then echo -1; return 0; fi
+        if [ "$a" -gt "$b" ]; then echo 1; return 0; fi
+    done
+    if [ "$left_pre" == "$right_pre" ]; then echo 0; return 0; fi
+    if [ -z "$left_pre" ]; then echo 1; return 0; fi
+    if [ -z "$right_pre" ]; then echo -1; return 0; fi
+    # Pre-releases compare identifier by identifier: numbers as numbers,
+    # anything else as text; when all shared ones match, fewer comes first.
+    IFS=. read -r -a left <<< "$left_pre"
+    IFS=. read -r -a right <<< "$right_pre"
+    for ((i = 0; i < ${#left[@]} && i < ${#right[@]}; i++)); do
+        a=${left[i]}
+        b=${right[i]}
+        [ "$a" == "$b" ] && continue
+        if [[ "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
+            if [ $((10#$a)) -lt $((10#$b)) ]; then echo -1; else echo 1; fi
+        elif [[ "$a" < "$b" ]]; then
+            echo -1
+        else
+            echo 1
+        fi
+        return 0
+    done
+    if [ ${#left[@]} -lt ${#right[@]} ]; then echo -1; else echo 1; fi
+}
+
+# Returns 0 when release $1 is newer than this script's own release, so it
+# ships a newer script. An unreleased script, or a target that is not a
+# release version ("stable", "local"), is never outdated.
+function scriptIsOutdatedFor() {
+    local order
+    [ "$SCRIPT_RELEASE" == "unreleased" ] && return 1
+    order=$(compareReleases "${1#hangar-}" "$SCRIPT_RELEASE") || return 1
+    [ "$order" == "1" ]
+}
+
+# Prints the commands that replace this script with the verified one of
+# release $1. The certificate identity is written here, as in
+# verifyChecksumSignature, never read from a downloaded file.
+function printScriptUpdateSteps() {
+    local release=$1
+    local tag="hangar-$release"
+    local base="$RELEASE_DOWNLOAD_URL/$tag"
+    local identity="https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/$tag"
+    {
+        echo "Replace it with the $SCRIPT_ASSET of $tag and check it before running it:"
+        echo ""
+        echo "    mkdir -p $tag && cd $tag"
+        echo "    curl -fsSL -O $base/$SCRIPT_ASSET -O $base/SHA256SUMS -O $base/SHA256SUMS.sigstore.json"
+        echo "    cosign verify-blob --bundle SHA256SUMS.sigstore.json \\"
+        echo "        --certificate-identity $identity \\"
+        echo "        --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS"
+        echo "    sha256sum --check --ignore-missing SHA256SUMS   # macOS: shasum -a 256 --check --ignore-missing SHA256SUMS"
+        echo "    cd .. && cp $tag/$SCRIPT_ASSET $SCRIPT_PATH && chmod 755 $SCRIPT_PATH"
+        echo ""
+        echo "or let '$SCRIPT_PATH update-script' download and verify it the same way; it does not run it."
+    } >&2
+}
+
+# install and upgrade (swarm.sh: deploy and upgrade) call this with the
+# release they are about to fetch, action $2, before they change anything.
+# A release newer than the script is refused unless HANGAR_ALLOW_OLD_SCRIPT=1.
+# The same or an older release (a rollback) goes ahead.
+function checkScriptRelease() {
+    local target=${1#hangar-} action=$2
+    scriptIsOutdatedFor "$target" || return 0
+    if [ "$HANGAR_ALLOW_OLD_SCRIPT" == "1" ]; then
+        if [ "$SCRIPT_RELEASE_WARNED" != "1" ]; then
+            echo "WARNING: this $SCRIPT_ASSET is from hangar-$SCRIPT_RELEASE and hangar-$target ships a newer one; continuing with it because HANGAR_ALLOW_OLD_SCRIPT=1. Changes in the newer script are not applied." >&2
+            SCRIPT_RELEASE_WARNED=1
+        fi
+        return 0
+    fi
+    echo "ERROR: this $SCRIPT_ASSET is from release hangar-$SCRIPT_RELEASE, and hangar-$target ships a newer $SCRIPT_ASSET." >&2
+    echo "The script does not update itself, and what the new one changes (how plane.env and its copies are protected," >&2
+    echo "which secrets are replaced, how downloads are verified) applies only when you run it." >&2
+    printScriptUpdateSteps "$target"
+    echo "Then run the $action again with the new script. To $action with this script anyway, set HANGAR_ALLOW_OLD_SCRIPT=1" >&2
+    echo "(or pass --allow-old-script). Nothing has been changed." >&2
+    return 1
+}
+
+# Actions that only run what is installed warn, once, when the deployment is
+# on a release newer than the script; they never refuse.
+function warnScriptRelease() {
+    local installed=${APP_RELEASE#hangar-}
+    scriptIsOutdatedFor "$installed" || return 0
+    [ "$SCRIPT_RELEASE_WARNED" == "1" ] && return 0
+    SCRIPT_RELEASE_WARNED=1
+    echo "WARNING: this $SCRIPT_ASSET is from hangar-$SCRIPT_RELEASE, but the deployment runs hangar-$installed, which ships a newer one." >&2
+    echo "Run '$SCRIPT_PATH update-script', or replace it by hand as the README's 'Upgrading Hangar Version' describes." >&2
+}
+
+# Prints the owner and group of $1 as uid:gid: GNU stat, or BSD stat on macOS.
+function fileOwner() {
+    stat -c '%u:%g' "$1" 2>/dev/null || stat -f '%u:%g' "$1" 2>/dev/null
+}
+
+# update-script: replaces this script with the SCRIPT_ASSET of HANGAR_RELEASE,
+# or of the latest release. It downloads into a scratch directory beside the
+# script, verifies the file with the release's SHA256SUMS and its signature
+# (verifyReleaseAssets, under the same HANGAR_REQUIRE_SIGNATURE policy as the
+# deployment files), checks that it names that release, gives it mode 755 and
+# the old script's owner, and renames it over the old script, so the old one
+# stays whole until then. It never runs the new script.
+function updateScript() {
+    local target order dir staging status owner
+    if [ -n "$HANGAR_RELEASE" ]; then
+        target=${HANGAR_RELEASE#hangar-}
+    else
+        target=$(checkLatestRelease) || return 1
+    fi
+    if ! compareReleases "$target" "$target" >/dev/null; then
+        echo "ERROR: '$target' is not a release version. Nothing has been changed." >&2
+        return 1
+    fi
+    if [ "$SCRIPT_RELEASE" != "unreleased" ]; then
+        order=$(compareReleases "$target" "$SCRIPT_RELEASE")
+        if [ "$order" == "0" ]; then
+            echo "$SCRIPT_PATH is already the $SCRIPT_ASSET of hangar-$target. Nothing has been changed."
+            return 0
+        fi
+        if [ "$order" == "-1" ]; then
+            echo "$SCRIPT_PATH is from hangar-$SCRIPT_RELEASE, newer than hangar-$target, and installs older releases too. Nothing has been changed."
+            return 0
+        fi
+    fi
+    if [ -L "$SCRIPT_PATH" ] || [ ! -f "$SCRIPT_PATH" ]; then
+        echo "ERROR: $SCRIPT_PATH is not a regular file (a symbolic link, or a script read from a pipe), so it is not replaced." >&2
+        printScriptUpdateSteps "$target"
+        return 1
+    fi
+    # The verification functions read the release from APP_RELEASE.
+    local APP_RELEASE=$target
+    if ! releasePublishesChecksums; then
+        echo "ERROR: release hangar-$target publishes no SHA256SUMS, so its $SCRIPT_ASSET cannot be verified. Nothing has been changed." >&2
+        return 1
+    fi
+    dir=$(dirname "$SCRIPT_PATH")
+    # Beside the script, so the final rename stays on one file system.
+    staging=$(mktemp -d "$dir/.update-script.XXXXXX") || return 1
+    status=$(fetchAsset "$RELEASE_DOWNLOAD_URL/hangar-$target/$SCRIPT_ASSET" "$staging/$SCRIPT_ASSET")
+    if [ "$status" != "200" ]; then
+        echo "ERROR: $SCRIPT_ASSET of release hangar-$target could not be downloaded (HTTP $status). $SCRIPT_PATH has not been changed." >&2
+        rm -rf "$staging"
+        return 1
+    fi
+    if ! verifyReleaseAssets "$staging" "$SCRIPT_ASSET"; then
+        echo "$SCRIPT_PATH has not been changed." >&2
+        rm -rf "$staging"
+        return 1
+    fi
+    if ! grep -qxF "SCRIPT_RELEASE=$target" "$staging/$SCRIPT_ASSET"; then
+        echo "ERROR: the $SCRIPT_ASSET of hangar-$target does not say it is from that release. $SCRIPT_PATH has not been changed." >&2
+        rm -rf "$staging"
+        return 1
+    fi
+    owner=$(fileOwner "$SCRIPT_PATH")
+    if ! chmod 755 "$staging/$SCRIPT_ASSET" \
+        || { [ "$(fileOwner "$staging/$SCRIPT_ASSET")" != "$owner" ] && ! chown "$owner" "$staging/$SCRIPT_ASSET" 2>/dev/null; }; then
+        echo "ERROR: could not give the new $SCRIPT_ASSET mode 755 and the owner of $SCRIPT_PATH ($owner); run update-script as that user. $SCRIPT_PATH has not been changed." >&2
+        rm -rf "$staging"
+        return 1
+    fi
+    if ! mv -f "$staging/$SCRIPT_ASSET" "$SCRIPT_PATH"; then
+        echo "ERROR: could not replace $SCRIPT_PATH. It has not been changed." >&2
+        rm -rf "$staging"
+        return 1
+    fi
+    rm -rf "$staging"
+    echo "Replaced $SCRIPT_PATH with the verified $SCRIPT_ASSET of hangar-$target. It has not been run; run '$SCRIPT_PATH upgrade' (or the action you need) now."
+}
+
 function download() {
     local LOCAL_BUILD=$1 staging
     checkSecretKeyRotation || exit 1
@@ -1037,11 +1244,14 @@ function upgrade() {
     if [ "$latest_release" == "$APP_RELEASE" ]; then
         echo ""
         echo "You are already using the latest release"
+        warnScriptRelease
         exit 0
     fi
 
     echo "Latest release: $latest_release"
     echo ""
+    # Before the prompt, so a refusal leaves everything as it was.
+    checkScriptRelease "$latest_release" upgrade || exit 1
 
     # Check for confirmation to upgrade
     if [ "$HANGAR_ASSUME_YES" == "1" ]; then
@@ -1275,14 +1485,17 @@ function askForAction() {
         # askForAction
     elif [ "$ACTION" == "2" ] || [ "$DEFAULT_ACTION" == "start" ];
     then
+        warnScriptRelease
         startServices
         # askForAction
     elif [ "$ACTION" == "3" ] || [ "$DEFAULT_ACTION" == "stop" ];
     then
+        warnScriptRelease
         stopServices
         # askForAction
     elif [ "$ACTION" == "4" ] || [ "$DEFAULT_ACTION" == "restart" ];
     then
+        warnScriptRelease
         restartServices
         # askForAction
     elif [ "$ACTION" == "5" ]  || [ "$DEFAULT_ACTION" == "upgrade" ];
@@ -1299,6 +1512,9 @@ function askForAction() {
     elif [ "$ACTION" == "8" ]  || [ "$DEFAULT_ACTION" == "migrate-storage" ];
     then
         migrateObjectStorage
+    elif [ "$DEFAULT_ACTION" == "update-script" ]
+    then
+        updateScript || exit 1
     elif [ "$ACTION" == "9" ]
     then
         exit 0
@@ -1350,11 +1566,12 @@ if [ -f "$DOCKER_ENV_PATH" ]; then
     fi
 fi
 
-# --yes / -y may appear anywhere among the arguments.
+# --yes / -y and --allow-old-script may appear anywhere among the arguments.
 ACTION_ARGS=()
 for arg in "$@"; do
     case "$arg" in
         --yes|-y) HANGAR_ASSUME_YES=1 ;;
+        --allow-old-script) HANGAR_ALLOW_OLD_SCRIPT=1 ;;
         *) ACTION_ARGS+=("$arg") ;;
     esac
 done
