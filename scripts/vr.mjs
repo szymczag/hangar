@@ -215,7 +215,9 @@ assertBundleIsSameOrigin();
  *
  * One addition, for the suite rather than the application: Playwright applies
  * screenshot.css as an inline <style> (its text, trimmed), which style-src-elem
- * refuses. That exact text is allowed by hash; anything else still is not.
+ * refuses. That exact text is allowed by hash; anything else still is not. The
+ * edge adds the same hash to the policy space sends (VR_SCREENSHOT_STYLE,
+ * Caddyfile.vr), and nothing else of it changes.
  */
 const SCREENSHOT_STYLE = hashSource(readFileSync(path.join(ROOT, "apps/visual-tests/screenshot.css"), "utf8").trim());
 function edgePolicy(app) {
@@ -230,6 +232,7 @@ function edgePolicy(app) {
 }
 env.VR_CSP_WEB = edgePolicy("web");
 env.VR_CSP_ADMIN = edgePolicy("admin");
+env.VR_SCREENSHOT_STYLE = SCREENSHOT_STYLE;
 env.VR_CSP_TRUSTED_TYPES = `${TRUSTED_TYPES_MEASUREMENT}; report-uri ${DEFAULT_REPORT_URI}`;
 
 const EDGE = process.env.VR_HOST_URL ?? "http://localhost:8100";
