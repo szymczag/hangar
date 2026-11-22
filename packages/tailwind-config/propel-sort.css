@@ -1,0 +1,11 @@
+/*
+ * Hangar: the stylesheet oxfmt sorts Tailwind classes against for code on
+ * Propel (.oxfmtrc.json). Not for apps: they import propel.css. The same as
+ * propel.css, except that it reads the Propel styles from @makeplane/propel's
+ * source rather than its dist/, so the format check and the pre-commit hook
+ * work before the package is built (CI's check:format job builds nothing).
+ * src/styles and dist/styles are the same files; tsdown copies them.
+ */
+@import "tailwindcss";
+@import "../makeplane-propel/src/styles/propel.css";
+@import "./propel-rules.css";
