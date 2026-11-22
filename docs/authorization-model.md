@@ -231,11 +231,17 @@ acted on the board in public:
 - No payload carries `created_by` or `updated_by`: on the board settings that is
   whoever published it, on a comment possibly an admin who edited it.
 - The intake a signed-in visitor can read carries no assignees.
+- The vote and reaction lists of a work item (`issues/<id>/votes/` and
+  `issues/<id>/reactions/`, signed in) answer only for a work item the board
+  shows and only while that feature is on, with the same public actor. A work
+  item nobody voted on or reacted to carries `vote_items: []` and
+  `reaction_items: []`, never `null`.
 - A mention in a description or comment keeps its user id in the stored rich
   text, but nothing on the board resolves it to a name: the board renders
   `@user`, or the viewer's own name for a mention of the viewer.
 
-`test_space_public_member_exposure_app.py` pins this (FORK.md, S30). Upstream
+`test_space_public_member_exposure_app.py` and `test_space_public_reactions_app.py`
+pin this (FORK.md, S30). Upstream
 Plane publishes the roster, the assignees and the full actor details by design;
 a sync keeps Hangar's narrower form.
 

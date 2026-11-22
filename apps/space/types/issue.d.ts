@@ -56,7 +56,7 @@ export interface IIssue extends Pick<
   | "estimate_point"
 > {
   comments: TIssuePublicComment[];
-  reaction_items: IIssueReaction[];
+  reaction_items: IIssueReaction[] | null;
   vote_items: IVote[] | null;
 }
 

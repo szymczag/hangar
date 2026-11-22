@@ -416,25 +416,30 @@ class IssueReactionPublicViewSet(BaseViewSet):
     model = IssueReaction
 
     def get_queryset(self):
+        # Fork: the route supplies `anchor` and `issue_id`; this looked the board
+        # up by `slug` and `project_id`, which are never there, so the list was
+        # always empty. Scoped like create(): a board-visible work item only.
         try:
             project_deploy_board = DeployBoard.objects.get(
-                workspace__slug=self.kwargs.get("slug"),
-                project_id=self.kwargs.get("project_id"),
+                anchor=self.kwargs.get("anchor"),
+                entity_name="project",
                 is_disabled=False,
             )
-            if project_deploy_board.is_reactions_enabled:
-                return (
-                    super()
-                    .get_queryset()
-                    .filter(workspace__slug=self.kwargs.get("slug"))
-                    .filter(project_id=self.kwargs.get("project_id"))
-                    .filter(issue_id=self.kwargs.get("issue_id"))
-                    .order_by("-created_at")
-                    .distinct()
-                )
-            return IssueReaction.objects.none()
         except DeployBoard.DoesNotExist:
             return IssueReaction.objects.none()
+        issue_id = self.kwargs.get("issue_id")
+        if not project_deploy_board.is_reactions_enabled or not _issue_in_board_scope(issue_id, project_deploy_board):
+            return IssueReaction.objects.none()
+        return (
+            super()
+            .get_queryset()
+            .filter(workspace_id=project_deploy_board.workspace_id)
+            .filter(project_id=project_deploy_board.project_id)
+            .filter(issue_id=issue_id)
+            .select_related("actor")
+            .order_by("-created_at")
+            .distinct()
+        )
 
     def create(self, request, anchor, issue_id):
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
@@ -626,23 +631,28 @@ class IssueVotePublicViewSet(BaseViewSet):
     serializer_class = PublicIssueVoteSerializer
 
     def get_queryset(self):
+        # Fork: the anchor was matched against the workspace slug, so the list
+        # was always empty. Scoped like create(): a board-visible work item only.
         try:
             project_deploy_board = DeployBoard.objects.get(
-                workspace__slug=self.kwargs.get("anchor"),
+                anchor=self.kwargs.get("anchor"),
                 entity_name="project",
                 is_disabled=False,
             )
-            if project_deploy_board.is_votes_enabled:
-                return (
-                    super()
-                    .get_queryset()
-                    .filter(issue_id=self.kwargs.get("issue_id"))
-                    .filter(workspace_id=project_deploy_board.workspace_id)
-                    .filter(project_id=project_deploy_board.project_id)
-                )
-            return IssueVote.objects.none()
         except DeployBoard.DoesNotExist:
             return IssueVote.objects.none()
+        issue_id = self.kwargs.get("issue_id")
+        if not project_deploy_board.is_votes_enabled or not _issue_in_board_scope(issue_id, project_deploy_board):
+            return IssueVote.objects.none()
+        return (
+            super()
+            .get_queryset()
+            .filter(issue_id=issue_id)
+            .filter(workspace_id=project_deploy_board.workspace_id)
+            .filter(project_id=project_deploy_board.project_id)
+            .select_related("actor")
+            .order_by("created_at")
+        )
 
     def create(self, request, anchor, issue_id):
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project", is_disabled=False)
@@ -824,31 +834,39 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
             )
             .prefetch_related(Prefetch("votes", queryset=IssueVote.objects.select_related("actor")))
             .annotate(
-                vote_items=ArrayAgg(
-                    vote_item, order_by=vote_item,
-                    filter=Case(
-                        When(
-                            votes__isnull=False,
-                            votes__deleted_at__isnull=True,
-                            then=True,
+                # Fork: an item nobody voted on or reacted to answers [] rather
+                # than null (ArrayAgg over no rows); Spaces spreads these lists.
+                vote_items=Coalesce(
+                    ArrayAgg(
+                        vote_item, order_by=vote_item,
+                        filter=Case(
+                            When(
+                                votes__isnull=False,
+                                votes__deleted_at__isnull=True,
+                                then=True,
+                            ),
+                            default=False,
+                            output_field=JSONField(),
                         ),
-                        default=False,
-                        output_field=JSONField(),
+                        distinct=True,
                     ),
-                    distinct=True,
+                    Value([], output_field=ArrayField(JSONField())),
                 ),
-                reaction_items=ArrayAgg(
-                    reaction_item, order_by=reaction_item,
-                    filter=Case(
-                        When(
-                            issue_reactions__isnull=False,
-                            issue_reactions__deleted_at__isnull=True,
-                            then=True,
+                reaction_items=Coalesce(
+                    ArrayAgg(
+                        reaction_item, order_by=reaction_item,
+                        filter=Case(
+                            When(
+                                issue_reactions__isnull=False,
+                                issue_reactions__deleted_at__isnull=True,
+                                then=True,
+                            ),
+                            default=False,
+                            output_field=JSONField(),
                         ),
-                        default=False,
-                        output_field=JSONField(),
+                        distinct=True,
                     ),
-                    distinct=True,
+                    Value([], output_field=ArrayField(JSONField())),
                 ),
             )
             .values(
