@@ -10,12 +10,23 @@ import { computedFn } from "mobx-utils";
 import { v4 as uuidv4 } from "uuid";
 // plane imports
 import { SitesFileService, SitesIssueService } from "@plane/services";
-import type { TFileSignedURLResponse, TIssuePublicComment } from "@plane/types";
+import type { ActorDetail, TFileSignedURLResponse, TIssuePublicComment } from "@plane/types";
 import { EFileAssetType } from "@plane/types";
 // store
 import type { RootStore } from "@/store/root.store";
 // types
-import type { IIssue, IPeekMode, IVote } from "@/types/issue";
+import type { IIssue, IIssueReaction, IPeekMode, IVote } from "@/types/issue";
+
+// The reaction and vote list endpoints answer with `actor_detail`; the work item
+// carries `actor_details`. A reload after a failed write goes through these.
+type TPublicReactionRow = { reaction: string; actor_detail: ActorDetail };
+type TPublicVoteRow = { vote: IVote["vote"]; actor_detail: ActorDetail };
+
+const toReactionItems = (rows: TPublicReactionRow[] | null | undefined): IIssueReaction[] =>
+  (rows ?? []).map((row) => ({ reaction: row.reaction, actor_details: row.actor_detail }));
+
+const toVoteItems = (rows: TPublicVoteRow[] | null | undefined): IVote[] =>
+  (rows ?? []).map((row) => ({ vote: row.vote, actor_details: row.actor_detail }));
 
 export interface IIssueDetailStore {
   loader: boolean;
@@ -350,7 +361,8 @@ export class IssueDetailStore implements IIssueDetailStore {
           this.details,
           [issueID, "reaction_items"],
           [
-            ...this.details[issueID].reaction_items,
+            // null for a work item nobody had reacted to (servers before the fix)
+            ...(this.details[issueID]?.reaction_items ?? []),
             {
               reaction: reactionHex,
               actor_details: this.rootStore.user.currentActor,
@@ -363,18 +375,18 @@ export class IssueDetailStore implements IIssueDetailStore {
         reaction: reactionHex,
       });
     } catch (_error) {
-      console.log("Failed to add issue vote");
+      console.log("Failed to add issue reaction");
       const issueReactions = await this.issueService.listReactions(anchor, issueID);
       runInAction(() => {
-        set(this.details, [issueID, "reaction_items"], issueReactions);
+        set(this.details, [issueID, "reaction_items"], toReactionItems(issueReactions));
       });
     }
   };
 
   removeIssueReaction = async (anchor: string, issueID: string, reactionHex: string) => {
     try {
-      const newReactions = this.details[issueID].reaction_items.filter(
-        (_r) => !(_r.reaction === reactionHex && _r.actor_details.id === this.rootStore.user.data?.id)
+      const newReactions = (this.details[issueID]?.reaction_items ?? []).filter(
+        (_r) => !(_r.reaction === reactionHex && _r.actor_details?.id === this.rootStore.user.data?.id)
       );
 
       runInAction(() => {
@@ -386,7 +398,7 @@ export class IssueDetailStore implements IIssueDetailStore {
       console.log("Failed to remove issue reaction");
       const reactions = await this.issueService.listReactions(anchor, issueID);
       runInAction(() => {
-        set(this.details, [issueID, "reaction_items"], reactions);
+        set(this.details, [issueID, "reaction_items"], toReactionItems(reactions));
       });
     }
   };
@@ -402,7 +414,7 @@ export class IssueDetailStore implements IIssueDetailStore {
       vote: data.vote,
     };
 
-    const filteredVotes = (this.details[issueID].vote_items ?? []).filter(
+    const filteredVotes = (this.details[issueID]?.vote_items ?? []).filter(
       (v) => v.actor_details?.id !== this.rootStore.user.data?.id
     );
 
@@ -419,13 +431,13 @@ export class IssueDetailStore implements IIssueDetailStore {
       const issueVotes = await this.issueService.listVotes(anchor, issueID);
 
       runInAction(() => {
-        set(this.details, [issueID, "vote_items"], issueVotes);
+        set(this.details, [issueID, "vote_items"], toVoteItems(issueVotes));
       });
     }
   };
 
   removeIssueVote = async (anchor: string, issueID: string) => {
-    const newVotes = (this.details[issueID].vote_items ?? []).filter(
+    const newVotes = (this.details[issueID]?.vote_items ?? []).filter(
       (v) => v.actor_details?.id !== this.rootStore.user.data?.id
     );
 
@@ -440,7 +452,7 @@ export class IssueDetailStore implements IIssueDetailStore {
       const issueVotes = await this.issueService.listVotes(anchor, issueID);
 
       runInAction(() => {
-        set(this.details, [issueID, "vote_items"], issueVotes);
+        set(this.details, [issueID, "vote_items"], toVoteItems(issueVotes));
       });
     }
   };
