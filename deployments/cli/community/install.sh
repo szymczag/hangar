@@ -1299,6 +1299,11 @@ function upgrade() {
     fi
 
     echo "***** PLEASE VALIDATE AND START SERVICES ****"
+    # The upgrade leaves every service stopped, so that plane.env can be
+    # checked against the new release first; name the command that starts it.
+    echo "The services are stopped. Check $DOCKER_ENV_PATH for the new release's settings, then start them with:"
+    echo ""
+    echo "    $SCRIPT_PATH start"
 }
 function viewSpecificLogs(){
     local SERVICE_NAME=$1

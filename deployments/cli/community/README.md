@@ -477,16 +477,31 @@ It is always advised to keep Hangar up to date with the latest release.
 > installer itself only takes effect once you run it. In particular, an upgrade
 > to hangar-v0.3.0 or later run with the hangar-v0.2.2 script, or an older one,
 > installs the new images but leaves `plane.env` and `plane.env.bak` at the
-> umask's mode, readable by other local users. Upgrade in three steps:
+> umask's mode, readable by other local users. Upgrade in four steps:
 >
-> 1. Replace `setup.sh` with the new release's script and verify it: run
->    `./setup.sh update-script` (below), or download it by hand (see
->    [Downloading Latest Release](#downloading-latest-release); for Swarm, its
->    `swarm.sh` saved as `setup.sh`) and check it as
->    [Verifying release assets](../../../README.md#verifying-release-assets)
->    describes.
-> 2. Run `./setup.sh upgrade`.
-> 3. Check that `stat -c '%a' plane-app/plane.env` (`stat -f '%Lp'` on macOS)
+> 1. Replace `setup.sh` with the new release's script, and verify it before it
+>    replaces the old one. Run `./setup.sh update-script` (below), or, with a
+>    script that does not have that action yet (up to hangar-v0.3.0), download
+>    the new script together with the release's `SHA256SUMS` and
+>    `SHA256SUMS.sigstore.json` into a folder of its own, check them with
+>    `cosign verify-blob` and `sha256sum`, and only then copy the script over
+>    the old one, as the commands under
+>    [An outdated script refuses to upgrade](#upgrading-hangar-version) below
+>    show. For Swarm, download `swarm.sh` instead and copy it over your
+>    `setup.sh`. Do not download the new script straight over the working one
+>    (`curl -o setup.sh`): a download that fails or does not verify would then
+>    have replaced the only script you have.
+> 2. Run `./setup.sh upgrade`. It checks the new release before it stops
+>    anything. On Docker Compose it then stops the services, installs the new
+>    release's files and **leaves every service stopped**: it ends with
+>    `PLEASE VALIDATE AND START SERVICES` (scripts from releases after
+>    hangar-v0.4.0-rc.1 also print the command that starts them). On Swarm it
+>    redeploys the stack itself.
+> 3. Docker Compose: check `plane-app/plane.env` for the new release's settings,
+>    then start the services with `./setup.sh start`. Hangar stays down until
+>    you do. Swarm: nothing to do, unless you change `plane.env`; then run
+>    `./setup.sh redeploy`.
+> 4. Check that `stat -c '%a' plane-app/plane.env` (`stat -f '%Lp'` on macOS)
 >    prints `600`. A script from hangar-v0.3.0 or later prints
 >    `NOTICE: restricted to the owner, ...` on its first run, whatever the action,
 >    when it tightens anything, and nothing once everything is owner-only. If you
@@ -512,7 +527,16 @@ It is always advised to keep Hangar up to date with the latest release.
 > sha256sum --check --ignore-missing SHA256SUMS # macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
 > cd .. && cp hangar-vX.Y.Z/setup.sh ./setup.sh && chmod 755 ./setup.sh
 > ./setup.sh upgrade
+> ./setup.sh start # Docker Compose: the upgrade leaves the services stopped
 > ```
+>
+> Run them in the folder that holds `setup.sh` and `plane-app/`. If
+> `cosign verify-blob` or `sha256sum --check` fails, stop there: the old
+> `setup.sh` has not been touched. For Swarm the script asset is `swarm.sh`
+> (`curl ... -O .../hangar-vX.Y.Z/swarm.sh`, then
+> `cp hangar-vX.Y.Z/swarm.sh ./setup.sh`), and the `start` line does not
+> apply. The script's own refusal prints these commands with the release and
+> paths filled in.
 >
 > | Action                                                             | Target release newer than the script | Same or older (rollback) |
 > | ------------------------------------------------------------------ | ------------------------------------ | ------------------------ |
@@ -538,7 +562,8 @@ It is always advised to keep Hangar up to date with the latest release.
 > release, and renames it over the old script with mode `755` and the old
 > script's owner. The old script stays whole until that rename, so a failed
 > check leaves it as it was. It does not run the new script; run
-> `./setup.sh upgrade` yourself afterwards. It changes nothing when the script
+> `./setup.sh upgrade` yourself afterwards, and on Docker Compose
+> `./setup.sh start` after that. It changes nothing when the script
 > is already from that release or a newer one, and refuses a script reached
 > through a symbolic link and releases up to hangar-v0.1.0, which publish no
 > `SHA256SUMS`; use the commands above then.
@@ -619,17 +644,23 @@ Select a Action you want to perform:
 Action [2]: 5
 ```
 
-By choosing this, it will stop the services and then will download the latest `docker-compose.yaml` and `plane.env`.
+By choosing this, it downloads and verifies the new release, then stops the services and installs the new `docker-compose.yaml` and `plane.env` (your previous `plane.env` is kept as `plane.env.bak`).
 
 You must expect the below message
 
 ![Alt text](images/upgrade.png)
 
-The script exits when the upgrade is done.
+The script exits when the upgrade is done and **leaves every service stopped**. It ends with `PLEASE VALIDATE AND START SERVICES`; a script from a release after hangar-v0.4.0-rc.1 also prints the command that starts them:
+
+```bash
+The services are stopped. Check /path/to/plane-app/plane.env for the new release's settings, then start them with:
+
+    ./setup.sh start
+```
 
 > It is very important for you to validate the `plane.env` for the new changes.
 
-Once done with making changes in `plane.env` file, jump on to `Start Server`
+Once done with making changes in `plane.env` file, start the services with `./setup.sh start` (or select `2` from the menu, as in [Start Server](#continue-with-setup---start-server-docker-compose)). Hangar stays down until you do.
 
 #### Docker Swarm
 
