@@ -16,6 +16,8 @@ export type VisualFixtures = {
   /** Display names of the seeded trainers, in ledger order. */
   trainers: string[];
   copyTarget: { id: string };
+  /** The published board (space): its anchor, its work items in order, and the one the peek opens. */
+  publishedBoard: { anchor: string; workItems: string[]; peekId: string };
   /** Names of the seeded work items, in the order they were created. */
   workItems: string[];
   /** Custom property names on the Task type, in sort order. */

@@ -25,8 +25,10 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from plane.db.models import (
+    DeployBoard,
     Issue,
     IssueType,
+    IssueLabel,
     IssueSequence,
     Label,
     Profile,
@@ -85,6 +87,11 @@ ADMIN, MEMBER = 20, 15
 WORKSPACE_ID = uuid.UUID("a0000000-0000-4000-8000-000000000001")
 PROJECT_ID = uuid.UUID("a0000000-0000-4000-8000-000000000002")
 COPY_TARGET_ID = uuid.UUID("a0000000-0000-4000-8000-000000000003")
+# The project behind the published board (apps/space). It has no members, so no
+# signed-in story sees it in a sidebar or a project list; only the board does.
+PUBLISHED_PROJECT_ID = uuid.UUID("a0000000-0000-4000-8000-000000000004")
+# `get_anchor` is a random hex string, and the board's URL is its anchor.
+PUBLISHED_ANCHOR = "a0000000000040008000000000000004"
 # 24 hex characters, the shape `secrets.token_hex(12)` produces.
 INSTANCE_ID = "a00000000000400080000000"
 
@@ -153,12 +160,20 @@ class Command(BaseCommand):
         workshop = self._workshop(workspace, project, users)
         self._maintenance_notice()
         copy_target = self._copy_in_flight(workspace, project, users)
+        published = self._published_board(workspace, users["admin"])
 
         manifest = {
             "clock": CLOCK.isoformat().replace("+00:00", "Z"),
             "workspace": {"slug": workspace.slug, "id": str(workspace.id)},
             "project": {"id": str(project.id), "identifier": project.identifier},
             "copyTarget": {"id": str(copy_target.id)},
+            # The published board: its anchor, the work items it lists in order,
+            # and the one the peek story opens.
+            "publishedBoard": {
+                "anchor": published.anchor,
+                "workItems": [name for name, _, _, _ in Command.PUBLISHED_WORK_ITEMS],
+                "peekId": str(Issue.objects.get(project_id=PUBLISHED_PROJECT_ID, sequence_id=1).id),
+            },
             # The Workshop work item, so the session specs address it by id rather
             # than by hunting for its name in a list.
             "workshop": {"id": str(workshop.id), "name": workshop.name, "sessions": 3},
@@ -728,3 +743,83 @@ class Command(BaseCommand):
             started_at=CLOCK,
         )
         return target
+
+    # The work items on the published board: name, priority, label names, and
+    # the due date as days from CLOCK (None for none). Overdue, due today and
+    # due later each colour the date differently; one carries both labels so
+    # the chip shows a count.
+    PUBLISHED_WORK_ITEMS = (
+        ("Publish the release notes", "urgent", ("release",), -2),
+        ("Check the public roadmap", "high", ("docs", "release"), 0),
+        ("Answer the board comments", "medium", ("docs",), 5),
+        ("Tidy the changelog", "none", (), None),
+    )
+
+    def _published_board(self, workspace, owner) -> DeployBoard:
+        """A project published to the web, for the space stories.
+
+        No `ProjectMember` rows, and secret: the signed-in stories photograph
+        sidebars and project lists, and a project nobody belongs to appears in
+        none of them. Its work items have no assignees, so the board does not
+        depend on which properties it shows to prove anything about them; the
+        visibility decision is `apps/space/helpers/display-properties.helper.ts`.
+        """
+        project, created = Project.objects.get_or_create(
+            id=PUBLISHED_PROJECT_ID,
+            defaults={
+                "name": "Published board",
+                "identifier": "PUB",
+                "workspace": workspace,
+                "created_by": owner,
+                "network": 0,
+            },
+        )
+        if created:
+            ensure_project_system_types(project)
+            states = [
+                State.objects.create(
+                    name=name, color=color, group=group, project=project, workspace=workspace, sequence=sequence
+                )
+                for name, color, group, sequence in (
+                    ("Backlog", "#6b7280", "backlog", 1000),
+                    ("In progress", "#f59e0b", "started", 2000),
+                    ("Done", "#16a34a", "completed", 3000),
+                )
+            ]
+            labels = {
+                name: Label.objects.create(
+                    name=name, color=color, project=project, workspace=workspace, sort_order=index
+                )
+                for index, (name, color) in enumerate((("docs", "#2563eb"), ("release", "#db2777")), start=1)
+            }
+            for index, (name, priority, label_names, due_in) in enumerate(Command.PUBLISHED_WORK_ITEMS, start=1):
+                issue = Issue.objects.create(
+                    name=name,
+                    project=project,
+                    workspace=workspace,
+                    state=states[(index - 1) % 2],
+                    priority=priority,
+                    target_date=None if due_in is None else (CLOCK + timedelta(days=due_in)).date(),
+                    created_by=owner,
+                )
+                stamped = CLOCK - timedelta(days=index)
+                Issue.objects.filter(pk=issue.pk).update(created_at=stamped, updated_at=stamped, sequence_id=index)
+                IssueSequence.objects.filter(issue=issue).update(created_at=stamped, updated_at=stamped, sequence=index)
+                for label_name in label_names:
+                    IssueLabel.objects.create(
+                        issue=issue, label=labels[label_name], project=project, workspace=workspace
+                    )
+        board, _ = DeployBoard.objects.get_or_create(
+            entity_name="project",
+            entity_identifier=project.id,
+            defaults={
+                "project": project,
+                "workspace": workspace,
+                "anchor": PUBLISHED_ANCHOR,
+                "view_props": {"list": True, "kanban": True},
+                "is_comments_enabled": True,
+                "is_reactions_enabled": True,
+                "is_votes_enabled": True,
+            },
+        )
+        return board
