@@ -158,16 +158,23 @@ def issue_on_results(
         default=None,
         output_field=JSONField(),
     )
+    # Fork: [] rather than null for an item nobody voted on or reacted to.
     issues = issues.annotate(
-        vote_items=ArrayAgg(
-            vote_item, order_by=vote_item,
-            filter=Q(votes__isnull=False, votes__deleted_at__isnull=True),
-            distinct=True,
+        vote_items=Coalesce(
+            ArrayAgg(
+                vote_item, order_by=vote_item,
+                filter=Q(votes__isnull=False, votes__deleted_at__isnull=True),
+                distinct=True,
+            ),
+            Value([], output_field=ArrayField(JSONField())),
         ),
-        reaction_items=ArrayAgg(
-            reaction_item, order_by=reaction_item,
-            filter=Q(issue_reactions__isnull=False, issue_reactions__deleted_at__isnull=True),
-            distinct=True,
+        reaction_items=Coalesce(
+            ArrayAgg(
+                reaction_item, order_by=reaction_item,
+                filter=Q(issue_reactions__isnull=False, issue_reactions__deleted_at__isnull=True),
+                distinct=True,
+            ),
+            Value([], output_field=ArrayField(JSONField())),
         ),
     ).values(*required_fields, "vote_items", "reaction_items")
 
