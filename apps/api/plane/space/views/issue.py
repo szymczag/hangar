@@ -47,12 +47,14 @@ from plane.space.utils.grouper import (
 
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
-from plane.app.serializers import (
-    CommentReactionSerializer,
-    IssueCommentSerializer,
-    IssueReactionSerializer,
-    IssueVoteSerializer,
+from plane.app.serializers import IssueCommentSerializer
+from plane.space.serializer.public import (
+    PublicCommentReactionSerializer,
+    PublicIssueCommentSerializer,
+    PublicIssueReactionSerializer,
+    PublicIssueVoteSerializer,
 )
+from plane.space.utils.people import is_person_grouping, public_filter_params, public_order_by
 from plane.db.models import (
     Issue,
     IssueComment,
@@ -107,8 +109,9 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):
-        filters = issue_filters(request.query_params, "GET")
-        order_by_param = request.GET.get("order_by", "-created_at")
+        # Fork (see FORK.md, S30): no filter, grouping or ordering keyed on a person.
+        filters = issue_filters(public_filter_params(request.query_params), "GET")
+        order_by_param = public_order_by(request.GET.get("order_by", "-created_at"))
 
         deploy_board = DeployBoard.objects.filter(
             anchor=anchor,
@@ -124,7 +127,7 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
         issue_queryset = (
             Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id)
             .select_related("workspace", "project", "state", "parent")
-            .prefetch_related("assignees", "labels", "issue_module__module")
+            .prefetch_related("labels", "issue_module__module")
             .prefetch_related(
                 Prefetch(
                     "issue_reactions",
@@ -170,6 +173,11 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
         # Group by
         group_by = request.GET.get("group_by", False)
         sub_group_by = request.GET.get("sub_group_by", False)
+        if is_person_grouping(group_by, sub_group_by):
+            return Response(
+                {"error": "A published board cannot be grouped by a person"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # issue queryset
         issue_queryset = issue_queryset_grouper(queryset=issue_queryset, group_by=group_by, sub_group_by=sub_group_by)
@@ -249,7 +257,7 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
 
 
 class IssueCommentPublicViewSet(BaseViewSet):
-    serializer_class = IssueCommentSerializer
+    serializer_class = PublicIssueCommentSerializer
     model = IssueComment
 
     filterset_fields = ["issue__id", "workspace__id"]
@@ -336,7 +344,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
                     project_id=project_deploy_board.project_id, member=request.user
                 )
 
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(PublicIssueCommentSerializer(serializer.instance).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, anchor, issue_id, pk):
@@ -370,7 +378,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
                 current_instance=current_instance,
                 epoch=int(timezone.now().timestamp()),
             )
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(PublicIssueCommentSerializer(serializer.instance).data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, anchor, issue_id, pk):
@@ -404,7 +412,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
 
 
 class IssueReactionPublicViewSet(BaseViewSet):
-    serializer_class = IssueReactionSerializer
+    serializer_class = PublicIssueReactionSerializer
     model = IssueReaction
 
     def get_queryset(self):
@@ -441,7 +449,7 @@ class IssueReactionPublicViewSet(BaseViewSet):
         if not _issue_in_board_scope(issue_id, project_deploy_board):
             return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = IssueReactionSerializer(data=request.data)
+        serializer = PublicIssueReactionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(
                 project_id=project_deploy_board.project_id,
@@ -501,7 +509,7 @@ class IssueReactionPublicViewSet(BaseViewSet):
 
 
 class CommentReactionPublicViewSet(BaseViewSet):
-    serializer_class = CommentReactionSerializer
+    serializer_class = PublicCommentReactionSerializer
     model = CommentReaction
 
     def get_queryset(self):
@@ -542,7 +550,7 @@ class CommentReactionPublicViewSet(BaseViewSet):
         if not _comment_in_board_scope(comment_id, project_deploy_board):
             return Response({"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = CommentReactionSerializer(data=request.data)
+        serializer = PublicCommentReactionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(
                 project_id=project_deploy_board.project_id,
@@ -615,7 +623,7 @@ class CommentReactionPublicViewSet(BaseViewSet):
 
 class IssueVotePublicViewSet(BaseViewSet):
     model = IssueVote
-    serializer_class = IssueVoteSerializer
+    serializer_class = PublicIssueVoteSerializer
 
     def get_queryset(self):
         try:
@@ -674,7 +682,7 @@ class IssueVotePublicViewSet(BaseViewSet):
             current_instance=None,
             epoch=int(timezone.now().timestamp()),
         )
-        serializer = IssueVoteSerializer(issue_vote)
+        serializer = PublicIssueVoteSerializer(issue_vote)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, anchor, issue_id):
@@ -708,6 +716,9 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
             is_disabled=False,
         )
 
+        # Fork (see FORK.md, S30): voters and reactors appear as the public actor
+        # (id, display name, avatar, bot flag), and the work item carries no
+        # assignee_ids or created_by.
         vote_item = Case(
             When(
                 votes__isnull=False,
@@ -716,9 +727,6 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                     vote=F("votes__vote"),
                     actor_details=JSONObject(
                         id=F("votes__actor__id"),
-                        first_name=F("votes__actor__first_name"),
-                        last_name=F("votes__actor__last_name"),
-                        avatar=F("votes__actor__avatar"),
                         avatar_url=Case(
                             When(
                                 votes__actor__avatar_asset__isnull=False,
@@ -736,6 +744,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                             output_field=CharField(),
                         ),
                         display_name=F("votes__actor__display_name"),
+                        is_bot=F("votes__actor__is_bot"),
                     ),
                 ),
             ),
@@ -750,26 +759,24 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                     reaction=F("issue_reactions__reaction"),
                     actor_details=JSONObject(
                         id=F("issue_reactions__actor__id"),
-                        first_name=F("issue_reactions__actor__first_name"),
-                        last_name=F("issue_reactions__actor__last_name"),
-                        avatar=F("issue_reactions__actor__avatar"),
                         avatar_url=Case(
                             When(
-                                votes__actor__avatar_asset__isnull=False,
+                                issue_reactions__actor__avatar_asset__isnull=False,
                                 then=Concat(
                                     Value("/api/assets/v2/static/"),
-                                    Cast("votes__actor__avatar_asset", CharField()),
+                                    Cast("issue_reactions__actor__avatar_asset", CharField()),
                                     Value("/"),
                                 ),
                             ),
                             When(
-                                votes__actor__avatar_asset__isnull=True,
-                                then=F("votes__actor__avatar"),
+                                issue_reactions__actor__avatar_asset__isnull=True,
+                                then=F("issue_reactions__actor__avatar"),
                             ),
                             default=Value(None),
                             output_field=CharField(),
                         ),
                         display_name=F("issue_reactions__actor__display_name"),
+                        is_bot=F("issue_reactions__actor__is_bot"),
                     ),
                 ),
             ),
@@ -783,7 +790,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 project_id=deploy_board.project_id,
             )
             .select_related("workspace", "project", "state", "parent")
-            .prefetch_related("assignees", "labels", "issue_module__module")
+            .prefetch_related("labels", "issue_module__module")
             .annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
@@ -795,18 +802,6 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                         "labels__id", order_by="labels__id",
                         distinct=True,
                         filter=Q(~Q(labels__id__isnull=True) & Q(label_issue__deleted_at__isnull=True)),
-                    ),
-                    Value([], output_field=ArrayField(UUIDField())),
-                ),
-                assignee_ids=Coalesce(
-                    ArrayAgg(
-                        "assignees__id", order_by="assignees__id",
-                        distinct=True,
-                        filter=Q(
-                            ~Q(assignees__id__isnull=True)
-                            & Q(assignees__member_project__is_active=True)
-                            & Q(issue_assignee__deleted_at__isnull=True)
-                        ),
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
@@ -867,7 +862,6 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 "description_binary",
                 "module_ids",
                 "label_ids",
-                "assignee_ids",
                 "estimate_point",
                 "priority",
                 "start_date",
@@ -876,7 +870,6 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 "project_id",
                 "parent_id",
                 "cycle_id",
-                "created_by",
                 "state__group",
                 "vote_items",
                 "reaction_items",

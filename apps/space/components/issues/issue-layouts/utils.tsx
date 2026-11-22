@@ -16,14 +16,11 @@ import type {
   IIssueDisplayProperties,
   TGroupedIssues,
 } from "@plane/types";
-// ui
-import { Avatar } from "@makeplane/propel/components/avatar";
 // components
 // constants
 // stores
 import type { ICycleStore } from "@/store/cycle.store";
 import type { IIssueLabelStore } from "@/store/label.store";
-import type { IIssueMemberStore } from "@/store/members.store";
 import type { IIssueModuleStore } from "@/store/module.store";
 import type { IStateStore } from "@/store/state.store";
 
@@ -36,7 +33,6 @@ export const getGroupByColumns = (
   module: IIssueModuleStore,
   label: IIssueLabelStore,
   projectState: IStateStore,
-  member: IIssueMemberStore,
   includeNone?: boolean
 ): IGroupByColumn[] | undefined => {
   switch (groupBy) {
@@ -50,10 +46,6 @@ export const getGroupByColumns = (
       return getPriorityColumns();
     case "labels":
       return getLabelsColumns(label) as any;
-    case "assignees":
-      return getAssigneeColumns(member);
-    case "created_by":
-      return getCreatedByColumns(member) as any;
     default:
       if (includeNone) return [{ id: `All Issues`, name: `All work items`, payload: {}, icon: undefined }];
   }
@@ -157,48 +149,6 @@ const getLabelsColumns = (label: IIssueLabelStore) => {
       />
     ),
     payload: columnLabel?.id === "None" ? {} : { label_ids: [columnLabel.id] },
-  }));
-};
-
-const getAssigneeColumns = (memberStore: IIssueMemberStore) => {
-  const { members } = memberStore;
-
-  if (!members) return;
-
-  const assigneeColumns: any = members.map((member) => ({
-    id: member.id,
-    name: member?.member__display_name || "",
-    icon: (
-      <Avatar
-        size="xs"
-        alt={member?.member__display_name}
-        fallback={member?.member__display_name?.[0]?.toUpperCase()}
-      />
-    ),
-    payload: { assignee_ids: [member.id] },
-  }));
-
-  assigneeColumns.push({ id: "None", name: "None", icon: <Avatar size="xs" />, payload: {} });
-
-  return assigneeColumns;
-};
-
-const getCreatedByColumns = (memberStore: IIssueMemberStore) => {
-  const { members } = memberStore;
-
-  if (!members) return;
-
-  return members.map((member) => ({
-    id: member.id,
-    name: member?.member__display_name || "",
-    icon: (
-      <Avatar
-        size="xs"
-        alt={member?.member__display_name}
-        fallback={member?.member__display_name?.[0]?.toUpperCase()}
-      />
-    ),
-    payload: {},
   }));
 };
 

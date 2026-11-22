@@ -168,7 +168,7 @@ class TestPublicBoardProjectScope:
     Requests are authenticated so the anonymous rate limit does not apply.
     """
 
-    @pytest.mark.parametrize("suffix", ["meta/", "settings/", "states/", "members/", f"issues/{uuid4()}/comments/"])
+    @pytest.mark.parametrize("suffix", ["meta/", "settings/", "states/", "labels/", f"issues/{uuid4()}/comments/"])
     def test_mismatched_board_is_not_found(self, session_client, other_project, board, suffix):
         DeployBoard.objects.filter(pk=board.pk).update(entity_identifier=other_project.id)
 
@@ -176,7 +176,7 @@ class TestPublicBoardProjectScope:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @pytest.mark.parametrize("suffix", ["meta/", "settings/", "states/", "members/"])
+    @pytest.mark.parametrize("suffix", ["meta/", "settings/", "states/", "labels/"])
     def test_board_is_served(self, session_client, board, suffix):
         response = session_client.get(f"/api/public/anchor/{board.anchor}/{suffix}")
 

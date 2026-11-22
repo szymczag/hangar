@@ -21,8 +21,9 @@ from plane.app.serializers import (
     IssueSerializer,
     IntakeIssueSerializer,
     IssueCreateSerializer,
-    IssueStateIntakeSerializer,
 )
+from plane.space.serializer.public import PublicIntakeIssueSerializer
+from plane.space.utils.people import public_filter_params
 from plane.utils.content_validator import validate_html_content
 from plane.ext.services import project_default_issue_type
 from plane.utils.issue_filters import issue_filters
@@ -68,7 +69,9 @@ class IntakeIssuePublicViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        filters = issue_filters(request.query_params, "GET")
+        # Fork (see FORK.md, S30): no filter keyed on a person, and the items
+        # carry no assignees or audit users.
+        filters = issue_filters(public_filter_params(request.query_params), "GET")
         issues = (
             Issue.objects.filter(
                 issue_intake__intake_id=intake_id,
@@ -78,7 +81,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
             .filter(**filters)
             .annotate(bridge_id=F("issue_intake__id"))
             .select_related("workspace", "project", "state", "parent")
-            .prefetch_related("assignees", "labels")
+            .prefetch_related("labels")
             .order_by("issue_intake__snoozed_till", "issue_intake__status")
             .annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
@@ -108,7 +111,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
                 )
             )
         )
-        issues_data = IssueStateIntakeSerializer(issues, many=True).data
+        issues_data = PublicIntakeIssueSerializer(issues, many=True).data
         return Response(issues_data, status=status.HTTP_200_OK)
 
     def create(self, request, anchor, intake_id):
@@ -194,7 +197,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
             source=SourceType.IN_APP,
         )
 
-        serializer = IssueStateIntakeSerializer(issue)
+        serializer = PublicIntakeIssueSerializer(issue)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def partial_update(self, request, anchor, intake_id, pk):
@@ -259,7 +262,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
                     epoch=int(timezone.now().timestamp()),
                 )
             issue_serializer.save()
-            return Response(issue_serializer.data, status=status.HTTP_200_OK)
+            return Response(PublicIntakeIssueSerializer(issue_serializer.instance).data, status=status.HTTP_200_OK)
         return Response(issue_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, anchor, intake_id, pk):
@@ -285,7 +288,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
             workspace_id=project_deploy_board.workspace_id,
             project_id=project_deploy_board.project_id,
         )
-        serializer = IssueStateIntakeSerializer(issue)
+        serializer = PublicIntakeIssueSerializer(issue)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, anchor, intake_id, pk):

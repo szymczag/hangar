@@ -71,7 +71,7 @@ export const CommentCard = observer(function CommentCard(props: Props) {
   };
 
   const displayName = comment.actor_detail.is_bot
-    ? comment.actor_detail.first_name + " Bot"
+    ? comment.actor_detail.display_name + " Bot"
     : comment.actor_detail.display_name;
   const canManageComment = !isInIframe && currentUser?.id === comment?.actor_detail?.id;
 

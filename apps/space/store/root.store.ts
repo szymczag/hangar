@@ -20,8 +20,6 @@ import type { IIssueFilterStore } from "./issue-filters.store";
 import { IssueFilterStore } from "./issue-filters.store";
 import type { IIssueLabelStore } from "./label.store";
 import { LabelStore } from "./label.store";
-import type { IIssueMemberStore } from "./members.store";
-import { MemberStore } from "./members.store";
 import type { IIssueModuleStore } from "./module.store";
 import { ModuleStore } from "./module.store";
 import type { IPublishListStore } from "./publish/publish_list.store";
@@ -39,7 +37,6 @@ export class RootStore {
   state: IStateStore;
   label: IIssueLabelStore;
   module: IIssueModuleStore;
-  member: IIssueMemberStore;
   cycle: ICycleStore;
   issueFilter: IIssueFilterStore;
   publishList: IPublishListStore;
@@ -52,7 +49,6 @@ export class RootStore {
     this.state = new StateStore(this);
     this.label = new LabelStore(this);
     this.module = new ModuleStore(this);
-    this.member = new MemberStore(this);
     this.cycle = new CycleStore(this);
     this.issueFilter = new IssueFilterStore(this);
     this.publishList = new PublishListStore(this);
@@ -74,7 +70,6 @@ export class RootStore {
     this.state = new StateStore(this);
     this.label = new LabelStore(this);
     this.module = new ModuleStore(this);
-    this.member = new MemberStore(this);
     this.cycle = new CycleStore(this);
     this.issueFilter = new IssueFilterStore(this);
     this.publishList = new PublishListStore(this);

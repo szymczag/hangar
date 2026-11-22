@@ -22,7 +22,6 @@ import type {
 // hooks
 import { useCycle } from "@/hooks/store/use-cycle";
 import { useLabel } from "@/hooks/store/use-label";
-import { useMember } from "@/hooks/store/use-member";
 import { useModule } from "@/hooks/store/use-module";
 import { useStates } from "@/hooks/store/use-state";
 //
@@ -64,14 +63,13 @@ export const KanBanSwimLanes = observer(function KanBanSwimLanes(props: IKanBanS
     scrollableContainerRef,
   } = props;
 
-  const member = useMember();
   const label = useLabel();
   const cycle = useCycle();
   const modules = useModule();
   const state = useStates();
 
-  const groupByList = getGroupByColumns(groupBy as GroupByColumnTypes, cycle, modules, label, state, member);
-  const subGroupByList = getGroupByColumns(subGroupBy as GroupByColumnTypes, cycle, modules, label, state, member);
+  const groupByList = getGroupByColumns(groupBy as GroupByColumnTypes, cycle, modules, label, state);
+  const subGroupByList = getGroupByColumns(subGroupBy as GroupByColumnTypes, cycle, modules, label, state);
 
   if (!groupByList || !subGroupByList) return null;
 

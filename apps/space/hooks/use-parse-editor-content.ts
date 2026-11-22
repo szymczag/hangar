@@ -10,8 +10,6 @@ import { parseInertHTML } from "@plane/utils";
 import type { TCustomComponentsMetaData } from "@plane/utils";
 // helpers
 import { getEditorAssetSrc } from "@/helpers/editor.helper";
-// hooks
-import { useMember } from "@/hooks/store/use-member";
 
 type TArgs = {
   anchor: string;
@@ -19,8 +17,6 @@ type TArgs = {
 
 export const useParseEditorContent = (args: TArgs) => {
   const { anchor } = args;
-  // store hooks
-  const { getMemberById } = useMember();
 
   const getEditorMetaData = useCallback(
     (htmlContent: string): TCustomComponentsMetaData => {
@@ -41,32 +37,14 @@ export const useParseEditorContent = (args: TArgs) => {
           }
         }
       });
-      // process user mentions
-      const userMentions: TCustomComponentsMetaData["user_mentions"] = [];
-      const mentionComponents = doc.querySelectorAll("mention-component");
-      mentionComponents.forEach((element) => {
-        const id = element.getAttribute("entity_identifier");
-        if (id) {
-          const userDetails = getMemberById(id);
-          const originUrl = typeof window !== "undefined" && (window.location.origin ?? "");
-          const path = `profile/${id}`;
-          const url = `${originUrl}/${path}`;
-          if (userDetails) {
-            userMentions.push({
-              id,
-              display_name: userDetails.member__display_name,
-              url,
-            });
-          }
-        }
-      });
-
+      // User mentions are not resolved to names: a published board does not publish the
+      // project's members (FORK.md, S30), so an exported mention carries no name.
       return {
         file_assets: imageMetaData,
-        user_mentions: userMentions,
+        user_mentions: [],
       };
     },
-    [anchor, getMemberById]
+    [anchor]
   );
 
   return {

@@ -22,7 +22,6 @@ import { cn } from "@plane/utils";
 // hooks
 import { useCycle } from "@/hooks/store/use-cycle";
 import { useLabel } from "@/hooks/store/use-label";
-import { useMember } from "@/hooks/store/use-member";
 import { useModule } from "@/hooks/store/use-module";
 import { useStates } from "@/hooks/store/use-state";
 //
@@ -64,13 +63,12 @@ export const KanBan = observer(function KanBan(props: IKanBan) {
     showEmptyGroup = true,
   } = props;
 
-  const member = useMember();
   const label = useLabel();
   const cycle = useCycle();
   const modules = useModule();
   const state = useStates();
 
-  const groupList = getGroupByColumns(groupBy as GroupByColumnTypes, cycle, modules, label, state, member);
+  const groupList = getGroupByColumns(groupBy as GroupByColumnTypes, cycle, modules, label, state);
 
   if (!groupList) return null;
 

@@ -18,23 +18,21 @@ from plane.db.models import (
     Label,
     Module,
     Project,
-    ProjectMember,
     State,
-    WorkspaceMember,
 )
 
 
 def issue_queryset_grouper(
     queryset: QuerySet[Issue], group_by: Optional[str], sub_group_by: Optional[str]
 ) -> QuerySet[Issue]:
+    # Fork (see FORK.md, S30): a published board's work items carry no
+    # assignees, so there is no assignee annotation or grouping here.
     FIELD_MAPPER = {
         "label_ids": "labels__id",
-        "assignee_ids": "assignees__id",
         "module_ids": "issue_module__module_id",
     }
 
     GROUP_FILTER_MAPPER = {
-        "assignees__id": Q(issue_assignee__deleted_at__isnull=True),
         "labels__id": Q(label_issue__deleted_at__isnull=True),
         "issue_module__module_id": Q(issue_module__deleted_at__isnull=True),
     }
@@ -44,10 +42,6 @@ def issue_queryset_grouper(
             queryset = queryset.filter(GROUP_FILTER_MAPPER[group_key])
 
     annotations_map = {
-        "assignee_ids": (
-            "assignees__id",
-            ~Q(assignees__id__isnull=True) & Q(issue_assignee__deleted_at__isnull=True),
-        ),
         "label_ids": (
             "labels__id",
             ~Q(labels__id__isnull=True) & Q(label_issue__deleted_at__isnull=True),
@@ -72,13 +66,14 @@ def issue_queryset_grouper(
 def issue_on_results(
     issues: QuerySet[Issue], group_by: Optional[str], sub_group_by: Optional[str]
 ) -> List[Dict[str, Any]]:
+    # Fork (see FORK.md, S30): no assignee_ids and no created_by -- a published
+    # board does not say who a work item is assigned to or who opened it.
     FIELD_MAPPER = {
         "labels__id": "label_ids",
-        "assignees__id": "assignee_ids",
         "issue_module__module_id": "module_ids",
     }
 
-    original_list = ["assignee_ids", "label_ids", "module_ids"]
+    original_list = ["label_ids", "module_ids"]
 
     required_fields = [
         "id",
@@ -93,7 +88,6 @@ def issue_on_results(
         "project_id",
         "parent_id",
         "cycle_id",
-        "created_by",
         "state__group",
     ]
 
@@ -107,6 +101,7 @@ def issue_on_results(
 
     required_fields.extend(original_list)
 
+    # Fork (see FORK.md, S30): voters and reactors appear as the public actor.
     vote_item = Case(
         When(
             votes__isnull=False,
@@ -115,9 +110,6 @@ def issue_on_results(
                 vote=F("votes__vote"),
                 actor_details=JSONObject(
                     id=F("votes__actor__id"),
-                    first_name=F("votes__actor__first_name"),
-                    last_name=F("votes__actor__last_name"),
-                    avatar=F("votes__actor__avatar"),
                     avatar_url=Case(
                         When(
                             votes__actor__avatar_asset__isnull=False,
@@ -131,6 +123,7 @@ def issue_on_results(
                         output_field=CharField(),
                     ),
                     display_name=F("votes__actor__display_name"),
+                    is_bot=F("votes__actor__is_bot"),
                 ),
             ),
         ),
@@ -145,9 +138,6 @@ def issue_on_results(
                 reaction=F("issue_reactions__reaction"),
                 actor_details=JSONObject(
                     id=F("issue_reactions__actor__id"),
-                    first_name=F("issue_reactions__actor__first_name"),
-                    last_name=F("issue_reactions__actor__last_name"),
-                    avatar=F("issue_reactions__actor__avatar"),
                     avatar_url=Case(
                         When(
                             issue_reactions__actor__avatar_asset__isnull=False,
@@ -161,6 +151,7 @@ def issue_on_results(
                         output_field=CharField(),
                     ),
                     display_name=F("issue_reactions__actor__display_name"),
+                    is_bot=F("issue_reactions__actor__is_bot"),
                 ),
             ),
         ),
@@ -197,15 +188,6 @@ def issue_group_values(
     if field == "labels__id":
         queryset = Label.objects.filter(workspace__slug=slug, project_id=project_id).values_list("id", flat=True)
         return list(queryset) + ["None"]
-    if field == "assignees__id":
-        if project_id:
-            return ProjectMember.objects.filter(
-                workspace__slug=slug, project_id=project_id, is_active=True
-            ).values_list("member_id", flat=True)
-        else:
-            return list(
-                WorkspaceMember.objects.filter(workspace__slug=slug, is_active=True).values_list("member_id", flat=True)
-            )
     if field == "issue_module__module_id":
         queryset = Module.objects.filter(workspace__slug=slug, project_id=project_id).values_list("id", flat=True)
         return list(queryset) + ["None"]
@@ -226,13 +208,6 @@ def issue_group_values(
             return list(queryset)
     if field == "start_date":
         queryset = queryset.values_list("start_date", flat=True).distinct()
-        if project_id:
-            return list(queryset.filter(project_id=project_id))
-        else:
-            return list(queryset)
-
-    if field == "created_by":
-        queryset = queryset.values_list("created_by", flat=True).distinct()
         if project_id:
             return list(queryset.filter(project_id=project_id))
         else:
