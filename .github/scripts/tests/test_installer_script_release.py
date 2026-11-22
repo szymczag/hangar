@@ -304,6 +304,16 @@ class ComposeUpgradeTests(unittest.TestCase):
         self.assertIn("PLEASE VALIDATE AND START SERVICES", result.stdout)
         self.assertEqual(_env(scratch.env)["APP_RELEASE"], target)
         self.assertTrue(any(call.endswith(" down") for call in scratch.docker_calls()), scratch.docker_calls())
+        self.assertLeftStopped(scratch, result)
+
+    def assertLeftStopped(self, scratch: ComposeScratch, result):
+        """An upgrade stops the services and leaves them stopped, and says how to start them."""
+        calls = scratch.docker_calls()
+        last_down = max(index for index, call in enumerate(calls) if call.endswith(" down"))
+        self.assertFalse(any(" up " in f"{call} " for call in calls[last_down:]), calls)
+        self.assertIn("The services are stopped.", result.stdout)
+        self.assertIn(f"Check {scratch.env} for the new release's settings", result.stdout)
+        self.assertIn("\n    ./setup.sh start\n", result.stdout)
 
     def test_an_older_script_refuses_to_upgrade_to_a_newer_release(self):
         scratch = ComposeScratch(self.addCleanup, script_release="v1.0.0")

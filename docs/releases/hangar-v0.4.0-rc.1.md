@@ -135,20 +135,42 @@ Upgrade from `0.3.0`. This is a release candidate, so the installers do not
 pick it on their own. On Compose and Swarm:
 
 1. Replace the script by hand, because the `0.3.0` script cannot replace
-   itself. Download the `0.4.0-rc.1` script next to `plane-app/`:
-   `curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.4.0-rc.1/setup.sh`
-   (Swarm: the same release's `swarm.sh`, saved as `setup.sh`), then
-   `chmod +x setup.sh`. Check it as described in
-   [Upgrading Hangar Version](../../deployments/cli/community/README.md#upgrading-hangar-version).
+   itself. Do not download the new script straight over the old one: fetch it
+   with the release's `SHA256SUMS` and `SHA256SUMS.sigstore.json` into a folder
+   of its own next to `plane-app/`, check it, and only then copy it into place:
+
+   ```sh
+   mkdir -p hangar-v0.4.0-rc.1 && cd hangar-v0.4.0-rc.1
+   curl -fsSL -O https://github.com/szymczag/hangar/releases/download/hangar-v0.4.0-rc.1/setup.sh \
+     -O https://github.com/szymczag/hangar/releases/download/hangar-v0.4.0-rc.1/SHA256SUMS \
+     -O https://github.com/szymczag/hangar/releases/download/hangar-v0.4.0-rc.1/SHA256SUMS.sigstore.json
+   cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+     --certificate-identity https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/hangar-v0.4.0-rc.1 \
+     --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+   sha256sum --check --ignore-missing SHA256SUMS
+   cd .. && cp hangar-v0.4.0-rc.1/setup.sh ./setup.sh && chmod 755 ./setup.sh
+   ```
+
+   On macOS use `shasum -a 256 --check --ignore-missing SHA256SUMS`. If either
+   check fails, stop: your old script is untouched. On Swarm, download
+   `swarm.sh` instead and copy `hangar-v0.4.0-rc.1/swarm.sh` over your
+   `setup.sh`.
+   [Upgrading Hangar Version](../../deployments/cli/community/README.md#upgrading-hangar-version)
+   explains each command.
+
 2. Run `HANGAR_RELEASE=v0.4.0-rc.1 ./setup.sh upgrade`, as the owner of
    `plane-app/` or as root.
-3. For later releases, run `HANGAR_RELEASE=<release> ./setup.sh update-script`
+3. On Compose, the upgrade leaves every service stopped. It ends with
+   `PLEASE VALIDATE AND START SERVICES`: check `plane-app/plane.env`, then run
+   `./setup.sh start`. Hangar stays down until you do. On Swarm, the upgrade
+   redeploys the stack itself.
+4. For later releases, run `HANGAR_RELEASE=<release> ./setup.sh update-script`
    (or plain `./setup.sh update-script` for the latest stable release) before
    `./setup.sh upgrade`. If you skip it, the upgrade refuses and tells you what
    to run.
 
 Use the `v0.4.0-rc.1` all-in-one image, or run `helm upgrade` with
-`--version 0.4.0-rc.1` on Kubernetes. No other operator action is required.
+`--version 0.4.0-rc.1` on Kubernetes. Neither needs a further step.
 Reload open published boards after the upgrade. Upgrading from a release older
 than `0.3.0` also brings what the [`0.3.0` notes](hangar-v0.3.0.md) and the
 releases before it describe; read them first. In particular, an upgrade from
