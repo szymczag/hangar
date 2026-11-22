@@ -6,6 +6,7 @@
     "DOMParser.parseFromString npm:tiptap-markdown": "elementFromString for HTML rendered from markdown: an inert document; the plain string goes through the default policy.",
     "DOMParser.parseFromString packages/csp/src/trusted-types.mjs": "The default policy's comparison parse, given TrustedHTML from hangar-inert.",
     "DOMParser.parseFromString packages/utils": "parseInertHTML, the one parse of our own, given TrustedHTML from hangar-inert.",
+    "dangerouslySetInnerHTML npm:@base-ui/react": "PrehydrationScript (Tabs.Indicator, Slider.Thumb with renderBeforeHydration, which no Propel or blocks component sets). Its body is an empty stub in the client bundle (the 'browser' condition); the server-rendered copy carries the request's nonce through CSPProvider (app/providers.tsx). A client render goes through the default policy.",
     "dangerouslySetInnerHTML npm:jsx-dom-cjs": "jsx-dom's support for the prop; the table view built with jsx-dom does not use it. Any use would go through the default policy.",
     "dangerouslySetInnerHTML npm:next-themes": "The anti-flash script. The copy that runs is the one served in the document, allowed by hash or nonce; React's client re-render does not execute and the default policy recognises it (KNOWN_LIBRARY_SCRIPTS).",
     "dangerouslySetInnerHTML npm:react-dom": "React's implementation of the prop; its callers are the other dangerouslySetInnerHTML entries here.",

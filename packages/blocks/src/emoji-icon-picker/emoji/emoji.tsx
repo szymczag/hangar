@@ -11,6 +11,7 @@ import { InputGroup } from "@makeplane/propel/components/input";
 import { Input } from "@makeplane/propel/elements/input";
 import { SearchOutline } from "@makeplane/propel/icons";
 import { useTranslation } from "@plane/i18n";
+import { getEmojiDataUrl } from "./data-url";
 
 /** Emoji cells per row; rows are a fixed grid of 32px cells so every column fits the picker. */
 const EMOJI_COLUMNS = 9;
@@ -45,6 +46,7 @@ export function EmojiRoot(props: EmojiRootProps) {
   return (
     <EmojiPicker.Root
       data-slot="emoji-picker"
+      emojibaseUrl={getEmojiDataUrl()}
       columns={EMOJI_COLUMNS}
       className="isolate flex h-full w-full flex-col"
       onEmojiSelect={(val) => onChange(val.emoji)}

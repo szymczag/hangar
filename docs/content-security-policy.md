@@ -78,7 +78,12 @@ have required `'wasm-unsafe-eval'`.
   storage origin is added because uploads are not proxied through the
   instance's origin.
 - **space (server-rendered):** `apps/space/app/entry.server.tsx` generates a nonce
-  per request, passes it to React Router and next-themes, and sets the header.
+  per request, passes it to React Router, and sets the header; `app/providers.tsx`
+  hands the same nonce to next-themes and to Base UI's `CSPProvider` (for the
+  inline script Base UI can render before hydration). `pnpm test:space-build`
+  reads the built server's HTML and fails on an inline script without the
+  response's nonce, an inline style the policy would refuse, or a `style` or
+  event-handler attribute.
 
 A build whose `index.html` has no inline scripts fails, because that is not the
 output the generator was written for.

@@ -4,13 +4,15 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { debounce } from "lodash-es";
 import { observer } from "mobx-react";
 // types
 import type { IIssueDisplayProperties } from "@plane/types";
 // components
 import { IssueLayoutHOC } from "@/components/issues/issue-layouts/issue-layout-HOC";
+// helpers
+import { PUBLIC_BOARD_DISPLAY_PROPERTIES } from "@/helpers/display-properties.helper";
 // hooks
 import { useIssue } from "@/hooks/store/use-issue";
 
@@ -24,16 +26,7 @@ export const IssueKanbanLayoutRoot = observer(function IssueKanbanLayoutRoot(pro
   // store hooks
   const { groupedIssueIds, getIssueLoader, fetchNextPublicIssues, getGroupIssueCount, getPaginationData } = useIssue();
 
-  const displayProperties: IIssueDisplayProperties = useMemo(
-    () => ({
-      key: true,
-      state: true,
-      labels: true,
-      priority: true,
-      due_date: true,
-    }),
-    []
-  );
+  const displayProperties: IIssueDisplayProperties = PUBLIC_BOARD_DISPLAY_PROPERTIES;
 
   const fetchMoreIssues = useCallback(
     (groupId?: string, subgroupId?: string) => {

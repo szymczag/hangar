@@ -4,13 +4,15 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { observer } from "mobx-react";
 // types
 import type { IIssueDisplayProperties, TGroupedIssues } from "@plane/types";
 // constants
 // components
 import { IssueLayoutHOC } from "@/components/issues/issue-layouts/issue-layout-HOC";
+// helpers
+import { PUBLIC_BOARD_DISPLAY_PROPERTIES } from "@/helpers/display-properties.helper";
 // hooks
 import { useIssue } from "@/hooks/store/use-issue";
 import { List } from "./default";
@@ -31,17 +33,7 @@ export const IssuesListLayoutRoot = observer(function IssuesListLayoutRoot(props
   } = useIssue();
 
   const groupedIssueIds = storeGroupedIssueIds as TGroupedIssues | undefined;
-  // auth
-  const displayProperties: IIssueDisplayProperties = useMemo(
-    () => ({
-      key: true,
-      state: true,
-      labels: true,
-      priority: true,
-      due_date: true,
-    }),
-    []
-  );
+  const displayProperties: IIssueDisplayProperties = PUBLIC_BOARD_DISPLAY_PROPERTIES;
 
   const loadMoreIssues = useCallback(
     (groupId?: string) => {

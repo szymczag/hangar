@@ -28,6 +28,7 @@ import {
   trustedTypesModeFromEnv,
   trustedTypesReportPolicy,
 } from "@plane/csp";
+import { initPromise } from "@plane/i18n";
 
 export const streamTimeout = 5_000;
 
@@ -52,13 +53,17 @@ const contentSecurityPolicy = (nonce: string, env: Record<string, string | undef
     frameAncestors: frameAncestors(env),
   });
 
-export default function handleRequest(
+export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   routerContext: EntryContext,
   _loadContext: RouterContextProvider
 ) {
+  // The page renders with translations loaded, as entry.client.tsx waits for
+  // them before hydrating; otherwise TranslationProvider renders nothing on
+  // the server and the client's first render no longer matches the HTML.
+  await initPromise.catch(() => {});
   const env = runtimeEnv();
   const nonce = randomBytes(16).toString("base64");
   responseHeaders.set(policyHeaderName(env), contentSecurityPolicy(nonce, env));

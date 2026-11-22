@@ -35,7 +35,9 @@
     "packages/makeplane-propel/src/**",
     "packages/blocks/src/**",
     "!packages/blocks/src/auth/password/**",
-    "!packages/blocks/src/portal/dialog-dismissal.test.tsx"
+    "!packages/blocks/src/portal/dialog-dismissal.test.tsx",
+    "!packages/blocks/src/emoji-icon-picker/emoji/data-url.ts",
+    "!packages/blocks/src/emoji-icon-picker/emoji/data-url.test.tsx"
   ],
   "rules": {
     "react/react-in-jsx-scope": "off",
