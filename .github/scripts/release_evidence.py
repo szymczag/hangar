@@ -12,6 +12,7 @@ The publication workflow calls each subcommand once, in order:
 ``pin-compose``  pin the release Docker Compose file to those digests
 ``sboms``        extract and check the BuildKit SPDX SBOM of every image
 ``manifest``     write ``release-manifest.json`` describing the release
+``stamp-scripts`` write the release into the published ``setup.sh`` and ``swarm.sh``
 ``checksums``    write ``SHA256SUMS`` over every release asset
 
 Everything except the ``docker buildx imagetools`` calls is a pure function so it
@@ -51,6 +52,11 @@ OIDC_ISSUER = "https://token.actions.githubusercontent.com"
 CHECKSUMS_FILE = "SHA256SUMS"
 CHECKSUMS_BUNDLE_FILE = "SHA256SUMS.sigstore.json"
 MANIFEST_FILE = "release-manifest.json"
+# The installers carry this line in the source tree; the published copies name
+# their release instead, which their script-release check compares with the
+# release they install.
+SCRIPT_RELEASE_PLACEHOLDER = "SCRIPT_RELEASE=unreleased"
+_SCRIPT_RELEASE_LINE = re.compile(r"^SCRIPT_RELEASE=.*$", re.MULTILINE)
 
 # Observed in the hangar-v0.1.0 SBOMs (syft via BuildKit): web 72, admin 72,
 # space 666, live 768, api 220, proxy 201, aio 1750 packages. The minimums sit
@@ -69,6 +75,7 @@ SBOM_POLICY: Mapping[str, tuple[int, tuple[str, ...]]] = {
 }
 
 _DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+_RELEASE_VERSION_PATTERN = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.]+)?")
 _ATTESTATION_TYPE = "attestation-manifest"
 _INDEX_MEDIA_TYPES = {
     "application/vnd.oci.image.index.v1+json",
@@ -262,6 +269,23 @@ def pin_compose(text: str, digests: Mapping[str, str], *, version: str, git_tag:
         "# no longer select those images. Verify the digests against release-manifest.json.\n"
     )
     return header + "".join(output_lines)
+
+
+def stamp_script_release(text: str, *, version: str) -> str:
+    """Replace the installer's ``SCRIPT_RELEASE=unreleased`` line with ``version``.
+
+    The script must assign SCRIPT_RELEASE at the start of a line exactly once,
+    to the placeholder, so a script already stamped or a second assignment
+    fails the release instead of publishing an ambiguous identity.
+    """
+    if _RELEASE_VERSION_PATTERN.fullmatch(version) is None:
+        raise EvidenceError(f"invalid release version for an installer: {version!r}")
+    assignments = _SCRIPT_RELEASE_LINE.findall(text)
+    if assignments != [SCRIPT_RELEASE_PLACEHOLDER]:
+        raise EvidenceError(
+            f"installer must assign {SCRIPT_RELEASE_PLACEHOLDER} exactly once, found {assignments!r}"
+        )
+    return _SCRIPT_RELEASE_LINE.sub(f"SCRIPT_RELEASE={version}", text, count=1)
 
 
 # --------------------------------------------------------------------------- #
@@ -515,6 +539,14 @@ def command_manifest(arguments: argparse.Namespace) -> None:
     _write_json(arguments.output, manifest)
 
 
+def command_stamp_scripts(arguments: argparse.Namespace) -> None:
+    version, _ = parse_release_tag(arguments.git_tag)
+    for path in arguments.scripts:
+        path.write_text(
+            stamp_script_release(path.read_text(encoding="utf-8"), version=version), encoding="utf-8"
+        )
+
+
 def command_checksums(arguments: argparse.Namespace) -> None:
     output = arguments.directory / CHECKSUMS_FILE
     output.write_text(format_checksums(collect_checksums(arguments.directory)), encoding="utf-8")
@@ -548,6 +580,10 @@ def create_argument_parser() -> argparse.ArgumentParser:
     manifest.add_argument("--chart-digest", required=True)
     manifest.add_argument("--output", type=Path, required=True)
 
+    stamp = subparsers.add_parser("stamp-scripts")
+    stamp.add_argument("--git-tag", required=True)
+    stamp.add_argument("scripts", type=Path, nargs="+")
+
     checksums = subparsers.add_parser("checksums")
     checksums.add_argument("--directory", type=Path, required=True)
     return parser
@@ -564,6 +600,8 @@ def main(argv: Sequence[str] | None = None, inspect: Inspector = imagetools_insp
             command_sboms(arguments, inspect)
         elif arguments.command == "manifest":
             command_manifest(arguments)
+        elif arguments.command == "stamp-scripts":
+            command_stamp_scripts(arguments)
         else:
             command_checksums(arguments)
     except (MetadataError, OSError) as exc:

@@ -490,6 +490,7 @@ class WiringTests(unittest.TestCase):
                 stubs = (
                     'function checkLatestRelease() { echo v9.9.9; }\n'
                     'function checkSecretKeyRotation() { :; }\n'
+                    'function checkScriptRelease() { :; }\n'
                     'function stopServices() { :; }\n'
                     'function install() { echo INSTALLED; }\n'
                     'function download() { echo INSTALLED; }\n'
@@ -521,6 +522,7 @@ class WiringTests(unittest.TestCase):
         stubs = (
             "function checkLatestRelease() { echo ASKED-GITHUB; exit 1; }\n"
             "function checkSecretKeyRotation() { :; }\n"
+            "function checkScriptRelease() { :; }\n"
             "function stopServices() { :; }\n"
             'function install() { echo "INSTALLING $APP_RELEASE"; }\n'
             "function objectStorageMigrationPending() { return 1; }\n"

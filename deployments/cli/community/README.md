@@ -66,8 +66,11 @@ Installing Hangar is a very easy and minimal step process.
 
 Download the script from the newest release on the
 [Releases page](https://github.com/szymczag/hangar/releases); the commands below
-use `hangar-v0.2.2`. Whichever copy you run, `install` and `upgrade` look
-up the release themselves and fetch that release's compose file and settings.
+use `hangar-v0.3.0`. Whichever copy you run, `install` and `upgrade` look
+up the release themselves and fetch that release's compose file and settings,
+but never a newer copy of the script itself. A script from a release after
+hangar-v0.3.0 knows its own release and refuses to install or upgrade to a newer
+one: see [Upgrading Hangar Version](#upgrading-hangar-version).
 They take the newest stable release, and the newest pre-release only while no
 stable release has been published, so a release candidate never replaces a
 stable install. GitHub's `releases/latest` links resolve only once a stable
@@ -82,7 +85,7 @@ cd plane-selfhost
 #### For _Docker Compose_ based setup
 
 ```
-curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.2.2/setup.sh
+curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.3.0/setup.sh
 
 chmod +x setup.sh
 ```
@@ -90,7 +93,7 @@ chmod +x setup.sh
 #### For _Docker Swarm_ based setup
 
 ```
-curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.2.2/swarm.sh
+curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.3.0/swarm.sh
 
 chmod +x setup.sh
 ```
@@ -240,7 +243,7 @@ Below are the most import keys you must refer to. _<span style="color: #fcba03">
 > Swarm) writes `plane.env`, the `plane.env.bak` and `archive/<timestamp>.env`
 > copies an upgrade keeps, and the backup archives with mode `600`, and the
 > `archive/` and `backup/` folders with mode `700`, whatever the umask. Releases up
-> to and including hangar-v0.3.0-rc.1 left those files at the umask's mode, often
+> to and including hangar-v0.2.2 (and the candidate hangar-v0.3.0-rc.1) left those files at the umask's mode, often
 > `664` or `644`, so any local user could read every secret in them. The first run
 > of a newer `setup.sh`, whatever the action, removes group and other access from
 > `plane.env`, `plane.env.bak`, `archive/*.env`, `archive/` and `backup/`, and prints
@@ -465,7 +468,80 @@ It is always advised to keep Hangar up to date with the latest release.
 > fresh install; the data, the uploaded files, password sign-in and API keys are
 > checked after both steps.
 >
-> Download the latest `setup.sh` (see [Downloading Latest Release](#downloading-latest-release)) before upgrading: the upgrade runs your local copy of the script.
+> **Download the new release's `setup.sh` first.** The upgrade runs your local
+> copy of the script, and the script does not update itself: `upgrade` fetches
+> the new release's `docker-compose.yml`, `variables.env` and
+> `migrate-object-storage.sh` (`swarm.sh`: `docker-compose.yml` and
+> `variables.env`), but never a new `setup.sh`, `swarm.sh` or `restore.sh`, and it
+> never runs one it downloaded. Whatever the new script changes in the
+> installer itself only takes effect once you run it. In particular, an upgrade
+> to hangar-v0.3.0 or later run with the hangar-v0.2.2 script, or an older one,
+> installs the new images but leaves `plane.env` and `plane.env.bak` at the
+> umask's mode, readable by other local users. Upgrade in three steps:
+>
+> 1. Replace `setup.sh` with the new release's script and verify it: run
+>    `./setup.sh update-script` (below), or download it by hand (see
+>    [Downloading Latest Release](#downloading-latest-release); for Swarm, its
+>    `swarm.sh` saved as `setup.sh`) and check it as
+>    [Verifying release assets](../../../README.md#verifying-release-assets)
+>    describes.
+> 2. Run `./setup.sh upgrade`.
+> 3. Check that `stat -c '%a' plane-app/plane.env` (`stat -f '%Lp'` on macOS)
+>    prints `600`. A script from hangar-v0.3.0 or later prints
+>    `NOTICE: restricted to the owner, ...` on its first run, whatever the action,
+>    when it tightens anything, and nothing once everything is owner-only. If you
+>    already upgraded with an older script, download the new one and run any
+>    action with it, for example `./setup.sh start` (Swarm: `./setup.sh status`).
+>
+> **An outdated script refuses to upgrade.** Every `setup.sh` and `swarm.sh`
+> published after hangar-v0.3.0 names the release it belongs to (the release
+> workflow writes it into `SCRIPT_RELEASE`; `SHA256SUMS` covers the result). When
+> `install` or `upgrade` (Swarm: the first deploy, and `upgrade`) would go to a
+> newer release, the script stops before it asks, downloads, stops a service or
+> changes a file. It prints an `ERROR` that names both releases, and the
+> commands that fetch and verify the new script:
+>
+> ```sh
+> mkdir -p hangar-vX.Y.Z && cd hangar-vX.Y.Z
+> curl -fsSL -O https://github.com/szymczag/hangar/releases/download/hangar-vX.Y.Z/setup.sh \
+>   -O https://github.com/szymczag/hangar/releases/download/hangar-vX.Y.Z/SHA256SUMS \
+>   -O https://github.com/szymczag/hangar/releases/download/hangar-vX.Y.Z/SHA256SUMS.sigstore.json
+> cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+>   --certificate-identity https://github.com/szymczag/hangar/.github/workflows/build-branch.yml@refs/tags/hangar-vX.Y.Z \
+>   --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+> sha256sum --check --ignore-missing SHA256SUMS # macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
+> cd .. && cp hangar-vX.Y.Z/setup.sh ./setup.sh && chmod 755 ./setup.sh
+> ./setup.sh upgrade
+> ```
+>
+> | Action                                                             | Target release newer than the script | Same or older (rollback) |
+> | ------------------------------------------------------------------ | ------------------------------------ | ------------------------ |
+> | `install`, `upgrade` (Swarm: first `deploy`, `upgrade`)            | refuses, nothing changed             | proceeds                 |
+> | `start`, `stop`, `restart` (Swarm: `deploy`, `remove`, `redeploy`) | `WARNING`, then proceeds             | proceeds                 |
+> | `upgrade` that finds the deployment already on the latest release  | `WARNING`                            | nothing to do            |
+>
+> `start`, `stop` and `restart` only run what is already installed, and an
+> operator must always be able to stop or restart a deployment, so they warn
+> instead of refusing. To install or upgrade with the old script anyway, set
+> `HANGAR_ALLOW_OLD_SCRIPT=1` or pass `--allow-old-script`; it prints one
+> `WARNING` and skips whatever the newer script would have done. A script
+> downloaded from a branch or run from a checkout says `SCRIPT_RELEASE=unreleased`
+> and is not checked, and neither is a target that is not a release (`local`).
+> Scripts up to hangar-v0.3.0 carry no release and cannot make this check.
+>
+> **`update-script`.** `./setup.sh update-script` (also `swarm.sh`) downloads the
+> script of the latest release, or of `HANGAR_RELEASE=vX.Y.Z`, into a scratch
+> directory beside the script, checks it exactly as
+> [the deployment files](#how-setupsh-verifies-what-it-downloads) are checked
+> (`SHA256SUMS`, its Cosign signature when Cosign is installed, and
+> `HANGAR_REQUIRE_SIGNATURE=1` to insist on it), checks that it names that
+> release, and renames it over the old script with mode `755` and the old
+> script's owner. The old script stays whole until that rename, so a failed
+> check leaves it as it was. It does not run the new script; run
+> `./setup.sh upgrade` yourself afterwards. It changes nothing when the script
+> is already from that release or a newer one, and refuses a script reached
+> through a symbolic link and releases up to hangar-v0.1.0, which publish no
+> `SHA256SUMS`; use the commands above then.
 >
 > **Object-storage credentials.** The bundled object storage takes its login from `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `plane.env`, and the proxy serves its S3 API on the application's origin. Older templates shipped the public pair `access-key` / `secret-key`, which let anybody sign requests that list, read, overwrite or delete uploads. `setup.sh` now generates a random pair on install, and on upgrade replaces any pair whose secret is still `secret-key`; it prints a notice when it does. The API and the object storage pick the new pair up together when the services start, and uploads stay where they are. The old pair is kept as `LEGACY_MINIO_ROOT_USER` / `LEGACY_MINIO_ROOT_PASSWORD` for `migrate-object-storage.sh`, which still needs it to read a volume written by MinIO. A pair you set yourself, or external S3 storage (`USE_MINIO=0` or another `AWS_S3_ENDPOINT_URL`), is left alone; with `USE_MINIO=0` the bundled storage stays idle and is not routed (see [External S3](#object-storage-minio-to-seaweedfs)). If anything outside Hangar used the old pair, give it the new one.
 >
@@ -824,7 +900,7 @@ When you want to restore the previously backed-up data, follow the instructions 
 1. Download the restore script using the command below. We suggest downloading it in the same folder as `setup.sh`.
 
    ```bash
-   curl -fsSL -o restore.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.2.2/restore.sh
+   curl -fsSL -o restore.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.3.0/restore.sh
    chmod +x restore.sh
    ```
 

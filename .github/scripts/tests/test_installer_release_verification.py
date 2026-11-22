@@ -804,7 +804,7 @@ class UpgradeOrderTest(unittest.TestCase):
         result = case.run(
             INSTALL,
             release="v0.0.1",
-            functions=("upgrade",),
+            functions=("upgrade", "compareReleases", "scriptIsOutdatedFor", "checkScriptRelease"),
             body=self.UPGRADE_STUBS + "upgrade\necho FINISHED\n",
             extra_env={"HANGAR_RELEASE": GIT_TAG, "HANGAR_ASSUME_YES": "1"},
         )
