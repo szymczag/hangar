@@ -212,6 +212,33 @@ everything private until someone opens it again deliberately.
 An instance configured through the environment rather than God Mode can bring
 existing content into line with `python manage.py enforce_private_visibility`.
 
+## What a published board says about people
+
+A published board is read by anyone who has its link, without an account, so its
+API (`plane.space`, `/api/public/anchor/<anchor>/…`) names only the people who
+acted on the board in public:
+
+- Someone who commented, voted or reacted appears as `id`, `display_name`,
+  `avatar_url` and `is_bot`. The display name and avatar are what the board
+  shows; the id lets a signed-in visitor's browser tell its own reactions and
+  comments apart. No email, first or last name, raw `avatar` field or role.
+- Work items carry no `assignee_ids` and no `created_by`, and there is no member
+  roster: `anchor/<anchor>/members/` is gone. The board cannot be grouped by
+  assignee or creator (400), filters on `assignees`, `mentions`, `created_by`,
+  `logged_by` and `subscriber` are dropped rather than applied, and ordering by an
+  assignee's name falls back to the default. Applied, any of them would answer
+  "is this user assigned here?" for every id a visitor tries.
+- No payload carries `created_by` or `updated_by`: on the board settings that is
+  whoever published it, on a comment possibly an admin who edited it.
+- The intake a signed-in visitor can read carries no assignees.
+- A mention in a description or comment keeps its user id in the stored rich
+  text, but nothing on the board resolves it to a name: the board renders
+  `@user`, or the viewer's own name for a mention of the viewer.
+
+`test_space_public_member_exposure_app.py` pins this (FORK.md, S30). Upstream
+Plane publishes the roster, the assignees and the full actor details by design;
+a sync keeps Hangar's narrower form.
+
 ## API tokens
 
 A token authenticates as its owner and names the workspace it may act in. It is
