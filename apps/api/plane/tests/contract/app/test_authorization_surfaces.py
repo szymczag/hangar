@@ -228,21 +228,20 @@ def test_archiving_a_project_stops_its_published_board(scenario, published_board
 
 @pytest.mark.contract
 @pytest.mark.django_db
-def test_a_published_board_exposes_its_member_roster(scenario, published_board):
-    """Intended, and pinned so it cannot change unnoticed.
+def test_a_published_board_does_not_list_its_members(scenario, published_board):
+    """A published board names no member who has not acted on it.
 
-    plane/space/views/project.py:80-101 returns display names and avatars of a
-    published project's members to unauthenticated callers. Confirmed as
-    intended for public boards; this test exists so widening or narrowing it is
-    a deliberate act.
+    The roster endpoint (``anchor/<anchor>/members/``) returned the display
+    name and avatar of every active project member to anyone holding the link.
+    It was removed (FORK.md, S30); the rest of the public payload contract is in
+    test_space_public_member_exposure_app.py.
     """
     response = APIClient().get(f"/api/public/anchor/{published_board.anchor}/members/")
 
-    assert response.status_code == 200
-    assert len(response.json()) > 0
+    assert response.status_code == 404
     body = response.content.decode()
     assert scenario.project_a.canary not in body
-    assert scenario.owner.email not in body, "email addresses must not be part of the public roster"
+    assert scenario.owner.email not in body
 
 
 # --------------------------------------------------------------------------

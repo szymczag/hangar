@@ -12,8 +12,8 @@ from rest_framework.permissions import AllowAny
 
 # Module imports
 from .base import BaseAPIView
-from plane.app.serializers import DeployBoardSerializer
-from plane.db.models import Project, DeployBoard, ProjectMember
+from plane.db.models import Project, DeployBoard
+from plane.space.serializer.public import PublicDeployBoardSerializer
 
 
 class ProjectDeployBoardPublicSettingsEndpoint(BaseAPIView):
@@ -25,7 +25,8 @@ class ProjectDeployBoardPublicSettingsEndpoint(BaseAPIView):
             entity_name="project",
             is_disabled=False,
         )
-        serializer = DeployBoardSerializer(project_deploy_board)
+        # Fork (see FORK.md, S30): without the audit users who published the board.
+        serializer = PublicDeployBoardSerializer(project_deploy_board)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -75,33 +76,6 @@ class WorkspaceProjectAnchorEndpoint(BaseAPIView):
             entity_name="project",
             is_disabled=False,
         )
-        serializer = DeployBoardSerializer(project_deploy_board)
+        # Fork (see FORK.md, S30): without the audit users who published the board.
+        serializer = PublicDeployBoardSerializer(project_deploy_board)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class ProjectMembersEndpoint(BaseAPIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, anchor):
-        deploy_board = DeployBoard.objects.filter(
-            anchor=anchor,
-            entity_name="project",
-            is_disabled=False,
-        ).first()
-        if not deploy_board:
-            return Response(
-                {"error": "Invalid anchor"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        members = ProjectMember.objects.filter(
-            project=deploy_board.project,
-            workspace=deploy_board.workspace,
-            is_active=True,
-        ).values(
-            "id",
-            "member",
-            "member__display_name",
-            "member__avatar",
-        )
-        return Response(members, status=status.HTTP_200_OK)

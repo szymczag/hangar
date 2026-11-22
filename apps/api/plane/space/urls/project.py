@@ -13,7 +13,6 @@ from plane.space.views import (
     ProjectModulesEndpoint,
     ProjectStatesEndpoint,
     ProjectLabelsEndpoint,
-    ProjectMembersEndpoint,
     ProjectMetaDataEndpoint,
 )
 
@@ -58,9 +57,6 @@ urlpatterns = [
         ProjectLabelsEndpoint.as_view(),
         name="project-labels",
     ),
-    path(
-        "anchor/<str:anchor>/members/",
-        ProjectMembersEndpoint.as_view(),
-        name="project-members",
-    ),
+    # Fork (see FORK.md, S30): no anchor/<anchor>/members/. A published board
+    # does not list the project's members to anyone holding its link.
 ]
