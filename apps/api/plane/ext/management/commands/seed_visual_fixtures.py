@@ -92,6 +92,12 @@ COPY_TARGET_ID = uuid.UUID("a0000000-0000-4000-8000-000000000003")
 PUBLISHED_PROJECT_ID = uuid.UUID("a0000000-0000-4000-8000-000000000004")
 # `get_anchor` is a random hex string, and the board's URL is its anchor.
 PUBLISHED_ANCHOR = "a0000000000040008000000000000004"
+# The board lists a work item's labels in `labels__id` order, so random ids put
+# "docs" and "release" in a different order on every fresh database.
+PUBLISHED_LABEL_IDS = {
+    "docs": uuid.UUID("a0000000-0000-4000-8000-000000000095"),
+    "release": uuid.UUID("a0000000-0000-4000-8000-000000000096"),
+}
 # 24 hex characters, the shape `secrets.token_hex(12)` produces.
 INSTANCE_ID = "a00000000000400080000000"
 
@@ -788,7 +794,12 @@ class Command(BaseCommand):
             ]
             labels = {
                 name: Label.objects.create(
-                    name=name, color=color, project=project, workspace=workspace, sort_order=index
+                    id=PUBLISHED_LABEL_IDS[name],
+                    name=name,
+                    color=color,
+                    project=project,
+                    workspace=workspace,
+                    sort_order=index,
                 )
                 for index, (name, color) in enumerate((("docs", "#2563eb"), ("release", "#db2777")), start=1)
             }
