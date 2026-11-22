@@ -4,11 +4,13 @@
  * See the LICENSE file for details.
  */
 
+import { initPromise } from "@plane/i18n";
 import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
 import { API_BASE_URL } from "@plane/constants";
 import { installTrustedTypesPolicies } from "@plane/csp/trusted-types";
+import { setEmojiDataUrl as setBlocksEmojiDataUrl } from "@plane/blocks/emoji-icon-picker";
 import { setEmojiDataUrl } from "@plane/propel/emoji-icon-picker";
 
 import polyfills from "@/lib/polyfills";
@@ -39,15 +41,28 @@ if (import.meta.env.PROD) {
 // value is changed.
 installTrustedTypesPolicies({ reportUrl: `${API_BASE_URL}/api/csp-report/` });
 
-// The emoji picker reads its data from this app, under whatever base path it
-// is served on (packages/csp/src/vite-emoji-data.mjs), never from a CDN.
-setEmojiDataUrl(`${import.meta.env.BASE_URL}emojibase`);
+// The emoji pickers read their data from this app, under whatever base path it
+// is served on (packages/csp/src/vite-emoji-data.mjs), never from a CDN. Both
+// the 1.4 picker (@plane/propel) and the blocks one are pointed at it while web
+// moves to Propel in phases.
+const emojiDataUrl = `${import.meta.env.BASE_URL}emojibase`;
+setEmojiDataUrl(emojiDataUrl);
+setBlocksEmojiDataUrl(emojiDataUrl);
 
-startTransition(() => {
-  hydrateRoot(
-    document,
-    <StrictMode>
-      <HydratedRouter />
-    </StrictMode>
-  );
-});
+// Initialize i18n before hydrating (the remix-i18next pattern for React
+// Router: await init, then hydrateRoot), as upstream makeplane/plane 1a76f29c79
+// does. Hydrating before the instance is ready would make the first client
+// render diverge from the prerendered shell, and React 19 leaves DOM it could
+// not adopt in place instead of clearing it. The policies and emoji data URL
+// above are set first, so nothing renders without them.
+const hydrate = () =>
+  startTransition(() => {
+    hydrateRoot(
+      document,
+      <StrictMode>
+        <HydratedRouter />
+      </StrictMode>
+    );
+  });
+
+void initPromise.catch(() => {}).then(hydrate);

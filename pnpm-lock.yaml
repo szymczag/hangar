@@ -1092,6 +1092,12 @@ importers:
       '@headlessui/react':
         specifier: 'catalog:'
         version: 2.2.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@makeplane/propel':
+        specifier: workspace:*
+        version: link:../../packages/makeplane-propel
+      '@plane/blocks':
+        specifier: workspace:*
+        version: link:../../packages/blocks
       '@plane/constants':
         specifier: workspace:*
         version: link:../../packages/constants
