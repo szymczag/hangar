@@ -11,7 +11,7 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.3.0-rc.2",
+  version: "0.3.0",
   highlights: [
     "The installers now keep plane.env and its copies readable by the owner only; every earlier release left them readable by all local users.",
     "The object-storage migration no longer puts S3 keys on container command lines.",
