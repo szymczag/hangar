@@ -167,6 +167,14 @@ jobs:
       - name: Check the built God Mode
         run: pnpm test:admin-build
 
+      # The same Propel class check on the built published-boards app, plus
+      # what only its built server can show: the HTML it serves carries the
+      # response's nonce on every inline script, has no inline style the
+      # policy would refuse, and renders through the i18n provider, so the
+      # client's first render matches it. Uses the space build from above.
+      - name: Check the built published boards
+        run: pnpm test:space-build
+
       # Nothing had ever run either Storybook -- no workflow, no turbo task, no
       # chromatic -- which is why `packages/ui`'s could sit broken indefinitely,
       # importing a stylesheet that no longer existed. Repairing it without

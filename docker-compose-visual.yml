@@ -274,6 +274,7 @@ services:
       VR_CSP_WEB: "${VR_CSP_WEB}"
       VR_CSP_ADMIN: "${VR_CSP_ADMIN}"
       VR_CSP_TRUSTED_TYPES: "${VR_CSP_TRUSTED_TYPES}"
+      VR_SCREENSHOT_STYLE: "${VR_SCREENSHOT_STYLE}"
     volumes:
       - ./apps/visual-tests/Caddyfile.vr:/etc/caddy/Caddyfile:ro
       - ./apps/web/build/client:/srv/web:ro

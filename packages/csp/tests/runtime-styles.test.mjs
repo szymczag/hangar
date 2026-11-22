@@ -47,8 +47,8 @@ test("Base UI 1.x renders no other inline <style> or <script> element", () => {
   // above, and PrehydrationScript, which renders only while React hydrates
   // server-rendered markup and whose body is an empty stub under the bundlers'
   // "browser" condition. Admin and web are client-only builds; space is
-  // server-rendered but does not use Base UI 1.x. A space that does would need
-  // the per-request nonce passed through Base UI's CSPProvider.
+  // server-rendered, so its providers pass the per-request nonce through
+  // Base UI's CSPProvider (apps/space/tests/built-assets.build.test.mjs).
   const root = baseUiRoot();
   const found = [];
   const walk = (dir) => {

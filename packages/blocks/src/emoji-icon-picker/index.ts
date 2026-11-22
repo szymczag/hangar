@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+export { getEmojiDataUrl, setEmojiDataUrl } from "./emoji/data-url";
 export * from "./emoji-picker";
 export * from "./helper";
 export * from "./logo";

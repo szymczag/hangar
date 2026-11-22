@@ -34,13 +34,13 @@ export function TermsAndConditions(props: Props) {
 
   return (
     <span className="flex items-center justify-center py-6">
-      <p className="text-center text-13 whitespace-pre-line text-secondary">
+      <p className="text-center text-body-xs-regular whitespace-pre-line text-secondary">
         {isSignUp ? "By creating an account" : "By signing in"}
         {termsUrl && (
           <>
             {", you agree to the "}
             <a href={termsUrl} target="_blank" rel="noopener noreferrer">
-              <span className="text-13 font-medium underline hover:cursor-pointer">Terms of Service</span>
+              <span className="text-body-xs-medium underline hover:cursor-pointer">Terms of Service</span>
             </a>
           </>
         )}
@@ -48,7 +48,7 @@ export function TermsAndConditions(props: Props) {
           <>
             {termsUrl ? " and acknowledge the " : ", you acknowledge the "}
             <a href={privacyUrl} target="_blank" rel="noopener noreferrer">
-              <span className="text-13 font-medium underline hover:cursor-pointer">Privacy Policy</span>
+              <span className="text-body-xs-medium underline hover:cursor-pointer">Privacy Policy</span>
             </a>
           </>
         )}

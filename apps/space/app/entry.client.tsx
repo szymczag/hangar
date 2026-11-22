@@ -4,12 +4,13 @@
  * See the LICENSE file for details.
  */
 
+import { initPromise } from "@plane/i18n";
 import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
 import { API_BASE_URL } from "@plane/constants";
 import { installTrustedTypesPolicies } from "@plane/csp/trusted-types";
-import { setEmojiDataUrl } from "@plane/propel/emoji-icon-picker";
+import { setEmojiDataUrl } from "@plane/blocks/emoji-icon-picker";
 
 // Trusted Types policies (docs/trusted-types-plan.md), before React renders
 // anything: library code that hands HTML strings to the DOM goes through the
@@ -21,11 +22,19 @@ installTrustedTypesPolicies({ reportUrl: `${API_BASE_URL}/api/csp-report/` });
 // is served on (packages/csp/src/vite-emoji-data.mjs), never from a CDN.
 setEmojiDataUrl(`${import.meta.env.BASE_URL}emojibase`);
 
-startTransition(() => {
-  hydrateRoot(
-    document,
-    <StrictMode>
-      <HydratedRouter />
-    </StrictMode>
-  );
-});
+// Initialize i18n before hydrating (the remix-i18next pattern for React
+// Router: await init, then hydrateRoot). The server renders with an
+// initialized instance; hydrating before the client instance is ready would
+// make the first client render diverge from the server HTML, and React 19
+// leaves server DOM it could not adopt in place instead of clearing it.
+const hydrate = () =>
+  startTransition(() => {
+    hydrateRoot(
+      document,
+      <StrictMode>
+        <HydratedRouter />
+      </StrictMode>
+    );
+  });
+
+void initPromise.catch(() => {}).then(hydrate);

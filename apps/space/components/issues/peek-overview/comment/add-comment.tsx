@@ -9,7 +9,7 @@ import { observer } from "mobx-react";
 import { useForm, Controller } from "react-hook-form";
 // plane imports
 import type { EditorRefApi } from "@plane/editor";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import { SitesFileService } from "@plane/services";
 import type { TIssuePublicComment } from "@plane/types";
 // editor components
@@ -62,10 +62,11 @@ export const AddComment = observer(function AddComment(props: Props) {
           });
           setUploadAssetIds([]);
         }
+        return res;
       })
       .catch(() =>
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: "Comment could not be posted. Please try again.",
         })

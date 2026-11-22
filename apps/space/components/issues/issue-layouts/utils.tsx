@@ -7,7 +7,8 @@
 import { isNil } from "lodash-es";
 // types
 import { EIconSize, ISSUE_PRIORITIES } from "@plane/constants";
-import { CycleGroupIcon, CycleIcon, ModuleIcon, PriorityIcon, StateGroupIcon } from "@plane/propel/icons";
+import { CycleGroupIcon, PriorityIcon, StateGroupIcon } from "@plane/blocks/icons";
+import { CyclesOutline, ModuleOutline } from "@makeplane/propel/icons";
 import type {
   GroupByColumnTypes,
   IGroupByColumn,
@@ -16,7 +17,7 @@ import type {
   TGroupedIssues,
 } from "@plane/types";
 // ui
-import { Avatar } from "@plane/ui";
+import { Avatar } from "@makeplane/propel/components/avatar";
 // components
 // constants
 // stores
@@ -79,7 +80,7 @@ const getCycleColumns = (cycleStore: ICycleStore): IGroupByColumn[] | undefined 
   cycleGroups.push({
     id: "None",
     name: "None",
-    icon: <CycleIcon className="h-3.5 w-3.5" />,
+    icon: <CyclesOutline className="h-3.5 w-3.5" />,
     payload: { cycle_id: null },
   });
 
@@ -98,14 +99,14 @@ const getModuleColumns = (moduleStore: IIssueModuleStore): IGroupByColumn[] | un
       moduleGroups.push({
         id: moduleInfo.id,
         name: moduleInfo.name,
-        icon: <ModuleIcon className="h-3.5 w-3.5" />,
+        icon: <ModuleOutline className="h-3.5 w-3.5" />,
         payload: { module_ids: [moduleInfo.id] },
       });
   }) as any;
   moduleGroups.push({
     id: "None",
     name: "None",
-    icon: <ModuleIcon className="h-3.5 w-3.5" />,
+    icon: <ModuleOutline className="h-3.5 w-3.5" />,
     payload: { module_ids: [] },
   });
 
@@ -146,42 +147,57 @@ const getLabelsColumns = (label: IIssueLabelStore) => {
 
   const labels = [...storeLabels, { id: "None", name: "None", color: "#666" }];
 
-  return labels.map((label) => ({
-    id: label.id,
-    name: label.name,
+  return labels.map((columnLabel) => ({
+    id: columnLabel.id,
+    name: columnLabel.name,
     icon: (
-      <div className="h-[12px] w-[12px] rounded-full" style={{ backgroundColor: label.color ? label.color : "#666" }} />
+      <div
+        className="h-[12px] w-[12px] rounded-full"
+        style={{ backgroundColor: columnLabel.color ? columnLabel.color : "#666" }}
+      />
     ),
-    payload: label?.id === "None" ? {} : { label_ids: [label.id] },
+    payload: columnLabel?.id === "None" ? {} : { label_ids: [columnLabel.id] },
   }));
 };
 
-const getAssigneeColumns = (member: IIssueMemberStore) => {
-  const { members } = member;
+const getAssigneeColumns = (memberStore: IIssueMemberStore) => {
+  const { members } = memberStore;
 
   if (!members) return;
 
   const assigneeColumns: any = members.map((member) => ({
     id: member.id,
     name: member?.member__display_name || "",
-    icon: <Avatar name={member?.member__display_name} src={undefined} size="md" />,
+    icon: (
+      <Avatar
+        size="xs"
+        alt={member?.member__display_name}
+        fallback={member?.member__display_name?.[0]?.toUpperCase()}
+      />
+    ),
     payload: { assignee_ids: [member.id] },
   }));
 
-  assigneeColumns.push({ id: "None", name: "None", icon: <Avatar size="md" />, payload: {} });
+  assigneeColumns.push({ id: "None", name: "None", icon: <Avatar size="xs" />, payload: {} });
 
   return assigneeColumns;
 };
 
-const getCreatedByColumns = (member: IIssueMemberStore) => {
-  const { members } = member;
+const getCreatedByColumns = (memberStore: IIssueMemberStore) => {
+  const { members } = memberStore;
 
   if (!members) return;
 
   return members.map((member) => ({
     id: member.id,
     name: member?.member__display_name || "",
-    icon: <Avatar name={member?.member__display_name} src={undefined} size="md" />,
+    icon: (
+      <Avatar
+        size="xs"
+        alt={member?.member__display_name}
+        fallback={member?.member__display_name?.[0]?.toUpperCase()}
+      />
+    ),
     payload: {},
   }));
 };

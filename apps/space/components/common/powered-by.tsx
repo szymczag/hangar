@@ -6,7 +6,7 @@
 
 import { SOURCE_CODE_URL } from "@plane/constants";
 // assets
-import { HangarMark } from "@plane/propel/icons";
+import { HangarMark } from "@plane/blocks/icons";
 import { useInstance } from "@/hooks/store/use-instance";
 
 type TPoweredBy = {
@@ -29,7 +29,7 @@ export function PoweredBy(props: TPoweredBy) {
       rel="noreferrer noopener"
     >
       <HangarMark className="size-3 text-primary" />
-      <div className="text-11">
+      <div className="text-caption-sm-regular">
         Powered by <span className="font-semibold">Hangar Publish</span>
       </div>
     </a>

@@ -8,13 +8,15 @@
 # entirely: no COOKIE_DOMAIN, no CORS configuration, and no SameSite reasoning,
 # because the browser never leaves the origin it was given the session on.
 #
-# Published boards (space) and the live collaboration server are routed for the
-# security suite; the visual suite photographs neither.
+# Published boards (space) are photographed by the visual suite and, with the
+# live collaboration server, exercised by the security suite.
 #
 # Web and admin are served with the Content-Security-Policy their builds
 # generated, enforced, and the default report-only Trusted Types policy
-# (scripts/vr.mjs renders both); space sends its own. Violations are reported to
-# the API, and `pnpm vr` fails on any.
+# (scripts/vr.mjs renders both); space sends its own, to which the edge adds
+# only the hash of screenshot.css, as it does for web and admin: Playwright
+# applies that file as an inline <style> when it takes a screenshot. Violations
+# are reported to the API, and `pnpm vr` fails on any.
 
 :80 {
 	# Every route is a `handle` block, deliberately. Caddy orders `handle`
@@ -39,7 +41,9 @@
 
 	redir /spaces /spaces/ permanent
 	handle /spaces/* {
-		reverse_proxy vr-space:3000
+		reverse_proxy vr-space:3000 {
+			header_down Content-Security-Policy "style-src-elem 'self'" "style-src-elem 'self' {$VR_SCREENSHOT_STYLE}"
+		}
 	}
 	handle /live/* {
 		reverse_proxy vr-live:3000

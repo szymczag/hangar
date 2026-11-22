@@ -10,7 +10,7 @@ import { useTheme } from "next-themes";
 import useSWR from "swr";
 // plane imports
 import { SPACE_BASE_PATH } from "@plane/constants";
-import { HangarLogo } from "@plane/propel/icons";
+import { HangarLogo } from "@plane/blocks/icons";
 // assets
 import HangarBackgroundPatternDark from "@/app/assets/auth/background-pattern-dark.svg?url";
 import HangarBackgroundPattern from "@/app/assets/auth/background-pattern.svg?url";

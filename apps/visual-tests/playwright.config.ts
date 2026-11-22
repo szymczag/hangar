@@ -51,6 +51,11 @@ export default defineConfig({
   // "flaky" rather than passing it silently, which is the signal to go and fix
   // the wait. Treat a flaky result as a defect with a deadline, not as a pass.
   retries: 2,
+  // A story without a baseline fails instead of quietly writing one inside the
+  // throwaway container and passing: the first published-board run did exactly
+  // that, so its images were never seen. `pnpm vr:update` passes
+  // --update-snapshots, which overrides this.
+  updateSnapshots: "none",
   reporter: process.env.CI ? [["html", { open: "never" }], ["list"]] : [["list"]],
 
   use: {
