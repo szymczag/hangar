@@ -48,6 +48,9 @@ test("the published board as a board", async ({ page }) => {
 test("a work item opened from the published board", async ({ page }) => {
   const board = await openBoard(page, `?peekId=${fixtures().publishedBoard.peekId}`);
 
+  // The list behind the panel loads on its own; until it has, the left half is
+  // the board's loader, which is a different picture of the same story.
+  await expect(page.getByText(board.workItems[1], { exact: true })).toBeVisible();
   const title = page.getByRole("heading", { name: board.workItems[0] });
   await capture(page, "published-board-peek", { ready: title });
 });
