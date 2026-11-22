@@ -45,7 +45,7 @@ test("the toast's logical insets are in the built space CSS", () => {
   }
 });
 
-const attribute = (tag, name) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
+const attribute = (tag, name) => new RegExp(`\\s${name}="([^"]*)"`, "i").exec(tag)?.[1];
 
 async function render(path) {
   const { createRequestHandler } = await import("react-router");
@@ -68,7 +68,7 @@ test("a published board's HTML carries the response's nonce on every inline scri
   const nonce = nonceOf(policy);
   assert.ok(nonce, "the policy allows scripts by nonce");
 
-  const scripts = [...html.matchAll(/<script\b[^>]*>/g)].map(([tag]) => tag);
+  const scripts = [...html.matchAll(/<script\b[^>]*>/gi)].map(([tag]) => tag);
   const inline = scripts.filter((tag) => attribute(tag, "src") === undefined);
   assert.ok(inline.length > 0, "React Router inlines its context and the hydration entry");
   for (const tag of inline) assert.equal(attribute(tag, "nonce"), nonce, tag);
@@ -79,12 +79,12 @@ test("a published board's HTML carries the response's nonce on every inline scri
 
   // style-src-elem allows only 'self' and the hashes of RUNTIME_STYLE_ELEMENTS.
   const allowedStyles = new Set([...policy.matchAll(/'sha256-([^']+)'/g)].map(([, hash]) => hash));
-  for (const [, body] of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)) {
+  for (const [, body] of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\b[^>]*>/gi)) {
     assert.ok(allowedStyles.has(createHash("sha256").update(body, "utf8").digest("base64")), body);
   }
   // style-src-attr 'none' and script-src-attr 'none': nothing inline on an element.
-  assert.doesNotMatch(html, /<[^>]+\sstyle="/);
-  assert.doesNotMatch(html, /<[^>]+\son[a-z]+="/);
+  assert.doesNotMatch(html, /<[^>]+\sstyle\s*=/i);
+  assert.doesNotMatch(html, /<[^>]+\son[a-z]+\s*=/i);
 
   // The providers rendered on the server: the instance loader sits inside
   // TranslationProvider, which renders nothing until i18n is ready.
@@ -121,7 +121,7 @@ test("Base UI's PrehydrationScript takes its nonce from Propel's CSPProvider", a
     h(TabsList, null, h(Tab, { value: "a", label: "A" }), h(TabsIndicator, { renderBeforeHydration: true }))
   );
   const html = renderToString(h(CSPProvider, { nonce: "request-nonce" }, tabs));
-  const scripts = [...html.matchAll(/<script\b[^>]*>/g)].map(([tag]) => tag);
+  const scripts = [...html.matchAll(/<script\b[^>]*>/gi)].map(([tag]) => tag);
   assert.ok(scripts.length > 0, "the indicator renders its prehydration script on the server");
   for (const tag of scripts) assert.equal(attribute(tag, "nonce"), "request-nonce", tag);
 });
