@@ -8,36 +8,33 @@ import { observer } from "mobx-react";
 // helpers
 import { cn } from "@plane/utils";
 // hooks
-import { useMember } from "@/hooks/store/use-member";
 import { useUser } from "@/hooks/store/use-user";
 
 type Props = {
   id: string;
 };
 
+/**
+ * A user mention on a published board. The board does not say whom a mention names:
+ * resolving the id would need the project's member list, which a board readable by
+ * anyone with the link does not publish (FORK.md, S30). Only the viewer's own mention
+ * shows a name, their own.
+ */
 export const EditorUserMention = observer(function EditorUserMention(props: Props) {
   const { id } = props;
   // store hooks
   const { data: currentUser } = useUser();
-  const { getMemberById } = useMember();
   // derived values
-  const userDetails = getMemberById(id);
-
-  if (!userDetails) {
-    return (
-      <div className="not-prose inline rounded-sm bg-layer-1 px-1 py-0.5 text-tertiary no-underline">
-        @deactivated user
-      </div>
-    );
-  }
+  const isCurrentUser = !!currentUser?.id && id === currentUser.id;
+  const label = (isCurrentUser && currentUser?.display_name) || "user";
 
   return (
     <div
       className={cn("not-prose inline rounded-sm bg-accent-primary/20 px-1 py-0.5 text-accent-primary no-underline", {
-        "bg-yellow-500/20 text-yellow-500": id === currentUser?.id,
+        "bg-yellow-500/20 text-yellow-500": isCurrentUser,
       })}
     >
-      @{userDetails?.member__display_name}
+      @{label}
     </div>
   );
 });

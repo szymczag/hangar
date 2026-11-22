@@ -17,7 +17,6 @@ import type { IIssue } from "@/types/issue";
 import { IssueBlockCycle } from "./cycle";
 import { IssueBlockDate } from "./due-date";
 import { IssueBlockLabels } from "./labels";
-import { IssueBlockMembers } from "./member";
 import { IssueBlockModules } from "./modules";
 import { IssueBlockPriority } from "./priority";
 import { IssueBlockState } from "./state";
@@ -57,8 +56,6 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       key: "due_date",
       chip: <IssueBlockDate date={issue.target_date} stateId={issue.state_id ?? undefined} />,
     });
-  if (isShown("assignee"))
-    entries.push({ key: "assignee", chip: <IssueBlockMembers memberIds={issue.assignee_ids} /> });
   if (isShown("modules") && issue.module_ids && issue.module_ids.length > 0)
     entries.push({ key: "modules", chip: <IssueBlockModules moduleIds={issue.module_ids} /> });
   if (isShown("cycle") && issue.cycle_id)

@@ -18,7 +18,6 @@ import type {
 // hooks
 import { useCycle } from "@/hooks/store/use-cycle";
 import { useLabel } from "@/hooks/store/use-label";
-import { useMember } from "@/hooks/store/use-member";
 import { useModule } from "@/hooks/store/use-module";
 import { useStates } from "@/hooks/store/use-state";
 //
@@ -54,13 +53,12 @@ export const List = observer(function List(props: IList) {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const member = useMember();
   const label = useLabel();
   const cycle = useCycle();
   const modules = useModule();
   const state = useStates();
 
-  const groupList = getGroupByColumns(groupBy as GroupByColumnTypes, cycle, modules, label, state, member, true);
+  const groupList = getGroupByColumns(groupBy as GroupByColumnTypes, cycle, modules, label, state, true);
 
   if (!groupList) return null;
 

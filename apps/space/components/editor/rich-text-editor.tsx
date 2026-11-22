@@ -12,7 +12,6 @@ import type { MakeOptional } from "@plane/types";
 // helpers
 import { getEditorFileHandlers } from "@/helpers/editor.helper";
 // hooks
-import { useMember } from "@/hooks/store/use-member";
 import { useParseEditorContent } from "@/hooks/use-parse-editor-content";
 // plane web imports
 import { useEditorFlagging } from "@/hooks/use-editor-flagging";
@@ -47,8 +46,6 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
     disabledExtensions: additionalDisabledExtensions = [],
     ...rest
   } = props;
-  // store hooks
-  const { getMemberById } = useMember();
   // parse content
   const { getEditorMetaData } = useParseEditorContent({
     anchor,
@@ -59,10 +56,9 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
   return (
     <RichTextEditorWithRef
       mentionHandler={{
-        renderComponent: (props) => <EditorMentionsRoot {...props} />,
-        getMentionedEntityDetails: (id: string) => ({
-          display_name: getMemberById(id)?.member__display_name ?? "",
-        }),
+        renderComponent: (mentionProps) => <EditorMentionsRoot {...mentionProps} />,
+        // A published board does not resolve mentions to names (FORK.md, S30).
+        getMentionedEntityDetails: () => ({ display_name: "user" }),
       }}
       ref={ref}
       disabledExtensions={[...richTextEditorExtensions.disabled, ...additionalDisabledExtensions]}

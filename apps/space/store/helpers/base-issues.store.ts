@@ -59,7 +59,9 @@ export interface IBaseIssuesStore {
   ) => number | undefined;
 }
 
-export const ISSUE_FILTER_DEFAULT_DATA: Record<TIssueDisplayFilterOptions, keyof IIssue> = {
+// A published board's work items name no people (no assignees, no creator), so there is
+// nothing to group them by person with.
+export const ISSUE_FILTER_DEFAULT_DATA: Partial<Record<TIssueDisplayFilterOptions, keyof IIssue>> = {
   project: "project_id",
   cycle: "cycle_id",
   module: "module_ids",
@@ -67,8 +69,6 @@ export const ISSUE_FILTER_DEFAULT_DATA: Record<TIssueDisplayFilterOptions, keyof
   "state_detail.group": "state_group" as keyof IIssue, // state_detail.group is only being used for state_group display,
   priority: "priority",
   labels: "label_ids",
-  created_by: "created_by",
-  assignees: "assignee_ids",
   target_date: "target_date",
 };
 
