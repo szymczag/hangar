@@ -6,10 +6,11 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.3.0`. It is a stable Hangar release for Docker
-Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
-for evaluation on AMD64 clusters only and is not yet a supported production
-release.
+The current release is `0.4.0-rc.1`. It is a release candidate for `0.4.0`;
+the current stable Hangar release for Docker Compose, Docker Swarm and the
+all-in-one image remains `0.3.0`. Helm installs a release candidate only when
+you name its version. On Kubernetes, both are qualified for evaluation on AMD64
+clusters only and are not yet a supported production release.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -63,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.3.0` qualification boundary is:
+The `0.4.0-rc.1` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -77,8 +78,9 @@ The `0.3.0` qualification boundary is:
 | Storage                | A default `StorageClass`, or explicit evaluation storage classes |
 
 The backend, the editor and the live server are also converged with upstream
-`v1.5.0`. God Mode, the instance admin console, uses the upstream `v1.5.0`
-design; the web app and Spaces are still the `v1.4` design.
+`v1.5.0`. God Mode, the instance admin console, and Spaces, which serves the
+published boards, use the upstream `v1.5.0` design; the web app is still the
+`v1.4` design.
 
 The chart does not install an ingress controller, cert-manager, a CNI, a CSI
 driver, an external secret operator, or observability infrastructure.
@@ -223,12 +225,12 @@ client can then change its throttle identity by sending its own `X-Forwarded-For
 
 The product, chart, and Git identifiers are deliberately different:
 
-| Identifier         | Current value                          |
-| ------------------ | -------------------------------------- |
-| Product version    | `v0.3.0`                               |
-| Helm chart version | `0.3.0`                                |
-| Git tag            | `hangar-v0.3.0`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.3.0` |
+| Identifier         | Current value                               |
+| ------------------ | ------------------------------------------- |
+| Product version    | `v0.4.0-rc.1`                               |
+| Helm chart version | `0.4.0-rc.1`                                |
+| Git tag            | `hangar-v0.4.0-rc.1`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.4.0-rc.1` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -241,10 +243,13 @@ upgrade targets for a deployment that holds a Workshop**: their migration
 release candidates are superseded by `0.2.0` and are not rollback targets.
 The `0.3.0` release candidates, `0.3.0-rc.1` and `0.3.0-rc.2`, are superseded
 by `0.3.0` and are not rollback targets.
-`0.2.2` is the previous stable release and the supported rollback target for
+`0.3.0` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
-values, only the images change, and it brings back the previous God Mode
-design. Rolling back further, to `0.2.1`, needs no schema change or values
+values, only the images change, and it brings back the previous design of the
+published boards and a public board API that names every project member and
+assignee. Rolling back further, to `0.2.2`, needs no schema change or values
+change either, but brings back the previous God Mode design. Rolling back
+further, to `0.2.1`, needs no schema change or values
 change either, but brings back the God Mode sessions that survive clone
 detection. Rolling back further, to `0.2.0`, needs no
 schema change or values change either. Rolling back further, to `0.1.4`, needs no
@@ -285,7 +290,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.3.0` notes](../releases/hangar-v0.3.0.md) — review
+- [Release `v0.4.0-rc.1` notes](../releases/hangar-v0.4.0-rc.1.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -317,8 +322,8 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.2.2`, tag `hangar-v0.2.2`, and chart
-`ghcr.io/szymczag/charts/hangar:0.2.2`. Anybody still on rc.62 with
+The previous release is `0.3.0`, tag `hangar-v0.3.0`, and chart
+`ghcr.io/szymczag/charts/hangar:0.3.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
@@ -333,6 +338,27 @@ Charts `0.3.0-rc.1` and `0.3.0-rc.2` were release candidates for `0.3.0` and
 are superseded by it; do not install them. `0.3.0` is built from the
 `0.3.0-rc.2` source, so an installation on either candidate upgrades to `0.3.0`
 with `helm upgrade` and `--version 0.3.0` and no other action.
+
+Release 0.4.0-rc.1 adds no database or license migration compared with 0.3.0
+and changes nothing in the chart's templates, values or Secrets. Upgrade from
+0.3.0 with `helm upgrade` and `--version 0.4.0-rc.1`; Helm does not select a
+release candidate otherwise. No other action is required. Two images change.
+The `space` image, which serves the published boards, moves to the upstream
+Plane 1.5.0 design on the Propel component library with its per-request nonce
+Content-Security-Policy unchanged; its emoji picker reads its data from the
+instance, never from a CDN, and the boards still show only the key, state,
+priority, labels and due date. The `api` image's public board API
+(`/api/public/`) no longer names project members: work items lose
+`assignee_ids` and `created_by`, `anchor/<anchor>/members/` answers 404,
+commenters, voters and reactors are reduced to `id`, `display_name`,
+`avatar_url` and `is_bot`, and grouping by a person answers 400 while person
+filters are ignored. That is a breaking change for any client of that API
+outside Hangar's own Spaces. The `web`, `admin` and `live` application code is
+unchanged. The installer change in this release, which makes an outdated
+`setup.sh` refuse to upgrade, concerns Docker Compose and Swarm; nothing
+changes on Kubernetes. Rolling back to 0.3.0 needs no schema change and no
+change to the values, and brings back the previous board design and member
+data.
 
 Release 0.3.0 adds no database or license migration compared with 0.2.2 and
 changes nothing in the chart's templates, values or Secrets; upgrade from 0.2.2

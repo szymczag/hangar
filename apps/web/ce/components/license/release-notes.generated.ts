@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.3.0",
+  version: "0.4.0-rc.1",
   highlights: [
-    "The installers now keep plane.env and its copies readable by the owner only; every earlier release left them readable by all local users.",
-    "The object-storage migration no longer puts S3 keys on container command lines.",
-    "God Mode moves to the new upstream 1.5.0 design, with its security rules kept.",
-    "God Mode secret fields no longer take a browser's saved password.",
-    "God Mode sign-in and setup wait for their CSRF token.",
+    "Published boards no longer reveal who is in the project.",
+    "An outdated setup.sh now refuses to install or upgrade to a newer release.",
+    "Spaces keeps its Content-Security-Policy on the new design and loads no emoji data from a CDN.",
+    "The published boards move to the new upstream 1.5.0 design.",
+    "Breaking change for clients of the public board API.",
   ],
   upstream: {
     version: "1.4.3",
