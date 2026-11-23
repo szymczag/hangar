@@ -39,6 +39,8 @@ type TAuthenticationWrapper = {
 // to use.
 const isValidURL = isValidNextPath;
 
+const PROFILE_SECURITY_SETTINGS_PATH = "/settings/profile/security";
+
 export const AuthenticationWrapper = observer(function AuthenticationWrapper(props: TAuthenticationWrapper) {
   const pathname = usePathname();
   const router = useAppRouter();
@@ -129,9 +131,12 @@ export const AuthenticationWrapper = observer(function AuthenticationWrapper(pro
       router.push(`/${pathname ? `?next_path=${pathname}` : ``}`);
       return <></>;
     } else {
-      if (currentUser && !currentUser?.is_password_autoset && currentUserProfile?.id && isUserOnboard) {
-        const currentRedirectRoute = getWorkspaceRedirectionUrl();
-        router.push(currentRedirectRoute);
+      // Fork (see FORK.md): an account that already has a password changes it
+      // in the security settings, onboarded or not. Upstream sent only an
+      // onboarded one away (to its workspace) and showed the rest a form that
+      // set-password refuses with PASSWORD_ALREADY_SET.
+      if (currentUser && !currentUser?.is_password_autoset) {
+        router.replace(PROFILE_SECURITY_SETTINGS_PATH);
         return <></>;
       } else return <>{children}</>;
     }

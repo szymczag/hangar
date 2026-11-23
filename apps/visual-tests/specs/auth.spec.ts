@@ -137,6 +137,19 @@ test("set password", async ({ asUser }) => {
   await capture(page, "set-password", { ready: page.locator("#password") });
 });
 
+test("set password: an account bound to an identity provider", async ({ asUser }) => {
+  const page = await asUser("light");
+  await rewrite<Record<string, unknown>>(page, "/api/users/me/", (user) => ({
+    ...user,
+    is_password_autoset: true,
+    is_federated: true,
+  }));
+  await page.goto("/accounts/set-password");
+  await capture(page, "set-password-federated", {
+    ready: page.getByText("This account signs in through an identity provider"),
+  });
+});
+
 test("onboarding: the profile step", async ({ asUser }) => {
   const page = await asUser("light");
   await notOnboarded(page);
