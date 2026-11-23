@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.4.0-rc.1`. It is a release candidate for `0.4.0`;
+The current release is `0.4.0-rc.2`. It is a release candidate for `0.4.0`;
 the current stable Hangar release for Docker Compose, Docker Swarm and the
 all-in-one image remains `0.3.0`. Helm installs a release candidate only when
 you name its version. On Kubernetes, both are qualified for evaluation on AMD64
@@ -64,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.4.0-rc.1` qualification boundary is:
+The `0.4.0-rc.2` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -79,8 +79,9 @@ The `0.4.0-rc.1` qualification boundary is:
 
 The backend, the editor and the live server are also converged with upstream
 `v1.5.0`. God Mode, the instance admin console, and Spaces, which serves the
-published boards, use the upstream `v1.5.0` design; the web app is still the
-`v1.4` design.
+published boards, use the upstream `v1.5.0` design. The web app loads the
+upstream `v1.5.0` design tokens, but its components are still the `v1.4`
+design.
 
 The chart does not install an ingress controller, cert-manager, a CNI, a CSI
 driver, an external secret operator, or observability infrastructure.
@@ -227,10 +228,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                               |
 | ------------------ | ------------------------------------------- |
-| Product version    | `v0.4.0-rc.1`                               |
-| Helm chart version | `0.4.0-rc.1`                                |
-| Git tag            | `hangar-v0.4.0-rc.1`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.4.0-rc.1` |
+| Product version    | `v0.4.0-rc.2`                               |
+| Helm chart version | `0.4.0-rc.2`                                |
+| Git tag            | `hangar-v0.4.0-rc.2`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.4.0-rc.2` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -243,11 +244,12 @@ upgrade targets for a deployment that holds a Workshop**: their migration
 release candidates are superseded by `0.2.0` and are not rollback targets.
 The `0.3.0` release candidates, `0.3.0-rc.1` and `0.3.0-rc.2`, are superseded
 by `0.3.0` and are not rollback targets.
+`0.4.0-rc.1` is superseded by `0.4.0-rc.2` and is not a rollback target.
 `0.3.0` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
 values, only the images change, and it brings back the previous design of the
-published boards and a public board API that names every project member and
-assignee. Rolling back further, to `0.2.2`, needs no schema change or values
+published boards, a public board API that names every project member and
+assignee, and the web app on the `v1.4` design tokens. Rolling back further, to `0.2.2`, needs no schema change or values
 change either, but brings back the previous God Mode design. Rolling back
 further, to `0.2.1`, needs no schema change or values
 change either, but brings back the God Mode sessions that survive clone
@@ -290,7 +292,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.4.0-rc.1` notes](../releases/hangar-v0.4.0-rc.1.md) — review
+- [Release `v0.4.0-rc.2` notes](../releases/hangar-v0.4.0-rc.2.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -322,8 +324,10 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.3.0`, tag `hangar-v0.3.0`, and chart
-`ghcr.io/szymczag/charts/hangar:0.3.0`. Anybody still on rc.62 with
+The previous release is `0.4.0-rc.1`, tag `hangar-v0.4.0-rc.1`, and chart
+`ghcr.io/szymczag/charts/hangar:0.4.0-rc.1`, a release candidate that
+`0.4.0-rc.2` supersedes. The previous stable release is `0.3.0`, tag
+`hangar-v0.3.0`, and chart `ghcr.io/szymczag/charts/hangar:0.3.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
@@ -338,6 +342,33 @@ Charts `0.3.0-rc.1` and `0.3.0-rc.2` were release candidates for `0.3.0` and
 are superseded by it; do not install them. `0.3.0` is built from the
 `0.3.0-rc.2` source, so an installation on either candidate upgrades to `0.3.0`
 with `helm upgrade` and `--version 0.3.0` and no other action.
+
+Chart `0.4.0-rc.1` was the first release candidate for `0.4.0`. It is
+superseded by `0.4.0-rc.2`; do not install it, and upgrade an installation on
+it to `0.4.0-rc.2` with `helm upgrade` and `--version 0.4.0-rc.2` and no other
+action.
+
+Release 0.4.0-rc.2 adds no database or license migration compared with 0.3.0
+or 0.4.0-rc.1 and changes nothing in the chart's templates, values or Secrets.
+Upgrade from 0.3.0 or 0.4.0-rc.1 with `helm upgrade` and
+`--version 0.4.0-rc.2`; Helm does not select a release candidate otherwise. No
+other action is required. Compared with 0.4.0-rc.1, three images change. The
+`api` image records page version history, which no earlier Hangar release
+did; versions are recorded from this release on, not for earlier edits. Its
+public board API now returns a work item's votes and reactions from the
+`issues/<issue>/votes/` and `issues/<issue>/reactions/` lists, which always
+answered an empty list, still scoped to the board and reduced to the public
+actor, and answers an empty `vote_items` and `reaction_items` instead of
+`null`. The `space` image saves the first reaction on a work item, which it
+used to drop. The `web` image loads the upstream Plane 1.5.0 design tokens, so
+colours, font weights, line heights and letter-spacing shift slightly across
+the web app while its components stay the same; it now waits for its
+translations before it hydrates. The `admin` and `live` application code is
+unchanged. The installer change in this candidate, which prints the command
+that starts the services after an upgrade, concerns Docker Compose; nothing
+changes on Kubernetes. Rolling back to 0.3.0 needs no schema change and no
+change to the values; page versions recorded on this release stay in the
+database and stay readable, but 0.3.0 records no new ones.
 
 Release 0.4.0-rc.1 adds no database or license migration compared with 0.3.0
 and changes nothing in the chart's templates, values or Secrets. Upgrade from
