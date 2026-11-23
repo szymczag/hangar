@@ -110,31 +110,32 @@ its emoji pickers read their data from this instance, never from a CDN.
 
 ## Migrations and compatibility
 
-**Page version history is now recorded.** No Hangar release before this one
-recorded it. Every page save started a background task that failed on a field
-upstream Plane had renamed (`AttributeError: 'Page' object has no attribute
-'description'`), and the task only logged the error, so the save itself
-succeeded and the page's version history stayed empty. Upstream Plane `v1.5.0`
-has the same bug. From this release on, saving a page records a version: a
-user's saves within ten minutes update that user's latest version, and a page
-keeps at most its 20 most recent versions. **Versions are recorded from this
-release on, not for earlier edits**: history before the upgrade cannot be
-recovered. The version history panel and its endpoints are unchanged and need
-no migration. Anyone who can open a page can open its history, under the same
-project and guest rules as the page itself, so text removed from a page stays
-readable in its earlier versions until they age out.
+**Page version history is now recorded.** New in this candidate. No Hangar
+release before this one recorded it. Every page save started a background task
+that failed on a field upstream Plane had renamed (`AttributeError: 'Page'
+object has no attribute 'description'`), and the task only logged the error, so
+the save itself succeeded and the page's version history stayed empty. Upstream
+Plane `v1.5.0` has the same bug. From this release on, saving a page records a
+version: a user's saves within ten minutes update that user's latest version,
+and a page keeps at most its 20 most recent versions. **Versions are recorded
+from this release on, not for earlier edits**: history before the upgrade
+cannot be recovered. The version history panel and its endpoints are unchanged
+and need no migration. Anyone who can open a page can open its history, under
+the same project and guest rules as the page itself, so text removed from a
+page stays readable in its earlier versions until they age out.
 
-**The web app loads the new upstream 1.5.0 design tokens.** This is the first
-step in moving the web app to the Propel design that God Mode and the published
-boards already use. The web app's stylesheet now carries Propel's colour,
-typography and spacing tokens, and its components, which are unchanged, render
-on them. Colours, font weights, line heights and letter-spacing shift slightly
-across the whole web app: some light-mode greys are a little darker, accent,
-danger and warning tints move by a step, regular text is slightly heavier,
-body lines are a little taller and text a little wider, so lists and cards
-grow by a few pixels. Menus still open above dialogs. The web app also waits
-for its translations to load before it hydrates, as Spaces already does; a
-failed translation load does not stop the app from starting.
+**The web app loads the new upstream 1.5.0 design tokens.** New in this
+candidate, and the first step in moving the web app to the Propel design that
+God Mode and the published boards already use. The web app's stylesheet now
+carries Propel's colour, typography and spacing tokens, and its components,
+which are unchanged, render on them. Colours, font weights, line heights and
+letter-spacing shift slightly across the whole web app: some light-mode greys
+are a little darker, accent, danger and warning tints move by a step, regular
+text is slightly heavier, body lines are a little taller and text a little
+wider, so lists and cards grow by a few pixels. Menus still open above dialogs.
+The web app also waits for its translations to load before it hydrates, as
+Spaces already does; a failed translation load does not stop the app from
+starting.
 
 **The first reaction on a published work item now saves.** New in this
 candidate. On a work item nobody had reacted to, Spaces dropped the reaction
@@ -142,9 +143,8 @@ before it sent it: the board API answered `null` instead of an empty list for
 `reaction_items` and `vote_items`, and Spaces failed on it. The API now
 answers an empty list on the work item and on the board's lists, grouped or
 not, and Spaces tolerates `null` from an older server. A failed vote or
-reaction no longer leaves the work item showing rows it cannot read. Up to and
-including `0.4.0-rc.1`, and on `0.3.0`, the first reaction on a work item was
-lost.
+reaction no longer leaves the work item showing rows it cannot read. `0.3.0`
+and `0.4.0-rc.1` both lost the first reaction on a work item.
 
 **The published boards move to the new upstream 1.5.0 design.** This carries
 over from `0.4.0-rc.1`. Spaces now uses the Propel component library and the
@@ -273,7 +273,7 @@ values: only the images change. It brings back the previous look of the
 published boards and the web app's previous design tokens, a public board API
 that names every project member and assignee, and the lost first reaction.
 `0.3.0` records no page versions; those recorded on this release stay in the
-database and stay readable in the history panel, but no new ones are added. The release check in this
-release's script never refuses an older release, so it does not stand in the
-way of a rollback. Rolling back to `0.4.0-rc.1` is not supported, because it is
-superseded.
+database and stay readable in the history panel, but no new ones are added. The
+release check in this release's script never refuses an older release, so it
+does not stand in the way of a rollback. Rolling back to `0.4.0-rc.1` is not
+supported, because it is superseded.
