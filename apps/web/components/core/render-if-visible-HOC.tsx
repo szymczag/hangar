@@ -15,6 +15,7 @@ type Props = {
   horizontalOffset?: number;
   root?: MutableRefObject<HTMLElement | null>;
   children: ReactNode;
+  // @types/react 19 removed the global JSX namespace; it now lives under React.
   as?: keyof React.JSX.IntrinsicElements;
   classNames?: string;
   placeholderChildren?: ReactNode;

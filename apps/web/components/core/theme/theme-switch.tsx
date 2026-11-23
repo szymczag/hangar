@@ -5,17 +5,41 @@
  */
 
 // plane imports
+import { SelectField } from "@makeplane/propel/components/select-field";
 import type { I_THEME_OPTION } from "@plane/constants";
 import { THEME_OPTIONS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-// constants
-import { CustomSelect } from "@plane/ui";
-// ui
 
 type Props = {
   value: I_THEME_OPTION | null;
   onChange: (value: I_THEME_OPTION) => void;
 };
+
+function ThemeOptionIcon({ option }: { option: I_THEME_OPTION }) {
+  return (
+    <div
+      aria-hidden
+      className="relative flex h-4 w-4 rotate-45 transform items-center justify-center rounded-full border"
+      style={{
+        borderColor: option.icon.border,
+      }}
+    >
+      <div
+        className="h-full w-1/2 rounded-l-full"
+        style={{
+          background: option.icon.color1,
+        }}
+      />
+      <div
+        className="h-full w-1/2 rounded-r-full border-l"
+        style={{
+          borderLeftColor: option.icon.border,
+          background: option.icon.color2,
+        }}
+      />
+    </div>
+  );
+}
 
 export function ThemeSwitch(props: Props) {
   const { value, onChange } = props;
@@ -23,69 +47,22 @@ export function ThemeSwitch(props: Props) {
   const { t } = useTranslation();
 
   return (
-    <CustomSelect
-      value={value}
-      label={
-        value ? (
-          <div className="flex items-center gap-2">
-            <div
-              className="relative flex h-4 w-4 rotate-45 transform items-center justify-center rounded-full border-1"
-              style={{
-                borderColor: value.icon.border,
-              }}
-            >
-              <div
-                className="h-full w-1/2 rounded-l-full"
-                style={{
-                  background: value.icon.color1,
-                }}
-              />
-              <div
-                className="h-full w-1/2 rounded-r-full border-l"
-                style={{
-                  borderLeftColor: value.icon.border,
-                  background: value.icon.color2,
-                }}
-              />
-            </div>
-            {t(value.key)}
-          </div>
-        ) : (
-          t("select_your_theme")
-        )
-      }
-      onChange={onChange}
-      buttonClassName="border border-subtle-1"
-      placement="bottom-end"
-      input
-    >
-      {THEME_OPTIONS.map((themeOption) => (
-        <CustomSelect.Option key={themeOption.value} value={themeOption}>
-          <div className="flex items-center gap-2">
-            <div
-              className="relative flex h-4 w-4 rotate-45 transform items-center justify-center rounded-full border border-1"
-              style={{
-                borderColor: themeOption.icon.border,
-              }}
-            >
-              <div
-                className="h-full w-1/2 rounded-l-full"
-                style={{
-                  background: themeOption.icon.color1,
-                }}
-              />
-              <div
-                className="h-full w-1/2 rounded-r-full border-l"
-                style={{
-                  borderLeftColor: themeOption.icon.border,
-                  background: themeOption.icon.color2,
-                }}
-              />
-            </div>
-            {t(themeOption.key)}
-          </div>
-        </CustomSelect.Option>
-      ))}
-    </CustomSelect>
+    <SelectField<string>
+      aria-label={t("theme")}
+      size="md"
+      width="fit"
+      value={value?.value ?? null}
+      onValueChange={(themeValue) => {
+        const themeOption = THEME_OPTIONS.find((option) => option.value === themeValue);
+        if (themeOption) onChange(themeOption);
+      }}
+      icon={value ? <ThemeOptionIcon option={value} /> : undefined}
+      options={THEME_OPTIONS.map((option) => ({
+        value: option.value,
+        label: t(option.key),
+        icon: <ThemeOptionIcon option={option} />,
+      }))}
+      placeholder={t("select_your_theme")}
+    />
   );
 }

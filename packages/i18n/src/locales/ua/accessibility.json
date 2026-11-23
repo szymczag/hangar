@@ -43,7 +43,8 @@
       "swatches": "Готові кольори"
     },
     "common": {
-      "more_actions": "Інші дії"
+      "more_actions": "Інші дії",
+      "remove": "Вилучити"
     }
   }
 }

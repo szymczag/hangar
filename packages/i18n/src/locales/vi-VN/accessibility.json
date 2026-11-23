@@ -43,7 +43,8 @@
       "swatches": "Màu có sẵn"
     },
     "common": {
-      "more_actions": "Thao tác khác"
+      "more_actions": "Thao tác khác",
+      "remove": "Xóa"
     }
   }
 }

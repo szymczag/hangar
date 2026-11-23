@@ -43,7 +43,8 @@
       "swatches": "Warna preset"
     },
     "common": {
-      "more_actions": "Tindakan lainnya"
+      "more_actions": "Tindakan lainnya",
+      "remove": "Hapus"
     }
   }
 }

@@ -43,7 +43,8 @@
       "swatches": "Hazır renkler"
     },
     "common": {
-      "more_actions": "Diğer işlemler"
+      "more_actions": "Diğer işlemler",
+      "remove": "Kaldır"
     }
   }
 }

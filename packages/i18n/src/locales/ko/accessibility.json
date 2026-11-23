@@ -43,7 +43,8 @@
       "swatches": "기본 색상"
     },
     "common": {
-      "more_actions": "추가 작업"
+      "more_actions": "추가 작업",
+      "remove": "제거"
     }
   }
 }

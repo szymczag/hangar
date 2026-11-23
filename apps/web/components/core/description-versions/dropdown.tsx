@@ -5,12 +5,12 @@
  */
 
 import { observer } from "mobx-react";
-import { History } from "lucide-react";
 // plane imports
+import { Menu, MenuContent, MenuGroup, MenuLabel, MenuTrigger } from "@makeplane/propel/components/menu";
+import { ChevronDownOutline, HistoryOutline } from "@makeplane/propel/icons";
 import { useTranslation } from "@plane/i18n";
 import type { TDescriptionVersion } from "@plane/types";
-import { CustomMenu } from "@plane/ui";
-import { calculateTimeAgo } from "@plane/utils";
+import { calculateTimeAgo, cn } from "@plane/utils";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 // local imports
@@ -38,30 +38,39 @@ export const DescriptionVersionsDropdown = observer(function DescriptionVersions
   const { t } = useTranslation();
 
   return (
-    <CustomMenu
-      label={
+    <Menu>
+      <MenuTrigger
+        disabled={disabled}
+        render={
+          <button
+            type="button"
+            className={cn(
+              "flex h-7 items-center justify-between gap-1.5 rounded-md bg-layer-transparent px-2 text-body-sm-regular whitespace-nowrap text-primary transition-colors outline-none",
+              disabled ? "cursor-not-allowed text-disabled" : "cursor-pointer hover:bg-layer-transparent-hover"
+            )}
+          />
+        }
+      >
         <div className="flex items-center gap-1 text-tertiary">
           <span className="grid size-4 flex-shrink-0 place-items-center">
-            <History className="size-3.5" />
+            <HistoryOutline className="size-3.5" />
           </span>
-          <p className="text-11">
+          <p className="text-caption-sm-regular">
             {t("description_versions.last_edited_by")}{" "}
             <span className="font-medium">{lastUpdatedByUserDisplayName ?? t("common.deactivated_user")}</span>{" "}
             {calculateTimeAgo(lastUpdatedAt)}
           </p>
         </div>
-      }
-      noBorder
-      noChevron={disabled}
-      placement="bottom-end"
-      optionsClassName="w-[300px]"
-      disabled={disabled}
-      closeOnSelect
-    >
-      <p className="mb-1 text-11 font-medium text-tertiary">{t("description_versions.previously_edited_by")}</p>
-      {versions?.map((version) => (
-        <DescriptionVersionsDropdownItem key={version.id} onClick={onVersionClick} version={version} />
-      ))}
-    </CustomMenu>
+        {!disabled && <ChevronDownOutline className="size-4 flex-shrink-0" />}
+      </MenuTrigger>
+      <MenuContent side="bottom" align="end">
+        <MenuGroup>
+          <MenuLabel>{t("description_versions.previously_edited_by")}</MenuLabel>
+          {versions?.map((version) => (
+            <DescriptionVersionsDropdownItem key={version.id} onClick={onVersionClick} version={version} />
+          ))}
+        </MenuGroup>
+      </MenuContent>
+    </Menu>
   );
 });

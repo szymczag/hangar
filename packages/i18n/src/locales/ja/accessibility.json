@@ -43,7 +43,8 @@
       "swatches": "プリセットカラー"
     },
     "common": {
-      "more_actions": "その他の操作"
+      "more_actions": "その他の操作",
+      "remove": "削除"
     }
   }
 }
