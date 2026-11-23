@@ -105,6 +105,31 @@ class EmailVerificationThrottle(UserRateThrottle):
             return Response(e.get_error_dict(), status=status.HTTP_429_TOO_MANY_REQUESTS)
 
 
+class SetPasswordThrottle(UserRateThrottle):
+    """
+    Fork (see FORK.md): per-account limit on setting a first password.
+
+    `POST /auth/set-password/` is session-only, so the default AnonRateThrottle
+    never applies to it. AuthenticationThrottle bounds it per client address;
+    this bounds it per account, so one session cannot keep submitting candidate
+    passwords from many addresses. An account sets a first password once, and
+    the web form refuses a weak one before it is sent, so a handful an hour is
+    generous for a person.
+    """
+
+    rate = "10/hour"
+    scope = "set_password"
+
+    def throttle_failure_view(self, request, *args, **kwargs):
+        try:
+            raise AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+                error_message="RATE_LIMIT_EXCEEDED",
+            )
+        except AuthenticationException as e:
+            return Response(e.get_error_dict(), status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+
 class _AdminWebAuthnThrottle(AnonRateThrottle):
     """Base for the console's second-factor endpoints.
 
