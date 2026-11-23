@@ -7,14 +7,15 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 import { Controller, useForm } from "react-hook-form";
-import { CircleUserRound } from "lucide-react";
 // plane imports
+import { Avatar } from "@makeplane/propel/components/avatar";
+import { InputField } from "@makeplane/propel/components/input-field";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { setPromiseToast, setToast } from "@plane/blocks/toast";
 import { EFileAssetType } from "@plane/types";
 import type { IUser, TUserProfile } from "@plane/types";
-import { Input } from "@plane/ui";
+
 import { getFileURL } from "@plane/utils";
 // components
 import { DeactivateAccountModal } from "@/components/account/deactivate-account-modal";
@@ -97,11 +98,9 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
   // Separate from the above: the address is refused by the API for any federated
   // account, whether or not attribute sync is on, because domain policy reads it.
   const isFederated = Boolean(currentUser?.is_federated);
-  const managedByNotice = providerManagesProfile ? (
-    <span className="text-11 text-tertiary">
-      Managed by {currentUser?.last_login_medium}. Change it with your provider.
-    </span>
-  ) : null;
+  const managedByNotice = providerManagesProfile
+    ? `Managed by ${currentUser?.last_login_medium}. Change it with your provider.`
+    : undefined;
 
   const handleProfilePictureDelete = async (url: string | null | undefined) => {
     if (!url) return;
@@ -110,7 +109,7 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
     })
       .then(() => {
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: "Success!",
           message: "Profile picture deleted successfully.",
         });
@@ -119,7 +118,7 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
       })
       .catch(() => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: "There was some error in deleting your profile picture. Please try again.",
         });
@@ -151,7 +150,7 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
     } catch (error) {
       console.error("Error handling cover image:", error);
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("toast.error"),
         message: error instanceof Error ? error.message : "Failed to process cover image",
       });
@@ -223,44 +222,37 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
         )}
       />
       <form onSubmit={handleSubmit(onSubmit)} className="w-full">
-        <div className="flex w-full flex-col gap-7">
-          <div className="relative h-44 w-full">
+        <div className="flex w-full flex-col gap-6">
+          <div className="relative h-[149px] w-full overflow-hidden rounded-lg bg-layer-2">
             <CoverImage
               src={userCover}
-              className="h-44 w-full rounded-lg"
+              className="absolute inset-0 size-full"
               alt={currentUser?.first_name ?? "Cover image"}
             />
-            <div className="absolute -bottom-6 left-6 flex items-end justify-between">
-              <div className="flex gap-3">
-                <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2">
-                  {/* Not merely reverted by sync but deleted: sync_user_data removes an
-                      uploaded avatar from storage before writing the provider's, so
-                      offering the upload here would be offering to lose the file. */}
-                  <button
-                    type="button"
-                    onClick={() => !providerManagesProfile && setIsImageUploadModalOpen(true)}
-                    disabled={providerManagesProfile}
-                  >
-                    {!userAvatar || userAvatar === "" ? (
-                      <div className="h-16 w-16 rounded-md bg-layer-1 p-2">
-                        <CircleUserRound className="h-full w-full text-secondary" />
-                      </div>
-                    ) : (
-                      <div className="relative h-16 w-16 overflow-hidden">
-                        <img
-                          src={getFileURL(userAvatar)}
-                          className="absolute top-0 left-0 h-full w-full rounded-lg object-cover"
-                          onClick={() => !providerManagesProfile && setIsImageUploadModalOpen(true)}
-                          alt={currentUser?.display_name}
-                          role={providerManagesProfile ? undefined : "button"}
-                        />
-                      </div>
-                    )}
-                  </button>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/70" />
+            <div className="absolute inset-x-4 bottom-4 z-5 flex h-10 items-end justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-3">
+                {/* Not merely reverted by sync but deleted: sync_user_data removes an
+                    uploaded avatar from storage before writing the provider's, so
+                    offering the upload here would be offering to lose the file. */}
+                <button
+                  type="button"
+                  className="flex shrink-0 rounded-full disabled:cursor-default"
+                  onClick={() => !providerManagesProfile && setIsImageUploadModalOpen(true)}
+                  disabled={providerManagesProfile}
+                  aria-label="Upload profile image"
+                >
+                  <Avatar
+                    size="xl"
+                    src={userAvatar ? getFileURL(userAvatar) : undefined}
+                    alt={currentUser?.display_name}
+                  />
+                </button>
+                <div className="flex min-w-0 flex-col text-on-color">
+                  <span className="truncate text-body-sm-medium">{`${watch("first_name")} ${watch("last_name")}`}</span>
+                  <span className="truncate text-body-xs-regular">{watch("email")}</span>
                 </div>
               </div>
-            </div>
-            <div className="absolute right-3 bottom-3 flex">
               <Controller
                 control={control}
                 name="cover_image_url"
@@ -275,160 +267,140 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
               />
             </div>
           </div>
-          <div className="item-center mt-6 flex justify-between">
-            <div className="flex flex-col">
-              <div className="item-center flex text-16 font-medium text-secondary">
-                <span>{`${watch("first_name")} ${watch("last_name")}`}</span>
-              </div>
-              <span className="text-13 tracking-tight text-tertiary">{watch("email")}</span>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="flex flex-col gap-1">
-                <h4 className="text-13 font-medium text-secondary">
-                  {t("first_name")}&nbsp;
-                  <span className="text-danger-primary">*</span>
-                </h4>
-                <Controller
-                  control={control}
+          <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+            <Controller
+              control={control}
+              name="first_name"
+              rules={{
+                required: "Please enter first name",
+                validate: validatePersonName,
+              }}
+              render={({ field: { value, onChange, ref } }) => (
+                <InputField
+                  size="lg"
+                  orientation="vertical"
+                  id="first_name"
                   name="first_name"
-                  rules={{
-                    required: "Please enter first name",
-                    validate: validatePersonName,
-                  }}
-                  render={({ field: { value, onChange, ref } }) => (
-                    <Input
-                      id="first_name"
-                      name="first_name"
-                      type="text"
-                      value={value}
-                      onChange={onChange}
-                      ref={ref}
-                      hasError={Boolean(errors.first_name)}
-                      placeholder="Enter your first name"
-                      disabled={providerManagesProfile}
-                      className={`w-full rounded-md ${errors.first_name ? "border-danger-strong" : ""}`}
-                      maxLength={50}
-                      autoComplete="on"
-                    />
-                  )}
+                  type="text"
+                  label={t("first_name")}
+                  required
+                  value={value}
+                  onChange={onChange}
+                  ref={ref}
+                  error={errors.first_name?.message}
+                  placeholder="Enter your first name"
+                  disabled={providerManagesProfile}
+                  hint={managedByNotice}
+                  maxLength={50}
+                  autoComplete="on"
                 />
-                {managedByNotice}
-                {errors.first_name && <span className="text-11 text-danger-primary">{errors.first_name.message}</span>}
-              </div>
-              <div className="flex flex-col gap-1">
-                <h4 className="text-13 font-medium text-secondary">{t("last_name")}</h4>
-                <Controller
-                  control={control}
+              )}
+            />
+            <Controller
+              control={control}
+              name="last_name"
+              rules={{
+                validate: validateOptionalPersonName,
+              }}
+              render={({ field: { value, onChange, ref } }) => (
+                <InputField
+                  size="lg"
+                  orientation="vertical"
+                  id="last_name"
                   name="last_name"
-                  rules={{
-                    validate: validateOptionalPersonName,
-                  }}
-                  render={({ field: { value, onChange, ref } }) => (
-                    <Input
-                      id="last_name"
-                      name="last_name"
-                      type="text"
-                      value={value}
-                      onChange={onChange}
-                      ref={ref}
-                      hasError={Boolean(errors.last_name)}
-                      placeholder="Enter your last name"
-                      disabled={providerManagesProfile}
-                      className="w-full rounded-md"
-                      maxLength={50}
-                      autoComplete="on"
-                    />
-                  )}
+                  type="text"
+                  label={t("last_name")}
+                  value={value}
+                  onChange={onChange}
+                  ref={ref}
+                  error={errors.last_name?.message}
+                  placeholder="Enter your last name"
+                  disabled={providerManagesProfile}
+                  hint={managedByNotice}
+                  maxLength={50}
+                  autoComplete="on"
                 />
-                {managedByNotice}
-                {errors.last_name && <span className="text-11 text-danger-primary">{errors.last_name.message}</span>}
-              </div>
-              <div className="flex flex-col gap-1">
-                <h4 className="text-13 font-medium text-secondary">
-                  {t("display_name")}&nbsp;
-                  <span className="text-danger-primary">*</span>
-                </h4>
-                <Controller
-                  control={control}
+              )}
+            />
+            <Controller
+              control={control}
+              name="display_name"
+              rules={{
+                required: "Display name is required.",
+                validate: validateDisplayName,
+              }}
+              render={({ field: { value, onChange, ref } }) => (
+                <InputField
+                  size="lg"
+                  orientation="vertical"
+                  id="display_name"
                   name="display_name"
-                  rules={{
-                    required: "Display name is required.",
-                    validate: validateDisplayName,
-                  }}
-                  render={({ field: { value, onChange, ref } }) => (
-                    <Input
-                      id="display_name"
-                      name="display_name"
-                      type="text"
-                      value={value}
-                      onChange={onChange}
-                      ref={ref}
-                      hasError={Boolean(errors?.display_name)}
-                      placeholder="Enter your display name"
-                      disabled={providerManagesProfile}
-                      className={`w-full ${errors?.display_name ? "border-danger-strong" : ""}`}
-                      maxLength={50}
-                    />
-                  )}
+                  type="text"
+                  label={t("display_name")}
+                  required
+                  value={value}
+                  onChange={onChange}
+                  ref={ref}
+                  error={errors?.display_name?.message}
+                  placeholder="Enter your display name"
+                  disabled={providerManagesProfile}
+                  hint={managedByNotice}
+                  maxLength={50}
                 />
-                {managedByNotice}
-                {errors?.display_name && (
-                  <span className="text-11 text-danger-primary">{errors?.display_name?.message}</span>
+              )}
+            />
+            <div className="flex flex-col gap-1">
+              <Controller
+                control={control}
+                name="email"
+                rules={{
+                  required: "Email is required.",
+                }}
+                render={({ field: { value, ref } }) => (
+                  <InputField
+                    size="lg"
+                    orientation="vertical"
+                    id="email"
+                    name="email"
+                    type="email"
+                    label={t("auth.common.email.label")}
+                    required
+                    value={value}
+                    ref={ref}
+                    error={errors.email?.message}
+                    placeholder="Enter your email"
+                    autoComplete="on"
+                    disabled
+                  />
                 )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <h4 className="text-13 font-medium text-secondary">
-                  {t("auth.common.email.label")}&nbsp;
-                  <span className="text-danger-primary">*</span>
-                </h4>
-                <Controller
-                  control={control}
-                  name="email"
-                  rules={{
-                    required: "Email is required.",
-                  }}
-                  render={({ field: { value, ref } }) => (
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={value}
-                      ref={ref}
-                      hasError={Boolean(errors.email)}
-                      placeholder="Enter your email"
-                      className={`w-full cursor-not-allowed rounded-md !bg-surface-2 ${
-                        errors.email ? "border-danger-strong" : ""
-                      }`}
-                      autoComplete="on"
-                      disabled
-                    />
-                  )}
-                />
-                {isFederated ? (
-                  <span className="text-11 text-tertiary">
-                    Your identity provider owns this address, and the workspaces you are admitted to are decided by its
-                    domain. Change it with your provider.
-                  </span>
-                ) : (
-                  isSMTPConfigured && (
-                    <button
-                      type="button"
-                      className="btn w-fit text-11 text-secondary underline"
-                      onClick={() => setIsChangeEmailModalOpen(true)}
-                    >
-                      {t("account_settings.profile.change_email_modal.title")}
-                    </button>
-                  )
-                )}
-              </div>
+              />
+              {isFederated ? (
+                <span className="text-caption-sm-regular text-tertiary">
+                  Your identity provider owns this address, and the workspaces you are admitted to are decided by its
+                  domain. Change it with your provider.
+                </span>
+              ) : (
+                isSMTPConfigured && (
+                  <button
+                    type="button"
+                    className="btn w-fit text-caption-sm-regular text-secondary underline"
+                    onClick={() => setIsChangeEmailModalOpen(true)}
+                  >
+                    {t("account_settings.profile.change_email_modal.title")}
+                  </button>
+                )
+              )}
             </div>
           </div>
           <div>
-            <Button variant="primary" type="submit" loading={isLoading}>
-              {isLoading ? t("saving") : t("save_changes")}
-            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              type="submit"
+              label={isLoading ? t("saving") : t("save_changes")}
+              loading={isLoading}
+            />
           </div>
         </div>
       </form>
@@ -437,9 +409,13 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
           title={t("deactivate_account")}
           description={t("deactivate_account_description")}
           control={
-            <Button variant="error-outline" onClick={() => setDeactivateAccountModal(true)}>
-              {t("deactivate_account")}
-            </Button>
+            <Button
+              variant="danger-outline"
+              size="sm"
+              stretch="auto"
+              label={t("deactivate_account")}
+              onClick={() => setDeactivateAccountModal(true)}
+            />
           }
         />
       </div>

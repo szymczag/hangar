@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "클립보드에 복사하지 못했습니다",
     "tooltip": {
       "copy_to_clipboard": "클립보드에 복사"
-    }
+    },
+    "status": "상태"
   },
   "chart": {
     "x_axis": "X축",

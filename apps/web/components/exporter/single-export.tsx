@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 // ui
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
 import type { IExportData } from "@plane/types";
 // helpers
 import { getDate, renderFormattedDate } from "@plane/utils";
@@ -21,6 +21,7 @@ export function SingleExport({ service, refreshing }: Props) {
   const provider = service.provider;
 
   const [isLoading] = useState(false);
+  const downloadLabel = isLoading ? "Downloading..." : "Download";
 
   const checkExpiry = (inputDateString: string) => {
     const currentDate = new Date();
@@ -33,7 +34,7 @@ export function SingleExport({ service, refreshing }: Props) {
   return (
     <div className="flex items-center justify-between gap-2 px-4 py-3">
       <div>
-        <h4 className="flex items-center gap-2 text-13">
+        <h4 className="flex items-center gap-2 text-body-xs-regular">
           <span>
             Export to{" "}
             <span className="font-medium">
@@ -41,7 +42,7 @@ export function SingleExport({ service, refreshing }: Props) {
             </span>{" "}
           </span>
           <span
-            className={`rounded-sm px-2 py-0.5 text-11 capitalize ${
+            className={`rounded-sm px-2 py-0.5 text-caption-sm-regular capitalize ${
               service.status === "completed"
                 ? "bg-success-subtle text-success-primary"
                 : service.status === "processing"
@@ -56,7 +57,7 @@ export function SingleExport({ service, refreshing }: Props) {
             {refreshing ? "Refreshing..." : service.status}
           </span>
         </h4>
-        <div className="mt-2 flex items-center gap-2 text-11 text-secondary">
+        <div className="mt-2 flex items-center gap-2 text-caption-sm-regular text-secondary">
           <span>{renderFormattedDate(service.created_at)}</span>|
           <span>Exported by {service?.initiated_by_detail?.display_name}</span>
         </div>
@@ -65,16 +66,23 @@ export function SingleExport({ service, refreshing }: Props) {
         <>
           {service.status == "completed" && (
             <div>
-              <a target="_blank" href={service?.url} rel="noopener noreferrer">
-                <Button variant="primary" className="w-full">
-                  {isLoading ? "Downloading..." : "Download"}
-                </Button>
-              </a>
+              <Button
+                variant="primary"
+                size="sm"
+                stretch="full"
+                label={downloadLabel}
+                nativeButton={false}
+                render={
+                  <a target="_blank" href={service?.url} rel="noopener noreferrer">
+                    {downloadLabel}
+                  </a>
+                }
+              />
             </div>
           )}
         </>
       ) : (
-        <div className="text-11 text-danger-primary">Expired</div>
+        <div className="text-caption-sm-regular text-danger-primary">Expired</div>
       )}
     </div>
   );

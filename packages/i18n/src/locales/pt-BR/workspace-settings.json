@@ -26,7 +26,9 @@
           "success_title": "Espaço de trabalho excluído.",
           "success_message": "Em breve, você irá para a página do seu perfil.",
           "error_title": "Isso não funcionou.",
-          "error_message": "Tente novamente, por favor."
+          "error_message": "Tente novamente, por favor.",
+          "confirm_description": "Você está prestes a excluir o espaço de trabalho {workspaceName}. Você perderá o acesso a todos os dados de trabalho deste espaço, e eles não poderão ser restaurados.",
+          "confirm_phrase_label": "Digite \"{phrase}\" para confirmar."
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "Não é possível usar uma tag com sinal de mais em {domain}.",
             "blocked_domain": "{domain} não tem nenhum método de login habilitado."
           }
-        }
+        },
+        "description": "Gerencie o acesso a este espaço de trabalho.",
+        "leave_input_label": "Digite o nome deste espaço de trabalho para continuar.",
+        "leave_title": "Sair do espaço de trabalho?"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "Erro!",
             "message": "O token de API não pôde ser excluído"
           }
-        }
+        },
+        "columns": {
+          "expires": "Expira",
+          "last_used": "Último uso"
+        },
+        "expired": "Expirado",
+        "not_used_yet": "Ainda não usado"
       },
       "integrations": {
         "title": "Integrações",

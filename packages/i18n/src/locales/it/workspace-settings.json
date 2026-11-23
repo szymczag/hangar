@@ -26,7 +26,9 @@
           "success_title": "Spazio di lavoro eliminato.",
           "success_message": "Presto verrai reindirizzato alla tua pagina del profilo.",
           "error_title": "Qualcosa non ha funzionato.",
-          "error_message": "Riprova, per favore."
+          "error_message": "Riprova, per favore.",
+          "confirm_description": "Stai per eliminare lo spazio di lavoro {workspaceName}. Perderai l’accesso a tutti i dati di lavoro di questo spazio e non sarà possibile ripristinarli.",
+          "confirm_phrase_label": "Digiti \"{phrase}\" per confermare."
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "Non è possibile usare un tag con il più su {domain}.",
             "blocked_domain": "Per {domain} non è abilitato alcun metodo di accesso."
           }
-        }
+        },
+        "description": "Gestisci l'accesso a questo spazio di lavoro.",
+        "leave_input_label": "Digita il nome di questo spazio di lavoro per continuare.",
+        "leave_title": "Lasciare lo spazio di lavoro?"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "Errore!",
             "message": "Il token API non può essere eliminato"
           }
-        }
+        },
+        "columns": {
+          "expires": "Scade",
+          "last_used": "Ultimo utilizzo"
+        },
+        "expired": "Scaduto",
+        "not_used_yet": "Non ancora usato"
       },
       "integrations": {
         "title": "Integrazioni",

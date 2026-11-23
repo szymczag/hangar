@@ -5,16 +5,16 @@
  */
 
 import { useState } from "react";
-import { range } from "lodash-es";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // icons
-import { Eye, EyeOff, RefreshCw } from "lucide-react";
+import { CopyOutline, HideOutline, RefreshOutline, ShowOutline } from "@makeplane/propel/icons";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { CopyIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { setToast } from "@plane/blocks/toast";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
 import type { IWebhook } from "@plane/types";
 // ui
 import { csvDownload, copyTextToClipboard } from "@plane/utils";
@@ -49,14 +49,14 @@ export const WebhookSecretKey = observer(function WebhookSecretKey(props: Props)
     copyTextToClipboard(webhookSecretKey)
       .then(() =>
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: `${t("success")}`,
           message: t("workspace_settings.settings.webhooks.toasts.secret_key_copied.message"),
         })
       )
       .catch(() =>
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: `${t("error")}!`,
           message: t("workspace_settings.settings.webhooks.toasts.secret_key_not_copied.message"),
         })
@@ -71,19 +71,18 @@ export const WebhookSecretKey = observer(function WebhookSecretKey(props: Props)
     regenerateSecretKey(workspaceSlug.toString(), data.id)
       .then(() => {
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: `${t("success")}`,
           message: "New key regenerated successfully.",
         });
 
-        if (currentWebhook && webhookSecretKey) {
-          const csvData = getCurrentHookAsCSV(currentWorkspace, currentWebhook, webhookSecretKey);
-          csvDownload(csvData, `webhook-secret-key-${Date.now()}`);
-        }
+        if (!currentWebhook || !webhookSecretKey) return;
+        const csvData = getCurrentHookAsCSV(currentWorkspace, currentWebhook, webhookSecretKey);
+        return csvDownload(csvData, `webhook-secret-key-${Date.now()}`);
       })
       .catch((err) =>
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: `${t("error")}!`,
           message: err?.error ?? t("something_went_wrong_please_try_again"),
         })
@@ -94,8 +93,8 @@ export const WebhookSecretKey = observer(function WebhookSecretKey(props: Props)
   const toggleShowKey = () => setShouldShowKey((prevState) => !prevState);
 
   const SECRET_KEY_OPTIONS = [
-    { label: "View secret key", Icon: shouldShowKey ? EyeOff : Eye, onClick: toggleShowKey, key: "eye" },
-    { label: "Copy secret key", Icon: CopyIcon, onClick: handleCopySecretKey, key: "copy" },
+    { label: "View secret key", Icon: shouldShowKey ? HideOutline : ShowOutline, onClick: toggleShowKey, key: "eye" },
+    { label: "Copy secret key", Icon: CopyOutline, onClick: handleCopySecretKey, key: "copy" },
   ];
 
   return (
@@ -103,45 +102,51 @@ export const WebhookSecretKey = observer(function WebhookSecretKey(props: Props)
       {(data || webhookSecretKey) && (
         <div className="space-y-2">
           {webhookId && (
-            <div className="text-13 font-medium">{t("workspace_settings.settings.webhooks.secret_key.title")}</div>
+            <div className="text-body-sm-medium">{t("workspace_settings.settings.webhooks.secret_key.title")}</div>
           )}
-          <div className="text-11 text-placeholder">{t("workspace_settings.settings.webhooks.secret_key.message")}</div>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="flex h-8 max-w-lg flex-grow items-center justify-between self-stretch rounded-sm border border-subtle px-2">
-              <div className="overflow-hidden font-medium select-none">
-                {shouldShowKey ? (
-                  <p className="text-11">{webhookSecretKey}</p>
-                ) : (
-                  <div className="mr-2 flex items-center gap-1.5 overflow-hidden">
-                    {range(30).map((index) => (
-                      <div key={index} className="h-1 w-1 flex-shrink-0 rounded-full bg-(--text-color-disabled)" />
-                    ))}
-                  </div>
-                )}
-              </div>
-              {webhookSecretKey && (
-                <div className="flex items-center gap-2">
-                  {SECRET_KEY_OPTIONS.map((option) => (
-                    <Tooltip key={option.key} tooltipContent={option.label} isMobile={isMobile}>
-                      <button type="button" className="grid flex-shrink-0 place-items-center" onClick={option.onClick}>
-                        <option.Icon className="h-3 w-3 text-placeholder" />
-                      </button>
-                    </Tooltip>
+          <div className="text-caption-sm-regular text-placeholder">
+            {t("workspace_settings.settings.webhooks.secret_key.message")}
+          </div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="min-w-0 flex-1 md:max-w-lg">
+              <InputGroup size="md">
+                <Input
+                  size="md"
+                  readOnly
+                  type={shouldShowKey ? "text" : "password"}
+                  value={webhookSecretKey ?? ""}
+                  // without a key in hand (an existing webhook) only the mask is shown
+                  placeholder={webhookSecretKey ? undefined : "•".repeat(30)}
+                  aria-label={t("workspace_settings.settings.webhooks.secret_key.title")}
+                />
+                {webhookSecretKey &&
+                  SECRET_KEY_OPTIONS.map((option) => (
+                    <IconButton
+                      key={option.key}
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-label={option.label}
+                      aria-pressed={option.key === "eye" ? shouldShowKey : undefined}
+                      showTooltip={!isMobile}
+                      onClick={option.onClick}
+                      icon={<Icon icon={option.Icon} />}
+                    />
                   ))}
-                </div>
-              )}
+              </InputGroup>
             </div>
             {data && (
               <div>
                 <Button
-                  onClick={handleRegenerateSecretKey}
                   variant="secondary"
-                  size="lg"
+                  size="md"
+                  stretch="auto"
+                  label={isRegenerating ? `${t("re_generating")}...` : t("re_generate_key")}
+                  onClick={handleRegenerateSecretKey}
                   loading={isRegenerating}
-                  prependIcon={<RefreshCw />}
-                >
-                  {isRegenerating ? `${t("re_generating")}...` : t("re_generate_key")}
-                </Button>
+                  icon={<Icon icon={RefreshOutline} />}
+                  iconPosition="start"
+                />
               </div>
             )}
           </div>

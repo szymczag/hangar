@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Kopírování do schránky se nezdařilo",
     "tooltip": {
       "copy_to_clipboard": "Kopírovat do schránky"
-    }
+    },
+    "status": "Stav"
   },
   "chart": {
     "x_axis": "Osa X",

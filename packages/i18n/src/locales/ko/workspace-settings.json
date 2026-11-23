@@ -26,7 +26,9 @@
           "success_title": "작업 공간 삭제됨.",
           "success_message": "곧 프로필 페이지로 이동합니다.",
           "error_title": "작업이 실패했습니다.",
-          "error_message": "다시 시도해주세요."
+          "error_message": "다시 시도해주세요.",
+          "confirm_description": "작업 공간 {workspaceName}을(를) 삭제하려고 합니다. 이 작업 공간의 모든 작업 데이터에 접근할 수 없게 되며 복원할 수 없습니다.",
+          "confirm_phrase_label": "확인하려면 \"{phrase}\"을(를) 입력하십시오."
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "{domain}에서는 플러스 태그를 사용할 수 없습니다.",
             "blocked_domain": "{domain}에는 사용 가능한 로그인 방법이 없습니다."
           }
-        }
+        },
+        "description": "이 작업 공간에 대한 접근을 관리합니다.",
+        "leave_input_label": "계속하려면 이 작업 공간의 이름을 입력하세요.",
+        "leave_title": "작업 공간을 떠나시겠습니까?"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "오류!",
             "message": "API 토큰을 삭제할 수 없습니다"
           }
-        }
+        },
+        "columns": {
+          "expires": "만료",
+          "last_used": "마지막 사용"
+        },
+        "expired": "만료됨",
+        "not_used_yet": "아직 사용 안 함"
       },
       "integrations": {
         "title": "인테그레이션",

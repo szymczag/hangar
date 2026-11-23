@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "Thao tác khác",
       "remove": "Xóa"
+    },
+    "pagination": {
+      "go_to_page": "Đi đến trang {page}",
+      "next_page": "Đi đến trang tiếp theo",
+      "previous_page": "Đi đến trang trước",
+      "root": "Phân trang"
     }
   }
 }

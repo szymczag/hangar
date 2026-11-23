@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Kopírovanie do schránky zlyhalo",
     "tooltip": {
       "copy_to_clipboard": "Kopírovať do schránky"
-    }
+    },
+    "status": "Stav"
   },
   "chart": {
     "x_axis": "Os X",

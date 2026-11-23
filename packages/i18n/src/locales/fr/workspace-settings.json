@@ -26,7 +26,9 @@
           "success_title": "Espace de travail supprimé.",
           "success_message": "Vous serez bientôt redirigé vers votre page de profil.",
           "error_title": "Cela n’a pas fonctionné.",
-          "error_message": "Veuillez réessayer."
+          "error_message": "Veuillez réessayer.",
+          "confirm_description": "Vous êtes sur le point de supprimer l’espace de travail {workspaceName}. Vous perdrez l’accès à toutes les données de travail de cet espace, sans possibilité de les restaurer.",
+          "confirm_phrase_label": "Saisissez « {phrase} » pour confirmer."
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "Une étiquette avec un plus ne peut pas être utilisée sur {domain}.",
             "blocked_domain": "Aucune méthode de connexion n’est activée pour {domain}."
           }
-        }
+        },
+        "description": "Gérez l’accès à cet espace de travail.",
+        "leave_input_label": "Saisissez le nom de cet espace de travail pour continuer.",
+        "leave_title": "Quitter l’espace de travail ?"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "Erreur !",
             "message": "Le jeton API n’a pas pu être supprimé"
           }
-        }
+        },
+        "columns": {
+          "expires": "Expire le",
+          "last_used": "Dernière utilisation"
+        },
+        "expired": "Expiré",
+        "not_used_yet": "Pas encore utilisé"
       },
       "integrations": {
         "title": "Intégrations",

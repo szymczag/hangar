@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "No se pudo copiar al portapapeles",
     "tooltip": {
       "copy_to_clipboard": "Copiar al portapapeles"
-    }
+    },
+    "status": "Estado"
   },
   "chart": {
     "x_axis": "Eje X",

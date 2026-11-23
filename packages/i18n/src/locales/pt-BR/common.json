@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Não foi possível copiar para a área de transferência",
     "tooltip": {
       "copy_to_clipboard": "Copiar para a área de transferência"
-    }
+    },
+    "status": "Status"
   },
   "chart": {
     "x_axis": "Eixo X",

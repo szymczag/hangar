@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "Altre azioni",
       "remove": "Rimuovi"
+    },
+    "pagination": {
+      "go_to_page": "Vai alla pagina {page}",
+      "next_page": "Vai alla pagina successiva",
+      "previous_page": "Vai alla pagina precedente",
+      "root": "Paginazione"
     }
   }
 }

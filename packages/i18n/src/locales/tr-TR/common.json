@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Panoya kopyalanamadı",
     "tooltip": {
       "copy_to_clipboard": "Panoya kopyala"
-    }
+    },
+    "status": "Durum"
   },
   "chart": {
     "x_axis": "X ekseni",

@@ -26,7 +26,9 @@
           "success_title": "ワークスペースが削除されました。",
           "success_message": "まもなくプロフィールページに移動します。",
           "error_title": "操作に失敗しました。",
-          "error_message": "もう一度お試しください。"
+          "error_message": "もう一度お試しください。",
+          "confirm_description": "ワークスペース {workspaceName} を削除しようとしています。このワークスペースのすべての作業データにアクセスできなくなり、復元することはできません。",
+          "confirm_phrase_label": "確認のため「{phrase}」と入力してください。"
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "{domain} ではプラス付きのアドレスは使用できません。",
             "blocked_domain": "{domain} では有効なサインイン方法がありません。"
           }
-        }
+        },
+        "description": "このワークスペースへのアクセスを管理します。",
+        "leave_input_label": "続行するには、このワークスペースの名前を入力してください。",
+        "leave_title": "ワークスペースから退出しますか？"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "エラー！",
             "message": "APIトークンを削除できませんでした"
           }
-        }
+        },
+        "columns": {
+          "expires": "有効期限",
+          "last_used": "最終使用"
+        },
+        "expired": "期限切れ",
+        "not_used_yet": "未使用"
       },
       "integrations": {
         "title": "インテグレーション",

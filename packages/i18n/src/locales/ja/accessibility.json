@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "その他の操作",
       "remove": "削除"
+    },
+    "pagination": {
+      "go_to_page": "{page}ページへ移動",
+      "next_page": "次のページへ移動",
+      "previous_page": "前のページへ移動",
+      "root": "ページネーション"
     }
   }
 }

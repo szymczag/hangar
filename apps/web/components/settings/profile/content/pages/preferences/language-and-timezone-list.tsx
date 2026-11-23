@@ -6,11 +6,11 @@
 
 import { observer } from "mobx-react";
 // plane imports
+import { SelectField } from "@makeplane/propel/components/select-field";
 import { SUPPORTED_LANGUAGES, useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { CustomSelect } from "@plane/ui";
+import { setToast } from "@plane/blocks/toast";
 // components
-import { TimezoneSelect } from "@/components/global";
+import { TimezoneSelect } from "@/components/global/timezone-select";
 import { StartOfWeekPreference } from "@/components/profile/start-of-week-preference";
 import { SettingsControlItem } from "@/components/settings/control-item";
 // hooks
@@ -34,13 +34,13 @@ export const ProfileSettingsLanguageAndTimezonePreferencesList = observer(
         setToast({
           title: "Success!",
           message: "Timezone updated successfully",
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
         });
       } catch (_error) {
         setToast({
           title: "Error!",
           message: "Failed to update timezone",
-          type: TOAST_TYPE.ERROR,
+          type: "error",
         });
       }
     };
@@ -51,21 +51,15 @@ export const ProfileSettingsLanguageAndTimezonePreferencesList = observer(
         setToast({
           title: "Success!",
           message: "Language updated successfully",
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
         });
       } catch (_error) {
         setToast({
           title: "Error!",
           message: "Failed to update language",
-          type: TOAST_TYPE.ERROR,
+          type: "error",
         });
       }
-    };
-
-    const getLanguageLabel = (value: string) => {
-      const selectedLanguage = SUPPORTED_LANGUAGES.find((l) => l.value === value);
-      if (!selectedLanguage) return value;
-      return selectedLanguage.label;
     };
 
     return (
@@ -73,27 +67,32 @@ export const ProfileSettingsLanguageAndTimezonePreferencesList = observer(
         <SettingsControlItem
           title={t("timezone")}
           description={t("timezone_setting")}
-          control={<TimezoneSelect value={user?.user_timezone || "Asia/Kolkata"} onChange={handleTimezoneChange} />}
+          control={
+            <TimezoneSelect
+              value={user?.user_timezone || "Asia/Kolkata"}
+              onChange={handleTimezoneChange}
+              label={t("timezone")}
+              size="md"
+              width="fit"
+              className="max-w-72 [&_button]:max-w-full"
+            />
+          }
         />
         <SettingsControlItem
           title={t("language")}
           description={t("language_setting")}
           control={
-            <CustomSelect
-              value={profile?.language}
-              label={profile?.language ? getLanguageLabel(profile?.language) : "Select a language"}
-              onChange={handleLanguageChange}
-              buttonClassName="border border-subtle-1"
-              className="rounded-md"
-              input
-              placement="bottom-end"
-            >
-              {SUPPORTED_LANGUAGES.map((item) => (
-                <CustomSelect.Option key={item.value} value={item.value}>
-                  {item.label}
-                </CustomSelect.Option>
-              ))}
-            </CustomSelect>
+            <SelectField<string>
+              aria-label={t("language")}
+              size="md"
+              width="fit"
+              options={SUPPORTED_LANGUAGES}
+              value={profile?.language ?? null}
+              onValueChange={(value) => {
+                if (value !== null) void handleLanguageChange(value);
+              }}
+              placeholder="Select a language"
+            />
           }
         />
         <StartOfWeekPreference

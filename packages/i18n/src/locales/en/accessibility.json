@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "More actions",
       "remove": "Remove"
+    },
+    "pagination": {
+      "go_to_page": "Go to page {page}",
+      "next_page": "Go to next page",
+      "previous_page": "Go to previous page",
+      "root": "Pagination"
     }
   }
 }

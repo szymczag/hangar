@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "추가 작업",
       "remove": "제거"
+    },
+    "pagination": {
+      "go_to_page": "{page}페이지로 이동",
+      "next_page": "다음 페이지로 이동",
+      "previous_page": "이전 페이지로 이동",
+      "root": "페이지 탐색"
     }
   }
 }

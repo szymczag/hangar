@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Impossibile copiare negli appunti",
     "tooltip": {
       "copy_to_clipboard": "Copia negli appunti"
-    }
+    },
+    "status": "Stato"
   },
   "chart": {
     "x_axis": "Asse X",

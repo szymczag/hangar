@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Nie udało się skopiować do schowka",
     "tooltip": {
       "copy_to_clipboard": "Kopiuj do schowka"
-    }
+    },
+    "status": "Status"
   },
   "chart": {
     "x_axis": "Oś X",

@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "Diğer işlemler",
       "remove": "Kaldır"
+    },
+    "pagination": {
+      "go_to_page": "{page}. sayfaya git",
+      "next_page": "Sonraki sayfaya git",
+      "previous_page": "Önceki sayfaya git",
+      "root": "Sayfalama"
     }
   }
 }

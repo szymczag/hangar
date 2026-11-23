@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Не удалось скопировать в буфер обмена",
     "tooltip": {
       "copy_to_clipboard": "Копировать в буфер обмена"
-    }
+    },
+    "status": "Статус"
   },
   "chart": {
     "x_axis": "Ось X",

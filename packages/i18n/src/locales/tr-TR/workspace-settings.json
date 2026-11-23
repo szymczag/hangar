@@ -26,7 +26,9 @@
           "success_title": "Çalışma alanı silindi.",
           "success_message": "Kısa süre sonra profil sayfanıza yönlendirileceksiniz.",
           "error_title": "Bu işe yaramadı.",
-          "error_message": "Lütfen tekrar deneyin."
+          "error_message": "Lütfen tekrar deneyin.",
+          "confirm_description": "{workspaceName} çalışma alanını silmek üzeresiniz. Bu çalışma alanındaki tüm iş verilerine erişiminizi kaybedeceksiniz ve bunlar geri yüklenemeyecek.",
+          "confirm_phrase_label": "Onaylamak için \"{phrase}\" yazın."
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "{domain} üzerinde artı etiketi kullanılamaz.",
             "blocked_domain": "{domain} için etkin bir oturum açma yöntemi yok."
           }
-        }
+        },
+        "description": "Bu çalışma alanına erişimi yönetin.",
+        "leave_input_label": "Devam etmek için bu çalışma alanının adını yazın.",
+        "leave_title": "Çalışma alanından ayrılmak istiyor musunuz?"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "Hata!",
             "message": "API token'ı silinemedi"
           }
-        }
+        },
+        "columns": {
+          "expires": "Bitiş",
+          "last_used": "Son kullanım"
+        },
+        "expired": "Süresi doldu",
+        "not_used_yet": "Henüz kullanılmadı"
       },
       "integrations": {
         "title": "Entegrasyonlar",

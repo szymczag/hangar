@@ -5,32 +5,31 @@
  */
 
 import { observer } from "mobx-react";
-import { Controller, useForm } from "react-hook-form";
-import { AlertTriangle } from "lucide-react";
 // Hangar Imports
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { TypeToConfirmDialog } from "@plane/blocks/dialog";
+import { setToast } from "@plane/blocks/toast";
 import type { IWorkspace } from "@plane/types";
-import { Input } from "@plane/ui";
-import { cn } from "@plane/utils";
 // hooks
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUserSettings } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
 
+/**
+ * The second phrase Hangar has always asked for, on top of the workspace's name.
+ * Deleting a workspace takes every project, page and member with it, so the
+ * dialog keeps both checks rather than upstream's name alone.
+ */
+export const DELETE_WORKSPACE_CONFIRM_PHRASE = "delete my workspace";
+
 type Props = {
   data: IWorkspace | null;
+  isOpen: boolean;
   onClose: () => void;
 };
 
-const defaultValues = {
-  workspaceName: "",
-  confirmDelete: "",
-};
-
 export const DeleteWorkspaceForm = observer(function DeleteWorkspaceForm(props: Props) {
-  const { data, onClose } = props;
+  const { data, isOpen, onClose } = props;
   // router
   const router = useAppRouter();
   // store hooks
@@ -38,42 +37,23 @@ export const DeleteWorkspaceForm = observer(function DeleteWorkspaceForm(props: 
   const { t } = useTranslation();
   const { getWorkspaceRedirectionUrl } = useWorkspace();
   const { fetchCurrentUserSettings } = useUserSettings();
-  // form info
-  const {
-    control,
-    formState: { errors, isSubmitting },
-    handleSubmit,
-    reset,
-    watch,
-  } = useForm({ defaultValues });
-
-  const canDelete = watch("workspaceName") === data?.name && watch("confirmDelete") === "delete my workspace";
-
-  const handleClose = () => {
-    const timer = setTimeout(() => {
-      reset(defaultValues);
-      clearTimeout(timer);
-    }, 350);
-
-    onClose();
-  };
 
   const onSubmit = async () => {
-    if (!data || !canDelete) return;
+    if (!data) return;
 
     try {
       await deleteWorkspace(data.slug);
       await fetchCurrentUserSettings();
-      handleClose();
+      onClose();
       router.push(getWorkspaceRedirectionUrl());
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: t("workspace_settings.settings.general.delete_modal.success_title"),
         message: t("workspace_settings.settings.general.delete_modal.success_message"),
       });
     } catch (_error) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("workspace_settings.settings.general.delete_modal.error_title"),
         message: t("workspace_settings.settings.general.delete_modal.error_message"),
       });
@@ -81,83 +61,30 @@ export const DeleteWorkspaceForm = observer(function DeleteWorkspaceForm(props: 
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6 p-6">
-      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-        <span
-          className={cn(
-            "grid size-12 shrink-0 place-items-center rounded-full bg-danger-subtle text-danger-primary sm:size-10"
-          )}
-        >
-          <AlertTriangle className="size-5 text-danger-primary" aria-hidden="true" />
-        </span>
-        <div>
-          <div className="text-center sm:text-left">
-            <h3 className="text-h5-medium">{t("workspace_settings.settings.general.delete_modal.title")}</h3>
-            <p className="mt-1 text-body-xs-regular text-secondary">
-              You are about to delete the workspace{" "}
-              <span className="text-body-xs-semibold break-words">{data?.name}</span>. If you confirm, you will lose
-              access to all your work data in this workspace without any way to restore it. Tread very carefully.
-            </p>
-          </div>
-
-          <div className="mt-4 text-secondary">
-            <p className="text-body-xs-regular break-words">Type in this workspace&apos;s name to continue.</p>
-            <Controller
-              control={control}
-              name="workspaceName"
-              render={({ field: { value, onChange, ref } }) => (
-                <Input
-                  id="workspaceName"
-                  name="workspaceName"
-                  type="text"
-                  value={value}
-                  onChange={onChange}
-                  ref={ref}
-                  hasError={Boolean(errors.workspaceName)}
-                  placeholder={data?.name}
-                  className="mt-2 w-full"
-                  autoComplete="off"
-                />
-              )}
-            />
-          </div>
-
-          <div className="mt-4 text-secondary">
-            <p className="text-body-xs-regular">
-              For final confirmation, type{" "}
-              <span className="text-body-xs-medium text-primary">delete my workspace </span>
-              below.
-            </p>
-            <Controller
-              control={control}
-              name="confirmDelete"
-              render={({ field: { value, onChange, ref } }) => (
-                <Input
-                  id="confirmDelete"
-                  name="confirmDelete"
-                  type="text"
-                  value={value}
-                  onChange={onChange}
-                  ref={ref}
-                  hasError={Boolean(errors.confirmDelete)}
-                  placeholder=""
-                  className="mt-2 w-full"
-                  autoComplete="off"
-                />
-              )}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Button variant="secondary" size="lg" onClick={handleClose}>
-          {t("cancel")}
-        </Button>
-        <Button variant="error-fill" size="lg" type="submit" disabled={!canDelete} loading={isSubmitting}>
-          {isSubmitting ? t("deleting") : t("confirm")}
-        </Button>
-      </div>
-    </form>
+    <TypeToConfirmDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      onConfirm={onSubmit}
+      title={t("workspace_settings.settings.general.delete_modal.title")}
+      description={t("workspace_settings.settings.general.delete_modal.confirm_description", {
+        workspaceName: data?.name ?? "",
+      })}
+      fields={[
+        {
+          name: "workspaceName",
+          label: t("workspace_settings.settings.members.leave_input_label"),
+          expectedValue: data?.name ?? "",
+        },
+        {
+          name: "confirmDelete",
+          label: t("workspace_settings.settings.general.delete_modal.confirm_phrase_label", {
+            phrase: DELETE_WORKSPACE_CONFIRM_PHRASE,
+          }),
+          expectedValue: DELETE_WORKSPACE_CONFIRM_PHRASE,
+        },
+      ]}
+      confirmLabel={t("confirm")}
+      loadingLabel={t("deleting")}
+    />
   );
 });

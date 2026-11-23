@@ -26,7 +26,9 @@
           "success_title": "Przestrzeń usunięta.",
           "success_message": "Zostaniesz przekierowany do profilu.",
           "error_title": "Nie udało się.",
-          "error_message": "Spróbuj ponownie."
+          "error_message": "Spróbuj ponownie.",
+          "confirm_description": "Zamierzasz usunąć przestrzeń roboczą {workspaceName}. Stracisz dostęp do wszystkich danych w tej przestrzeni i nie będzie można ich przywrócić.",
+          "confirm_phrase_label": "Aby potwierdzić, wpisz „{phrase}”."
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "W domenie {domain} nie można użyć znacznika z plusem.",
             "blocked_domain": "Domena {domain} nie ma włączonej żadnej metody logowania."
           }
-        }
+        },
+        "description": "Zarządzaj dostępem do tego obszaru roboczego.",
+        "leave_input_label": "Wpisz nazwę tego obszaru roboczego, aby kontynuować.",
+        "leave_title": "Opuścić przestrzeń roboczą?"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "Błąd!",
             "message": "Usunięcie tokena nie powiodło się"
           }
-        }
+        },
+        "columns": {
+          "expires": "Wygasa",
+          "last_used": "Ostatnie użycie"
+        },
+        "expired": "Wygasł",
+        "not_used_yet": "Jeszcze nieużywany"
       },
       "integrations": {
         "title": "Integracje",
