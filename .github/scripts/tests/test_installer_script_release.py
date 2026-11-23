@@ -397,12 +397,101 @@ class ComposeUpgradeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.output)
         self.assertNotIn("WARNING: this setup.sh", result.stderr)
 
+    def assertNoMisleadingWording(self, result):
+        # The upgrade installs the release it names, which need not be stable.
+        self.assertNotIn("STABLE", result.output)
+        self.assertNotIn("'plane.env 'file", result.output)
+        self.assertIn("please check the 'plane.env' file for any new variables", result.stdout)
+
+    def test_the_upgrade_names_the_release_it_was_given(self):
+        scratch = ComposeScratch(self.addCleanup, script_release="v1.1.0")
+        result = scratch.run("--yes", "upgrade", target="v1.1.0-rc.2")
+        self.assertUpgraded(scratch, result, "v1.1.0-rc.2")
+        self.assertIn("Requested release: v1.1.0-rc.2\n", result.stdout)
+        self.assertIn(
+            "Upgrading to release v1.1.0-rc.2 (from HANGAR_RELEASE) without asking (HANGAR_ASSUME_YES=1).",
+            result.stdout,
+        )
+        self.assertIn("Upgrading Hangar to release v1.1.0-rc.2...", result.stdout)
+        self.assertIn("***** INSTALLING RELEASE v1.1.0-rc.2 ****", result.stdout)
+        # HANGAR_RELEASE names a release; it is not reported as the latest one.
+        self.assertNotIn("latest release", result.output.lower().replace("checking for the latest release", ""))
+        self.assertNoMisleadingWording(result)
+
+    def test_without_a_requested_release_the_upgrade_names_the_latest_one(self):
+        scratch = ComposeScratch(self.addCleanup, script_release="v1.1.0")
+        # The GitHub API's release list, newest first: a candidate after the stable release.
+        fake_curl = scratch.bin / "curl"
+        fake_curl.write_text(
+            "#!/usr/bin/env bash\n"
+            "printf '%s\\n' '[{\"tag_name\": \"hangar-v1.2.0-rc.1\", \"prerelease\": true},' "
+            "'{\"tag_name\": \"hangar-v1.1.0\", \"prerelease\": false}]'\n"
+        )
+        fake_curl.chmod(0o755)
+        result = scratch.run("--yes", "upgrade", extra_env={"HANGAR_RELEASE": ""})
+        self.assertUpgraded(scratch, result, "v1.1.0")
+        self.assertIn("Latest release: v1.1.0\n", result.stdout)
+        self.assertIn("Upgrading to the latest release (v1.1.0) without asking (HANGAR_ASSUME_YES=1).", result.stdout)
+        self.assertIn("***** INSTALLING RELEASE v1.1.0 ****", result.stdout)
+        self.assertNotIn("HANGAR_RELEASE)", result.stdout)
+        self.assertNoMisleadingWording(result)
+
     def test_an_installed_release_newer_than_the_script_is_reported_when_nothing_is_upgraded(self):
         scratch = ComposeScratch(self.addCleanup, script_release="v1.0.0", installed="v1.1.0")
         result = scratch.run("--yes", "upgrade", target="v1.1.0")
         self.assertEqual(result.returncode, 0, result.output)
-        self.assertIn("You are already using the latest release", result.stdout)
+        self.assertIn("You are already using release v1.1.0 (from HANGAR_RELEASE)", result.stdout)
         self.assertIn("WARNING: this setup.sh is from hangar-v1.0.0, but the deployment runs hangar-v1.1.0", result.stderr)
+
+
+class UpdateScriptDirectoryTests(unittest.TestCase):
+    """`update-script` where nothing is installed creates no plane-app/."""
+
+    def _run(self, script: Path, action: str) -> tuple:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        local = root / script.name
+        local.write_text(_stamped(script, "v1.1.0"))
+        local.chmod(0o755)
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        for name in ("docker", "docker-compose"):
+            fake = bin_dir / name
+            fake.write_text(FAKE_DOCKER)
+            fake.chmod(0o755)
+        result = subprocess.run(
+            ["bash", f"./{script.name}", action],
+            cwd=root,
+            env={
+                "PATH": f"{bin_dir}:/usr/bin:/bin",
+                "HOME": str(root),
+                "HANGAR_ASSUME_YES": "1",
+                # The script's own release: update-script has nothing to fetch.
+                "HANGAR_RELEASE": "v1.1.0",
+                "DOCKER_LOG": str(root / "docker.log"),
+            },
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        return result, root
+
+    def test_update_script_creates_no_install_directory(self):
+        for script in SCRIPTS:
+            with self.subTest(script=script.name):
+                result, root = self._run(script, "update-script")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Nothing has been changed", result.stdout)
+                self.assertFalse((root / "plane-app").exists(), sorted(path.name for path in root.iterdir()))
+
+    def test_other_actions_still_create_it_owner_only(self):
+        result, root = self._run(INSTALL, "stop")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        archive = root / "plane-app" / "archive"
+        self.assertTrue(archive.is_dir())
+        self.assertEqual(stat.S_IMODE(archive.stat().st_mode), 0o700)
 
 
 class SwarmTests(unittest.TestCase):
@@ -520,10 +609,10 @@ class WiringTests(unittest.TestCase):
         for script in SCRIPTS:
             with self.subTest(script=script.name):
                 upgrade = _function(script.read_text(), "upgrade", script)
-                check = upgrade.index('checkScriptRelease "$latest_release" upgrade || exit 1')
-                self.assertLess(upgrade.index("latest_release=${HANGAR_RELEASE#hangar-}"), check)
+                check = upgrade.index('checkScriptRelease "$target" upgrade || exit 1')
+                self.assertLess(upgrade.index("target=${HANGAR_RELEASE#hangar-}"), check)
                 self.assertLess(check, upgrade.index('if [ "$HANGAR_ASSUME_YES" == "1" ]'))
-                self.assertLess(check, upgrade.index("export APP_RELEASE=$latest_release"))
+                self.assertLess(check, upgrade.index("export APP_RELEASE=$target"))
                 for later in ("stageDeploymentFiles", "stopServices", "copyEnvFile", "download"):
                     if later in upgrade:
                         self.assertLess(check, upgrade.index(later), later)
