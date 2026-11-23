@@ -39,6 +39,25 @@ const defaultValues: TResetPasswordFormValues = {
 // services
 const authService = new AuthService();
 
+// Fork: one show/hide toggle for both fields, which keeps the form's own control flow small.
+function PasswordVisibilityToggle({ isVisible, onToggle }: { isVisible: boolean; onToggle: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="grid size-5 shrink-0 place-items-center"
+      aria-label={t(isVisible ? "aria_labels.auth_forms.hide_password" : "aria_labels.auth_forms.show_password")}
+    >
+      {isVisible ? (
+        <HideOutline className="size-5 text-placeholder" />
+      ) : (
+        <ShowOutline className="size-5 text-placeholder" />
+      )}
+    </button>
+  );
+}
+
 export const ResetPasswordForm = observer(function ResetPasswordForm() {
   // search params
   const searchParams = useSearchParams();
@@ -99,7 +118,7 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
     <FormContainer>
       <AuthFormHeader title="Reset password" description="Create a new password." />
 
-      {errorInfo && errorInfo?.type === EErrorAlertType.BANNER_ALERT && (
+      {errorInfo?.type === EErrorAlertType.BANNER_ALERT && (
         <Banner
           placement="inline"
           variant="info"
@@ -144,22 +163,10 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
             onBlur={() => setIsPasswordInputFocused(false)}
             autoComplete="new-password"
             endIcon={
-              <button
-                type="button"
-                onClick={() => handleShowPassword("password")}
-                className="grid size-5 shrink-0 place-items-center"
-                aria-label={t(
-                  showPassword.password
-                    ? "aria_labels.auth_forms.hide_password"
-                    : "aria_labels.auth_forms.show_password"
-                )}
-              >
-                {showPassword.password ? (
-                  <HideOutline className="size-5 text-placeholder" />
-                ) : (
-                  <ShowOutline className="size-5 text-placeholder" />
-                )}
-              </button>
+              <PasswordVisibilityToggle
+                isVisible={showPassword.password}
+                onToggle={() => handleShowPassword("password")}
+              />
             }
           />
           <div id="reset-password-support">
@@ -184,22 +191,10 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
           onBlur={() => setIsRetryPasswordInputFocused(false)}
           autoComplete="new-password"
           endIcon={
-            <button
-              type="button"
-              onClick={() => handleShowPassword("retypePassword")}
-              className="grid size-5 shrink-0 place-items-center"
-              aria-label={t(
-                showPassword.retypePassword
-                  ? "aria_labels.auth_forms.hide_password"
-                  : "aria_labels.auth_forms.show_password"
-              )}
-            >
-              {showPassword.retypePassword ? (
-                <HideOutline className="size-5 text-placeholder" />
-              ) : (
-                <ShowOutline className="size-5 text-placeholder" />
-              )}
-            </button>
+            <PasswordVisibilityToggle
+              isVisible={showPassword.retypePassword}
+              onToggle={() => handleShowPassword("retypePassword")}
+            />
           }
           error={
             !!confirmPassword && password !== confirmPassword && renderPasswordMatchError
