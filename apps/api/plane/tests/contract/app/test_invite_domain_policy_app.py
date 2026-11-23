@@ -231,6 +231,7 @@ class TestInvitationPolicyEndpoint:
         )
         assert response.json() == {
             "restrict_to_domains": True,
+            "members_can_invite": False,
             "domains": {"corp.com": {"allows_sign_in": True, "allows_plus_tags": False}},
         }
 
@@ -246,17 +247,26 @@ class TestInvitationPolicyEndpoint:
         _store("SSO_ENFORCED_DOMAINS", "")
         _store("RESTRICT_INVITES_TO_SSO_DOMAINS", "1")
         response = session_client.get(_workspace_invite_url(workspace.slug) + "policy/")
-        assert response.json() == {"restrict_to_domains": False, "domains": {}}
+        assert response.json() == {"restrict_to_domains": False, "members_can_invite": False, "domains": {}}
 
-    def test_a_member_reads_it_because_the_create_endpoint_admits_members_too(self, workspace, confined_instance):
-        """WorkSpaceAdminPermission admits members despite its name, and this
-        endpoint must not be narrower than the one that writes invitations."""
+    def test_a_member_cannot_read_it_while_members_cannot_invite(self, workspace, confined_instance):
+        """The endpoint is exactly as wide as the one that writes invitations."""
+        client = _client_for(_workspace_user(workspace, role=15))
+
+        response = client.get(_workspace_invite_url(workspace.slug) + "policy/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN, (
+            f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
+        )
+
+    def test_a_member_reads_it_where_members_may_invite(self, workspace, confined_instance):
+        _store("ALLOW_MEMBERS_TO_INVITE", "1")
         client = _client_for(_workspace_user(workspace, role=15))
 
         response = client.get(_workspace_invite_url(workspace.slug) + "policy/")
         assert response.status_code == status.HTTP_200_OK, (
             f"Got {response.status_code}: {getattr(response, 'data', None)!r}"
         )
+        assert response.json()["members_can_invite"] is True
 
     def test_a_guest_cannot_read_the_policy(self, workspace, confined_instance):
         client = _client_for(_workspace_user(workspace, role=5))

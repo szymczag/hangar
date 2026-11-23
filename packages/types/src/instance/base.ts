@@ -124,6 +124,9 @@ export interface IInstanceConfig {
   // Fork: the instance forces every project, page and view private and refuses
   // to publish anything publicly, so the clients must not offer the choice.
   force_private_visibility?: boolean;
+  // Fork: workspace members, and not only admins, may invite people and manage
+  // the invitations they sent. Off unless the operator turns it on.
+  members_can_invite?: boolean;
   // Fork: whether the application may link to hosts this instance does not run.
   // The AGPL source offer is exempt and always shown.
   show_external_links?: boolean;

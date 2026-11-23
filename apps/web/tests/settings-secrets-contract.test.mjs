@@ -13,6 +13,8 @@
  *   cache that outlives the dialog;
  * - the invite dialog checks addresses against the workspace's invite policy
  *   and offers no role above the inviter's;
+ * - inviting is offered to admins, and to members only where the instance
+ *   reports `members_can_invite`; a member manages only the invitations they sent;
  * - the password change uses the async zxcvbn estimate (15 characters, S9) and
  *   shows a federated account the notice instead of the form (S10).
  */
@@ -78,6 +80,47 @@ test("invitations follow the invite policy and the inviter's role", () => {
     /\.filter\(\(role\) => !!currentWorkspaceRole && currentWorkspaceRole >= role\.key\)/,
     "no role above the inviter's own may be offered"
   );
+});
+
+test("inviting is offered only where the server accepts it", () => {
+  const helper = read("helpers/workspace-invite-access.ts");
+  assert.match(
+    helper,
+    /role === EUserPermissions\.ADMIN \|\| \(role === EUserPermissions\.MEMBER && membersCanInvite === true\)/,
+    "members invite only where the instance says so; guests never"
+  );
+  assert.match(helper, /invitationSender === currentUserId/, "a member manages only what they sent");
+
+  const page = read("app/(all)/[workspaceSlug]/(settings)/settings/(workspace)/members/page.tsx");
+  assert.match(
+    page,
+    /canInviteToWorkspace\(workspaceInfoBySlug\(workspaceSlug\)\?\.role, config\?\.members_can_invite\)/
+  );
+  for (const offer of page.matchAll(/setInviteModal\(true\)/g)) {
+    const before = page.slice(Math.max(0, offer.index - 400), offer.index);
+    assert.match(before, /\{canInvite && \(/, "every way into the invite dialog must be behind canInvite");
+  }
+  assert.match(page, /<WorkspaceMembersList searchQuery=\{searchQuery\} canSeeInvitations=\{canInvite\} \/>/);
+
+  const list = read("components/workspace/settings/members-list.tsx");
+  assert.match(
+    list,
+    /slug \? \["WORKSPACE_MEMBERS_AND_MEMBER_INVITATIONS", slug, canSeeInvitations\] : null[\s\S]*?if \(withInvitations\) await fetchWorkspaceMemberInvitations\(/,
+    "the invitation list is refused to others, so it must not be requested"
+  );
+  assert.match(list, /\{canSeeInvitations && <PendingInvitations /);
+
+  const row = read("components/workspace/settings/invitations-list-item.tsx");
+  assert.match(row, /const canManageInvitation = canManageWorkspaceInvitation\(/);
+  assert.match(row, /const hasRoleChangeAccess = canManageInvitation;/);
+  assert.match(row, /\{canManageInvitation && \(\s*<Menu>/, "remove and copy link follow the same rule");
+
+  const sidebar = read("components/workspace/sidebar/dropdown-item.tsx");
+  assert.match(sidebar, /canInviteToWorkspace\(workspace\?\.role, config\?\.members_can_invite\)/);
+  assert.match(sidebar, /\{canInvite && \(\s*<Menu\.Item/);
+
+  const home = read("components/home/widgets/empty-states/no-projects.tsx");
+  assert.match(home, /link: `\/\$\{workspaceSlug\}\/settings\/members`,\s*disabled: !canInvite,/);
 });
 
 test("the password change keeps Hangar's strength rules and federated notice", () => {

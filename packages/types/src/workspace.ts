@@ -51,6 +51,8 @@ export interface IWorkspaceMemberInvitation {
   role: TUserPermissions;
   token: string;
   invite_link: string;
+  /** Id of the account that sent the invitation; null when it is unknown. */
+  created_by?: string | null;
   workspace: {
     id: string;
     logo_url: string;

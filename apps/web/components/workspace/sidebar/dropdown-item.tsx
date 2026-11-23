@@ -18,6 +18,10 @@ import { EUserPermissions } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { IWorkspace } from "@plane/types";
 import { cn, getFileURL, getUserRole } from "@plane/utils";
+// helpers
+import { canInviteToWorkspace } from "@/helpers/workspace-invite-access";
+// hooks
+import { useInstance } from "@/hooks/store/use-instance";
 
 type TProps = {
   workspace: IWorkspace;
@@ -30,8 +34,10 @@ const SidebarDropdownItem = observer(function SidebarDropdownItem(props: TProps)
   const { workspace, activeWorkspace, handleItemClick, handleWorkspaceNavigation, handleClose } = props;
   // hooks
   const { t } = useTranslation();
+  const { config } = useInstance();
   // derived values
   const isActiveWorkspace = workspace.id === activeWorkspace?.id;
+  const canInvite = canInviteToWorkspace(workspace?.role, config?.members_can_invite);
 
   return (
     <div
@@ -90,7 +96,7 @@ const SidebarDropdownItem = observer(function SidebarDropdownItem(props: TProps)
               {t("settings")}
             </Menu.Item>
           )}
-          {[EUserPermissions.ADMIN].includes(workspace?.role) && (
+          {canInvite && (
             <Menu.Item
               render={
                 <Button

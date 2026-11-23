@@ -22,6 +22,8 @@ export type TInvitePolicyDomain = {
 
 export type TInvitePolicy = {
   restrict_to_domains: boolean;
+  /** Whether the instance lets workspace members invite, not only admins. */
+  members_can_invite?: boolean;
   domains: Record<string, TInvitePolicyDomain>;
 };
 

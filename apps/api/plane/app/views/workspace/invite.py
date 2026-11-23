@@ -21,7 +21,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 # Module imports
-from plane.app.permissions import WorkSpaceAdminPermission
+from plane.app.permissions.workspace_invite import ADMIN, WorkspaceInvitePermission
 from plane.app.serializers import (
     WorkSpaceMemberInviteSerializer,
     WorkSpaceMemberInvitePublicSerializer,
@@ -43,13 +43,12 @@ class WorkspaceInvitationPolicyEndpoint(BaseAPIView):
     """What the invite dialog needs to refuse an address before submitting.
 
     Carries the permission the create endpoint carries, so exactly those who
-    can write an invitation can read the rules it will be judged by — note that
-    WorkSpaceAdminPermission admits members as well as admins, despite the
-    name. Nobody learns a pinned domain here who could not read it off a
-    rejected invitation.
+    can write an invitation can read the rules it will be judged by: admins,
+    and members only where the instance lets them invite. Nobody learns a
+    pinned domain here who could not read it off a rejected invitation.
     """
 
-    permission_classes = [WorkSpaceAdminPermission]
+    permission_classes = [WorkspaceInvitePermission]
 
     def get(self, request, slug):
         return Response(invitation_policy_snapshot(), status=status.HTTP_200_OK)
@@ -61,15 +60,29 @@ class WorkspaceInvitationsViewset(BaseViewSet):
     serializer_class = WorkSpaceMemberInviteSerializer
     model = WorkspaceMemberInvite
 
-    permission_classes = [WorkSpaceAdminPermission]
+    # Fork (see FORK.md): admins, or members where ALLOW_MEMBERS_TO_INVITE is on
+    # and then only for the invitations they sent. WorkSpaceAdminPermission,
+    # used before, admits every member.
+    permission_classes = [WorkspaceInvitePermission]
 
     def get_queryset(self):
-        return self.filter_queryset(
+        queryset = (
             super()
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
             .select_related("workspace", "workspace__owner", "created_by")
         )
+        # Fork (see FORK.md): a member who may invite sees only the invitations
+        # they sent — each carries a join link — and an invitation someone else
+        # sent answers 404 on read, change and withdraw alike. Admins see all.
+        if not WorkspaceMember.objects.filter(
+            workspace__slug=self.kwargs.get("slug"),
+            member=self.request.user,
+            role=ADMIN,
+            is_active=True,
+        ).exists():
+            queryset = queryset.filter(created_by=self.request.user)
+        return self.filter_queryset(queryset)
 
     def create(self, request, slug):
         emails = request.data.get("emails", [])
@@ -157,6 +170,10 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         return Response({"message": "Emails sent successfully"}, status=status.HTTP_200_OK)
 
     def partial_update(self, request, slug, pk):
+        workspace_member_invite = self.get_queryset().get(pk=pk)
+        # A member may change only an invitation they sent.
+        self.check_object_permissions(request, workspace_member_invite)
+
         # SECURITY: only ``role`` is writable, capped at the requester's own role as in create().
         if not isinstance(request.data, dict) or set(request.data) != {"role"}:
             return Response(
@@ -164,7 +181,6 @@ class WorkspaceInvitationsViewset(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        workspace_member_invite = WorkspaceMemberInvite.objects.get(pk=pk, workspace__slug=slug)
         serializer = WorkSpaceMemberInviteSerializer(workspace_member_invite, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -180,7 +196,9 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, slug, pk):
-        workspace_member_invite = WorkspaceMemberInvite.objects.get(pk=pk, workspace__slug=slug)
+        workspace_member_invite = self.get_queryset().get(pk=pk)
+        # A member may withdraw only an invitation they sent.
+        self.check_object_permissions(request, workspace_member_invite)
         workspace_member_invite.revoked_at = timezone.now()
         workspace_member_invite.save(update_fields=["revoked_at", "updated_at"])
         workspace_member_invite.delete()

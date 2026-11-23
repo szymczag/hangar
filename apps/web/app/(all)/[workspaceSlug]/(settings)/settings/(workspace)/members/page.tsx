@@ -23,7 +23,10 @@ import { WorkspaceMembersList } from "@/components/workspace/settings/members-li
 import { SettingsContentWrapper } from "@/components/settings/content-wrapper";
 import { SettingsHeading } from "@/components/settings/heading";
 import { SendWorkspaceInvitationModal } from "@/components/workspace/members";
+// helpers
+import { canInviteToWorkspace } from "@/helpers/workspace-invite-access";
 // hooks
+import { useInstance } from "@/hooks/store/use-instance";
 import { useMember } from "@/hooks/store/use-member";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUserPermissions } from "@/hooks/store/user";
@@ -38,7 +41,8 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
   // router
   const { workspaceSlug } = params;
   // store hooks
-  const { workspaceUserInfo, allowPermissions } = useUserPermissions();
+  const { workspaceUserInfo, allowPermissions, workspaceInfoBySlug } = useUserPermissions();
+  const { config } = useInstance();
   const {
     workspace: { workspaceMemberIds, inviteMembersToWorkspace, filtersStore },
   } = useMember();
@@ -46,11 +50,12 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
   const { t } = useTranslation();
 
   // derived values
-  const canPerformWorkspaceAdminActions = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
   const canPerformWorkspaceMemberActions = allowPermissions(
     [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
     EUserPermissionsLevel.WORKSPACE
   );
+  // Admins always; members only where the instance lets them (ALLOW_MEMBERS_TO_INVITE).
+  const canInvite = canInviteToWorkspace(workspaceInfoBySlug(workspaceSlug)?.role, config?.members_can_invite);
 
   const handleWorkspaceInvite = async (data: IWorkspaceBulkInviteFormData) => {
     try {
@@ -138,7 +143,7 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
                 handleUpdate={handleRoleFilterUpdate}
                 memberType="workspace"
               />
-              {canPerformWorkspaceAdminActions && (
+              {canInvite && (
                 <Button
                   variant="primary"
                   size="md"
@@ -150,7 +155,7 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
             </div>
           }
         />
-        <WorkspaceMembersList searchQuery={searchQuery} isAdmin={canPerformWorkspaceAdminActions} />
+        <WorkspaceMembersList searchQuery={searchQuery} canSeeInvitations={canInvite} />
       </section>
     </SettingsContentWrapper>
   );

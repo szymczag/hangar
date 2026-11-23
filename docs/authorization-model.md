@@ -287,6 +287,40 @@ anything workspace-bound.
 The secret is returned **only** when the token is created. Reads and renames
 answer with `APITokenReadSerializer`, which excludes it.
 
+## Workspace invitations
+
+Inviting someone to a workspace, changing a pending invitation's role and
+withdrawing one are a workspace admin's acts. `WorkSpaceAdminPermission`, which
+the app endpoints used, admits members as well as admins despite its name, so
+before this any member could invite, re-role any pending invitation and withdraw
+one an admin had sent. The endpoints under `/api/workspaces/<slug>/invitations/`
+(list, create, read, change, withdraw, and `policy/`) now carry
+`WorkspaceInvitePermission` (`plane/app/permissions/workspace_invite.py`):
+
+| Caller | `ALLOW_MEMBERS_TO_INVITE` off | `ALLOW_MEMBERS_TO_INVITE=1`                                                                       |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| Admin  | everything                    | everything                                                                                        |
+| Member | `403` on every route          | list and read only their own; invite at most at their own role; change or withdraw only their own |
+| Guest  | `403`                         | `403`                                                                                             |
+
+"Their own" is the invitation's `created_by`. The view's queryset drops every
+other invitation for a non-admin, so someone else's answers `404` on read, change
+and withdraw alike, and the list carries no other join links. An invitation with
+no recorded sender is left to admins. Turning the setting off takes the right back at once,
+including over invitations a member sent while it was on; the invitations
+themselves stay valid until an admin withdraws them. The setting is off by
+default and seeded by `license` migration `0025`, so an upgrade narrows what
+members could do before. It is set in God Mode under **Workspaces → Members can
+invite to workspaces**, and reported to signed-in users as `members_can_invite`
+on `/api/users/me/instance-config/` and on the invitation `policy/` endpoint, so
+the application shows the invite button, the pending-invitation list and the
+per-invitation actions only where they would succeed. That is presentation; the
+permission class decides.
+
+The public API (`/api/v1/workspaces/<slug>/invitations/`) was already
+admin-only (`WorkspaceOwnerPermission`) and is not widened by the setting.
+`test_workspace_invite_access_app.py` pins the matrix above.
+
 ## What the instance tells a visitor without a session
 
 `/api/instances/` is `AllowAny` because every sign-in page reads it before anyone
@@ -355,6 +389,7 @@ Two consequences for anyone adding an endpoint there:
 | `DISABLE_WORKSPACE_CREATION=1` | only instance administrators create workspaces        |
 | `SSO_ENFORCED_DOMAINS`         | pins an email domain to designated identity providers |
 | `SSO_AUTO_JOIN_WORKSPACES`     | places federated users into a workspace on sign-in    |
+| `ALLOW_MEMBERS_TO_INVITE=1`    | members, not only admins, send workspace invitations  |
 
 An account with no membership sees no content, so those two flags are what make
 "anyone can sign in" safe. See [federated SSO security](federated-sso-security.md).
