@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "Ďalšie akcie",
       "remove": "Odstrániť"
+    },
+    "pagination": {
+      "go_to_page": "Prejsť na stránku {page}",
+      "next_page": "Prejsť na ďalšiu stránku",
+      "previous_page": "Prejsť na predchádzajúcu stránku",
+      "root": "Stránkovanie"
     }
   }
 }

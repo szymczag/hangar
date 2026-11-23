@@ -26,7 +26,9 @@
           "success_title": "Priestor zmazaný.",
           "success_message": "Budete presmerovaný na profil.",
           "error_title": "Nepodarilo sa.",
-          "error_message": "Skúste to prosím znova."
+          "error_message": "Skúste to prosím znova.",
+          "confirm_description": "Chystáte sa zmazať pracovný priestor {workspaceName}. Stratíte prístup ku všetkým pracovným údajom v tomto priestore a nebude možné ich obnoviť.",
+          "confirm_phrase_label": "Na potvrdenie napíšte „{phrase}“."
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "Na doméne {domain} nemožno použiť značku s plusom.",
             "blocked_domain": "Doména {domain} nemá povolený žiadny spôsob prihlásenia."
           }
-        }
+        },
+        "description": "Spravujte prístup k tomuto pracovnému priestoru.",
+        "leave_input_label": "Ak chcete pokračovať, zadajte názov tohto pracovného priestoru.",
+        "leave_title": "Opustiť pracovný priestor?"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "Chyba!",
             "message": "Mazanie tokenu zlyhalo"
           }
-        }
+        },
+        "columns": {
+          "expires": "Vyprší",
+          "last_used": "Naposledy použité"
+        },
+        "expired": "Vypršané",
+        "not_used_yet": "Zatiaľ nepoužité"
       },
       "integrations": {
         "title": "Integrácie",

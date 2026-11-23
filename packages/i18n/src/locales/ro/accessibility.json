@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "Mai multe acțiuni",
       "remove": "Elimină"
+    },
+    "pagination": {
+      "go_to_page": "Mergeți la pagina {page}",
+      "next_page": "Mergeți la pagina următoare",
+      "previous_page": "Mergeți la pagina anterioară",
+      "root": "Paginare"
     }
   }
 }

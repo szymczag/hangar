@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Gagal menyalin ke clipboard",
     "tooltip": {
       "copy_to_clipboard": "Salin ke clipboard"
-    }
+    },
+    "status": "Status"
   },
   "chart": {
     "x_axis": "Sumbu-X",

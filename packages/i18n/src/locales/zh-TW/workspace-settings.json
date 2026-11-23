@@ -26,7 +26,9 @@
           "success_title": "工作區已刪除。",
           "success_message": "您很快就會進入個人資料頁面。",
           "error_title": "操作失敗。",
-          "error_message": "請重試。"
+          "error_message": "請重試。",
+          "confirm_description": "您即將刪除工作區 {workspaceName}。您將無法再存取此工作區中的所有工作資料，且無法復原。",
+          "confirm_phrase_label": "請輸入「{phrase}」以確認。"
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "{domain} 上不能使用帶加號的位址。",
             "blocked_domain": "{domain} 未啟用任何登入方式。"
           }
-        }
+        },
+        "description": "管理此工作區的存取權限。",
+        "leave_input_label": "輸入此工作區的名稱以繼續。",
+        "leave_title": "離開工作區？"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "錯誤！",
             "message": "無法刪除 API 權杖"
           }
-        }
+        },
+        "columns": {
+          "expires": "到期時間",
+          "last_used": "上次使用"
+        },
+        "expired": "已過期",
+        "not_used_yet": "尚未使用"
       },
       "integrations": {
         "title": "整合",

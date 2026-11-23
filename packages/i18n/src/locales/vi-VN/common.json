@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Không thể sao chép vào bảng tạm",
     "tooltip": {
       "copy_to_clipboard": "Sao chép vào bảng tạm"
-    }
+    },
+    "status": "Trạng thái"
   },
   "chart": {
     "x_axis": "Trục X",

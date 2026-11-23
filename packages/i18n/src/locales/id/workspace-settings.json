@@ -26,7 +26,9 @@
           "success_title": "Ruang kerja dihapus.",
           "success_message": "Anda akan segera diarahkan ke halaman profil Anda.",
           "error_title": "Itu tidak berhasil.",
-          "error_message": "Silakan coba lagi."
+          "error_message": "Silakan coba lagi.",
+          "confirm_description": "Anda akan menghapus ruang kerja {workspaceName}. Anda akan kehilangan akses ke semua data kerja di ruang kerja ini, dan data tersebut tidak dapat dipulihkan.",
+          "confirm_phrase_label": "Ketik \"{phrase}\" untuk mengonfirmasi."
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "Tag plus tidak dapat digunakan pada {domain}.",
             "blocked_domain": "{domain} tidak memiliki metode masuk yang aktif."
           }
-        }
+        },
+        "description": "Kelola akses ke ruang kerja ini.",
+        "leave_input_label": "Ketik nama ruang kerja ini untuk melanjutkan.",
+        "leave_title": "Tinggalkan ruang kerja?"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "Kesalahan!",
             "message": "Token API tidak dapat dihapus"
           }
-        }
+        },
+        "columns": {
+          "expires": "Kedaluwarsa",
+          "last_used": "Terakhir digunakan"
+        },
+        "expired": "Kedaluwarsa",
+        "not_used_yet": "Belum digunakan"
       },
       "integrations": {
         "title": "Integrasi",

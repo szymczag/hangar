@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "Impossible de copier dans le presse-papiers",
     "tooltip": {
       "copy_to_clipboard": "Copier dans le presse-papiers"
-    }
+    },
+    "status": "Statut"
   },
   "chart": {
     "x_axis": "Axe X",

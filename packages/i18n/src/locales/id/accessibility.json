@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "Tindakan lainnya",
       "remove": "Hapus"
+    },
+    "pagination": {
+      "go_to_page": "Buka halaman {page}",
+      "next_page": "Buka halaman berikutnya",
+      "previous_page": "Buka halaman sebelumnya",
+      "root": "Paginasi"
     }
   }
 }

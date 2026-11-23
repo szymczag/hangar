@@ -26,7 +26,9 @@
           "success_title": "工作区已删除。",
           "success_message": "即将跳转到您的个人资料页面。",
           "error_title": "操作失败。",
-          "error_message": "请重试。"
+          "error_message": "请重试。",
+          "confirm_description": "您即将删除工作区 {workspaceName}。您将无法再访问此工作区中的所有工作数据，且无法恢复。",
+          "confirm_phrase_label": "请输入\"{phrase}\"以确认。"
         },
         "errors": {
           "name": {
@@ -66,7 +68,10 @@
             "plus_tag": "{domain} 上不能使用带加号的地址。",
             "blocked_domain": "{domain} 未启用任何登录方式。"
           }
-        }
+        },
+        "description": "管理对此工作区的访问权限。",
+        "leave_input_label": "输入此工作区的名称以继续。",
+        "leave_title": "离开工作区？"
       },
       "billing_and_plans": {
         "title": "Hangar by @szymczag"
@@ -181,7 +186,13 @@
             "title": "错误！",
             "message": "无法删除 API 令牌"
           }
-        }
+        },
+        "columns": {
+          "expires": "过期时间",
+          "last_used": "上次使用"
+        },
+        "expired": "已过期",
+        "not_used_yet": "尚未使用"
       },
       "integrations": {
         "title": "集成",

@@ -45,6 +45,12 @@
     "common": {
       "more_actions": "更多操作",
       "remove": "移除"
+    },
+    "pagination": {
+      "go_to_page": "前往第 {page} 頁",
+      "next_page": "前往下一頁",
+      "previous_page": "前往上一頁",
+      "root": "分頁"
     }
   }
 }

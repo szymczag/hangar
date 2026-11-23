@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "无法复制到剪贴板",
     "tooltip": {
       "copy_to_clipboard": "复制到剪贴板"
-    }
+    },
+    "status": "状态"
   },
   "chart": {
     "x_axis": "X轴",

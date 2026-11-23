@@ -742,7 +742,8 @@
     "clipboard_copy_failed": "クリップボードにコピーできませんでした",
     "tooltip": {
       "copy_to_clipboard": "クリップボードにコピー"
-    }
+    },
+    "status": "ステータス"
   },
   "chart": {
     "x_axis": "エックス アクシス",
