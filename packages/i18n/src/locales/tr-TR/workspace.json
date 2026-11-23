@@ -223,6 +223,11 @@
       "search": {
         "description": "Eşleşen kriterlerle proje bulunamadı.\nBunun yerine yeni bir proje oluşturun"
       }
+    },
+    "card": {
+      "archived": "Arşivlendi",
+      "joined": "Katıldı",
+      "no_lead": "Lider yok"
     }
   },
   "workspace_views": {

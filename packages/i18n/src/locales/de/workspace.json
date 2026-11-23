@@ -223,6 +223,11 @@
       "search": {
         "description": "Keine Projekte entsprechen Ihren Suchkriterien.\nErstellen Sie ein neues."
       }
+    },
+    "card": {
+      "archived": "Archiviert",
+      "joined": "Beigetreten",
+      "no_lead": "Keine Leitung"
     }
   },
   "workspace_views": {
