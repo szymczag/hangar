@@ -15,18 +15,19 @@ import type {
   UseFormWatch,
 } from "react-hook-form";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
-import { usePopper } from "react-popper";
-import { XCircle } from "lucide-react";
-import { Listbox } from "@headlessui/react";
+import { AddOutline, CloseCircleOutline } from "@makeplane/propel/icons";
 // plane imports
+import { Input, InputGroup } from "@makeplane/propel/components/input";
+import { Select, SelectContent, SelectItem, SelectList, SelectTrigger } from "@makeplane/propel/components/select";
 import type { EUserPermissions } from "@plane/constants";
-import { ROLE, ROLE_DETAILS } from "@plane/constants";
+import { ROLE_DETAILS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { PlusIcon, CheckIcon, ChevronDownIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { setToast } from "@plane/blocks/toast";
 import { EOnboardingSteps } from "@plane/types";
-import { Input, Spinner } from "@plane/ui";
+import { cn } from "@plane/utils";
 // hooks
 import { useWorkspace } from "@/hooks/store/use-workspace";
 // services
@@ -62,8 +63,15 @@ type InviteMemberFormProps = {
   setIsInvitationDisabled: (value: boolean) => void;
 };
 
+type TRoleOption = { key: EUserPermissions; i18n_title: string; i18n_description: string };
+
 // services
 const workspaceService = new WorkspaceService();
+const roleOptions: TRoleOption[] = Object.entries(ROLE_DETAILS).map(([key, details]) => ({
+  key: parseInt(key) as EUserPermissions,
+  i18n_title: details.i18n_title,
+  i18n_description: details.i18n_description,
+}));
 const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
 const placeholderEmails = [
@@ -91,9 +99,6 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
     getValues,
     watch,
   } = props;
-
-  const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
 
   const { t } = useTranslation();
 
@@ -123,139 +128,94 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
     }
   };
 
-  const { styles, attributes } = usePopper(referenceElement, popperElement, {
-    placement: "bottom-end",
-    modifiers: [
-      {
-        name: "preventOverflow",
-        options: {
-          padding: 12,
-        },
-      },
-    ],
-  });
+  const isEmailInvalid = Boolean(errors.emails?.[index]?.email);
 
   return (
     <div>
-      <div className="group relative grid grid-cols-10 gap-4">
-        <div className="col-span-6">
-          <Controller
-            control={control}
-            name={`emails.${index}.email`}
-            rules={{
-              pattern: {
-                value: emailRegex,
-                message: "Invalid Email ID",
-              },
-            }}
-            render={({ field: { value, onChange, ref } }) => (
-              <Input
-                id={`emails.${index}.email`}
-                name={`emails.${index}.email`}
-                type="text"
-                value={value}
-                onChange={(event) => {
-                  emailOnChange(event);
-                  onChange(event);
-                }}
-                ref={ref}
-                hasError={Boolean(errors.emails?.[index]?.email)}
-                placeholder={placeholderEmails[index % placeholderEmails.length]}
-                className="w-full border-strong text-11 placeholder:text-placeholder sm:text-13"
-                autoComplete="off"
-              />
-            )}
-          />
-        </div>
-        <div className="col-span-4 mr-8">
-          <Controller
-            control={control}
-            name={`emails.${index}.role`}
-            rules={{ required: true }}
-            render={({ field: { value, onChange } }) => (
-              <Listbox
-                as="div"
-                value={value}
-                onChange={(val) => {
-                  onChange(val);
-                  setValue(`emails.${index}.role_active`, true);
-                }}
-                className="w-full flex-shrink-0 text-left"
-              >
-                <Listbox.Button
-                  type="button"
-                  ref={setReferenceElement}
-                  className="flex w-full items-center justify-between gap-1 rounded-md border-[0.5px] border-strong px-2.5 py-2 text-13"
-                >
-                  <span
-                    className={`text-13 ${
-                      !getValues(`emails.${index}.role_active`) ? "text-placeholder" : "text-primary"
-                    } sm:text-13`}
+      <div className="flex items-center gap-2">
+        {/* One bordered control: a borderless email input and a ghost role select behind a divider. */}
+        <div className="min-w-0 flex-1">
+          <InputGroup size="xl" render={<div className="!pr-px" />}>
+            <Controller
+              control={control}
+              name={`emails.${index}.email`}
+              rules={{
+                pattern: {
+                  value: emailRegex,
+                  message: "Invalid Email ID",
+                },
+              }}
+              render={({ field: { value, onChange, ref } }) => (
+                <Input
+                  size="xl"
+                  id={`emails.${index}.email`}
+                  name={`emails.${index}.email`}
+                  type="text"
+                  value={value}
+                  onChange={(event) => {
+                    emailOnChange(event);
+                    onChange(event);
+                  }}
+                  ref={ref}
+                  aria-label={t("email")}
+                  aria-invalid={isEmailInvalid || undefined}
+                  data-invalid={isEmailInvalid || undefined}
+                  placeholder={placeholderEmails[index % placeholderEmails.length]}
+                  autoComplete="off"
+                />
+              )}
+            />
+            <div aria-hidden="true" className="h-4 shrink-0 border-l border-subtle-1" />
+            <div
+              className={cn(
+                "w-26 shrink-0 [&_button]:w-full",
+                !watch(`emails.${index}.role_active`) && "[&_button]:text-placeholder"
+              )}
+            >
+              <Controller
+                control={control}
+                name={`emails.${index}.role`}
+                rules={{ required: true }}
+                render={({ field: { value, onChange } }) => (
+                  <Select<EUserPermissions>
+                    value={value}
+                    items={roleOptions.map((role) => ({ value: role.key, label: t(role.i18n_title) }))}
+                    onValueChange={(role) => {
+                      if (role === null) return;
+                      onChange(role);
+                      setValue(`emails.${index}.role_active`, true);
+                    }}
                   >
-                    {ROLE[value]}
-                  </span>
-
-                  <ChevronDownIcon
-                    className={`size-3 ${
-                      !getValues(`emails.${index}.role_active`) ? "stroke-placeholder" : "stroke-primary"
-                    }`}
-                  />
-                </Listbox.Button>
-
-                <Listbox.Options
-                  as="div"
-                  className="z-10"
-                  data-prevent-outside-click
-                  modal={false}
-                  portal
-                  ref={setPopperElement}
-                  style={styles.popper}
-                  {...attributes.popper}
-                >
-                  <div className="shadow-sm absolute z-10 mt-1 h-fit w-48 space-y-1 rounded-md border border-strong bg-surface-1 p-2 focus:outline-none sm:w-60">
-                    {Object.entries(ROLE_DETAILS).map(([key, value]) => (
-                      <Listbox.Option
-                        as="div"
-                        key={key}
-                        value={parseInt(key)}
-                        className={({ active, selected }) =>
-                          `cursor-pointer truncate rounded-sm px-1 py-1.5 select-none ${
-                            active || selected ? "bg-onboarding-background-400/40" : ""
-                          } ${selected ? "text-primary" : "text-secondary"}`
-                        }
-                      >
-                        {({ selected }) => (
-                          <div className="flex items-center gap-2 p-1 text-wrap">
-                            <div className="flex flex-col">
-                              <div className="text-13 font-medium">{t(value.i18n_title)}</div>
-                              <div className="flex text-11 text-tertiary">{t(value.i18n_description)}</div>
-                            </div>
-                            {selected && <CheckIcon className="h-4 w-4 shrink-0" />}
-                          </div>
-                        )}
-                      </Listbox.Option>
-                    ))}
-                  </div>
-                </Listbox.Options>
-              </Listbox>
-            )}
-          />
+                    <SelectTrigger size="lg" variant="ghost" width="fit" aria-label={t("role")} />
+                    <SelectContent side="bottom" align="end" sizing="auto">
+                      <SelectList>
+                        {roleOptions.map((role) => (
+                          <SelectItem
+                            key={role.key}
+                            value={role.key}
+                            label={t(role.i18n_title)}
+                            description={t(role.i18n_description)}
+                          />
+                        ))}
+                      </SelectList>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          </InputGroup>
         </div>
-        {fields.length > 1 && (
-          <button
-            type="button"
-            className="absolute right-0 hidden place-items-center self-center rounded-sm group-hover:grid"
-            onClick={() => remove(index)}
-          >
-            <XCircle className="h-5 w-5 pl-0.5 text-placeholder" />
-          </button>
-        )}
+        <IconButton
+          variant="ghost"
+          size="sm"
+          aria-label={t("remove")}
+          icon={<Icon icon={CloseCircleOutline} />}
+          disabled={fields.length <= 1}
+          onClick={() => remove(index)}
+        />
       </div>
       {email && !emailRegex.test(email) && (
-        <div className="mx-8 my-1">
-          <span className="text-13">🤥</span>{" "}
-          <span className="mt-1 text-11 text-danger-primary">That doesn{"'"}t look like an email address.</span>
-        </div>
+        <p className="mt-1 text-caption-sm-regular text-danger-primary">That doesn{"'"}t look like an email address.</p>
       )}
     </div>
   );
@@ -264,6 +224,7 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
 export const InviteTeamStep = observer(function InviteTeamStep(props: Props) {
   const { handleStepChange } = props;
 
+  const { t } = useTranslation();
   const [isInvitationDisabled, setIsInvitationDisabled] = useState(true);
 
   const { workspaces } = useWorkspace();
@@ -303,15 +264,15 @@ export const InviteTeamStep = observer(function InviteTeamStep(props: Props) {
       })
       .then(async () => {
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: "Success!",
           message: "Invitations sent successfully.",
         });
-        await nextStep();
+        return nextStep();
       })
       .catch((err) => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: err?.error,
         });
@@ -339,7 +300,7 @@ export const InviteTeamStep = observer(function InviteTeamStep(props: Props) {
 
   return (
     <form
-      className="flex flex-col gap-10"
+      className="flex flex-col gap-11"
       onSubmit={handleSubmit(onSubmit)}
       onKeyDown={(e) => {
         if (e.code === "Enter") e.preventDefault();
@@ -349,51 +310,62 @@ export const InviteTeamStep = observer(function InviteTeamStep(props: Props) {
         title="Invite your teammates"
         description="Work in plane happens best with your team. Invite them now to use Hangar to its potential."
       />
-      <div className="w-full py-4 text-13">
-        <div className="group relative mx-8 grid grid-cols-10 gap-4 py-2">
-          <div className="col-span-6 px-1 text-13 font-medium text-secondary">Email</div>
-          <div className="col-span-4 px-1 text-13 font-medium text-secondary">Role</div>
-        </div>
-        <div className="mb-3 space-y-3 sm:space-y-4">
-          {fields.map((field, index) => (
-            <InviteMemberInput
-              watch={watch}
-              getValues={getValues}
-              setValue={setValue}
-              isInvitationDisabled={isInvitationDisabled}
-              setIsInvitationDisabled={(value: boolean) => setIsInvitationDisabled(value)}
-              control={control}
-              errors={errors}
-              field={field}
-              fields={fields}
-              index={index}
-              remove={remove}
-              key={field.id}
+      <div className="flex w-full flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <div className="space-y-2">
+            <div aria-hidden="true" className="flex items-center gap-2 text-body-sm-medium text-secondary">
+              {/* mirrors the control below: border, inset, divider and role column */}
+              <div className="flex min-w-0 flex-1 items-center gap-(--control-gap-xl) pr-0.5 pl-[calc(var(--field-inset-xl)+1px)]">
+                <div className="min-w-0 flex-1">{t("email")}</div>
+                <div className="w-px shrink-0" />
+                <div className="w-26 shrink-0 px-(--field-inset-lg)">{t("role")}</div>
+              </div>
+              <div className="size-6 shrink-0" />
+            </div>
+            <div className="space-y-2">
+              {fields.map((field, index) => (
+                <InviteMemberInput
+                  watch={watch}
+                  getValues={getValues}
+                  setValue={setValue}
+                  isInvitationDisabled={isInvitationDisabled}
+                  setIsInvitationDisabled={(value: boolean) => setIsInvitationDisabled(value)}
+                  control={control}
+                  errors={errors}
+                  field={field}
+                  fields={fields}
+                  index={index}
+                  remove={remove}
+                  key={field.id}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <Button
+              type="button"
+              variant="tertiary"
+              size="md"
+              stretch="auto"
+              onClick={appendField}
+              icon={<Icon icon={AddOutline} />}
+              iconPosition="start"
+              label="Add another"
             />
-          ))}
+          </div>
         </div>
-        <button
-          type="button"
-          className="mx-8 flex items-center gap-1.5 bg-transparent text-13 font-medium text-accent-primary outline-accent-strong"
-          onClick={appendField}
-        >
-          <PlusIcon className="h-4 w-4" strokeWidth={2} />
-          Add another
-        </button>
-      </div>
-      <div className="mx-auto flex w-full flex-col items-center justify-center gap-4 px-8 sm:px-2">
-        <Button
-          variant="primary"
-          type="submit"
-          size="xl"
-          className="w-full"
-          disabled={isInvitationDisabled || !isValid || isSubmitting}
-        >
-          {isSubmitting ? <Spinner height="20px" width="20px" /> : "Continue"}
-        </Button>
-        <Button variant="ghost" size="xl" className="w-full" onClick={nextStep}>
-          I’ll do it later
-        </Button>
+        <div className="flex w-full flex-col items-center justify-center gap-4">
+          <Button
+            variant="primary"
+            type="submit"
+            size="lg"
+            stretch="full"
+            disabled={isInvitationDisabled || !isValid || isSubmitting}
+            loading={isSubmitting}
+            label="Continue"
+          />
+          <Button variant="ghost" size="lg" stretch="full" onClick={nextStep} label="I’ll do it later" />
+        </div>
       </div>
     </form>
   );

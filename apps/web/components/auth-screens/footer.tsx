@@ -22,7 +22,7 @@ export const AuthFooter = observer(function AuthFooter() {
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <span className="text-13 text-tertiary">
+      <span className="text-body-xs-regular text-tertiary">
         Running Hangar, an open-source work management platform
         {brandingName ? <span className="text-secondary"> · {brandingName}</span> : null}
       </span>

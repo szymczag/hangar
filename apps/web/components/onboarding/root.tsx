@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { IWorkspaceMemberInvitation, TOnboardingStep, TOnboardingSteps, TUserProfile } from "@plane/types";
 import { EOnboardingSteps } from "@plane/types";
 // hooks
@@ -47,7 +47,7 @@ export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [
       await finishUserOnboarding();
     } catch (_error) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Failed",
         message: "Failed to finish onboarding, Please try again later.",
       });
@@ -128,6 +128,7 @@ export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [
         !userProfile?.onboarding_step?.workspace_join
       ) {
         setCurrentStep(EOnboardingSteps.WORKSPACE_CREATE_OR_JOIN);
+        return;
       }
       if (
         userProfile?.onboarding_step?.profile_complete &&

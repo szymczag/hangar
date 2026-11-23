@@ -8,14 +8,17 @@ import { useState } from "react";
 import { observer } from "mobx-react";
 import { Controller, useForm } from "react-hook-form";
 // constants
+import { Field } from "@makeplane/propel/components/field";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { ORGANIZATION_SIZE, RESTRICTED_URLS } from "@plane/constants";
 // types
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/elements/button";
+import { setToast } from "@plane/blocks/toast";
 import type { IUser, IWorkspace, TOnboardingSteps } from "@plane/types";
 // ui
-import { CustomSelect, Input, Spinner } from "@plane/ui";
+import { Select } from "@plane/blocks/select";
+import { Spinner } from "@plane/blocks/spinner";
 import { validateWorkspaceName, validateSlug } from "@plane/utils";
 // hooks
 import { useWorkspace } from "@/hooks/store/use-workspace";
@@ -68,7 +71,7 @@ export const CreateWorkspace = observer(function CreateWorkspace(props: Props) {
         setSlugError(false);
         const workspaceResponse = await createWorkspace(formData);
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: t("workspace_creation.toast.success.title"),
           message: t("workspace_creation.toast.success.message"),
         });
@@ -77,7 +80,7 @@ export const CreateWorkspace = observer(function CreateWorkspace(props: Props) {
       } else setSlugError(true);
     } catch (_error) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("workspace_creation.toast.error.title"),
         message: t("workspace_creation.toast.error.message"),
       });
@@ -106,30 +109,31 @@ export const CreateWorkspace = observer(function CreateWorkspace(props: Props) {
         <>
           <Button
             variant="ghost"
-            size="xl"
-            className="flex w-full items-center gap-2 bg-surface-2 text-14"
+            size="lg"
+            stretch="full"
             onClick={handleCurrentViewChange}
+            render={<button type="button" className="flex items-center gap-2 bg-surface-2 text-body-sm-regular" />}
           >
             I want to join invited workspaces{" "}
-            <span className="flex h-4 w-4 items-center justify-center rounded-xs bg-accent-primary/80 text-11 font-medium text-on-color">
+            <span className="flex h-4 w-4 items-center justify-center rounded-xs bg-accent-primary/80 text-caption-sm-medium text-on-color">
               {invitedWorkspaces}
             </span>
           </Button>
           <div className="mx-auto mt-4 flex items-center sm:w-96">
             <hr className="w-full border-strong" />
-            <p className="mx-3 flex-shrink-0 text-center text-13 text-placeholder">or</p>
+            <p className="mx-3 flex-shrink-0 text-center text-body-xs-regular text-placeholder">or</p>
             <hr className="w-full border-strong" />
           </div>
         </>
       )}
       <div className="mx-auto space-y-1 py-4 text-center">
-        <h3 className="text-24 font-bold text-primary">{t("workspace_creation.heading")}</h3>
+        <h3 className="text-h3-bold text-primary">{t("workspace_creation.heading")}</h3>
         <p className="font-medium text-placeholder">{t("workspace_creation.subheading")}</p>
       </div>
       <form className="mx-auto mt-2 w-full space-y-4" onSubmit={handleSubmit(handleCreateWorkspace)}>
         <div className="space-y-1">
           <label
-            className="text-13 font-medium text-tertiary after:ml-0.5 after:text-danger-primary after:content-['*']"
+            className="text-body-xs-medium text-tertiary after:ml-0.5 after:text-danger-primary after:content-['*']"
             htmlFor="name"
           >
             {t("workspace_creation.form.name.label")}
@@ -147,32 +151,36 @@ export const CreateWorkspace = observer(function CreateWorkspace(props: Props) {
             }}
             render={({ field: { value, ref, onChange } }) => (
               <div className="relative flex items-center rounded-md">
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  value={value}
-                  onChange={(event) => {
-                    onChange(event.target.value);
-                    setValue("name", event.target.value);
-                    setValue("slug", event.target.value.toLocaleLowerCase().trim().replace(/ /g, "-"), {
-                      shouldValidate: true,
-                    });
-                  }}
-                  placeholder={t("workspace_creation.form.name.placeholder")}
-                  ref={ref}
-                  hasError={Boolean(errors.name)}
-                  className="w-full border-strong placeholder:text-placeholder"
-                  autoFocus
-                />
+                <Field name="name" invalid={Boolean(errors.name)}>
+                  <InputGroup size="2xl">
+                    <Input
+                      size="2xl"
+                      id="name"
+                      name="name"
+                      type="text"
+                      value={value}
+                      onChange={(event) => {
+                        onChange(event.target.value);
+                        setValue("name", event.target.value);
+                        setValue("slug", event.target.value.toLocaleLowerCase().trim().replace(/ /g, "-"), {
+                          shouldValidate: true,
+                        });
+                      }}
+                      placeholder={t("workspace_creation.form.name.placeholder")}
+                      ref={ref}
+                      // oxlint-disable-next-line jsx-a11y/no-autofocus -- the workspace step opens on its name field
+                      autoFocus
+                    />
+                  </InputGroup>
+                </Field>
               </div>
             )}
           />
-          {errors.name && <span className="text-13 text-danger-primary">{errors.name.message}</span>}
+          {errors.name && <span className="text-body-xs-regular text-danger-primary">{errors.name.message}</span>}
         </div>
         <div className="space-y-1">
           <label
-            className="text-13 font-medium text-tertiary after:ml-0.5 after:text-danger-primary after:content-['*']"
+            className="text-body-xs-medium text-tertiary after:ml-0.5 after:text-danger-primary after:content-['*']"
             htmlFor="slug"
           >
             {t("workspace_creation.form.url.label")}
@@ -188,46 +196,45 @@ export const CreateWorkspace = observer(function CreateWorkspace(props: Props) {
               },
             }}
             render={({ field: { value, ref, onChange } }) => (
-              <div
-                className={`relative flex items-center rounded-md border-[0.5px] px-3 ${
-                  invalidSlug ? "border-danger-strong" : "border-strong"
-                }`}
-              >
-                <span className="text-13 whitespace-nowrap">{window && window.location.host}/</span>
-                <Input
-                  id="slug"
-                  name="slug"
-                  type="text"
-                  value={value.toLocaleLowerCase().trim().replace(/ /g, "-")}
-                  onChange={(e) => {
-                    const validation = validateSlug(e.target.value);
-                    if (validation === true) setInvalidSlug(false);
-                    else setInvalidSlug(true);
-                    onChange(e.target.value.toLowerCase());
-                  }}
-                  ref={ref}
-                  hasError={Boolean(errors.slug)}
-                  placeholder={t("workspace_creation.form.url.placeholder")}
-                  className="w-full border-none !px-0"
-                />
-              </div>
+              <Field name="slug" invalid={invalidSlug || Boolean(errors.slug)}>
+                <InputGroup size="2xl">
+                  <span className="text-body-xs-regular whitespace-nowrap">{window && window.location.host}/</span>
+                  <Input
+                    size="2xl"
+                    id="slug"
+                    name="slug"
+                    type="text"
+                    value={value.toLocaleLowerCase().trim().replace(/ /g, "-")}
+                    onChange={(e) => {
+                      const validation = validateSlug(e.target.value);
+                      if (validation === true) setInvalidSlug(false);
+                      else setInvalidSlug(true);
+                      onChange(e.target.value.toLowerCase());
+                    }}
+                    ref={ref}
+                    placeholder={t("workspace_creation.form.url.placeholder")}
+                  />
+                </InputGroup>
+              </Field>
             )}
           />
-          <p className="text-13 text-tertiary">{t("workspace_creation.form.url.edit_slug")}</p>
+          <p className="text-body-xs-regular text-tertiary">{t("workspace_creation.form.url.edit_slug")}</p>
           {slugError && (
-            <p className="-mt-3 text-13 text-danger-primary">
+            <p className="-mt-3 text-body-xs-regular text-danger-primary">
               {t("workspace_creation.errors.validation.url_already_taken")}
             </p>
           )}
           {invalidSlug && (
-            <p className="text-13 text-danger-primary">{t("workspace_creation.errors.validation.url_alphanumeric")}</p>
+            <p className="text-body-xs-regular text-danger-primary">
+              {t("workspace_creation.errors.validation.url_alphanumeric")}
+            </p>
           )}
-          {errors.slug && <span className="text-13 text-danger-primary">{errors.slug.message}</span>}
+          {errors.slug && <span className="text-body-xs-regular text-danger-primary">{errors.slug.message}</span>}
         </div>
         <hr className="w-full border-strong" />
         <div className="space-y-1">
           <label
-            className="text-13 font-medium text-tertiary after:ml-0.5 after:text-danger-primary after:content-['*']"
+            className="text-body-xs-medium text-tertiary after:ml-0.5 after:text-danger-primary after:content-['*']"
             htmlFor="organization_size"
           >
             {t("workspace_creation.form.organization_size.label")}
@@ -238,33 +245,36 @@ export const CreateWorkspace = observer(function CreateWorkspace(props: Props) {
               control={control}
               rules={{ required: t("common.errors.required") }}
               render={({ field: { value, onChange } }) => (
-                <CustomSelect
-                  value={value}
+                <Select<string>
+                  value={ORGANIZATION_SIZE.find((item) => item === value) ?? null}
                   onChange={onChange}
-                  label={
-                    ORGANIZATION_SIZE.find((c) => c === value) ?? (
-                      <span className="text-placeholder">
-                        {t("workspace_creation.form.organization_size.placeholder")}
-                      </span>
-                    )
-                  }
-                  buttonClassName="border border-subtle bg-layer-2 !shadow-none !rounded-md"
-                  input
+                  getValues={() => ORGANIZATION_SIZE}
+                  getOptionValue={(item) => item}
+                  getOptionLabel={(item) => item}
+                  showSearch={false}
+                  pinSelected={false}
+                  placeholder={t("workspace_creation.form.organization_size.placeholder")}
                 >
-                  {ORGANIZATION_SIZE.map((item) => (
-                    <CustomSelect.Option key={item} value={item}>
-                      {item}
-                    </CustomSelect.Option>
-                  ))}
-                </CustomSelect>
+                  <Select.Trigger<string> id="organization_size" variant="select-xl">
+                    {(selected) => (
+                      <span className="grow truncate text-left">
+                        {selected[0] ?? (
+                          <span className="text-placeholder">
+                            {t("workspace_creation.form.organization_size.placeholder")}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </Select.Trigger>
+                </Select>
               )}
             />
             {errors.organization_size && (
-              <span className="text-13 text-danger-primary">{errors.organization_size.message}</span>
+              <span className="text-body-xs-regular text-danger-primary">{errors.organization_size.message}</span>
             )}
           </div>
         </div>
-        <Button variant="primary" type="submit" size="xl" className="w-full" disabled={isButtonDisabled}>
+        <Button variant="primary" type="submit" size="lg" stretch="full" disabled={isButtonDisabled}>
           {isSubmitting ? <Spinner height="20px" width="20px" /> : t("workspace_creation.button.default")}
         </Button>
       </form>

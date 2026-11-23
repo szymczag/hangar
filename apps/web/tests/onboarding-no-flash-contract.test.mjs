@@ -46,3 +46,16 @@ test("the decision waits for the data it depends on", () => {
   );
   assert.match(source, /workspacesLoader,/, "the effect has to re-run when loading finishes");
 });
+
+test("each chosen step stands; the profile step is only the fallback", () => {
+  // The fallback at the end of the effect sets PROFILE_SETUP. A branch that
+  // chooses a step and does not return is overwritten by it, which sent someone
+  // with a finished profile and no workspace back to the profile step.
+  for (const step of ["WORKSPACE_CREATE_OR_JOIN", "INVITE_MEMBERS"]) {
+    assert.match(
+      source,
+      new RegExp(`setCurrentStep\\(EOnboardingSteps\\.${step}\\);\\s*return;`),
+      `the ${step} branch falls through to the profile step`
+    );
+  }
+});

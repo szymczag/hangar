@@ -8,7 +8,9 @@ import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
 import { useSearchParams } from "next/navigation";
 // plane imports
-import { OAuthOptions } from "@plane/ui";
+import { Banner } from "@makeplane/propel/components/banner";
+import { OAuthOptions } from "@plane/blocks/auth";
+import { useTranslation } from "@plane/i18n";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
 // helpers
@@ -26,7 +28,6 @@ import { useOAuthConfig } from "@/hooks/oauth";
 import { useInstance } from "@/hooks/store/use-instance";
 // local imports
 import { TermsAndConditions } from "../terms-and-conditions";
-import { AuthBanner } from "./auth-banner";
 import { AuthHeader, AuthHeaderBase } from "./auth-header";
 import { AuthFormRoot } from "./form-root";
 
@@ -53,6 +54,8 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   const hasStartedGoogleRedirect = useRef(false);
   // store hooks
   const { config } = useInstance();
+  // translation
+  const { t } = useTranslation();
   // derived values
   const oAuthActionText = authMode === EAuthModes.SIGN_UP ? "Sign up" : "Sign in";
   const { isOAuthEnabled, oAuthOptions } = useOAuthConfig(oAuthActionText);
@@ -122,7 +125,10 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   if (shouldStartGoogleRedirect) {
     return (
       <AuthContainer>
-        <div className="flex flex-col items-center gap-3 text-center text-13 text-tertiary" aria-live="polite">
+        <div
+          className="flex flex-col items-center gap-3 text-center text-body-xs-regular text-tertiary"
+          aria-live="polite"
+        >
           <LogoSpinner />
           <span>Redirecting to Google…</span>
         </div>
@@ -144,7 +150,14 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   return (
     <AuthContainer>
       {errorInfo && errorInfo?.type === EErrorAlertType.BANNER_ALERT && (
-        <AuthBanner message={errorInfo.message} handleBannerData={(value) => setErrorInfo(value)} />
+        <Banner
+          placement="inline"
+          variant="info"
+          role="alert"
+          description={errorInfo.message}
+          dismissLabel={t("close")}
+          onDismiss={() => setErrorInfo(undefined)}
+        />
       )}
       <AuthHeader
         workspaceSlug={workspaceSlug?.toString() || undefined}
@@ -165,10 +178,10 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
           authStep={authStep}
           authMode={authMode}
           email={email}
-          setEmail={(email) => setEmail(email)}
-          setAuthMode={(authMode) => setAuthMode(authMode)}
-          setAuthStep={(authStep) => setAuthStep(authStep)}
-          setErrorInfo={(errorInfo) => setErrorInfo(errorInfo)}
+          setEmail={setEmail}
+          setAuthMode={setAuthMode}
+          setAuthStep={setAuthStep}
+          setErrorInfo={setErrorInfo}
           currentAuthMode={currentAuthMode}
         />
       )}
