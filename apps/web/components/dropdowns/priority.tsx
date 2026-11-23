@@ -12,7 +12,8 @@ import type { Placement } from "@popperjs/core";
 // plane imports
 import type { TIssuePriorities } from "@plane/types";
 // local imports
-import { DropdownCompatFrame, toSelectTooltip, toSelectVariant, toTriggerClassName } from "./compat";
+import { toSelectTooltip, toSelectVariant, toTriggerClassName } from "./compat";
+import { DropdownCompatFrame } from "./compat-frame";
 import { PrioritySelect } from "./priority/priority-select";
 import type { TButtonVariants } from "./types";
 

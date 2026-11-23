@@ -13,7 +13,8 @@ import { observer } from "mobx-react";
 // hooks
 import { useProjectState } from "@/hooks/store/use-project-state";
 // local imports
-import { DropdownCompatFrame, toSelectTooltip, toSelectVariant, toTriggerClassName } from "../compat";
+import { toSelectTooltip, toSelectVariant, toTriggerClassName } from "../compat";
+import { DropdownCompatFrame } from "../compat-frame";
 import type { TButtonVariants } from "../types";
 import { StateSelect } from "./state-select";
 

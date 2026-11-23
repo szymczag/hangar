@@ -10,7 +10,8 @@
 
 import type { Placement } from "@popperjs/core";
 // local imports
-import { DropdownCompatFrame, toSelectTooltip, toSelectVariant, toTriggerClassName } from "./compat";
+import { toSelectTooltip, toSelectVariant, toTriggerClassName } from "./compat";
+import { DropdownCompatFrame } from "./compat-frame";
 import { EstimateSelect } from "./estimate/estimate-select";
 import type { TButtonVariants } from "./types";
 

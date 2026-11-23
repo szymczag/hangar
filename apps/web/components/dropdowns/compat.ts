@@ -11,11 +11,8 @@
 // old paths now render the new components so that the screens still on the 1.4 call shape (work
 // items, cycles, modules, views, pages, ...) need no change until their own phase moves them.
 
-import { useMemo } from "react";
-import type { ReactNode } from "react";
 import type { Placement } from "@popperjs/core";
 import type { MemberSelectVariant } from "@plane/blocks/property-select";
-import { SelectDropdownPlacementContext } from "@plane/blocks/select";
 import type { SelectDropdownPlacement, SelectTooltip, SelectVariant } from "@plane/blocks/select";
 import { cn } from "@plane/utils";
 // local imports
@@ -73,26 +70,3 @@ export function toDropdownPlacement(placement: Placement | undefined): SelectDro
 /** The old button container and button classes both land on the single blocks trigger. */
 export const toTriggerClassName = (buttonContainerClassName?: string, buttonClassName?: string): string | undefined =>
   cn(buttonContainerClassName, buttonClassName) || undefined;
-
-type TDropdownCompatFrameProps = {
-  children: ReactNode;
-  className?: string;
-  placement?: Placement;
-};
-
-/**
- * The 1.4 dropdowns rendered inside `<div className={cn("h-full", className)}>` (Headless UI's
- * `ComboDropDown`), and callers size and group-hover through that wrapper, so it stays. `placement`
- * reaches the Base UI popup through the blocks placement context.
- */
-export function DropdownCompatFrame(props: TDropdownCompatFrameProps) {
-  const { children, className, placement } = props;
-  const dropdownPlacement = useMemo(() => toDropdownPlacement(placement), [placement]);
-  const content = <div className={cn("h-full", className)}>{children}</div>;
-  if (!dropdownPlacement) return content;
-  return (
-    <SelectDropdownPlacementContext.Provider value={dropdownPlacement}>
-      {content}
-    </SelectDropdownPlacementContext.Provider>
-  );
-}

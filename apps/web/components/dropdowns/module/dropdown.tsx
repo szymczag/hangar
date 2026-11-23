@@ -11,7 +11,8 @@
 import type { Placement } from "@popperjs/core";
 import type { SelectVariant } from "@plane/blocks/select";
 // local imports
-import { DropdownCompatFrame, toSelectTooltip, toSelectVariant, toTriggerClassName } from "../compat";
+import { toSelectTooltip, toSelectVariant, toTriggerClassName } from "../compat";
+import { DropdownCompatFrame } from "../compat-frame";
 import type { TButtonVariants } from "../types";
 import { ModuleSelect } from "./module-select";
 

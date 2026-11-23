@@ -13,7 +13,8 @@
 import { useCallback } from "react";
 import type { Placement } from "@popperjs/core";
 // local imports
-import { DropdownCompatFrame, toSelectTooltip, toSelectVariant, toTriggerClassName } from "../compat";
+import { toSelectTooltip, toSelectVariant, toTriggerClassName } from "../compat";
+import { DropdownCompatFrame } from "../compat-frame";
 import type { TButtonVariants } from "../types";
 import { ProjectSelect } from "./project-select";
 

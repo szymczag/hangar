@@ -22,7 +22,8 @@ import type { DateRange } from "@plane/propel/calendar";
 // hooks
 import { useUserProfile } from "@/hooks/store/user";
 // local imports
-import { DropdownCompatFrame, toDropdownPlacement, toSelectVariant, toTriggerClassName } from "./compat";
+import { toDropdownPlacement, toSelectVariant, toTriggerClassName } from "./compat";
+import { DropdownCompatFrame } from "./compat-frame";
 import type { TButtonVariants } from "./types";
 
 type TDateRangeDropdownProps = {
