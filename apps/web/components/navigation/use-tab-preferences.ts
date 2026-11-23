@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from "react";
-import { setToast, TOAST_TYPE } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import { useMember } from "@/hooks/store/use-member";
 import { useUser } from "@/hooks/store/user";
 import { DEFAULT_TAB_KEY } from "./tab-navigation-utils";
@@ -41,15 +41,16 @@ export const useTabPreferences = (workspaceSlug: string, projectId: string): TTa
   // Get preferences from store
   const storePreferences = getProjectUserProperties(projectId);
   const defaultTab = storePreferences?.preferences?.navigation?.default_tab || DEFAULT_TAB_KEY;
-  const hideInMoreMenu = storePreferences?.preferences?.navigation?.hide_in_more_menu || [];
+  // The store's array itself, not a fresh `[]` per render, so the memo below holds.
+  const storedHiddenTabs = storePreferences?.preferences?.navigation?.hide_in_more_menu;
 
   // Convert store preferences to component format
   const tabPreferences: TTabPreferences = useMemo(() => {
     return {
       defaultTab,
-      hiddenTabs: hideInMoreMenu,
+      hiddenTabs: storedHiddenTabs ?? [],
     };
-  }, [defaultTab, hideInMoreMenu]);
+  }, [defaultTab, storedHiddenTabs]);
 
   const isLoading = !storePreferences && memberId !== null;
 
@@ -78,7 +79,7 @@ export const useTabPreferences = (workspaceSlug: string, projectId: string): TTa
     updatePreferences(newPreferences)
       .then(() => {
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: "Success!",
           message: "Default tab updated successfully.",
         });
@@ -86,7 +87,7 @@ export const useTabPreferences = (workspaceSlug: string, projectId: string): TTa
       })
       .catch(() => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: "Failed to update default tab. Please try again later.",
         });
@@ -106,7 +107,7 @@ export const useTabPreferences = (workspaceSlug: string, projectId: string): TTa
     } catch (error) {
       console.error("Error hiding tab:", error);
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error!",
         message: "Failed to hide tab. Please try again later.",
       });
@@ -126,7 +127,7 @@ export const useTabPreferences = (workspaceSlug: string, projectId: string): TTa
     } catch (error) {
       console.error("Error showing tab:", error);
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error!",
         message: "Something went wrong. Please try again later.",
       });

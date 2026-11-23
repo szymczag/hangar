@@ -893,5 +893,6 @@
       "short_description": "JSON으로 내보내기"
     }
   },
-  "searching": "검색 중..."
+  "searching": "검색 중...",
+  "rename_folder": "폴더 이름 변경"
 }

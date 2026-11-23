@@ -21,7 +21,10 @@
       "close_project_menu": "Proje menüsünü kapat",
       "collapse_sidebar": "Kenar çubuğunu daralt",
       "expand_sidebar": "Kenar çubuğunu genişlet",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Ana kenar çubuğu",
+      "resize_sidebar": "Kenar çubuğunu yeniden boyutlandır",
+      "sidebar_peek_view": "Kenar çubuğu önizlemesi"
     },
     "auth_forms": {
       "clear_email": "E-postayı temizle",
@@ -38,6 +41,9 @@
       "hex_input": "Hex renk",
       "open": "Renk seçiciyi aç",
       "swatches": "Hazır renkler"
+    },
+    "common": {
+      "more_actions": "Diğer işlemler"
     }
   }
 }

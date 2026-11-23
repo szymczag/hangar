@@ -7,8 +7,9 @@
 import React from "react";
 import { observer } from "mobx-react";
 // ui
-import { Tooltip } from "@plane/propel/tooltip";
-import { DragHandle } from "@plane/ui";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { DragHandle } from "@plane/blocks/common";
+import { useTranslation } from "@plane/i18n";
 // helper
 import { cn } from "@plane/utils";
 // hooks
@@ -23,13 +24,13 @@ export const FavoriteItemDragHandle = observer(function FavoriteItemDragHandle(p
   const { sort_order, isDragging } = props;
   // store hooks
   const { isMobile } = usePlatformOS();
+  const { t } = useTranslation();
 
   return (
     <Tooltip
-      isMobile={isMobile}
-      tooltipContent={sort_order === null ? "Join the project to rearrange" : "Drag to rearrange"}
-      position="top-end"
-      disabled={isDragging}
+      label={sort_order === null ? t("join_the_project_to_rearrange") : t("drag_to_rearrange")}
+      align="end"
+      disabled={isDragging || isMobile}
     >
       <div
         className={cn(

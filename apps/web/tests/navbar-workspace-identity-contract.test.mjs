@@ -18,8 +18,10 @@ test("the top navigation gives the workspace identity room without crowding narr
 
   assert.match(navigation, /h-12 min-h-12/);
   assert.match(workspaceMenu, /sm:max-w-48 md:max-w-60 xl:max-w-72/);
-  assert.match(workspaceMenu, /classNames="border border-subtle rounded-md size-9"/);
-  assert.match(workspaceMenu, /hidden min-w-0 truncate text-14 font-medium text-primary sm:block/);
-  assert.match(workspaceMenu, /tooltipContent=\{activeWorkspace\?\.name/);
+  // Propel's largest workspace avatar (32px) in the top navigation, as the
+  // 36px logo was before the move to Propel.
+  assert.match(workspaceMenu, /<WorkspaceAvatar\s+size="lg"/);
+  assert.match(workspaceMenu, /hidden min-w-0 truncate text-body-sm-medium text-primary sm:block/);
+  assert.match(workspaceMenu, /<Tooltip label=\{activeWorkspace\?\.name/);
   assert.match(commandSearch, /w-\[clamp\(12rem,32vw,22\.75rem\)\]/);
 });

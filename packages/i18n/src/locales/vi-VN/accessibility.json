@@ -21,7 +21,10 @@
       "close_project_menu": "Đóng menu dự án",
       "collapse_sidebar": "Thu gọn thanh bên",
       "expand_sidebar": "Mở rộng thanh bên",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Thanh bên chính",
+      "resize_sidebar": "Đổi kích thước thanh bên",
+      "sidebar_peek_view": "Xem trước thanh bên"
     },
     "auth_forms": {
       "clear_email": "Xóa email",
@@ -38,6 +41,9 @@
       "hex_input": "Màu hệ hex",
       "open": "Mở bộ chọn màu",
       "swatches": "Màu có sẵn"
+    },
+    "common": {
+      "more_actions": "Thao tác khác"
     }
   }
 }

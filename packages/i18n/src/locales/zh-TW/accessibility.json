@@ -21,7 +21,10 @@
       "close_project_menu": "關閉項目選單",
       "collapse_sidebar": "摺疊側邊欄",
       "expand_sidebar": "展開側邊欄",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "主側邊欄",
+      "resize_sidebar": "調整側邊欄大小",
+      "sidebar_peek_view": "側邊欄預覽"
     },
     "auth_forms": {
       "clear_email": "清除電子郵件",
@@ -38,6 +41,9 @@
       "hex_input": "十六進位色彩",
       "open": "開啟色彩選擇器",
       "swatches": "預設色彩"
+    },
+    "common": {
+      "more_actions": "更多操作"
     }
   }
 }

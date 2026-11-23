@@ -29,6 +29,8 @@
     "epics": "エピック",
     "upgrade_plan": "プランをアップグレード",
     "plane_pro": "optional features",
-    "business": "ビジネス"
+    "business": "ビジネス",
+    "hide": "非表示",
+    "more": "その他"
   }
 }

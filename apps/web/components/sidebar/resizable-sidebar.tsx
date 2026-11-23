@@ -8,6 +8,7 @@ import type { Dispatch, ReactElement, SetStateAction } from "react";
 import React, { useCallback, useEffect, useState, useRef } from "react";
 // helpers
 import { usePlatformOS } from "@plane/hooks";
+import { useTranslation } from "@plane/i18n";
 import { cn } from "@plane/utils";
 
 interface ResizableSidebarProps {
@@ -49,6 +50,7 @@ export function ResizableSidebar({
   isAnyExtendedSidebarExpanded = false,
   isAnySidebarDropdownOpen = false,
 }: ResizableSidebarProps) {
+  const { t } = useTranslation();
   // states
   const [isResizing, setIsResizing] = useState(false);
   const [isHoveringTrigger, setIsHoveringTrigger] = useState(false);
@@ -75,6 +77,32 @@ export function ResizableSidebar({
       setWidth(newWidth);
     },
     [isResizing, minWidth, maxWidth, setWidth]
+  );
+
+  const handleResizeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+      const step = 10;
+      switch (event.key) {
+        case "ArrowLeft":
+          setWidth((currentWidth) => Math.min(Math.max(currentWidth - step, minWidth), maxWidth));
+          break;
+        case "ArrowRight":
+          setWidth((currentWidth) => Math.min(Math.max(currentWidth + step, minWidth), maxWidth));
+          break;
+        case "Home":
+          setWidth(minWidth);
+          break;
+        case "End":
+          setWidth(maxWidth);
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+    },
+    [minWidth, maxWidth, setWidth]
   );
 
   const startResizing = useCallback(
@@ -146,12 +174,14 @@ export function ResizableSidebar({
     if (!isAnySidebarDropdownOpen && isCollapsed && isHoveringTrigger) {
       handlePeekLeave();
     }
+    // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps -- runs only when isAnySidebarDropdownOpen changes; the other values are read at that moment
   }, [isAnySidebarDropdownOpen]);
 
   useEffect(() => {
     if (!isAnyExtendedSidebarExpanded && isCollapsed && isHoveringTrigger) {
       handlePeekLeave();
     }
+    // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps -- runs only when isAnyExtendedSidebarExpanded changes; the other values are read at that moment
   }, [isAnyExtendedSidebarExpanded]);
 
   // Reset peek when sidebar is expanded
@@ -192,12 +222,14 @@ export function ResizableSidebar({
           maxWidth: `${isCollapsed ? 0 : width}px`,
         }}
         role="complementary"
-        aria-label="Main sidebar"
+        aria-label={t("aria_labels.projects_sidebar.main_sidebar")}
+        inert={isCollapsed}
+        aria-hidden={isCollapsed}
         data-prevent-outside-click={isMobile}
       >
         <aside
           className={cn(
-            "group/sidebar relative flex h-full w-full flex-col overflow-hidden bg-surface-1 pt-3",
+            "group/sidebar relative flex h-full w-full flex-col overflow-hidden bg-surface-1",
             isAnyExtendedSidebarExpanded && "rounded-none"
           )}
         >
@@ -206,7 +238,7 @@ export function ResizableSidebar({
           {/* Resize Handle */}
           <div
             className={cn(
-              "absolute z-[20] h-full w-1 cursor-ew-resize transition-all duration-200",
+              "absolute z-[20] h-full w-1 cursor-ew-resize transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset",
               !isResizing && "hover:bg-surface-2",
               isResizing && "w-1.5 bg-layer-1",
               "top-0 right-0"
@@ -214,8 +246,14 @@ export function ResizableSidebar({
             // onDoubleClick toggle sidebar
             onDoubleClick={() => toggleCollapsed()}
             onMouseDown={(e) => startResizing(e)}
+            onKeyDown={handleResizeKeyDown}
             role="separator"
-            aria-label="Resize sidebar"
+            tabIndex={0}
+            aria-label={t("aria_labels.projects_sidebar.resize_sidebar")}
+            aria-orientation="vertical"
+            aria-valuemin={minWidth}
+            aria-valuemax={maxWidth}
+            aria-valuenow={width}
           />
         </aside>
       </div>
@@ -235,7 +273,9 @@ export function ResizableSidebar({
         onMouseEnter={handlePeekEnter}
         onMouseLeave={handlePeekLeave}
         role="complementary"
-        aria-label="Sidebar peek view"
+        aria-label={t("aria_labels.projects_sidebar.sidebar_peek_view")}
+        inert={!(isCollapsed && showPeek)}
+        aria-hidden={!(isCollapsed && showPeek)}
       >
         <aside
           className={cn(
@@ -248,7 +288,7 @@ export function ResizableSidebar({
           {/* Resize Handle */}
           <div
             className={cn(
-              "absolute z-[20] h-full w-1 cursor-ew-resize transition-all duration-200",
+              "absolute z-[20] h-full w-1 cursor-ew-resize transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset",
               !isResizing && "hover:bg-surface-2",
               isResizing && "bg-layer-1",
               "top-0 right-0"
@@ -256,14 +296,20 @@ export function ResizableSidebar({
             // onDoubleClick toggle sidebar
             onDoubleClick={() => toggleCollapsed()}
             onMouseDown={(e) => startResizing(e)}
+            onKeyDown={handleResizeKeyDown}
             role="separator"
-            aria-label="Resize sidebar"
+            tabIndex={0}
+            aria-label={t("aria_labels.projects_sidebar.resize_sidebar")}
+            aria-orientation="vertical"
+            aria-valuemin={minWidth}
+            aria-valuemax={maxWidth}
+            aria-valuenow={width}
           />
         </aside>
       </div>
 
       {/* Extended Sidebar */}
-      {extendedSidebar && extendedSidebar}
+      {extendedSidebar}
     </>
   );
 }

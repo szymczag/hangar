@@ -893,5 +893,6 @@
       "short_description": "Exportă ca JSON"
     }
   },
-  "searching": "Se caută..."
+  "searching": "Se caută...",
+  "rename_folder": "Redenumiți dosarul"
 }

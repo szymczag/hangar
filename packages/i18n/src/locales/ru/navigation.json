@@ -29,6 +29,8 @@
     "epics": "Эпики",
     "upgrade_plan": "Апгрейд план",
     "plane_pro": "Плейн Про",
-    "business": "Бизнес"
+    "business": "Бизнес",
+    "hide": "Скрыть",
+    "more": "Ещё"
   }
 }

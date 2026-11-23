@@ -11,7 +11,6 @@ import { DEFAULT_TRUSTED_TYPES_MODE, TRUSTED_TYPES_META_NAME } from "@plane/csp/
 import { ThemeProvider } from "next-themes";
 // plane imports
 import { SITE_DESCRIPTION, SITE_NAME } from "@plane/constants";
-import { cn } from "@plane/utils";
 // types
 // assets
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
@@ -26,12 +25,9 @@ import type { Route } from "./+types/root";
 import { LogoSpinner } from "@/components/common/logo-spinner";
 // lib
 import { isStaleAssetError, recoverFromStaleAsset } from "@/lib/stale-asset-error";
-// Hangar extension
-import { MaintenanceBar } from "@/plane-web/components/instance/maintenance-bar";
 // local
 import { trailingSlashRedirectMiddleware } from "./compat/next/trailing-slash-redirect";
 import { CustomErrorComponent } from "./error";
-import { AppProvider } from "./provider";
 // fonts
 // oxlint-disable-next-line import/no-unassigned-import -- registers the bundled font faces
 import "@fontsource-variable/inter";
@@ -41,9 +37,9 @@ import "@fontsource/material-symbols-rounded";
 // oxlint-disable-next-line import/no-unassigned-import -- registers the bundled monospace font
 import "@fontsource/ibm-plex-mono";
 
-// Upstream makeplane/plane#9824 adds this to its pathless app/layout.tsx; Hangar's
-// root route plays that role. In SPA mode every non-root route loader runs on
-// hydration, so the root middleware also runs on a cold load.
+// Upstream makeplane/plane#9824 adds this to its pathless app/layout.tsx; Hangar keeps
+// it on the root route, whose middleware runs on every cold load in SPA mode. It
+// imports only react-router and a URL helper, so the root stays shell-thin.
 export const clientMiddleware: Route.ClientMiddlewareFunction[] = [trailingSlashRedirectMiddleware];
 
 const APP_TITLE = "Hangar | Simple, extensible, open-source project management tool.";
@@ -124,29 +120,11 @@ export const meta: Route.MetaFunction = () => [
   { name: "twitter:image:alt", content: "Hangar - Modern project management" },
 ];
 
+// Root stays shell-thin: in SPA mode React Router server-builds only the root route, so
+// everything imported here is evaluated in Node just to prerender the fallback index.html.
+// Providers, the store layer, and app chrome belong in app/layout.tsx — never import them here.
 export default function Root() {
-  return (
-    <AppProvider>
-      <div className={cn("relative flex h-screen w-full flex-col overflow-hidden bg-canvas", "desktop-app-container")}>
-        {/* Fork (see FORK.md): mounted here rather than inside InstanceWrapper,
-            which early-returns its own view on an API error or an unfinished
-            setup -- a bar below it would disappear exactly when things are
-            going wrong. This is the only slot covering sign-in, onboarding and
-            the error routes.
-
-            `<main>` was `h-full`, which inside a `flex-col h-screen` pushes the
-            app's bottom edge past the viewport as soon as it has a sibling, and
-            `overflow-hidden` then clips it. `min-h-0 flex-1` is equivalent to
-            `h-full` while the bar renders null, so with no notice the layout is
-            unchanged; `min-h-0` is required or the nested scroll containers
-            refuse to shrink below their content. */}
-        <MaintenanceBar />
-        <main className="relative min-h-0 w-full flex-1 overflow-hidden">
-          <Outlet />
-        </main>
-      </div>
-    </AppProvider>
-  );
+  return <Outlet />;
 }
 
 export function HydrateFallback() {

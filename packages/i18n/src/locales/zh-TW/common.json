@@ -893,5 +893,6 @@
       "short_description": "匯出為 JSON"
     }
   },
-  "searching": "搜尋中…"
+  "searching": "搜尋中…",
+  "rename_folder": "重新命名資料夾"
 }

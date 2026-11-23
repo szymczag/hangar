@@ -21,7 +21,10 @@
       "close_project_menu": "プロジェクトメニューを閉じる",
       "collapse_sidebar": "サイドバーを折りたたむ",
       "expand_sidebar": "サイドバーを展開",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "メインサイドバー",
+      "resize_sidebar": "サイドバーのサイズを変更",
+      "sidebar_peek_view": "サイドバーのプレビュー"
     },
     "auth_forms": {
       "clear_email": "メールをクリア",
@@ -38,6 +41,9 @@
       "hex_input": "16 進数カラー",
       "open": "カラーピッカーを開く",
       "swatches": "プリセットカラー"
+    },
+    "common": {
+      "more_actions": "その他の操作"
     }
   }
 }

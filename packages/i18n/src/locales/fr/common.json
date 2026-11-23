@@ -893,5 +893,6 @@
       "short_description": "Exporter en json"
     }
   },
-  "searching": "Recherche en cours..."
+  "searching": "Recherche en cours...",
+  "rename_folder": "Renommer le dossier"
 }

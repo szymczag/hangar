@@ -893,5 +893,6 @@
       "short_description": "Export as json"
     }
   },
-  "searching": "Searching..."
+  "searching": "Searching...",
+  "rename_folder": "Rename folder"
 }

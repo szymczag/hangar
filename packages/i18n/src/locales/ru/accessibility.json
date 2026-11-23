@@ -21,7 +21,10 @@
       "close_project_menu": "Закрыть меню проекта",
       "collapse_sidebar": "Свернуть боковую панель",
       "expand_sidebar": "Развернуть боковую панель",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Основная боковая панель",
+      "resize_sidebar": "Изменить размер боковой панели",
+      "sidebar_peek_view": "Предпросмотр боковой панели"
     },
     "auth_forms": {
       "clear_email": "Очистить email",
@@ -38,6 +41,9 @@
       "hex_input": "Цвет в HEX",
       "open": "Открыть выбор цвета",
       "swatches": "Готовые цвета"
+    },
+    "common": {
+      "more_actions": "Другие действия"
     }
   }
 }

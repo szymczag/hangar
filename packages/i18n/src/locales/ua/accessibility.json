@@ -21,7 +21,10 @@
       "close_project_menu": "Закрити меню проекту",
       "collapse_sidebar": "Згорнути бічну панель",
       "expand_sidebar": "Розгорнути бічну панель",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Основна бічна панель",
+      "resize_sidebar": "Змінити розмір бічної панелі",
+      "sidebar_peek_view": "Попередній перегляд бічної панелі"
     },
     "auth_forms": {
       "clear_email": "Очистити email",
@@ -38,6 +41,9 @@
       "hex_input": "Колір у HEX",
       "open": "Відкрити вибір кольору",
       "swatches": "Готові кольори"
+    },
+    "common": {
+      "more_actions": "Інші дії"
     }
   }
 }

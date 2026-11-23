@@ -4,21 +4,23 @@
  * See the LICENSE file for details.
  */
 
-import React, { useState } from "react";
+import React from "react";
 import { observer } from "mobx-react";
-import { FileCode2, Github, HelpCircle, ShieldCheck } from "lucide-react";
+import { CodeOutline, Github, HelpOutline, PagesOutline, ShieldOutline } from "@makeplane/propel/icons";
 import { DOCUMENTATION_URL, ISSUE_TRACKER_URL, SECURITY_REPORT_URL, SOURCE_CODE_URL } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { PageIcon } from "@plane/propel/icons";
 // ui
-import { CustomMenu } from "@plane/ui";
-// components
-import { AppSidebarItem } from "@/components/sidebar/sidebar-item";
+import { Icon } from "@makeplane/propel/components/icon";
+import { Menu, MenuContent, MenuFooter, MenuItem, MenuSeparator, MenuTrigger } from "@makeplane/propel/components/menu";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { IconButton } from "@makeplane/propel/elements/icon-button";
 // helpers
 import { showExternalLinks } from "@/helpers/external-links";
 // hooks
 import { useInstance } from "@/hooks/store/use-instance";
 import { usePowerK } from "@/hooks/store/use-power-k";
+
+const openInNewTab = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
 
 export const HelpMenuRoot = observer(function HelpMenuRoot() {
   // store hooks
@@ -26,78 +28,55 @@ export const HelpMenuRoot = observer(function HelpMenuRoot() {
   const { toggleShortcutsListModal } = usePowerK();
   const { config, instance } = useInstance();
   const product = config?.product;
-  // states
-  const [isNeedHelpOpen, setIsNeedHelpOpen] = useState(false);
 
   // This control opens links to documentation, issue-tracker and security
   // hosts, so remove the entry point when the operator disables outbound links.
   if (!showExternalLinks(config)) return null;
 
   return (
-    <>
-      <CustomMenu
-        customButton={
-          <AppSidebarItem
-            variant="button"
-            item={{
-              icon: <HelpCircle className="size-5" />,
-              isActive: isNeedHelpOpen,
-            }}
-          />
-        }
-        // customButtonClassName="relative grid place-items-center rounded-md p-1.5 outline-none"
-        menuButtonOnClick={() => !isNeedHelpOpen && setIsNeedHelpOpen(true)}
-        onMenuClose={() => setIsNeedHelpOpen(false)}
-        placement="bottom-end"
-        maxHeight="lg"
-        closeOnSelect
+    <Menu>
+      <Tooltip label={t("power_k.group_titles.help")} side="bottom">
+        <MenuTrigger
+          render={
+            <IconButton
+              variant="ghost"
+              size="md"
+              aria-label={t("power_k.group_titles.help")}
+              render={<button type="button" className="data-popup-open:bg-layer-transparent-active" />}
+            >
+              <HelpOutline className="size-4.5" />
+            </IconButton>
+          }
+        />
+      </Tooltip>
+      <MenuContent
+        side="bottom"
+        align="end"
+        footer={<MenuFooter>Hangar {product?.version ?? instance?.current_version ?? "development"}</MenuFooter>}
       >
-        <CustomMenu.MenuItem
-          onClick={() => window.open(product?.documentation_url ?? DOCUMENTATION_URL, "_blank", "noopener,noreferrer")}
-        >
-          <div className="flex items-center gap-x-2 rounded-sm text-11">
-            <PageIcon className="h-3.5 w-3.5 text-secondary" height={14} width={14} />
-            <span className="text-11">{t("documentation")}</span>
-          </div>
-        </CustomMenu.MenuItem>
-        <CustomMenu.MenuItem
-          onClick={() => window.open(product?.issues_url ?? ISSUE_TRACKER_URL, "_blank", "noopener,noreferrer")}
-        >
-          <div className="flex items-center gap-x-2 rounded-sm text-11">
-            <Github className="h-3.5 w-3.5 text-secondary" size={14} />
-            <span className="text-11">Open a GitHub issue</span>
-          </div>
-        </CustomMenu.MenuItem>
-        <CustomMenu.MenuItem
-          onClick={() => window.open(product?.security_url ?? SECURITY_REPORT_URL, "_blank", "noopener,noreferrer")}
-        >
-          <div className="flex items-center gap-x-2 rounded-sm text-11">
-            <ShieldCheck className="h-3.5 w-3.5 text-secondary" size={14} />
-            <span className="text-11">Report a vulnerability privately</span>
-          </div>
-        </CustomMenu.MenuItem>
-        <div className="my-1 border-t border-subtle" />
-        <CustomMenu.MenuItem>
-          <button
-            type="button"
-            onClick={() => toggleShortcutsListModal(true)}
-            className="flex w-full items-center hover:bg-layer-1"
-          >
-            <span className="text-11">{t("keyboard_shortcuts")}</span>
-          </button>
-        </CustomMenu.MenuItem>
-        <CustomMenu.MenuItem
-          onClick={() => window.open(product?.source_url ?? SOURCE_CODE_URL, "_blank", "noopener,noreferrer")}
-        >
-          <div className="flex items-center gap-x-2 rounded-sm text-11">
-            <FileCode2 className="h-3.5 w-3.5 text-secondary" size={14} />
-            <span className="text-11">Source code and license</span>
-          </div>
-        </CustomMenu.MenuItem>
-        <div className="mt-1 border-t border-subtle px-1 pt-2 text-11 text-secondary">
-          Hangar {product?.version ?? instance?.current_version ?? "development"}
-        </div>
-      </CustomMenu>
-    </>
+        <MenuItem
+          icon={<Icon icon={PagesOutline} tint="secondary" />}
+          label={t("documentation")}
+          onClick={() => openInNewTab(product?.documentation_url ?? DOCUMENTATION_URL)}
+        />
+        <MenuItem
+          icon={<Icon icon={Github} tint="secondary" />}
+          label="Open a GitHub issue"
+          onClick={() => openInNewTab(product?.issues_url ?? ISSUE_TRACKER_URL)}
+        />
+        <MenuItem
+          icon={<Icon icon={ShieldOutline} tint="secondary" />}
+          label="Report a vulnerability privately"
+          onClick={() => openInNewTab(product?.security_url ?? SECURITY_REPORT_URL)}
+        />
+        <MenuSeparator />
+        <MenuItem label={t("keyboard_shortcuts")} onClick={() => toggleShortcutsListModal(true)} />
+        <MenuItem
+          icon={<Icon icon={CodeOutline} tint="secondary" />}
+          label="Source code and license"
+          onClick={() => openInNewTab(product?.source_url ?? SOURCE_CODE_URL)}
+        />
+      </MenuContent>
+    </Menu>
   );
 });

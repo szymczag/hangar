@@ -893,5 +893,6 @@
       "short_description": "JSONとしてエクスポート"
     }
   },
-  "searching": "検索中…"
+  "searching": "検索中…",
+  "rename_folder": "フォルダー名を変更"
 }
