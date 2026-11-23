@@ -27,6 +27,18 @@ Describe known limitations, rollback constraints, and data compatibility. State
 explicitly when no additional limitation is known.
 ```
 
+When an upgrade step tells Compose or Swarm operators to replace `setup.sh` (or
+`swarm.sh`) by hand, give the same commands the script prints when it refuses
+an upgrade: download the script, `SHA256SUMS` and `SHA256SUMS.sigstore.json`
+into `hangar-vX.Y.Z/`, check them with `cosign verify-blob` and
+`sha256sum --check`, and only then copy the script into place. Never tell
+operators to `curl -o setup.sh` over the script they are running. `setup.sh
+upgrade` on Compose leaves every service stopped, so the steps end with
+`./setup.sh start`; "No operator action is required" is never true for a
+Compose upgrade. Swarm's `upgrade` redeploys the stack itself. These commands
+are an upgrade step, not the generated verification section the next paragraph
+refers to.
+
 Do not add generated commit lists, upstream SHAs, container digests, or verification
 commands manually. The release workflow derives those from the signed tag, exact
 upstream baseline, published Hangar releases, and GHCR manifests. Inherited Plane
