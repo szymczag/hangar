@@ -94,8 +94,9 @@ test("workspace settings: the delete dialog", async ({ asUser }) => {
   await expect(main.getByText("Delete this workspace", { exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Delete", exact: true }).click();
 
+  // A confirmation, so the blocks dialog is an `alertdialog`, named by its title.
   const title = "Are you sure you want to delete this workspace?";
-  const dialog = dialogTitled(page, title);
+  const dialog = page.getByRole("alertdialog", { name: title });
   await settled(dialog);
   await capture(page, "workspace-delete-modal", { ready: dialog.getByText(title, { exact: true }), target: dialog });
 });
