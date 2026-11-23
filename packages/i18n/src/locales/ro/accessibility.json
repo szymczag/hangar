@@ -21,7 +21,10 @@
       "close_project_menu": "Închide meniul proiectului",
       "collapse_sidebar": "Restrânge bara laterală",
       "expand_sidebar": "Extinde bara laterală",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Bara laterală principală",
+      "resize_sidebar": "Redimensionează bara laterală",
+      "sidebar_peek_view": "Previzualizarea barei laterale"
     },
     "auth_forms": {
       "clear_email": "Șterge e-mailul",
@@ -38,6 +41,9 @@
       "hex_input": "Culoare hexazecimală",
       "open": "Deschide selectorul de culoare",
       "swatches": "Culori predefinite"
+    },
+    "common": {
+      "more_actions": "Mai multe acțiuni"
     }
   }
 }

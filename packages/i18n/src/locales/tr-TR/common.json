@@ -893,5 +893,6 @@
       "short_description": "JSON olarak aktar"
     }
   },
-  "searching": "Aranıyor..."
+  "searching": "Aranıyor...",
+  "rename_folder": "Klasörü yeniden adlandır"
 }

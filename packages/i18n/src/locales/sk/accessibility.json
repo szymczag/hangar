@@ -21,7 +21,10 @@
       "close_project_menu": "Zavrieť menu projektu",
       "collapse_sidebar": "Zbaliť bočný panel",
       "expand_sidebar": "Rozbaliť bočný panel",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Hlavný bočný panel",
+      "resize_sidebar": "Zmeniť veľkosť bočného panela",
+      "sidebar_peek_view": "Náhľad bočného panela"
     },
     "auth_forms": {
       "clear_email": "Vymazať e-mail",
@@ -38,6 +41,9 @@
       "hex_input": "Hexadecimálna farba",
       "open": "Otvoriť výber farby",
       "swatches": "Prednastavené farby"
+    },
+    "common": {
+      "more_actions": "Ďalšie akcie"
     }
   }
 }

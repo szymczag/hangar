@@ -29,6 +29,8 @@
     "epics": "Épicos",
     "upgrade_plan": "Atualizar plano",
     "plane_pro": "optional features",
-    "business": "Business"
+    "business": "Business",
+    "hide": "Ocultar",
+    "more": "Mais"
   }
 }

@@ -893,5 +893,6 @@
       "short_description": "Експортувати як JSON"
     }
   },
-  "searching": "Пошук..."
+  "searching": "Пошук...",
+  "rename_folder": "Перейменувати папку"
 }

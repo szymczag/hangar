@@ -893,5 +893,6 @@
       "short_description": "Exportar como json"
     }
   },
-  "searching": "Buscando..."
+  "searching": "Buscando...",
+  "rename_folder": "Renombrar carpeta"
 }

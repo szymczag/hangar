@@ -9,20 +9,21 @@ import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
 import { observer } from "mobx-react";
 import { useParams, usePathname } from "next/navigation";
-import { Ellipsis } from "lucide-react";
-import { Disclosure, Transition } from "@headlessui/react";
+import { Collapsible } from "@makeplane/propel/components/collapsible";
+import { AddOutline, MoreHorizontalOutline } from "@makeplane/propel/icons";
 // plane imports
-import { EUserPermissions, EUserPermissionsLevel, PROJECT_TRACKER_ELEMENTS } from "@plane/constants";
+import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { PlusIcon, ChevronRightIcon } from "@plane/propel/icons";
-import { IconButton } from "@plane/propel/icon-button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
-import { Loader } from "@plane/ui";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { ListItem, ListItemLabel } from "@makeplane/propel/components/list";
+import { ListItemButton } from "@makeplane/propel/elements/list";
+import { setToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { Loader } from "@plane/blocks/skeleton";
 import { copyUrlToClipboard, cn, orderJoinedProjects } from "@plane/utils";
 // components
 import { CreateProjectModal } from "@/components/project/create-project-modal";
-import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
@@ -71,7 +72,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   const handleCopyText = async (projectId: string) => {
     await copyUrlToClipboard(`${workspaceSlug}/projects/${projectId}/issues`);
     setToast({
-      type: TOAST_TYPE.SUCCESS,
+      type: "success",
       title: t("link_copied"),
       message: t("project_link_copied_to_clipboard"),
     });
@@ -100,7 +101,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
     if (updatedSortOrder != undefined)
       updateProjectView(workspaceSlug.toString(), sourceId, { sort_order: updatedSortOrder }).catch(() => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: t("error"),
           message: t("something_went_wrong"),
         });
@@ -169,122 +170,93 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
         })}
       >
         <>
-          <Disclosure as="div" className="flex flex-col" defaultOpen={isAllProjectsListOpen}>
-            <div className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-placeholder hover:bg-layer-transparent-hover">
-              <Disclosure.Button
-                as="button"
-                type="button"
-                className="flex w-full items-center gap-1 text-left text-13 font-semibold whitespace-nowrap text-placeholder"
-                onClick={() => toggleListDisclosure(!isAllProjectsListOpen)}
-                aria-label={t(
-                  isAllProjectsListOpen
-                    ? "aria_labels.projects_sidebar.close_projects_menu"
-                    : "aria_labels.projects_sidebar.open_projects_menu"
-                )}
-              >
-                <span className="text-13 font-semibold">{t("projects")}</span>
-              </Disclosure.Button>
-              <div className="flex items-center gap-1">
-                {isAuthorizedUser && (
-                  <Tooltip tooltipHeading={t("create_project")} tooltipContent="">
+          <Collapsible
+            placement="sidebar"
+            // the group marker lives on the root: CollapsibleHeader takes no className. The root extends into
+            // the left gutter so absolutely positioned drag handles stay visible while the header and rows
+            // keep the same start as other sidebar sections.
+            render={
+              <div className="group/projects-section -ml-3 w-[calc(100%+0.75rem)]! [&>div:first-child]:ml-3 [&>div:first-child]:w-[calc(100%-0.75rem)]!" />
+            }
+            open={isAllProjectsListOpen}
+            onOpenChange={toggleListDisclosure}
+            trigger={<span className="text-body-xs-semibold whitespace-nowrap text-tertiary">{t("projects")}</span>}
+            trailing={
+              isAuthorizedUser ? (
+                <span className="hidden text-placeholder group-focus-within/projects-section:inline-flex group-hover/projects-section:inline-flex">
+                  <Tooltip label={t("create_project")}>
                     <IconButton
                       variant="ghost"
-                      size="sm"
-                      icon={PlusIcon}
+                      size="xs"
+                      showTooltip={false}
+                      icon={<Icon icon={AddOutline} />}
                       onClick={() => {
                         setIsProjectModalOpen(true);
                       }}
-                      data-ph-element={PROJECT_TRACKER_ELEMENTS.SIDEBAR_CREATE_PROJECT_TOOLTIP}
-                      className="hidden text-placeholder group-hover:inline-flex"
                       aria-label={t("aria_labels.projects_sidebar.create_new_project")}
                     />
                   </Tooltip>
+                </span>
+              ) : null
+            }
+          >
+            <div className="pl-3">
+              <div className="flex w-full flex-col gap-px">
+                {loader === "init-loader" && (
+                  <Loader className="w-full space-y-1.5">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      // oxlint-disable-next-line react/no-array-index-key
+                      <Loader.Item key={index} height="28px" />
+                    ))}
+                  </Loader>
                 )}
-                <IconButton
-                  variant="ghost"
-                  size="sm"
-                  icon={ChevronRightIcon}
-                  onClick={() => toggleListDisclosure(!isAllProjectsListOpen)}
-                  className="text-placeholder"
-                  iconClassName={cn("transition-transform", {
-                    "rotate-90": isAllProjectsListOpen,
-                  })}
-                  aria-label={t(
-                    isAllProjectsListOpen
-                      ? "aria_labels.projects_sidebar.close_projects_menu"
-                      : "aria_labels.projects_sidebar.open_projects_menu"
-                  )}
-                />
+                {displayedProjects.map((projectId, index) => (
+                  <SidebarProjectsListItem
+                    key={projectId}
+                    projectId={projectId}
+                    handleCopyText={() => handleCopyText(projectId)}
+                    projectListType={"JOINED"}
+                    disableDrag={false}
+                    disableDrop={false}
+                    isLastChild={index === displayedProjects.length - 1}
+                    handleOnProjectDrop={handleOnProjectDrop}
+                  />
+                ))}
+                {hasMoreProjects && (
+                  <ListItem density="comfortable">
+                    <ListItemButton
+                      type="button"
+                      onClick={() => toggleExtendedProjectSidebar()}
+                      id="extended-project-sidebar-toggle"
+                      aria-label={t(
+                        isExtendedProjectSidebarOpened
+                          ? "aria_labels.projects_sidebar.close_extended_sidebar"
+                          : "aria_labels.projects_sidebar.open_extended_sidebar"
+                      )}
+                    >
+                      <Icon icon={MoreHorizontalOutline} />
+                      <ListItemLabel>
+                        {isExtendedProjectSidebarOpened ? t("sidebar.hide") : t("sidebar.more")}
+                      </ListItemLabel>
+                    </ListItemButton>
+                  </ListItem>
+                )}
               </div>
             </div>
-            <Transition
-              as="div"
-              show={isAllProjectsListOpen}
-              enter="transition duration-100 ease-out"
-              enterFrom="transform scale-95 opacity-0"
-              enterTo="transform scale-100 opacity-100"
-              leave="transition duration-75 ease-out"
-              leaveFrom="transform scale-100 opacity-100"
-              leaveTo="transform scale-95 opacity-0"
-            >
-              {loader === "init-loader" && (
-                <Loader className="w-full space-y-1.5">
-                  {["first", "second", "third", "fourth"].map((loaderKey) => (
-                    <Loader.Item key={loaderKey} height="28px" />
-                  ))}
-                </Loader>
-              )}
-              {isAllProjectsListOpen && (
-                <Disclosure.Panel as="div" className="flex flex-col gap-0.5" static>
-                  <>
-                    {displayedProjects.map((projectId, index) => (
-                      <SidebarProjectsListItem
-                        key={projectId}
-                        projectId={projectId}
-                        handleCopyText={() => handleCopyText(projectId)}
-                        projectListType={"JOINED"}
-                        disableDrag={false}
-                        disableDrop={false}
-                        isLastChild={index === displayedProjects.length - 1}
-                        handleOnProjectDrop={handleOnProjectDrop}
-                      />
-                    ))}
-                    {hasMoreProjects && (
-                      <SidebarNavItem>
-                        <button
-                          type="button"
-                          onClick={() => toggleExtendedProjectSidebar()}
-                          className="flex flex-grow items-center gap-1.5 text-13 font-medium text-tertiary"
-                          id="extended-project-sidebar-toggle"
-                          aria-label={t(
-                            isExtendedProjectSidebarOpened
-                              ? "aria_labels.app_sidebar.close_extended_sidebar"
-                              : "aria_labels.app_sidebar.open_extended_sidebar"
-                          )}
-                        >
-                          <Ellipsis className="size-4 flex-shrink-0" />
-                          <span>{isExtendedProjectSidebarOpened ? "Hide" : "More"}</span>
-                        </button>
-                      </SidebarNavItem>
-                    )}
-                  </>
-                </Disclosure.Panel>
-              )}
-            </Transition>
-          </Disclosure>
+          </Collapsible>
         </>
 
         {isAuthorizedUser && joinedProjects?.length === 0 && (
-          <button
-            type="button"
-            data-ph-element={PROJECT_TRACKER_ELEMENTS.SIDEBAR_CREATE_PROJECT_BUTTON}
-            className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-13 leading-5 font-medium text-secondary hover:bg-surface-2"
-            onClick={() => {
-              toggleCreateProjectModal(true);
-            }}
-          >
-            {t("add_project")}
-          </button>
+          <ListItem density="comfortable">
+            <ListItemButton
+              type="button"
+              onClick={() => {
+                toggleCreateProjectModal(true);
+              }}
+            >
+              <ListItemLabel>{t("add_project")}</ListItemLabel>
+            </ListItemButton>
+          </ListItem>
         )}
       </div>
     </>

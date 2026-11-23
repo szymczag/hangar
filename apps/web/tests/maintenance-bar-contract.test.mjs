@@ -7,7 +7,9 @@ import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-const root = read("app/root.tsx");
+// The shell (providers, chrome, the bar) lives in the pathless app/layout.tsx since
+// the upstream v1.5.0 root/layout split; root.tsx only renders the document.
+const root = read("app/layout.tsx");
 const bar = read("ce/components/instance/maintenance-bar.tsx");
 const helper = read("helpers/maintenance-notice.ts");
 const service = read("../../packages/services/src/instance/instance-maintenance.service.ts");
@@ -19,7 +21,7 @@ test("the app's own height survives the bar being given a slot", () => {
   // catches an upstream merge quietly restoring `h-full`.
   const main = /<main className="([^"]+)"/.exec(root)?.[1];
 
-  assert.ok(main, "root.tsx must still render a <main> with a className");
+  assert.ok(main, "layout.tsx must still render a <main> with a className");
   assert.match(main, /\bflex-1\b/);
   assert.match(main, /\bmin-h-0\b/, "nested scroll containers refuse to shrink below content without it");
   assert.doesNotMatch(main, /\bh-full\b/);
@@ -31,7 +33,7 @@ test("the bar sits above main, where an error view cannot hide it", () => {
   const barIndex = root.indexOf("<MaintenanceBar />");
   const mainIndex = root.indexOf("<main className");
 
-  assert.ok(barIndex > 0, "root.tsx must render the bar");
+  assert.ok(barIndex > 0, "layout.tsx must render the bar");
   assert.ok(barIndex < mainIndex, "the bar must precede <main>");
 });
 

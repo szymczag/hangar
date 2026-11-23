@@ -21,7 +21,10 @@
       "close_project_menu": "Projekt-Menü schließen",
       "collapse_sidebar": "Seitenleiste einklappen",
       "expand_sidebar": "Seitenleiste ausklappen",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Hauptseitenleiste",
+      "resize_sidebar": "Größe der Seitenleiste ändern",
+      "sidebar_peek_view": "Seitenleistenvorschau"
     },
     "auth_forms": {
       "clear_email": "E-Mail löschen",
@@ -38,6 +41,9 @@
       "hex_input": "Hex-Farbe",
       "open": "Farbwähler öffnen",
       "swatches": "Voreingestellte Farben"
+    },
+    "common": {
+      "more_actions": "Weitere Aktionen"
     }
   }
 }

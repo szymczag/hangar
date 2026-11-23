@@ -9,7 +9,10 @@ import { Command } from "cmdk";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // hooks
-import { CloseIcon, SearchIcon } from "@plane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { CloseOutline, SearchOutline } from "@makeplane/propel/icons";
+import { useTranslation } from "@plane/i18n";
 import { cn } from "@plane/utils";
 // power-k
 import type { TPowerKCommandConfig, TPowerKContext } from "@/components/power-k/core/types";
@@ -22,6 +25,7 @@ import { useAppRouter } from "@/hooks/use-app-router";
 import { useExpandableSearch } from "@/hooks/use-expandable-search";
 
 export const TopNavPowerK = observer(() => {
+  const { t } = useTranslation();
   // router
   const router = useAppRouter();
   const params = useParams();
@@ -101,7 +105,7 @@ export const TopNavPowerK = observer(() => {
     return () => {
       setTopNavInputRef(null);
     };
-  }, [setTopNavInputRef]);
+  }, [inputRef, setTopNavInputRef]);
 
   const handleClear = () => {
     setSearchTerm("");
@@ -203,19 +207,22 @@ export const TopNavPowerK = observer(() => {
         return;
       }
     },
-    [searchTerm, activePage, context, shouldShowContextBasedActions, setActivePage, closePanel]
+    [searchTerm, activePage, context, shouldShowContextBasedActions, setActivePage, closePanel, isOpen, containerRef]
   );
 
   return (
     <div ref={containerRef} className="relative">
       <div
         className={cn(
-          "relative z-30 flex w-[clamp(12rem,32vw,22.75rem)] items-center transition-all duration-300 ease-in-out",
+          "relative z-30 flex w-full items-center transition-all duration-300 ease-in-out md:w-[clamp(12rem,32vw,22.75rem)]",
           {
-            "w-[min(34.625rem,calc(100vw-2rem))]": isOpen,
+            "md:w-[min(34.625rem,calc(100vw-2rem))]": isOpen,
           }
         )}
       >
+        {/* A pointer convenience only: clicking the field's padding focuses the input,
+            which is the keyboard target itself, so the wrapper is not a button. */}
+        {/* oxlint-disable-next-line eslint-plugin-jsx-a11y/click-events-have-key-events, eslint-plugin-jsx-a11y/no-static-element-interactions */}
         <div
           className={cn(
             "flex h-7 w-full items-center rounded-lg border border-subtle-1 bg-layer-2 p-2 transition-colors duration-200",
@@ -224,9 +231,8 @@ export const TopNavPowerK = observer(() => {
             }
           )}
           onClick={() => inputRef.current?.focus()}
-          role="button"
         >
-          <SearchIcon className="mr-2 size-3.5 shrink-0 text-placeholder" />
+          <SearchOutline className="mr-2 size-3.5 shrink-0 text-placeholder" />
           <input
             ref={inputRef}
             type="text"
@@ -239,20 +245,29 @@ export const TopNavPowerK = observer(() => {
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             placeholder="Search commands..."
-            className="placeholder-text-placeholder min-w-0 flex-1 bg-transparent text-13 text-primary outline-none"
+            className="placeholder-text-placeholder min-w-0 flex-1 bg-transparent text-body-xs-regular text-primary outline-none"
           />
           {searchTerm && (
-            <button type="button" onClick={handleClear} className="ml-2 shrink-0">
-              <CloseIcon className="size-3.5 text-placeholder hover:text-primary" />
-            </button>
+            <div className="ml-2 flex shrink-0">
+              <IconButton
+                type="button"
+                variant="ghost"
+                size="xs"
+                aria-label={t("power_k.search_menu.clear_search")}
+                showTooltip={false}
+                onClick={handleClear}
+                icon={<Icon icon={CloseOutline} />}
+              />
+            </div>
           )}
         </div>
       </div>
       <div
         className={cn(
-          "shadow-lg absolute -top-[6px] left-1/2 z-20 flex -translate-x-1/2 flex-col overflow-hidden rounded-md border border-subtle bg-surface-1 px-0 pt-10 transition-all duration-300 ease-in-out",
+          "shadow-lg absolute -top-1.5 left-1/2 z-20 flex -translate-x-1/2 flex-col overflow-hidden rounded-md border border-subtle bg-surface-1 px-0 pt-10 transition-all duration-300 ease-in-out",
           {
-            "max-h-[80vh] w-[min(35.875rem,calc(100vw-2rem))] opacity-100": isOpen,
+            "max-h-[80vh] w-[min(35.875rem,calc(100vw-2rem))] opacity-100 max-md:fixed max-md:inset-x-3 max-md:top-20 max-md:w-auto max-md:translate-x-0":
+              isOpen,
             "h-0 w-0 opacity-0": !isOpen,
           }
         )}
