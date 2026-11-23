@@ -7,8 +7,8 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 // ui
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { AlertModalCore } from "@plane/ui";
+import { ConfirmDialog } from "@plane/blocks/dialog";
+import { setToast } from "@plane/blocks/toast";
 // hooks
 import { useWebhook } from "@/hooks/store/use-webhook";
 import { useAppRouter } from "@/hooks/use-app-router";
@@ -16,10 +16,12 @@ import { useAppRouter } from "@/hooks/use-app-router";
 interface IDeleteWebhook {
   isOpen: boolean;
   onClose: () => void;
+  /** The webhook to delete; defaults to the one in the route (its detail page). */
+  webhookId?: string;
 }
 
 export function DeleteWebhookModal(props: IDeleteWebhook) {
-  const { isOpen, onClose } = props;
+  const { isOpen, onClose, webhookId: webhookIdProp } = props;
   // states
   const [isDeleting, setIsDeleting] = useState(false);
   // router
@@ -27,7 +29,8 @@ export function DeleteWebhookModal(props: IDeleteWebhook) {
   // store hooks
   const { removeWebhook } = useWebhook();
 
-  const { workspaceSlug, webhookId } = useParams();
+  const { workspaceSlug, webhookId: webhookIdParam } = useParams();
+  const webhookId = webhookIdProp ?? webhookIdParam;
 
   const handleClose = () => {
     onClose();
@@ -38,15 +41,16 @@ export function DeleteWebhookModal(props: IDeleteWebhook) {
     setIsDeleting(true);
     try {
       await removeWebhook(workspaceSlug.toString(), webhookId.toString());
+      handleClose();
       router.replace(`/${workspaceSlug}/settings/webhooks/`);
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Success!",
         message: "Webhook deleted successfully.",
       });
     } catch (_error) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error!",
         message: "Webhook could not be deleted. Please try again.",
       });
@@ -55,7 +59,7 @@ export function DeleteWebhookModal(props: IDeleteWebhook) {
   };
 
   return (
-    <AlertModalCore
+    <ConfirmDialog
       handleClose={handleClose}
       handleSubmit={handleDelete}
       isSubmitting={isDeleting}

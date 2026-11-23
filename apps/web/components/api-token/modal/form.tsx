@@ -4,25 +4,36 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { add } from "date-fns";
 import { Controller, useForm } from "react-hook-form";
-import { Calendar } from "lucide-react";
-// types
+import { Button } from "@makeplane/propel/components/button";
+import {
+  DialogActions,
+  DialogBody,
+  DialogHeader,
+  DialogHeading,
+  DialogInfo,
+  DialogMain,
+  DialogTitle,
+} from "@makeplane/propel/components/dialog";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { SelectField } from "@makeplane/propel/components/select-field";
+import { Switch } from "@makeplane/propel/components/switch";
+import { TextAreaField } from "@makeplane/propel/components/text-area-field";
+import { CalendarOutline } from "@makeplane/propel/icons";
+import { DateSelect } from "@plane/blocks/property-select";
+import { setToast } from "@plane/blocks/toast";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { IApiToken } from "@plane/types";
-// ui
-import { CustomSelect, Input, TextArea, ToggleSwitch } from "@plane/ui";
-import { cn, renderFormattedDate, renderFormattedTime } from "@plane/utils";
-// components
-import { DateDropdown } from "@/components/dropdowns/date";
-// hooks
+import { renderFormattedDate, renderFormattedTime } from "@plane/utils";
+// helpers
 import { workspacesAllowingApiTokens } from "@/helpers/api-token-eligibility";
+// hooks
 import { useInstance } from "@/hooks/store/use-instance";
 import { useWorkspace } from "@/hooks/store/use-workspace";
-// helpers
+import { useUserProfile } from "@/hooks/store/user";
+
 type Props = {
   handleClose: () => void;
   neverExpires: boolean;
@@ -51,6 +62,12 @@ const EXPIRY_DATE_OPTIONS = [
     label: "1 year",
     value: { years: 1 },
   },
+];
+
+/** The expiry picker's rows: the presets plus the "Custom" row that reveals the date picker. */
+const EXPIRY_SELECT_OPTIONS = [
+  ...EXPIRY_DATE_OPTIONS.map(({ key, label }) => ({ value: key, label })),
+  { value: "custom", label: "Custom" },
 ];
 
 const defaultValues: Partial<IApiToken> = {
@@ -89,19 +106,28 @@ export function CreateApiTokenForm(props: Props) {
   } = useForm<IApiToken>({ defaultValues });
   // hooks
   const { t } = useTranslation();
+  // store hooks
+  const { data: userProfile } = useUserProfile();
   const { workspaces } = useWorkspace();
   const { config } = useInstance();
   // A token acts only in the workspace it names, so the choice is part of
   // creating one rather than a detail that can be filled in later — and it is
   // narrowed to the workspaces where a role high enough to mint one is held,
   // because offering the others produces a form that is filled in and refused.
-  const workspaceOptions = workspacesAllowingApiTokens(workspaces, config?.api_token_minimum_role);
+  const workspaceOptions = useMemo(
+    () =>
+      workspacesAllowingApiTokens(workspaces, config?.api_token_minimum_role).map((workspace) => ({
+        value: workspace.slug,
+        label: workspace.name,
+      })),
+    [workspaces, config?.api_token_minimum_role]
+  );
 
   const handleFormSubmit = async (data: IApiToken) => {
     // if never expires is toggled off, and the user has not selected a custom date or a predefined date, show an error
     if (!neverExpires && (!data.expired_at || (data.expired_at === "custom" && !customDate)))
       return setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error!",
         message: "Please select an expiration date.",
       });
@@ -126,7 +152,7 @@ export function CreateApiTokenForm(props: Props) {
 
     await onSubmit(payload).then(() => {
       reset(defaultValues);
-      setCustomDate(null);
+      return setCustomDate(null);
     });
   };
 
@@ -137,13 +163,15 @@ export function CreateApiTokenForm(props: Props) {
   const customDateFormatted = customDate && getFormattedDate(customDate);
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)}>
-      <div className="space-y-5 p-5">
-        <h3 className="text-18 font-medium text-secondary">
-          {t("workspace_settings.settings.api_tokens.create_token")}
-        </h3>
-        <div className="space-y-3">
-          <div className="space-y-1">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="flex min-h-0 flex-1 flex-col">
+      <DialogMain>
+        <DialogHeader>
+          <DialogHeading>
+            <DialogTitle>{t("workspace_settings.settings.api_tokens.create_token")}</DialogTitle>
+          </DialogHeading>
+        </DialogHeader>
+        <DialogBody tabIndex={0}>
+          <div className="space-y-3">
             <Controller
               control={control}
               name="label"
@@ -155,160 +183,139 @@ export function CreateApiTokenForm(props: Props) {
                 },
                 validate: (val) => val.trim() !== "" || t("title_is_required"),
               }}
-              render={({ field: { value, onChange } }) => (
-                <Input
+              render={({ field: { value, onChange, ref } }) => (
+                <InputField
                   type="text"
+                  size="2xl"
+                  orientation="vertical"
                   value={value}
                   onChange={onChange}
-                  hasError={Boolean(errors.label)}
+                  ref={ref}
+                  error={errors.label?.message}
                   placeholder={t("title")}
-                  className="w-full text-14"
+                  aria-label={t("title")}
                 />
               )}
             />
-            {errors.label && <span className="text-11 text-danger-primary">{errors.label.message}</span>}
-          </div>
-          <div className="space-y-1">
             <Controller
               control={control}
               name="workspace_slug"
               rules={{ required: "Choose the workspace this token may act in." }}
               render={({ field: { value, onChange } }) => (
-                <CustomSelect
-                  customButton={
-                    <div
-                      className={cn(
-                        "flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-14",
-                        errors.workspace_slug ? "border-danger-strong" : "border-strong"
-                      )}
-                    >
-                      <span className={cn(!value && "text-placeholder")}>
-                        {workspaceOptions.find((workspace) => workspace.slug === value)?.name ?? "Select a workspace"}
-                      </span>
-                    </div>
-                  }
-                  value={value}
-                  onChange={onChange}
-                  className="w-full"
-                  optionsClassName="w-full"
-                  input
-                >
-                  {workspaceOptions.map((workspace) => (
-                    <CustomSelect.Option key={workspace.id} value={workspace.slug}>
-                      {workspace.name}
-                    </CustomSelect.Option>
-                  ))}
-                </CustomSelect>
+                <SelectField<string>
+                  name="workspace_slug"
+                  aria-label="Workspace"
+                  size="2xl"
+                  value={value || null}
+                  onValueChange={(slug) => {
+                    if (slug) onChange(slug);
+                  }}
+                  options={workspaceOptions}
+                  placeholder="Select a workspace"
+                  hint="The token reaches this workspace only. Creating one needs a sufficient role in it, which an instance administrator sets."
+                  error={errors.workspace_slug?.message}
+                />
               )}
             />
-            <span className="text-11 text-tertiary">
-              The token reaches this workspace only. Creating one needs a sufficient role in it, which an instance
-              administrator sets.
-            </span>
-            {errors.workspace_slug && (
-              <span className="text-11 text-danger-primary">{errors.workspace_slug.message}</span>
-            )}
-          </div>
-          <Controller
-            control={control}
-            name="description"
-            render={({ field: { value, onChange } }) => (
-              <TextArea
-                value={value}
-                onChange={onChange}
-                hasError={Boolean(errors.description)}
-                placeholder={t("description")}
-                className="min-h-24 w-full resize-none text-14"
-              />
-            )}
-          />
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Controller
-                control={control}
-                name="expired_at"
-                render={({ field: { onChange, value } }) => {
-                  const selectedOption = EXPIRY_DATE_OPTIONS.find((option) => option.key === value);
-
-                  return (
-                    <CustomSelect
-                      customButton={
-                        <div
-                          className={cn(
-                            "flex h-7 items-center gap-2 rounded-sm border-[0.5px] border-strong px-2 py-0.5",
-                            {
-                              "text-placeholder": neverExpires,
-                            }
-                          )}
-                        >
-                          <Calendar className="h-3 w-3" />
-                          {value === "custom"
-                            ? "Custom date"
-                            : selectedOption
-                              ? selectedOption.label
-                              : "Set expiration date"}
-                        </div>
+            <Controller
+              control={control}
+              name="description"
+              render={({ field: { value, onChange } }) => (
+                <TextAreaField
+                  size="lg"
+                  resize="none"
+                  autoResize
+                  maxRows={8}
+                  value={value}
+                  onChange={onChange}
+                  error={errors.description?.message}
+                  placeholder={t("description")}
+                  aria-label={t("description")}
+                />
+              )}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Controller
+                  control={control}
+                  name="expired_at"
+                  render={({ field: { onChange, value } }) => (
+                    <SelectField<string>
+                      name="expired_at"
+                      aria-label="Set expiration date"
+                      size="md"
+                      variant="pill"
+                      value={value ?? null}
+                      onValueChange={(expiry) => {
+                        if (expiry) onChange(expiry);
+                      }}
+                      options={EXPIRY_SELECT_OPTIONS}
+                      itemToStringLabel={(expiry) =>
+                        expiry === "custom"
+                          ? "Custom date"
+                          : (EXPIRY_SELECT_OPTIONS.find((option) => option.value === expiry)?.label ?? expiry)
                       }
-                      value={value}
-                      onChange={onChange}
+                      icon={<CalendarOutline className="size-3.5 shrink-0" />}
+                      placeholder="Set expiration date"
                       disabled={neverExpires}
-                    >
-                      {EXPIRY_DATE_OPTIONS.map((option) => (
-                        <CustomSelect.Option key={option.key} value={option.key}>
-                          {option.label}
-                        </CustomSelect.Option>
-                      ))}
-                      <CustomSelect.Option value="custom">Custom</CustomSelect.Option>
-                    </CustomSelect>
-                  );
-                }}
-              />
-              {expiredAt === "custom" && (
-                <div className="h-7">
-                  <DateDropdown
+                    />
+                  )}
+                />
+                {expiredAt === "custom" && (
+                  <DateSelect
                     value={customDate}
                     onChange={(date) => setCustomDate(date)}
                     minDate={tomorrow}
-                    icon={<Calendar className="h-3 w-3" />}
-                    buttonVariant="border-with-text"
+                    icon={<CalendarOutline />}
                     placeholder="Set date"
                     disabled={neverExpires}
+                    clearable
+                    weekStartsOn={userProfile?.start_of_the_week}
+                    variant="pill-md"
                   />
-                </div>
+                )}
+              </div>
+              {!neverExpires && (
+                <span className="text-caption-sm-regular text-placeholder">
+                  {expiredAt === "custom"
+                    ? customDate
+                      ? `Expires ${renderFormattedDate(customDateFormatted ?? "")} at ${renderFormattedTime(customDateFormatted ?? "")}`
+                      : null
+                    : expiredAt
+                      ? `Expires ${renderFormattedDate(expiryDate ?? "")} at ${renderFormattedTime(expiryDate ?? "")}`
+                      : null}
+                </span>
               )}
             </div>
-            {!neverExpires && (
-              <span className="text-11 text-placeholder">
-                {expiredAt === "custom"
-                  ? customDate
-                    ? `Expires ${renderFormattedDate(customDateFormatted ?? "")} at ${renderFormattedTime(customDateFormatted ?? "")}`
-                    : null
-                  : expiredAt
-                    ? `Expires ${renderFormattedDate(expiryDate ?? "")} at ${renderFormattedTime(expiryDate ?? "")}`
-                    : null}
-              </span>
-            )}
           </div>
-        </div>
-      </div>
-      <div className="flex items-center justify-between gap-2 border-t-[0.5px] border-subtle px-5 py-4">
-        <div className="flex cursor-pointer items-center gap-1.5" onClick={toggleNeverExpires}>
-          <div className="flex cursor-pointer items-center justify-center">
-            <ToggleSwitch value={neverExpires} onChange={() => {}} size="sm" />
-          </div>
-          <span className="text-11">{t("workspace_settings.settings.api_tokens.never_expires")}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={handleClose}>
-            {t("cancel")}
-          </Button>
-          <Button variant="primary" type="submit" loading={isSubmitting}>
-            {isSubmitting
+        </DialogBody>
+      </DialogMain>
+      <DialogActions>
+        <DialogInfo>
+          <label className="flex cursor-pointer items-center gap-1.5">
+            <Switch
+              size="sm"
+              checked={neverExpires}
+              onCheckedChange={toggleNeverExpires}
+              aria-label={t("workspace_settings.settings.api_tokens.never_expires")}
+            />
+            <span>{t("workspace_settings.settings.api_tokens.never_expires")}</span>
+          </label>
+        </DialogInfo>
+        <Button variant="secondary" size="sm" stretch="auto" label={t("cancel")} onClick={handleClose} />
+        <Button
+          variant="primary"
+          type="submit"
+          size="sm"
+          stretch="auto"
+          label={
+            isSubmitting
               ? t("workspace_settings.settings.api_tokens.generating")
-              : t("workspace_settings.settings.api_tokens.generate_token")}
-          </Button>
-        </div>
-      </div>
+              : t("workspace_settings.settings.api_tokens.generate_token")
+          }
+          loading={isSubmitting}
+        />
+      </DialogActions>
     </form>
   );
 }

@@ -8,10 +8,12 @@ import { observer } from "mobx-react";
 import type { Control, FieldArrayWithId, FormState } from "react-hook-form";
 import { Controller } from "react-hook-form";
 // plane imports
+import { Field } from "@makeplane/propel/components/field";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { ROLE } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { CloseIcon } from "@plane/propel/icons";
-import { CustomSelect, Input } from "@plane/ui";
+import { CloseOutline } from "@makeplane/propel/icons";
+import { Select } from "@plane/blocks/select";
 import { cn } from "@plane/utils";
 // hooks
 import { useUserPermissions } from "@/hooks/store/user";
@@ -19,6 +21,8 @@ import type { InvitationFormValues } from "@/hooks/use-workspace-invitation";
 // local
 import type { TInvitePolicy } from "./invite-policy";
 import { inviteRejection } from "./invite-policy";
+
+type TRoleOption = { key: number; label: string };
 
 type TInvitationFieldsProps = {
   workspaceSlug: string;
@@ -47,6 +51,10 @@ export const InvitationFields = observer(function InvitationFields(props: TInvit
   const { workspaceInfoBySlug } = useUserPermissions();
   // derived values
   const currentWorkspaceRole = workspaceInfoBySlug(workspaceSlug.toString())?.role;
+  // A member can only invite at or below their own role.
+  const roleOptions: TRoleOption[] = Object.entries(ROLE)
+    .map(([key, label]) => ({ key: parseInt(key), label }))
+    .filter((role) => !!currentWorkspaceRole && currentWorkspaceRole >= role.key);
 
   /**
    * The server refuses these addresses either way. Applying the rules here
@@ -87,17 +95,20 @@ export const InvitationFields = observer(function InvitationFields(props: TInvit
               }}
               render={({ field: { value, onChange, ref } }) => (
                 <>
-                  <Input
-                    id={`emails.${index}.email`}
-                    name={`emails.${index}.email`}
-                    type="text"
-                    value={value}
-                    onChange={onChange}
-                    ref={ref}
-                    hasError={Boolean(errors.emails?.[index]?.email)}
-                    placeholder={t("workspace_settings.settings.members.modal.placeholder")}
-                    className="w-full text-caption-sm-regular sm:text-body-xs-regular"
-                  />
+                  <Field name="input" invalid={Boolean(errors.emails?.[index]?.email)}>
+                    <InputGroup size="2xl">
+                      <Input
+                        size="2xl"
+                        id={`emails.${index}.email`}
+                        name={`emails.${index}.email`}
+                        type="text"
+                        value={value}
+                        onChange={onChange}
+                        ref={ref}
+                        placeholder={t("workspace_settings.settings.members.modal.placeholder")}
+                      />
+                    </InputGroup>
+                  </Field>
                   {errors.emails?.[index]?.email && (
                     <span className="ml-1 text-caption-sm-regular text-danger-primary">
                       {errors.emails?.[index]?.email?.message}
@@ -114,22 +125,23 @@ export const InvitationFields = observer(function InvitationFields(props: TInvit
                 name={`emails.${index}.role`}
                 rules={{ required: true }}
                 render={({ field: { value, onChange } }) => (
-                  <CustomSelect
-                    value={value}
-                    label={<span className="text-caption-sm-regular sm:text-body-xs-regular">{ROLE[value]}</span>}
-                    onChange={onChange}
-                    className="w-24 flex-grow"
-                    input
-                  >
-                    {Object.entries(ROLE).map(([key, roleLabel]) => {
-                      if (currentWorkspaceRole && currentWorkspaceRole >= parseInt(key))
-                        return (
-                          <CustomSelect.Option key={key} value={parseInt(key)}>
-                            {roleLabel}
-                          </CustomSelect.Option>
-                        );
-                    })}
-                  </CustomSelect>
+                  <div className="w-24 grow">
+                    <Select<TRoleOption>
+                      value={roleOptions.find((role) => role.key === value) ?? null}
+                      onChange={(val) => onChange(Number(val))}
+                      getValues={() => roleOptions}
+                      getOptionValue={(role) => String(role.key)}
+                      getOptionLabel={(role) => role.label}
+                      showSearch={false}
+                      pinSelected={false}
+                    >
+                      <Select.Trigger<TRoleOption> variant="select-2xl">
+                        <span className="min-w-0 flex-1 truncate text-left text-caption-sm-regular sm:text-body-xs-regular">
+                          {ROLE[value]}
+                        </span>
+                      </Select.Trigger>
+                    </Select>
+                  </div>
                 )}
               />
             </div>
@@ -140,7 +152,7 @@ export const InvitationFields = observer(function InvitationFields(props: TInvit
                   className="place-items-center self-center rounded-sm"
                   onClick={() => remove(index)}
                 >
-                  <CloseIcon className="h-4 w-4 text-secondary" />
+                  <CloseOutline className="h-4 w-4 text-secondary" />
                 </button>
               </div>
             )}

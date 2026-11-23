@@ -9,9 +9,9 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 // plane imports
+import { Collapsible } from "@makeplane/propel/components/collapsible";
 import { useTranslation } from "@plane/i18n";
-import { ChevronDownIcon } from "@plane/propel/icons";
-import { Collapsible } from "@plane/ui";
+import { EmptyStateCompact } from "@plane/blocks/empty-state";
 // components
 import { CountChip } from "@/components/common/count-chip";
 import { MembersSettingsLoader } from "@/components/ui/loader/settings/members";
@@ -63,6 +63,7 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
   const searchedInvitationsIds = getSearchedWorkspaceInvitationIds(searchQuery);
   const memberDetails = searchedMemberIds
     ?.map((memberId) => getWorkspaceMemberDetails(memberId))
+    // oxlint-disable-next-line unicorn/no-array-sort -- sorts the fresh array map() just returned; the lib target has no toSorted
     .sort((a, b) => {
       if (a?.is_active && !b?.is_active) return -1;
       if (!a?.is_active && b?.is_active) return 1;
@@ -71,42 +72,35 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
 
   return (
     <>
-      <div className="divide-y-[0.5px] divide-subtle overflow-scroll">
+      <div className="flex min-h-[50vh] grow flex-col overflow-hidden">
         {searchedMemberIds?.length !== 0 && <WorkspaceMembersListItem memberDetails={memberDetails ?? []} />}
         {searchedInvitationsIds?.length === 0 && searchedMemberIds?.length === 0 && (
-          <h4 className="mt-16 text-center text-body-xs-regular text-placeholder">{t("no_matching_members")}</h4>
+          <EmptyStateCompact
+            assetKey="search-compact"
+            title={t("no_matching_members")}
+            rootClassName="grow rounded-lg border border-subtle py-10"
+          />
         )}
       </div>
       {isAdmin && searchedInvitationsIds && searchedInvitationsIds.length > 0 && (
-        <Collapsible
-          isOpen={showPendingInvites}
-          onToggle={() => setShowPendingInvites((prev) => !prev)}
-          buttonClassName="w-full"
-          className=""
-          title={
-            <div className="flex w-full items-center justify-between pt-4">
-              <div className="flex">
-                <h4 className="pt-2 pb-2 text-h5-medium">{t("workspace_settings.settings.members.pending_invites")}</h4>
-                {searchedInvitationsIds && (
-                  <CountChip count={searchedInvitationsIds.length} className="m-auto ml-2 h-5" />
-                )}
-              </div>{" "}
-              <ChevronDownIcon className={`h-5 w-5 transition-all ${showPendingInvites ? "rotate-180" : ""}`} />
+        <div className="shrink-0 pt-4">
+          <Collapsible
+            open={showPendingInvites}
+            onOpenChange={setShowPendingInvites}
+            trigger={
+              <span className="flex items-center gap-2">
+                <span className="text-h5-medium">{t("workspace_settings.settings.members.pending_invites")}</span>
+                {searchedInvitationsIds && <CountChip count={searchedInvitationsIds.length} />}
+              </span>
+            }
+          >
+            <div className="flex flex-col items-center gap-1.5 rounded-md bg-surface-1 py-1.5">
+              {searchedInvitationsIds?.map((invitationId) => (
+                <WorkspaceInvitationsListItem key={invitationId} invitationId={invitationId} />
+              ))}
             </div>
-          }
-        >
-          {/* No Disclosure.Panel here. Collapsible already renders one, `static`,
-              inside its own Disclosure and drives it from `isOpen`. A second,
-              non-static panel nested in that context follows headlessui's own
-              open state instead, which starts closed — so the section animated
-              open and its contents were never shown, which reads as expanding
-              and immediately collapsing again. */}
-          <div className="ml-auto items-center gap-1.5 rounded-md bg-surface-1 py-1.5">
-            {searchedInvitationsIds?.map((invitationId) => (
-              <WorkspaceInvitationsListItem key={invitationId} invitationId={invitationId} />
-            ))}
-          </div>
-        </Collapsible>
+          </Collapsible>
+        </div>
       )}
     </>
   );

@@ -4,31 +4,34 @@
  * See the LICENSE file for details.
  */
 
+import { InputField } from "@makeplane/propel/components/input-field";
 import { useTranslation } from "@plane/i18n";
-import { Input } from "@plane/ui";
 
 type Props = {
   value: string;
   onChange: (value: string) => void;
   hasError: boolean;
+  errorMessage?: string;
 };
 export function WebhookInput(props: Props) {
-  const { value, onChange, hasError } = props;
+  const { value, onChange, hasError, errorMessage } = props;
   const { t } = useTranslation();
 
   return (
-    <>
-      <h6 className="text-13 font-medium">{t("workspace_settings.settings.webhooks.modal.payload")}</h6>
-      <Input
-        type="url"
-        className="h-11 w-full"
-        onChange={(e) => onChange(e.target.value)}
-        value={value}
-        autoComplete="off"
-        hasError={hasError}
-        placeholder="https://example.com/post"
-        autoFocus
-      />
-    </>
+    <InputField
+      size="lg"
+      orientation="vertical"
+      name="payload"
+      label={t("workspace_settings.settings.webhooks.modal.payload")}
+      required
+      type="url"
+      onChange={(e) => onChange(e.target.value)}
+      value={value}
+      autoComplete="off"
+      placeholder="https://example.com/post"
+      // oxlint-disable-next-line jsx-a11y/no-autofocus -- the URL is the only required field of the create dialog it opens
+      autoFocus
+      error={hasError ? errorMessage : undefined}
+    />
   );
 }
