@@ -184,7 +184,11 @@ states, labels, cycles and modules.
 **No database migration and no chart change.** This release adds no database
 or license migration compared with `0.3.0` or `0.4.0-rc.1`, and the migrations
 lockfile is unchanged. The Helm chart's templates, values and Secrets do not
-change, and neither do the Compose and Swarm deployment files. Compared with
+change. The Compose and Swarm deployment contract does not change either:
+`variables.env` is the same, and the published `docker-compose.yml` keeps its
+services, settings and variables. The file itself does change, as it does in
+every release: its header names `v0.4.0-rc.2`, and it pins the Hangar images to
+this release's digests. Compared with
 `0.4.0-rc.1`, the `api` image changes for page versions and the board's votes
 and reactions, the `space` image for the first reaction, and the `web` image
 for the design tokens. The `admin` and `live` application code is unchanged.
@@ -198,7 +202,12 @@ installers do not pick it on their own. On Compose and Swarm:
 1. Replace the script with this release's.
    - **From `0.4.0-rc.1`**, let the script replace itself:
      `HANGAR_RELEASE=v0.4.0-rc.2 ./setup.sh update-script`. It downloads and
-     verifies the new script and changes nothing if a check fails.
+     verifies the new script and changes nothing if a check fails. It checks
+     the Cosign signature of `SHA256SUMS` only when `cosign` is installed;
+     without it, it prints a `WARNING` and compares the script only with the
+     `SHA256SUMS` downloaded beside it. Add `HANGAR_REQUIRE_SIGNATURE=1` to make
+     the signature check mandatory: without Cosign the command then refuses and
+     leaves the old script in place.
    - **From `0.3.0`**, replace it by hand, because the `0.3.0` script cannot
      replace itself. Do not download the new script straight over the old one:
      fetch it with the release's `SHA256SUMS` and `SHA256SUMS.sigstore.json`
@@ -224,14 +233,26 @@ installers do not pick it on their own. On Compose and Swarm:
      [Upgrading Hangar Version](../../deployments/cli/community/README.md#upgrading-hangar-version)
      explains each command.
 
-2. Run `HANGAR_RELEASE=v0.4.0-rc.2 ./setup.sh upgrade`, as the owner of
-   `plane-app/` or as root.
-3. On Compose, the upgrade leaves every service stopped. It ends with
+2. On Compose, back up before you upgrade: run `./setup.sh backup` while the
+   services are running and keep `plane-app/plane.env` with it
+   (`install -m 600 plane-app/plane.env plane-app/backup/<folder>/plane.env`).
+   The upgrade takes no backup itself. Be aware that `setup.sh backup` copies the running database's data directory
+   rather than dumping it, so the copy is not guaranteed to be consistent:
+   take it while nobody uses the instance, and keep a `pg_dump` beside it as
+   [Backup Data](../../deployments/cli/community/README.md#backup-data-docker-compose)
+   shows. Swarm has no backup action; back up the volumes on the node that
+   holds them.
+3. Run `HANGAR_RELEASE=v0.4.0-rc.2 ./setup.sh upgrade`, as the owner of
+   `plane-app/` or as root. This release's script calls the candidate "the
+   latest release (v0.4.0-rc.2)" and prints `DOWNLOADING STABLE VERSION`, but
+   it installs the release that `HANGAR_RELEASE` names; scripts after this
+   release name it as the requested release.
+4. On Compose, the upgrade leaves every service stopped. It ends with
    `PLEASE VALIDATE AND START SERVICES` and, with this release's script, the
    command that starts them: check `plane-app/plane.env`, then run
    `./setup.sh start`. Hangar stays down until you do. On Swarm, the upgrade
    redeploys the stack itself.
-4. For later releases, run `HANGAR_RELEASE=<release> ./setup.sh update-script`
+5. For later releases, run `HANGAR_RELEASE=<release> ./setup.sh update-script`
    (or plain `./setup.sh update-script` for the latest stable release) before
    `./setup.sh upgrade`. If you skip it, the upgrade refuses and tells you what
    to run.

@@ -39,6 +39,26 @@ Compose upgrade. Swarm's `upgrade` redeploys the stack itself. These commands
 are an upgrade step, not the generated verification section the next paragraph
 refers to.
 
+Every Compose upgrade path starts with a backup: tell operators to run
+`./setup.sh backup` while the services are running and to keep
+`plane-app/plane.env` with it, before `./setup.sh upgrade`. Say plainly that
+`setup.sh backup` copies the running database's data directory instead of
+dumping it, so the copy is not guaranteed to be consistent, and point to the
+`pg_dump` step in the
+[Compose guide](../../deployments/cli/community/README.md#backup-data-docker-compose).
+Swarm has no backup action; say that its volumes are backed up on the node that
+holds them.
+
+When a step uses `./setup.sh update-script`, say that it checks the Cosign
+signature only when `cosign` is installed and otherwise warns, and that
+`HANGAR_REQUIRE_SIGNATURE=1` makes the check mandatory.
+
+Do not write that the Compose or Swarm deployment files are unchanged: the
+release workflow rewrites the published `docker-compose.yml` for every release,
+with a header naming it and the Hangar images pinned to its digests. Say
+instead whether the deployment contract changes: the services, settings and
+`variables.env` keys operators rely on.
+
 Do not add generated commit lists, upstream SHAs, container digests, or verification
 commands manually. The release workflow derives those from the signed tag, exact
 upstream baseline, published Hangar releases, and GHCR manifests. Inherited Plane
