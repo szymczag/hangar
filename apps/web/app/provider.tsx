@@ -9,6 +9,7 @@ import { useTheme } from "next-themes";
 import { SWRConfig } from "swr";
 // Hangar Imports
 import { WEB_SWR_CONFIG } from "@plane/constants";
+import { PlaneToastProvider } from "@plane/blocks/toast";
 import { TranslationProvider } from "@plane/i18n";
 import { Toast } from "@plane/propel/toast";
 // helpers
@@ -43,14 +44,20 @@ export function AppProvider(props: IAppProvider) {
       <>
         <AppProgressBar />
         <TranslationProvider>
+          {/* Both toast APIs work while web moves to Propel in phases: the 1.4
+              `setToast` from @plane/propel/toast reaches <Toast>, the blocks one
+              reaches PlaneToastProvider (which calls `useTranslation`, so it
+              stays inside TranslationProvider). */}
           <Toast theme={resolveGeneralTheme(resolvedTheme)} />
-          <StoreWrapper>
-            <InstanceWrapper>
-              <Suspense>
-                <SWRConfig value={WEB_SWR_CONFIG}>{children}</SWRConfig>
-              </Suspense>
-            </InstanceWrapper>
-          </StoreWrapper>
+          <PlaneToastProvider>
+            <StoreWrapper>
+              <InstanceWrapper>
+                <Suspense>
+                  <SWRConfig value={WEB_SWR_CONFIG}>{children}</SWRConfig>
+                </Suspense>
+              </InstanceWrapper>
+            </StoreWrapper>
+          </PlaneToastProvider>
         </TranslationProvider>
       </>
     </StoreProvider>

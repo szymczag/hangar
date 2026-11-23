@@ -51,6 +51,19 @@ export type ActiveCycleStatsProps = {
   cycleIssueDetails?: ActiveCycleIssueDetails | { nextPageResults: boolean };
 };
 
+const tabIndexOf = (storedTab: string | null) => {
+  switch (storedTab) {
+    case "Priority-Issues":
+      return 0;
+    case "Assignees":
+      return 1;
+    case "Labels":
+      return 2;
+    default:
+      return 0;
+  }
+};
+
 export const ActiveCycleStats = observer(function ActiveCycleStats(props: ActiveCycleStatsProps) {
   const { workspaceSlug, projectId, cycle, cycleId, handleFiltersUpdate, cycleIssueDetails } = props;
   // local storage
@@ -68,18 +81,6 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
   const assigneesResolvedPath = resolvedTheme === "light" ? lightAssigneeAsset : darkAssigneeAsset;
   const labelsResolvedPath = resolvedTheme === "light" ? lightLabelAsset : darkLabelAsset;
 
-  const currentValue = (tab: string | null) => {
-    switch (tab) {
-      case "Priority-Issues":
-        return 0;
-      case "Assignees":
-        return 1;
-      case "Labels":
-        return 2;
-      default:
-        return 0;
-    }
-  };
   const {
     issues: { fetchNextActiveCycleIssues },
   } = useIssues(EIssuesStoreType.CYCLE);
@@ -107,7 +108,7 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
     <div className="col-span-1 flex min-h-[17rem] flex-col gap-4 overflow-hidden rounded-lg border border-subtle bg-surface-1 p-4 lg:col-span-2 xl:col-span-1">
       <Tab.Group
         as={Fragment}
-        defaultIndex={currentValue(tab)}
+        defaultIndex={tabIndexOf(tab)}
         onChange={(i) => {
           switch (i) {
             case 0:
@@ -173,11 +174,11 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
         <Tab.Panels as={Fragment}>
           <Tab.Panel
             as="div"
-            className="vertical-scrollbar flex scrollbar-sm h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
+            className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
           >
             <div
               ref={issuesContainerRef}
-              className="vertical-scrollbar flex scrollbar-sm h-full w-full flex-col gap-1 overflow-y-auto"
+              className="vertical-scrollbar scrollbar-sm flex h-full w-full flex-col gap-1 overflow-y-auto"
             >
               {cycleIssueDetails && "issueIds" in cycleIssueDetails ? (
                 cycleIssueDetails.issueCount > 0 ? (
@@ -187,22 +188,30 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
 
                       if (!issue) return null;
 
+                      const openPeek = () => {
+                        if (issue.id) {
+                          setPeekIssue({
+                            workspaceSlug,
+                            projectId,
+                            issueId: issue.id,
+                            isArchived: !!issue.archived_at,
+                          });
+                          handleFiltersUpdate([{ property: "priority", operator: "in", value: ["urgent", "high"] }]);
+                        }
+                      };
+
                       return (
                         <div
                           key={issue.id}
+                          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the row holds the state dropdown's button, which a <button> cannot contain
+                          role="button"
+                          tabIndex={0}
                           className="group flex cursor-pointer items-center justify-between gap-2 rounded-md p-1 hover:bg-surface-2"
-                          onClick={() => {
-                            if (issue.id) {
-                              setPeekIssue({
-                                workspaceSlug,
-                                projectId,
-                                issueId: issue.id,
-                                isArchived: !!issue.archived_at,
-                              });
-                              handleFiltersUpdate([
-                                { property: "priority", operator: "in", value: ["urgent", "high"] },
-                              ]);
-                            }
+                          onClick={openPeek}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            openPeek();
                           }}
                         >
                           <div className="flex w-full min-w-24 flex-grow items-center gap-1.5 truncate">
@@ -264,11 +273,11 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
 
           <Tab.Panel
             as="div"
-            className="vertical-scrollbar flex scrollbar-sm h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
+            className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
           >
             {cycle && !isEmpty(cycle.distribution) ? (
               cycle?.distribution?.assignees && cycle.distribution.assignees.length > 0 ? (
-                cycle.distribution?.assignees?.map((assignee, index) => {
+                cycle.distribution?.assignees?.map((assignee) => {
                   if (assignee.assignee_id)
                     return (
                       <SingleProgressStats
@@ -297,7 +306,7 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
                   else
                     return (
                       <SingleProgressStats
-                        key={`unassigned-${index}`}
+                        key="unassigned"
                         title={
                           <div className="flex items-center gap-2">
                             <div className="h-5 w-5 rounded-full border-2 border-subtle bg-layer-1">
@@ -326,13 +335,13 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
 
           <Tab.Panel
             as="div"
-            className="vertical-scrollbar flex scrollbar-sm h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
+            className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
           >
             {cycle && !isEmpty(cycle.distribution) ? (
               cycle?.distribution?.labels && cycle.distribution.labels.length > 0 ? (
-                cycle.distribution.labels?.map((label, index) => (
+                cycle.distribution.labels?.map((label) => (
                   <SingleProgressStats
-                    key={label.label_id ?? `no-label-${index}`}
+                    key={label.label_id ?? "no-label"}
                     title={
                       <div className="flex items-center gap-2 truncate">
                         <span

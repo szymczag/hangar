@@ -1,0 +1,136 @@
+/*
+ * Hangar: the rules of the Propel entry point (propel.css) after the
+ * @makeplane/propel styles barrel, taken unchanged from upstream v1.5.0's
+ * index.css. Split out so propel-sort.css, which oxfmt sorts Tailwind classes
+ * against, uses the same utilities as the apps. Import propel.css, not this.
+ */
+@source "../**/*.{ts,tsx}";
+
+* {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  font-variant-ligatures: none;
+  -webkit-font-variant-ligatures: none;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  @apply font-body bg-canvas text-primary;
+}
+
+/* emoji icon picker */
+@utility conical-gradient {
+  background: conic-gradient(
+    from 180deg at 50% 50%,
+    #ff6b00 0deg,
+    #f7ae59 70.5deg,
+    #3f76ff 151.12deg,
+    #05c3ff 213deg,
+    #18914f 289.87deg,
+    #f6f172 329.25deg,
+    #ff6b00 360deg
+  );
+}
+
+/* progress bar */
+@utility progress-bar {
+  fill: currentColor;
+  color: var(--text-color-secondary);
+}
+
+::-webkit-input-placeholder,
+::placeholder,
+:-ms-input-placeholder {
+  @apply text-placeholder;
+}
+
+@utility vertical-lr {
+  writing-mode: vertical-lr;
+  width: fit-content;
+}
+
+/* Native scrolling keeps CE's existing overflow containers and refs. Geometry and
+ * rest/hover/active colors belong to the published Propel scrollbar utilities. */
+@layer base {
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: none;
+    }
+  }
+
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  :where(
+    .vertical-scrollbar,
+    .horizontal-scrollbar,
+    .scrollbar-xs,
+    .scrollbar-sm,
+    .scrollbar-md,
+    .scrollbar-lg
+  )::-webkit-scrollbar {
+    display: block;
+  }
+}
+
+.vertical-scrollbar {
+  @apply overflow-y-auto;
+}
+
+.horizontal-scrollbar {
+  @apply overflow-x-auto;
+}
+
+/* Older callers without an explicit size use the published default scale. */
+@layer utilities {
+  :where(
+    .vertical-scrollbar:not(.scrollbar-xs, .scrollbar-sm, .scrollbar-md, .scrollbar-lg, .scrollbar-hide),
+    .horizontal-scrollbar:not(.scrollbar-xs, .scrollbar-sm, .scrollbar-md, .scrollbar-lg, .scrollbar-hide)
+  ) {
+    @apply scrollbar-md;
+  }
+}
+
+.vertical-scrollbar-margin-top-md::-webkit-scrollbar-track {
+  margin-top: 44px;
+}
+
+/* CE's old extra-small name remains an alias, without a second geometry system. */
+@utility scrollbar-xs {
+  @apply scrollbar-sm;
+}
+
+/* highlight class */
+@utility highlight {
+  border: 1px solid var(--border-color-accent-strong) !important;
+}
+
+@utility highlight-with-line {
+  border-left: 5px solid var(--border-color-accent-strong) !important;
+  background: var(--background-color-layer-2);
+}
+
+/* By applying below class, the autofilled text in form fields will not have the default autofill background color and styles applied by WebKit browsers  */
+@utility disable-autofill-style {
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus,
+  &:-webkit-autofill:active {
+    -webkit-background-clip: text;
+  }
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-placeholder;
+  }
+}

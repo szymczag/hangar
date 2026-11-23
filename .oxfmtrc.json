@@ -19,10 +19,19 @@
       }
     },
     {
+      "files": ["apps/web/**/*"],
+      "options": {
+        "sortTailwindcss": {
+          "stylesheet": "packages/tailwind-config/propel-sort.css",
+          "functions": ["cn", "clsx", "cva"]
+        }
+      }
+    },
+    {
       "files": ["packages/blocks/**/*"],
       "options": {
         "sortTailwindcss": {
-          "stylesheet": "packages/tailwind-config/propel.css",
+          "stylesheet": "packages/tailwind-config/propel-sort.css",
           "functions": ["cn", "clsx", "cva"]
         }
       }

@@ -16,8 +16,9 @@ const { renderToString } = webRequire("react-dom/server");
 const { Combobox, Transition } = webRequire("@headlessui/react");
 
 const sourceRoots = [path.join(repoRoot, "apps"), path.join(repoRoot, "packages")];
-const tailwindVariablesPath = path.join(repoRoot, "packages/tailwind-config/variables.css");
-const tailwindStylesPath = path.join(repoRoot, "packages/tailwind-config/index.css");
+// Web loads the Propel entry point (packages/tailwind-config/propel.css), which has no
+// floating-overlay layer of its own, so web's stylesheet carries the token and the rule.
+const webStylesPath = path.join(repoRoot, "apps/web/styles/globals.css");
 const fragmentButtonComponents = new Set(["Combobox", "Disclosure", "Listbox", "Menu", "Popover"]);
 const nonModalPanelComponents = new Map([
   ["Combobox", "Options"],
@@ -758,10 +759,11 @@ test("keeps every Popper target above application dialogs", () => {
     `Popper targets without the shared floating-overlay layer:\n${violations.join("\n")}`
   );
 
-  const variables = readFileSync(tailwindVariablesPath, "utf8");
-  const styles = readFileSync(tailwindStylesPath, "utf8");
+  const styles = readFileSync(webStylesPath, "utf8");
 
-  assert.match(variables, /--z-index-floating-overlay:\s*110\s*;/);
+  assert.match(styles, /@import "@plane\/tailwind-config\/propel\.css";/);
+  assert.doesNotMatch(styles, /@import "@plane\/tailwind-config\/index\.css";/);
+  assert.match(styles, /--z-index-floating-overlay:\s*110\s*;/);
   assert.match(
     styles,
     /\[data-popper-placement\]\s*\{[^}]*z-index:\s*var\(--z-index-floating-overlay\)\s*!important\s*;/s

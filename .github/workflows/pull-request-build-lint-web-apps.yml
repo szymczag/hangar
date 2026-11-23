@@ -175,6 +175,13 @@ jobs:
       - name: Check the built published boards
         run: pnpm test:space-build
 
+      # The same Propel class check on the built web app, which loads the Propel
+      # tokens while its components move over in phases, plus the floating-overlay
+      # layer propel.css lacks (web's stylesheet carries it) and the prerendered
+      # HydrateFallback loader. Uses the web build from above.
+      - name: Check the built web app
+        run: pnpm test:web-build
+
       # Nothing had ever run either Storybook -- no workflow, no turbo task, no
       # chromatic -- which is why `packages/ui`'s could sit broken indefinitely,
       # importing a stylesheet that no longer existed. Repairing it without

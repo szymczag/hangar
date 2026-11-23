@@ -32,7 +32,7 @@ function ModuleIssuesPage({ params }: Route.ComponentProps) {
   // const { issuesFilter } = useIssues(EIssuesStoreType.MODULE);
   // local storage
   const { setValue, storedValue } = useLocalStorage("module_sidebar_collapsed", "false");
-  const isSidebarCollapsed = storedValue ? (storedValue === "true" ? true : false) : false;
+  const isSidebarCollapsed = storedValue === "true";
   // fetching module details
   const { error } = useSWR(`CURRENT_MODULE_DETAILS_${moduleId}`, () =>
     fetchModuleDetails(workspaceSlug, projectId, moduleId)
@@ -68,7 +68,7 @@ function ModuleIssuesPage({ params }: Route.ComponentProps) {
           {!isSidebarCollapsed && (
             <div
               className={cn(
-                "vertical-scrollbar absolute right-0 z-13 flex scrollbar-sm h-full w-[24rem] flex-shrink-0 flex-col gap-3.5 overflow-y-auto border-l border-subtle bg-surface-1 px-6 shadow-raised-200 duration-300"
+                "vertical-scrollbar absolute right-0 z-13 scrollbar-sm flex h-full w-[24rem] flex-shrink-0 flex-col gap-3.5 overflow-y-auto border-l border-subtle bg-surface-1 px-6 shadow-raised-200 duration-300"
               )}
             >
               <ModuleAnalyticsSidebar moduleId={moduleId} handleClose={toggleSidebar} />
