@@ -893,5 +893,6 @@
       "short_description": "Als JSON exportieren"
     }
   },
-  "searching": "Wird gesucht..."
+  "searching": "Wird gesucht...",
+  "rename_folder": "Ordner umbenennen"
 }

@@ -29,6 +29,8 @@
     "epics": "Epics",
     "upgrade_plan": "Nâng cấp gói",
     "plane_pro": "optional features",
-    "business": "Doanh nghiệp"
+    "business": "Doanh nghiệp",
+    "hide": "Ẩn",
+    "more": "Thêm"
   }
 }

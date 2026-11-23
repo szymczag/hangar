@@ -893,5 +893,6 @@
       "short_description": "Esporta come JSON"
     }
   },
-  "searching": "Ricerca in corso..."
+  "searching": "Ricerca in corso...",
+  "rename_folder": "Rinomina cartella"
 }

@@ -25,12 +25,20 @@ type TAuthenticationWrapper = {
   pageType?: TPageType;
 };
 
-// next_path is only followed when it is a same-origin relative path. The
-// previous local check only rejected a literal http(s)/ftp scheme, so
-// "//evil.com", "///evil.com" and "/\t/evil.com" (browsers drop tabs/CR/LF and
-// resolve a leading "//" as authority-relative) were handed to router.push()
-// and left the site after sign-in. isValidNextPath requires a leading "/",
-// rejects "//" and backslashes, and re-checks the host after URL parsing.
+// Delegates to the shared isValidNextPath (@plane/utils) instead of a local
+// reimplementation. A from-scratch version here previously resolved the
+// value against location.origin and required the result to stay
+// same-origin — which has its own gap: a next_path like "http:evil.com"
+// resolves AS IF relative whenever the input's scheme happens to match the
+// real origin's own scheme, e.g. any self-hosted deployment actually
+// serving over plain http (verified directly: this bypasses the
+// location.origin-based check on an http:// origin, though not on https://,
+// since the schemes then differ). isValidNextPath closes this by requiring
+// a literal leading "/" (and rejecting "//") before any URL-based
+// comparison, so it doesn't depend on which scheme the real origin happens
+// to use.
+const isValidURL = isValidNextPath;
+
 export const AuthenticationWrapper = observer(function AuthenticationWrapper(props: TAuthenticationWrapper) {
   const pathname = usePathname();
   const router = useAppRouter();
@@ -61,7 +69,7 @@ export const AuthenticationWrapper = observer(function AuthenticationWrapper(pro
     let redirectionRoute = "/create-workspace";
 
     // validating the nextPath from the router query
-    if (nextPath && isValidNextPath(nextPath.toString())) {
+    if (nextPath && isValidURL(nextPath.toString())) {
       redirectionRoute = nextPath.toString();
       return redirectionRoute;
     }

@@ -29,6 +29,8 @@
     "epics": "Epiky",
     "upgrade_plan": "Plán upgradu",
     "plane_pro": "optional features",
-    "business": "Byznys"
+    "business": "Byznys",
+    "hide": "Skrýt",
+    "more": "Více"
   }
 }

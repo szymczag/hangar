@@ -893,5 +893,6 @@
       "short_description": "Xuất sang JSON"
     }
   },
-  "searching": "Đang tìm kiếm..."
+  "searching": "Đang tìm kiếm...",
+  "rename_folder": "Đổi tên thư mục"
 }

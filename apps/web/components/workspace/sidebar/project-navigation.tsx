@@ -11,11 +11,19 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { EUserPermissionsLevel, EUserPermissions } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { CycleIcon, IntakeIcon, ModuleIcon, PageIcon, ViewsIcon, WorkItemsIcon } from "@plane/propel/icons";
+import {
+  CyclesOutline,
+  IntakeOutline,
+  ModuleOutline,
+  PagesOutline,
+  ViewsOutline,
+  WorkItemsOutline,
+} from "@makeplane/propel/icons";
 import type { EUserProjectRoles } from "@plane/types";
 // plane ui
 // components
-import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
+import { ListItem, ListItemLabel } from "@makeplane/propel/components/list";
+import { ListItemLink } from "@makeplane/propel/elements/list";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -76,7 +84,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         key: "work_items",
         name: "Work items",
         href: `/${targetWorkspaceSlug}/projects/${targetProjectId}/issues`,
-        icon: WorkItemsIcon,
+        icon: WorkItemsOutline,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
         shouldRender: true,
         sortOrder: 1,
@@ -86,7 +94,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         key: "cycles",
         name: "Cycles",
         href: `/${targetWorkspaceSlug}/projects/${targetProjectId}/cycles`,
-        icon: CycleIcon,
+        icon: CyclesOutline,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
         shouldRender: project?.cycle_view ?? false,
         sortOrder: 2,
@@ -96,7 +104,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         key: "modules",
         name: "Modules",
         href: `/${targetWorkspaceSlug}/projects/${targetProjectId}/modules`,
-        icon: ModuleIcon,
+        icon: ModuleOutline,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
         shouldRender: project?.module_view ?? false,
         sortOrder: 3,
@@ -106,7 +114,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         key: "views",
         name: "Views",
         href: `/${targetWorkspaceSlug}/projects/${targetProjectId}/views`,
-        icon: ViewsIcon,
+        icon: ViewsOutline,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
         shouldRender: project?.issue_views_view ?? false,
         sortOrder: 4,
@@ -116,7 +124,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         key: "pages",
         name: "Pages",
         href: `/${targetWorkspaceSlug}/projects/${targetProjectId}/pages`,
-        icon: PageIcon,
+        icon: PagesOutline,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
         shouldRender: project?.page_view ?? false,
         sortOrder: 5,
@@ -126,7 +134,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         key: "intake",
         name: "Intake",
         href: `/${targetWorkspaceSlug}/projects/${targetProjectId}/intake`,
-        icon: IntakeIcon,
+        icon: IntakeOutline,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
         shouldRender: project?.inbox_view ?? false,
         sortOrder: 6,
@@ -177,22 +185,18 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         const hasAccess = allowPermissions(item.access, EUserPermissionsLevel.PROJECT, workspaceSlug, project.id);
         if (!hasAccess) return null;
 
-        const shouldShowCount = item.key === "intake" && (project.intake_count ?? 0) > 0;
-
         return (
-          <Link key={item.key} href={item.href} onClick={handleProjectClick}>
-            <SidebarNavItem isActive={!!isActive(item)}>
-              <div className="flex w-full items-center justify-between gap-1.5 py-[1px]">
-                <div className="flex items-center gap-1.5">
-                  <item.icon
-                    className={`size-4 flex-shrink-0 ${item.name === "Intake" ? "stroke-1" : "stroke-[1.5]"}`}
-                  />
-                  <span className="text-11 font-medium">{t(item.i18n_key)}</span>
-                </div>
-                {shouldShowCount && <span className="text-11 font-medium text-tertiary">{project.intake_count}</span>}
-              </div>
-            </SidebarNavItem>
-          </Link>
+          <ListItem key={item.key} density="compact">
+            <ListItemLink
+              href={item.href}
+              render={<Link href={item.href} />}
+              onClick={handleProjectClick}
+              aria-current={isActive(item) ? "page" : undefined}
+            >
+              <item.icon className={`size-4 flex-shrink-0 ${item.name === "Intake" ? "stroke-1" : "stroke-[1.5]"}`} />
+              <ListItemLabel>{t(item.i18n_key)}</ListItemLabel>
+            </ListItemLink>
+          </ListItem>
         );
       })}
     </>

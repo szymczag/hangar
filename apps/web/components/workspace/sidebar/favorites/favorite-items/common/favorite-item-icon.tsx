@@ -4,19 +4,20 @@
  * See the LICENSE file for details.
  */
 
-import type { LucideIcon } from "lucide-react";
+import type { IconGlyph } from "@makeplane/propel/components/icon";
 // plane imports
 import type { TLogoProps } from "@plane/types";
-import { CycleIcon, FavoriteFolderIcon, ModuleIcon, PageIcon, ProjectIcon, ViewsIcon } from "@plane/propel/icons";
-import type { ISvgIcons } from "@plane/propel/icons";
-import { Logo } from "@plane/propel/emoji-icon-picker";
+import { FavoriteFolderIcon } from "@plane/blocks/icons";
+import { CyclesOutline, ModuleOutline, PagesOutline, ProjectsOutline, ViewsOutline } from "@makeplane/propel/icons";
+import type { ISvgIcons } from "@plane/blocks/icons";
+import { Logo } from "@plane/blocks/emoji-icon-picker";
 
-const ICON_MAP: Record<string, React.FC<ISvgIcons> | LucideIcon> = {
-  page: PageIcon,
-  project: ProjectIcon,
-  view: ViewsIcon,
-  module: ModuleIcon,
-  cycle: CycleIcon,
+const ICON_MAP: Record<string, React.FC<ISvgIcons> | IconGlyph> = {
+  page: PagesOutline,
+  project: ProjectsOutline,
+  view: ViewsOutline,
+  module: ModuleOutline,
+  cycle: CyclesOutline,
   folder: FavoriteFolderIcon,
 };
 
@@ -26,7 +27,7 @@ type Props = {
 };
 
 export const FavoriteItemIcon = ({ type, logo }: Props) => {
-  const Icon = ICON_MAP[type] ?? PageIcon;
+  const Icon = ICON_MAP[type] ?? PagesOutline;
 
   return (
     <>

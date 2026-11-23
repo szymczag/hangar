@@ -21,7 +21,10 @@
       "close_project_menu": "프로젝트 메뉴 닫기",
       "collapse_sidebar": "사이드바 축소",
       "expand_sidebar": "사이드바 확장",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "기본 사이드바",
+      "resize_sidebar": "사이드바 크기 조절",
+      "sidebar_peek_view": "사이드바 미리보기"
     },
     "auth_forms": {
       "clear_email": "이메일 지우기",
@@ -38,6 +41,9 @@
       "hex_input": "16진수 색상",
       "open": "색상 선택기 열기",
       "swatches": "기본 색상"
+    },
+    "common": {
+      "more_actions": "추가 작업"
     }
   }
 }

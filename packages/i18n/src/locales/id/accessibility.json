@@ -21,7 +21,10 @@
       "close_project_menu": "Tutup menu proyek",
       "collapse_sidebar": "Tutup sidebar",
       "expand_sidebar": "Perluas sidebar",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Bilah sisi utama",
+      "resize_sidebar": "Ubah ukuran bilah sisi",
+      "sidebar_peek_view": "Pratinjau bilah sisi"
     },
     "auth_forms": {
       "clear_email": "Hapus email",
@@ -38,6 +41,9 @@
       "hex_input": "Warna heksadesimal",
       "open": "Buka pemilih warna",
       "swatches": "Warna preset"
+    },
+    "common": {
+      "more_actions": "Tindakan lainnya"
     }
   }
 }

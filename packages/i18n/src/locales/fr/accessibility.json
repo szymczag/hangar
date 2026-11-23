@@ -21,7 +21,10 @@
       "close_project_menu": "Fermer le menu du projet",
       "collapse_sidebar": "Réduire la barre latérale",
       "expand_sidebar": "Étendre la barre latérale",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Barre latérale principale",
+      "resize_sidebar": "Redimensionner la barre latérale",
+      "sidebar_peek_view": "Aperçu de la barre latérale"
     },
     "auth_forms": {
       "clear_email": "Effacer l’e-mail",
@@ -38,6 +41,9 @@
       "hex_input": "Couleur hexadécimale",
       "open": "Ouvrir le sélecteur de couleur",
       "swatches": "Couleurs prédéfinies"
+    },
+    "common": {
+      "more_actions": "Plus d’actions"
     }
   }
 }

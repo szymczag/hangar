@@ -4,83 +4,39 @@
  * See the LICENSE file for details.
  */
 
-// styles
-import "@/styles/globals.css";
-
-import { PRODUCT_REPOSITORY_URL, SITE_DESCRIPTION, SITE_NAME } from "@plane/constants";
-
-// helpers
+import { Outlet } from "react-router";
+// plane imports
 import { cn } from "@plane/utils";
-
-// assets
-import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
-import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
-import faviconIco from "@/app/assets/favicon/favicon.ico?url";
-import icon180 from "@/app/assets/icons/icon-180x180.png?url";
-import icon512 from "@/app/assets/icons/icon-512x512.png?url";
-
+// Hangar extension
+import { MaintenanceBar } from "@/plane-web/components/instance/maintenance-bar";
 // local
 import { AppProvider } from "./provider";
 
-export const meta = () => [
-  { title: SITE_NAME },
-  { name: "description", content: SITE_DESCRIPTION },
-  {
-    name: "keywords",
-    content:
-      "software development, plan, ship, software, accelerate, code management, release management, project management, work item tracking, agile, scrum, kanban, collaboration",
-  },
-  {
-    name: "viewport",
-    content:
-      "width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
-  },
-  { property: "og:title", content: SITE_NAME },
-  {
-    property: "og:description",
-    content: SITE_DESCRIPTION,
-  },
-  { property: "og:url", content: PRODUCT_REPOSITORY_URL },
-  { property: "og:image", content: "/hangar-og.png" },
-  { property: "og:image:width", content: "1200" },
-  { property: "og:image:height", content: "630" },
-  { property: "og:image:alt", content: "Hangar - Open-source project management for self-hosted teams" },
-  { name: "twitter:card", content: "summary_large_image" },
-  { name: "twitter:image", content: "/hangar-og.png" },
-  { name: "twitter:image:width", content: "1200" },
-  { name: "twitter:image:height", content: "630" },
-  { name: "twitter:image:alt", content: "Hangar - Open-source project management for self-hosted teams" },
-];
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// Pathless layout route wrapping every route (see app/routes.ts). Providers, the store
+// layer, and app chrome live here instead of root.tsx so they stay out of the SPA-mode
+// server build — see the note in app/root.tsx. The trailing-slash middleware upstream
+// declares here stays on the root route in Hangar (see app/root.tsx).
+export default function AppShellLayout() {
   return (
-    <html lang="en">
-      <head>
-        <meta name="theme-color" content="#7080d0" />
-        <link rel="icon" type="image/png" sizes="32x32" href={favicon32} />
-        <link rel="icon" type="image/png" sizes="16x16" href={favicon16} />
-        <link rel="manifest" href="/site.webmanifest.json" />
-        <link rel="shortcut icon" href={faviconIco} />
-        {/* Meta info for PWA */}
-        <meta name="application-name" content="Hangar" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
-        <meta name="format-detection" content="telephone=no" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href={icon512} />
-        <link rel="apple-touch-icon" sizes="180x180" href={icon180} />
-        <link rel="apple-touch-icon" sizes="512x512" href={icon512} />
-      </head>
-      <body>
-        <div id="context-menu-portal" />
-        <div id="editor-portal" />
-        <AppProvider>
-          <div className={cn("relative flex h-screen w-full flex-col overflow-hidden", "app-container")}>
-            <main className="relative h-full w-full overflow-hidden">{children}</main>
-          </div>
-        </AppProvider>
-      </body>
-    </html>
+    <AppProvider>
+      <div className={cn("relative flex h-screen w-full flex-col overflow-hidden bg-canvas", "desktop-app-container")}>
+        {/* Fork (see FORK.md): mounted here rather than inside InstanceWrapper,
+            which early-returns its own view on an API error or an unfinished
+            setup -- a bar below it would disappear exactly when things are
+            going wrong. This is the only slot covering sign-in, onboarding and
+            the error routes.
+
+            `<main>` was `h-full`, which inside a `flex-col h-screen` pushes the
+            app's bottom edge past the viewport as soon as it has a sibling, and
+            `overflow-hidden` then clips it. `min-h-0 flex-1` is equivalent to
+            `h-full` while the bar renders null, so with no notice the layout is
+            unchanged; `min-h-0` is required or the nested scroll containers
+            refuse to shrink below their content. */}
+        <MaintenanceBar />
+        <main className="relative min-h-0 w-full flex-1 overflow-hidden">
+          <Outlet />
+        </main>
+      </div>
+    </AppProvider>
   );
 }

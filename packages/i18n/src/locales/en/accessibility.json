@@ -21,7 +21,10 @@
       "close_project_menu": "Close project menu",
       "collapse_sidebar": "Collapse sidebar",
       "expand_sidebar": "Expand sidebar",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Main sidebar",
+      "resize_sidebar": "Resize sidebar",
+      "sidebar_peek_view": "Sidebar peek view"
     },
     "auth_forms": {
       "clear_email": "Clear email",
@@ -38,6 +41,9 @@
       "hex_input": "Hex color",
       "open": "Open color picker",
       "swatches": "Preset colors"
+    },
+    "common": {
+      "more_actions": "More actions"
     }
   }
 }

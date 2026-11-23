@@ -11,16 +11,18 @@ import { attachInstruction, extractInstruction } from "@atlaskit/pragmatic-drag-
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { Pin, PinOff } from "lucide-react";
+import { DragDropOutline, PinOutline, UnpinOutline } from "@makeplane/propel/icons";
 // plane imports
 import type { IWorkspaceSidebarNavigationItem } from "@plane/constants";
 import { EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { Tooltip } from "@plane/propel/tooltip";
-import { DragHandle, DropIndicator } from "@plane/ui";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { ListItem, ListItemLabel } from "@makeplane/propel/components/list";
+import { ListItemLink } from "@makeplane/propel/elements/list";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { DropIndicator } from "@plane/blocks/common";
 import { cn } from "@plane/utils";
-// components
-import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
@@ -158,65 +160,81 @@ export const ExtendedSidebarItem = observer(function ExtendedSidebarItem(props: 
   return (
     <div
       id={`sidebar-${item.key}`}
-      className={cn("relative", {
+      className={cn("relative min-w-0", {
         "bg-layer-1 opacity-60": isDragging,
       })}
       ref={navigationIemRef}
     >
       <DropIndicator classNames="absolute top-0" isVisible={instruction === "DRAG_OVER"} />
-      <div
-        className={cn(
-          "group/project-item relative flex w-full items-center rounded-md text-primary hover:bg-surface-2"
-        )}
-        id={`${item.key}`}
-      >
+      <div className="group/project-item relative" id={`${item.key}`}>
         {!disableDrag && (
-          <Tooltip
-            // isMobile={isMobile}
-            tooltipContent={t("drag_to_rearrange")}
-            position="top-start"
-            disabled={isDragging}
-          >
-            <button
+          <Tooltip label={t("drag_to_rearrange")} align="start" disabled={isDragging}>
+            <IconButton
               type="button"
-              className={cn(
-                "absolute top-1/2 -left-3 flex -translate-y-1/2 cursor-grab items-center justify-center rounded text-placeholder opacity-0 group-hover/project-item:opacity-100",
-                {
-                  "cursor-grabbing": isDragging,
-                  "opacity-100": isDragging,
-                }
-              )}
+              variant="ghost"
+              size="xs"
+              aria-label={t("drag_to_rearrange")}
+              showTooltip={false}
               ref={dragHandleRef}
-            >
-              <DragHandle className="bg-transparent" />
-            </button>
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              render={(buttonProps) => (
+                <button
+                  {...buttonProps}
+                  className={cn(
+                    buttonProps.className,
+                    "absolute top-1/2 -left-3 flex -translate-y-1/2 cursor-grab opacity-0 group-focus-within/project-item:opacity-100 group-hover/project-item:opacity-100",
+                    {
+                      "cursor-grabbing": isDragging,
+                      "opacity-100": isDragging,
+                    }
+                  )}
+                />
+              )}
+              icon={<Icon icon={DragDropOutline} tint="placeholder" />}
+            />
           </Tooltip>
         )}
-        <SidebarNavItem isActive={isActive}>
-          <Link href={itemHref} onClick={() => handleLinkClick()} className="group flex-grow">
-            <div className="flex items-center gap-1.5 py-[1px]">
-              {icon}
-              <p className="text-13 leading-5 font-medium">{t(item.labelTranslationKey)}</p>
-            </div>
-          </Link>
-          <div className="flex items-center gap-2">
+        <ListItem density="comfortable">
+          <ListItemLink
+            href={itemHref}
+            render={<Link href={itemHref} />}
+            onClick={() => handleLinkClick()}
+            aria-current={isActive ? "page" : undefined}
+          >
+            {icon}
+            <ListItemLabel>{t(item.labelTranslationKey)}</ListItemLabel>
+          </ListItemLink>
+          <div className="flex shrink-0 items-center gap-2">
             {isPinned ? (
-              <Tooltip tooltipContent="Unpin">
-                <PinOff
-                  className="size-3.5 flex-shrink-0 text-placeholder outline-none hover:text-tertiary"
+              <Tooltip label={t("unpin")}>
+                <IconButton
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  aria-label={t("unpin")}
+                  showTooltip={false}
+                  icon={<Icon icon={UnpinOutline} tint="placeholder" />}
                   onClick={() => unPinNavigationItem(item.key)}
                 />
               </Tooltip>
             ) : (
-              <Tooltip tooltipContent="Pin">
-                <Pin
-                  className="size-3.5 flex-shrink-0 text-placeholder outline-none hover:text-tertiary"
+              <Tooltip label={t("pin")}>
+                <IconButton
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  aria-label={t("pin")}
+                  showTooltip={false}
+                  icon={<Icon icon={PinOutline} tint="placeholder" />}
                   onClick={() => pinNavigationItem(item.key)}
                 />
               </Tooltip>
             )}
           </div>
-        </SidebarNavItem>
+        </ListItem>
       </div>
       {isLastChild && <DropIndicator isVisible={instruction === "DRAG_BELOW"} />}
     </div>

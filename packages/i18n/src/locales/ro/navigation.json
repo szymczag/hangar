@@ -29,6 +29,8 @@
     "epics": "Epice",
     "upgrade_plan": "Actualizare plan",
     "plane_pro": "optional features",
-    "business": "Business"
+    "business": "Business",
+    "hide": "Ascunde",
+    "more": "Mai multe"
   }
 }

@@ -21,7 +21,10 @@
       "close_project_menu": "Zavřít menu projektu",
       "collapse_sidebar": "Sbalit postranní panel",
       "expand_sidebar": "Rozbalit postranní panel",
-      "edition_badge": "Hangar by @szymczag"
+      "edition_badge": "Hangar by @szymczag",
+      "main_sidebar": "Hlavní postranní panel",
+      "resize_sidebar": "Změnit velikost postranního panelu",
+      "sidebar_peek_view": "Náhled postranního panelu"
     },
     "auth_forms": {
       "clear_email": "Vymazat e-mail",
@@ -38,6 +41,9 @@
       "hex_input": "Hexadecimální barva",
       "open": "Otevřít výběr barvy",
       "swatches": "Přednastavené barvy"
+    },
+    "common": {
+      "more_actions": "Další akce"
     }
   }
 }
