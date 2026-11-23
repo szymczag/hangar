@@ -223,6 +223,11 @@
       "search": {
         "description": "Nenašli sa projekty zodpovedajúce kritériám.\nVytvorte nový."
       }
+    },
+    "card": {
+      "archived": "Archivované",
+      "joined": "Pripojené",
+      "no_lead": "Bez vedúceho"
     }
   },
   "workspace_views": {

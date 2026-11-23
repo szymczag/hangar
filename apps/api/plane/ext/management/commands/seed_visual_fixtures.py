@@ -351,12 +351,19 @@ class Command(BaseCommand):
             # three rows sharing one timestamp leave the order to whatever the
             # database returns.
             WorkspaceMember.objects.filter(pk=membership.pk).update(created_at=CLOCK - timedelta(days=30 + index))
-            ProjectMember.objects.get_or_create(
+            project_membership, _ = ProjectMember.objects.get_or_create(
                 project=project,
                 member=user,
                 defaults={"workspace": workspace, "role": ADMIN if key == "admin" else MEMBER, "is_active": True},
             )
+            # The project members table prints this as the "Joining date", the
+            # same way the workspace table prints the row above, so it is pinned
+            # and staggered for the same reasons.
+            ProjectMember.objects.filter(pk=project_membership.pk).update(created_at=CLOCK - timedelta(days=30 + index))
             self._sidebar_preferences(workspace, user)
+        # "Created on" in the project settings and on the project cards; the
+        # list sorts on it too, so the three projects keep their seeding order.
+        Project.objects.filter(pk=project.pk).update(created_at=CLOCK - timedelta(days=60))
         return project
 
     # The order the sidebar's personal entries render in, which is otherwise
@@ -747,6 +754,7 @@ class Command(BaseCommand):
                     "is_active": True,
                 },
             )
+        Project.objects.filter(pk=target.pk).update(created_at=CLOCK - timedelta(days=59))
         # Hard delete: `target_project` is a OneToOne, so its unique index is
         # unconditional and a soft-deleted row keeps occupying it -- re-seeding
         # would fail on a constraint the row is no longer logically part of.
@@ -796,6 +804,8 @@ class Command(BaseCommand):
                 "network": 0,
             },
         )
+        # The admin's projects list shows this card too ("Join"), with its date.
+        Project.objects.filter(pk=project.pk).update(created_at=CLOCK - timedelta(days=58))
         if created:
             ensure_project_system_types(project)
             states = [

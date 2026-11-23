@@ -6,23 +6,26 @@
 
 import type { MutableRefObject } from "react";
 import { useRef, useState } from "react";
-import type { LucideIcon } from "lucide-react";
+import type { IconGlyph } from "@makeplane/propel/components/icon";
 // plane helpers
-import { PROJECT_SETTINGS_TRACKER_ELEMENTS } from "@plane/constants";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@makeplane/propel/components/menu";
+import { CloseOutline, MoreHorizontalOutline } from "@makeplane/propel/icons";
 import { useOutsideClickDetector } from "@plane/hooks";
-import type { ISvgIcons } from "@plane/propel/icons";
-import { CloseIcon } from "@plane/propel/icons";
+import { useTranslation } from "@plane/i18n";
+import type { ISvgIcons } from "@plane/blocks/icons";
 // types
 import type { IIssueLabel } from "@plane/types";
 // ui
-import { CustomMenu, DragHandle } from "@plane/ui";
+import { DragHandle } from "@plane/blocks/common";
 // helpers
 import { cn } from "@plane/utils";
 // components
 import { LabelName } from "./label-name";
 
 export interface ICustomMenuItem {
-  CustomIcon: LucideIcon | React.FC<ISvgIcons>;
+  CustomIcon: IconGlyph | React.FC<ISvgIcons>;
   onClick: (label: IIssueLabel) => void;
   isVisible: boolean;
   text: string;
@@ -51,6 +54,8 @@ export function LabelItemBlock(props: ILabelItemBlock) {
     disabled = false,
     draggable = true,
   } = props;
+  // plane hooks
+  const { t } = useTranslation();
   // states
   const [isMenuActive, setIsMenuActive] = useState(true);
   // refs
@@ -59,53 +64,64 @@ export function LabelItemBlock(props: ILabelItemBlock) {
   useOutsideClickDetector(actionSectionRef, () => setIsMenuActive(false));
 
   return (
-    <div className="group flex items-center">
-      <div className="flex items-center">
-        {!disabled && draggable && (
-          <DragHandle
-            className={cn("opacity-0 group-hover:opacity-100", {
-              "opacity-100": isDragging,
-            })}
-            ref={dragHandleRef}
-          />
-        )}
+    <div className="group flex min-w-0 flex-1 items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-1 items-center">
+        <DragHandle
+          disabled={disabled || !draggable}
+          className={cn("opacity-0 group-hover:opacity-100", {
+            "opacity-100": isDragging,
+          })}
+          ref={dragHandleRef}
+        />
         <LabelName color={label.color} name={label.name} isGroup={isLabelGroup ?? false} />
       </div>
 
       {!disabled && (
         <div
           ref={actionSectionRef}
-          className={`absolute right-2.5 flex items-center gap-2 px-4 ${
+          className={cn(
+            "flex shrink-0 items-center gap-2",
             isMenuActive || isLabelGroup
               ? "opacity-100"
-              : "opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
-          } ${isLabelGroup && "-top-0.5"}`}
+              : "opacity-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+          )}
         >
-          <CustomMenu ellipsis menuButtonOnClick={() => setIsMenuActive(!isMenuActive)} useCaptureForOutsideClick>
-            {customMenuItems.map(
-              ({ isVisible, onClick, CustomIcon, text, key }) =>
-                isVisible && (
-                  <CustomMenu.MenuItem key={key} onClick={() => onClick(label)}>
-                    <span className="flex items-center justify-start gap-2">
-                      <CustomIcon className="size-4" />
-                      <span>{text}</span>
-                    </span>
-                  </CustomMenu.MenuItem>
-                )
-            )}
-          </CustomMenu>
+          <Menu onOpenChange={(open) => setIsMenuActive(open)}>
+            <MenuTrigger
+              render={
+                <IconButton
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t("aria_labels.common.more_actions")}
+                  icon={<Icon icon={MoreHorizontalOutline} />}
+                />
+              }
+            />
+            <MenuContent align="end">
+              {customMenuItems.map(
+                ({ isVisible, onClick, CustomIcon, text, key }) =>
+                  isVisible && (
+                    <MenuItem
+                      key={key}
+                      variant={key === "delete_label" ? "danger" : "neutral"}
+                      label={text}
+                      icon={<CustomIcon className="size-4" />}
+                      onClick={() => onClick(label)}
+                    />
+                  )
+              )}
+            </MenuContent>
+          </Menu>
           {!isLabelGroup && (
-            <div className="py-0.5">
-              <button
-                className="flex size-5 items-center justify-center rounded-sm hover:bg-layer-1"
-                onClick={() => {
-                  handleLabelDelete(label);
-                }}
-                data-ph-element={PROJECT_SETTINGS_TRACKER_ELEMENTS.LABELS_DELETE_BUTTON}
-              >
-                <CloseIcon className="size-3.5 flex-shrink-0 text-tertiary" />
-              </button>
-            </div>
+            <IconButton
+              variant="ghost"
+              size="sm"
+              aria-label={t("delete")}
+              icon={<Icon icon={CloseOutline} />}
+              onClick={() => {
+                handleLabelDelete(label);
+              }}
+            />
           )}
         </div>
       )}

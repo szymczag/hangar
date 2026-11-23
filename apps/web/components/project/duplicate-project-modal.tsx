@@ -7,13 +7,24 @@
 import { useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
-import { CopyPlus } from "lucide-react";
 // Hangar imports
+import { Button } from "@makeplane/propel/components/button";
+import { CheckboxField } from "@makeplane/propel/components/checkbox-field";
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogHeading,
+  DialogMain,
+  DialogTitle,
+} from "@makeplane/propel/components/dialog";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { setToast } from "@plane/blocks/toast";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { IProject } from "@plane/types";
-import { Checkbox, Input, EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
 import { projectIdentifierSanitizer } from "@plane/utils";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
@@ -112,7 +123,7 @@ export function DuplicateProjectModal(props: TDuplicateProjectModalProps) {
 
       onClose();
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: t("success"),
         message: t("project_duplicated_successfully"),
       });
@@ -149,7 +160,7 @@ export function DuplicateProjectModal(props: TDuplicateProjectModalProps) {
       }
 
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("error"),
         message:
           code === "PROJECT_TOO_LARGE_TO_COPY_SYNCHRONOUSLY"
@@ -160,101 +171,108 @@ export function DuplicateProjectModal(props: TDuplicateProjectModalProps) {
   };
 
   return (
-    <ModalCore isOpen={isOpen} handleClose={onClose} position={EModalPosition.CENTER} width={EModalWidth.XXL}>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6 p-6">
-        <div className="flex w-full items-center justify-start gap-4">
-          <span className="place-items-center rounded-full bg-layer-1 p-3">
-            <CopyPlus className="h-5 w-5 text-secondary" aria-hidden="true" />
-          </span>
-          <h3 className="text-18 font-medium 2xl:text-20">{t("duplicate_project")}</h3>
-        </div>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent size="md">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+          <DialogMain>
+            <DialogHeader>
+              <DialogHeading>
+                <DialogTitle>{t("duplicate_project")}</DialogTitle>
+                <DialogDescription>{t("duplicate_project_description")}</DialogDescription>
+              </DialogHeading>
+            </DialogHeader>
+            <DialogBody>
+              <div className="flex flex-col gap-6">
+                <div className="flex gap-4">
+                  <div className="min-w-0 flex-grow">
+                    <Controller
+                      control={control}
+                      name="name"
+                      rules={{ required: true, maxLength: 255 }}
+                      render={({ field: { value, onChange, ref } }) => (
+                        <InputField
+                          id="duplicate-project-name"
+                          size="lg"
+                          orientation="vertical"
+                          label={t("project_name")}
+                          type="text"
+                          value={value}
+                          onChange={onChange}
+                          ref={ref}
+                          error={errors.name?.message || (errors.name ? true : undefined)}
+                          autoComplete="off"
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="w-28 flex-shrink-0">
+                    <Controller
+                      control={control}
+                      name="identifier"
+                      rules={{ required: true, maxLength: 12 }}
+                      render={({ field: { value, onChange, ref } }) => (
+                        <InputField
+                          id="duplicate-project-identifier"
+                          size="lg"
+                          orientation="vertical"
+                          label={t("project_id")}
+                          type="text"
+                          value={value}
+                          // Mirrors the create form: uppercase, no separators, capped.
+                          onChange={(event) =>
+                            onChange(projectIdentifierSanitizer(event.target.value.toUpperCase()).slice(0, 12))
+                          }
+                          ref={ref}
+                          error={errors.identifier?.message || (errors.identifier ? true : undefined)}
+                          autoComplete="off"
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
 
-        <p className="text-13 leading-6 text-secondary">{t("duplicate_project_description")}</p>
-
-        <div className="flex gap-4">
-          <div className="flex-grow">
-            <label htmlFor="duplicate-project-name" className="text-13 text-secondary">
-              {t("project_name")}
-            </label>
-            <Controller
-              control={control}
-              name="name"
-              rules={{ required: true, maxLength: 255 }}
-              render={({ field: { value, onChange, ref } }) => (
-                <Input
-                  id="duplicate-project-name"
-                  type="text"
-                  value={value}
-                  onChange={onChange}
-                  ref={ref}
-                  hasError={Boolean(errors.name)}
-                  className="mt-1 w-full"
-                  autoComplete="off"
-                />
-              )}
+                <div>
+                  <p className="text-body-sm-medium text-primary">{t("duplicate_project_what_to_copy")}</p>
+                  <p className="mt-1 text-body-xs-regular text-secondary">{t("duplicate_project_always_copied")}</p>
+                  <div className="mt-3 grid grid-cols-2 gap-y-2.5">
+                    {OPTIONAL_COPY_FIELDS.map((option) => (
+                      <Controller
+                        key={option.key}
+                        control={control}
+                        name={option.key}
+                        render={({ field: { value, onChange } }) => (
+                          <CheckboxField
+                            size="md"
+                            label={t(option.labelKey)}
+                            checked={!!value}
+                            onCheckedChange={(checked) => onChange(checked)}
+                          />
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </DialogBody>
+          </DialogMain>
+          <DialogActions>
+            <Button variant="secondary" size="md" stretch="auto" label={t("cancel")} onClick={onClose} />
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              type="submit"
+              loading={isSubmitting}
+              label={isSubmitting ? t("duplicating_project") : t("duplicate_project")}
             />
-            {errors.name?.message && <p className="mt-1 text-11 text-danger-primary">{errors.name.message}</p>}
-          </div>
-
-          <div className="w-28 flex-shrink-0">
-            <label htmlFor="duplicate-project-identifier" className="text-13 text-secondary">
-              {t("project_id")}
-            </label>
-            <Controller
-              control={control}
-              name="identifier"
-              rules={{ required: true, maxLength: 12 }}
-              render={({ field: { value, onChange, ref } }) => (
-                <Input
-                  id="duplicate-project-identifier"
-                  type="text"
-                  value={value}
-                  // Mirrors the create form: uppercase, no separators, capped.
-                  onChange={(event) =>
-                    onChange(projectIdentifierSanitizer(event.target.value.toUpperCase()).slice(0, 12))
-                  }
-                  ref={ref}
-                  hasError={Boolean(errors.identifier)}
-                  className="mt-1 w-full"
-                  autoComplete="off"
-                />
-              )}
-            />
-            {errors.identifier?.message && (
-              <p className="mt-1 text-11 text-danger-primary">{errors.identifier.message}</p>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-13 font-medium text-primary">{t("duplicate_project_what_to_copy")}</p>
-          <p className="mt-1 text-11 text-secondary">{t("duplicate_project_always_copied")}</p>
-          <div className="mt-3 grid grid-cols-2 gap-y-2.5">
-            {OPTIONAL_COPY_FIELDS.map((option) => (
-              <Controller
-                key={option.key}
-                control={control}
-                name={option.key}
-                render={({ field: { value, onChange } }) => (
-                  <label className="flex cursor-pointer items-center gap-2 text-13 text-secondary">
-                    <Checkbox checked={!!value} onChange={(event) => onChange(event.target.checked)} />
-                    <span>{t(option.labelKey)}</span>
-                  </label>
-                )}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="lg" onClick={onClose}>
-            {t("cancel")}
-          </Button>
-          <Button variant="primary" size="lg" type="submit" loading={isSubmitting}>
-            {isSubmitting ? t("duplicating_project") : t("duplicate_project")}
-          </Button>
-        </div>
-      </form>
-    </ModalCore>
+          </DialogActions>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

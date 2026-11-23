@@ -53,14 +53,14 @@ function* sources(directory) {
     if (["node_modules", "build", "dist", ".turbo", "tests"].includes(entry)) continue;
     const full = path.join(directory, entry);
     if (statSync(full).isDirectory()) yield* sources(full);
-    else if (/\.tsx$/.test(entry)) yield full;
+    else if (entry.endsWith(".tsx")) yield full;
   }
 }
 
 const allSources = () => [
-  ...["components", "hooks", "layouts", "lib", "services", "store"].flatMap((directory) => [
-    ...sources(path.join(WEB, directory)),
-  ]),
+  ...["components", "hooks", "layouts", "lib", "services", "store"].flatMap((directory) =>
+    Array.from(sources(path.join(WEB, directory)))
+  ),
   ...sources(path.join(WEB, "app")),
   ...sources(path.join(WEB, "ce")),
 ];
@@ -123,4 +123,17 @@ test("the top-navigation help menu is hidden when outbound links are disabled", 
 
   assert.match(helpMenu, /import \{ showExternalLinks \} from "@\/helpers\/external-links"/);
   assert.match(helpMenu, /if \(!showExternalLinks\(config\)\) return null/);
+});
+
+test("settings headings link to no help center, and only behind the switch", () => {
+  // Upstream's settings headings carry a "Docs" button for each page, pointing
+  // at its hosted help center. The addresses live in @plane/constants, outside
+  // the files the scan above reads, so they are pinned here: every entry stays
+  // empty, and the button itself renders only where outbound links are allowed.
+  const docs = readFileSync(path.join(WEB, "../../packages/constants/src/settings/docs.ts"), "utf8");
+  assert.doesNotMatch(docs, /https?:\/\//, "SETTINGS_DOCS_URLS must not name a host");
+
+  const docsLink = readFileSync(path.join(WEB, "components/settings/docs-link.tsx"), "utf8");
+  assert.match(docsLink, /import \{ showExternalLinks \} from "@\/helpers\/external-links"/);
+  assert.match(docsLink, /if \(!href \|\| !showExternalLinks\(config\)\) return null/);
 });

@@ -7,9 +7,9 @@
 import { observer } from "mobx-react";
 // plane imports
 import { useTranslation } from "@plane/i18n";
-import { setPromiseToast } from "@plane/propel/toast";
+import { setPromiseToast } from "@plane/blocks/toast";
 import type { IProject } from "@plane/types";
-import { CycleIcon, IntakeIcon, ModuleIcon, PageIcon, ViewsIcon } from "@plane/propel/icons";
+import { CyclesOutline, IntakeOutline, ModuleOutline, PagesOutline, ViewsOutline } from "@makeplane/propel/icons";
 // components
 import { SettingsBoxedControlItem } from "@/components/settings/boxed-control-item";
 import { SettingsHeading } from "@/components/settings/heading";
@@ -31,7 +31,7 @@ const PROJECT_FEATURES_LIST = {
     property: "cycle_view",
     title: "Cycles",
     description: "Timebox work as you see fit per project and change frequency from one period to the next.",
-    icon: <CycleIcon className="h-5 w-5 flex-shrink-0 rotate-180 text-tertiary" />,
+    icon: <CyclesOutline className="h-5 w-5 flex-shrink-0 rotate-180 text-tertiary" />,
     isPro: false,
     isEnabled: true,
   },
@@ -40,7 +40,7 @@ const PROJECT_FEATURES_LIST = {
     property: "module_view",
     title: "Modules",
     description: "Group work into sub-project-like set-ups with their own leads and assignees.",
-    icon: <ModuleIcon width={20} height={20} className="flex-shrink-0 text-tertiary" />,
+    icon: <ModuleOutline width={20} height={20} className="flex-shrink-0 text-tertiary" />,
     isPro: false,
     isEnabled: true,
   },
@@ -49,7 +49,7 @@ const PROJECT_FEATURES_LIST = {
     property: "issue_views_view",
     title: "Views",
     description: "Save sorts, filters, and display options for later or share them.",
-    icon: <ViewsIcon className="h-5 w-5 flex-shrink-0 text-tertiary" />,
+    icon: <ViewsOutline className="h-5 w-5 flex-shrink-0 text-tertiary" />,
     isPro: false,
     isEnabled: true,
   },
@@ -58,7 +58,7 @@ const PROJECT_FEATURES_LIST = {
     property: "page_view",
     title: "Pages",
     description: "Write anything like you write anything.",
-    icon: <PageIcon className="h-5 w-5 flex-shrink-0 text-tertiary" />,
+    icon: <PagesOutline className="h-5 w-5 flex-shrink-0 text-tertiary" />,
     isPro: false,
     isEnabled: true,
   },
@@ -67,7 +67,7 @@ const PROJECT_FEATURES_LIST = {
     property: "inbox_view",
     title: "Intake",
     description: "Consider and discuss work items before you add them to your project.",
-    icon: <IntakeIcon className="h-5 w-5 flex-shrink-0 text-tertiary" />,
+    icon: <IntakeOutline className="h-5 w-5 flex-shrink-0 text-tertiary" />,
     isPro: false,
     isEnabled: true,
   },
@@ -101,39 +101,36 @@ export const ProjectFeaturesList = observer(function ProjectFeaturesList(props: 
         message: () => "Something went wrong while updating project feature. Please try again.",
       },
     });
-    void updateProjectPromise.then(() => {
-      return undefined;
-    });
   };
 
   return (
-    <>
-      <div>
-        <SettingsHeading title={t("projects_and_issues")} description={t("projects_and_issues_description")} />
-        <div className="mt-6 flex flex-col gap-y-4">
-          {Object.entries(PROJECT_FEATURES_LIST).map(([featureItemKey, featureItem]) => (
-            <div key={featureItemKey}>
-              <SettingsBoxedControlItem
-                title={<span className="flex items-center gap-2">{t(featureItem.key)}</span>}
-                description={t(`${featureItem.key}_description`)}
-                control={
-                  <ProjectFeatureToggle
-                    workspaceSlug={workspaceSlug}
-                    projectId={projectId}
-                    featureItem={featureItem}
-                    value={Boolean(currentProjectDetails?.[featureItem.property as keyof IProject])}
-                    handleSubmit={handleSubmit}
-                    disabled={!isAdmin}
-                  />
-                }
-              />
-              {/* {currentProjectDetails?.[featureItem.property as keyof IProject] && (
-                <div className="pl-14">{featureItem.renderChildren?.(currentProjectDetails, workspaceSlug)}</div>
-              )} */}
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
+    <section className="flex flex-col gap-y-4">
+      <SettingsHeading
+        title={t("projects_and_issues")}
+        description={t("projects_and_issues_description")}
+        variant="h5"
+      />
+      {Object.entries(PROJECT_FEATURES_LIST).map(([featureItemKey, featureItem]) => (
+        <SettingsBoxedControlItem
+          key={featureItemKey}
+          title={
+            <span>
+              {t("common.actions.enable")} <span className="lowercase">{t(featureItem.key)}</span>
+            </span>
+          }
+          description={t(`${featureItem.key}_description`)}
+          control={
+            <ProjectFeatureToggle
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              featureItem={featureItem}
+              value={Boolean(currentProjectDetails?.[featureItem.property as keyof IProject])}
+              handleSubmit={handleSubmit}
+              disabled={!isAdmin}
+            />
+          }
+        />
+      ))}
+    </section>
   );
 });

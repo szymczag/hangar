@@ -6,18 +6,21 @@
 
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Info } from "lucide-react";
+import { InfoOutline, LockOutline } from "@makeplane/propel/icons";
+import { FieldLabel } from "@makeplane/propel/elements/field";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { TextAreaField } from "@makeplane/propel/components/text-area-field";
+import type { TNetworkChoice } from "@plane/constants";
 import { NETWORK_CHOICES } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 // plane imports
-import { Button } from "@plane/propel/button";
-import { EmojiPicker, EmojiIconPickerTypes, Logo } from "@plane/propel/emoji-icon-picker";
-import { LockIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { Button } from "@makeplane/propel/components/button";
+import { EmojiPicker, Logo } from "@plane/blocks/emoji-icon-picker";
+import { setToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { EFileAssetType } from "@plane/types";
 import type { IProject, IWorkspace } from "@plane/types";
-import { CustomSelect, Input, TextArea } from "@plane/ui";
+import { Select } from "@plane/blocks/select";
 import { renderFormattedDate } from "@plane/utils";
 import { CoverImage } from "@/components/common/cover-image";
 import { ImagePickerPopover } from "@/components/core/image-picker-popover";
@@ -92,8 +95,8 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
     if (!workspaceSlug || !project) return;
     return updateProject(workspaceSlug.toString(), project.id, payload)
       .then(() => {
-        setToast({
-          type: TOAST_TYPE.SUCCESS,
+        return setToast({
+          type: "success",
           title: t("toast.success"),
           message: t("project_settings.general.toast.success"),
         });
@@ -110,7 +113,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
           if (nameError || identifierError || nameSpecialCharError) {
             if (nameError) {
               setToast({
-                type: TOAST_TYPE.ERROR,
+                type: "error",
                 title: t("toast.error"),
                 message: t("project_name_already_taken"),
               });
@@ -118,7 +121,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
 
             if (identifierError) {
               setToast({
-                type: TOAST_TYPE.ERROR,
+                type: "error",
                 title: t("toast.error"),
                 message: t("project_identifier_already_taken"),
               });
@@ -126,14 +129,14 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
 
             if (nameSpecialCharError) {
               setToast({
-                type: TOAST_TYPE.ERROR,
+                type: "error",
                 title: t("toast.error"),
                 message: t("project_name_cannot_contain_special_characters"),
               });
             }
           } else {
             setToast({
-              type: TOAST_TYPE.ERROR,
+              type: "error",
               title: t("toast.error"),
               message: t("something_went_wrong"),
             });
@@ -142,7 +145,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
           // Fallback error handling if the error processing fails
           console.error("Error processing API error:", error);
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: t("toast.error"),
             message: t("something_went_wrong"),
           });
@@ -178,7 +181,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
     } catch (error) {
       console.error("Error handling cover image:", error);
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("toast.error"),
         message: error instanceof Error ? error.message : "Failed to process cover image",
       });
@@ -190,8 +193,8 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
       await projectService
         .checkProjectIdentifierAvailability(workspaceSlug, payload.identifier ?? "")
         .then(async (res) => {
-          if (res.exists) setError("identifier", { message: t("common.identifier_already_exists") });
-          else await handleUpdateChange(payload);
+          if (res.exists) return setError("identifier", { message: t("common.identifier_already_exists") });
+          return handleUpdateChange(payload);
         });
     else await handleUpdateChange(payload);
     setTimeout(() => {
@@ -202,7 +205,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="relative h-44 w-full">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <div className="absolute inset-0 rounded-md bg-gradient-to-t from-black/80 via-black/50 to-transparent" />
         <CoverImage src={coverImage} alt="Project cover image" className="h-44 w-full rounded-md" />
         <div className="absolute bottom-4 z-5 flex w-full items-end justify-between gap-3 px-4">
           <div className="flex flex-grow gap-3 truncate">
@@ -216,7 +219,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
                   isOpen={isOpen}
                   handleToggle={(val: boolean) => setIsOpen(val)}
                   className="flex items-center justify-center"
-                  buttonClassName="flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-lg bg-white/10"
+                  buttonClassName="flex size-[52px] shrink-0 items-center justify-center rounded-lg bg-layer-3/50"
                   label={<Logo logo={value} size={28} />}
                   // TODO: fix types
                   onChange={(val: any) => {
@@ -235,19 +238,17 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
                     setIsOpen(false);
                   }}
                   defaultIconColor={value?.in_use && value.in_use === "icon" ? value?.icon?.color : undefined}
-                  defaultOpen={
-                    value.in_use && value.in_use === "emoji" ? EmojiIconPickerTypes.EMOJI : EmojiIconPickerTypes.ICON
-                  }
+                  defaultOpen={value.in_use && value.in_use === "emoji" ? "emoji" : "icon"}
                   disabled={!isAdmin}
                 />
               )}
             />
             <div className="flex flex-col gap-1 truncate text-on-color">
-              <span className="truncate text-16 font-semibold">{watch("name")}</span>
-              <span className="flex items-center gap-2 text-13">
+              <span className="truncate text-body-md-semibold">{watch("name")}</span>
+              <span className="flex items-center gap-2 text-body-xs-regular">
                 <span>{watch("identifier")} .</span>
                 <span className="flex items-center gap-1.5">
-                  {project.network === 0 && <LockIcon className="h-2.5 w-2.5 text-on-color" />}
+                  {project.network === 0 && <LockOutline className="h-2.5 w-2.5 text-on-color" />}
                   {currentNetwork && t(currentNetwork?.i18n_label)}
                 </span>
               </span>
@@ -273,147 +274,151 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
         </div>
       </div>
       <div className="mt-8 flex flex-col gap-8">
-        <div className="flex flex-col gap-1">
-          <h4 className="text-13">{t("common.project_name")}</h4>
-          <Controller
-            control={control}
-            name="name"
-            rules={{
-              required: t("name_is_required"),
-              maxLength: {
-                value: 255,
-                message: "Project name should be less than 255 characters",
-              },
-            }}
-            render={({ field: { value, onChange, ref } }) => (
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                ref={ref}
-                value={value}
-                onChange={onChange}
-                hasError={Boolean(errors.name)}
-                className="rounded-md !p-3 font-medium"
-                placeholder={t("common.project_name")}
-                disabled={!isAdmin}
-              />
-            )}
-          />
-          <span className="text-11 text-danger-primary">{errors?.name?.message}</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <h4 className="text-13">{t("description")}</h4>
-          <Controller
-            name="description"
-            control={control}
-            render={({ field: { value, onChange } }) => (
-              <TextArea
-                id="description"
-                name="description"
-                value={value}
-                placeholder={t("project_description_placeholder")}
-                onChange={onChange}
-                className="min-h-[102px] text-13 font-medium"
-                hasError={Boolean(errors?.description)}
-                disabled={!isAdmin}
-              />
-            )}
-          />
-        </div>
+        <Controller
+          control={control}
+          name="name"
+          rules={{
+            required: t("name_is_required"),
+            maxLength: {
+              value: 255,
+              message: "Project name should be less than 255 characters",
+            },
+          }}
+          render={({ field: { value, onChange, ref } }) => (
+            <InputField
+              size="lg"
+              orientation="vertical"
+              id="name"
+              name="name"
+              type="text"
+              label={t("common.project_name")}
+              ref={ref}
+              value={value}
+              onChange={onChange}
+              error={errors?.name?.message}
+              placeholder={t("common.project_name")}
+              disabled={!isAdmin}
+            />
+          )}
+        />
+        <Controller
+          name="description"
+          control={control}
+          render={({ field: { value, onChange } }) => (
+            <TextAreaField
+              size="lg"
+              resize="none"
+              autoResize
+              maxRows={8}
+              id="description"
+              name="description"
+              label={t("description")}
+              value={value}
+              placeholder={t("project_description_placeholder")}
+              onChange={onChange}
+              error={errors?.description?.message}
+              disabled={!isAdmin}
+            />
+          )}
+        />
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <h4 className="text-13">Project ID</h4>
-            <div className="relative">
-              <Controller
-                control={control}
-                name="identifier"
-                rules={{
-                  required: t("project_id_is_required"),
-                  validate: (value) => /^[ÇŞĞIİÖÜA-Z0-9]+$/.test(value.toUpperCase()) || t("project_id_allowed_char"),
-                  minLength: {
-                    value: 1,
-                    message: t("project_id_min_char"),
-                  },
-                  maxLength: {
-                    value: 10,
-                    message: t("project_id_max_char"),
-                  },
-                }}
-                render={({ field: { value, ref } }) => (
-                  <Input
-                    id="identifier"
-                    name="identifier"
-                    type="text"
-                    value={value}
-                    onChange={handleIdentifierChange}
-                    ref={ref}
-                    hasError={Boolean(errors.identifier)}
-                    placeholder={t("project_settings.general.enter_project_id")}
-                    className="w-full font-medium"
-                    disabled={!isAdmin}
-                  />
-                )}
-              />
-              <Tooltip
-                isMobile={isMobile}
-                tooltipContent={t("project_id_tooltip_content")}
-                className="text-13"
-                position="right-start"
-              >
-                <Info className="absolute top-2.5 right-2 h-4 w-4 text-placeholder" />
-              </Tooltip>
-            </div>
-            <span className="text-11 text-danger-primary">
-              <>{errors?.identifier?.message}</>
-            </span>
+          <div>
+            <Controller
+              control={control}
+              name="identifier"
+              rules={{
+                required: t("project_id_is_required"),
+                validate: (value) => /^[ÇŞĞIİÖÜA-Z0-9]+$/.test(value.toUpperCase()) || t("project_id_allowed_char"),
+                minLength: {
+                  value: 1,
+                  message: t("project_id_min_char"),
+                },
+                maxLength: {
+                  value: 10,
+                  message: t("project_id_max_char"),
+                },
+              }}
+              render={({ field: { value, ref } }) => (
+                <InputField
+                  size="lg"
+                  orientation="vertical"
+                  id="identifier"
+                  name="identifier"
+                  type="text"
+                  label="Project ID"
+                  value={value}
+                  onChange={handleIdentifierChange}
+                  ref={ref}
+                  error={errors?.identifier?.message}
+                  placeholder={t("project_settings.general.enter_project_id")}
+                  disabled={!isAdmin}
+                  endIcon={
+                    <Tooltip
+                      label={t("project_id_tooltip_content")}
+                      layout="stacked"
+                      side="right"
+                      align="start"
+                      disabled={isMobile}
+                    >
+                      <span className="flex cursor-pointer items-center">
+                        <InfoOutline className="size-4 text-placeholder" />
+                      </span>
+                    </Tooltip>
+                  }
+                />
+              )}
+            />
           </div>
-          <div className="flex flex-col gap-1">
-            <h4 className="text-13">{t("workspace_projects.network.label")}</h4>
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel size="lg" inset={false} htmlFor="project-network">
+              {t("workspace_projects.network.label")}
+            </FieldLabel>
             <Controller
               name="network"
               control={control}
               render={({ field: { value, onChange } }) => {
                 const selectedNetwork = NETWORK_CHOICES.find((n) => n.key === value);
                 return (
-                  <CustomSelect
-                    value={value}
-                    onChange={onChange}
-                    label={
-                      <div className="flex items-center gap-1">
-                        {selectedNetwork ? (
-                          <>
-                            <ProjectNetworkIcon iconKey={selectedNetwork.iconKey} className="h-3.5 w-3.5" />
-                            {t(selectedNetwork.i18n_label)}
-                          </>
-                        ) : (
-                          <span className="text-placeholder">{t("select_network")}</span>
-                        )}
-                      </div>
-                    }
-                    buttonClassName="!border-subtle !shadow-none font-medium rounded-md"
-                    input
+                  <Select<TNetworkChoice>
+                    getValues={() => NETWORK_CHOICES}
+                    value={selectedNetwork ?? null}
+                    onChange={(key) => onChange(Number(key))}
+                    getOptionValue={(network) => String(network.key)}
+                    getOptionLabel={(network) => t(network.i18n_label)}
+                    getOptionIcon={(network) => (
+                      <ProjectNetworkIcon iconKey={network.iconKey} className="mt-0.5 size-4 shrink-0" />
+                    )}
+                    getOptionDescription={(network) => t(network.description)}
+                    placeholder={t("select_network")}
+                    showSearch={false}
+                    pinSelected={false}
+                    contentSizing="anchor"
                     disabled={!isAdmin}
-                    // optionsClassName="w-full"
+                    estimateItemSize={64}
                   >
-                    {NETWORK_CHOICES.map((network) => (
-                      <CustomSelect.Option key={network.key} value={network.key}>
-                        <div className="flex items-start gap-2">
-                          <ProjectNetworkIcon iconKey={network.iconKey} className="h-3.5 w-3.5" />
-                          <div className="-mt-1">
-                            <p>{t(network.i18n_label)}</p>
-                            <p className="text-11 text-placeholder">{t(network.description)}</p>
-                          </div>
-                        </div>
-                      </CustomSelect.Option>
-                    ))}
-                  </CustomSelect>
+                    <Select.Trigger<TNetworkChoice>
+                      id="project-network"
+                      variant="select-lg"
+                      className="font-medium"
+                      disabled={!isAdmin}
+                      prependIcon={(networks) =>
+                        networks[0] ? (
+                          <ProjectNetworkIcon iconKey={networks[0].iconKey} className="h-3.5 w-3.5" />
+                        ) : undefined
+                      }
+                    >
+                      {(networks) => (
+                        <span className="min-w-0 grow truncate text-left">
+                          {networks[0] ? t(networks[0].i18n_label) : t("select_network")}
+                        </span>
+                      )}
+                    </Select.Trigger>
+                  </Select>
                 );
               }}
             />
           </div>
-          <div className="col-span-1 flex flex-col gap-1 sm:col-span-2 xl:col-span-1">
-            <h4 className="text-13">{t("common.project_timezone")}</h4>
+          <div className="col-span-1 flex flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
             <Controller
               name="timezone"
               control={control}
@@ -421,10 +426,13 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
               render={({ field: { value, onChange } }) => (
                 <>
                   <TimezoneSelect
+                    fieldLabel={t("common.project_timezone")}
+                    errorMessage={errors.timezone?.message}
                     value={value}
-                    onChange={(value: string) => {
-                      onChange(value);
+                    onChange={(timezone: string) => {
+                      onChange(timezone);
                     }}
+                    label={t("common.project_timezone")}
                     error={Boolean(errors.timezone)}
                     buttonClassName="!border-subtle !shadow-none font-medium rounded-md"
                     disabled={!isAdmin}
@@ -432,15 +440,20 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
                 </>
               )}
             />
-            {errors.timezone && <span className="text-11 text-danger-primary">{errors.timezone.message}</span>}
           </div>
         </div>
         <div className="flex items-center justify-between py-2">
           <>
-            <Button variant="primary" size="lg" type="submit" loading={isLoading} disabled={!isAdmin}>
-              {isLoading ? t("updating") : t("common.update_project")}
-            </Button>
-            <span className="text-13 text-placeholder italic">
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              type="submit"
+              label={isLoading ? t("updating") : t("common.update_project")}
+              loading={isLoading}
+              disabled={!isAdmin}
+            />
+            <span className="text-body-xs-regular text-placeholder italic">
               {t("common.created_on")} {renderFormattedDate(project?.created_at)}
             </span>
           </>

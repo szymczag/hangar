@@ -7,22 +7,34 @@
 import { useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { ArchiveX } from "lucide-react";
+import { StateOutline } from "@makeplane/propel/icons";
 // plane imports
 import { PROJECT_AUTOMATION_MONTHS, EUserPermissions, EUserPermissionsLevel, EIconSize } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { StateGroupIcon, StatePropertyIcon } from "@plane/propel/icons";
-import type { IProject } from "@plane/types";
-import { CustomSelect, CustomSearchSelect, ToggleSwitch, Loader } from "@plane/ui";
+import { StateGroupIcon } from "@plane/blocks/icons";
+import type { IProject, IState } from "@plane/types";
+import { cn } from "@plane/utils";
+import { Switch } from "@makeplane/propel/components/switch";
+import { Select } from "@plane/blocks/select";
+import { Loader } from "@plane/blocks/skeleton";
 import { SelectMonthModal } from "@/components/automation";
-import { SettingsControlItem } from "@/components/settings/control-item";
+import { SettingsBoxedControlItem } from "@/components/settings/boxed-control-item";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { useProjectState } from "@/hooks/store/use-project-state";
 import { useUserPermissions } from "@/hooks/store/user";
+// local imports
+import { AutomationPanel, AutomationPanelRow } from "./automation-panel";
 
 type Props = {
   handleChange: (formData: Partial<IProject>) => Promise<void>;
+};
+
+const CUSTOMIZE_TIME_RANGE = "customize-time-range";
+
+type TAutomationMonthOption = {
+  id: string;
+  label: string;
 };
 
 export const AutoCloseAutomation = observer(function AutoCloseAutomation(props: Props) {
@@ -39,18 +51,7 @@ export const AutoCloseAutomation = observer(function AutoCloseAutomation(props: 
 
   // const stateGroups = projectStateStore.groupedProjectStates ?? undefined;
 
-  const options = projectStates
-    ?.filter((state) => state.group === "cancelled")
-    .map((state) => ({
-      value: state.id,
-      query: state.name,
-      content: (
-        <div className="flex items-center gap-2">
-          <StateGroupIcon stateGroup={state.group} color={state.color} size={EIconSize.LG} />
-          {state.name}
-        </div>
-      ),
-    }));
+  const options = (projectStates ?? []).filter((state) => state.group === "cancelled");
 
   const multipleOptions = (options ?? []).length > 1;
 
@@ -58,6 +59,27 @@ export const AutoCloseAutomation = observer(function AutoCloseAutomation(props: 
 
   const selectedOption = projectStates?.find((s) => s.id === (currentProjectDetails?.default_state ?? defaultState));
   const currentDefaultState = projectStates?.find((s) => s.id === defaultState);
+  // The trigger falls back to the project's own cancelled state when nothing is stored yet.
+  const triggerState = selectedOption ?? currentDefaultState;
+
+  // `close_in` is not constrained to the presets — the "Customize time range" modal writes any
+  // month count — and `Select` names its trigger from the option list, so a value outside the
+  // presets has to join the list or the trigger reads empty.
+  const closeIn = currentProjectDetails?.close_in;
+  const monthOptions = useMemo<TAutomationMonthOption[]>(() => {
+    const months = PROJECT_AUTOMATION_MONTHS.map((month) => month.value);
+    if (closeIn !== undefined && !months.includes(closeIn)) months.push(closeIn);
+    months.sort((a, b) => a - b);
+    return [
+      ...months.map((month) => ({
+        id: String(month),
+        label: t("workspace_projects.common.months_count", { months: month }),
+      })),
+      // The last row opens the custom range modal instead of setting a value.
+      { id: CUSTOMIZE_TIME_RANGE, label: t("common.customize_time_range") },
+    ];
+  }, [t, closeIn]);
+  const selectedMonthOption = monthOptions.find((option) => option.id === String(closeIn)) ?? null;
 
   const initialValues: Partial<IProject> = {
     close_in: 1,
@@ -85,108 +107,83 @@ export const AutoCloseAutomation = observer(function AutoCloseAutomation(props: 
         handleClose={() => setmonthModal(false)}
         handleChange={handleChange}
       />
-      <div className="flex flex-col gap-4 py-2">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-sm bg-layer-2">
-            <ArchiveX className="size-4 shrink-0 text-danger-primary" />
-          </div>
-          <SettingsControlItem
-            title={t("project_settings.automations.auto-close.title")}
-            description={t("project_settings.automations.auto-close.description")}
-            control={
-              <ToggleSwitch
-                value={autoCloseStatus}
-                onChange={() => {
-                  if (currentProjectDetails?.close_in === 0) {
-                    void handleChange({ close_in: 1, default_state: defaultState });
-                  } else {
-                    void handleChange({ close_in: 0, default_state: null });
-                  }
-                }}
-                size="sm"
-                disabled={!isAdmin}
-              />
-            }
-          />
-        </div>
-
+      <div>
+        <SettingsBoxedControlItem
+          title={t("project_settings.automations.auto-close.title")}
+          description={t("project_settings.automations.auto-close.description")}
+          className={cn({ "rounded-b-none": autoCloseStatus })}
+          control={
+            <Switch
+              size="md"
+              checked={autoCloseStatus}
+              onCheckedChange={() => {
+                if (currentProjectDetails?.close_in === 0) {
+                  void handleChange({ close_in: 1, default_state: defaultState });
+                } else {
+                  void handleChange({ close_in: 0, default_state: null });
+                }
+              }}
+              disabled={!isAdmin}
+              aria-label={t("project_settings.automations.auto-close.title")}
+            />
+          }
+        />
         {currentProjectDetails ? (
-          autoCloseStatus && (
-            <div className="ml-13">
-              <div className="flex flex-col rounded-sm border border-subtle bg-surface-2">
-                <div className="flex w-full items-center justify-between gap-2 px-5 py-4">
-                  <div className="w-1/2 text-13 font-medium">
-                    {t("project_settings.automations.auto-close.duration")}
-                  </div>
-                  <div className="w-1/2">
-                    <CustomSelect
-                      value={currentProjectDetails?.close_in}
-                      label={`${currentProjectDetails?.close_in} ${
-                        currentProjectDetails?.close_in === 1 ? "month" : "months"
-                      }`}
-                      onChange={(val: number) => void handleChange({ close_in: val })}
-                      input
-                      disabled={!isAdmin}
-                    >
-                      <>
-                        {PROJECT_AUTOMATION_MONTHS.map((month) => (
-                          <CustomSelect.Option key={month.i18n_label} value={month.value}>
-                            {t(month.i18n_label, { months: month.value })}
-                          </CustomSelect.Option>
-                        ))}
-                        <button
-                          type="button"
-                          className="flex w-full items-center rounded-sm px-1 py-1.5 text-secondary select-none hover:bg-layer-1"
-                          onClick={() => setmonthModal(true)}
-                        >
-                          {t("common.customize_time_range")}
-                        </button>
-                      </>
-                    </CustomSelect>
-                  </div>
-                </div>
-
-                <div className="ppy flex w-full items-center justify-between gap-2 px-5 py-4 sm:py-10">
-                  <div className="w-1/2 text-13 font-medium">
-                    {t("project_settings.automations.auto-close.auto_close_status")}
-                  </div>
-                  <div className="w-1/2">
-                    <CustomSearchSelect
-                      value={currentProjectDetails?.default_state ?? defaultState}
-                      label={
-                        <div className="flex items-center gap-2">
-                          {selectedOption ? (
-                            <StateGroupIcon
-                              stateGroup={selectedOption.group}
-                              color={selectedOption.color}
-                              size={EIconSize.LG}
-                            />
-                          ) : currentDefaultState ? (
-                            <StateGroupIcon
-                              stateGroup={currentDefaultState.group}
-                              color={currentDefaultState.color}
-                              size={EIconSize.LG}
-                            />
-                          ) : (
-                            <StatePropertyIcon className="h-3.5 w-3.5 text-secondary" />
-                          )}
-                          {selectedOption?.name
-                            ? selectedOption.name
-                            : (currentDefaultState?.name ?? <span className="text-secondary">{t("state")}</span>)}
-                        </div>
-                      }
-                      onChange={(val: string) => void handleChange({ default_state: val })}
-                      options={options}
-                      disabled={!multipleOptions}
-                      input
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
+          <AutomationPanel isOpen={autoCloseStatus}>
+            <AutomationPanelRow label={t("project_settings.automations.auto-close.duration")}>
+              <Select<TAutomationMonthOption>
+                getValues={() => monthOptions}
+                value={selectedMonthOption}
+                onChange={(id) => {
+                  if (id === CUSTOMIZE_TIME_RANGE) {
+                    setmonthModal(true);
+                    return;
+                  }
+                  void handleChange({ close_in: Number(id) });
+                }}
+                getOptionValue={(option) => option.id}
+                getOptionLabel={(option) => option.label}
+                showSearch={false}
+                pinSelected={false}
+                disabled={!isAdmin}
+              >
+                <Select.Trigger variant="select-md" disabled={!isAdmin}>
+                  <Select.Value />
+                </Select.Trigger>
+              </Select>
+            </AutomationPanelRow>
+            <AutomationPanelRow label={t("project_settings.automations.auto-close.auto_close_status")}>
+              <Select<IState>
+                getValues={() => options}
+                value={selectedOption ?? null}
+                onChange={(val) => void handleChange({ default_state: val })}
+                disabled={!multipleOptions}
+                getOptionValue={(state) => state.id}
+                getOptionLabel={(state) => state.name}
+                getOptionIcon={(state) => (
+                  <StateGroupIcon stateGroup={state.group} color={state.color} size={EIconSize.LG} />
+                )}
+                pinSelected={false}
+                placeholder={t("state")}
+              >
+                <Select.Trigger variant="select-md">
+                  {triggerState ? (
+                    <>
+                      <StateGroupIcon stateGroup={triggerState.group} color={triggerState.color} size={EIconSize.LG} />
+                      <span className="grow truncate">{triggerState.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <StateOutline className="h-3.5 w-3.5 text-secondary" />
+                      <span className="grow truncate text-secondary">{t("state")}</span>
+                    </>
+                  )}
+                </Select.Trigger>
+              </Select>
+            </AutomationPanelRow>
+          </AutomationPanel>
         ) : (
-          <Loader className="ml-13">
+          <Loader className="mt-2">
             <Loader.Item height="50px" />
           </Loader>
         )}

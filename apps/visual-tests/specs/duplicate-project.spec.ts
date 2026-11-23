@@ -43,10 +43,8 @@ test("the duplicate project modal", async ({ asUser }) => {
   await expect(trigger).toBeVisible();
   await trigger.click();
 
-  // The panel, not the wrapper: the element carrying role="dialog" is Headless
-  // UI's outermost div, which has no size of its own and is never "visible".
-  await expect(page.getByRole("dialog")).toHaveCount(1);
-  const dialog = page.locator('[id^="headlessui-dialog-panel"]');
+  // The Propel dialog carries role="dialog" on its own panel, named by its title.
+  const dialog = page.getByRole("dialog", { name: "Duplicate project" });
   await settled(dialog);
 
   const options = dialog.getByText("States and work item types are always copied.");

@@ -10,12 +10,10 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-// icons
-import { Timer } from "lucide-react";
 // plane imports
+import { Switch } from "@makeplane/propel/components/switch";
+import { setToast } from "@plane/blocks/toast";
 import { useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { ToggleSwitch } from "@plane/ui";
 // components
 import { ProjectFeaturesList as CoreProjectFeaturesList } from "@/components/project/settings/features-list";
 import { SettingsBoxedControlItem } from "@/components/settings/boxed-control-item";
@@ -46,13 +44,13 @@ const TimeTrackingFeatureToggle = observer(function TimeTrackingFeatureToggle(pr
     try {
       await updateProject(workspaceSlug, projectId, { is_time_tracking_enabled: next });
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Success!",
         message: `Time tracking ${next ? "enabled" : "disabled"} for this project.`,
       });
     } catch (error) {
       console.error(error);
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to update the time tracking setting." });
+      setToast({ type: "error", title: "Error!", message: "Failed to update the time tracking setting." });
     } finally {
       setIsSubmitting(false);
     }
@@ -61,19 +59,15 @@ const TimeTrackingFeatureToggle = observer(function TimeTrackingFeatureToggle(pr
   return (
     <div className="mt-4">
       <SettingsBoxedControlItem
-        title={
-          <span className="flex items-center gap-2">
-            <Timer className="h-5 w-5 flex-shrink-0 text-tertiary" />
-            {t("project_settings.features.time_tracking.title")}
-          </span>
-        }
+        title={t("project_settings.features.time_tracking.title")}
         description={t("project_settings.features.time_tracking.description")}
         control={
-          <ToggleSwitch
-            value={Boolean(project?.is_time_tracking_enabled)}
-            onChange={handleToggle}
-            disabled={!isAdmin || isSubmitting || !project}
+          <Switch
             size="sm"
+            checked={Boolean(project?.is_time_tracking_enabled)}
+            onCheckedChange={() => void handleToggle()}
+            disabled={!isAdmin || isSubmitting || !project}
+            aria-label={t("project_settings.features.time_tracking.title")}
           />
         }
       />

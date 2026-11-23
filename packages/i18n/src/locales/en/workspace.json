@@ -223,6 +223,11 @@
       "search": {
         "description": "No projects detected with the matching criteria.\nCreate a new project instead"
       }
+    },
+    "card": {
+      "archived": "Archived",
+      "joined": "Joined",
+      "no_lead": "No lead"
     }
   },
   "workspace_views": {

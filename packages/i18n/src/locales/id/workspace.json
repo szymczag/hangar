@@ -223,6 +223,11 @@
       "search": {
         "description": "Tidak ada proyek yang terdeteksi dengan kriteria yang cocok.\nBuat proyek baru sebagai gantinya"
       }
+    },
+    "card": {
+      "archived": "Diarsipkan",
+      "joined": "Bergabung",
+      "no_lead": "Tanpa pemimpin"
     }
   },
   "workspace_views": {
