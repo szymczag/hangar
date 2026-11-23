@@ -27,7 +27,7 @@ from plane.authentication.adapter.error import (
 from django.middleware.csrf import get_token
 from plane.utils.cache import invalidate_cache
 from plane.authentication.utils.host import base_host
-from plane.authentication.rate_limit import AuthenticationThrottle
+from plane.authentication.rate_limit import AuthenticationThrottle, SetPasswordThrottle
 
 
 class CSRFTokenEndpoint(APIView):
@@ -116,6 +116,11 @@ class ChangePasswordEndpoint(APIView):
 
 
 class SetUserPasswordEndpoint(APIView):
+    # Fork (see FORK.md): per account and per client address, the pair the
+    # email change uses. Upstream had neither, and AnonRateThrottle skips a
+    # signed-in caller.
+    throttle_classes = [SetPasswordThrottle, AuthenticationThrottle]
+
     @invalidate_cache("/api/users/me/")
     def post(self, request):
         user = User.objects.get(pk=request.user.id)

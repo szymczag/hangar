@@ -308,8 +308,10 @@ Some endpoints are rate-limited per client IP. Two settings in `plane.env` contr
 - **Leaving `NUM_PROXIES` empty and `TRUSTED_PROXIES` at its default (`0.0.0.0/0`)** keeps the current behaviour.
 
 `AUTHENTICATION_RATE_LIMIT` (default `10/minute`) is the per-IP limit for the
-anonymous sign-in, sign-up and magic-link endpoints, in DRF format
-`<count>/<second|minute|hour|day>`. `API_KEY_RATE_LIMIT` (default `60/minute`)
+anonymous sign-in, sign-up and magic-link endpoints and for the signed-in
+password change, first password and email change, in DRF format
+`<count>/<second|minute|hour|day>`. Setting a first password is also limited to
+ten attempts an hour per account. `API_KEY_RATE_LIMIT` (default `60/minute`)
 limits requests made with an API key.
 
 Restart the services after changing these values.
