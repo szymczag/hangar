@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.4.0-rc.2",
+  version: "0.4.0-rc.3",
   highlights: [
-    "Published boards no longer reveal who is in the project.",
-    "An outdated setup.sh now refuses to install or upgrade to a newer release.",
-    "The vote and reaction lists of a published board now return the board's own data, and still name nobody.",
-    "Spaces keeps its Content-Security-Policy on the new design and loads no emoji data from a CDN.",
-    "Page version history is now recorded.",
+    "Workspace invitations are now an admin's act unless the instance hands them to members.",
+    "Setting a first password is now rate limited.",
+    "The set-password page now shows the form that sets a password.",
+    "A new API token's secret no longer stays in the page's token list.",
+    "The web app's move to the new design brings in none of upstream's external services.",
   ],
   upstream: {
     version: "1.4.3",
