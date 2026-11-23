@@ -13,10 +13,10 @@ import {
   MembersOutline,
   ModuleOutline,
   PagesOutline,
-  StackLayersOutline,
   StateOutline,
   TriggerOutline,
   ViewsOutline,
+  WorkItemsOutline,
 } from "@makeplane/propel/icons";
 // plane imports
 import type { ISvgIcons } from "@plane/blocks/icons";
@@ -37,5 +37,5 @@ export const PROJECT_SETTINGS_ICONS: Record<TProjectSettingsTabs, IconGlyph | Re
   estimates: EstimateOutline,
   automations: TriggerOutline,
   // Fork (see FORK.md)
-  work_item_types: StackLayersOutline,
+  work_item_types: WorkItemsOutline,
 };
