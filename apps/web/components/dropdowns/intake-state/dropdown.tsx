@@ -4,49 +4,81 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+// Fork: compatibility shim, removed in phase 9
+//
+// The 1.4 `IntakeStateDropdown` call shape over upstream's `IntakeStateSelect`
+// (intake-state/intake-state-select.tsx). An empty value shows the project's intake state, as before.
+
+import type { Placement } from "@popperjs/core";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-// hooks
-import { useProjectState } from "@/hooks/store/use-project-state";
 // local imports
-import type { TWorkItemStateDropdownBaseProps } from "./base";
-import { WorkItemStateDropdownBase } from "./base";
+import { toSelectVariant, toTriggerClassName } from "../compat";
+import { DropdownCompatFrame } from "../compat-frame";
+import type { TButtonVariants } from "../types";
+import { IntakeStateSelect } from "./intake-state-select";
 
-type TWorkItemStateDropdownProps = Omit<
-  TWorkItemStateDropdownBaseProps,
-  "stateIds" | "getStateById" | "onDropdownOpen" | "isInitializing"
-> & {
-  stateIds?: string[];
+type TIntakeStateDropdownProps = {
+  buttonClassName?: string;
+  buttonContainerClassName?: string;
+  buttonVariant: TButtonVariants;
+  className?: string;
+  disabled?: boolean;
+  /** No effect: the trigger chrome draws its own chevron where the variant has one. */
+  dropdownArrow?: boolean;
+  /** No effect, see `dropdownArrow`. */
+  dropdownArrowClassName?: string;
+  /** No effect: the state glyph is part of the option. */
+  hideIcon?: boolean;
+  /** No effect: the glyph takes the trigger's size. */
+  iconSize?: string;
+  /** No effect in Hangar: no workflow gates the state list. */
+  isForWorkItemCreation?: boolean;
+  onChange: (val: string) => void;
+  onClose?: () => void;
+  placeholder?: string;
+  placement?: Placement;
+  projectId: string | undefined;
+  /** No effect: the blocks trigger always renders lazily. */
+  renderByDefault?: boolean;
+  /** No effect: the intake trigger has no tooltip. */
+  showTooltip?: boolean;
+  tabIndex?: number;
+  value: string | undefined | null;
 };
 
-export const IntakeStateDropdown = observer(function IntakeStateDropdown(props: TWorkItemStateDropdownProps) {
-  const { projectId, stateIds: propsStateIds } = props;
+export const IntakeStateDropdown = observer(function IntakeStateDropdown(props: TIntakeStateDropdownProps) {
+  const {
+    buttonClassName,
+    buttonContainerClassName,
+    buttonVariant,
+    className,
+    disabled,
+    onChange,
+    onClose,
+    placeholder,
+    placement,
+    projectId,
+    tabIndex,
+    value,
+  } = props;
   // router params
   const { workspaceSlug } = useParams();
-  // states
-  const [stateLoader, setStateLoader] = useState(false);
-  // store hooks
-  const { fetchProjectIntakeState, getProjectIntakeStateIds, getIntakeStateById } = useProjectState();
-  // derived values
-  const stateIds = propsStateIds ?? getProjectIntakeStateIds(projectId);
-
-  // fetch states if not provided
-  const onDropdownOpen = async () => {
-    if ((stateIds === undefined || stateIds.length === 0) && workspaceSlug && projectId) {
-      setStateLoader(true);
-      await fetchProjectIntakeState(workspaceSlug.toString(), projectId);
-      setStateLoader(false);
-    }
-  };
 
   return (
-    <WorkItemStateDropdownBase
-      {...props}
-      getStateById={getIntakeStateById}
-      isInitializing={stateLoader}
-      stateIds={stateIds ?? []}
-      onDropdownOpen={onDropdownOpen}
-    />
+    <DropdownCompatFrame className={className} placement={placement}>
+      <IntakeStateSelect
+        workspaceSlug={workspaceSlug?.toString() ?? ""}
+        projectId={projectId ?? ""}
+        value={value}
+        onChange={onChange}
+        variant={toSelectVariant(buttonVariant)}
+        disabled={disabled}
+        placeholder={placeholder}
+        onClose={onClose}
+        className={toTriggerClassName(buttonContainerClassName, buttonClassName)}
+        tabIndex={tabIndex}
+      />
+    </DropdownCompatFrame>
   );
 });
