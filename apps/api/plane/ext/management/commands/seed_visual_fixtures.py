@@ -82,6 +82,17 @@ ASSIGNEE_IDS = {
     "dark": uuid.UUID("a0000000-0000-4000-8000-000000000094"),
 }
 
+# Work item lists aggregate `assignee_ids` in `assignees__id` order, which is the
+# users' own random ids. The 1.4 avatars printed one initial ("V" for all three
+# users), so the order never showed; the Propel avatar group prints two ("VD",
+# "VL"), and a work item assigned to two people swapped them between fresh
+# databases.
+USER_IDS = {
+    "light": uuid.UUID("a0000000-0000-4000-8000-000000000097"),
+    "dark": uuid.UUID("a0000000-0000-4000-8000-000000000098"),
+    "admin": uuid.UUID("a0000000-0000-4000-8000-000000000099"),
+}
+
 ADMIN, MEMBER = 20, 15
 
 WORKSPACE_ID = uuid.UUID("a0000000-0000-4000-8000-000000000001")
@@ -229,7 +240,12 @@ class Command(BaseCommand):
         for key, theme in (("light", "light"), ("dark", "dark"), ("admin", "light")):
             user, _ = User.objects.get_or_create(
                 email=f"vr-{key}@hangar.test",
-                defaults={"username": f"vr-{key}", "display_name": f"VR {key.title()}", "is_active": True},
+                defaults={
+                    "id": USER_IDS[key],
+                    "username": f"vr-{key}",
+                    "display_name": f"VR {key.title()}",
+                    "is_active": True,
+                },
             )
             user.set_password("visual-regression")
             user.is_password_autoset = False
