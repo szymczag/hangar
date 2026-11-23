@@ -8,6 +8,7 @@ import { observer } from "mobx-react";
 import { usePathname } from "next/navigation";
 import { useParams } from "react-router";
 // plane imports
+import { List } from "@makeplane/propel/components/list";
 import {
   EUserPermissionsLevel,
   GROUPED_WORKSPACE_SETTINGS,
@@ -18,6 +19,7 @@ import { useTranslation } from "@plane/i18n";
 import { joinUrlPath } from "@plane/utils";
 // components
 import { SettingsSidebarItem } from "@/components/settings/sidebar/item";
+import { SettingsSidebarSectionHeading } from "@/components/settings/sidebar/section-heading";
 // hooks
 import { useInstance } from "@/hooks/store/use-instance";
 import { useUserPermissions } from "@/hooks/store/user";
@@ -35,7 +37,7 @@ export const WorkspaceSettingsSidebarItemCategories = observer(function Workspac
   const { t } = useTranslation();
 
   return (
-    <div className="mt-3 flex flex-col divide-y divide-subtle px-3">
+    <div className="mt-1.5 flex flex-col divide-y divide-subtle px-3 pb-2">
       {WORKSPACE_SETTINGS_CATEGORIES.map((category) => {
         const categoryItems = GROUPED_WORKSPACE_SETTINGS[category];
         const accessibleItems = categoryItems.filter(
@@ -48,10 +50,10 @@ export const WorkspaceSettingsSidebarItemCategories = observer(function Workspac
 
         return (
           <div key={category} className="shrink-0 py-3 first:pt-0 last:pb-0">
-            <div className="p-2 text-caption-md-medium text-tertiary capitalize">
+            <SettingsSidebarSectionHeading>
               {t(WORKSPACE_SETTINGS_CATEGORY_LABELS[category])}
-            </div>
-            <div className="flex flex-col">
+            </SettingsSidebarSectionHeading>
+            <List gap="px" role="toolbar" aria-label={t(WORKSPACE_SETTINGS_CATEGORY_LABELS[category])}>
               {accessibleItems.map((item) => {
                 const isItemActive =
                   item.href === "/settings"
@@ -69,7 +71,7 @@ export const WorkspaceSettingsSidebarItemCategories = observer(function Workspac
                   />
                 );
               })}
-            </div>
+            </List>
           </div>
         );
       })}
