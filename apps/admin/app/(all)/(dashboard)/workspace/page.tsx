@@ -97,6 +97,7 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
   const disableWorkspaceCreation = formattedConfig?.DISABLE_WORKSPACE_CREATION ?? "";
   const apiTokenMinimumRole = formattedConfig?.API_TOKEN_MINIMUM_ROLE ?? "5";
   const forcePrivateVisibility = formattedConfig?.FORCE_PRIVATE_VISIBILITY ?? "0";
+  const allowMembersToInvite = formattedConfig?.ALLOW_MEMBERS_TO_INVITE ?? "0";
   const defaultWorkspaceId = formattedConfig?.INSTANCE_DEFAULT_WORKSPACE_ID ?? "";
   const defaultStartOfWeek = formattedConfig?.INSTANCE_DEFAULT_START_OF_WEEK ?? "1";
   const defaultTheme = formattedConfig?.INSTANCE_DEFAULT_THEME ?? "light";
@@ -271,6 +272,30 @@ const WorkspaceManagementPage = observer(function WorkspaceManagementPage(_props
               disabled={isControlDisabled}
               onChange={(value) => updateConfig("API_TOKEN_MINIMUM_ROLE", value)}
             />
+          </div>
+        )}
+        {formattedConfig && (
+          <div className="flex w-full items-start justify-between gap-4 rounded-lg border border-subtle bg-layer-2 px-4 py-3 md:items-center md:gap-8">
+            <div className="min-w-0 grow">
+              <div className="pb-1 text-body-sm-medium text-primary">Members can invite to workspaces</div>
+              <div className="text-body-xs-regular leading-5 text-tertiary">
+                When off, only workspace admins can invite people and change or withdraw pending invitations. When on,
+                members can invite too — at most at their own role — and change or withdraw the invitations they sent,
+                not anyone else&apos;s. Guests can never invite. Turning it off takes the right back from members at
+                once; invitations already sent stay valid until an admin withdraws them.
+              </div>
+            </div>
+            <div className={cn("shrink-0", { "opacity-70": isSubmitting })}>
+              <Switch
+                checked={allowMembersToInvite.trim() === "1"}
+                onCheckedChange={() =>
+                  updateConfig("ALLOW_MEMBERS_TO_INVITE", allowMembersToInvite.trim() === "1" ? "0" : "1")
+                }
+                size="sm"
+                aria-label="Members can invite to workspaces"
+                disabled={isControlDisabled}
+              />
+            </div>
           </div>
         )}
         {workspaceLoader !== "init-loader" ? (

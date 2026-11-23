@@ -16,8 +16,11 @@ import { useLocalStorage } from "@plane/hooks";
 import { useTranslation } from "@plane/i18n";
 import { MembersPropertyIcon, CheckIcon, ProjectIcon, CloseIcon } from "@plane/propel/icons";
 import { cn, getFileURL } from "@plane/utils";
+// helpers
+import { canInviteToWorkspace } from "@/helpers/workspace-invite-access";
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
+import { useInstance } from "@/hooks/store/use-instance";
 import { useProject } from "@/hooks/store/use-project";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
@@ -27,7 +30,8 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
   // navigation
   const { workspaceSlug } = useParams();
   // store hooks
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, workspaceInfoBySlug } = useUserPermissions();
+  const { config } = useInstance();
   const { toggleCreateProjectModal } = useCommandPalette();
   const { data: currentUser } = useUser();
   const { joinedProjectIds } = useProject();
@@ -46,6 +50,10 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
     EUserPermissionsLevel.WORKSPACE
   );
   const isWorkspaceAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
+  const canInvite = canInviteToWorkspace(
+    workspaceSlug ? workspaceInfoBySlug(workspaceSlug.toString())?.role : undefined,
+    config?.members_can_invite
+  );
 
   const EMPTY_STATE_DATA = [
     {
@@ -74,7 +82,7 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
       cta: {
         text: "home.empty.invite_team.cta",
         link: `/${workspaceSlug}/settings/members`,
-        disabled: !isWorkspaceAdmin,
+        disabled: !canInvite,
       },
     },
     {

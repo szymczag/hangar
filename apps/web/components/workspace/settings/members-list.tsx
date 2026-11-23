@@ -23,9 +23,10 @@ import { WorkspaceMembersListItem } from "./members-list-item";
 
 export const WorkspaceMembersList = observer(function WorkspaceMembersList(props: {
   searchQuery: string;
-  isAdmin: boolean;
+  /** Admins, and members where the instance lets them invite; the list endpoint refuses everyone else. */
+  canSeeInvitations: boolean;
 }) {
-  const { searchQuery, isAdmin } = props;
+  const { searchQuery, canSeeInvitations } = props;
   const [showPendingInvites, setShowPendingInvites] = useState<boolean>(true);
 
   // router
@@ -46,10 +47,13 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
   const { t } = useTranslation();
   // fetching workspace invitations
   useSWR(
-    workspaceSlug ? `WORKSPACE_MEMBERS_AND_MEMBER_INVITATIONS_${workspaceSlug.toString()}` : null,
+    // The flag is in the key so the invitations arrive once the instance config says they may be read.
+    workspaceSlug
+      ? `WORKSPACE_MEMBERS_AND_MEMBER_INVITATIONS_${workspaceSlug.toString()}_${canSeeInvitations ? "with" : "without"}_invitations`
+      : null,
     workspaceSlug
       ? async () => {
-          await fetchWorkspaceMemberInvitations(workspaceSlug.toString());
+          if (canSeeInvitations) await fetchWorkspaceMemberInvitations(workspaceSlug.toString());
           await fetchWorkspaceMembers(workspaceSlug.toString());
         }
       : null
@@ -82,7 +86,7 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
           />
         )}
       </div>
-      {isAdmin && searchedInvitationsIds && searchedInvitationsIds.length > 0 && (
+      {canSeeInvitations && searchedInvitationsIds && searchedInvitationsIds.length > 0 && (
         <div className="shrink-0 pt-4">
           <Collapsible
             open={showPendingInvites}

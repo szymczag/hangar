@@ -119,6 +119,15 @@ because a stored value is what an incident response will look at.
 | `SSO_AUTO_JOIN_WORKSPACES` | Workspaces joined on sign-in, as `corp.com=workspace-slug:role`                                |
 | `SSO_AUTO_JOIN_PROJECTS`   | Projects joined on sign-in, as `corp.com=workspace-slug/IDENTIFIER:role`                       |
 
+Two invitation settings sit beside these. `RESTRICT_INVITES_TO_SSO_DOMAINS=1`
+(the **Only invite addresses on these domains** box on the same page, off by
+default) refuses workspace and project invitations to any address outside the
+pinned domains, in the app and in the API. Who may send a workspace invitation at
+all is `ALLOW_MEMBERS_TO_INVITE`, set under **Workspaces → Members can invite to
+workspaces** and described in
+[the authorization model](authorization-model.md#workspace-invitations): off by
+default, so only workspace admins invite.
+
 A listed domain may be asserted **only** by the providers named for it. Every other
 enabled method — password, magic code, and the remaining providers — is refused for
 that domain on both sign-up and sign-in. This is what prevents an attacker from

@@ -173,9 +173,23 @@ branding_asset_config_variables = [
     },
 ]
 
+# "1" lets workspace members invite people and manage the invitations they
+# sent. Off by default: inviting is an admin's decision unless the operator
+# hands it to members, and a member's access never depends on a workspace
+# admin noticing what was sent in their name.
+workspace_policy_config_variables = [
+    {
+        "key": "ALLOW_MEMBERS_TO_INVITE",
+        "value": os.environ.get("ALLOW_MEMBERS_TO_INVITE", "0"),
+        "category": "WORKSPACE_MANAGEMENT",
+        "is_encrypted": False,
+    },
+]
+
 extended_config_variables = [
     *oidc_config_variables,
     *saml_config_variables,
     *sso_policy_config_variables,
     *branding_asset_config_variables,
+    *workspace_policy_config_variables,
 ]

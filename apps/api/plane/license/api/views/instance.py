@@ -24,6 +24,7 @@ from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.api.serializers import InstanceSerializer
 from plane.license.models import Instance
 from plane.utils.api_token_policy import api_token_minimum_role
+from plane.utils.invite_policy import members_can_invite
 from plane.utils.provider_profile import providers_managing_profiles
 from plane.utils.visibility_policy import force_private_visibility
 from plane.license.utils.instance_value import get_configuration_value
@@ -409,6 +410,12 @@ class InstanceEndpoint(BaseAPIView):
         # Reported so the clients stop offering a visibility choice that is not
         # accepted, and stop showing a publish action that is refused.
         data["force_private_visibility"] = force_private_visibility()
+
+        # Fork (see FORK.md): whether workspace members, and not only admins,
+        # may invite. Reported so the application offers the invite action only
+        # where it would succeed; the policy endpoint that carries the same
+        # flag is itself closed to a member who may not invite.
+        data["members_can_invite"] = members_can_invite()
 
         # File size settings
         data["file_size_limit"] = float(os.environ.get("FILE_SIZE_LIMIT", 5242880))

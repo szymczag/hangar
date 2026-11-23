@@ -8,7 +8,7 @@ import { useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
-import { ROLE, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
+import { ROLE, EUserPermissions } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { ChevronDownOutline, DeleteOutline, LinkOutline, MoreHorizontalOutline } from "@makeplane/propel/icons";
 import { Avatar } from "@makeplane/propel/components/avatar";
@@ -23,9 +23,12 @@ import { setToast } from "@plane/blocks/toast";
 import { copyTextToClipboard } from "@plane/utils";
 // components
 import { ConfirmWorkspaceMemberRemove } from "@/components/workspace/confirm-workspace-member-remove";
+// helpers
+import { canManageWorkspaceInvitation } from "@/helpers/workspace-invite-access";
 // hooks
+import { useInstance } from "@/hooks/store/use-instance";
 import { useMember } from "@/hooks/store/use-member";
-import { useUserPermissions } from "@/hooks/store/user";
+import { useUser, useUserPermissions } from "@/hooks/store/user";
 
 type TRoleOption = { key: number; label: string };
 
@@ -45,7 +48,9 @@ export const WorkspaceInvitationsListItem = observer(function WorkspaceInvitatio
   // plane hooks
   const { t } = useTranslation();
   // store hooks
-  const { allowPermissions, workspaceInfoBySlug } = useUserPermissions();
+  const { workspaceInfoBySlug } = useUserPermissions();
+  const { data: currentUser } = useUser();
+  const { config } = useInstance();
   const {
     workspace: { updateMemberInvitation, deleteMemberInvitation, getWorkspaceInvitationDetails },
   } = useMember();
@@ -53,16 +58,16 @@ export const WorkspaceInvitationsListItem = observer(function WorkspaceInvitatio
   const invitationDetails = getWorkspaceInvitationDetails(invitationId);
   const currentWorkspaceMemberInfo = workspaceInfoBySlug(workspaceSlug.toString());
   const currentWorkspaceRole = currentWorkspaceMemberInfo?.role;
-  // is the current logged in user admin
-  const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  // role change access-
-  // 1. user cannot change their own role
-  // 2. only admin or member can change role
-  // 3. user cannot change role of higher role
-  const hasRoleChangeAccess = allowPermissions(
-    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
-    EUserPermissionsLevel.WORKSPACE
+  // Admins manage every invitation; a member, where the instance lets members
+  // invite, only the ones they sent. The role select and the actions menu follow
+  // the same rule as the server.
+  const canManageInvitation = canManageWorkspaceInvitation(
+    currentWorkspaceRole,
+    config?.members_can_invite,
+    invitationDetails?.created_by,
+    currentUser?.id
   );
+  const hasRoleChangeAccess = canManageInvitation;
   // non-admins can only assign roles up to their own
   const roleOptions: TRoleOption[] = Object.entries(ROLE)
     .map(([key, label]) => ({ key: parseInt(key, 10), label }))
@@ -122,7 +127,7 @@ export const WorkspaceInvitationsListItem = observer(function WorkspaceInvitatio
       },
       title: t("common.remove"),
       icon: DeleteOutline,
-      shouldRender: isAdmin,
+      shouldRender: canManageInvitation,
       variant: "danger",
     },
   ];
@@ -184,7 +189,7 @@ export const WorkspaceInvitationsListItem = observer(function WorkspaceInvitatio
               </Select.Trigger>
             </Select>
           </SelectDropdownPlacementContext.Provider>
-          {isAdmin && (
+          {canManageInvitation && (
             <Menu>
               <MenuTrigger
                 render={

@@ -22,6 +22,7 @@ import os
 
 # Module imports
 from plane.license.utils.instance_value import get_configuration_value
+from plane.utils.invite_policy import members_can_invite
 
 # Providers that federate identity to an external directory. A bare domain
 # entry (no explicit provider) admits any of these and refuses everything else.
@@ -180,7 +181,7 @@ def invitation_rejection_reason(email, *, raw_setting=None, restrict_setting=Non
     return None
 
 
-def invitation_policy_snapshot(raw_setting=None, restrict_setting=None):
+def invitation_policy_snapshot(raw_setting=None, restrict_setting=None, members_setting=None):
     """The policy in the shape a client needs to apply the same three rules.
 
     The admin panel holds the settings, and only an instance admin may read
@@ -188,11 +189,16 @@ def invitation_policy_snapshot(raw_setting=None, restrict_setting=None):
     whether each accepts a plus tag, so that is all this returns — to callers
     who can already invite. The server stays authoritative: this only moves the
     refusal earlier, so an admin is not told after the round trip.
+
+    ``members_can_invite`` says whether the instance lets workspace members
+    invite at all, so a client can tell an admin's dialog that its members may
+    be sending invitations too.
     """
     raw_setting = _enforced_domains_setting(raw_setting)
     policy = parse_enforced_domains(raw_setting)
     return {
         "restrict_to_domains": bool(_restrict_invites_enabled(restrict_setting) and policy),
+        "members_can_invite": members_can_invite(members_setting),
         "domains": {
             domain: {
                 "allows_sign_in": bool(providers),

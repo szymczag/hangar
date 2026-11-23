@@ -8,4 +8,4 @@ db: 0136_intakeissue_intake_issue_snoozed_till_idx
 
 ext: 0039_default_working_hours
 
-license: 0024_remove_unsplash_access_key
+license: 0025_allow_members_to_invite
