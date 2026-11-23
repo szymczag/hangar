@@ -170,10 +170,38 @@ class TestMembersCannotInviteByDefault:
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestMembersInviteWhereTheInstanceAllows:
-    def test_member_lists_invitations(self, workspace, create_user, members_may_invite):
+    """Someone else's invitation is invisible to a member: 404 on read, change and withdraw."""
+
+    def test_member_lists_only_their_own_invitations(self, workspace, create_user, members_may_invite):
+        member = _user_with_role(workspace, MEMBER)
+        own = _invite(workspace, created_by=member)
         _invite(workspace, created_by=create_user)
-        response = _client_for(_user_with_role(workspace, MEMBER)).get(_list_url(workspace.slug))
+        _invite(workspace, created_by=_user_with_role(workspace, MEMBER))
+
+        response = _client_for(member).get(_list_url(workspace.slug))
         assert response.status_code == status.HTTP_200_OK, _detail(response)
+        assert [row["id"] for row in response.json()] == [str(own.id)]
+
+    def test_admin_still_lists_every_invitation(self, session_client, workspace, members_may_invite):
+        member = _user_with_role(workspace, MEMBER)
+        invites = {_invite(workspace, created_by=member).id, _invite(workspace, created_by=None).id}
+
+        response = session_client.get(_list_url(workspace.slug))
+        assert response.status_code == status.HTTP_200_OK, _detail(response)
+        assert {row["id"] for row in response.json()} >= {str(pk) for pk in invites}
+
+    def test_member_reads_their_own_invitation(self, workspace, members_may_invite):
+        member = _user_with_role(workspace, MEMBER)
+        invite = _invite(workspace, created_by=member)
+
+        response = _client_for(member).get(_detail_url(workspace.slug, invite.id))
+        assert response.status_code == status.HTTP_200_OK, _detail(response)
+
+    def test_member_cannot_read_someone_elses_invitation(self, workspace, create_user, members_may_invite):
+        invite = _invite(workspace, created_by=create_user)
+
+        response = _client_for(_user_with_role(workspace, MEMBER)).get(_detail_url(workspace.slug, invite.id))
+        assert response.status_code == status.HTTP_404_NOT_FOUND, _detail(response)
 
     def test_member_invites_up_to_their_own_role(self, workspace, members_may_invite):
         member = _user_with_role(workspace, MEMBER)
@@ -208,7 +236,7 @@ class TestMembersInviteWhereTheInstanceAllows:
 
         client = _client_for(_user_with_role(workspace, MEMBER))
         response = client.patch(_detail_url(workspace.slug, invite.id), {"role": GUEST}, format="json")
-        assert response.status_code == status.HTTP_403_FORBIDDEN, _detail(response)
+        assert response.status_code == status.HTTP_404_NOT_FOUND, _detail(response)
         invite.refresh_from_db()
         assert invite.role == MEMBER
 
@@ -216,7 +244,7 @@ class TestMembersInviteWhereTheInstanceAllows:
         invite = _invite(workspace, created_by=create_user, role=ADMIN)
 
         response = _client_for(_user_with_role(workspace, MEMBER)).delete(_detail_url(workspace.slug, invite.id))
-        assert response.status_code == status.HTTP_403_FORBIDDEN, _detail(response)
+        assert response.status_code == status.HTTP_404_NOT_FOUND, _detail(response)
         assert WorkspaceMemberInvite.objects.filter(pk=invite.pk).exists()
 
     def test_member_cannot_withdraw_another_members_invitation(self, workspace, members_may_invite):
@@ -224,14 +252,14 @@ class TestMembersInviteWhereTheInstanceAllows:
         invite = _invite(workspace, created_by=sender)
 
         response = _client_for(_user_with_role(workspace, MEMBER)).delete(_detail_url(workspace.slug, invite.id))
-        assert response.status_code == status.HTTP_403_FORBIDDEN, _detail(response)
+        assert response.status_code == status.HTTP_404_NOT_FOUND, _detail(response)
         assert WorkspaceMemberInvite.objects.filter(pk=invite.pk).exists()
 
     def test_an_invitation_with_no_sender_is_left_to_admins(self, workspace, members_may_invite):
         invite = _invite(workspace, created_by=None)
 
         response = _client_for(_user_with_role(workspace, MEMBER)).delete(_detail_url(workspace.slug, invite.id))
-        assert response.status_code == status.HTTP_403_FORBIDDEN, _detail(response)
+        assert response.status_code == status.HTTP_404_NOT_FOUND, _detail(response)
 
 
 @pytest.mark.contract

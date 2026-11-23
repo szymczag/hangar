@@ -297,14 +297,16 @@ one an admin had sent. The endpoints under `/api/workspaces/<slug>/invitations/`
 (list, create, read, change, withdraw, and `policy/`) now carry
 `WorkspaceInvitePermission` (`plane/app/permissions/workspace_invite.py`):
 
-| Caller | `ALLOW_MEMBERS_TO_INVITE` off | `ALLOW_MEMBERS_TO_INVITE=1`                                                            |
-| ------ | ----------------------------- | -------------------------------------------------------------------------------------- |
-| Admin  | everything                    | everything                                                                             |
-| Member | `403` on every route          | list and read all; invite at most at their own role; change or withdraw only their own |
-| Guest  | `403`                         | `403`                                                                                  |
+| Caller | `ALLOW_MEMBERS_TO_INVITE` off | `ALLOW_MEMBERS_TO_INVITE=1`                                                                       |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| Admin  | everything                    | everything                                                                                        |
+| Member | `403` on every route          | list and read only their own; invite at most at their own role; change or withdraw only their own |
+| Guest  | `403`                         | `403`                                                                                             |
 
-"Their own" is the invitation's `created_by`. An invitation with no recorded
-sender is left to admins. Turning the setting off takes the right back at once,
+"Their own" is the invitation's `created_by`. The view's queryset drops every
+other invitation for a non-admin, so someone else's answers `404` on read, change
+and withdraw alike, and the list carries no other join links. An invitation with
+no recorded sender is left to admins. Turning the setting off takes the right back at once,
 including over invitations a member sent while it was on; the invitations
 themselves stay valid until an admin withdraws them. The setting is off by
 default and seeded by `license` migration `0025`, so an upgrade narrows what

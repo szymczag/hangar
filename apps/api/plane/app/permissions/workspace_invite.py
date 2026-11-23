@@ -9,12 +9,12 @@ name, and the invitation endpoints used it. A plain member could therefore
 invite, change the role of any pending invitation, and withdraw one an admin
 had sent. Inviting is an admin's act here unless the operator turns on
 ``ALLOW_MEMBERS_TO_INVITE``; then a member may invite (at most at their own
-role, which the view checks) and manage the invitations they sent, and nobody
-else's. Guests never.
+role, which the view checks) and see and manage the invitations they sent, and
+nobody else's. Guests never.
 """
 
 # Third party imports
-from rest_framework.permissions import SAFE_METHODS, BasePermission
+from rest_framework.permissions import BasePermission
 
 # Module imports
 from plane.db.models import WorkspaceMember
@@ -53,8 +53,6 @@ class WorkspaceInvitePermission(BasePermission):
             return True
         if role != MEMBER or not members_can_invite():
             return False
-        # Reading follows the list, which shows a member every pending
-        # invitation. Changing or withdrawing one is limited to the sender.
-        if request.method in SAFE_METHODS:
-            return True
+        # The view's queryset already hides other people's invitations from a
+        # member (404); this is the same rule again, for every method.
         return obj.created_by_id is not None and obj.created_by_id == request.user.id
