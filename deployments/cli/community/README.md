@@ -199,7 +199,7 @@ This will create a folder `plane-app` and will download 2 files inside that
 
 The script exits when the install is done. Review `plane-app/plane.env` (see below), then start the services.
 
-The script also accepts the action as an argument, so you can skip the menu: `./setup.sh install|start|stop|restart|upgrade|logs|backup|migrate-storage`.
+The script also accepts the action as an argument, so you can skip the menu: `./setup.sh install|start|stop|restart|upgrade|logs|backup|migrate-storage|update-script`. `update-script` is not in the menu; it replaces the script itself, as [Upgrading Hangar Version](#upgrading-hangar-version) describes, and does not create `plane-app/` when nothing is installed.
 
 #### Docker Swarm
 
@@ -454,8 +454,13 @@ If all goes well, you will see the confirmation from docker cli
 
 It is always advised to keep Hangar up to date with the latest release.
 
-> **Back up first.** Run [Backup Data](#backup-data-docker-compose) and copy
-> `plane-app/plane.env` next to the backup before every upgrade. The upgrade runs
+> **Back up first.** Run `./setup.sh backup` ([Backup Data](#backup-data-docker-compose))
+> while the services are running, and copy `plane-app/plane.env` next to the
+> backup, before every upgrade. `setup.sh backup` copies the database's data
+> directory out of the running `plane-db` container rather than dumping it, so
+> take it while nobody uses the instance, and keep a `pg_dump` beside it as
+> [Backup Data](#backup-data-docker-compose) shows. Docker Swarm has no backup
+> action: back up the volumes on the node that holds them. The upgrade runs
 > the new release's database migrations when it starts, and **putting the previous
 > images back does not undo them**: the previous release may refuse to start on the
 > migrated database, or run on a schema it does not know. To go back, restore that
@@ -477,7 +482,7 @@ It is always advised to keep Hangar up to date with the latest release.
 > installer itself only takes effect once you run it. In particular, an upgrade
 > to hangar-v0.3.0 or later run with the hangar-v0.2.2 script, or an older one,
 > installs the new images but leaves `plane.env` and `plane.env.bak` at the
-> umask's mode, readable by other local users. Upgrade in four steps:
+> umask's mode, readable by other local users. Upgrade in five steps:
 >
 > 1. Replace `setup.sh` with the new release's script, and verify it before it
 >    replaces the old one. Run `./setup.sh update-script` (below), or, with a
@@ -491,17 +496,23 @@ It is always advised to keep Hangar up to date with the latest release.
 >    `setup.sh`. Do not download the new script straight over the working one
 >    (`curl -o setup.sh`): a download that fails or does not verify would then
 >    have replaced the only script you have.
-> 2. Run `./setup.sh upgrade`. It checks the new release before it stops
+> 2. Docker Compose: back up with `./setup.sh backup`, keep
+>    `plane-app/plane.env` with it
+>    (`install -m 600 plane-app/plane.env plane-app/backup/<folder>/plane.env`),
+>    and take a `pg_dump` as [Backup Data](#backup-data-docker-compose) shows.
+>    The upgrade does not take a backup for you, and nothing else brings the
+>    previous database back once the new release has migrated it.
+> 3. Run `./setup.sh upgrade`. It checks the new release before it stops
 >    anything. On Docker Compose it then stops the services, installs the new
 >    release's files and **leaves every service stopped**: it ends with
 >    `PLEASE VALIDATE AND START SERVICES` (scripts from releases after
 >    hangar-v0.4.0-rc.1 also print the command that starts them). On Swarm it
 >    redeploys the stack itself.
-> 3. Docker Compose: check `plane-app/plane.env` for the new release's settings,
+> 4. Docker Compose: check `plane-app/plane.env` for the new release's settings,
 >    then start the services with `./setup.sh start`. Hangar stays down until
 >    you do. Swarm: nothing to do, unless you change `plane.env`; then run
 >    `./setup.sh redeploy`.
-> 4. Check that `stat -c '%a' plane-app/plane.env` (`stat -f '%Lp'` on macOS)
+> 5. Check that `stat -c '%a' plane-app/plane.env` (`stat -f '%Lp'` on macOS)
 >    prints `600`. A script from hangar-v0.3.0 or later prints
 >    `NOTICE: restricted to the owner, ...` on its first run, whatever the action,
 >    when it tightens anything, and nothing once everything is owner-only. If you
@@ -557,9 +568,8 @@ It is always advised to keep Hangar up to date with the latest release.
 > script of the latest release, or of `HANGAR_RELEASE=vX.Y.Z`, into a scratch
 > directory beside the script, checks it exactly as
 > [the deployment files](#how-setupsh-verifies-what-it-downloads) are checked
-> (`SHA256SUMS`, its Cosign signature when Cosign is installed, and
-> `HANGAR_REQUIRE_SIGNATURE=1` to insist on it), checks that it names that
-> release, and renames it over the old script with mode `755` and the old
+> (`SHA256SUMS`, and the Cosign signature of `SHA256SUMS`), checks that it
+> names that release, and renames it over the old script with mode `755` and the old
 > script's owner. The old script stays whole until that rename, so a failed
 > check leaves it as it was. It does not run the new script; run
 > `./setup.sh upgrade` yourself afterwards, and on Docker Compose
@@ -567,6 +577,14 @@ It is always advised to keep Hangar up to date with the latest release.
 > is already from that release or a newer one, and refuses a script reached
 > through a symbolic link and releases up to hangar-v0.1.0, which publish no
 > `SHA256SUMS`; use the commands above then.
+>
+> `update-script` checks the signature only when `cosign` is installed. Without
+> it, it prints a `WARNING` and compares the script only with the `SHA256SUMS`
+> downloaded from the same release, which shows that the two agree, not that
+> the release workflow published them. Install Cosign, and run
+> `HANGAR_REQUIRE_SIGNATURE=1 ./setup.sh update-script` to make the signature
+> check mandatory: without Cosign it then refuses and leaves the old script as
+> it was.
 >
 > **Object-storage credentials.** The bundled object storage takes its login from `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `plane.env`, and the proxy serves its S3 API on the application's origin. Older templates shipped the public pair `access-key` / `secret-key`, which let anybody sign requests that list, read, overwrite or delete uploads. `setup.sh` now generates a random pair on install, and on upgrade replaces any pair whose secret is still `secret-key`; it prints a notice when it does. The API and the object storage pick the new pair up together when the services start, and uploads stay where they are. The old pair is kept as `LEGACY_MINIO_ROOT_USER` / `LEGACY_MINIO_ROOT_PASSWORD` for `migrate-object-storage.sh`, which still needs it to read a volume written by MinIO. A pair you set yourself, or external S3 storage (`USE_MINIO=0` or another `AWS_S3_ENDPOINT_URL`), is left alone; with `USE_MINIO=0` the bundled storage stays idle and is not routed (see [External S3](#object-storage-minio-to-seaweedfs)). If anything outside Hangar used the old pair, give it the new one.
 >
@@ -917,6 +935,32 @@ Unattended: `./setup.sh backup`.
 >
 > The backup copies the data directories of the running services. Take it when
 > nobody is using the instance, so no write lands half-way through the copy.
+>
+> **The database copy is a file copy, not a dump.** `setup.sh backup` runs
+> `docker cp` on `/var/lib/postgresql/data` while Postgres is running, then packs
+> the copy. Postgres keeps writing its files during the copy (checkpoints,
+> autovacuum), and a file-level copy taken that way is not guaranteed to be
+> consistent: a restore may need crash recovery, or may not start. It cannot be
+> taken with the services stopped either: `./setup.sh stop` removes the
+> containers, and the backup then fails with `container not found`. To lower the
+> risk, stop the services that write to the database first and leave the data
+> services running, and keep a `pg_dump` next to the archives, which is
+> consistent on its own:
+>
+> ```bash
+> cd plane-app
+> compose() { docker compose -f docker-compose.yaml --env-file plane.env "$@"; }
+> compose stop proxy web space admin live api worker import-worker mail-worker beat-worker
+> cd .. && ./setup.sh backup && cd plane-app
+> # Over the local socket, which needs no password; the users are POSTGRES_USER
+> # and POSTGRES_DB from plane.env (plane by default).
+> ( umask 077 && compose exec -T plane-db pg_dump -h /var/run/postgresql -U plane -d plane \
+>     --format=custom > backup/<folder>/plane.dump )
+> cd .. && ./setup.sh start
+> ```
+>
+> Restore the dump with `pg_restore --clean --if-exists` into a running
+> `plane-db` of the same release if the archived data directory does not start.
 
 ---
 

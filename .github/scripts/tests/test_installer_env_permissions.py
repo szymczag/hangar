@@ -190,7 +190,7 @@ class FreshInstallTests(unittest.TestCase):
         first = scratch.run_installer("--yes", "upgrade")
         self.assertEqual(first.returncode, 0, first.stderr)
         second = scratch.run_installer("--yes", "upgrade")
-        self.assertIn("You are already using the latest release", second.stdout)
+        self.assertIn("You are already using release v9.9.9 (from HANGAR_RELEASE)", second.stdout)
         self.assertNotIn("NOTICE: restricted", second.stderr)
 
 

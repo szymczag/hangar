@@ -834,4 +834,4 @@ class UpgradeOrderTest(unittest.TestCase):
         for script in SCRIPTS:
             with self.subTest(script=script.name):
                 upgrade = _function(script.read_text(), "upgrade", script)
-                self.assertIn("latest_release=${HANGAR_RELEASE#hangar-}", upgrade)
+                self.assertIn("target=${HANGAR_RELEASE#hangar-}", upgrade)

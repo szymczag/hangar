@@ -23,11 +23,6 @@ SCRIPT_PATH=${BASH_SOURCE[0]:-$SCRIPT_ASSET}
 
 OS_NAME=$(uname)
 
-# Create necessary directories
-mkdir -p "$PLANE_INSTALL_DIR"
-# Holds earlier copies of plane.env: owner only, like plane.env itself.
-( umask 077 && mkdir -p "$PLANE_INSTALL_DIR/archive" )
-
 DOCKER_FILE_PATH=$PLANE_INSTALL_DIR/docker-compose.yml
 STACK_FILE_PATH=$PLANE_INSTALL_DIR/docker-stack.yml
 DOCKER_ENV_PATH=$PLANE_INSTALL_DIR/plane.env
@@ -45,6 +40,14 @@ HANGAR_ASSUME_YES=${HANGAR_ASSUME_YES:-0}
 HANGAR_RELEASE=${HANGAR_RELEASE:-}
 HANGAR_REQUIRE_SIGNATURE=${HANGAR_REQUIRE_SIGNATURE:-0}
 SCRIPT_RELEASE_WARNED=0
+
+# Creates the install directory, and archive/, which holds earlier copies of
+# plane.env: owner only, like plane.env itself. Every action but update-script
+# calls it, so update-script run where nothing is installed creates nothing.
+function createInstallDir() {
+    mkdir -p "$PLANE_INSTALL_DIR"
+    ( umask 077 && mkdir -p "$PLANE_INSTALL_DIR/archive" )
+}
 
 function print_header() {
 if [ "$HANGAR_ASSUME_YES" != "1" ] && [ -t 1 ]; then
@@ -1020,33 +1023,39 @@ function upgrade() {
     fi
     
     checkSecretKeyRotation || exit 1
-    local latest_release
+    # target: the release to upgrade to; target_name: how the messages name it,
+    # since HANGAR_RELEASE may name any release, not only the latest one.
+    local target target_name target_heading
     if [ -n "$HANGAR_RELEASE" ]; then
-        latest_release=${HANGAR_RELEASE#hangar-}
+        target=${HANGAR_RELEASE#hangar-}
+        target_name="release $target (from HANGAR_RELEASE)"
+        target_heading="Requested release"
     else
-        latest_release=$(checkLatestRelease) || exit 1
+        target=$(checkLatestRelease) || exit 1
+        target_name="the latest release ($target)"
+        target_heading="Latest release"
     fi
 
     echo ""
     echo "Current release: $APP_RELEASE"
 
-    if [ "$latest_release" == "$APP_RELEASE" ]; then
+    if [ "$target" == "$APP_RELEASE" ]; then
         echo ""
-        echo "You are already using the latest release"
+        echo "You are already using $target_name"
         warnScriptRelease
         exit 0
     fi
 
-    echo "Latest release: $latest_release"
+    echo "$target_heading: $target"
     echo ""
     # Before the prompt, so a refusal leaves everything as it was.
-    checkScriptRelease "$latest_release" upgrade || exit 1
+    checkScriptRelease "$target" upgrade || exit 1
 
     # Check for confirmation to upgrade
     if [ "$HANGAR_ASSUME_YES" == "1" ]; then
-        echo "Upgrading to the latest release ($latest_release) without asking (HANGAR_ASSUME_YES=1)."
+        echo "Upgrading to $target_name without asking (HANGAR_ASSUME_YES=1)."
     else
-        echo "Do you want to upgrade to the latest release ($latest_release)?"
+        echo "Do you want to upgrade to $target_name?"
         read -p "Continue? [y/N]: " confirm
 
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -1055,7 +1064,7 @@ function upgrade() {
         fi
     fi
 
-    export APP_RELEASE=$latest_release
+    export APP_RELEASE=$target
 
     # check if stack exists
     echo "Upgrading ${stack_name} stack..."
@@ -1338,6 +1347,10 @@ for arg in "$@"; do
 done
 set -- "${ACTION_ARGS[@]}"
 
+# update-script replaces only this script, so it leaves the directory alone.
+if [ "${1:-}" != "update-script" ]; then
+    createInstallDir
+fi
 print_header
 protectEnvFiles
 askForAction "$@"
