@@ -94,6 +94,12 @@ test("sign-in: the password step", async ({ page }) => {
 
 test("sign-in: the unique code step", async ({ page }) => {
   await answerEmailCheck(page, { existing: true, status: "MAGIC_CODE" });
+  // With SMTP configured the step asks the server to e-mail a code. That stores
+  // a code and sends mail, so it is answered here instead.
+  await page.route(
+    (url) => url.pathname.endsWith("/auth/magic-generate/"),
+    (route) => route.fulfill({ json: {} })
+  );
   await page.goto("/");
   await submitEmail(page);
   await capture(page, "sign-in-unique-code", { ready: page.locator("#unique-code") });
