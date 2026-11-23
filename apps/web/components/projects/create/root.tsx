@@ -4,12 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { observer } from "mobx-react";
 import { FormProvider, useForm } from "react-hook-form";
 // plane imports
 import { useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import { EFileAssetType } from "@plane/types";
 // components
 import ProjectCommonAttributes from "@/components/project/create/common-attributes";
@@ -72,12 +72,14 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
     });
   }, [sourceProject, reset]);
   const { isMobile } = usePlatformOS();
+  // ties the pinned action row (outside the form) to the form
+  const formId = useId();
   const handleAddToFavorites = (projectId: string) => {
     if (!workspaceSlug) return;
 
     addProjectToFavorites(workspaceSlug.toString(), projectId).catch(() => {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("toast.error"),
         message: t("failed_to_remove_project_from_favorites"),
       });
@@ -141,7 +143,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
           } catch (error) {
             console.error("Error uploading cover image:", error);
             setToast({
-              type: TOAST_TYPE.WARNING,
+              type: "warning",
               title: t("warning"),
               message:
                 error instanceof Error && error.message
@@ -154,7 +156,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
           await updateProject(workspaceSlug.toString(), res.id, { cover_image_url: coverImage });
         }
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: t("success"),
           message: templateId ? t("project_duplicated_successfully") : t("project_created_successfully"),
         });
@@ -176,7 +178,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
           if (nameError || identifierError || nameSpecialCharError) {
             if (nameError) {
               setToast({
-                type: TOAST_TYPE.ERROR,
+                type: "error",
                 title: t("toast.error"),
                 message: t("project_name_already_taken"),
               });
@@ -184,7 +186,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
 
             if (identifierError) {
               setToast({
-                type: TOAST_TYPE.ERROR,
+                type: "error",
                 title: t("toast.error"),
                 message: t("project_identifier_already_taken"),
               });
@@ -192,14 +194,14 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
 
             if (nameSpecialCharError) {
               setToast({
-                type: TOAST_TYPE.ERROR,
+                type: "error",
                 title: t("toast.error"),
                 message: t("project_name_cannot_contain_special_characters"),
               });
             }
           } else {
             setToast({
-              type: TOAST_TYPE.ERROR,
+              type: "error",
               title: t("toast.error"),
               message: t("something_went_wrong"),
             });
@@ -208,7 +210,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
           // Fallback error handling if the error processing fails
           console.error("Error processing API error:", error);
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: t("toast.error"),
             message: t("something_went_wrong"),
           });
@@ -226,20 +228,28 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
 
   return (
     <FormProvider {...methods}>
-      <ProjectCreateHeader handleClose={handleClose} isMobile={isMobile} handleTemplateSelect={handleTemplateSelect} />
-
-      <form onSubmit={handleSubmit(onSubmit)} className="px-3">
-        <div className="mt-9 space-y-6 pb-5">
-          <ProjectCommonAttributes
-            setValue={setValue}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col p-3">
+          <ProjectCreateHeader
+            handleClose={handleClose}
             isMobile={isMobile}
-            shouldAutoSyncIdentifier={shouldAutoSyncIdentifier}
-            setShouldAutoSyncIdentifier={setShouldAutoSyncIdentifier}
+            handleTemplateSelect={handleTemplateSelect}
           />
-          <ProjectAttributes isMobile={isMobile} />
+          <form id={formId} onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col px-3">
+            {/* the fields scroll under the cover so the action row stays pinned */}
+            <div className="-mx-0.5 mt-8.5 min-h-0 flex-1 space-y-6 overflow-y-auto px-0.5 pt-0.5 pb-5">
+              <ProjectCommonAttributes
+                setValue={setValue}
+                isMobile={isMobile}
+                shouldAutoSyncIdentifier={shouldAutoSyncIdentifier}
+                setShouldAutoSyncIdentifier={setShouldAutoSyncIdentifier}
+              />
+              <ProjectAttributes isMobile={isMobile} />
+            </div>
+          </form>
         </div>
-        <ProjectCreateButtons handleClose={handleClose} />
-      </form>
+        <ProjectCreateButtons handleClose={handleClose} formId={formId} />
+      </div>
     </FormProvider>
   );
 });

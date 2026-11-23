@@ -7,14 +7,13 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { observer } from "mobx-react";
-import { Info } from "lucide-react";
+import { InfoOutline } from "@makeplane/propel/icons";
+import { Button } from "@makeplane/propel/components/button";
 import { EEstimateSystem, MAX_ESTIMATE_POINT_INPUT_LENGTH } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { CheckIcon, CloseIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { setToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { TEstimatePointsObject, TEstimateSystemKeys, TEstimateTypeErrorObject } from "@plane/types";
-import { Spinner } from "@plane/ui";
 import { cn, isEstimatePointValuesRepeated } from "@plane/utils";
 import { EstimateInputRoot } from "@/components/estimates/inputs/root";
 // helpers
@@ -57,13 +56,13 @@ export const EstimatePointCreate = observer(function EstimatePointCreate(props: 
   const [loader, setLoader] = useState(false);
 
   const handleSuccess = (value: string) => {
-    handleEstimatePointValue && handleEstimatePointValue(value);
+    handleEstimatePointValue?.(value);
     setEstimateInputValue("");
     closeCallBack();
   };
 
   const handleClose = () => {
-    handleEstimatePointError && handleEstimatePointError(estimateInputValue, undefined, "delete");
+    handleEstimatePointError?.(estimateInputValue, undefined, "delete");
     setEstimateInputValue("");
     closeCallBack();
   };
@@ -122,22 +121,21 @@ export const EstimatePointCreate = observer(function EstimatePointCreate(props: 
               await creteEstimatePoint(workspaceSlug, projectId, payload);
 
               setLoader(false);
-              handleEstimatePointError && handleEstimatePointError(estimateInputValue, undefined, "delete");
+              handleEstimatePointError?.(estimateInputValue, undefined, "delete");
               setToast({
-                type: TOAST_TYPE.SUCCESS,
+                type: "success",
                 title: t("project_settings.estimates.toasts.created.success.title"),
                 message: t("project_settings.estimates.toasts.created.success.message"),
               });
               handleClose();
             } catch {
               setLoader(false);
-              handleEstimatePointError &&
-                handleEstimatePointError(
-                  estimateInputValue,
-                  t("project_settings.estimates.validation.unable_to_process")
-                );
+              handleEstimatePointError?.(
+                estimateInputValue,
+                t("project_settings.estimates.validation.unable_to_process")
+              );
               setToast({
-                type: TOAST_TYPE.ERROR,
+                type: "error",
                 title: t("project_settings.estimates.toasts.created.error.title"),
                 message: t("project_settings.estimates.toasts.created.error.message"),
               });
@@ -150,61 +148,60 @@ export const EstimatePointCreate = observer(function EstimatePointCreate(props: 
           }
         } else {
           setLoader(false);
-          handleEstimatePointError &&
-            handleEstimatePointError(
-              estimateInputValue,
-              [EEstimateSystem.POINTS, EEstimateSystem.TIME].includes(estimateType)
-                ? t("project_settings.estimates.validation.numeric")
-                : t("project_settings.estimates.validation.character")
-            );
+          handleEstimatePointError?.(
+            estimateInputValue,
+            [EEstimateSystem.POINTS, EEstimateSystem.TIME].includes(estimateType)
+              ? t("project_settings.estimates.validation.numeric")
+              : t("project_settings.estimates.validation.character")
+          );
         }
-      } else
-        handleEstimatePointError &&
-          handleEstimatePointError(estimateInputValue, t("project_settings.estimates.validation.already_exists"));
-    } else
-      handleEstimatePointError &&
-        handleEstimatePointError(estimateInputValue, t("project_settings.estimates.validation.empty"));
+      } else handleEstimatePointError?.(estimateInputValue, t("project_settings.estimates.validation.already_exists"));
+    } else handleEstimatePointError?.(estimateInputValue, t("project_settings.estimates.validation.empty"));
   };
 
   return (
-    <form onSubmit={handleCreate} className="relative flex items-center gap-2 pr-2.5 text-14">
+    <form
+      onSubmit={handleCreate}
+      className="my-1 flex w-full scroll-m-8 items-center gap-2 rounded-lg border border-subtle-1 bg-layer-2 px-3 py-2 text-primary"
+    >
       <div
-        className={cn(
-          "relative my-1 flex w-full items-center rounded-sm border",
-          estimatePointError?.message ? `border-danger-strong` : `border-subtle`
-        )}
+        className={cn("relative flex min-w-0 flex-1 items-center gap-2 rounded-md", {
+          "border border-danger-strong": estimatePointError?.message,
+        })}
       >
         <EstimateInputRoot
+          size="lg"
           estimateType={estimateType}
           handleEstimateInputValue={handleEstimateInputValue}
           value={estimateInputValue}
         />
         {estimatePointError?.message && (
-          <Tooltip tooltipContent={estimatePointError?.message} position="bottom">
-            <div className="relative mr-3 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center overflow-hidden text-danger-primary">
-              <Info size={14} />
+          <Tooltip label={estimatePointError?.message} layout="stacked" side="bottom">
+            <div className="relative mr-3 flex size-3.5 shrink-0 items-center justify-center overflow-hidden text-danger-primary">
+              <InfoOutline width={14} height={14} />
             </div>
           </Tooltip>
         )}
       </div>
 
-      {estimateInputValue && estimateInputValue.length > 0 && (
-        <button
-          type="submit"
-          className="relative flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded-xs text-success-primary transition-colors hover:bg-layer-1"
-          disabled={loader}
-        >
-          {loader ? <Spinner className="h-4 w-4" /> : <CheckIcon width={14} height={14} />}
-        </button>
-      )}
-      <button
+      <Button
         type="button"
-        className="relative flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded-xs transition-colors hover:bg-layer-1"
+        variant="ghost"
+        size="lg"
+        stretch="auto"
         onClick={handleClose}
         disabled={loader}
-      >
-        <CloseIcon height={14} width={14} className="text-secondary" />
-      </button>
+        label={t("cancel")}
+      />
+      <Button
+        type="submit"
+        variant="secondary"
+        size="lg"
+        stretch="auto"
+        loading={loader}
+        disabled={!estimateInputValue}
+        label={loader ? t("adding") : t("add")}
+      />
     </form>
   );
 });

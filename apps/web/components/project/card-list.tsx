@@ -8,8 +8,8 @@ import { observer } from "mobx-react";
 // plane imports
 import { EUserPermissionsLevel, EUserPermissions } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { EmptyStateDetailed } from "@plane/propel/empty-state";
-import { ContentWrapper } from "@plane/ui";
+import { EmptyStateDetailed } from "@plane/blocks/empty-state";
+import { ContentWrapper } from "@plane/blocks/layout";
 // components
 import { calculateTotalFilters } from "@plane/utils";
 import { ProjectsLoader } from "@/components/ui/loader/projects-loader";
@@ -93,7 +93,7 @@ export const ProjectCardList = observer(function ProjectCardList(props: TProject
         assetKey={
           currentWorkspaceDisplayFilters?.archived_projects &&
           calculateTotalFilters(currentWorkspaceFilters ?? {}) === 0
-            ? "archived-work-item"
+            ? "archive"
             : "search"
         }
         assetClassName="size-40"

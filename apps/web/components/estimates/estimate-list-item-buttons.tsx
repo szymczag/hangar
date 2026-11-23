@@ -5,8 +5,10 @@
  */
 
 import { observer } from "mobx-react";
-import { PROJECT_SETTINGS_TRACKER_ELEMENTS } from "@plane/constants";
-import { TrashIcon } from "@plane/propel/icons";
+import { DeleteOutline } from "@makeplane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { useTranslation } from "@plane/i18n";
 
 type TEstimateListItem = {
   estimateId: string;
@@ -19,17 +21,19 @@ type TEstimateListItem = {
 
 export const EstimateListItemButtons = observer(function EstimateListItemButtons(props: TEstimateListItem) {
   const { estimateId, isAdmin, isEditable, onDeleteClick } = props;
+  // i18n
+  const { t } = useTranslation();
 
   if (!isAdmin || !isEditable) return <></>;
   return (
     <div className="relative flex items-center gap-1">
-      <button
-        className="relative flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-sm transition-colors hover:bg-layer-1"
+      <IconButton
+        variant="ghost"
+        size="sm"
+        icon={<Icon icon={DeleteOutline} />}
+        aria-label={t("common.delete")}
         onClick={() => onDeleteClick && onDeleteClick(estimateId)}
-        data-ph-element={PROJECT_SETTINGS_TRACKER_ELEMENTS.ESTIMATES_LIST_ITEM}
-      >
-        <TrashIcon width={12} height={12} />
-      </button>
+      />
     </div>
   );
 });

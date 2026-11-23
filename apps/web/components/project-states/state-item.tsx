@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { attachClosestEdge, extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
@@ -12,7 +12,7 @@ import { observer } from "mobx-react";
 // Hangar
 import type { TDraggableData } from "@plane/constants";
 import type { IState, TStateGroups, TStateOperationsCallbacks } from "@plane/types";
-import { DropIndicator } from "@plane/ui";
+import { DropIndicator } from "@plane/blocks/common";
 import { cn, getCurrentStateSequence } from "@plane/utils";
 // components
 import { StateItemTitle, StateUpdate } from "@/components/project-states";
@@ -23,7 +23,6 @@ type TStateItem = {
   totalStates: number;
   state: IState;
   stateOperationsCallbacks: TStateOperationsCallbacks;
-  shouldTrackEvents: boolean;
   disabled?: boolean;
   stateItemClassName?: string;
 };
@@ -35,7 +34,6 @@ export const StateItem = observer(function StateItem(props: TStateItem) {
     totalStates,
     state,
     stateOperationsCallbacks,
-    shouldTrackEvents,
     disabled = false,
     stateItemClassName,
   } = props;
@@ -47,7 +45,7 @@ export const StateItem = observer(function StateItem(props: TStateItem) {
   const [isDraggedOver, setIsDraggedOver] = useState(false);
   const [closestEdge, setClosestEdge] = useState<string | null>(null);
   // derived values
-  const isDraggable = totalStates === 1 ? false : true;
+  const isDraggable = totalStates !== 1;
   const commonStateItemListProps = {
     stateCount: totalStates,
     state: state,
@@ -123,19 +121,19 @@ export const StateItem = observer(function StateItem(props: TStateItem) {
       <StateUpdate
         state={state}
         updateStateCallback={stateOperationsCallbacks.updateState}
-        shouldTrackEvents={shouldTrackEvents}
         handleClose={() => setUpdateStateModal(false)}
       />
     );
 
+  // one box per state, so the list's spacing falls between states and not around the drop indicators
   return (
-    <Fragment>
+    <div>
       {/* draggable drop top indicator */}
       <DropIndicator isVisible={isDraggedOver && closestEdge === "top"} />
       <div
         ref={draggableElementRef}
         className={cn(
-          "group relative rounded-sm border border-subtle bg-surface-1 px-3.5 py-3",
+          "group relative rounded-lg border border-subtle bg-layer-2 px-3.5 py-2 transition-opacity",
           isDragging ? `opacity-50` : `opacity-100`,
           totalStates === 1 ? `cursor-auto` : `cursor-grab`,
           stateItemClassName
@@ -151,12 +149,11 @@ export const StateItem = observer(function StateItem(props: TStateItem) {
               markStateAsDefault: stateOperationsCallbacks.markStateAsDefault,
               deleteState: stateOperationsCallbacks.deleteState,
             }}
-            shouldTrackEvents={shouldTrackEvents}
           />
         )}
       </div>
       {/* draggable drop bottom indicator */}
       <DropIndicator isVisible={isDraggedOver && closestEdge === "bottom"} />
-    </Fragment>
+    </div>
   );
 });

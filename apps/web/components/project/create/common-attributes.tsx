@@ -7,15 +7,18 @@
 import type { ChangeEvent } from "react";
 import type { UseFormSetValue } from "react-hook-form";
 import { Controller, useFormContext } from "react-hook-form";
-import { InfoIcon } from "@plane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { TextAreaField } from "@makeplane/propel/components/text-area-field";
+import { InfoOutline } from "@makeplane/propel/icons";
 // plane imports
 import { ETabIndices } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { TProject } from "@plane/types";
 // ui
-import { Tooltip } from "@plane/propel/tooltip";
-import { Input, TextArea } from "@plane/ui";
-import { cn, projectIdentifierSanitizer, getTabIndex } from "@plane/utils";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { projectIdentifierSanitizer, getTabIndex } from "@plane/utils";
 
 type Props = {
   setValue: UseFormSetValue<TProject>;
@@ -68,22 +71,23 @@ function ProjectCommonAttributes(props: Props) {
             },
           }}
           render={({ field: { value, onChange } }) => (
-            <Input
+            <InputField
+              size="lg"
+              orientation="vertical"
+              error={errors?.name?.message}
               id="name"
               name="name"
               type="text"
               value={value}
               onChange={handleNameChange(onChange)}
-              hasError={Boolean(errors.name)}
               placeholder={t("project_name")}
-              className="focus:border-blue-400 w-full"
+              aria-label={t("project_name")}
               tabIndex={getIndex("name")}
             />
           )}
         />
-        <span className="text-11 text-danger-primary">{errors?.name?.message}</span>
       </div>
-      <div className="relative">
+      <div>
         <Controller
           control={control}
           name="identifier"
@@ -102,47 +106,58 @@ function ProjectCommonAttributes(props: Props) {
             },
           }}
           render={({ field: { value, onChange } }) => (
-            <Input
+            <InputField
+              size="lg"
+              orientation="vertical"
+              error={errors?.identifier?.message}
               id="identifier"
               name="identifier"
               type="text"
               value={value}
               onChange={handleIdentifierChange(onChange)}
-              hasError={Boolean(errors.identifier)}
               placeholder={t("project_id")}
-              className={cn("focus:border-blue-400 w-full pr-7 text-11", {
-                uppercase: value,
-              })}
+              aria-label={t("project_id")}
               tabIndex={getIndex("identifier")}
+              endIcon={
+                <Tooltip
+                  label={t("project_id_tooltip_content")}
+                  layout="stacked"
+                  side="right"
+                  align="start"
+                  disabled={isMobile}
+                >
+                  <IconButton
+                    variant="ghost"
+                    size="xs"
+                    icon={<Icon icon={InfoOutline} size="sm" tint="placeholder" />}
+                    aria-label={t("project_id_tooltip_content")}
+                    showTooltip={false}
+                  />
+                </Tooltip>
+              }
             />
           )}
         />
-        <Tooltip
-          isMobile={isMobile}
-          tooltipContent={t("project_id_tooltip_content")}
-          className="text-13"
-          position="right-start"
-        >
-          <InfoIcon className="absolute top-2.5 right-2 h-3 w-3 text-placeholder" />
-        </Tooltip>
-        <span className="text-11 text-danger-primary">{errors?.identifier?.message}</span>
       </div>
       <div className="md:col-span-4">
         <Controller
           name="description"
           control={control}
           render={({ field: { value, onChange } }) => (
-            <TextArea
+            <TextAreaField
+              size="lg"
+              autoResize
+              maxRows={8}
+              error={errors?.description?.message}
               id="description"
               name="description"
               value={value}
               placeholder={t("description")}
+              aria-label={t("description")}
               onChange={(e) => {
                 onChange(e);
                 handleFormOnChange?.();
               }}
-              className="focus:border-blue-400 !h-24 text-13"
-              hasError={Boolean(errors?.description)}
               tabIndex={getIndex("description")}
             />
           )}

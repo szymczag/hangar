@@ -5,7 +5,7 @@
  */
 
 // plane imports
-import { ScrollArea } from "@plane/propel/scrollarea";
+import { ScrollArea } from "@makeplane/propel/components/scroll-area";
 import { cn } from "@plane/utils";
 // components
 import { AppHeader } from "@/components/core/app-header";
@@ -26,11 +26,12 @@ export function SettingsContentWrapper(props: Props) {
           <AppHeader header={header} />
         </div>
       )}
-      <ScrollArea scrollType="hover" orientation="vertical" size="sm" className="size-full grow overflow-y-scroll">
+      {/* `inset` keeps the scrollbar track reserved so content does not shift when it stops overflowing. */}
+      <ScrollArea orientation="vertical" variant="inset" size="sm">
         <div
           className={cn("py-9", {
             "w-full px-page-x lg:px-12": hugging,
-            "mx-auto w-full max-w-225 px-page-x @min-[58.95rem]:px-0": !hugging, // 58.95rem = max-width(56.25rem) + padding-x(1.35rem * 2)
+            "mx-auto w-full max-w-200 px-page-x @min-[52.7rem]:px-0": !hugging, // 52.7rem = max-width(50rem) + padding-x(1.35rem * 2)
           })}
         >
           {children}

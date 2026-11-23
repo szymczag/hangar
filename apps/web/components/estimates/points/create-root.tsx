@@ -9,10 +9,11 @@ import { useCallback, useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { estimateCount } from "@plane/constants";
-import { Button } from "@plane/propel/button";
-import { PlusIcon } from "@plane/propel/icons";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { AddOutline } from "@makeplane/propel/icons";
 import type { TEstimatePointsObject, TEstimateSystemKeys, TEstimateTypeError } from "@plane/types";
-import { Sortable } from "@plane/ui";
+import { Sortable } from "@plane/blocks/common";
 // local imports
 import { EstimatePointCreate } from "./create";
 import { EstimatePointItemPreview } from "./preview";
@@ -80,16 +81,10 @@ export const EstimatePointCreateRoot = observer(function EstimatePointCreateRoot
   const handleEstimatePointCreate = (mode: "add" | "remove", value: TEstimatePointsObject) => {
     switch (mode) {
       case "add":
-        setEstimatePointCreate((prevValue) => {
-          prevValue = prevValue ? [...prevValue] : [];
-          return [...prevValue, value];
-        });
+        setEstimatePointCreate((prevValue) => [...(prevValue ?? []), value]);
         break;
       case "remove":
-        setEstimatePointCreate((prevValue) => {
-          prevValue = prevValue ? [...prevValue] : [];
-          return prevValue.filter((item) => item.key !== value.key);
-        });
+        setEstimatePointCreate((prevValue) => (prevValue ?? []).filter((item) => item.key !== value.key));
         break;
       default:
         break;
@@ -115,8 +110,8 @@ export const EstimatePointCreateRoot = observer(function EstimatePointCreateRoot
 
   if (!workspaceSlug || !projectId) return <></>;
   return (
-    <div className="space-y-1">
-      <div className="text-13 font-medium text-secondary capitalize">{estimateType}</div>
+    <div className="flex flex-col gap-2 px-1">
+      <div className="text-body-xs-medium text-secondary capitalize">{estimateType}</div>
 
       <div>
         <Sortable
@@ -171,9 +166,17 @@ export const EstimatePointCreateRoot = observer(function EstimatePointCreateRoot
           />
         ))}
       {estimatePoints && estimatePoints.length + (estimatePointCreate?.length || 0) <= estimateCount.max - 1 && (
-        <Button variant="link" prependIcon={<PlusIcon />} onClick={handleCreate}>
-          Add {estimateType}
-        </Button>
+        <div className="self-start">
+          <Button
+            variant="ghost"
+            size="sm"
+            stretch="auto"
+            label={`Add ${estimateType}`}
+            icon={<Icon icon={AddOutline} />}
+            iconPosition="start"
+            onClick={handleCreate}
+          />
+        </div>
       )}
     </div>
   );

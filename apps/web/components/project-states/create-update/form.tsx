@@ -5,10 +5,14 @@
  */
 
 import { useEffect, useState } from "react";
-import { TwitterPicker } from "react-color";
-import { Button } from "@plane/propel/button";
-import type { IState } from "@plane/types";
-import { Popover, Input, TextArea } from "@plane/ui";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { Popover, PopoverContent, PopoverTrigger } from "@makeplane/propel/components/popover";
+import { TextAreaField } from "@makeplane/propel/components/text-area-field";
+import { Button } from "@makeplane/propel/components/button";
+import { ColorSwatchPicker } from "@plane/blocks/common";
+import { useTranslation } from "@plane/i18n";
+import { StateGroupIcon } from "@plane/blocks/icons";
+import type { IState, TStateGroups } from "@plane/types";
 
 type TStateForm = {
   data: Partial<IState>;
@@ -18,19 +22,22 @@ type TStateForm = {
   buttonTitle: string;
 };
 
-function PopoverButton({ color }: { color?: string }) {
+function PopoverButton({ color, group }: { color?: string; group?: TStateGroups }) {
   return (
-    <div
-      className="group inline-flex h-5 w-5 items-center rounded-sm text-14 font-medium transition-all focus:outline-none"
-      style={{
-        backgroundColor: color ?? "black",
-      }}
-    />
+    <span className="grid size-8 shrink-0 place-items-center rounded-md border border-subtle-1">
+      {group ? (
+        <StateGroupIcon stateGroup={group} color={color ?? "black"} size="lg" />
+      ) : (
+        <span className="size-4 rounded-sm transition-colors" style={{ backgroundColor: color ?? "black" }} />
+      )}
+    </span>
   );
 }
 
 export function StateForm(props: TStateForm) {
   const { data, onSubmit, onCancel, buttonDisabled, buttonTitle } = props;
+  // plane hooks
+  const { t } = useTranslation();
   // states
   const [formData, setFromData] = useState<Partial<IState> | undefined>(undefined);
   const [errors, setErrors] = useState<Partial<Record<keyof IState, string>> | undefined>(undefined);
@@ -63,48 +70,81 @@ export function StateForm(props: TStateForm) {
   };
 
   return (
-    <div className="relative flex space-x-2 rounded-sm bg-surface-1 p-3">
-      {/* color */}
-      <div className="mt-2 h-full flex-shrink-0">
-        <Popover button={<PopoverButton color={formData?.color} />} panelClassName="mt-4 -ml-3">
-          <TwitterPicker color={formData?.color} onChange={(value) => handleFormData("color", value.hex)} />
-        </Popover>
-      </div>
-
-      <div className="w-full space-y-2">
-        {/* title */}
-        <Input
-          id="name"
-          type="text"
-          name="name"
-          placeholder="Name"
-          value={formData?.name}
-          onChange={(e) => handleFormData("name", e.target.value)}
-          hasError={(errors && Boolean(errors.name)) || false}
-          className="w-full"
-          maxLength={100}
-          autoFocus
-        />
+    <div className="relative rounded-lg border border-subtle bg-layer-2">
+      <div className="space-y-3 p-4">
+        <div className="flex items-center gap-2.5">
+          {/* color */}
+          <div className="shrink-0">
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <button
+                    type="button"
+                    className="flex items-center justify-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                    aria-label={t("aria_labels.color_picker.open")}
+                  >
+                    <PopoverButton color={formData?.color} group={data?.group} />
+                  </button>
+                }
+              />
+              <PopoverContent variant="rich" side="bottom" align="start">
+                <ColorSwatchPicker value={formData?.color} onChange={(hex) => handleFormData("color", hex)} />
+              </PopoverContent>
+            </Popover>
+          </div>
+          {/* title */}
+          <div className="min-w-0 flex-1">
+            <InputField
+              size="lg"
+              orientation="vertical"
+              id="name"
+              type="text"
+              name="name"
+              aria-label={t("name")}
+              placeholder="Name"
+              value={formData?.name}
+              onChange={(e) => handleFormData("name", e.target.value)}
+              maxLength={100}
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- the inline state form opens on its name field
+              autoFocus
+              error={errors?.name || undefined}
+            />
+          </div>
+        </div>
 
         {/* description */}
-        <TextArea
+        <TextAreaField
+          size="lg"
+          resize="none"
+          autoResize
+          maxRows={8}
           id="description"
           name="description"
+          aria-label={t("description")}
           placeholder="Describe this state for your members."
-          value={formData?.description}
+          value={formData?.description ?? ""}
           onChange={(e) => handleFormData("description", e.target.value)}
-          hasError={(errors && Boolean(errors.description)) || false}
-          className="min-h-14 w-full resize-none text-13"
+          error={errors?.description || undefined}
         />
-
-        <div className="flex items-center space-x-2">
-          <Button onClick={formSubmit} variant="primary" size="lg" disabled={buttonDisabled}>
-            {buttonTitle}
-          </Button>
-          <Button type="button" variant="secondary" size="lg" disabled={buttonDisabled} onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
+      </div>
+      <div className="flex items-center justify-end gap-3 border-t border-subtle-1 px-4 py-3">
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          stretch="auto"
+          label="Cancel"
+          disabled={buttonDisabled}
+          onClick={onCancel}
+        />
+        <Button
+          variant="primary"
+          size="md"
+          stretch="auto"
+          label={buttonTitle}
+          onClick={formSubmit}
+          disabled={buttonDisabled}
+        />
       </div>
     </div>
   );

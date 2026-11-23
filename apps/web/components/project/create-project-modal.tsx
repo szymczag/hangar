@@ -5,12 +5,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
+import { useTranslation } from "@plane/i18n";
+import { Dialog, DialogContent } from "@makeplane/propel/components/dialog";
 import { getAssetIdFromUrl, checkURLValidity } from "@plane/utils";
 // plane ui
 // helpers
-// hooks
-import useKeypress from "@/hooks/use-keypress";
 // plane web components
 import { CreateProjectForm } from "@/components/projects/create/root";
 // plane web types
@@ -37,6 +36,7 @@ enum EProjectCreationSteps {
 }
 
 export function CreateProjectModal(props: Props) {
+  const { t } = useTranslation();
   const { isOpen, onClose, setToFavorite = false, workspaceSlug, data, templateId } = props;
   // states
   const [currentStep, setCurrentStep] = useState<EProjectCreationSteps>(EProjectCreationSteps.CREATE_PROJECT);
@@ -67,36 +67,42 @@ export function CreateProjectModal(props: Props) {
     }
   };
 
-  useKeypress("Escape", () => {
-    if (isOpen) onClose();
-  });
-
   return (
-    <ModalCore isOpen={isOpen} position={EModalPosition.TOP} width={EModalWidth.XXXXL}>
-      {currentStep === EProjectCreationSteps.SOURCE_SELECTION && (
-        <ProjectSourcePicker
-          onSelect={(projectId) => {
-            setSourceProjectId(projectId);
-            setCurrentStep(EProjectCreationSteps.CREATE_PROJECT);
-          }}
-          onCancel={() => setCurrentStep(EProjectCreationSteps.CREATE_PROJECT)}
-        />
-      )}
-      {currentStep === EProjectCreationSteps.CREATE_PROJECT && (
-        <CreateProjectForm
-          setToFavorite={setToFavorite}
-          workspaceSlug={workspaceSlug}
-          onClose={onClose}
-          updateCoverImageStatus={handleCoverImageStatusUpdate}
-          handleNextStep={handleNextStep}
-          data={data}
-          templateId={sourceProjectId}
-          handleTemplateSelect={() => setCurrentStep(EProjectCreationSteps.SOURCE_SELECTION)}
-        />
-      )}
-      {currentStep === EProjectCreationSteps.FEATURE_SELECTION && (
-        <ProjectFeatureUpdate projectId={createdProjectId} workspaceSlug={workspaceSlug} onClose={onClose} />
-      )}
-    </ModalCore>
+    <Dialog
+      open={isOpen}
+      disablePointerDismissal
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent size="lg" aria-label={t("create_project")}>
+        {currentStep === EProjectCreationSteps.SOURCE_SELECTION && (
+          <ProjectSourcePicker
+            onSelect={(projectId) => {
+              setSourceProjectId(projectId);
+              setCurrentStep(EProjectCreationSteps.CREATE_PROJECT);
+            }}
+            onCancel={() => setCurrentStep(EProjectCreationSteps.CREATE_PROJECT)}
+          />
+        )}
+        {currentStep === EProjectCreationSteps.CREATE_PROJECT && (
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <CreateProjectForm
+              setToFavorite={setToFavorite}
+              workspaceSlug={workspaceSlug}
+              onClose={onClose}
+              updateCoverImageStatus={handleCoverImageStatusUpdate}
+              handleNextStep={handleNextStep}
+              data={data}
+              templateId={sourceProjectId}
+              handleTemplateSelect={() => setCurrentStep(EProjectCreationSteps.SOURCE_SELECTION)}
+            />
+          </div>
+        )}
+        {currentStep === EProjectCreationSteps.FEATURE_SELECTION && (
+          <ProjectFeatureUpdate projectId={createdProjectId} workspaceSlug={workspaceSlug} onClose={onClose} />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

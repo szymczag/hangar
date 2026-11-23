@@ -6,14 +6,14 @@
 
 import React from "react";
 // ui
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
 
 type Props = {
   title: string;
   description?: React.ReactNode;
   image: any;
   primaryButton?: {
-    icon?: any;
+    icon?: React.ReactNode;
     text: string;
     onClick: () => void;
   };
@@ -28,19 +28,20 @@ export function EmptyState({ title, description, image, primaryButton, secondary
         <img src={image} className="w-52 object-cover sm:w-60" alt={primaryButton?.text ?? ""} />
       </div>
       <div className="absolute flex w-full flex-col items-center pt-[30vh] text-center md:pt-[35vh] lg:pt-[45vh]">
-        <h6 className="mt-6 text-18 font-semibold">{title}</h6>
+        <h6 className="mt-6 text-h5-semibold">{title}</h6>
         {description && <p className="mb-7 text-tertiary">{description}</p>}
         <div className="flex items-center gap-4">
           {primaryButton && (
             <Button
-              size="xl"
               variant="primary"
-              prependIcon={primaryButton.icon}
+              size="lg"
+              stretch="auto"
+              label={primaryButton.text}
+              icon={primaryButton.icon}
+              iconPosition="start"
               onClick={primaryButton.onClick}
               disabled={disabled}
-            >
-              {primaryButton.text}
-            </Button>
+            />
           )}
           {secondaryButton}
         </div>

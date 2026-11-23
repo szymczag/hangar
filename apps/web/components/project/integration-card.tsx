@@ -6,7 +6,7 @@
 
 import { useParams } from "next/navigation";
 import useSWR, { mutate } from "swr";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { IWorkspaceIntegration } from "@plane/types";
 // assets
 import GithubLogo from "@/app/assets/logos/github-square.png?url";
@@ -66,8 +66,8 @@ export function IntegrationCard({ integration }: Props) {
       .then(() => {
         mutate(PROJECT_GITHUB_REPOSITORY(projectId));
 
-        setToast({
-          type: TOAST_TYPE.SUCCESS,
+        return setToast({
+          type: "success",
           title: "Success!",
           message: `${login}/${name} repository synced with the project successfully.`,
         });
@@ -75,7 +75,7 @@ export function IntegrationCard({ integration }: Props) {
       .catch((err) => {
         console.error(err);
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: "Repository could not be synced with the project. Please try again.",
         });
@@ -95,8 +95,8 @@ export function IntegrationCard({ integration }: Props) {
               />
             </div>
             <div>
-              <h3 className="flex items-center gap-4 text-13 font-medium">{integration.integration_detail.title}</h3>
-              <p className="text-13 tracking-tight text-secondary">
+              <h3 className="flex items-center gap-4 text-body-xs-medium">{integration.integration_detail.title}</h3>
+              <p className="text-body-xs-regular tracking-tight text-secondary">
                 {integrationDetails[integration.integration_detail.provider].description}
               </p>
             </div>
