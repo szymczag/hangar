@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.4.0-rc.1",
+  version: "0.4.0-rc.2",
   highlights: [
     "Published boards no longer reveal who is in the project.",
     "An outdated setup.sh now refuses to install or upgrade to a newer release.",
+    "The vote and reaction lists of a published board now return the board's own data, and still name nobody.",
     "Spaces keeps its Content-Security-Policy on the new design and loads no emoji data from a CDN.",
-    "The published boards move to the new upstream 1.5.0 design.",
-    "Breaking change for clients of the public board API.",
+    "Page version history is now recorded.",
   ],
   upstream: {
     version: "1.4.3",
