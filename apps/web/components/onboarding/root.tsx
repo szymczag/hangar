@@ -128,6 +128,7 @@ export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [
         !userProfile?.onboarding_step?.workspace_join
       ) {
         setCurrentStep(EOnboardingSteps.WORKSPACE_CREATE_OR_JOIN);
+        return;
       }
       if (
         userProfile?.onboarding_step?.profile_complete &&
