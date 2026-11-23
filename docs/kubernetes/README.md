@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.4.0-rc.2`. It is a release candidate for `0.4.0`;
+The current release is `0.4.0-rc.3`. It is a release candidate for `0.4.0`;
 the current stable Hangar release for Docker Compose, Docker Swarm and the
 all-in-one image remains `0.3.0`. Helm installs a release candidate only when
 you name its version. On Kubernetes, both are qualified for evaluation on AMD64
@@ -64,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.4.0-rc.2` qualification boundary is:
+The `0.4.0-rc.3` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -80,8 +80,10 @@ The `0.4.0-rc.2` qualification boundary is:
 The backend, the editor and the live server are also converged with upstream
 `v1.5.0`. God Mode, the instance admin console, and Spaces, which serves the
 published boards, use the upstream `v1.5.0` design. The web app loads the
-upstream `v1.5.0` design tokens, but its components are still the `v1.4`
-design.
+upstream `v1.5.0` design tokens, and its shell, sign-in and onboarding,
+projects, and workspace, project and account settings use the `v1.5.0`
+components; its other screens, such as the work items, cycles and pages, are
+still the `v1.4` design.
 
 The chart does not install an ingress controller, cert-manager, a CNI, a CSI
 driver, an external secret operator, or observability infrastructure.
@@ -228,10 +230,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                               |
 | ------------------ | ------------------------------------------- |
-| Product version    | `v0.4.0-rc.2`                               |
-| Helm chart version | `0.4.0-rc.2`                                |
-| Git tag            | `hangar-v0.4.0-rc.2`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.4.0-rc.2` |
+| Product version    | `v0.4.0-rc.3`                               |
+| Helm chart version | `0.4.0-rc.3`                                |
+| Git tag            | `hangar-v0.4.0-rc.3`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.4.0-rc.3` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -244,12 +246,16 @@ upgrade targets for a deployment that holds a Workshop**: their migration
 release candidates are superseded by `0.2.0` and are not rollback targets.
 The `0.3.0` release candidates, `0.3.0-rc.1` and `0.3.0-rc.2`, are superseded
 by `0.3.0` and are not rollback targets.
-`0.4.0-rc.1` is superseded by `0.4.0-rc.2` and is not a rollback target.
+`0.4.0-rc.1` and `0.4.0-rc.2` are superseded by `0.4.0-rc.3` and are not
+rollback targets.
 `0.3.0` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
-values, only the images change, and it brings back the previous design of the
-published boards, a public board API that names every project member and
-assignee, and the web app on the `v1.4` design tokens. Rolling back further, to `0.2.2`, needs no schema change or values
+values, only the images change. License migration `0025` only adds a
+configuration row that `0.3.0` does not read, so it stays in place. Rolling
+back brings back the previous design of the published boards, a public board
+API that names every project member and assignee, the web app on the `v1.4`
+design tokens and components, and workspace members who can invite people and
+change or withdraw any pending invitation. Rolling back further, to `0.2.2`, needs no schema change or values
 change either, but brings back the previous God Mode design. Rolling back
 further, to `0.2.1`, needs no schema change or values
 change either, but brings back the God Mode sessions that survive clone
@@ -292,7 +298,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.4.0-rc.2` notes](../releases/hangar-v0.4.0-rc.2.md) — review
+- [Release `v0.4.0-rc.3` notes](../releases/hangar-v0.4.0-rc.3.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -324,9 +330,10 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.4.0-rc.1`, tag `hangar-v0.4.0-rc.1`, and chart
-`ghcr.io/szymczag/charts/hangar:0.4.0-rc.1`, a release candidate that
-`0.4.0-rc.2` supersedes. The previous stable release is `0.3.0`, tag
+The previous release is `0.4.0-rc.2`, tag `hangar-v0.4.0-rc.2`, and chart
+`ghcr.io/szymczag/charts/hangar:0.4.0-rc.2`, a release candidate that
+`0.4.0-rc.3` supersedes and that is not a rollback target. The previous stable
+release and the rollback target is `0.3.0`, tag
 `hangar-v0.3.0`, and chart `ghcr.io/szymczag/charts/hangar:0.3.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
@@ -343,10 +350,37 @@ are superseded by it; do not install them. `0.3.0` is built from the
 `0.3.0-rc.2` source, so an installation on either candidate upgrades to `0.3.0`
 with `helm upgrade` and `--version 0.3.0` and no other action.
 
-Chart `0.4.0-rc.1` was the first release candidate for `0.4.0`. It is
-superseded by `0.4.0-rc.2`; do not install it, and upgrade an installation on
-it to `0.4.0-rc.2` with `helm upgrade` and `--version 0.4.0-rc.2` and no other
-action.
+Charts `0.4.0-rc.1` and `0.4.0-rc.2` were the first two release candidates
+for `0.4.0`. Both are superseded by `0.4.0-rc.3`; do not install them, and
+upgrade an installation on either to `0.4.0-rc.3` with `helm upgrade` and
+`--version 0.4.0-rc.3`. The upgrade needs no change to the values; read the
+invitation note below before you run it.
+
+Release 0.4.0-rc.3 adds one license migration, `0025`, compared with 0.3.0
+and 0.4.0-rc.2, and changes nothing in the chart's templates, values or
+Secrets. The migration changes no table: it adds the `ALLOW_MEMBERS_TO_INVITE`
+row to the instance configuration with the value `0` and never overwrites a
+row that is already there. It runs in the chart's migration Job with the
+others and needs no step of its own. Upgrade from 0.3.0 or 0.4.0-rc.2 with
+`helm upgrade` and `--version 0.4.0-rc.3`; Helm does not select a release
+candidate otherwise. Compared with 0.4.0-rc.2, three images change. The `api`
+image makes workspace invitations an admin's act: after the upgrade, workspace
+members can no longer invite people, change or withdraw pending invitations,
+or see the pending-invitation list, until an operator turns on **God Mode →
+Workspaces → Members can invite to workspaces**; even then a member sees and
+manages only the invitations they sent. Workspace admins are unaffected, and
+invitations already pending stay valid. The `api` image also rate limits
+setting a first password, per account and per client address. The `admin`
+image adds that switch. The `web` image moves its shell, sign-in and
+onboarding, projects, and workspace, project and account settings to the
+upstream Plane 1.5.0 components, keeps a new API token's secret out of its
+cached token list, and offers the invitation controls only where the server
+accepts them. The `space` and `live` application code is unchanged. The
+installer changes in this candidate, which name the requested release in the
+upgrade output, concern Docker Compose and Swarm; nothing changes on
+Kubernetes. Rolling back to 0.3.0 needs no schema change and no change to the
+values: the configuration row stays and 0.3.0 does not read it. Rolling back
+gives workspace members their previous invitation rights again.
 
 Release 0.4.0-rc.2 adds no database or license migration compared with 0.3.0
 or 0.4.0-rc.1 and changes nothing in the chart's templates, values or Secrets.
