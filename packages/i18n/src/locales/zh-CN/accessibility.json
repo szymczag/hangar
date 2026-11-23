@@ -43,7 +43,8 @@
       "swatches": "预设颜色"
     },
     "common": {
-      "more_actions": "更多操作"
+      "more_actions": "更多操作",
+      "remove": "移除"
     }
   }
 }

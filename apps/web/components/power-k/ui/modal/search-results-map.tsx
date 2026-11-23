@@ -4,9 +4,15 @@
  * See the LICENSE file for details.
  */
 
-import { Briefcase, FileText, Layers, LayoutGrid } from "lucide-react";
+import {
+  CyclesOutline,
+  DocumentationOutline,
+  GridOutline,
+  ModuleOutline,
+  ProjectsOutline,
+  WorkItemsOutline,
+} from "@makeplane/propel/icons";
 // plane imports
-import { ContrastIcon, DiceIcon } from "@plane/propel/icons";
 import type {
   IWorkspaceDefaultSearchResult,
   IWorkspaceIssueSearchResult,
@@ -21,6 +27,8 @@ import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifi
 
 export type TPowerKSearchResultGroupDetails = {
   icon?: React.ComponentType<{ className?: string }>;
+  /** Rendered before the name and kept out of its truncation, e.g. a work item identifier. */
+  iconNode?: (item: any) => React.ReactNode;
   itemName: (item: any) => React.ReactNode;
   path: (item: any, projectId: string | undefined) => string;
   title: string;
@@ -28,10 +36,11 @@ export type TPowerKSearchResultGroupDetails = {
 
 export const POWER_K_SEARCH_RESULTS_GROUPS_MAP: Record<TPowerKSearchResultsKeys, TPowerKSearchResultGroupDetails> = {
   cycle: {
-    icon: ContrastIcon,
+    icon: CyclesOutline,
     itemName: (cycle: IWorkspaceDefaultSearchResult) => (
-      <p>
-        <span className="text-11 text-tertiary">{cycle.project__identifier}</span> {cycle.name}
+      <p className="flex min-w-0 items-center gap-1">
+        <span className="shrink-0 text-caption-sm-regular text-tertiary">{cycle.project__identifier}</span>
+        <span className="truncate">{cycle.name}</span>
       </p>
     ),
     path: (cycle: IWorkspaceDefaultSearchResult) =>
@@ -39,18 +48,16 @@ export const POWER_K_SEARCH_RESULTS_GROUPS_MAP: Record<TPowerKSearchResultsKeys,
     title: "Cycles",
   },
   issue: {
-    itemName: (workItem: IWorkspaceIssueSearchResult) => (
-      <div className="flex gap-2">
-        <IssueIdentifier
-          projectId={workItem.project_id}
-          issueTypeId={workItem.type_id}
-          projectIdentifier={workItem.project__identifier}
-          issueSequenceId={workItem.sequence_id}
-          size="xs"
-        />{" "}
-        {workItem.name}
-      </div>
+    iconNode: (workItem: IWorkspaceIssueSearchResult) => (
+      <IssueIdentifier
+        projectId={workItem.project_id}
+        issueTypeId={workItem.type_id}
+        projectIdentifier={workItem.project__identifier}
+        issueSequenceId={workItem.sequence_id}
+        size="xs"
+      />
     ),
+    itemName: (workItem: IWorkspaceIssueSearchResult) => workItem.name,
     path: (workItem: IWorkspaceIssueSearchResult) =>
       generateWorkItemLink({
         workspaceSlug: workItem?.workspace__slug,
@@ -62,10 +69,11 @@ export const POWER_K_SEARCH_RESULTS_GROUPS_MAP: Record<TPowerKSearchResultsKeys,
     title: "Work items",
   },
   issue_view: {
-    icon: Layers,
+    icon: WorkItemsOutline,
     itemName: (view: IWorkspaceDefaultSearchResult) => (
-      <p>
-        <span className="text-11 text-tertiary">{view.project__identifier}</span> {view.name}
+      <p className="flex min-w-0 items-center gap-1">
+        <span className="shrink-0 text-caption-sm-regular text-tertiary">{view.project__identifier}</span>
+        <span className="truncate">{view.name}</span>
       </p>
     ),
     path: (view: IWorkspaceDefaultSearchResult) =>
@@ -73,10 +81,11 @@ export const POWER_K_SEARCH_RESULTS_GROUPS_MAP: Record<TPowerKSearchResultsKeys,
     title: "Views",
   },
   module: {
-    icon: DiceIcon,
+    icon: ModuleOutline,
     itemName: (module: IWorkspaceDefaultSearchResult) => (
-      <p>
-        <span className="text-11 text-tertiary">{module.project__identifier}</span> {module.name}
+      <p className="flex min-w-0 items-center gap-1">
+        <span className="shrink-0 text-caption-sm-regular text-tertiary">{module.project__identifier}</span>
+        <span className="truncate">{module.name}</span>
       </p>
     ),
     path: (module: IWorkspaceDefaultSearchResult) =>
@@ -84,10 +93,11 @@ export const POWER_K_SEARCH_RESULTS_GROUPS_MAP: Record<TPowerKSearchResultsKeys,
     title: "Modules",
   },
   page: {
-    icon: FileText,
+    icon: DocumentationOutline,
     itemName: (page: IWorkspacePageSearchResult) => (
-      <p>
-        <span className="text-11 text-tertiary">{page.project__identifiers?.[0]}</span> {page.name}
+      <p className="flex min-w-0 items-center gap-1">
+        <span className="shrink-0 text-caption-sm-regular text-tertiary">{page.project__identifiers?.[0]}</span>
+        <span className="truncate">{page.name}</span>
       </p>
     ),
     path: (page: IWorkspacePageSearchResult, projectId: string | undefined) => {
@@ -100,13 +110,13 @@ export const POWER_K_SEARCH_RESULTS_GROUPS_MAP: Record<TPowerKSearchResultsKeys,
     title: "Pages",
   },
   project: {
-    icon: Briefcase,
+    icon: ProjectsOutline,
     itemName: (project: IWorkspaceProjectSearchResult) => project?.name,
     path: (project: IWorkspaceProjectSearchResult) => `/${project?.workspace__slug}/projects/${project?.id}/issues/`,
     title: "Projects",
   },
   workspace: {
-    icon: LayoutGrid,
+    icon: GridOutline,
     itemName: (workspace: IWorkspaceSearchResult) => workspace?.name,
     path: (workspace: IWorkspaceSearchResult) => `/${workspace?.slug}/`,
     title: "Workspaces",

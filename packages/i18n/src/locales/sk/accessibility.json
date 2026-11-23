@@ -43,7 +43,8 @@
       "swatches": "Prednastavené farby"
     },
     "common": {
-      "more_actions": "Ďalšie akcie"
+      "more_actions": "Ďalšie akcie",
+      "remove": "Odstrániť"
     }
   }
 }

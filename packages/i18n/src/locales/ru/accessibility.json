@@ -43,7 +43,8 @@
       "swatches": "Готовые цвета"
     },
     "common": {
-      "more_actions": "Другие действия"
+      "more_actions": "Другие действия",
+      "remove": "Удалить"
     }
   }
 }

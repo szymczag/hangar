@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useTheme } from "next-themes";
 // icons
-import { Lightbulb } from "lucide-react";
+import { ThoughtsOutline } from "@makeplane/propel/icons";
 import { SOURCE_CODE_URL } from "@plane/constants";
 // images
 import latestFeatures from "@/app/assets/onboarding/onboarding-pages.webp?url";
@@ -18,11 +18,11 @@ export function LatestFeatureBlock() {
   return (
     <>
       <div className="mx-auto mt-16 flex rounded-[3.5px] border border-subtle bg-surface-1 py-2 sm:w-96">
-        <Lightbulb className="mx-3 mr-2 h-7 w-7" />
-        <p className="text-left text-13 text-primary">
+        <ThoughtsOutline className="mx-3 mr-2 h-7 w-7" />
+        <p className="text-left text-body-xs-regular text-primary">
           See what is new in Hangar.{" "}
           <Link href={`${SOURCE_CODE_URL}/releases`} target="_blank" rel="noopener noreferrer">
-            <span className="text-13 font-medium underline hover:cursor-pointer">View releases</span>
+            <span className="text-body-xs-medium underline hover:cursor-pointer">View releases</span>
           </Link>
         </p>
       </div>

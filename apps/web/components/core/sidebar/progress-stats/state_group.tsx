@@ -6,7 +6,7 @@
 
 import { observer } from "mobx-react";
 // plane imports
-import { StateGroupIcon } from "@plane/propel/icons";
+import { StateGroupIcon } from "@plane/blocks/icons";
 import type { TStateGroups } from "@plane/types";
 // components
 import { SingleProgressStats } from "@/components/core/sidebar/single-progress-stats";
@@ -30,13 +30,13 @@ export const StateGroupStatComponent = observer(function StateGroupStatComponent
 
   return (
     <div>
-      {distribution.map((group, index) => (
+      {distribution.map((group) => (
         <SingleProgressStats
-          key={index}
+          key={group.state}
           title={
             <div className="flex items-center gap-2">
               <StateGroupIcon stateGroup={group.state as TStateGroups} />
-              <span className="text-11 capitalize">{group.state}</span>
+              <span className="text-body-xs-regular capitalize">{group.state}</span>
             </div>
           }
           completed={group.completed}

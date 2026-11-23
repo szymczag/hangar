@@ -43,7 +43,8 @@
       "swatches": "Culori predefinite"
     },
     "common": {
-      "more_actions": "Mai multe acțiuni"
+      "more_actions": "Mai multe acțiuni",
+      "remove": "Elimină"
     }
   }
 }

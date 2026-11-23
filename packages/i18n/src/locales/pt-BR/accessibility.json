@@ -43,7 +43,8 @@
       "swatches": "Cores predefinidas"
     },
     "common": {
-      "more_actions": "Mais ações"
+      "more_actions": "Mais ações",
+      "remove": "Remover"
     }
   }
 }

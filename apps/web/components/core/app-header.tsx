@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { observer } from "mobx-react";
 // plane imports
-import { Row } from "@plane/ui";
+import { Row } from "@plane/blocks/layout";
 // components
 import { cn } from "@plane/utils";
 import { ExtendedAppHeader } from "@/components/common/extended-app-header";
@@ -24,7 +24,7 @@ export const AppHeader = observer(function AppHeader(props: AppHeaderProps) {
 
   return (
     <div className={cn("z-[18]", className)}>
-      <Row className={cn("flex h-11 w-full items-center gap-2 border-b border-subtle bg-surface-1", rowClassName)}>
+      <Row className={cn("flex h-12 w-full items-center gap-2 border-b border-subtle bg-surface-1", rowClassName)}>
         <ExtendedAppHeader header={header} />
       </Row>
       {/* eslint-disable-next-line oxc/const-comparisons */}
