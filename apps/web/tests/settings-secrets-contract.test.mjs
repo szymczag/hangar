@@ -105,10 +105,10 @@ test("inviting is offered only where the server accepts it", () => {
   const list = read("components/workspace/settings/members-list.tsx");
   assert.match(
     list,
-    /if \(canSeeInvitations\) await fetchWorkspaceMemberInvitations\(/,
+    /slug \? \["WORKSPACE_MEMBERS_AND_MEMBER_INVITATIONS", slug, canSeeInvitations\] : null[\s\S]*?if \(withInvitations\) await fetchWorkspaceMemberInvitations\(/,
     "the invitation list is refused to others, so it must not be requested"
   );
-  assert.match(list, /\{canSeeInvitations && searchedInvitationsIds/);
+  assert.match(list, /\{canSeeInvitations && <PendingInvitations /);
 
   const row = read("components/workspace/settings/invitations-list-item.tsx");
   assert.match(row, /const canManageInvitation = canManageWorkspaceInvitation\(/);
