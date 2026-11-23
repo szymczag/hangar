@@ -21,6 +21,9 @@ import { useMember } from "@/hooks/store/use-member";
 import { WorkspaceInvitationsListItem } from "./invitations-list-item";
 import { WorkspaceMembersListItem } from "./members-list-item";
 
+// One shared empty list, so a workspace with no pending invitations does not hand the child a new array each render.
+const NO_INVITATIONS: string[] = [];
+
 /** Shown only to callers the invitation list endpoint answers. */
 const PendingInvitations = observer(function PendingInvitations(props: { invitationIds: string[] }) {
   const { invitationIds } = props;
@@ -112,7 +115,7 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
           />
         )}
       </div>
-      {canSeeInvitations && <PendingInvitations invitationIds={searchedInvitationsIds ?? []} />}
+      {canSeeInvitations && <PendingInvitations invitationIds={searchedInvitationsIds ?? NO_INVITATIONS} />}
     </>
   );
 });
