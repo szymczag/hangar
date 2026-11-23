@@ -6,13 +6,15 @@
 
 import { useMemo, useState } from "react";
 import { observer } from "mobx-react";
-import { Search, X } from "lucide-react";
 // Hangar imports
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { CloseOutline, SearchOutline } from "@makeplane/propel/icons";
+import { Logo } from "@plane/blocks/emoji-icon-picker";
 import { EUserPermissions } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { Logo } from "@plane/propel/emoji-icon-picker";
-import { Input } from "@plane/ui";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 
@@ -45,29 +47,33 @@ export const ProjectSourcePicker = observer(function ProjectSourcePicker(props: 
   return (
     <div className="flex flex-col gap-4 p-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-16 font-medium text-primary">{t("start_from_an_existing_project")}</h3>
-        <button type="button" onClick={onCancel} aria-label={t("cancel")} className="text-placeholder">
-          <X className="size-4" />
-        </button>
-      </div>
-
-      <p className="text-13 text-secondary">{t("choose_a_project_to_copy")}</p>
-
-      <div className="relative">
-        <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-placeholder" />
-        <Input
-          type="text"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("search")}
-          className="w-full pl-8"
-          autoComplete="off"
+        <h3 className="text-h5-medium text-primary">{t("start_from_an_existing_project")}</h3>
+        <IconButton
+          variant="ghost"
+          size="sm"
+          aria-label={t("cancel")}
+          icon={<Icon icon={CloseOutline} />}
+          onClick={onCancel}
         />
       </div>
 
+      <p className="text-body-sm-regular text-secondary">{t("choose_a_project_to_copy")}</p>
+
+      <InputField
+        size="lg"
+        orientation="vertical"
+        type="text"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder={t("search")}
+        aria-label={t("search")}
+        startIcon={<Icon icon={SearchOutline} />}
+        autoComplete="off"
+      />
+
       <div className="max-h-72 overflow-y-auto">
         {candidates.length === 0 ? (
-          <p className="py-6 text-center text-13 text-placeholder">{t("no_projects_to_copy")}</p>
+          <p className="py-6 text-center text-body-sm-regular text-placeholder">{t("no_projects_to_copy")}</p>
         ) : (
           candidates.map((project) => (
             <button
@@ -79,17 +85,17 @@ export const ProjectSourcePicker = observer(function ProjectSourcePicker(props: 
               <span className="grid size-5 flex-shrink-0 place-items-center">
                 <Logo logo={project!.logo_props} size={16} />
               </span>
-              <span className="truncate text-13 text-primary">{project!.name}</span>
-              <span className="ml-auto flex-shrink-0 text-11 text-placeholder">{project!.identifier}</span>
+              <span className="truncate text-body-sm-regular text-primary">{project!.name}</span>
+              <span className="ml-auto flex-shrink-0 text-caption-md-regular text-placeholder">
+                {project!.identifier}
+              </span>
             </button>
           ))
         )}
       </div>
 
       <div className="flex justify-end">
-        <Button variant="secondary" size="sm" onClick={onCancel}>
-          {t("cancel")}
-        </Button>
+        <Button variant="secondary" size="md" stretch="auto" label={t("cancel")} onClick={onCancel} />
       </div>
     </div>
   );
