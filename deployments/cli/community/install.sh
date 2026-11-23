@@ -25,9 +25,6 @@ CPU_ARCH=$(uname -m)
 OS_NAME=$(uname)
 UPPER_CPU_ARCH=$(tr '[:lower:]' '[:upper:]' <<< "$CPU_ARCH")
 
-mkdir -p "$PLANE_INSTALL_DIR"
-# Holds earlier copies of plane.env: owner only, like plane.env itself.
-( umask 077 && mkdir -p "$PLANE_INSTALL_DIR/archive" )
 DOCKER_FILE_PATH=$PLANE_INSTALL_DIR/docker-compose.yaml
 # Written after a local image build; points the Hangar services at those images.
 DOCKER_OVERRIDE_PATH=$PLANE_INSTALL_DIR/docker-compose.override.yaml
@@ -57,6 +54,14 @@ HANGAR_REQUIRE_SIGNATURE=${HANGAR_REQUIRE_SIGNATURE:-0}
 SCRIPT_RELEASE_WARNED=0
 # Set by upgrade: the directory holding the verified files of the new release.
 STAGED_DEPLOYMENT_DIR=""
+
+# Creates the install directory, and archive/, which holds earlier copies of
+# plane.env: owner only, like plane.env itself. Every action but update-script
+# calls it, so update-script run where nothing is installed creates nothing.
+function createInstallDir() {
+    mkdir -p "$PLANE_INSTALL_DIR"
+    ( umask 077 && mkdir -p "$PLANE_INSTALL_DIR/archive" )
+}
 
 function print_header() {
 if [ "$HANGAR_ASSUME_YES" != "1" ] && [ -t 1 ]; then
@@ -1108,7 +1113,7 @@ function finishDownload() {
     echo ""
     echo "Most recent version of Hangar is now available for you to use"
     echo ""
-    echo "In case of 'Upgrade', please check the 'plane.env 'file for any new variables and update them accordingly"
+    echo "In case of 'Upgrade', please check the 'plane.env' file for any new variables and update them accordingly"
     echo ""
 }
 # The bundled object storage moved from MinIO to SeaweedFS, which cannot read
@@ -1230,34 +1235,40 @@ function restartServices() {
     startServices
 }
 function upgrade() {
-    local latest_release
+    # target: the release to upgrade to; target_name: how the messages name it,
+    # since HANGAR_RELEASE may name any release, not only the latest one.
+    local target target_name target_heading
     checkSecretKeyRotation || exit 1
     if [ -n "$HANGAR_RELEASE" ]; then
-        latest_release=${HANGAR_RELEASE#hangar-}
+        target=${HANGAR_RELEASE#hangar-}
+        target_name="release $target (from HANGAR_RELEASE)"
+        target_heading="Requested release"
     else
-        latest_release=$(checkLatestRelease) || exit 1
+        target=$(checkLatestRelease) || exit 1
+        target_name="the latest release ($target)"
+        target_heading="Latest release"
     fi
 
     echo ""
     echo "Current release: $APP_RELEASE"
 
-    if [ "$latest_release" == "$APP_RELEASE" ]; then
+    if [ "$target" == "$APP_RELEASE" ]; then
         echo ""
-        echo "You are already using the latest release"
+        echo "You are already using $target_name"
         warnScriptRelease
         exit 0
     fi
 
-    echo "Latest release: $latest_release"
+    echo "$target_heading: $target"
     echo ""
     # Before the prompt, so a refusal leaves everything as it was.
-    checkScriptRelease "$latest_release" upgrade || exit 1
+    checkScriptRelease "$target" upgrade || exit 1
 
     # Check for confirmation to upgrade
     if [ "$HANGAR_ASSUME_YES" == "1" ]; then
-        echo "Upgrading to the latest release ($latest_release) without asking (HANGAR_ASSUME_YES=1)."
+        echo "Upgrading to $target_name without asking (HANGAR_ASSUME_YES=1)."
     else
-        echo "Do you want to upgrade to the latest release ($latest_release)?"
+        echo "Do you want to upgrade to $target_name?"
         read -p "Continue? [y/N]: " confirm
 
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -1266,14 +1277,14 @@ function upgrade() {
         fi
     fi
 
-    export APP_RELEASE=$latest_release
+    export APP_RELEASE=$target
 
-    echo "Upgrading Hangar to the latest release..."
+    echo "Upgrading Hangar to release $target..."
     echo ""
 
     # Download and verify the new release while the installed one keeps
     # running, so a download that fails or does not verify leaves it running.
-    echo "***** DOWNLOADING AND VERIFYING RELEASE $latest_release ****"
+    echo "***** DOWNLOADING AND VERIFYING RELEASE $target ****"
     STAGED_DEPLOYMENT_DIR=$(mktemp -d "$PLANE_INSTALL_DIR/.download.XXXXXX") || exit 1
     trap 'rm -rf "$STAGED_DEPLOYMENT_DIR"' EXIT
     if ! stageDeploymentFiles "$STAGED_DEPLOYMENT_DIR"; then
@@ -1286,7 +1297,7 @@ function upgrade() {
     stopServices
 
     echo
-    echo "***** DOWNLOADING STABLE VERSION ****"
+    echo "***** INSTALLING RELEASE $target ****"
     install
 
     if objectStorageMigrationPending; then
@@ -1582,6 +1593,10 @@ for arg in "$@"; do
 done
 set -- "${ACTION_ARGS[@]}"
 
+# update-script replaces only this script, so it leaves the directory alone.
+if [ "${1:-}" != "update-script" ]; then
+    createInstallDir
+fi
 print_header
 protectEnvFiles
 askForAction "$@"
