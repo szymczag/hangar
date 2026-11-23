@@ -16,20 +16,22 @@ import type {
 } from "react-hook-form";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 // icons
-import { usePopper } from "react-popper";
-import { XCircle } from "lucide-react";
-import { Listbox } from "@headlessui/react";
+import { AddOutline, CloseCircleOutline } from "@makeplane/propel/icons";
 // plane imports
+import { Field } from "@makeplane/propel/components/field";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
 import type { EUserPermissions } from "@plane/constants";
 import { ROLE, ROLE_DETAILS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 // types
-import { Button } from "@plane/propel/button";
-import { PlusIcon, CheckIcon, ChevronDownIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { Button as ButtonElement } from "@makeplane/propel/elements/button";
+import { setToast } from "@plane/blocks/toast";
 import type { IUser, IWorkspace } from "@plane/types";
 // ui
-import { Input, Spinner } from "@plane/ui";
+import { Select, SelectDropdownPlacementContext } from "@plane/blocks/select";
+import { Spinner } from "@plane/blocks/spinner";
+import { cn } from "@plane/utils";
 // services
 import { WorkspaceService } from "@/services/workspace.service";
 // components
@@ -66,8 +68,17 @@ type InviteMemberFormProps = {
   setIsInvitationDisabled: (value: boolean) => void;
 };
 
+type TRoleOption = { key: EUserPermissions; i18n_title: string; i18n_description: string };
+
 // services
 const workspaceService = new WorkspaceService();
+const roleOptions: TRoleOption[] = Object.entries(ROLE_DETAILS).map(([key, details]) => ({
+  key: parseInt(key) as EUserPermissions,
+  i18n_title: details.i18n_title,
+  i18n_description: details.i18n_description,
+}));
+// legacy role picker opened at bottom-end (right-column trigger), so align the panel to its end edge
+const ROLE_SELECT_PLACEMENT = { side: "bottom", align: "end" } as const;
 const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
 const placeholderEmails = [
@@ -95,9 +106,6 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
     getValues,
     watch,
   } = props;
-
-  const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
 
   const { t } = useTranslation();
 
@@ -127,18 +135,6 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
     }
   };
 
-  const { styles, attributes } = usePopper(referenceElement, popperElement, {
-    placement: "bottom-end",
-    modifiers: [
-      {
-        name: "preventOverflow",
-        options: {
-          padding: 12,
-        },
-      },
-    ],
-  });
-
   return (
     <div>
       <div className="group relative grid grid-cols-10 gap-4">
@@ -153,21 +149,24 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
               },
             }}
             render={({ field: { value, onChange, ref } }) => (
-              <Input
-                id={`emails.${index}.email`}
-                name={`emails.${index}.email`}
-                type="text"
-                value={value}
-                onChange={(event) => {
-                  emailOnChange(event);
-                  onChange(event);
-                }}
-                ref={ref}
-                hasError={Boolean(errors.emails?.[index]?.email)}
-                placeholder={placeholderEmails[index % placeholderEmails.length]}
-                className="w-full border-strong text-11 placeholder:text-placeholder sm:text-13"
-                autoComplete="off"
-              />
+              <Field name="input" invalid={Boolean(errors.emails?.[index]?.email)}>
+                <InputGroup size="2xl">
+                  <Input
+                    size="2xl"
+                    id={`emails.${index}.email`}
+                    name={`emails.${index}.email`}
+                    type="text"
+                    value={value}
+                    onChange={(event) => {
+                      emailOnChange(event);
+                      onChange(event);
+                    }}
+                    ref={ref}
+                    placeholder={placeholderEmails[index % placeholderEmails.length]}
+                    autoComplete="off"
+                  />
+                </InputGroup>
+              </Field>
             )}
           />
         </div>
@@ -177,71 +176,32 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
             name={`emails.${index}.role`}
             rules={{ required: true }}
             render={({ field: { value, onChange } }) => (
-              <Listbox
-                as="div"
-                value={value}
-                onChange={(val) => {
-                  onChange(val);
-                  setValue(`emails.${index}.role_active`, true);
-                }}
-                className="w-full flex-shrink-0 text-left"
-              >
-                <Listbox.Button
-                  type="button"
-                  ref={setReferenceElement}
-                  className="flex w-full items-center justify-between gap-1 rounded-md border-[0.5px] border-strong px-2.5 py-2 text-13"
+              <SelectDropdownPlacementContext.Provider value={ROLE_SELECT_PLACEMENT}>
+                <Select<TRoleOption>
+                  value={roleOptions.find((role) => role.key === value) ?? null}
+                  onChange={(val) => {
+                    onChange(Number(val) as EUserPermissions);
+                    setValue(`emails.${index}.role_active`, true);
+                  }}
+                  getValues={() => roleOptions}
+                  getOptionValue={(role) => String(role.key)}
+                  getOptionLabel={(role) => t(role.i18n_title)}
+                  getOptionDescription={(role) => t(role.i18n_description)}
+                  showSearch={false}
+                  pinSelected={false}
                 >
-                  <span
-                    className={`text-13 ${
-                      !getValues(`emails.${index}.role_active`) ? "text-placeholder" : "text-primary"
-                    } sm:text-13`}
-                  >
-                    {ROLE[value]}
-                  </span>
-
-                  <ChevronDownIcon
-                    className={`size-3 ${
-                      !getValues(`emails.${index}.role_active`) ? "stroke-placeholder" : "stroke-primary"
-                    }`}
-                  />
-                </Listbox.Button>
-
-                <Listbox.Options
-                  as="div"
-                  className="z-10"
-                  data-prevent-outside-click
-                  modal={false}
-                  portal
-                  ref={setPopperElement}
-                  style={styles.popper}
-                  {...attributes.popper}
-                >
-                  <div className="shadow-sm absolute z-10 mt-1 h-fit w-48 space-y-1 rounded-md border border-strong bg-surface-1 p-2 focus:outline-none sm:w-60">
-                    {Object.entries(ROLE_DETAILS).map(([key, value]) => (
-                      <Listbox.Option
-                        as="div"
-                        key={key}
-                        value={parseInt(key)}
-                        className={({ active, selected }) =>
-                          `cursor-pointer truncate rounded-sm px-1 py-1.5 select-none ${
-                            active || selected ? "bg-onboarding-background-400/40" : ""
-                          } ${selected ? "text-primary" : "text-secondary"}`
-                        }
-                      >
-                        {({ selected }) => (
-                          <div className="flex items-center gap-2 p-1 text-wrap">
-                            <div className="flex flex-col">
-                              <div className="text-13 font-medium">{t(value.i18n_title)}</div>
-                              <div className="flex text-11 text-tertiary">{t(value.i18n_description)}</div>
-                            </div>
-                            {selected && <CheckIcon className="h-4 w-4 shrink-0" />}
-                          </div>
-                        )}
-                      </Listbox.Option>
-                    ))}
-                  </div>
-                </Listbox.Options>
-              </Listbox>
+                  <Select.Trigger<TRoleOption> variant="select-2xl">
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-left text-body-xs-regular",
+                        getValues(`emails.${index}.role_active`) ? "text-primary" : "text-placeholder"
+                      )}
+                    >
+                      {ROLE[value]}
+                    </span>
+                  </Select.Trigger>
+                </Select>
+              </SelectDropdownPlacementContext.Provider>
             )}
           />
         </div>
@@ -251,14 +211,16 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
             className="absolute right-0 hidden place-items-center self-center rounded-sm group-hover:grid"
             onClick={() => remove(index)}
           >
-            <XCircle className="h-5 w-5 pl-0.5 text-placeholder" />
+            <CloseCircleOutline className="h-5 w-5 pl-0.5 text-placeholder" />
           </button>
         )}
       </div>
       {email && !emailRegex.test(email) && (
         <div className="mx-8 my-1">
-          <span className="text-13">🤥</span>{" "}
-          <span className="mt-1 text-11 text-danger-primary">That doesn{"'"}t look like an email address.</span>
+          <span className="text-body-xs-regular">🤥</span>{" "}
+          <span className="mt-1 text-caption-sm-regular text-danger-primary">
+            That doesn{"'"}t look like an email address.
+          </span>
         </div>
       )}
     </div>
@@ -303,15 +265,15 @@ export function InviteMembers(props: Props) {
       })
       .then(async () => {
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: "Success!",
           message: "Invitations sent successfully.",
         });
-        await nextStep();
+        return nextStep();
       })
       .catch((err) => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: err?.error,
         });
@@ -342,7 +304,7 @@ export function InviteMembers(props: Props) {
       <div className="h-full w-full overflow-auto px-6 py-10 sm:px-7 sm:py-14 md:px-14 lg:px-28">
         <div className="mx-auto mt-6 flex w-full flex-col items-center justify-center p-8 md:w-4/5">
           <div className="mx-auto w-4/5 space-y-1 py-4 text-center">
-            <h3 className="text-24 font-bold text-primary">Invite your teammates</h3>
+            <h3 className="text-h3-bold text-primary">Invite your teammates</h3>
             <p className="font-medium text-placeholder">
               Work in plane happens best with your team. Invite them now to use Hangar to its potential.
             </p>
@@ -354,10 +316,10 @@ export function InviteMembers(props: Props) {
               if (e.code === "Enter") e.preventDefault();
             }}
           >
-            <div className="w-full py-4 text-13">
+            <div className="w-full py-4 text-body-xs-regular">
               <div className="group relative mx-8 grid grid-cols-10 gap-4 py-2">
-                <div className="col-span-6 px-1 text-13 font-medium text-secondary">Email</div>
-                <div className="col-span-4 px-1 text-13 font-medium text-secondary">Role</div>
+                <div className="col-span-6 px-1 text-body-xs-medium text-secondary">Email</div>
+                <div className="col-span-4 px-1 text-body-xs-medium text-secondary">Role</div>
               </div>
               <div className="mb-3 space-y-3 sm:space-y-4">
                 {fields.map((field, index) => (
@@ -379,26 +341,24 @@ export function InviteMembers(props: Props) {
               </div>
               <button
                 type="button"
-                className="mx-8 flex items-center gap-1.5 bg-transparent text-13 font-medium text-accent-primary outline-accent-strong"
+                className="mx-8 flex items-center gap-1.5 bg-transparent text-body-xs-medium text-accent-primary outline-accent-strong"
                 onClick={appendField}
               >
-                <PlusIcon className="h-4 w-4" strokeWidth={2} />
+                <AddOutline className="h-4 w-4" />
                 Add another
               </button>
             </div>
             <div className="mx-auto flex w-full max-w-96 flex-col items-center justify-center gap-4 px-8 sm:px-2">
-              <Button
+              <ButtonElement
                 variant="primary"
                 type="submit"
-                size="xl"
-                className="w-full"
+                size="lg"
+                stretch="full"
                 disabled={isInvitationDisabled || !isValid || isSubmitting}
               >
                 {isSubmitting ? <Spinner height="20px" width="20px" /> : "Continue"}
-              </Button>
-              <Button variant="ghost" size="xl" className="w-full" onClick={nextStep}>
-                I’ll do it later
-              </Button>
+              </ButtonElement>
+              <Button variant="ghost" size="lg" stretch="full" onClick={nextStep} label="I’ll do it later" />
             </div>
           </form>
         </div>

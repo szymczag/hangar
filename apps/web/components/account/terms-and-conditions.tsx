@@ -22,7 +22,7 @@ const MESSAGES = {
 function LegalLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link href={href} className="text-secondary" target="_blank" rel="noopener noreferrer">
-      <span className="text-13 font-medium underline hover:cursor-pointer">{children}</span>
+      <span className="text-body-xs-medium underline hover:cursor-pointer">{children}</span>
     </Link>
   );
 }
@@ -45,7 +45,7 @@ export function TermsAndConditions({ authType = EAuthModes.SIGN_IN }: TermsAndCo
   return (
     <div className="flex flex-col items-center justify-center gap-1">
       {hasLegalLinks && (
-        <p className="text-center text-13 whitespace-pre-line text-tertiary">
+        <p className="text-center text-body-xs-regular whitespace-pre-line text-tertiary">
           {MESSAGES[authType]}
           {termsUrl && (
             <>
@@ -66,7 +66,7 @@ export function TermsAndConditions({ authType = EAuthModes.SIGN_IN }: TermsAndCo
           configuring terms and privacy dropped the source offer without anyone
           deciding to. The two are separate statements and now render as such. */}
       {showLicenseNotice && (
-        <p className="text-center text-13 text-tertiary">
+        <p className="text-center text-body-xs-regular text-tertiary">
           Hangar is open-source software under the AGPL-3.0 license.{" "}
           <LegalLink href={sourceUrl}>View source code</LegalLink>.
         </p>

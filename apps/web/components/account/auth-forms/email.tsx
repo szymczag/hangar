@@ -8,13 +8,13 @@ import type { FormEvent } from "react";
 import { useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
 // icons
-import { CircleAlert, XCircle } from "lucide-react";
+import { CloseCircleOutline, WarningCircleOutline } from "@makeplane/propel/icons";
 // plane imports
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
+import { InputField } from "@makeplane/propel/components/input-field";
 import type { IEmailCheckData } from "@plane/types";
-import { Input, Spinner } from "@plane/ui";
-import { cn, checkEmailValidity } from "@plane/utils";
+import { checkEmailValidity } from "@plane/utils";
 // helpers
 type TAuthEmailForm = {
   defaultEmail: string;
@@ -50,59 +50,56 @@ export const AuthEmailForm = observer(function AuthEmailForm(props: TAuthEmailFo
 
   return (
     <form onSubmit={handleFormSubmit} className="space-y-4">
-      <div className="space-y-1">
-        <label htmlFor="email" className="text-13 font-medium text-tertiary">
-          {t("auth.common.email.label")}
-        </label>
-        <div
-          className={cn(
-            `relative flex items-center rounded-md border bg-surface-1`,
-            !isFocused && Boolean(emailError?.email) ? `border-danger-strong` : `border-strong`
-          )}
-          onFocus={() => {
-            setIsFocused(true);
-          }}
-          onBlur={() => {
-            setIsFocused(false);
-          }}
-        >
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={t("auth.common.email.placeholder")}
-            className={`h-10 w-full border-0 disable-autofill-style placeholder:text-placeholder autofill:bg-danger-primary focus:bg-none active:bg-transparent`}
-            autoComplete="off"
-            autoFocus
-            ref={inputRef}
-          />
-          {email.length > 0 && (
+      <InputField
+        size="xl"
+        orientation="vertical"
+        label={t("auth.common.email.label")}
+        id="email"
+        name="email"
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder={t("auth.common.email.placeholder")}
+        autoComplete="off"
+        // oxlint-disable-next-line jsx-a11y/no-autofocus -- the sign-in page opens on its only field
+        autoFocus
+        ref={inputRef}
+        endIcon={
+          email.length > 0 && (
             <button
               type="button"
               onClick={() => {
                 setEmail("");
                 inputRef.current?.focus();
               }}
-              className="absolute right-3 grid size-5 place-items-center"
+              className="grid size-5 shrink-0 place-items-center"
               aria-label={t("aria_labels.auth_forms.clear_email")}
               tabIndex={-1}
             >
-              <XCircle className="size-5 stroke-placeholder" />
+              <CloseCircleOutline className="size-5 text-placeholder" />
             </button>
-          )}
-        </div>
-        {emailError?.email && !isFocused && (
-          <p className="flex items-center gap-1 px-0.5 text-11 text-danger-primary">
-            <CircleAlert height={12} width={12} />
-            {t(emailError.email)}
-          </p>
-        )}
-      </div>
-      <Button type="submit" variant="primary" className="w-full" size="xl" disabled={isButtonDisabled}>
-        {isSubmitting ? <Spinner height="20px" width="20px" /> : t("common.continue")}
-      </Button>
+          )
+        }
+        error={
+          emailError?.email && !isFocused ? (
+            <span className="flex items-center gap-1">
+              <WarningCircleOutline height={12} width={12} />
+              {t(emailError.email)}
+            </span>
+          ) : undefined
+        }
+      />
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        stretch="full"
+        disabled={isButtonDisabled}
+        loading={isSubmitting}
+        label={t("common.continue")}
+      />
     </form>
   );
 });

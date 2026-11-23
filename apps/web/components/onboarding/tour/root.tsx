@@ -7,8 +7,9 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
-import { Button } from "@plane/propel/button";
-import { CloseIcon, HangarLogo } from "@plane/propel/icons";
+import { Button } from "@makeplane/propel/components/button";
+import { HangarLogo } from "@plane/blocks/icons";
+import { CloseOutline } from "@makeplane/propel/icons";
 // assets
 import CyclesTour from "@/app/assets/onboarding/cycles.webp?url";
 import IssuesTour from "@/app/assets/onboarding/issues.webp?url";
@@ -98,10 +99,10 @@ export const TourRoot = observer(function TourRoot(props: TOnboardingTourProps) 
               <HangarLogo className="h-10 w-auto" />
             </div>
             <div className="flex flex-col overflow-y-auto p-6">
-              <h3 className="font-semibold sm:text-18">
+              <h3 className="font-semibold sm:text-h5-regular">
                 Welcome to Hangar, {currentUser?.first_name} {currentUser?.last_name}
               </h3>
-              <p className="mt-3 text-13 text-secondary">
+              <p className="mt-3 text-body-xs-regular text-secondary">
                 We{"'"}re glad that you decided to try out Hangar. You can now manage your projects with ease. Get
                 started by creating a project.
               </p>
@@ -109,15 +110,16 @@ export const TourRoot = observer(function TourRoot(props: TOnboardingTourProps) 
                 <div className="mt-12 flex items-center gap-6">
                   <Button
                     variant="primary"
+                    size="sm"
+                    stretch="auto"
+                    label="Take a Product Tour"
                     onClick={() => {
                       setStep("work-items");
                     }}
-                  >
-                    Take a Product Tour
-                  </Button>
+                  />
                   <button
                     type="button"
-                    className="bg-transparent text-11 font-medium text-accent-primary outline-subtle-1"
+                    className="bg-transparent text-caption-sm-medium text-accent-primary outline-subtle-1"
                     onClick={() => {
                       onComplete();
                     }}
@@ -136,7 +138,7 @@ export const TourRoot = observer(function TourRoot(props: TOnboardingTourProps) 
             className="fixed top-[19%] right-[9%] z-10 translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border border-strong bg-surface-1 p-1 sm:top-[11.5%] md:right-[24%] lg:right-[19%]"
             onClick={onComplete}
           >
-            <CloseIcon className="border-strong- h-3 w-3 text-primary" />
+            <CloseOutline className="border-strong- h-3 w-3 text-primary" />
           </button>
           <TourSidebar step={step} setStep={setStep} />
           <div className="col-span-10 h-full overflow-hidden lg:col-span-7">
@@ -148,31 +150,40 @@ export const TourRoot = observer(function TourRoot(props: TOnboardingTourProps) 
               <img src={currentStep?.image} className="h-full w-full object-cover" alt={currentStep?.title} />
             </div>
             <div className="flex h-1/2 flex-col overflow-y-auto p-4 sm:h-2/5">
-              <h3 className="font-semibold sm:text-18">{currentStep?.title}</h3>
-              <p className="mt-3 text-13 text-secondary">{currentStep?.description}</p>
+              <h3 className="font-semibold sm:text-h5-regular">{currentStep?.title}</h3>
+              <p className="mt-3 text-body-xs-regular text-secondary">{currentStep?.description}</p>
               <div className="mt-3 flex h-full items-end justify-between gap-4">
                 <div className="flex items-center gap-4">
                   {currentStep?.prevStep && (
-                    <Button variant="secondary" onClick={() => setStep(currentStep.prevStep ?? "welcome")}>
-                      Back
-                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      stretch="auto"
+                      label="Back"
+                      onClick={() => setStep(currentStep.prevStep ?? "welcome")}
+                    />
                   )}
                   {currentStep?.nextStep && (
-                    <Button variant="primary" onClick={() => setStep(currentStep.nextStep ?? "work-items")}>
-                      Next
-                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      stretch="auto"
+                      label="Next"
+                      onClick={() => setStep(currentStep.nextStep ?? "work-items")}
+                    />
                   )}
                 </div>
                 {currentStepIndex === TOUR_STEPS.length - 1 && (
                   <Button
                     variant="primary"
+                    size="sm"
+                    stretch="auto"
+                    label="Create your first project"
                     onClick={() => {
                       onComplete();
                       toggleCreateProjectModal(true);
                     }}
-                  >
-                    Create your first project
-                  </Button>
+                  />
                 )}
               </div>
             </div>

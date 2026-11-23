@@ -6,12 +6,20 @@
 
 import { observer } from "mobx-react";
 import { Controller, useForm } from "react-hook-form";
-import { Box, PenTool, Rocket, Monitor, RefreshCw } from "lucide-react";
+import {
+  CubeOutline,
+  MonitorOutline,
+  PenToolOutline,
+  RefreshOutline,
+  RocketOutline,
+  TickOutline,
+  ViewsOutline,
+} from "@makeplane/propel/icons";
 // plane imports
-import { Button } from "@plane/propel/button";
-import { CheckIcon, ViewsIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { setToast } from "@plane/blocks/toast";
 import type { TUserProfile } from "@plane/types";
+import { cn } from "@plane/utils";
 import { EOnboardingSteps } from "@plane/types";
 // hooks
 import { useUserProfile } from "@/hooks/store/user";
@@ -24,13 +32,13 @@ type Props = {
 };
 
 const ROLES = [
-  { id: "product-manager", label: "Product Manager", icon: Box },
-  { id: "engineering-manager", label: "Engineering Manager", icon: ViewsIcon },
-  { id: "designer", label: "Designer", icon: PenTool },
-  { id: "developer", label: "Developer", icon: Monitor },
-  { id: "founder-executive", label: "Founder/Executive", icon: Rocket },
-  { id: "operations-manager", label: "Operations Manager", icon: RefreshCw },
-  { id: "others", label: "Others", icon: Box },
+  { id: "product-manager", label: "Product Manager", icon: CubeOutline },
+  { id: "engineering-manager", label: "Engineering Manager", icon: ViewsOutline },
+  { id: "designer", label: "Designer", icon: PenToolOutline },
+  { id: "developer", label: "Developer", icon: MonitorOutline },
+  { id: "founder-executive", label: "Founder/Executive", icon: RocketOutline },
+  { id: "operations-manager", label: "Operations Manager", icon: RefreshOutline },
+  { id: "others", label: "Others", icon: CubeOutline },
 ];
 
 const defaultValues = {
@@ -59,18 +67,15 @@ export const RoleSetupStep = observer(function RoleSetupStep({ handleStepChange 
       role: formData.role,
     };
     try {
-      await Promise.all([
-        updateUserProfile(profileUpdatePayload),
-        // totalSteps > 2 && stepChange({ profile_complete: true }),
-      ]);
+      await updateUserProfile(profileUpdatePayload);
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Success",
         message: "Profile setup completed!",
       });
     } catch {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error",
         message: "Profile setup failed. Please try again!",
       });
@@ -87,15 +92,15 @@ export const RoleSetupStep = observer(function RoleSetupStep({ handleStepChange 
     handleStepChange(EOnboardingSteps.ROLE_SETUP);
   };
 
-  const isButtonDisabled = !isSubmitting && isValid ? false : true;
+  const isButtonDisabled = isSubmitting || !isValid;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-10">
       {/* Header */}
       <CommonOnboardingHeader title="What's your role?" description="Let's set up Hangar for how you work." />
       {/* Role Selection */}
-      <div className="flex flex-col gap-3">
-        <p className="text-body-sm-semibold text-placeholder">Select one</p>
+      <fieldset className="flex min-w-0 flex-col gap-3">
+        <legend className="mb-3 text-body-sm-semibold text-placeholder">Select one</legend>
         <Controller
           control={control}
           name="role"
@@ -103,7 +108,7 @@ export const RoleSetupStep = observer(function RoleSetupStep({ handleStepChange 
             required: "This field is required",
           }}
           render={({ field: { value, onChange } }) => (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               {ROLES.map((role) => {
                 const Icon = role.icon;
                 const isSelected = value === role.id;
@@ -111,46 +116,62 @@ export const RoleSetupStep = observer(function RoleSetupStep({ handleStepChange 
                 return (
                   <button
                     key={role.id}
+                    type="button"
+                    aria-pressed={isSelected}
                     onClick={(e) => {
                       e.stopPropagation();
                       e.preventDefault();
                       onChange(role.id);
                     }}
-                    className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 transition-all duration-200 ${
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:outline-none",
                       isSelected
-                        ? "border-accent-strong bg-accent-subtle text-accent-primary"
-                        : "border-subtle text-tertiary hover:border-strong"
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Icon className="size-3.5" />
-                      <span className="text-body-sm-semibold">{role.label}</span>
-                    </div>
-                    {isSelected && (
-                      <>
-                        <button
-                          className={`border-blue-500 flex size-4 items-center justify-center rounded-sm border-2 bg-accent-primary`}
-                        >
-                          <CheckIcon className="h-3 w-3 text-on-color" />
-                        </button>
-                      </>
+                        ? "border-accent-strong bg-accent-subtle"
+                        : "border-subtle bg-layer-2 hover:bg-layer-2-hover"
                     )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn("flex size-4 shrink-0 items-center justify-center rounded-sm border", {
+                        "border-accent-strong bg-accent-primary": isSelected,
+                        "border-strong bg-layer-1": !isSelected,
+                      })}
+                    >
+                      <TickOutline
+                        className={cn("size-3 text-on-color", {
+                          "opacity-100": isSelected,
+                          "opacity-0": !isSelected,
+                        })}
+                      />
+                    </span>
+                    <Icon className={cn("size-4 shrink-0", { "text-icon-accent-primary": isSelected })} />
+                    <span
+                      className={cn("min-w-0 flex-1 truncate text-body-sm-medium", {
+                        "text-accent-primary": isSelected,
+                        "text-primary": !isSelected,
+                      })}
+                    >
+                      {role.label}
+                    </span>
                   </button>
                 );
               })}
             </div>
           )}
         />
-        {errors.role && <span className="text-13 text-danger-primary">{errors.role.message}</span>}
-      </div>
+        {errors.role && <span className="text-body-xs-regular text-danger-primary">{errors.role.message}</span>}
+      </fieldset>
       {/* Action Buttons */}
       <div className="space-y-3">
-        <Button variant="primary" type="submit" className="w-full" size="xl" disabled={isButtonDisabled}>
-          Continue
-        </Button>
-        <Button variant="ghost" onClick={handleSkip} className="w-full text-tertiary" size="xl">
-          Skip
-        </Button>
+        <Button variant="primary" type="submit" stretch="full" size="lg" disabled={isButtonDisabled} label="Continue" />
+        <Button
+          variant="ghost"
+          onClick={handleSkip}
+          stretch="full"
+          size="lg"
+          render={<button type="button" />}
+          label="Skip"
+        />
       </div>
     </form>
   );
