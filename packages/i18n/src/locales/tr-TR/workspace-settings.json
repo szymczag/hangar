@@ -459,7 +459,7 @@
         },
         "app_available_description": "Kullanmaya başlamak için bir Pleyn workspeysi bağlayın",
         "client_id_and_secret": "Klayınt ID ve Sikrıt",
-        "client_id_and_secret_description": "Bu sikrıt anahtarı Peycislere kopyalayıp kaydedin. Kapat'a bastıktan sonra bu anahtarı tekrar göremezsiniz.",
+        "client_id_and_secret_description": "Bu gizli anahtarı kopyalayın ve güvenli bir yerde saklayın. Kapat düğmesine bastıktan sonra bu anahtarı bir daha göremezsiniz.",
         "client_id_and_secret_download": "Anahtarı buradan CSV olarak indirebilirsiniz.",
         "application_id": "Aplikasyon ID",
         "client_id": "Klayınt ID",

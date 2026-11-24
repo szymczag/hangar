@@ -459,7 +459,7 @@
         },
         "app_available_description": "连接Hangar工作空间以开始使用",
         "client_id_and_secret": "客户端ID和密钥",
-        "client_id_and_secret_description": "复制并保存此密钥。关闭后您将无法再次查看此密钥。",
+        "client_id_and_secret_description": "请复制此密钥并妥善保存。关闭后您将无法再次查看此密钥。",
         "client_id_and_secret_download": "您可以从这里下载包含密钥的CSV文件。",
         "application_id": "应用ID",
         "client_id": "客户端ID",
