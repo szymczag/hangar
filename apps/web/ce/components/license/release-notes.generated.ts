@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.4.0-rc.4",
+  version: "0.4.0",
   highlights: [
     "The worker's log no longer shows password-reset tokens, sign-in codes or invitation join tokens.",
-    "A member who sends an invitation can now see and manage it.",
+    "Published boards no longer reveal who is in the project.",
     "Workspace invitations are now an admin's act unless the instance hands them to members.",
+    "An outdated setup.sh now refuses to install or upgrade to a newer release.",
     "Setting a first password is now rate limited.",
-    "The set-password page now shows the form that sets a password.",
   ],
   upstream: {
     version: "1.4.3",
