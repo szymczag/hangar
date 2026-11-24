@@ -459,7 +459,7 @@
         },
         "app_available_description": "Připojte pracovní prostor Hangar pro začátek používání",
         "client_id_and_secret": "ID a Tajemství Klienta",
-        "client_id_and_secret_description": "Zkopírujte a uložte tento tajný klíč. Po kliknutí na Zavřít tento klíč již neuvidíte.",
+        "client_id_and_secret_description": "Zkopírujte tento tajný klíč a uložte jej na bezpečné místo. Po kliknutí na Zavřít jej již neuvidíte.",
         "client_id_and_secret_download": "Můžete si stáhnout CSV s klíčem odsud.",
         "application_id": "ID Aplikace",
         "client_id": "ID Klienta",

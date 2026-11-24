@@ -459,7 +459,7 @@
         },
         "app_available_description": "Conecta un espacio de trabajo de Hangar para comenzar a usarla",
         "client_id_and_secret": "ID y Secreto de Cliente",
-        "client_id_and_secret_description": "Copia y guarda esta clave secreta. No podrás ver esta clave después de hacer clic en Cerrar.",
+        "client_id_and_secret_description": "Copie esta clave secreta y guárdela en un lugar seguro. No podrá volver a verla después de hacer clic en Cerrar.",
         "client_id_and_secret_download": "Puedes descargar un CSV con la clave desde aquí.",
         "application_id": "ID de Aplicación",
         "client_id": "ID de Cliente",

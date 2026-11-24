@@ -43,6 +43,13 @@ test("the workspace import history", async ({ asUser }) => {
   // photographing one and a half of the two rows the story asserts. Scoping
   // also leaves the upload wizard out, which is a different surface with a file
   // input in it.
-  const history = main.getByRole("heading", { name: "Recent imports" }).locator("xpath=../..");
+  //
+  // The innermost section holding the heading, rather than a fixed number of
+  // ancestors: the Propel move wrapped the heading in `SettingsHeading`, and
+  // "two levels up" then photographed the heading alone.
+  const history = main
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Recent imports" }) })
+    .last();
   await capture(page, "workspace-imports", { ready: report, target: history });
 });

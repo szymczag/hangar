@@ -69,7 +69,7 @@ export function ProductUpdatesFooter() {
         )}
         rel="noreferrer"
       >
-        <HangarLogo className="h-4 w-auto" />
+        <HangarLogo themed className="h-4 w-auto" />
         {t("powered_by_plane_pages")}
       </a>
     </div>
