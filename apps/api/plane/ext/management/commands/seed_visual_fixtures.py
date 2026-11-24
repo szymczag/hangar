@@ -27,6 +27,7 @@ from django.db import transaction
 from plane.db.models import (
     DeployBoard,
     Issue,
+    IssueComment,
     IssueType,
     IssueLabel,
     IssueSequence,
@@ -170,6 +171,7 @@ class Command(BaseCommand):
         self._work_items(workspace, project, users["light"])
         self._work_item_properties(workspace, project)
         self._worklogs(workspace, project, users["light"])
+        self._comments(workspace, project, users["light"])
         self._shared_links(workspace, users)
         self._import_jobs(workspace, project, users["admin"])
         self._invitations(workspace, users["admin"])
@@ -203,6 +205,8 @@ class Command(BaseCommand):
             "workItems": [name for name, _ in WORK_ITEMS],
             # Published so the specs assert seeded content instead of strings
             "properties": [name for name, _, _ in Command.PROPERTIES],
+            # The first work item's comment, which the work item detail stories wait on.
+            "comment": Command.COMMENT,
             "invitations": [email for email, _ in Command.INVITATIONS],
             "sharedLinks": {
                 "visible": [t for t, _, hidden in Command.SHARED_LINKS if not hidden],
@@ -499,8 +503,10 @@ class Command(BaseCommand):
         issue = Issue.objects.filter(project=project).order_by("sequence_id").first()
         if issue is None:
             return
-        for minutes, description in ((90, "Traced the failing request"), (45, "Wrote the regression test")):
-            IssueWorkLog.objects.update_or_create(
+        for index, (minutes, description) in enumerate(
+            ((90, "Traced the failing request"), (45, "Wrote the regression test")), start=1
+        ):
+            worklog, _ = IssueWorkLog.objects.update_or_create(
                 workspace=workspace,
                 project=project,
                 issue=issue,
@@ -508,6 +514,34 @@ class Command(BaseCommand):
                 description=description,
                 defaults={"duration": minutes},
             )
+            # The activity feed prints when each entry was logged, relative to
+            # the browser's clock, so the real insert time would drift by a day
+            # every day.
+            IssueWorkLog.objects.filter(pk=worklog.pk).update(
+                created_at=CLOCK - timedelta(hours=4 - index), updated_at=CLOCK - timedelta(hours=4 - index)
+            )
+
+    COMMENT = "Reproduced on a fresh workspace: the export stalls after the first page."
+
+    def _comments(self, workspace, project, author) -> None:
+        """One comment on the first work item, so the activity feed photographs a comment card."""
+        issue = Issue.objects.filter(project=project).order_by("sequence_id").first()
+        if issue is None:
+            return
+        comment = IssueComment.objects.filter(issue=issue, actor=author).first()
+        if comment is None:
+            comment = IssueComment.objects.create(
+                workspace=workspace,
+                project=project,
+                issue=issue,
+                actor=author,
+                created_by=author,
+                comment_html=f"<p>{self.COMMENT}</p>",
+            )
+        # Printed relative to the browser's clock, like the worklogs above.
+        IssueComment.objects.filter(pk=comment.pk).update(
+            created_at=CLOCK - timedelta(hours=1), updated_at=CLOCK - timedelta(hours=1)
+        )
 
     # Two visible and one hidden. The widget renders a "show hidden (n)"
     # affordance only when something is hidden, so a seed with three visible
