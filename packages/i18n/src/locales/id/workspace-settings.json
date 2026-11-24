@@ -459,7 +459,7 @@
         },
         "app_available_description": "Hubungkan workspace Hangar untuk mulai menggunakannya",
         "client_id_and_secret": "ID klien dan Rahasia",
-        "client_id_and_secret_description": "Salin dan simpan kunci rahasia ini di Pages. Anda tidak dapat melihat kunci ini lagi setelah Anda menutupnya.",
+        "client_id_and_secret_description": "Salin kunci rahasia ini dan simpan di tempat yang aman. Anda tidak dapat melihatnya lagi setelah menekan Tutup.",
         "client_id_and_secret_download": "Anda dapat mengunduh CSV dengan kunci dari sini.",
         "application_id": "ID Aplikasi",
         "client_id": "ID Klien",

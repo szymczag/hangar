@@ -459,7 +459,7 @@
         },
         "app_available_description": "Connect a Hangar workspace to start using it",
         "client_id_and_secret": "Client ID and Secret",
-        "client_id_and_secret_description": "Copy and save this secret key in Pages. You can't see this key again after you hit Close.",
+        "client_id_and_secret_description": "Copy this secret key and store it somewhere safe. You can't see it again after you hit Close.",
         "client_id_and_secret_download": "You can download a CSV with the key from here.",
         "application_id": "Application ID",
         "client_id": "Client ID",

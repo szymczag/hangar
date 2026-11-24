@@ -459,7 +459,7 @@
         },
         "app_available_description": "Conectează un workspace al Hangar pentru a începe să folosesti",
         "client_id_and_secret": "ID-ul clientului și Secretul",
-        "client_id_and_secret_description": "Copiază și salvează această cheie secretă în Pagini. Nu poți vedea această cheie din nou după ce închizi.",
+        "client_id_and_secret_description": "Copiați această cheie secretă și păstrați-o într-un loc sigur. Nu o veți mai putea vedea după ce apăsați Închide.",
         "client_id_and_secret_download": "Poți descărca un fișier CSV cu cheia de aici.",
         "application_id": "ID-ul aplicației",
         "client_id": "ID-ul clientului",

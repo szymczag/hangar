@@ -72,7 +72,7 @@ describe("EstimateSelect", () => {
   it("emits null when the estimate is cleared", () => {
     const onChange = vi.fn();
     renderToStaticMarkup(
-      <EstimateSelect value="point-1" onChange={onChange} projectId="project-1" variant="pill-md" />
+      <EstimateSelect value="point-1" onChange={onChange} projectId="project-1" variant="table-cell" />
     );
 
     captured.onChange?.(undefined);
@@ -83,7 +83,7 @@ describe("EstimateSelect", () => {
   it("passes a picked estimate point through", () => {
     const onChange = vi.fn();
     renderToStaticMarkup(
-      <EstimateSelect value={undefined} onChange={onChange} projectId="project-1" variant="pill-md" />
+      <EstimateSelect value={undefined} onChange={onChange} projectId="project-1" variant="table-cell" />
     );
 
     captured.onChange?.("point-2");

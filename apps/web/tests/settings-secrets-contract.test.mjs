@@ -19,7 +19,8 @@
  *   shows a federated account the notice instead of the form (S10);
  * - the dialog that shows a new token or webhook secret tells the person to
  *   keep it somewhere safe, not to save it "in Hangar Pages", which was
- *   upstream's "Plane Pages" renamed mechanically.
+ *   upstream's "Plane Pages" renamed mechanically; the same holds for the
+ *   application client secret notice, which said "in Pages".
  */
 
 import assert from "node:assert/strict";
@@ -156,4 +157,18 @@ test("the shown-once secret dialogs do not send the secret to Pages", () => {
   }
   const english = JSON.parse(readFileSync(new URL("en/workspace-settings.json", localesDir), "utf8"));
   assert.match(english.workspace_settings.copy_key, /somewhere safe/);
+});
+
+test("the application client secret notice does not send the secret to Pages", () => {
+  const localesDir = new URL("../../../packages/i18n/src/locales/", import.meta.url);
+  const locales = readdirSync(localesDir);
+  assert.ok(locales.length >= 19, "every locale must be checked");
+  for (const locale of locales) {
+    const strings = JSON.parse(readFileSync(new URL(`${locale}/workspace-settings.json`, localesDir), "utf8"));
+    const notice = strings.workspace_settings.settings.applications.client_id_and_secret_description;
+    assert.ok(notice, `${locale} must translate the notice`);
+    assert.doesNotMatch(notice, /Hangar|Pages|Páginas|Pagini|Halaman|ページ|Peycis/, `${locale}: ${notice}`);
+  }
+  const english = JSON.parse(readFileSync(new URL("en/workspace-settings.json", localesDir), "utf8"));
+  assert.match(english.workspace_settings.settings.applications.client_id_and_secret_description, /somewhere safe/);
 });

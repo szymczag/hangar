@@ -4,11 +4,11 @@
  * See the LICENSE file for details.
  */
 
-import { ShieldAlert } from "lucide-react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 // plane imports
-import { Button } from "@plane/propel/button";
+import { Banner } from "@makeplane/propel/components/banner";
+import { Button } from "@makeplane/propel/components/button";
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useAppRouter } from "@/hooks/use-app-router";
@@ -86,25 +86,20 @@ export const EmailSecurityNotice = observer(function EmailSecurityNotice() {
     router.push("/settings/profile/security");
   };
 
+  // A danger banner is announced as an alert, as this notice always was.
   return (
-    <div
-      role="alert"
-      className="mb-7 flex max-w-3xl flex-col gap-3 rounded-md border border-danger-subtle bg-danger-subtle p-4 text-13"
-    >
-      <div className="flex gap-3">
-        <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger-primary" />
-        <div>
-          <p className="font-medium text-primary">{copy.title}</p>
-          <p className="mt-1 leading-5">{copy.body}</p>
-        </div>
-      </div>
-      {copy.action && (
-        <div className="pl-7">
-          <Button variant="error-outline" size="lg" onClick={openSecurityTab}>
-            {copy.action}
-          </Button>
-        </div>
-      )}
+    <div className="mb-7 max-w-3xl">
+      <Banner
+        variant="danger"
+        placement="inline"
+        title={copy.title}
+        description={copy.body}
+        actions={
+          copy.action ? (
+            <Button variant="danger-outline" size="md" stretch="auto" label={copy.action} onClick={openSecurityTab} />
+          ) : undefined
+        }
+      />
     </div>
   );
 });

@@ -459,7 +459,7 @@
         },
         "app_available_description": "Conecte um workspace do Hangar para começar a usar",
         "client_id_and_secret": "ID do cliente e chave secreta",
-        "client_id_and_secret_description": "Copie e salve esta chave secreta em Páginas. Você não poderá ver esta chave novamente após fechar.",
+        "client_id_and_secret_description": "Copie esta chave secreta e guarde-a em um lugar seguro. Você não poderá vê-la novamente depois de clicar em Fechar.",
         "client_id_and_secret_download": "Você pode baixar um CSV com a chave aqui.",
         "application_id": "ID da aplicação",
         "client_id": "ID do cliente",

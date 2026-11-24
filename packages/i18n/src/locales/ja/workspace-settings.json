@@ -459,7 +459,7 @@
         },
         "app_available_description": "使用を開始するにはHangarワークスペースに接続してください",
         "client_id_and_secret": "クライアントIDとシークレット",
-        "client_id_and_secret_description": "このシークレットキーをコピーして保存してください。閉じた後はこのキーを見ることができません。",
+        "client_id_and_secret_description": "このシークレットキーをコピーして、安全な場所に保管してください。閉じた後はこのキーを再度表示できません。",
         "client_id_and_secret_download": "ここからキーをCSVでダウンロードできます。",
         "application_id": "アプリケーションID",
         "client_id": "クライアントID",
