@@ -31,6 +31,7 @@ from plane.db.models import (
     IssueComment,
     IssueType,
     IssueLabel,
+    IssueView,
     IssueSequence,
     Label,
     Profile,
@@ -114,6 +115,11 @@ PUBLISHED_LABEL_IDS = {
 }
 # 24 hex characters, the shape `secrets.token_hex(12)` produces.
 INSTANCE_ID = "a00000000000400080000000"
+# One saved view in the project and one in the workspace, for the view list
+# stories. Pinned like the projects, so a re-seed finds them rather than adding
+# a second row the lists would then show.
+PROJECT_VIEW_ID = uuid.UUID("a0000000-0000-4000-8000-000000000005")
+WORKSPACE_VIEW_ID = uuid.UUID("a0000000-0000-4000-8000-000000000006")
 
 # Enough to overflow a 900px viewport, which the layout story depends on.
 #
@@ -174,6 +180,7 @@ class Command(BaseCommand):
         self._work_item_properties(workspace, project)
         self._worklogs(workspace, project, users["light"])
         self._comments(workspace, project, users["light"])
+        self._views(workspace, project, users["light"])
         self._shared_links(workspace, users)
         self._import_jobs(workspace, project, users["admin"])
         self._invitations(workspace, users["admin"])
@@ -209,6 +216,8 @@ class Command(BaseCommand):
             "properties": [name for name, _, _ in Command.PROPERTIES],
             # The first work item's comment, which the work item detail stories wait on.
             "comment": Command.COMMENT,
+            # The saved views the view list stories wait on.
+            "views": {"project": Command.PROJECT_VIEW, "workspace": Command.WORKSPACE_VIEW},
             "invitations": [email for email, _ in Command.INVITATIONS],
             "sharedLinks": {
                 "visible": [t for t, _, hidden in Command.SHARED_LINKS if not hidden],
@@ -565,6 +574,39 @@ class Command(BaseCommand):
         ("On-call rota", "https://example.invalid/on-call", False),
         ("Archived wiki", "https://example.invalid/wiki", True),
     )
+
+    PROJECT_VIEW = "Urgent and high"
+    WORKSPACE_VIEW = "Everything in review"
+
+    def _views(self, workspace, project, owner) -> None:
+        """One public saved view in the project and one in the workspace.
+
+        Without them both view lists render their empty state, and the list
+        rows, their access icon and their quick actions show nowhere. The
+        filters are left empty: a list row does not print them, and the view's
+        own page is the work item layout the layout stories already cover.
+        """
+        for view_id, name, view_project in (
+            (PROJECT_VIEW_ID, Command.PROJECT_VIEW, project),
+            (WORKSPACE_VIEW_ID, Command.WORKSPACE_VIEW, None),
+        ):
+            view, _ = IssueView.objects.get_or_create(
+                id=view_id,
+                defaults={
+                    "name": name,
+                    "workspace": workspace,
+                    "project": view_project,
+                    "owned_by": owner,
+                    "created_by": owner,
+                    "filters": {},
+                    "access": 1,
+                },
+            )
+            # `auto_now_add`, as with the work items: the list rows print no
+            # date today, but a row that ever does should not drift.
+            IssueView.objects.filter(pk=view.pk).update(
+                created_at=CLOCK - timedelta(days=3), updated_at=CLOCK - timedelta(days=3)
+            )
 
     def _shared_links(self, workspace, users) -> None:
         for index, (title, url, hidden) in enumerate(self.SHARED_LINKS):

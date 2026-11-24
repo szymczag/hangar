@@ -5,16 +5,19 @@
  */
 
 import { useTranslation } from "@plane/i18n";
-import { CloseIcon } from "@plane/propel/icons";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { CloseOutline } from "@makeplane/propel/icons";
 // plane imports
 import type { EViewAccess, TViewFilterProps } from "@plane/types";
-import { Tag } from "@plane/ui";
 import { replaceUnderscoreIfSnakeCase } from "@plane/utils";
 // components
 import { AppliedDateFilters } from "@/components/common/applied-filters/date";
 import { AppliedMembersFilters } from "@/components/common/applied-filters/members";
 // local imports
 import { AppliedAccessFilters } from "./access";
+import { APPLIED_FILTER_GROUP_CLASSNAME } from "@/components/common/removable-chip";
 
 type Props = {
   appliedFilters: TViewFilterProps;
@@ -23,9 +26,9 @@ type Props = {
   alwaysAllowEditing?: boolean;
 };
 
-const MEMBERS_FILTERS = ["owned_by"];
-const DATE_FILTERS = ["created_at"];
-const VIEW_ACCESS_FILTERS = ["view_type"];
+const MEMBERS_FILTERS = new Set(["owned_by"]);
+const DATE_FILTERS = new Set(["created_at"]);
+const VIEW_ACCESS_FILTERS = new Set(["view_type"]);
 
 export function ViewAppliedFiltersList(props: Props) {
   const { appliedFilters, handleClearAllFilters, handleRemoveFilter, alwaysAllowEditing } = props;
@@ -37,56 +40,63 @@ export function ViewAppliedFiltersList(props: Props) {
   const isEditingAllowed = alwaysAllowEditing;
 
   return (
-    <div className="flex flex-wrap items-stretch gap-2 bg-surface-1">
+    <div className="flex flex-wrap items-center gap-2">
       {Object.entries(appliedFilters).map(([key, value]) => {
         const filterKey = key as keyof TViewFilterProps;
 
         if (!value) return;
         if (Array.isArray(value) && value.length === 0) return;
 
+        const filterLabel = replaceUnderscoreIfSnakeCase(filterKey);
+
         return (
-          <Tag key={filterKey}>
-            <span className="text-11 text-tertiary">{replaceUnderscoreIfSnakeCase(filterKey)}</span>
-            {VIEW_ACCESS_FILTERS.includes(filterKey) && (
-              <AppliedAccessFilters
-                editable={isEditingAllowed}
-                handleRemove={(val) => handleRemoveFilter(filterKey, val)}
-                values={Array.isArray(value) ? (value as EViewAccess[]) : []}
-              />
-            )}
-            {DATE_FILTERS.includes(filterKey) && (
-              <AppliedDateFilters
-                editable={isEditingAllowed}
-                handleRemove={(val) => handleRemoveFilter(filterKey, val)}
-                values={Array.isArray(value) ? (value as string[]) : []}
-              />
-            )}
-            {MEMBERS_FILTERS.includes(filterKey) && (
-              <AppliedMembersFilters
-                editable={isEditingAllowed}
-                handleRemove={(val) => handleRemoveFilter(filterKey, val)}
-                values={Array.isArray(value) ? (value as string[]) : []}
-              />
-            )}
-            {isEditingAllowed && (
-              <button
-                type="button"
-                className="grid place-items-center text-tertiary hover:text-secondary"
-                onClick={() => handleRemoveFilter(filterKey, null)}
-              >
-                <CloseIcon height={12} width={12} strokeWidth={2} />
-              </button>
-            )}
-          </Tag>
+          <div key={filterKey} className={APPLIED_FILTER_GROUP_CLASSNAME}>
+            <span className="text-caption-sm-regular text-tertiary capitalize">{filterLabel}</span>
+            <div className="flex flex-wrap items-center gap-1">
+              {VIEW_ACCESS_FILTERS.has(filterKey) && (
+                <AppliedAccessFilters
+                  editable={isEditingAllowed}
+                  handleRemove={(val) => handleRemoveFilter(filterKey, val)}
+                  values={Array.isArray(value) ? (value as EViewAccess[]) : []}
+                />
+              )}
+              {DATE_FILTERS.has(filterKey) && (
+                <AppliedDateFilters
+                  editable={isEditingAllowed}
+                  handleRemove={(val) => handleRemoveFilter(filterKey, val)}
+                  values={Array.isArray(value) ? (value as string[]) : []}
+                />
+              )}
+              {MEMBERS_FILTERS.has(filterKey) && (
+                <AppliedMembersFilters
+                  editable={isEditingAllowed}
+                  handleRemove={(val) => handleRemoveFilter(filterKey, val)}
+                  values={Array.isArray(value) ? (value as string[]) : []}
+                />
+              )}
+              {isEditingAllowed && (
+                <IconButton
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  aria-label={`${t("aria_labels.common.remove")}: ${filterLabel}`}
+                  onClick={() => handleRemoveFilter(filterKey, null)}
+                  icon={<Icon icon={CloseOutline} />}
+                />
+              )}
+            </div>
+          </div>
         );
       })}
       {isEditingAllowed && (
-        <button type="button" onClick={handleClearAllFilters}>
-          <Tag>
-            {t("common.clear_all")}
-            <CloseIcon height={12} width={12} strokeWidth={2} />
-          </Tag>
-        </button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          stretch="auto"
+          label={t("common.clear_all")}
+          onClick={handleClearAllFilters}
+        />
       )}
     </div>
   );

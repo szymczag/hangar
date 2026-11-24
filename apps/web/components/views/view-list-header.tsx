@@ -4,101 +4,37 @@
  * See the LICENSE file for details.
  */
 
-import React, { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
+import { ExpandableSearch } from "@makeplane/propel/components/expandable-search";
 // icons
-import { ListFilter } from "lucide-react";
-import { useOutsideClickDetector } from "@plane/hooks";
-import { SearchIcon, CloseIcon } from "@plane/propel/icons";
-// plane helpers
-// helpers
-import { cn } from "@plane/utils";
+import { FilterOutline } from "@makeplane/propel/icons";
+import { useTranslation } from "@plane/i18n";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useProjectView } from "@/hooks/store/use-project-view";
 import { FiltersDropdownLegacy } from "../issues/issue-layouts/filters";
 import { ViewFiltersSelection } from "./filters/filter-selection";
 import { ViewOrderByDropdown } from "./filters/order-by";
-import { IconButton } from "@plane/propel/icon-button";
 
 export const ViewListHeader = observer(function ViewListHeader() {
-  // states
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  // refs
-  const inputRef = useRef<HTMLInputElement>(null);
+  // translation
+  const { t } = useTranslation();
   // store hooks
   const { filters, updateFilters } = useProjectView();
   const {
     project: { projectMemberIds },
   } = useMember();
 
-  // handlers
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Escape") {
-      if (filters?.searchQuery && filters?.searchQuery.trim() !== "") {
-        updateFilters("searchQuery", "");
-      } else {
-        setIsSearchOpen(false);
-        inputRef.current?.blur();
-      }
-    }
-  };
-
-  // outside click detector hook
-  useOutsideClickDetector(inputRef, () => {
-    if (isSearchOpen && filters?.searchQuery.trim() === "") setIsSearchOpen(false);
-  });
-
-  useEffect(() => {
-    if (filters?.searchQuery.trim() !== "") setIsSearchOpen(true);
-  }, [filters?.searchQuery]);
-
   return (
     <div className="flex h-full items-center gap-2">
-      <div className="flex items-center">
-        {!isSearchOpen && (
-          <IconButton
-            variant="ghost"
-            size="lg"
-            className="-mr-1"
-            onClick={() => {
-              setIsSearchOpen(true);
-              inputRef.current?.focus();
-            }}
-            icon={SearchIcon}
-          />
-        )}
-        <div
-          className={cn(
-            "ml-auto flex w-0 items-center justify-start gap-1 overflow-hidden rounded-md border border-transparent bg-surface-1 text-placeholder opacity-0 transition-[width] ease-linear",
-            {
-              "w-64 border-subtle px-2.5 py-1.5 opacity-100": isSearchOpen,
-            }
-          )}
-        >
-          <SearchIcon className="h-3.5 w-3.5" />
-          <input
-            ref={inputRef}
-            className="w-full max-w-[234px] border-none bg-transparent text-13 text-primary placeholder:text-placeholder focus:outline-none"
-            placeholder="Search"
-            value={filters?.searchQuery}
-            onChange={(e) => updateFilters("searchQuery", e.target.value)}
-            onKeyDown={handleInputKeyDown}
-          />
-          {isSearchOpen && (
-            <button
-              type="button"
-              className="grid place-items-center"
-              onClick={() => {
-                updateFilters("searchQuery", "");
-                setIsSearchOpen(false);
-              }}
-            >
-              <CloseIcon className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      </div>
+      <ExpandableSearch
+        size="md"
+        aria-label={t("common.search.label")}
+        clearLabel={t("common.clear")}
+        placeholder={t("common.search.label")}
+        value={filters?.searchQuery ?? ""}
+        onValueChange={(value) => updateFilters("searchQuery", value)}
+      />
       <div className="hidden items-center gap-2 md:flex">
         <ViewOrderByDropdown
           sortBy={filters.sortBy}
@@ -108,8 +44,11 @@ export const ViewListHeader = observer(function ViewListHeader() {
             if (val.order) updateFilters("sortBy", val.order);
           }}
         />
+        {/* Fork: compatibility shim, removed in phase 9. The panel's created date and
+            created by sections are shared with the pages list filters, which move in
+            phase 6, so the 1.4 popover stays until then. */}
         <FiltersDropdownLegacy
-          icon={<ListFilter className="h-3 w-3" />}
+          icon={<FilterOutline className="h-3 w-3" />}
           title="Filters"
           placement="bottom-end"
           isFiltersApplied={false}

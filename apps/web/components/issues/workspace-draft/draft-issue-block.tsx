@@ -7,19 +7,19 @@
 import React, { useRef, useState } from "react";
 import { omit } from "lodash-es";
 import { observer } from "mobx-react";
-import { SquareStackIcon } from "lucide-react";
-import { CopyIcon, EditIcon, TrashIcon } from "@plane/propel/icons";
+import { CopyOutline, DeleteOutline, EditOutline, SquareStackOutline } from "@makeplane/propel/icons";
 // plane utils
-import { Tooltip } from "@plane/propel/tooltip";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { TWorkspaceDraftIssue } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
-import type { TContextMenuItem } from "@plane/ui";
-import { Row } from "@plane/ui";
+import type { TContextMenuItem } from "@plane/blocks/context-menu";
+import { Row } from "@plane/blocks/layout";
 import { cn } from "@plane/utils";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useProject } from "@/hooks/store/use-project";
 import { useWorkspaceDraftIssues } from "@/hooks/store/workspace-draft";
+import { useListRowPropertiesBudget } from "@/hooks/use-list-row-properties-budget";
 // local imports
 import { IdentifierText } from "../issue-detail/identifier-text";
 import { CreateUpdateIssueModal } from "../issue-modal/modal";
@@ -49,6 +49,11 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
   // derived values
   const issue = getIssueById(issueId);
   const projectIdentifier = (issue && issue.project_id && getProjectIdentifierById(issue.project_id)) || undefined;
+  // Room for the property chips while the row is single-line (`md:flex-row` / `lg:flex-row` below).
+  const { rowRef, leadingRef, quickActionsRef, budgetPx } = useListRowPropertiesBudget({
+    enabled: !!issue && !!projectIdentifier,
+    singleLineFrom: isSidebarCollapsed ? "md" : "lg",
+  });
   if (!issue || !projectIdentifier) return null;
 
   const duplicateIssuePayload = omit(
@@ -64,7 +69,7 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
     {
       key: "edit",
       title: "edit",
-      icon: EditIcon,
+      icon: EditOutline,
       action: () => {
         setIssueToEdit(issue);
         setCreateUpdateIssueModal(true);
@@ -73,7 +78,7 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
     {
       key: "make-a-copy",
       title: "make_a_copy",
-      icon: CopyIcon,
+      icon: CopyOutline,
       action: () => {
         setCreateUpdateIssueModal(true);
       },
@@ -81,7 +86,7 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
     {
       key: "move-to-issues",
       title: "move_to_project",
-      icon: SquareStackIcon,
+      icon: SquareStackOutline,
       action: () => {
         setMoveToIssue(true);
         setIssueToEdit(issue);
@@ -91,7 +96,7 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
     {
       key: "delete",
       title: "delete",
-      icon: TrashIcon,
+      icon: DeleteOutline,
       action: () => {
         setDeleteIssueModal(true);
       },
@@ -131,9 +136,12 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
         }}
       >
         <Row
-          ref={issueRef}
+          ref={(node: HTMLDivElement | null) => {
+            issueRef.current = node;
+            rowRef(node);
+          }}
           className={cn(
-            "group/list-block relative flex min-h-11 flex-col gap-3 bg-layer-transparent py-3 text-13 transition-colors hover:bg-layer-transparent-hover",
+            "group/list-block relative flex min-h-11 flex-col gap-3 bg-layer-transparent py-3 text-body-xs-regular transition-colors hover:bg-layer-transparent-hover",
             {
               "md:flex-row md:items-center": isSidebarCollapsed,
               "lg:flex-row lg:items-center": !isSidebarCollapsed,
@@ -142,7 +150,7 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
         >
           <div className="flex w-full truncate">
             <div className="flex flex-grow items-center gap-0.5 truncate">
-              <div className="flex items-center gap-1">
+              <div ref={leadingRef} className="flex items-center gap-1">
                 <div className="flex-shrink-0">
                   {issue.project_id && (
                     <div className="flex items-center space-x-2">
@@ -160,8 +168,8 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
                 <div className="grid size-4 flex-shrink-0 place-items-center" />
               </div>
 
-              <Tooltip tooltipContent={issue.name} position="top-start" renderByDefault={false}>
-                <p className="w-full cursor-pointer truncate text-13 text-primary">{issue.name}</p>
+              <Tooltip label={issue.name} layout="stacked" align="start">
+                <p className="w-full cursor-pointer truncate text-body-xs-regular text-primary">{issue.name}</p>
               </Tooltip>
             </div>
 
@@ -178,17 +186,20 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
 
           <div className="flex flex-shrink-0 items-center gap-2">
             <DraftIssueProperties
-              className={`relative flex flex-wrap ${isSidebarCollapsed ? "md:flex-shrink-0 md:flex-grow" : "lg:flex-shrink-0 lg:flex-grow"} items-center gap-2 whitespace-nowrap`}
+              className={`relative flex min-w-0 flex-wrap ${isSidebarCollapsed ? "md:flex-shrink-0 md:flex-grow md:flex-nowrap md:overflow-hidden" : "lg:flex-shrink-0 lg:flex-grow lg:flex-nowrap lg:overflow-hidden"} items-center gap-2 whitespace-nowrap`}
               issue={issue}
-              updateIssue={async (projectId, issueId, data) => {
-                await updateIssue(workspaceSlug, issueId, data);
+              overflowBudgetPx={budgetPx}
+              updateIssue={async (_projectId, draftIssueId, data) => {
+                await updateIssue(workspaceSlug, draftIssueId, data);
               }}
             />
             <div
+              ref={quickActionsRef}
               className={cn("hidden", {
                 "md:flex": isSidebarCollapsed,
                 "lg:flex": !isSidebarCollapsed,
               })}
+              role="presentation"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();

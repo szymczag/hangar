@@ -20,6 +20,8 @@ export type VisualFixtures = {
   publishedBoard: { anchor: string; workItems: string[]; peekId: string };
   /** Names of the seeded work items, in the order they were created. */
   workItems: string[];
+  /** Names of the seeded saved views, one in the project and one in the workspace. */
+  views: { project: string; workspace: string };
   /** The comment on the first work item. */
   comment: string;
   /** Custom property names on the Task type, in sort order. */

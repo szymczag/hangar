@@ -8,15 +8,15 @@ import React, { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import type { Control } from "react-hook-form";
 import { Controller } from "react-hook-form";
-import { Sparkle } from "lucide-react";
+import { AiStar1Outline } from "@makeplane/propel/icons";
 // plane imports
 import { ETabIndices } from "@plane/constants";
 import type { EditorRefApi } from "@plane/editor";
 import { useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { TIssue } from "@plane/types";
 import { EFileAssetType } from "@plane/types";
-import { Loader } from "@plane/ui";
+import { Loader } from "@plane/blocks/skeleton";
 import { getDescriptionPlaceholderI18n, getTabIndex } from "@plane/utils";
 // components
 import { GptAssistantPopover } from "@/components/core/modals/gpt-assistant-popover";
@@ -97,7 +97,7 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
       onClose();
     } else {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error!",
         message: "Editor is still processing changes. Please wait before proceeding.",
       });
@@ -127,25 +127,26 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
       .then((res) => {
         if (res.response === "")
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: "Error!",
             message:
               "Work item title isn't informative enough to generate the description. Please try with a different title.",
           });
         else handleAiAssistance(res.response_html);
+        return undefined;
       })
       .catch((err) => {
         const error = err?.data?.error;
 
         if (err.status === 429)
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: "Error!",
             message: error || "You have reached the maximum number of requests of 50 requests per month per user.",
           });
         else
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: "Error!",
             message: error || "Some error occurred. Please try again.",
           });
@@ -154,7 +155,7 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
   };
 
   return (
-    <div className="relative rounded-lg border-[0.5px] border-subtle-1 bg-layer-2">
+    <div className="relative rounded-lg border border-subtle-1 bg-layer-2 transition-[background-color,border-color,box-shadow] focus-within:border-accent-strong focus-within:bg-layer-2 focus-within:ring-2 focus-within:ring-accent-strong/20 hover:border-strong hover:bg-layer-2-hover focus-within:hover:border-accent-strong focus-within:hover:bg-layer-2">
       {descriptionHtmlData === undefined || !projectId ? (
         <Loader className="max-h-64 min-h-[120px] space-y-2 overflow-hidden rounded-md border border-subtle p-3 py-2 pt-3">
           <Loader.Item width="100%" height="26px" />
@@ -222,7 +223,7 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
                     return asset_id;
                   } catch (error) {
                     console.log("Error in uploading issue asset:", error);
-                    throw new Error("Asset upload failed. Please try again later.");
+                    throw new Error("Asset upload failed. Please try again later.", { cause: error });
                   }
                 }}
                 duplicateFile={async (assetId: string) => {
@@ -258,7 +259,7 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
                   "Generating response"
                 ) : (
                   <>
-                    <Sparkle className="h-3.5 w-3.5" />I{"'"}m feeling lucky
+                    <AiStar1Outline className="h-3.5 w-3.5" />I{"'"}m feeling lucky
                   </>
                 )}
               </button>
@@ -282,7 +283,7 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
                     onClick={() => setGptAssistantModal((prevData) => !prevData)}
                     tabIndex={-1}
                   >
-                    <Sparkle className="h-4 w-4" />
+                    <AiStar1Outline className="h-4 w-4" />
                     AI
                   </button>
                 }

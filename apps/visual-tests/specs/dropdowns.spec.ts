@@ -11,10 +11,11 @@ import { expect, fixtures, test } from "../src/fixtures.js";
 /**
  * The property dropdowns on the work item create modal, open.
  *
- * The dropdowns moved to the `@plane/blocks` selects in phase 1b, and the
- * modal still calls them through the 1.4 module paths, which now render the
- * new selects (`components/dropdowns/compat.tsx`). The closed triggers show in
- * every work item baseline; the open panels showed nowhere until these.
+ * The dropdowns moved to the `@plane/blocks` selects in phase 1b; since phase
+ * 4c the modal is a Propel dialog that calls upstream's selects directly, so
+ * the triggers are found by the test ids upstream gives them. The closed
+ * triggers show in every work item baseline; the open panels showed nowhere
+ * until these.
  *
  * One modal per story rather than one modal and four dropdowns: Escape closes
  * the dropdown, but the modal listens for it too, so the next dropdown would
@@ -34,8 +35,8 @@ async function openCreateModal(page: Page): Promise<Locator> {
   await page.keyboard.press("n");
   await page.keyboard.press("i");
 
-  // The panel, not the wrapper: Headless UI's role="dialog" element has no size of its own.
-  const dialog = page.locator('[id^="headlessui-dialog-panel"]');
+  // Since phase 4c the dialog is Propel's: the Base UI popup carries role="dialog" and its size.
+  const dialog = page.getByRole("dialog").filter({ has: page.getByPlaceholder("Title") });
   await settled(dialog);
   await expect(dialog.getByPlaceholder("Title")).toBeVisible();
   return dialog;
@@ -45,7 +46,7 @@ test("the state dropdown on the work item create modal", async ({ asUser }) => {
   const page = await asUser("light");
   const dialog = await openCreateModal(page);
 
-  await dialog.getByRole("button", { name: /^State/ }).click();
+  await dialog.getByTestId("create-work-item-state-select").click();
   // The last seeded state: once it is listed, the ones before it are too.
   const done = page.getByRole("option", { name: "Done" });
 
@@ -56,7 +57,7 @@ test("the priority dropdown on the work item create modal", async ({ asUser }) =
   const page = await asUser("light");
   const dialog = await openCreateModal(page);
 
-  await dialog.getByRole("button", { name: /^Priority/ }).click();
+  await dialog.getByTestId("create-work-item-priority-select").click();
   const low = page.getByRole("option", { name: "Low" });
 
   await capture(page, "dropdowns-priority", { ready: low });
@@ -66,7 +67,7 @@ test("the assignees dropdown on the work item create modal", async ({ asUser }) 
   const page = await asUser("light");
   const dialog = await openCreateModal(page);
 
-  await dialog.getByRole("button", { name: /^Assignees/ }).click();
+  await dialog.getByTestId("create-work-item-assignee-select").click();
   // Every project member is listed; the admin is seeded last.
   const admin = page.getByRole("option", { name: /VR Admin/ });
 
@@ -77,7 +78,7 @@ test("the start date picker on the work item create modal", async ({ asUser }) =
   const page = await asUser("light");
   const dialog = await openCreateModal(page);
 
-  await dialog.getByRole("button", { name: /Start date/ }).click();
+  await dialog.getByTestId("create-work-item-start-date-select").click();
   const calendar = page.getByRole("grid");
 
   await capture(page, "dropdowns-start-date", { ready: calendar });

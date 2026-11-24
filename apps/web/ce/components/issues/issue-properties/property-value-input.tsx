@@ -6,11 +6,14 @@
 
 import { observer } from "mobx-react";
 // plane imports
-import { CustomSearchSelect, Input, ToggleSwitch } from "@plane/ui";
+import { Field } from "@makeplane/propel/components/field";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
+import { Switch } from "@makeplane/propel/components/switch";
+import { Select } from "@plane/blocks/select";
 // components
-import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
+import { MemberSelect } from "@/components/dropdowns/member/member-select";
 // plane web
-import type { TIssuePropertyExt } from "@/plane-web/types/issue-types";
+import type { TIssuePropertyExt, TIssuePropertyOptionExt } from "@/plane-web/types/issue-types";
 
 type Props = {
   property: TIssuePropertyExt;
@@ -27,112 +30,108 @@ export const PropertyValueInput = observer(function PropertyValueInput(props: Pr
 
   switch (property.property_type) {
     case "text":
-      return (
-        <Input
-          id={`property-${property.id}`}
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value ? [e.target.value] : [])}
-          placeholder={property.display_name}
-          className="w-full"
-          hasError={hasError}
-          disabled={disabled}
-        />
-      );
     case "number":
-      return (
-        <Input
-          id={`property-${property.id}`}
-          type="number"
-          value={value}
-          onChange={(e) => onChange(e.target.value ? [e.target.value] : [])}
-          placeholder={property.display_name}
-          className="w-full"
-          hasError={hasError}
-          disabled={disabled}
-        />
-      );
     case "date":
       return (
-        <Input
-          id={`property-${property.id}`}
-          type="date"
-          value={value ? value.slice(0, 10) : ""}
-          onChange={(e) => onChange(e.target.value ? [e.target.value] : [])}
-          className="w-full"
-          hasError={hasError}
-          disabled={disabled}
-        />
+        <Field name={`property-${property.id}`} invalid={hasError}>
+          <InputGroup size="md">
+            <Input
+              size="md"
+              id={`property-${property.id}`}
+              type={property.property_type}
+              value={property.property_type === "date" && value ? value.slice(0, 10) : value}
+              onChange={(e) => onChange(e.target.value ? [e.target.value] : [])}
+              placeholder={property.property_type === "date" ? undefined : property.display_name}
+              aria-label={property.display_name}
+              disabled={disabled}
+            />
+          </InputGroup>
+        </Field>
       );
     case "boolean":
       return (
-        <ToggleSwitch
-          value={value === "true"}
-          onChange={() => onChange([value === "true" ? "false" : "true"])}
+        <Switch
           size="sm"
+          checked={value === "true"}
+          onCheckedChange={(checked) => onChange([checked ? "true" : "false"])}
+          aria-label={property.display_name}
           disabled={disabled}
         />
       );
     case "select":
     case "multi_select": {
       const isMulti = property.property_type === "multi_select" && property.is_multi;
-      const selectedValueIds = new Set(values);
-      const options: { value: string; query: string; content: string }[] = [];
-      const selectedOptionNames: string[] = [];
-      for (const option of property.options ?? []) {
-        if (option.is_active) options.push({ value: option.id, query: option.name, content: option.name });
-        if (selectedValueIds.has(option.id)) selectedOptionNames.push(option.name);
-      }
-      const selectedLabel = selectedOptionNames.length
-        ? selectedOptionNames.join(", ")
-        : `Select ${property.display_name}`;
-      if (isMulti) {
-        return (
-          <CustomSearchSelect
-            value={values}
-            onChange={(next: string[] | null) => onChange(next ?? [])}
-            options={options}
-            label={selectedLabel}
-            multiple
-            disabled={disabled}
-            buttonClassName="w-full"
-          />
-        );
-      }
-      return (
-        <CustomSearchSelect
-          value={value || null}
-          onChange={(next: string | null) => onChange(next ? [next] : [])}
-          options={options}
-          label={selectedLabel}
+      // Deactivated options stay out of the list, but a value that still holds one keeps it.
+      const selectedIds = new Set(values);
+      const options = (property.options ?? []).filter((option) => option.is_active || selectedIds.has(option.id));
+      const byId = new Map(options.map((option) => [option.id, option]));
+      const selected = values.map((id) => byId.get(id)).filter((option) => option !== undefined);
+      const placeholder = `Select ${property.display_name}`;
+      const common = {
+        getValues: () => options,
+        getOptionValue: (option: TIssuePropertyOptionExt) => option.id,
+        getOptionLabel: (option: TIssuePropertyOptionExt) => option.name,
+        getOptionDisabled: (option: TIssuePropertyOptionExt) => !option.is_active,
+        disabled,
+        placeholder,
+        pinSelected: false,
+        showSearch: options.length > 7,
+        contentSizing: "anchor" as const,
+      };
+      const trigger = (
+        <Select.Trigger<TIssuePropertyOptionExt>
+          variant="select-md"
           disabled={disabled}
-          buttonClassName="w-full"
-        />
+          className="w-full"
+          id={`property-${property.id}`}
+        >
+          {(chosen) => (
+            <span className="min-w-0 grow truncate text-left">
+              {chosen.length ? chosen.map((option) => option.name).join(", ") : placeholder}
+            </span>
+          )}
+        </Select.Trigger>
+      );
+      return (
+        <Field name={`property-${property.id}`} invalid={hasError}>
+          {isMulti ? (
+            <Select<TIssuePropertyOptionExt> {...common} multiple value={selected} onChange={(next) => onChange(next)}>
+              {trigger}
+            </Select>
+          ) : (
+            <Select<TIssuePropertyOptionExt>
+              {...common}
+              value={selected[0] ?? null}
+              onChange={(next) => onChange(next ? [next] : [])}
+            >
+              {trigger}
+            </Select>
+          )}
+        </Field>
       );
     }
     case "member":
       if (property.is_multi) {
         return (
-          <MemberDropdown
+          <MemberSelect
             value={values}
-            onChange={(next: string[]) => onChange(next ?? [])}
+            onChange={(next) => onChange(next ?? [])}
             projectId={projectId}
             multiple
             disabled={disabled}
             placeholder={property.display_name}
-            buttonVariant="border-with-text"
+            variant={values.length ? "avatar-group-md" : "pill-md"}
           />
         );
       }
       return (
-        <MemberDropdown
+        <MemberSelect
           value={value || null}
-          onChange={(next: string | null) => onChange(next ? [next] : [])}
+          onChange={(next) => onChange(next ? [next] : [])}
           projectId={projectId}
-          multiple={false}
           disabled={disabled}
           placeholder={property.display_name}
-          buttonVariant="border-with-text"
+          variant="pill-md"
         />
       );
     default:

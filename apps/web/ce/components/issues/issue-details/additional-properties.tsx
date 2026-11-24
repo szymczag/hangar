@@ -69,7 +69,7 @@ export const WorkItemAdditionalSidebarProperties = observer(function WorkItemAdd
             {property.display_name}
             {property.is_required && <span className="text-danger-primary">*</span>}
           </div>
-          <div className="w-3/5">
+          <div className="w-3/5 min-w-0">
             <PropertyValueInput
               property={property}
               values={((values ?? {})[property.id] as string[] | undefined) ?? []}

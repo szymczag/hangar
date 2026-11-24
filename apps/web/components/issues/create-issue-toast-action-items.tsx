@@ -4,9 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useState } from "react";
-import type React from "react";
-import { observer } from "mobx-react";
+import { useCallback } from "react";
 import { useTranslation } from "@plane/i18n";
 import type { ToastActionItem } from "@plane/blocks/toast";
 import { copyTextToClipboard, copyUrlToClipboard, generateWorkItemLink } from "@plane/utils";
@@ -75,84 +73,3 @@ export function useCreateIssueToastActions() {
     [t, getIssueById, getProjectIdentifierById]
   );
 }
-
-type TCreateIssueToastActionItems = {
-  workspaceSlug: string;
-  projectId: string;
-  issueId: string;
-  isEpic?: boolean;
-};
-
-/**
- * Fork: compatibility shim, removed in phase 9.
- *
- * The 1.4 markup the create/edit dialog (`issue-modal/base.tsx`) still hands the 1.4 toast until the
- * dialog moves to Propel (phase 4c). Everything else builds the actions with the hook above.
- */
-export const CreateIssueToastActionItems = observer(function CreateIssueToastActionItems(
-  props: TCreateIssueToastActionItems
-) {
-  const { workspaceSlug, issueId, isEpic = false } = props;
-  // state
-  const [copied, setCopied] = useState(false);
-  // store hooks
-  const {
-    issue: { getIssueById },
-  } = useIssueDetail();
-  const { getProjectIdentifierById } = useProject();
-
-  // derived values
-  const issue = getIssueById(issueId);
-  const projectIdentifier = getProjectIdentifierById(issue?.project_id);
-
-  if (!issue) return null;
-
-  const workItemLink = generateWorkItemLink({
-    workspaceSlug,
-    projectId: issue?.project_id,
-    issueId,
-    projectIdentifier,
-    sequenceId: issue?.sequence_id,
-    isEpic,
-  });
-
-  const copyToClipboard = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    try {
-      await copyUrlToClipboard(workItemLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    } catch (_error) {
-      setCopied(false);
-    }
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  return (
-    <div className="-ml-2 flex items-center gap-1 text-11 text-secondary">
-      <a
-        href={workItemLink}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-sm px-2 py-1 font-medium text-accent-primary hover:bg-surface-2"
-      >
-        {`View ${isEpic ? "epic" : "work item"}`}
-      </a>
-
-      {copied ? (
-        <>
-          <span className="cursor-default px-2 py-1 text-secondary">Copied!</span>
-        </>
-      ) : (
-        <>
-          <button
-            className="hidden cursor-pointer rounded-sm px-2 py-1 text-tertiary group-hover:flex hover:bg-surface-2 hover:text-secondary"
-            onClick={copyToClipboard}
-          >
-            Copy link
-          </button>
-        </>
-      )}
-    </div>
-  );
-});

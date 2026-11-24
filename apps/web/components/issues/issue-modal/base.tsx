@@ -9,11 +9,11 @@ import { isEqual, xor } from "lodash-es";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // Hangar imports
+import { Dialog, DialogContent } from "@makeplane/propel/components/dialog";
 import { useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { TBaseIssue, TIssue } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
-import { EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
 // hooks
 import { useIssueModal } from "@/hooks/context/use-issue-modal";
 import { useCycle } from "@/hooks/store/use-cycle";
@@ -27,7 +27,7 @@ import { useIssuesActions } from "@/hooks/use-issues-actions";
 import { FileService } from "@/services/file.service";
 const fileService = new FileService();
 // local imports
-import { CreateIssueToastActionItems } from "../create-issue-toast-action-items";
+import { useCreateIssueToastActions } from "../create-issue-toast-action-items";
 import { DraftIssueLayout } from "./draft-issue-layout";
 import { IssueFormRoot } from "./form";
 import type { IssueFormProps } from "./form";
@@ -79,6 +79,8 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   const { getProjectByIdentifier } = useProject();
   // current store details
   const { createIssue, updateIssue } = useIssuesActions(storeType);
+  // propel: toast actions cross the boundary as data, never as JSX
+  const buildCreateIssueToastActions = useCreateIssueToastActions();
   // derived values
   const routerProjectIdentifier = workItem?.toString().split("-")[0];
   const projectIdFromRouter = getProjectByIdentifier(routerProjectIdentifier)?.id;
@@ -124,11 +126,11 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.project_id, data?.id, data?.sourceIssueId, projectId, isOpen, activeProjectId]);
 
-  const addIssueToCycle = async (issue: TIssue, cycleId: string) => {
+  const addIssueToCycle = async (issue: TIssue, targetCycleId: string) => {
     if (!workspaceSlug || !issue.project_id) return;
 
-    await issues.addIssueToCycle(workspaceSlug.toString(), issue.project_id, cycleId, [issue.id]);
-    fetchCycleDetails(workspaceSlug.toString(), issue.project_id, cycleId);
+    await issues.addIssueToCycle(workspaceSlug.toString(), issue.project_id, targetCycleId, [issue.id]);
+    fetchCycleDetails(workspaceSlug.toString(), issue.project_id, targetCycleId);
   };
 
   const addIssueToModule = async (issue: TIssue, moduleIds: string[]) => {
@@ -137,7 +139,8 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     await Promise.all([
       issues.changeModulesInIssue(workspaceSlug.toString(), issue.project_id, issue.id, moduleIds, []),
       ...moduleIds.map(
-        (moduleId) => issue.project_id && fetchModuleDetails(workspaceSlug.toString(), issue.project_id, moduleId)
+        (targetModuleId) =>
+          issue.project_id && fetchModuleDetails(workspaceSlug.toString(), issue.project_id, targetModuleId)
       ),
     ]);
   };
@@ -234,16 +237,13 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
       }
 
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: t("success"),
         message: `${is_draft_issue ? t("draft_created") : t("issue_created_successfully")} `,
-        actionItems: !is_draft_issue && response?.project_id && (
-          <CreateIssueToastActionItems
-            workspaceSlug={workspaceSlug.toString()}
-            projectId={response?.project_id}
-            issueId={response.id}
-          />
-        ),
+        actionItems:
+          !is_draft_issue && response?.project_id
+            ? buildCreateIssueToastActions({ workspaceSlug: workspaceSlug.toString(), issueId: response.id })
+            : undefined,
       });
       if (!createMore) handleClose();
       if (createMore && issueTitleRef) issueTitleRef?.current?.focus();
@@ -252,7 +252,7 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
       return response;
     } catch (error: any) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("error"),
         message: error?.error ?? t(is_draft_issue ? "draft_creation_failed" : "issue_creation_failed"),
       });
@@ -260,20 +260,20 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     }
   };
 
-  const handleCycleChange = async (data: Partial<TIssue> | undefined, payload: Partial<TIssue>) => {
-    if (!workspaceSlug || !data?.project_id || !data?.id) return;
+  const handleCycleChange = async (currentIssue: Partial<TIssue> | undefined, payload: Partial<TIssue>) => {
+    if (!workspaceSlug || !currentIssue?.project_id || !currentIssue?.id) return;
     // return if user is not trying to change the cycle, i.e
     // - cycle_id is not present in payload
     // - cycle_id is the same as the current cycle id
-    if (!("cycle_id" in payload) || isEqual(data?.cycle_id, payload.cycle_id)) return;
+    if (!("cycle_id" in payload) || isEqual(currentIssue?.cycle_id, payload.cycle_id)) return;
 
     const slug = workspaceSlug.toString();
 
     // Removing the cycle
-    const currentCycleId = data?.cycle_id;
+    const currentCycleId = currentIssue?.cycle_id;
     if (currentCycleId && payload.cycle_id === null) {
-      await issues.removeIssueFromCycle(slug, data.project_id, currentCycleId, data.id);
-      fetchCycleDetails(slug, data.project_id, currentCycleId).catch((error) => {
+      await issues.removeIssueFromCycle(slug, currentIssue.project_id, currentCycleId, currentIssue.id);
+      fetchCycleDetails(slug, currentIssue.project_id, currentCycleId).catch((error) => {
         console.error(error);
       });
     }
@@ -281,12 +281,12 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     // Adding the cycle
     const newCycleId = payload.cycle_id;
     if (newCycleId && newCycleId !== "" && (payload.cycle_id !== cycleId || storeType !== EIssuesStoreType.CYCLE)) {
-      await addIssueToCycle(data as TBaseIssue, newCycleId);
+      await addIssueToCycle(currentIssue as TBaseIssue, newCycleId);
     }
   };
 
-  const handleModuleChange = async (data: Partial<TIssue>, payload: Partial<TIssue>) => {
-    if (!workspaceSlug || !data?.project_id || !data?.id) return;
+  const handleModuleChange = async (currentIssue: Partial<TIssue>, payload: Partial<TIssue>) => {
+    if (!workspaceSlug || !currentIssue?.project_id || !currentIssue?.id) return;
     // return if user is not trying to change the module, i.e
     // - module_ids is not present in payload
     // - module_ids is not an array
@@ -294,27 +294,27 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     if (
       !("module_ids" in payload) ||
       !Array.isArray(payload.module_ids) ||
-      isEqual(data?.module_ids, payload.module_ids)
+      isEqual(currentIssue?.module_ids, payload.module_ids)
     )
       return;
 
-    const updatedModuleIds = xor(data.module_ids, payload.module_ids);
+    const updatedModuleIds = xor(currentIssue.module_ids, payload.module_ids);
     const modulesToAdd: string[] = [];
     const modulesToRemove: string[] = [];
 
-    for (const moduleId of updatedModuleIds) {
-      if (data.module_ids?.includes(moduleId)) {
-        modulesToRemove.push(moduleId);
+    for (const changedModuleId of updatedModuleIds) {
+      if (currentIssue.module_ids?.includes(changedModuleId)) {
+        modulesToRemove.push(changedModuleId);
       } else {
-        modulesToAdd.push(moduleId);
+        modulesToAdd.push(changedModuleId);
       }
     }
     // update modules if there are modules to add or remove
     if (modulesToAdd.length > 0 || modulesToRemove.length > 0) {
       await issues.changeModulesInIssue(
         workspaceSlug.toString(),
-        data.project_id,
-        data.id,
+        currentIssue.project_id,
+        currentIssue.id,
         modulesToAdd,
         modulesToRemove
       );
@@ -341,23 +341,19 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
       });
 
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: t("success"),
         message: t("issue_updated_successfully"),
         actionItems:
-          showActionItemsOnUpdate && payload.project_id ? (
-            <CreateIssueToastActionItems
-              workspaceSlug={workspaceSlug.toString()}
-              projectId={payload.project_id}
-              issueId={data.id}
-            />
-          ) : undefined,
+          showActionItemsOnUpdate && payload.project_id
+            ? buildCreateIssueToastActions({ workspaceSlug: workspaceSlug.toString(), issueId: data.id })
+            : undefined,
       });
       handleClose();
     } catch (error: any) {
       console.error(error);
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("error"),
         message: error?.error ?? t("issue_could_not_be_updated"),
       });
@@ -413,17 +409,15 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   };
 
   return (
-    <ModalCore
-      isOpen={isOpen}
-      position={EModalPosition.TOP}
-      width={isDuplicateModalOpen ? EModalWidth.VIXL : EModalWidth.XXXXL}
-      className="rounded-lg !bg-transparent shadow-none transition-[width] ease-linear"
-    >
-      {withDraftIssueWrapper ? (
-        <DraftIssueLayout {...commonIssueModalProps} changesMade={changesMade} onChange={handleFormChange} />
-      ) : (
-        <IssueFormRoot {...commonIssueModalProps} />
-      )}
-    </ModalCore>
+    /* The modal it replaces passed no `handleClose`, so only its own form dismisses it. */
+    <Dialog open={isOpen} disablePointerDismissal onOpenChange={() => {}}>
+      <DialogContent size="lg">
+        {withDraftIssueWrapper ? (
+          <DraftIssueLayout {...commonIssueModalProps} changesMade={changesMade} onChange={handleFormChange} />
+        ) : (
+          <IssueFormRoot {...commonIssueModalProps} />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 });
