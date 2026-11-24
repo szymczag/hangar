@@ -34,10 +34,13 @@ from plane.db.models import (
     IssueView,
     IssueSequence,
     Label,
+    Page,
     Profile,
     Project,
     ProjectMember,
+    ProjectPage,
     State,
+    Sticky,
     User,
     Workspace,
     WorkspaceMember,
@@ -120,6 +123,13 @@ INSTANCE_ID = "a00000000000400080000000"
 # a second row the lists would then show.
 PROJECT_VIEW_ID = uuid.UUID("a0000000-0000-4000-8000-000000000005")
 WORKSPACE_VIEW_ID = uuid.UUID("a0000000-0000-4000-8000-000000000006")
+# Two project pages and one sticky, for the page and sticky stories. Pinned for
+# the same reason as the views.
+PAGE_IDS = (
+    uuid.UUID("a0000000-0000-4000-8000-000000000007"),
+    uuid.UUID("a0000000-0000-4000-8000-000000000008"),
+)
+STICKY_ID = uuid.UUID("a0000000-0000-4000-8000-000000000009")
 
 # Enough to overflow a 900px viewport, which the layout story depends on.
 #
@@ -181,6 +191,8 @@ class Command(BaseCommand):
         self._worklogs(workspace, project, users["light"])
         self._comments(workspace, project, users["light"])
         self._views(workspace, project, users["light"])
+        self._pages(workspace, project, users["light"])
+        self._stickies(workspace, users["light"])
         self._shared_links(workspace, users)
         self._import_jobs(workspace, project, users["admin"])
         self._invitations(workspace, users["admin"])
@@ -218,6 +230,9 @@ class Command(BaseCommand):
             "comment": Command.COMMENT,
             # The saved views the view list stories wait on.
             "views": {"project": Command.PROJECT_VIEW, "workspace": Command.WORKSPACE_VIEW},
+            # The project pages and the sticky the page and sticky stories wait on.
+            "pages": {"ids": [str(page_id) for page_id in PAGE_IDS], "names": [n for n, _ in Command.PAGES]},
+            "sticky": Command.STICKY_TEXT,
             "invitations": [email for email, _ in Command.INVITATIONS],
             "sharedLinks": {
                 "visible": [t for t, _, hidden in Command.SHARED_LINKS if not hidden],
@@ -607,6 +622,63 @@ class Command(BaseCommand):
             IssueView.objects.filter(pk=view.pk).update(
                 created_at=CLOCK - timedelta(days=3), updated_at=CLOCK - timedelta(days=3)
             )
+
+    PAGES = (
+        (
+            "Release checklist",
+            "<h2>Before the release</h2>"
+            "<p>Freeze <strong>preview</strong> and read the <em>migration</em> notes twice.</p>"
+            "<ul><li><p>Record the visual baselines</p></li><li><p>Tag the release candidate</p></li></ul>"
+            "<blockquote><p>Nothing ships that nobody has looked at.</p></blockquote>"
+            "<p>The last paragraph.</p>",
+        ),
+        ("Retrospective notes", "<p>What went well, and what did not.</p>"),
+    )
+    STICKY_TEXT = "Book the training room"
+
+    def _pages(self, workspace, project, owner) -> None:
+        """Two public project pages, the first with a little of everything.
+
+        Without them the pages list renders its empty state, and the page editor,
+        its toolbar and the export dialog show nowhere. The editor loads the
+        stored HTML through the live server, as it loads every page that has no
+        collaborative state yet.
+        """
+        for index, (page_id, (name, html)) in enumerate(zip(PAGE_IDS, Command.PAGES)):
+            page, _ = Page.objects.get_or_create(
+                id=page_id,
+                defaults={
+                    "name": name,
+                    "workspace": workspace,
+                    "owned_by": owner,
+                    "created_by": owner,
+                    "description_html": html,
+                    "access": 0,
+                },
+            )
+            ProjectPage.objects.get_or_create(
+                page=page, project=project, defaults={"workspace": workspace, "created_by": owner}
+            )
+            # `auto_now_add`: the list prints when each page was created.
+            Page.objects.filter(pk=page.pk).update(
+                created_at=CLOCK - timedelta(days=5 - index), updated_at=CLOCK - timedelta(days=5 - index)
+            )
+
+    def _stickies(self, workspace, owner) -> None:
+        """One sticky, so the stickies page shows a note rather than its empty state."""
+        sticky, _ = Sticky.objects.get_or_create(
+            id=STICKY_ID,
+            defaults={
+                "workspace": workspace,
+                "owner": owner,
+                "created_by": owner,
+                "description_html": f"<p>{Command.STICKY_TEXT}</p><ul><li><p>Projector</p></li></ul>",
+                "background_color": "peach",
+            },
+        )
+        Sticky.objects.filter(pk=sticky.pk).update(
+            created_at=CLOCK - timedelta(days=1), updated_at=CLOCK - timedelta(days=1)
+        )
 
     def _shared_links(self, workspace, users) -> None:
         for index, (title, url, hidden) in enumerate(self.SHARED_LINKS):
