@@ -78,8 +78,8 @@ describe("the spreadsheet estimate column", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     const [, data] = onChange.mock.calls[0] as [TIssue, Partial<TIssue>];
     expect(data).toEqual({ estimate_point: null });
-    // The key is present, so JSON keeps it.
-    expect(JSON.parse(JSON.stringify(data))).toEqual({ estimate_point: null });
+    // The key is present, so the PATCH body carries it.
+    expect(JSON.stringify(data)).toBe('{"estimate_point":null}');
   });
 });
 
