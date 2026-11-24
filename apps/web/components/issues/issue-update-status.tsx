@@ -6,7 +6,7 @@
 
 import React from "react";
 import { observer } from "mobx-react";
-import { RefreshCw } from "lucide-react";
+import { RefreshOutline } from "@makeplane/propel/icons";
 // types
 import type { TNameDescriptionLoader } from "@plane/types";
 
@@ -25,9 +25,11 @@ export const NameDescriptionUpdateStatus = observer(function NameDescriptionUpda
         }`}
       >
         {isSubmitting !== "submitted" && isSubmitting !== "saved" && (
-          <RefreshCw className="size-3.5 animate-spin stroke-tertiary" />
+          <RefreshOutline className="size-3.5 animate-spin text-tertiary" />
         )}
-        <span className="text-13 text-tertiary">{isSubmitting === "submitting" ? "Saving..." : "Saved"}</span>
+        <span className="text-body-xs-regular text-tertiary">
+          {isSubmitting === "submitting" ? "Saving..." : "Saved"}
+        </span>
       </div>
     </>
   );

@@ -9,9 +9,12 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 
 import { useTranslation } from "@plane/i18n";
-import { EditIcon, CloseIcon } from "@plane/propel/icons";
+import { CloseOutline, EditOutline } from "@makeplane/propel/icons";
 // plane imports
-import { Tooltip } from "@plane/propel/tooltip";
+import { Button } from "@makeplane/propel/elements/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { cn } from "@plane/utils";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -73,66 +76,94 @@ export const IssueParentSelect = observer(function IssueParentSelect(props: TIss
         issueId={issueId}
         isOpen={isParentIssueModalOpen === issueId}
         handleClose={() => toggleParentIssueModal(null)}
-        onChange={(issue: any) => handleParentIssue(issue?.id)}
+        onChange={(selected: any) => handleParentIssue(selected?.id)}
       />
-      <button
-        type="button"
+      <div
         className={cn(
-          "group flex items-center justify-between gap-2 rounded-sm px-2 py-0.5 outline-none",
+          "group flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md",
           {
-            "cursor-not-allowed": disabled,
+            "px-2": !!(issue.parent_id && parentIssue),
             "hover:bg-layer-transparent-hover": !disabled,
             "bg-layer-transparent-selected": isParentIssueModalOpen,
           },
           className
         )}
-        onClick={() => toggleParentIssueModal(issue.id)}
-        disabled={disabled}
       >
         {issue.parent_id && parentIssue ? (
-          <div className="flex items-center gap-1.5">
-            <Tooltip tooltipHeading="Title" tooltipContent={parentIssue.name} isMobile={isMobile}>
-              <Link href={workItemLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                {parentIssue?.project_id && parentIssueProjectDetails && (
-                  <IssueIdentifier
-                    projectId={parentIssue.project_id}
-                    issueTypeId={parentIssue.type_id}
-                    projectIdentifier={parentIssueProjectDetails?.identifier}
-                    issueSequenceId={parentIssue.sequence_id}
-                    size="xs"
-                    variant="secondary"
-                  />
-                )}
-              </Link>
-            </Tooltip>
-
-            {!disabled && (
-              <Tooltip tooltipContent={t("common.remove")} position="bottom" isMobile={isMobile}>
-                <span
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleRemoveSubIssue(workspaceSlug, projectId, parentIssue.id, issueId);
-                  }}
+          <>
+            <div className="flex h-full min-w-0 flex-1 items-center gap-1.5">
+              <Tooltip label={`Title: ${parentIssue.name}`} layout="stacked" disabled={isMobile}>
+                <Link
+                  href={workItemLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={
+                    parentIssue.project_id && parentIssueProjectDetails
+                      ? undefined
+                      : parentIssue.name?.trim() || t("common.parent")
+                  }
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <CloseIcon className="h-2.5 w-2.5 text-tertiary hover:text-danger-primary" />
-                </span>
+                  {parentIssue?.project_id && parentIssueProjectDetails && (
+                    <IssueIdentifier
+                      projectId={parentIssue.project_id}
+                      issueTypeId={parentIssue.type_id}
+                      projectIdentifier={parentIssueProjectDetails?.identifier}
+                      issueSequenceId={parentIssue.sequence_id}
+                      size="xs"
+                      variant="secondary"
+                    />
+                  )}
+                </Link>
               </Tooltip>
+              {!disabled && (
+                <Tooltip label={t("common.remove")} side="bottom" disabled={isMobile}>
+                  <IconButton
+                    variant="ghost"
+                    size="xs"
+                    aria-label={t("common.remove")}
+                    showTooltip={false}
+                    icon={<Icon icon={CloseOutline} />}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleRemoveSubIssue(workspaceSlug, projectId, parentIssue.id, issueId);
+                    }}
+                  />
+                </Tooltip>
+              )}
+            </div>
+            {!disabled && (
+              <div className="shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+                <IconButton
+                  variant="ghost"
+                  size="xs"
+                  aria-label={t("change_parent_issue")}
+                  showTooltip={!isMobile}
+                  icon={<Icon icon={EditOutline} />}
+                  onClick={() => toggleParentIssueModal(issue.id)}
+                />
+              </div>
             )}
-          </div>
+          </>
         ) : (
-          <span className="text-body-xs-medium text-placeholder">{t("issue.add.parent")}</span>
-        )}
-        {!disabled && (
-          <span
-            className={cn("flex-shrink-0 p-1 opacity-0 group-hover:opacity-100", {
-              "text-placeholder": !issue.parent_id && !parentIssue,
-            })}
+          <Button
+            type="button"
+            variant="ghost"
+            size="md"
+            stretch="full"
+            onClick={() => toggleParentIssueModal(issue.id)}
+            disabled={disabled}
           >
-            <EditIcon className="h-2.5 w-2.5 flex-shrink-0" />
-          </span>
+            <span className="grow text-left text-body-xs-regular text-placeholder">{t("issue.add.parent")}</span>
+            {!disabled && (
+              <span className="shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+                <Icon icon={EditOutline} />
+              </span>
+            )}
+          </Button>
         )}
-      </button>
+      </div>
     </>
   );
 });

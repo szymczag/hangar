@@ -545,7 +545,8 @@
       "asc": "Artan",
       "desc": "Azalan",
       "created_on": "Oluşturulma tarihi",
-      "updated_on": "Güncellenme tarihi"
+      "updated_on": "Güncellenme tarihi",
+      "label": "Sırala"
     },
     "comments": "Yorumlar",
     "updates": "Güncellemeler",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Aranıyor...",
-  "rename_folder": "Klasörü yeniden adlandır"
+  "rename_folder": "Klasörü yeniden adlandır",
+  "entity_detail_toolbar": "İşlemler"
 }

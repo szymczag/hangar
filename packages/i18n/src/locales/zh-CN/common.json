@@ -545,7 +545,8 @@
       "asc": "升序",
       "desc": "降序",
       "created_on": "创建时间",
-      "updated_on": "更新时间"
+      "updated_on": "更新时间",
+      "label": "排序"
     },
     "comments": "评论",
     "updates": "更新",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "搜索中…",
-  "rename_folder": "重命名文件夹"
+  "rename_folder": "重命名文件夹",
+  "entity_detail_toolbar": "操作"
 }

@@ -6,13 +6,27 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-import { Pencil, Trash2 } from "lucide-react";
 // plane imports
+import { Button } from "@makeplane/propel/components/button";
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogHeading,
+  DialogMain,
+  DialogTitle,
+} from "@makeplane/propel/components/dialog";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { DeleteOutline, EditOutline } from "@makeplane/propel/icons";
+import { ConfirmDialog } from "@plane/blocks/dialog";
+import { setToast } from "@plane/blocks/toast";
 import { EUserPermissions } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { AlertModalCore, EModalPosition, EModalWidth, Input, ModalCore } from "@plane/ui";
 import { renderFormattedDate } from "@plane/utils";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -93,7 +107,7 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
     const minutes = validateDurationInput(durationInput);
     if (minutes === null) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Invalid duration",
         message: 'Use a format like "2h 30m", "45m" or plain minutes, up to 24h.',
       });
@@ -110,7 +124,7 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
       await refresh();
     } catch (error) {
       console.error(error);
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to log time." });
+      setToast({ type: "error", title: "Error!", message: "Failed to log time." });
     } finally {
       setIsSubmitting(false);
     }
@@ -126,7 +140,7 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
     const minutes = validateDurationInput(editDurationInput);
     if (minutes === null) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Invalid duration",
         message: 'Use a format like "2h 30m", "45m" or plain minutes, up to 24h.',
       });
@@ -142,7 +156,7 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
       await refresh();
     } catch (error) {
       console.error(error);
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to update the entry." });
+      setToast({ type: "error", title: "Error!", message: "Failed to update the entry." });
     } finally {
       setIsSubmitting(false);
     }
@@ -156,7 +170,7 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
       await refresh();
     } catch (error) {
       console.error(error);
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to delete the entry." });
+      setToast({ type: "error", title: "Error!", message: "Failed to delete the entry." });
     } finally {
       setIsSubmitting(false);
     }
@@ -164,130 +178,166 @@ export const WorklogModal = observer(function WorklogModal(props: TWorklogModal)
 
   return (
     <>
-      <AlertModalCore
+      <ConfirmDialog
         isOpen={pendingDeleteId !== null}
         handleClose={() => setPendingDeleteId(null)}
-        handleSubmit={() => pendingDeleteId && void handleDelete(pendingDeleteId)}
+        handleSubmit={async () => {
+          if (pendingDeleteId) await handleDelete(pendingDeleteId);
+        }}
         isSubmitting={isSubmitting}
         title="Delete worklog"
         content="Are you sure you want to delete this time entry? This action cannot be undone."
       />
-      <ModalCore isOpen={isOpen} handleClose={handleClose} position={EModalPosition.TOP} width={EModalWidth.XL}>
-        <div className="space-y-4 p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-medium text-primary">{t("time_tracking")}</h3>
-            <span className="text-sm text-tertiary">
-              {t("common.worklogs")}:{" "}
-              <span className="font-medium text-primary">{formatWorklogDuration(totalDuration)}</span>
-            </span>
-          </div>
-
-          {!disabled && (
-            <div className="flex items-start gap-2">
-              <Input
-                value={durationInput}
-                onChange={(e) => setDurationInput(e.target.value)}
-                placeholder="2h 30m"
-                className="w-28"
-              />
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What was done? (optional)"
-                maxLength={MAX_WORKLOG_DESCRIPTION_LENGTH}
-                className="grow"
-              />
-              <Button variant="primary" size="sm" onClick={handleCreate} loading={isSubmitting} disabled={isSubmitting}>
-                Log time
-              </Button>
-            </div>
-          )}
-
-          <div className="max-h-72 space-y-1 overflow-y-auto">
-            {!isLoading && worklogs.length === 0 && (
-              <p className="text-sm py-4 text-center text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
-            )}
-            {worklogs.map((worklog) => {
-              const author = worklog.logged_by ? getUserDetails(worklog.logged_by) : undefined;
-              const isEditing = editingId === worklog.id;
-              return (
-                <div
-                  key={worklog.id}
-                  className="group text-sm flex items-center gap-2 rounded-md border border-subtle px-3 py-2"
-                >
-                  {isEditing ? (
-                    <>
-                      <Input
-                        value={editDurationInput}
-                        onChange={(e) => setEditDurationInput(e.target.value)}
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) handleClose();
+        }}
+      >
+        <DialogContent size="lg">
+          <DialogMain>
+            <DialogHeader>
+              <DialogHeading>
+                <DialogTitle>{t("time_tracking")}</DialogTitle>
+                <DialogDescription>
+                  {t("common.worklogs")}:{" "}
+                  <span className="text-body-sm-medium text-primary">{formatWorklogDuration(totalDuration)}</span>
+                </DialogDescription>
+              </DialogHeading>
+            </DialogHeader>
+            <DialogBody>
+              <div className="flex flex-col gap-4">
+                {!disabled && (
+                  <div className="flex items-end gap-2">
+                    <div className="w-28 shrink-0">
+                      <InputField
+                        size="md"
+                        orientation="vertical"
+                        aria-label="Duration"
+                        value={durationInput}
+                        onChange={(e) => setDurationInput(e.target.value)}
                         placeholder="2h 30m"
-                        className="w-28"
                       />
-                      <Input
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
+                    </div>
+                    <div className="min-w-0 grow">
+                      <InputField
+                        size="md"
+                        orientation="vertical"
+                        aria-label="Description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
                         placeholder="What was done? (optional)"
                         maxLength={MAX_WORKLOG_DESCRIPTION_LENGTH}
-                        className="grow"
                       />
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleUpdate(worklog.id)}
-                        loading={isSubmitting}
-                        disabled={isSubmitting}
-                      >
-                        Save
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={() => setEditingId(null)} disabled={isSubmitting}>
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-20 shrink-0 font-medium text-primary">
-                        {formatWorklogDuration(worklog.duration)}
-                      </span>
-                      <span className="grow truncate text-secondary">{worklog.description}</span>
-                      <span className="text-xs shrink-0 text-tertiary">
-                        {author?.display_name ?? "—"} · {renderFormattedDate(worklog.created_at)}
-                      </span>
-                      {canModify(worklog) && (
-                        <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() => startEditing(worklog)}
-                            disabled={isSubmitting}
-                            className="rounded p-1 text-tertiary hover:bg-layer-1 hover:text-primary"
-                            aria-label="Edit worklog"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPendingDeleteId(worklog.id)}
-                            disabled={isSubmitting}
-                            className="rounded p-1 text-tertiary hover:bg-layer-1 hover:text-danger-primary"
-                            aria-label="Delete worklog"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      stretch="auto"
+                      label="Log time"
+                      onClick={() => void handleCreate()}
+                      loading={isSubmitting}
+                    />
+                  </div>
+                )}
 
-          <div className="flex justify-end">
-            <Button variant="secondary" size="sm" onClick={handleClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-      </ModalCore>
+                <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+                  {!isLoading && worklogs.length === 0 && (
+                    <p className="py-4 text-center text-body-sm-regular text-tertiary">
+                      {t("activity_empty_state.no_worklogs")}
+                    </p>
+                  )}
+                  {worklogs.map((worklog) => {
+                    const author = worklog.logged_by ? getUserDetails(worklog.logged_by) : undefined;
+                    const isEditing = editingId === worklog.id;
+                    return (
+                      <div
+                        key={worklog.id}
+                        className="group flex items-center gap-2 rounded-md border border-subtle px-3 py-2 text-body-sm-regular"
+                      >
+                        {isEditing ? (
+                          <>
+                            <div className="w-28 shrink-0">
+                              <InputField
+                                size="md"
+                                orientation="vertical"
+                                aria-label="Duration"
+                                value={editDurationInput}
+                                onChange={(e) => setEditDurationInput(e.target.value)}
+                                placeholder="2h 30m"
+                              />
+                            </div>
+                            <div className="min-w-0 grow">
+                              <InputField
+                                size="md"
+                                orientation="vertical"
+                                aria-label="Description"
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                placeholder="What was done? (optional)"
+                                maxLength={MAX_WORKLOG_DESCRIPTION_LENGTH}
+                              />
+                            </div>
+                            <Button
+                              variant="primary"
+                              size="md"
+                              stretch="auto"
+                              label="Save"
+                              onClick={() => void handleUpdate(worklog.id)}
+                              loading={isSubmitting}
+                            />
+                            <Button
+                              variant="secondary"
+                              size="md"
+                              stretch="auto"
+                              label="Cancel"
+                              onClick={() => setEditingId(null)}
+                              disabled={isSubmitting}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <span className="w-20 shrink-0 text-body-sm-medium text-primary">
+                              {formatWorklogDuration(worklog.duration)}
+                            </span>
+                            <span className="grow truncate text-secondary">{worklog.description}</span>
+                            <span className="shrink-0 text-caption-md-regular text-tertiary">
+                              {author?.display_name ?? "—"} · {renderFormattedDate(worklog.created_at)}
+                            </span>
+                            {canModify(worklog) && (
+                              <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                                <IconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  icon={<Icon icon={EditOutline} />}
+                                  aria-label="Edit worklog"
+                                  onClick={() => startEditing(worklog)}
+                                  disabled={isSubmitting}
+                                />
+                                <IconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  icon={<Icon icon={DeleteOutline} />}
+                                  aria-label="Delete worklog"
+                                  onClick={() => setPendingDeleteId(worklog.id)}
+                                  disabled={isSubmitting}
+                                />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </DialogBody>
+          </DialogMain>
+          <DialogActions>
+            <Button variant="secondary" size="md" stretch="auto" label="Close" onClick={handleClose} />
+          </DialogActions>
+        </DialogContent>
+      </Dialog>
     </>
   );
 });

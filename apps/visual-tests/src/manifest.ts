@@ -20,6 +20,8 @@ export type VisualFixtures = {
   publishedBoard: { anchor: string; workItems: string[]; peekId: string };
   /** Names of the seeded work items, in the order they were created. */
   workItems: string[];
+  /** The comment on the first work item. */
+  comment: string;
   /** Custom property names on the Task type, in sort order. */
   properties: string[];
   /** Shared quick links, split by whether the light user has hidden them. */

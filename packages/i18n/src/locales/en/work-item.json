@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "View other work items"
         }
+      },
+      "no_access": {
+        "description": "Contact a project admin to request access.",
+        "title": "You don't have access to this work item"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "Work item could not be archived. Please try again."
-      }
+      },
+      "banner_message": "This work item has been archived. Visit the Archives section to restore it.",
+      "go_to_archives": "Go to archives"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Click to downvote",
       "click_to_view_upvotes": "Click to view upvotes",
       "click_to_view_downvotes": "Click to view downvotes"
-    }
+    },
+    "archived_banner": "This work item is archived. Restore it to make changes.",
+    "assignee_count": "{count, plural, one {# assignee} other {# assignees}}",
+    "description_load_failed": "Couldn't load the description.",
+    "updated_time_ago": "Updated {time}"
   },
   "sub_work_item": {
     "update": {

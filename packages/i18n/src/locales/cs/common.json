@@ -545,7 +545,8 @@
       "asc": "Vzestupně",
       "desc": "Sestupně",
       "created_on": "Vytvořeno dne",
-      "updated_on": "Aktualizováno dne"
+      "updated_on": "Aktualizováno dne",
+      "label": "Seřadit"
     },
     "comments": "Komentáře",
     "updates": "Aktualizace",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Hledání...",
-  "rename_folder": "Přejmenovat složku"
+  "rename_folder": "Přejmenovat složku",
+  "entity_detail_toolbar": "Akce"
 }

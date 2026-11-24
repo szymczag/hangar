@@ -7,13 +7,15 @@
 import React from "react";
 import { observer } from "mobx-react";
 // plane imports
+import { EntityDetailWidgetSection } from "@plane/blocks/entity-detail";
+import { useTranslation } from "@plane/i18n";
 import type { TIssueServiceType } from "@plane/types";
-import { Collapsible } from "@plane/ui";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local imports
 import { SubIssuesCollapsibleContent } from "./content";
-import { SubIssuesCollapsibleTitle } from "./title";
+import { SubIssuesProgressChip } from "./title";
+import { SubWorkItemTitleActions } from "./title-actions";
 
 type Props = {
   workspaceSlug: string;
@@ -25,25 +27,33 @@ type Props = {
 
 export const SubIssuesCollapsible = observer(function SubIssuesCollapsible(props: Props) {
   const { workspaceSlug, projectId, issueId, disabled = false, issueServiceType } = props;
+  // translation
+  const { t } = useTranslation();
   // store hooks
-  const { openWidgets, toggleOpenWidget } = useIssueDetail(issueServiceType);
+  const {
+    openWidgets,
+    toggleOpenWidget,
+    subIssues: { subIssuesByIssueId },
+  } = useIssueDetail(issueServiceType);
   // derived values
   const isCollapsibleOpen = openWidgets.includes("sub-work-items");
+  const subIssuesCount = subIssuesByIssueId(issueId)?.length ?? 0;
 
   return (
-    <Collapsible
+    <EntityDetailWidgetSection
+      title={t("common.sub_work_items")}
+      count={subIssuesCount}
       isOpen={isCollapsibleOpen}
       onToggle={() => toggleOpenWidget("sub-work-items")}
-      title={
-        <SubIssuesCollapsibleTitle
-          isOpen={isCollapsibleOpen}
-          parentIssueId={issueId}
-          disabled={disabled}
+      titleAccessory={<SubIssuesProgressChip parentIssueId={issueId} issueServiceType={issueServiceType} />}
+      actions={
+        <SubWorkItemTitleActions
           projectId={projectId}
-          workspaceSlug={workspaceSlug}
+          parentId={issueId}
+          disabled={disabled}
+          issueServiceType={issueServiceType}
         />
       }
-      buttonClassName="w-full"
     >
       <SubIssuesCollapsibleContent
         workspaceSlug={workspaceSlug}
@@ -52,6 +62,6 @@ export const SubIssuesCollapsible = observer(function SubIssuesCollapsible(props
         disabled={disabled}
         issueServiceType={issueServiceType}
       />
-    </Collapsible>
+    </EntityDetailWidgetSection>
   );
 });

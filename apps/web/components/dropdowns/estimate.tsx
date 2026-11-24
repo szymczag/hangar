@@ -28,10 +28,11 @@ type TEstimateDropdownProps = {
   /** No effect: the estimate glyph is part of the trigger. */
   hideIcon?: boolean;
   /**
-   * Receives `undefined` for "No estimate", as in 1.4 (the callers type it so). Upstream's
-   * `EstimateSelect` emits `null`, which its own callers send to clear the field.
+   * Receives `null` for "No estimate", as upstream's `EstimateSelect` emits it. The callers send it
+   * as `estimate_point`, and only `null` clears the field: `undefined` is dropped from the JSON
+   * payload, so the server kept the old estimate.
    */
-  onChange: (val: string | undefined) => void;
+  onChange: (val: string | null) => void;
   onClose?: () => void;
   placeholder?: string;
   placement?: Placement;
@@ -64,7 +65,7 @@ export function EstimateDropdown(props: TEstimateDropdownProps) {
     <DropdownCompatFrame className={className} placement={placement}>
       <EstimateSelect
         value={value}
-        onChange={(estimatePoint) => onChange(estimatePoint ?? undefined)}
+        onChange={onChange}
         projectId={projectId}
         variant={toSelectVariant(buttonVariant)}
         disabled={disabled}

@@ -7,9 +7,9 @@
 import { useCallback, useMemo } from "react";
 import { observer } from "mobx-react";
 // plane imports
-import { ListFilter } from "lucide-react";
+import { FilterOutline } from "@makeplane/propel/icons";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
 import type { GroupByColumnTypes, TIssue, TIssueServiceType, TSubIssueOperations } from "@plane/types";
 import { EIssueServiceType, EIssuesStoreType } from "@plane/types";
 // hooks
@@ -89,12 +89,16 @@ export const SubIssuesListRoot = observer(function SubIssuesListRoot(props: Prop
         <SectionEmptyState
           title={t("sub_work_item.empty_state.sub_list_filters.title")}
           description={t("sub_work_item.empty_state.sub_list_filters.description")}
-          icon={<ListFilter />}
+          icon={<FilterOutline />}
           customClassName="border-none"
           actionElement={
-            <Button variant="secondary" onClick={() => resetFilters(rootIssueId)}>
-              {t("sub_work_item.empty_state.list_filters.action")}
-            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              stretch="auto"
+              onClick={() => resetFilters(rootIssueId)}
+              label={t("sub_work_item.empty_state.list_filters.action")}
+            />
           }
         />
       ) : (

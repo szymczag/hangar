@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "Diğer iş öğelerini görüntüle"
         }
+      },
+      "no_access": {
+        "description": "Erişim istemek için bir proje yöneticisiyle iletişime geçin.",
+        "title": "Bu iş öğesine erişiminiz yok"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "İş öğesi arşivlenemedi. Lütfen tekrar deneyin."
-      }
+      },
+      "banner_message": "Bu iş öğesi arşivlendi. Geri yüklemek için Arşivler bölümüne gidin.",
+      "go_to_archives": "Arşivlere git"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Olumsuz oy vermek için tıklayın",
       "click_to_view_upvotes": "Olumlu oyları görüntülemek için tıklayın",
       "click_to_view_downvotes": "Olumsuz oyları görüntülemek için tıklayın"
-    }
+    },
+    "archived_banner": "Bu iş öğesi arşivlendi. Değişiklik yapmak için geri yükleyin.",
+    "assignee_count": "{count, plural, one {# atanan} other {# atanan}}",
+    "description_load_failed": "Açıklama yüklenemedi.",
+    "updated_time_ago": "{time} güncellendi"
   },
   "sub_work_item": {
     "update": {

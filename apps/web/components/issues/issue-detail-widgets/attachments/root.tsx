@@ -7,13 +7,14 @@
 import React from "react";
 import { observer } from "mobx-react";
 // plane imports
+import { EntityDetailWidgetSection } from "@plane/blocks/entity-detail";
+import { useTranslation } from "@plane/i18n";
 import type { TIssueServiceType } from "@plane/types";
-import { Collapsible } from "@plane/ui";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local imports
 import { IssueAttachmentsCollapsibleContent } from "./content";
-import { IssueAttachmentsCollapsibleTitle } from "./title";
+import { IssueAttachmentActionButton } from "./quick-action-button";
 
 type Props = {
   workspaceSlug: string;
@@ -25,27 +26,35 @@ type Props = {
 
 export const AttachmentsCollapsible = observer(function AttachmentsCollapsible(props: Props) {
   const { workspaceSlug, projectId, issueId, disabled = false, issueServiceType } = props;
+  // translation
+  const { t } = useTranslation();
   // store hooks
-  const { openWidgets, toggleOpenWidget } = useIssueDetail(issueServiceType);
-
+  const {
+    openWidgets,
+    toggleOpenWidget,
+    issue: { getIssueById },
+  } = useIssueDetail(issueServiceType);
   // derived values
   const isCollapsibleOpen = openWidgets.includes("attachments");
+  const attachmentCount = getIssueById(issueId)?.attachment_count ?? 0;
 
   return (
-    <Collapsible
+    <EntityDetailWidgetSection
+      title={t("common.attachments")}
+      count={attachmentCount}
       isOpen={isCollapsibleOpen}
       onToggle={() => toggleOpenWidget("attachments")}
-      title={
-        <IssueAttachmentsCollapsibleTitle
-          isOpen={isCollapsibleOpen}
-          workspaceSlug={workspaceSlug}
-          projectId={projectId}
-          issueId={issueId}
-          disabled={disabled}
-          issueServiceType={issueServiceType}
-        />
+      actions={
+        !disabled ? (
+          <IssueAttachmentActionButton
+            workspaceSlug={workspaceSlug}
+            projectId={projectId}
+            issueId={issueId}
+            disabled={disabled}
+            issueServiceType={issueServiceType}
+          />
+        ) : undefined
       }
-      buttonClassName="w-full"
     >
       <IssueAttachmentsCollapsibleContent
         workspaceSlug={workspaceSlug}
@@ -54,6 +63,6 @@ export const AttachmentsCollapsible = observer(function AttachmentsCollapsible(p
         disabled={disabled}
         issueServiceType={issueServiceType}
       />
-    </Collapsible>
+    </EntityDetailWidgetSection>
   );
 });

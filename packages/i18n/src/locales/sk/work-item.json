@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "Zobraziť ďalšie pracovné položky"
         }
+      },
+      "no_access": {
+        "description": "Požiadajte o prístup administrátora projektu.",
+        "title": "K tejto pracovnej položke nemáte prístup"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "Archivácia pracovnej položky zlyhala. Skúste to prosím znova."
-      }
+      },
+      "banner_message": "Táto pracovná položka bola archivovaná. Prejdite do sekcie Archívy a obnovte ju.",
+      "go_to_archives": "Prejsť do archívov"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Kliknite pre hlasovanie dole",
       "click_to_view_upvotes": "Kliknite pre zobrazenie hlasov hore",
       "click_to_view_downvotes": "Kliknite pre zobrazenie hlasov dole"
-    }
+    },
+    "archived_banner": "Táto pracovná položka je archivovaná. Ak chcete vykonať zmeny, obnovte ju.",
+    "assignee_count": "{count, plural, one {# priradený} few {# priradení} many {# priradeného} other {# priradených}}",
+    "description_load_failed": "Popis sa nepodarilo načítať.",
+    "updated_time_ago": "Aktualizované {time}"
   },
   "sub_work_item": {
     "update": {

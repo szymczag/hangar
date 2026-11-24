@@ -4,9 +4,9 @@
  * See the LICENSE file for details.
  */
 
-import { NewTabIcon, EditIcon, TrashIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { DeleteOutline, EditOutline, NewTabOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { getIconForLink, copyTextToClipboard, calculateTimeAgo } from "@plane/utils";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -44,33 +44,38 @@ export function IssueLinkDetail(props: TIssueLinkDetail) {
 
   const createdByDetails = getUserDetails(linkDetail.created_by_id);
 
+  const handleCopyLink = () => {
+    void copyTextToClipboard(linkDetail.url);
+    setToast({
+      type: "success",
+      title: "Link copied!",
+      message: "Link copied to clipboard",
+    });
+  };
+
   return (
     <div key={linkId}>
       <div className="relative flex flex-col rounded-md bg-surface-2 p-2.5">
-        <div
-          className="flex w-full cursor-pointer items-start justify-between gap-2"
-          onClick={() => {
-            copyTextToClipboard(linkDetail.url);
-            setToast({
-              type: TOAST_TYPE.SUCCESS,
-              title: "Link copied!",
-              message: "Link copied to clipboard",
-            });
-          }}
-        >
-          <div className="flex items-start gap-2 truncate">
+        <div className="flex w-full items-start justify-between gap-2">
+          {/* The copy action is the title alone, so the edit, open and remove controls beside it are not nested in it. */}
+          <button
+            type="button"
+            className="flex min-w-0 cursor-pointer items-start gap-2 truncate text-left"
+            onClick={handleCopyLink}
+          >
             <span className="py-1">
               <Icon className="size-3 flex-shrink-0 stroke-2 text-tertiary group-hover:text-primary" />
             </span>
             <Tooltip
-              tooltipContent={linkDetail.title && linkDetail.title !== "" ? linkDetail.title : linkDetail.url}
-              isMobile={isMobile}
+              label={linkDetail.title && linkDetail.title !== "" ? linkDetail.title : linkDetail.url}
+              layout="stacked"
+              disabled={isMobile}
             >
-              <span className="truncate text-11">
+              <span className="truncate text-caption-sm-regular">
                 {linkDetail.title && linkDetail.title !== "" ? linkDetail.title : linkDetail.url}
               </span>
             </Tooltip>
-          </div>
+          </button>
 
           {!isNotAllowed && (
             <div className="z-[1] flex flex-shrink-0 items-center gap-2">
@@ -83,7 +88,7 @@ export function IssueLinkDetail(props: TIssueLinkDetail) {
                   toggleIssueLinkModal(true);
                 }}
               >
-                <EditIcon className="h-3 w-3 stroke-[1.5] text-secondary" />
+                <EditOutline className="h-3 w-3 text-secondary" />
               </button>
               <a
                 href={linkDetail.url}
@@ -91,7 +96,7 @@ export function IssueLinkDetail(props: TIssueLinkDetail) {
                 rel="noopener noreferrer"
                 className="flex items-center justify-center p-1 hover:bg-layer-1"
               >
-                <NewTabIcon className="h-3 w-3 stroke-[1.5] text-secondary" />
+                <NewTabOutline className="h-3 w-3 text-secondary" />
               </a>
               <button
                 type="button"
@@ -102,14 +107,14 @@ export function IssueLinkDetail(props: TIssueLinkDetail) {
                   linkOperations.remove(linkDetail.id);
                 }}
               >
-                <TrashIcon className="h-3 w-3" />
+                <DeleteOutline className="h-3 w-3" />
               </button>
             </div>
           )}
         </div>
 
         <div className="px-5">
-          <p className="mt-0.5 stroke-[1.5] text-11 text-tertiary">
+          <p className="mt-0.5 stroke-[1.5] text-caption-sm-regular text-tertiary">
             Added {calculateTimeAgo(linkDetail.created_at)}
             <br />
             {createdByDetails && (

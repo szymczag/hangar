@@ -545,7 +545,8 @@
       "asc": "Ascendente",
       "desc": "Descendente",
       "created_on": "Criado em",
-      "updated_on": "Atualizado em"
+      "updated_on": "Atualizado em",
+      "label": "Ordenar"
     },
     "comments": "Comentários",
     "updates": "Atualizações",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Pesquisando...",
-  "rename_folder": "Renomear pasta"
+  "rename_folder": "Renomear pasta",
+  "entity_detail_toolbar": "Ações"
 }

@@ -6,10 +6,10 @@
 
 import { useMemo, useState } from "react";
 import { observer } from "mobx-react";
-import { stringToEmoji } from "@plane/propel/emoji-icon-picker";
-import { EmojiReactionGroup, EmojiReactionPicker } from "@plane/propel/emoji-reaction";
-import type { EmojiReactionType } from "@plane/propel/emoji-reaction";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { stringToEmoji } from "@plane/blocks/emoji-icon-picker";
+import { EmojiReactionButton, EmojiReactionGroup, EmojiReactionPicker } from "@plane/blocks/emoji-reaction";
+import type { EmojiReactionType } from "@plane/blocks/emoji-reaction";
+import { setToast } from "@plane/blocks/toast";
 import type { IUser } from "@plane/types";
 // hooks
 // ui
@@ -51,13 +51,13 @@ export const IssueReaction = observer(function IssueReaction(props: TIssueReacti
           await createReaction(workspaceSlug, projectId, issueId, reaction);
           setToast({
             title: "Success!",
-            type: TOAST_TYPE.SUCCESS,
+            type: "success",
             message: "Reaction created successfully",
           });
         } catch (_error) {
           setToast({
             title: "Error!",
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             message: "Reaction creation failed",
           });
         }
@@ -68,13 +68,13 @@ export const IssueReaction = observer(function IssueReaction(props: TIssueReacti
           await removeReaction(workspaceSlug, projectId, issueId, reaction, currentUser.id);
           setToast({
             title: "Success!",
-            type: TOAST_TYPE.SUCCESS,
+            type: "success",
             message: "Reaction removed successfully",
           });
         } catch (_error) {
           setToast({
             title: "Error!",
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             message: "Reaction remove failed",
           });
         }
@@ -101,18 +101,17 @@ export const IssueReaction = observer(function IssueReaction(props: TIssueReacti
   };
 
   // Transform reactions data to Propel EmojiReactionType format
-  const reactions: EmojiReactionType[] = useMemo(() => {
-    if (!reactionIds) return [];
-
-    return Object.keys(reactionIds)
-      .filter((reaction) => reactionIds[reaction]?.length > 0)
-      .map((reaction) => ({
-        emoji: stringToEmoji(reaction),
-        count: reactionIds[reaction].length,
-        reacted: userReactions.includes(reaction),
-        users: getReactionUsers(reaction),
-      }));
-  }, [reactionIds, userReactions]);
+  // Not memoized: the reacting users' names come from the member store, which the observer tracks.
+  const reactions: EmojiReactionType[] = reactionIds
+    ? Object.keys(reactionIds)
+        .filter((reaction) => reactionIds[reaction]?.length > 0)
+        .map((reaction) => ({
+          emoji: stringToEmoji(reaction),
+          count: reactionIds[reaction].length,
+          reacted: userReactions.includes(reaction),
+          users: getReactionUsers(reaction),
+        }))
+    : [];
 
   const handleReactionClick = (emoji: string) => {
     if (disabled) return;
@@ -129,20 +128,21 @@ export const IssueReaction = observer(function IssueReaction(props: TIssueReacti
 
   return (
     <div className={cn("relative mt-4", className)}>
-      <EmojiReactionPicker
-        isOpen={isPickerOpen}
-        handleToggle={setIsPickerOpen}
-        onChange={handleEmojiSelect}
+      <EmojiReactionGroup
         disabled={disabled}
-        label={
-          <EmojiReactionGroup
-            reactions={reactions}
-            onReactionClick={handleReactionClick}
-            showAddButton={!disabled}
-            onAddReaction={() => setIsPickerOpen(true)}
+        reactions={reactions}
+        onReactionClick={handleReactionClick}
+        showAddButton={!disabled}
+        addReactionButton={
+          <EmojiReactionPicker
+            isOpen={isPickerOpen}
+            handleToggle={setIsPickerOpen}
+            onChange={handleEmojiSelect}
+            disabled={disabled}
+            render={<EmojiReactionButton />}
+            placement="bottom-start"
           />
         }
-        placement="bottom-start"
       />
     </div>
   );

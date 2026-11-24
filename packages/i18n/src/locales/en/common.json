@@ -545,7 +545,8 @@
       "asc": "Ascending",
       "desc": "Descending",
       "created_on": "Created on",
-      "updated_on": "Updated on"
+      "updated_on": "Updated on",
+      "label": "Sort"
     },
     "comments": "Comments",
     "updates": "Updates",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Searching...",
-  "rename_folder": "Rename folder"
+  "rename_folder": "Rename folder",
+  "entity_detail_toolbar": "Actions"
 }

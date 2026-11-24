@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "Visualizza altri elementi di lavoro"
         }
+      },
+      "no_access": {
+        "description": "Contatta un amministratore del progetto per richiedere l'accesso.",
+        "title": "Non hai accesso a questo elemento di lavoro"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "Impossibile archiviare l'elemento di lavoro. Per favore, riprova."
-      }
+      },
+      "banner_message": "Questo elemento di lavoro è stato archiviato. Vai alla sezione Archivi per ripristinarlo.",
+      "go_to_archives": "Vai agli archivi"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Clicca per votare contro",
       "click_to_view_upvotes": "Clicca per vedere i voti a favore",
       "click_to_view_downvotes": "Clicca per vedere i voti contro"
-    }
+    },
+    "archived_banner": "Questo elemento di lavoro è archiviato. Lo ripristini per apportare modifiche.",
+    "assignee_count": "{count, plural, one {# assegnatario} many {# assegnatari} other {# assegnatari}}",
+    "description_load_failed": "Impossibile caricare la descrizione.",
+    "updated_time_ago": "Aggiornato {time}"
   },
   "sub_work_item": {
     "update": {

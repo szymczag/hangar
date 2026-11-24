@@ -39,6 +39,12 @@ export interface IIssueProperties {
   className: string;
 }
 
+// Keeps a click on a property from opening the work item underneath it.
+const handleEventPropagation = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  e.preventDefault();
+};
+
 export const DraftIssueProperties = observer(function DraftIssueProperties(props: IIssueProperties) {
   const { issue, updateIssue, className } = props;
   // store hooks
@@ -117,7 +123,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
       target_date: date ? (renderFormattedPayloadDate(date) ?? undefined) : undefined,
     });
 
-  const handleEstimate = (value: string | undefined) =>
+  const handleEstimate = (value: string | null) =>
     issue?.project_id && updateIssue && updateIssue(issue.project_id, issue.id, { estimate_point: value });
 
   if (!issue.project_id) return null;
@@ -134,15 +140,11 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
   const maxDate = getDate(issue.target_date);
   maxDate?.setDate(maxDate.getDate());
 
-  const handleEventPropagation = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-  };
-
   return (
     <div className={className}>
       {/* basic properties */}
       {/* state */}
+      {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- stops a click reaching the row; the dropdown inside is the control */}
       <div className="h-5" onClick={handleEventPropagation}>
         <StateDropdown
           buttonContainerClassName="truncate max-w-40"
@@ -156,6 +158,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
       </div>
 
       {/* priority */}
+      {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- stops a click reaching the row; the dropdown inside is the control */}
       <div className="h-5" onClick={handleEventPropagation}>
         <PriorityDropdown
           value={issue?.priority}
@@ -179,6 +182,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
       />
 
       {/* start date */}
+      {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- stops a click reaching the row; the dropdown inside is the control */}
       <div className="h-5" onClick={handleEventPropagation}>
         <DateDropdown
           value={issue.start_date ?? null}
@@ -194,6 +198,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
       </div>
 
       {/* target/due date */}
+      {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- stops a click reaching the row; the dropdown inside is the control */}
       <div className="h-5" onClick={handleEventPropagation}>
         <DateDropdown
           value={issue?.target_date ?? null}
@@ -213,6 +218,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
       </div>
 
       {/* assignee */}
+      {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- stops a click reaching the row; the dropdown inside is the control */}
       <div className="h-5" onClick={handleEventPropagation}>
         <MemberDropdown
           projectId={issue?.project_id}
@@ -231,6 +237,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
 
       {/* modules */}
       {projectDetails?.module_view && (
+        // oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- stops a click reaching the row; the dropdown inside is the control
         <div className="h-5" onClick={handleEventPropagation}>
           <ModuleDropdown
             buttonContainerClassName="truncate max-w-40"
@@ -248,6 +255,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
 
       {/* cycles */}
       {projectDetails?.cycle_view && (
+        // oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- stops a click reaching the row; the dropdown inside is the control
         <div className="h-5" onClick={handleEventPropagation}>
           <CycleDropdown
             buttonContainerClassName="truncate max-w-40"
@@ -263,6 +271,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
 
       {/* estimates */}
       {issue.project_id && areEstimateEnabledByProjectId(issue.project_id?.toString()) && (
+        // oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- stops a click reaching the row; the dropdown inside is the control
         <div className="h-5" onClick={handleEventPropagation}>
           <EstimateDropdown
             value={issue.estimate_point ?? undefined}

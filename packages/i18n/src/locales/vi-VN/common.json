@@ -545,7 +545,8 @@
       "asc": "Tăng dần",
       "desc": "Giảm dần",
       "created_on": "Thời gian tạo",
-      "updated_on": "Thời gian cập nhật"
+      "updated_on": "Thời gian cập nhật",
+      "label": "Sắp xếp"
     },
     "comments": "Bình luận",
     "updates": "Cập nhật",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Đang tìm kiếm...",
-  "rename_folder": "Đổi tên thư mục"
+  "rename_folder": "Đổi tên thư mục",
+  "entity_detail_toolbar": "Hành động"
 }

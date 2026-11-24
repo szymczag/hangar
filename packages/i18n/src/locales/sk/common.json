@@ -545,7 +545,8 @@
       "asc": "Vzostupne",
       "desc": "Zostupne",
       "created_on": "Vytvorené dňa",
-      "updated_on": "Aktualizované dňa"
+      "updated_on": "Aktualizované dňa",
+      "label": "Zoradiť"
     },
     "comments": "Komentáre",
     "updates": "Aktualizácie",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Vyhľadávanie...",
-  "rename_folder": "Premenovať priečinok"
+  "rename_folder": "Premenovať priečinok",
+  "entity_detail_toolbar": "Akcie"
 }

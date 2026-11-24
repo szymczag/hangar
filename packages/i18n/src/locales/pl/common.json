@@ -545,7 +545,8 @@
       "asc": "Rosnąco",
       "desc": "Malejąco",
       "created_on": "Utworzono dnia",
-      "updated_on": "Zaktualizowano dnia"
+      "updated_on": "Zaktualizowano dnia",
+      "label": "Sortuj"
     },
     "comments": "Komentarze",
     "updates": "Aktualizacje",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Wyszukiwanie...",
-  "rename_folder": "Zmień nazwę folderu"
+  "rename_folder": "Zmień nazwę folderu",
+  "entity_detail_toolbar": "Akcje"
 }

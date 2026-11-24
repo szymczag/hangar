@@ -545,7 +545,8 @@
       "asc": "오름차순",
       "desc": "내림차순",
       "created_on": "생성일",
-      "updated_on": "업데이트일"
+      "updated_on": "업데이트일",
+      "label": "정렬"
     },
     "comments": "댓글",
     "updates": "업데이트",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "검색 중...",
-  "rename_folder": "폴더 이름 변경"
+  "rename_folder": "폴더 이름 변경",
+  "entity_detail_toolbar": "작업"
 }
