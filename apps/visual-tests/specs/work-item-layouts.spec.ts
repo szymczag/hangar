@@ -158,8 +158,8 @@ test("the work item create dialog", async ({ asUser }) => {
   await page.keyboard.press("n");
   await page.keyboard.press("i");
 
-  // The panel, not the wrapper: Headless UI's role="dialog" element has no size of its own.
-  const dialog = page.locator('[id^="headlessui-dialog-panel"]');
+  // Since phase 4c the dialog is Propel's: the Base UI popup carries role="dialog" and its size.
+  const dialog = page.getByRole("dialog").filter({ has: page.getByPlaceholder("Title") });
   await settled(dialog);
   const title = dialog.getByPlaceholder("Title");
 
