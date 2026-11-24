@@ -195,12 +195,13 @@ class Command(BaseCommand):
         self._comments(workspace, project, users["light"])
         self._views(workspace, project, users["light"])
         self._cycles_and_modules(workspace, project, users["light"])
-        self._intake(workspace, project, users["light"])
         self._shared_links(workspace, users)
         self._import_jobs(workspace, project, users["admin"])
         self._invitations(workspace, users["admin"])
         trainers = self._trainers(workspace, project, users)
         workshop = self._workshop(workspace, project, users)
+        # After the workshop, which takes the next number on save; see `_intake`.
+        self._intake(workspace, project, users["light"])
         self._maintenance_notice()
         copy_target = self._copy_in_flight(workspace, project, users)
         published = self._published_board(workspace, users["admin"])
@@ -691,7 +692,8 @@ class Command(BaseCommand):
         "Intake" to the project's sidebar entry in every story, so the intake
         stories patch the flag on the project responses, as the view stories
         do. The work item sits in the triage state, which every work item
-        list leaves out, and is numbered after the seeded work items.
+        list leaves out, and is numbered after the seeded work items and the
+        workshop.
         """
         intake, _ = Intake.objects.get_or_create(
             id=INTAKE_ID,
@@ -725,7 +727,10 @@ class Command(BaseCommand):
                 created_by=author,
             )
         stamped = CLOCK - timedelta(days=2)
-        sequence = len(WORK_ITEMS) + 1
+        # Numbered after the seeded work items and the workshop (VR-31), which
+        # several baselines print; seeded before them, it took VR-31 and moved
+        # the workshop to VR-32 in every list.
+        sequence = len(WORK_ITEMS) + 2
         Issue.all_objects.filter(pk=issue.pk).update(created_at=stamped, updated_at=stamped, sequence_id=sequence)
         IssueSequence.objects.filter(issue=issue).update(created_at=stamped, updated_at=stamped, sequence=sequence)
         intake_issue, _ = IntakeIssue.objects.get_or_create(
