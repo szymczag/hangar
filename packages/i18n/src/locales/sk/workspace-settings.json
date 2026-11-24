@@ -3,7 +3,7 @@
     "label": "Nastavenia pracovného priestoru",
     "page_label": "{workspace} - Všeobecné nastavenia",
     "key_created": "Kľúč vytvorený",
-    "copy_key": "Skopírujte a uložte tento kľúč do Hangar Pages. Po zatvorení ho neuvidíte. CSV súbor s kľúčom bol stiahnutý.",
+    "copy_key": "Skopírujte tento tajný kľúč a uložte ho na bezpečné miesto. Po zatvorení ho už neuvidíte. CSV súbor s kľúčom bol stiahnutý.",
     "token_copied": "Token skopírovaný do schránky.",
     "settings": {
       "general": {

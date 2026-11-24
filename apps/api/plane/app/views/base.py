@@ -3,8 +3,6 @@
 # See the LICENSE file for details.
 
 # Python imports
-import traceback
-
 import zoneinfo
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -206,7 +204,6 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
             response = super().handle_exception(exc)
             return response
         except Exception as e:
-            (print(e, traceback.format_exc()) if settings.DEBUG else print("Server Error"))
             if isinstance(e, IntegrityError):
                 return Response(
                     {"error": "The payload is not valid"},

@@ -7,11 +7,11 @@
 import { observer } from "mobx-react";
 import { ShieldCheck } from "lucide-react";
 // plane imports
-import { EAuthModes } from "@plane/constants";
+import { useTranslation } from "@plane/i18n";
 // components
 import { FormContainer } from "@/components/account/auth-forms/common/container";
 import { SetPasswordForm } from "@/components/account/auth-forms/set-password";
-import { AuthHeader } from "@/components/auth-screens/header";
+import { AuthHeaderBase } from "@/components/auth-screens/header";
 // helpers
 import { EPageTypes } from "@/helpers/authentication.helper";
 // hooks
@@ -69,11 +69,14 @@ const SetPasswordContent = observer(function SetPasswordContent() {
 });
 
 function SetPasswordPage() {
+  const { t } = useTranslation();
+  // The visitor is already signed in here, so the header offers no
+  // "New to Hangar? Sign up" or "Sign in" switch, only the logo.
   return (
     <DefaultLayout>
       <AuthenticationWrapper pageType={EPageTypes.SET_PASSWORD}>
         <div className="relative z-10 flex h-screen w-screen flex-col items-center overflow-hidden overflow-y-auto px-8 pt-6 pb-10">
-          <AuthHeader type={EAuthModes.SIGN_IN} />
+          <AuthHeaderBase pageTitle={t("auth.set_password.title")} />
           <SetPasswordContent />
         </div>
       </AuthenticationWrapper>

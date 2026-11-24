@@ -3,7 +3,7 @@
     "label": "Configurações do espaço de trabalho",
     "page_label": "{workspace} - Configurações gerais",
     "key_created": "Chave criada",
-    "copy_key": "Copie e salve esta chave secreta no Páginas do Hangar. Você não pode ver esta chave depois de clicar em Fechar. Um arquivo CSV contendo a chave foi baixado.",
+    "copy_key": "Copie esta chave secreta e guarde-a em um lugar seguro. Você não poderá vê-la novamente depois de clicar em Fechar. Um arquivo CSV contendo a chave foi baixado.",
     "token_copied": "Token copiado para a área de transferência.",
     "settings": {
       "general": {
