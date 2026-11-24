@@ -8,9 +8,9 @@ oci://ghcr.io/szymczag/charts/hangar
 ```
 
 The latest stable chart is `0.3.0` (`appVersion: v0.3.0`). Release candidate
-`0.4.0-rc.3` is also published; Helm installs it only when you name its version.
-It supersedes `0.4.0-rc.1` and `0.4.0-rc.2`; do not install those, and upgrade an
-installation on either to `0.4.0-rc.3`. The release candidates `0.3.0-rc.1` and `0.3.0-rc.2` are superseded by it, and so are the
+`0.4.0-rc.4` is also published; Helm installs it only when you name its version.
+It supersedes `0.4.0-rc.1`, `0.4.0-rc.2` and `0.4.0-rc.3`; do not install those,
+and upgrade an installation on any of them to `0.4.0-rc.4`. The release candidates `0.3.0-rc.1` and `0.3.0-rc.2` are superseded by it, and so are the
 release candidates `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not install
 those, and upgrade an installation on any of them to `0.3.0`. The chart's evaluation profile is live-qualified on AMD64. The
 chart is qualified for evaluation only and is not yet supported for production. Release packaging stages these versions and immutable
@@ -53,14 +53,18 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.3.0`, or name `0.4.0-rc.3` to test the release candidate. Its license
-migration `0025` only adds the configuration row behind the God Mode switch
-"Members can invite to workspaces", which is off after the upgrade, so
-workspace members can no longer invite people until an operator turns it on.
-Rolling back from `0.4.0-rc.3` to `0.3.0` needs no schema change and no values
-change; the row stays and `0.3.0` does not read it. The rollback brings back a
-public board API that names every project member and workspace members who can
-manage any pending invitation, and stops recording page versions. `0.2.2` is
+Use `0.3.0`, or name `0.4.0-rc.4` to test the release candidate. It adds no
+migration compared with `0.4.0-rc.3`. Its license migration `0025`, new in
+`0.4.0-rc.3`, only adds the configuration row behind the God Mode switch
+"Members can invite to workspaces", which is off after an upgrade from `0.3.0`,
+so workspace members can no longer invite people until an operator turns it
+on. Its workers no longer log task arguments, which held password-reset tokens
+and sign-in codes up to `0.4.0-rc.3`; logs written before the upgrade are not
+rewritten, so rotate or purge them. Rolling back from `0.4.0-rc.4` to `0.3.0`
+needs no schema change and no values change; the row stays and `0.3.0` does
+not read it. The rollback brings back a public board API that names every
+project member, workspace members who can manage any pending invitation and
+the worker log of task arguments, and stops recording page versions. `0.2.2` is
 the previous stable release and the supported rollback target from `0.3.0`;
 rolling back to it needs no schema change and no values change,
 but brings back the previous God Mode design and its secret fields that a
