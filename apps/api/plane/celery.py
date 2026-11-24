@@ -15,6 +15,7 @@ from celery.schedules import crontab, schedule
 
 # Module imports
 from plane.settings.redis import redis_instance
+from plane.utils.logging import RedactTaskArgumentsFilter
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "plane.settings.production")
@@ -189,20 +190,23 @@ app.conf.beat_schedule = {
 
 
 # Setup logging
+def _json_handler():
+    handler = logging.StreamHandler()
+    handler.setFormatter(fmt=JsonFormatter('"%(levelname)s %(asctime)s %(module)s %(name)s %(message)s'))
+    # Fork (see FORK.md): task arguments carry reset tokens, sign-in codes and
+    # join tokens; the JSON formatter would print them with every task line.
+    handler.addFilter(RedactTaskArgumentsFilter())
+    return handler
+
+
 @after_setup_logger.connect
 def setup_loggers(logger, *args, **kwargs):
-    formatter = JsonFormatter('"%(levelname)s %(asctime)s %(module)s %(name)s %(message)s')
-    handler = logging.StreamHandler()
-    handler.setFormatter(fmt=formatter)
-    logger.addHandler(handler)
+    logger.addHandler(_json_handler())
 
 
 @after_setup_task_logger.connect
 def setup_task_loggers(logger, *args, **kwargs):
-    formatter = JsonFormatter('"%(levelname)s %(asctime)s %(module)s %(name)s %(message)s')
-    handler = logging.StreamHandler()
-    handler.setFormatter(fmt=formatter)
-    logger.addHandler(handler)
+    logger.addHandler(_json_handler())
 
 
 # Load task modules from all registered Django app configs.
