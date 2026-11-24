@@ -62,7 +62,8 @@ export const PropertyValueInput = observer(function PropertyValueInput(props: Pr
     case "multi_select": {
       const isMulti = property.property_type === "multi_select" && property.is_multi;
       // Deactivated options stay out of the list, but a value that still holds one keeps it.
-      const options = (property.options ?? []).filter((option) => option.is_active || values.includes(option.id));
+      const selectedIds = new Set(values);
+      const options = (property.options ?? []).filter((option) => option.is_active || selectedIds.has(option.id));
       const byId = new Map(options.map((option) => [option.id, option]));
       const selected = values.map((id) => byId.get(id)).filter((option) => option !== undefined);
       const placeholder = `Select ${property.display_name}`;
