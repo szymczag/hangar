@@ -16,11 +16,10 @@ import type {
   TFilterConditionNodeForDisplay,
   TAllAvailableOperatorsForDisplay,
 } from "@plane/types";
-import { CustomSearchSelect } from "@plane/ui";
-import { cn, getOperatorForPayload } from "@plane/utils";
+import { Select } from "@plane/blocks/select";
+import { getOperatorForPayload } from "@plane/utils";
 // local imports
 import { FilterValueInput } from "../filter-value-input/root";
-import { COMMON_FILTER_ITEM_BORDER_CLASSNAME } from "../shared";
 import { FilterItemCloseButton } from "./close-button";
 import { FilterItemContainer } from "./container";
 import { InvalidFilterItem } from "./invalid";
@@ -40,13 +39,11 @@ export const FilterItem = observer(function FilterItem<P extends TFilterProperty
   const { condition, filter, isDisabled = false, showTransition = true } = props;
   // derived values
   const filterConfig = condition?.property ? filter.configManager.getConfigByProperty(condition.property) : undefined;
-  const operatorOptions = filterConfig
-    ?.getAllDisplayOperatorOptionsByValue(condition.value as TFilterValue)
-    .map((option) => ({
+  const operatorOptions =
+    filterConfig?.getAllDisplayOperatorOptionsByValue(condition.value as TFilterValue)?.map((option) => ({
       value: option.value,
-      content: option.label,
-      query: option.label.toLowerCase(),
-    }));
+      label: option.label,
+    })) ?? [];
   const selectedOperatorFieldConfig = filterConfig?.getOperatorConfig(condition.operator);
   const selectedOperatorOption = filterConfig?.getDisplayOperatorByValue(
     condition.operator,
@@ -84,7 +81,7 @@ export const FilterItem = observer(function FilterItem<P extends TFilterProperty
   }
 
   return (
-    <FilterItemContainer conditionValue={condition.value} showTransition={showTransition}>
+    <FilterItemContainer conditionValue={condition.value} showTransition={showTransition} label={filterConfig.label}>
       {/* Property section */}
       <FilterItemProperty
         conditionId={condition.id}
@@ -92,28 +89,25 @@ export const FilterItem = observer(function FilterItem<P extends TFilterProperty
         icon={filterConfig.icon}
         isDisabled={isDisabled}
         label={filterConfig.label}
-        tooltipContent={filterConfig.tooltipContent}
+        tooltipContent={typeof filterConfig.tooltipContent === "string" ? filterConfig.tooltipContent : undefined}
       />
 
       {/* Operator section */}
-      <CustomSearchSelect
-        value={condition.operator}
-        onChange={handleOperatorChange}
-        options={operatorOptions}
-        className={COMMON_FILTER_ITEM_BORDER_CLASSNAME}
-        customButtonClassName={cn(
-          "h-full px-2 text-13 font-regular",
-          isOperatorSelectionDisabled && "hover:bg-layer-2-hover"
-        )}
-        optionsClassName="w-48"
-        maxHeight="2xl"
+      <Select<(typeof operatorOptions)[number]>
+        getValues={() => operatorOptions}
+        value={operatorOptions.find((option) => option.value === condition.operator) ?? null}
+        onChange={(operator) => handleOperatorChange(operator as TAllAvailableOperatorsForDisplay)}
         disabled={isOperatorSelectionDisabled}
-        customButton={
-          <div className="flex h-full items-center" aria-disabled={isOperatorSelectionDisabled}>
-            {filterConfig.getLabelForOperator(selectedOperatorOption)}
-          </div>
-        }
-      />
+        getOptionValue={(option) => option.value}
+        getOptionLabel={(option) => option.label}
+        pinSelected={false}
+        placeholder={filterConfig.label}
+      >
+        {/* A pill segment of the condition, chevron-less like the segments either side of it. */}
+        <Select.Trigger variant="pill-lg" appendIcon={null} className="max-w-none text-body-xs-regular">
+          {filterConfig.getLabelForOperator(selectedOperatorOption)}
+        </Select.Trigger>
+      </Select>
 
       {/* Value section */}
       {selectedOperatorFieldConfig && (

@@ -4,12 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { differenceInCalendarDays } from "date-fns/differenceInCalendarDays";
 import { observer } from "mobx-react";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { TGroupedIssues, TIssue, TIssueMap, TPaginationData, ICalendarDate } from "@plane/types";
 // types
 // ui
@@ -83,6 +83,27 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
 
   const dayTileRef = useRef<HTMLDivElement | null>(null);
 
+  // Reads the latest issues map and drop handler without re-registering the drop target
+  const handleDrop = useEffectEvent((sourceData: { id: string; date: string }, destinationDate: string) => {
+    const issueDetails = issues?.[sourceData?.id];
+    if (issueDetails?.start_date) {
+      const issueStartDate = new Date(issueDetails.start_date);
+      const targetDate = new Date(destinationDate);
+      const diffInDays = differenceInCalendarDays(targetDate, issueStartDate);
+      if (diffInDays < 0) {
+        setToast({
+          type: "error",
+          title: "Error!",
+          message: "Due date cannot be before the start date of the work item.",
+        });
+        return false;
+      }
+    }
+
+    handleDragAndDrop(sourceData?.id, issueDetails?.project_id ?? undefined, sourceData?.date, destinationDate);
+    return true;
+  });
+
   useEffect(() => {
     const element = dayTileRef.current;
 
@@ -104,32 +125,12 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
           const destinationData = self?.data as { date: string } | undefined;
           if (!sourceData || !destinationData) return;
 
-          const issueDetails = issues?.[sourceData?.id];
-          if (issueDetails?.start_date) {
-            const issueStartDate = new Date(issueDetails.start_date);
-            const targetDate = new Date(destinationData?.date);
-            const diffInDays = differenceInCalendarDays(targetDate, issueStartDate);
-            if (diffInDays < 0) {
-              setToast({
-                type: TOAST_TYPE.ERROR,
-                title: "Error!",
-                message: "Due date cannot be before the start date of the work item.",
-              });
-              return;
-            }
-          }
-
-          handleDragAndDrop(
-            sourceData?.id,
-            issueDetails?.project_id ?? undefined,
-            sourceData?.date,
-            destinationData?.date
-          );
+          if (!handleDrop(sourceData, destinationData.date)) return;
           highlightIssueOnDrop(source?.element?.id, false);
         },
       })
     );
-  }, [dayTileRef?.current, formattedDatePayload]);
+  }, [formattedDatePayload]);
 
   if (!formattedDatePayload) return null;
   const issueIds = groupedIssueIds?.[formattedDatePayload];
@@ -148,7 +149,7 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
       <div ref={dayTileRef} className="group relative flex h-full w-full flex-col">
         {/* header */}
         <div
-          className={`hidden flex-shrink-0 justify-end px-2 py-1.5 text-right text-11 md:flex ${
+          className={`hidden flex-shrink-0 items-center justify-end gap-1 px-2 py-1.5 text-right text-caption-sm-regular md:flex ${
             isMonthLayout // if month layout, highlight current month days
               ? date.is_current_month
                 ? "font-medium"
@@ -156,7 +157,7 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
               : "font-medium" // if week layout, highlight all days
           } ${isWeekend ? "bg-layer-1" : "bg-layer-transparent"} `}
         >
-          {date.date.getDate() === 1 && MONTHS_LIST[date.date.getMonth() + 1].shortTitle + " "}
+          {date.date.getDate() === 1 && <span>{MONTHS_LIST[date.date.getMonth() + 1].shortTitle}</span>}
           {isToday ? (
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-primary text-on-color">
               {date.date.getDate()}
@@ -196,24 +197,25 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
         </div>
 
         {/* Mobile view content */}
-        <div
+        <button
+          type="button"
           onClick={() => setSelectedDate(date.date)}
           className={cn(
-            "mx-auto flex h-full w-full cursor-pointer flex-col items-center justify-start py-2.5 text-13 font-medium opacity-80 md:hidden",
+            "mx-auto flex h-full w-full cursor-pointer flex-col items-center justify-start py-2.5 text-body-xs-medium opacity-80 md:hidden",
             {
               "bg-layer-2": !isWeekend,
             }
           )}
         >
-          <div
+          <span
             className={cn("flex size-6 items-center justify-center rounded-full", {
               "bg-accent-primary text-on-color": isSelectedDate,
               "bg-accent-primary/10 text-accent-primary": isToday && !isSelectedDate,
             })}
           >
             {date.date.getDate()}
-          </div>
-        </div>
+          </span>
+        </button>
       </div>
     </>
   );

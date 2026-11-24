@@ -26,7 +26,7 @@ function CalendarDay() {
 export function CalendarLayoutLoader() {
   return (
     <div className="h-full w-full animate-pulse overflow-y-auto bg-surface-1">
-      <span className="relative grid grid-cols-5 divide-x-[0.5px] divide-subtle-1 text-13 font-medium">
+      <span className="relative grid grid-cols-5 divide-x-[0.5px] divide-subtle-1 text-body-xs-medium">
         {range(5).map((index) => (
           <span key={index} className="h-11 w-full bg-layer-1" />
         ))}
@@ -35,8 +35,8 @@ export function CalendarLayoutLoader() {
         <div className="grid h-full w-full grid-cols-1 divide-y-[0.5px] divide-subtle-1 overflow-y-auto">
           {range(6).map((index) => (
             <div key={index} className="grid grid-cols-5 divide-x-[0.5px] divide-subtle-1">
-              {range(5).map((index) => (
-                <CalendarDay key={index} />
+              {range(5).map((dayIndex) => (
+                <CalendarDay key={dayIndex} />
               ))}
             </div>
           ))}

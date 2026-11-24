@@ -51,6 +51,9 @@
       "next_page": "Přejít na další stránku",
       "previous_page": "Přejít na předchozí stránku",
       "root": "Stránkování"
+    },
+    "project_board": {
+      "collapse_group": "Sbalit skupinu"
     }
   }
 }

@@ -276,7 +276,11 @@
     "archived_banner": "Этот рабочий элемент архивирован. Восстановите его, чтобы внести изменения.",
     "assignee_count": "{count, plural, one {# назначенный} few {# назначенных} many {# назначенных} other {# назначенного}}",
     "description_load_failed": "Не удалось загрузить описание.",
-    "updated_time_ago": "Обновлено {time}"
+    "updated_time_ago": "Обновлено {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# метка} few {+# метки} many {+# меток} other {+# метки}}",
+      "trigger_aria_label": "{count, plural, one {ещё # свойство} few {ещё # свойства} many {ещё # свойств} other {ещё # свойства}}"
+    }
   },
   "sub_work_item": {
     "update": {

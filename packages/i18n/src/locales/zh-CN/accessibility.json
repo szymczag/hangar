@@ -51,6 +51,9 @@
       "next_page": "转到下一页",
       "previous_page": "转到上一页",
       "root": "分页"
+    },
+    "project_board": {
+      "collapse_group": "折叠分组"
     }
   }
 }

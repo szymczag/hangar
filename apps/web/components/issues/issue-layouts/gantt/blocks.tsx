@@ -7,10 +7,10 @@
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
-import { Popover } from "@plane/propel/popover";
-import { Tooltip } from "@plane/propel/tooltip";
-import { ControlLink } from "@plane/ui";
-import { findTotalDaysInRange, generateWorkItemLink } from "@plane/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@makeplane/propel/components/popover";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { ControlLink } from "@plane/blocks/layout";
+import { generateWorkItemLink } from "@plane/utils";
 // components
 import { SIDEBAR_WIDTH } from "@/components/gantt-chart/constants";
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
@@ -55,12 +55,11 @@ export const IssueGanttBlock = observer(function IssueGanttBlock(props: Props) {
 
   const handleIssuePeekOverview = () => handleRedirection(workspaceSlug, issueDetails, isMobile);
 
-  const duration = findTotalDaysInRange(issueDetails?.start_date, issueDetails?.target_date) || 0;
-
   return (
-    <Popover delay={100} openOnHover>
-      <Popover.Button
-        className="w-full"
+    <Popover>
+      <PopoverTrigger
+        openOnHover
+        delay={100}
         render={
           // oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions
           <div
@@ -71,7 +70,7 @@ export const IssueGanttBlock = observer(function IssueGanttBlock(props: Props) {
           >
             <div className="absolute top-0 left-0 h-full w-full bg-surface-1/50" />
             <div
-              className="sticky w-auto flex-1 truncate overflow-hidden px-2.5 py-1 text-13 text-primary"
+              className="sticky w-auto flex-1 truncate overflow-hidden px-2.5 py-1 text-body-xs-regular text-primary"
               style={{ left: `${SIDEBAR_WIDTH}px` }}
             >
               {issueDetails?.name}
@@ -79,19 +78,17 @@ export const IssueGanttBlock = observer(function IssueGanttBlock(props: Props) {
           </div>
         }
       />
-      <Popover.Panel side="bottom" align="start">
-        <>
-          {issueDetails && issueDetails?.project_id && (
-            <WorkItemPreviewCard
-              projectId={issueDetails.project_id}
-              stateDetails={{
-                id: issueDetails.state_id ?? undefined,
-              }}
-              workItem={issueDetails}
-            />
-          )}
-        </>
-      </Popover.Panel>
+      <PopoverContent side="bottom" align="start" sideOffset={8}>
+        {issueDetails && issueDetails?.project_id && (
+          <WorkItemPreviewCard
+            projectId={issueDetails.project_id}
+            stateDetails={{
+              id: issueDetails.state_id ?? undefined,
+            }}
+            workItem={issueDetails}
+          />
+        )}
+      </PopoverContent>
     </Popover>
   );
 });
@@ -138,7 +135,7 @@ export const IssueGanttSidebarBlock = observer(function IssueGanttSidebarBlock(p
       id={`issue-${issueId}`}
       href={workItemLink}
       onClick={handleIssuePeekOverview}
-      className="line-clamp-1 w-full cursor-pointer text-13 text-primary"
+      className="line-clamp-1 w-full cursor-pointer text-body-xs-regular text-primary"
       disabled={!!issueDetails?.tempId}
     >
       <div className="relative flex h-full w-full cursor-pointer items-center gap-2">
@@ -151,8 +148,8 @@ export const IssueGanttSidebarBlock = observer(function IssueGanttSidebarBlock(p
             displayProperties={issuesFilter?.issueFilters?.displayProperties}
           />
         )}
-        <Tooltip tooltipContent={issueDetails?.name} isMobile={isMobile}>
-          <span className="flex-grow truncate text-13 font-medium">{issueDetails?.name}</span>
+        <Tooltip label={issueDetails?.name ?? ""} layout="stacked" disabled={isMobile}>
+          <span className="flex-grow truncate text-body-xs-medium">{issueDetails?.name}</span>
         </Tooltip>
       </div>
     </ControlLink>

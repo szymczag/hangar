@@ -276,7 +276,11 @@
     "archived_banner": "This work item is archived. Restore it to make changes.",
     "assignee_count": "{count, plural, one {# assignee} other {# assignees}}",
     "description_load_failed": "Couldn't load the description.",
-    "updated_time_ago": "Updated {time}"
+    "updated_time_ago": "Updated {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# label} other {+# labels}}",
+      "trigger_aria_label": "{count, plural, one {# more property} other {# more properties}}"
+    }
   },
   "sub_work_item": {
     "update": {

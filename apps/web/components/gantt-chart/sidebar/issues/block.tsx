@@ -7,7 +7,7 @@
 import { observer } from "mobx-react";
 // plane imports
 import type { IGanttBlock } from "@plane/types";
-import { Row } from "@plane/ui";
+import { Row } from "@plane/blocks/layout";
 import { cn } from "@plane/utils";
 // components
 import { MultipleSelectEntityAction } from "@/components/core/multiple-select";
@@ -85,7 +85,7 @@ export const IssuesSidebarBlock = observer(function IssuesSidebarBlock(props: Pr
             <IssueGanttSidebarBlock issueId={block.data.id} isEpic={isEpic} />
           </div>
           {duration && (
-            <div className="flex-shrink-0 text-13 text-secondary">
+            <div className="flex-shrink-0 text-body-xs-regular text-secondary">
               <span>
                 {duration} day{duration > 1 ? "s" : ""}
               </span>

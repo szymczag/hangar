@@ -38,16 +38,17 @@ export const RightResizable = observer(function RightResizable(props: RightResiz
   return (
     <>
       {(isHovering || isRightResizing) && dateString && (
-        <div className="absolute -right-36 z-[10] flex h-full w-32 items-center justify-start text-11 font-regular text-tertiary">
+        <div className="absolute -right-36 z-[10] flex h-full w-32 items-center justify-start text-caption-sm-regular text-tertiary">
           <div className="rounded-sm bg-accent-subtle px-2 py-1">{dateString}</div>
         </div>
       )}
+      {/* oxlint-disable-next-line jsx_a11y/no-static-element-interactions -- a pointer-only resize grip; the dates are also editable from the work item */}
       <div
         onMouseDown={(e) => handleBlockDrag(e, "right")}
-        onMouseOver={() => {
+        onMouseEnter={() => {
           setIsHovering(true);
         }}
-        onMouseOut={() => {
+        onMouseLeave={() => {
           setIsHovering(false);
         }}
         className="absolute top-1/2 -right-1.5 z-[6] h-full w-3 -translate-y-1/2 cursor-col-resize rounded-md"

@@ -10,7 +10,7 @@ import { getButtonStyling } from "@plane/propel/button";
 import { ChevronDownIcon } from "@plane/propel/icons";
 import { cn } from "@plane/utils";
 // components
-import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
 // hooks
 import useSize from "@/hooks/use-window-size";
 // local imports
@@ -32,9 +32,13 @@ export function FiltersRoot() {
   return (
     <div className="relative flex items-center gap-2">
       <div>
-        <FiltersDropdown menuButton={windowSize[0] > 1280 ? largeButton : smallButton} title="" placement="bottom-end">
+        <FiltersDropdownLegacy
+          menuButton={windowSize[0] > 1280 ? largeButton : smallButton}
+          title=""
+          placement="bottom-end"
+        >
           <InboxIssueFilterSelection />
-        </FiltersDropdown>
+        </FiltersDropdownLegacy>
       </div>
       <div>
         <InboxIssueOrderByDropdown />

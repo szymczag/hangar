@@ -276,7 +276,11 @@
     "archived_banner": "此工作事項已封存。請還原後再進行變更。",
     "assignee_count": "{count, plural, one {# 位指派對象} other {# 位指派對象}}",
     "description_load_failed": "無法載入描述。",
-    "updated_time_ago": "更新於 {time}"
+    "updated_time_ago": "更新於 {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# 個標籤} other {+# 個標籤}}",
+      "trigger_aria_label": "{count, plural, one {另外 # 個屬性} other {另外 # 個屬性}}"
+    }
   },
   "sub_work_item": {
     "update": {

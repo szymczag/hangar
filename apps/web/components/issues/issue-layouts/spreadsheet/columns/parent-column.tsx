@@ -6,7 +6,6 @@
 
 import { observer } from "mobx-react";
 import type { TIssue } from "@plane/types";
-import { Row } from "@plane/ui";
 // components
 import { WorkItemParentProperty } from "../../properties/parent-property";
 
@@ -18,8 +17,8 @@ export const SpreadsheetParentColumn = observer(function SpreadsheetParentColumn
   const { issue } = props;
 
   return (
-    <Row className="flex h-11 w-full items-center border-b-[0.5px] border-subtle py-1 group-[.selected-issue-row]:bg-accent-primary/5 hover:bg-surface-2">
-      <WorkItemParentProperty issue={issue} className="border-0 px-0" />
-    </Row>
+    <div className="flex h-11 w-full items-center border-b-[0.5px] border-subtle px-2">
+      <WorkItemParentProperty issue={issue} className="clickable" />
+    </div>
   );
 });

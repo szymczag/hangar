@@ -15,7 +15,7 @@ import { DRAG_ALLOWED_GROUPS } from "@plane/constants";
 // i18n
 import { useTranslation } from "@plane/i18n";
 //types
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type {
   TGroupedIssues,
   TIssue,
@@ -165,7 +165,7 @@ export const KanbanGroup = observer(function KanbanGroup(props: IKanbanGroup) {
 
           if ((isWorkflowDropDisabled || isDropDisabled) && dropErrorMessage) {
             setToast({
-              type: TOAST_TYPE.WARNING,
+              type: "warning",
               title: t("common.warning"),
               message: dropErrorMessage,
             });
@@ -223,7 +223,7 @@ export const KanbanGroup = observer(function KanbanGroup(props: IKanbanGroup) {
   ) : (
     // oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions
     <div
-      className="sticky bottom-0 w-full cursor-pointer p-3 text-13 font-medium text-accent-primary hover:text-accent-secondary hover:underline"
+      className="sticky bottom-0 w-full cursor-pointer p-3 text-body-xs-medium text-accent-primary hover:text-accent-secondary hover:underline"
       onClick={loadMoreIssuesInThisGroup}
     >
       {t("common.load_more")} &darr;
@@ -243,6 +243,7 @@ export const KanbanGroup = observer(function KanbanGroup(props: IKanbanGroup) {
       id={`${groupId}__${sub_group_id}`}
       className={cn(
         "relative h-full min-h-[120px] transition-all",
+        { "pt-2": !sub_group_by },
         { "rounded-sm bg-layer-1": isDraggingOverColumn },
         { "vertical-scrollbar scrollbar-md": !sub_group_by && !shouldOverlayBeVisible }
       )}
@@ -289,7 +290,7 @@ export const KanbanGroup = observer(function KanbanGroup(props: IKanbanGroup) {
       {enableQuickIssueCreate &&
         !disableIssueCreation &&
         !getIsWorkflowWorkItemCreationDisabled(groupId, sub_group_id) && (
-          <div className="sticky bottom-0 w-full bg-surface-2 py-0.5">
+          <div className="sticky bottom-0 w-full bg-layer-1 pt-1">
             <QuickAddIssueRoot
               layout={EIssueLayoutTypes.KANBAN}
               QuickAddButton={KanbanQuickAddIssueButton}

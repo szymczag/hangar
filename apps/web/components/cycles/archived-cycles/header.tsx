@@ -17,7 +17,7 @@ import type { TCycleFilters } from "@plane/types";
 import { cn, calculateTotalFilters } from "@plane/utils";
 // components
 import { ArchiveTabsList } from "@/components/archives";
-import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
 // hooks
 import { useCycleFilter } from "@/hooks/store/use-cycle-filter";
 // local imports
@@ -119,7 +119,7 @@ export const ArchivedCyclesHeader = observer(function ArchivedCyclesHeader() {
             </button>
           )}
         </div>
-        <FiltersDropdown
+        <FiltersDropdownLegacy
           icon={<ListFilter className="h-3 w-3" />}
           title="Filters"
           placement="bottom-end"
@@ -130,7 +130,7 @@ export const ArchivedCyclesHeader = observer(function ArchivedCyclesHeader() {
             handleFiltersUpdate={handleFilters}
             isArchived
           />
-        </FiltersDropdown>
+        </FiltersDropdownLegacy>
       </div>
     </div>
   );

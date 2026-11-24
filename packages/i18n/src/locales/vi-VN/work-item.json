@@ -276,7 +276,11 @@
     "archived_banner": "Mục công việc này đã được lưu trữ. Hãy khôi phục để thực hiện thay đổi.",
     "assignee_count": "{count, plural, one {# người phụ trách} other {# người phụ trách}}",
     "description_load_failed": "Không thể tải mô tả.",
-    "updated_time_ago": "Đã cập nhật {time}"
+    "updated_time_ago": "Đã cập nhật {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# nhãn} other {+# nhãn}}",
+      "trigger_aria_label": "{count, plural, one {thêm # thuộc tính} other {thêm # thuộc tính}}"
+    }
   },
   "sub_work_item": {
     "update": {

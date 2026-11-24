@@ -51,6 +51,9 @@
       "next_page": "Buka halaman berikutnya",
       "previous_page": "Buka halaman sebelumnya",
       "root": "Paginasi"
+    },
+    "project_board": {
+      "collapse_group": "Ciutkan grup"
     }
   }
 }

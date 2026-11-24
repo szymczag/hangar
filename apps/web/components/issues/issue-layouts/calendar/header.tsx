@@ -5,13 +5,15 @@
  */
 
 import { observer } from "mobx-react";
+import { Button } from "@makeplane/propel/components/button";
+import { IconButton } from "@makeplane/propel/components/icon-button";
 
 // components
 import type { TSupportedFilterTypeForUpdate } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { ChevronLeftIcon, ChevronRightIcon } from "@plane/propel/icons";
+import { ChevronLeftOutline, ChevronRightOutline } from "@makeplane/propel/icons";
 import type { TSupportedFilterForUpdate } from "@plane/types";
-import { Row } from "@plane/ui";
+import { Row } from "@plane/blocks/layout";
 // icons
 import { useCalendarView } from "@/hooks/store/use-calendar-view";
 import type { ICycleIssuesFilter } from "@/store/issue/cycle";
@@ -103,22 +105,24 @@ export const CalendarHeader = observer(function CalendarHeader(props: ICalendarH
   return (
     <Row className="mb-4 flex items-center justify-between gap-2">
       <div className="flex items-center gap-1.5">
-        <button type="button" className="grid place-items-center" onClick={handlePrevious}>
-          <ChevronLeftIcon height={16} width={16} strokeWidth={2} />
-        </button>
-        <button type="button" className="grid place-items-center" onClick={handleNext}>
-          <ChevronRightIcon height={16} width={16} strokeWidth={2} />
-        </button>
+        <IconButton
+          variant="ghost"
+          size="xs"
+          icon={<ChevronLeftOutline height={16} width={16} />}
+          onClick={handlePrevious}
+          aria-label={t("prev")}
+        />
+        <IconButton
+          variant="ghost"
+          size="xs"
+          icon={<ChevronRightOutline height={16} width={16} />}
+          onClick={handleNext}
+          aria-label={t("next")}
+        />
         <CalendarMonthsDropdown issuesFilterStore={issuesFilterStore} />
       </div>
       <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          className="rounded-sm bg-layer-transparent px-2.5 py-1 text-11 font-medium text-secondary hover:bg-layer-transparent-hover hover:text-primary"
-          onClick={handleToday}
-        >
-          {t("common.today")}
-        </button>
+        <Button variant="secondary" size="md" stretch="auto" label={t("common.today")} onClick={handleToday} />
         <CalendarOptionsDropdown issuesFilterStore={issuesFilterStore} updateFilters={updateFilters} />
       </div>
     </Row>

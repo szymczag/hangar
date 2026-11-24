@@ -4,11 +4,6 @@
  * See the LICENSE file for details.
  */
 
-import { observer } from "mobx-react";
-// components
-import { BulkOperationsUpgradeBanner } from "@/components/issues/bulk-operations/upgrade-banner";
-// hooks
-import { useMultipleSelectStore } from "@/hooks/store/use-multiple-select-store";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 
 type Props = {
@@ -16,12 +11,11 @@ type Props = {
   selectionHelpers: TSelectionHelper;
 };
 
-export const IssueBulkOperationsRoot = observer(function IssueBulkOperationsRoot(props: Props) {
-  const { className, selectionHelpers } = props;
-  // store hooks
-  const { isSelectionActive } = useMultipleSelectStore();
-
-  if (!isSelectionActive || selectionHelpers.isSelectionDisabled) return null;
-
-  return <BulkOperationsUpgradeBanner className={className} />;
-});
+/**
+ * Fork (see FORK.md): Hangar has no bulk operations (`useBulkOperationStatus` is always false), so
+ * there is no selection bar to show. Upstream renders an "upgrade" banner linking off-instance
+ * here; Hangar renders nothing rather than an upsell or an ungated external link (S22).
+ */
+export function IssueBulkOperationsRoot(_props: Props) {
+  return null;
+}

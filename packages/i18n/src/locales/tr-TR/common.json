@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "Panoya kopyala"
     },
-    "status": "Durum"
+    "status": "Durum",
+    "locked": "Kilitli"
   },
   "chart": {
     "x_axis": "X ekseni",
@@ -897,5 +898,14 @@
   },
   "searching": "Aranıyor...",
   "rename_folder": "Klasörü yeniden adlandır",
-  "entity_detail_toolbar": "İşlemler"
+  "entity_detail_toolbar": "İşlemler",
+  "labels_count": "{count, plural, one {# etiket} other {# etiket}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "Filtreleri gizle",
+      "save_as": "Farklı kaydet",
+      "save_options": "Görünüm kaydetme seçenekleri",
+      "update_view": "Görünümü güncelle"
+    }
+  }
 }

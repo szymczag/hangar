@@ -6,7 +6,7 @@
 
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { ParentPropertyIcon } from "@plane/propel/icons";
+import { ParentOutline } from "@makeplane/propel/icons";
 // components
 import { IssueTypeIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
@@ -24,5 +24,5 @@ export const WorkItemGroupIcon = observer(function WorkItemGroupIcon(props: Prop
 
   if (workItem?.type_id && workItem.project_id)
     return <IssueTypeIdentifier issueTypeId={workItem.type_id} projectId={workItem.project_id} size="sm" />;
-  return <ParentPropertyIcon className="h-3.5 w-3.5" />;
+  return <ParentOutline className="h-3.5 w-3.5" />;
 });

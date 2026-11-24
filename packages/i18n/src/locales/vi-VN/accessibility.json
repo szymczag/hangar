@@ -51,6 +51,9 @@
       "next_page": "Đi đến trang tiếp theo",
       "previous_page": "Đi đến trang trước",
       "root": "Phân trang"
+    },
+    "project_board": {
+      "collapse_group": "Thu gọn nhóm"
     }
   }
 }

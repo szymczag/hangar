@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "Kopírovať do schránky"
     },
-    "status": "Stav"
+    "status": "Stav",
+    "locked": "Uzamknuté"
   },
   "chart": {
     "x_axis": "Os X",
@@ -897,5 +898,14 @@
   },
   "searching": "Vyhľadávanie...",
   "rename_folder": "Premenovať priečinok",
-  "entity_detail_toolbar": "Akcie"
+  "entity_detail_toolbar": "Akcie",
+  "labels_count": "{count, plural, one {# štítok} few {# štítky} many {# štítku} other {# štítkov}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "Skryť filtre",
+      "save_as": "Uložiť ako",
+      "save_options": "Možnosti uloženia pohľadu",
+      "update_view": "Aktualizovať pohľad"
+    }
+  }
 }

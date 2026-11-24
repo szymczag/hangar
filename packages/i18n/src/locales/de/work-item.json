@@ -276,7 +276,11 @@
     "archived_banner": "Dieses Arbeitselement ist archiviert. Zum Bearbeiten muss es wiederhergestellt werden.",
     "assignee_count": "{count, plural, one {# zugewiesene Person} other {# zugewiesene Personen}}",
     "description_load_failed": "Die Beschreibung konnte nicht geladen werden.",
-    "updated_time_ago": "Aktualisiert {time}"
+    "updated_time_ago": "Aktualisiert {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# Label} other {+# Labels}}",
+      "trigger_aria_label": "{count, plural, one {# weitere Eigenschaft} other {# weitere Eigenschaften}}"
+    }
   },
   "sub_work_item": {
     "update": {

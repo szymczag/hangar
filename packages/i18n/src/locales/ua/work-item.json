@@ -276,7 +276,11 @@
     "archived_banner": "Цю робочу одиницю заархівовано. Відновіть її, щоб унести зміни.",
     "assignee_count": "{count, plural, one {# призначений} few {# призначені} many {# призначених} other {# призначеного}}",
     "description_load_failed": "Не вдалося завантажити опис.",
-    "updated_time_ago": "Оновлено {time}"
+    "updated_time_ago": "Оновлено {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# мітка} few {+# мітки} many {+# міток} other {+# мітки}}",
+      "trigger_aria_label": "{count, plural, one {ще # властивість} few {ще # властивості} many {ще # властивостей} other {ще # властивості}}"
+    }
   },
   "sub_work_item": {
     "update": {

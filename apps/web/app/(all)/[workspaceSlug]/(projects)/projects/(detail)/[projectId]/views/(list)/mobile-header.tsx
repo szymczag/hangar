@@ -10,7 +10,7 @@ import { ListFilter } from "lucide-react";
 import { ChevronDownIcon } from "@plane/propel/icons";
 // components
 import { Row } from "@plane/ui";
-import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
 import { ViewFiltersSelection } from "@/components/views/filters/filter-selection";
 import { ViewOrderByDropdown } from "@/components/views/filters/order-by";
 // hooks
@@ -39,7 +39,7 @@ export const ViewMobileHeader = observer(function ViewMobileHeader() {
           />
         </Row>
         <div className="flex flex-grow items-center justify-center border-l border-subtle text-13 text-secondary">
-          <FiltersDropdown
+          <FiltersDropdownLegacy
             icon={<ListFilter className="h-3 w-3" />}
             title="Filters"
             placement="bottom-end"
@@ -56,7 +56,7 @@ export const ViewMobileHeader = observer(function ViewMobileHeader() {
               handleFiltersUpdate={updateFilters}
               memberIds={projectMemberIds ?? undefined}
             />
-          </FiltersDropdown>
+          </FiltersDropdownLegacy>
         </div>
       </div>
     </>

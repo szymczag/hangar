@@ -10,28 +10,29 @@ import { extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tre
 import { clone, isNil, pull, uniq, concat } from "lodash-es";
 import scrollIntoView from "smooth-scroll-into-view-if-needed";
 import type { FC } from "react";
-import { CalendarDays, LayersIcon, Paperclip } from "lucide-react";
-// plane types
-import { EIconSize, ISSUE_PRIORITIES, STATE_GROUPS } from "@plane/constants";
-import { Logo } from "@plane/propel/emoji-icon-picker";
-import type { ISvgIcons } from "@plane/propel/icons";
 import {
-  CycleGroupIcon,
-  CycleIcon,
-  ModuleIcon,
-  PriorityIcon,
-  StateGroupIcon,
-  LinkIcon,
-  StatePropertyIcon,
-  MembersPropertyIcon,
-  DueDatePropertyIcon,
-  EstimatePropertyIcon,
-  LabelPropertyIcon,
-  EpicIcon,
-  ParentPropertyIcon,
-  PriorityPropertyIcon,
-  StartDatePropertyIcon,
-} from "@plane/propel/icons";
+  AttachOutline,
+  CalendarOutline,
+  CyclesOutline,
+  DueDateOutline,
+  EstimateOutline,
+  LabelsOutline,
+  LinkOutline,
+  MembersOutline,
+  EpicOutline,
+  ModuleOutline,
+  ParentOutline,
+  PriorityOutline,
+  StartDateOutline,
+  StateOutline,
+  WorkItemsOutline,
+} from "@makeplane/propel/icons";
+// plane types
+import { Avatar } from "@makeplane/propel/components/avatar";
+import { EIconSize, ISSUE_PRIORITIES, STATE_GROUPS } from "@plane/constants";
+import { Logo } from "@plane/blocks/emoji-icon-picker";
+import type { ISvgIcons } from "@plane/blocks/icons";
+import { CycleGroupIcon, PriorityIcon, StateGroupIcon } from "@plane/blocks/icons";
 import type {
   GroupByColumnTypes,
   IGroupByColumn,
@@ -49,7 +50,7 @@ import type {
 } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 // plane ui
-import { Avatar } from "@plane/ui";
+
 import { renderFormattedDate, getFileURL } from "@plane/utils";
 // store
 import { store } from "@/lib/store-context";
@@ -197,7 +198,7 @@ const getParentColumns = ({ groupIds }: TGetColumns): IGroupByColumn[] =>
   getWorkItemGroupColumns(
     groupIds,
     (parentId) => ({ parent_id: parentId }),
-    <ParentPropertyIcon className="h-3.5 w-3.5" />,
+    <ParentOutline className="h-3.5 w-3.5" />,
     "Parent"
   );
 
@@ -205,7 +206,7 @@ const getEpicColumns = ({ groupIds }: TGetColumns): IGroupByColumn[] =>
   getWorkItemGroupColumns(
     groupIds,
     (epicId) => ({ parent_id: epicId, epic_id: epicId }),
-    <EpicIcon className="h-3.5 w-3.5" />,
+    <EpicOutline className="h-3.5 w-3.5" />,
     "Epic"
   );
 
@@ -256,7 +257,7 @@ const getCycleColumns = (): IGroupByColumn[] | undefined => {
   cycles.push({
     id: "None",
     name: "None",
-    icon: <CycleIcon className="h-3.5 w-3.5" />,
+    icon: <CyclesOutline className="h-3.5 w-3.5" />,
     payload: {},
   });
   return cycles;
@@ -276,14 +277,14 @@ const getModuleColumns = (): IGroupByColumn[] | undefined => {
     modules.push({
       id: module.id,
       name: module.name,
-      icon: <ModuleIcon className="h-3.5 w-3.5" />,
+      icon: <ModuleOutline className="h-3.5 w-3.5" />,
       payload: { module_ids: [module.id] },
     });
   });
   modules.push({
     id: "None",
     name: "None",
-    icon: <ModuleIcon className="h-3.5 w-3.5" />,
+    icon: <ModuleOutline className="h-3.5 w-3.5" />,
     payload: {},
   });
   return modules;
@@ -365,12 +366,19 @@ const getAssigneeColumns = ({ isWorkspaceLevel, projectId }: TGetColumns): IGrou
     assigneeColumns.push({
       id: memberId,
       name: member?.display_name || "",
-      icon: <Avatar name={member?.display_name} src={getFileURL(member?.avatar_url ?? "")} size="md" />,
+      icon: (
+        <Avatar
+          alt={member?.display_name}
+          fallback={member?.display_name?.[0]?.toUpperCase()}
+          src={getFileURL(member?.avatar_url ?? "")}
+          size="xs"
+        />
+      ),
       payload: { assignee_ids: [memberId] },
     });
   });
   if (includeNone) {
-    assigneeColumns.push({ id: "None", name: "None", icon: <Avatar size="md" />, payload: {} });
+    assigneeColumns.push({ id: "None", name: "None", icon: <Avatar size="xs" />, payload: {} });
   }
 
   return assigneeColumns;
@@ -388,7 +396,14 @@ const getCreatedByColumns = (): IGroupByColumn[] | undefined => {
     return {
       id: memberId,
       name: member?.display_name || "",
-      icon: <Avatar name={member?.display_name} src={getFileURL(member?.avatar_url ?? "")} size="md" />,
+      icon: (
+        <Avatar
+          alt={member?.display_name}
+          fallback={member?.display_name?.[0]?.toUpperCase()}
+          src={getFileURL(member?.avatar_url ?? "")}
+          size="xs"
+        />
+      ),
       payload: {},
     };
   });
@@ -885,20 +900,22 @@ export const getScopeMemberIds = ({ isWorkspaceLevel, projectId }: TGetColumns):
 export const getTeamProjectColumns = (): IGroupByColumn[] | undefined => undefined;
 
 export const SpreadSheetPropertyIconMap: Record<string, FC<ISvgIcons>> = {
-  MembersPropertyIcon: MembersPropertyIcon,
-  CalenderDays: CalendarDays,
-  DueDatePropertyIcon: DueDatePropertyIcon,
-  EstimatePropertyIcon: EstimatePropertyIcon,
-  LabelPropertyIcon: LabelPropertyIcon,
-  ModuleIcon: ModuleIcon,
-  ContrastIcon: CycleIcon,
-  PriorityPropertyIcon: PriorityPropertyIcon,
-  StartDatePropertyIcon: StartDatePropertyIcon,
-  StatePropertyIcon: StatePropertyIcon,
-  Link2: LinkIcon,
-  Paperclip: Paperclip,
-  LayersIcon: LayersIcon,
-  ParentPropertyIcon: ParentPropertyIcon,
+  // keyed by the `icon` values in SPREADSHEET_PROPERTY_DETAILS
+  MembersPropertyIcon: MembersOutline,
+  CalendarDays: CalendarOutline,
+  DueDatePropertyIcon: DueDateOutline,
+  EstimatePropertyIcon: EstimateOutline,
+  LabelPropertyIcon: LabelsOutline,
+  DiceIcon: ModuleOutline,
+  ContrastIcon: CyclesOutline,
+  PriorityPropertyIcon: PriorityOutline,
+  StartDatePropertyIcon: StartDateOutline,
+  StatePropertyIcon: StateOutline,
+  Link2: LinkOutline,
+  Paperclip: AttachOutline,
+  LayersIcon: WorkItemsOutline,
+  // Fork (see FORK.md): the parent column
+  ParentPropertyIcon: ParentOutline,
 };
 
 export const SPREADSHEET_COLUMNS: { [key in keyof IIssueDisplayProperties]: TSpreadsheetColumn } = {

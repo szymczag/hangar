@@ -8,7 +8,8 @@ import type { RefObject } from "react";
 import { useState } from "react";
 import { observer } from "mobx-react";
 import type { IBaseLayoutsBaseItem, IBlockUpdateData } from "@plane/types";
-import { Loader, Row } from "@plane/ui";
+import { Loader } from "@plane/blocks/skeleton";
+import { Row } from "@plane/blocks/layout";
 import { cn } from "@plane/utils";
 import RenderIfVisible from "@/components/core/render-if-visible-HOC";
 import { BLOCK_HEIGHT } from "@/components/gantt-chart/constants";
@@ -94,9 +95,11 @@ export const BaseGanttSidebar = observer(function BaseGanttSidebar<T extends IBa
                   onDrop={handleOnDrop}
                 >
                   {(isDragging: boolean) => {
-                    const block = getBlockById(blockId);
-                    const isBlockComplete = !!block?.start_date && !!block?.target_date;
-                    const duration = isBlockComplete ? getNumberOfDaysFromPosition(block?.position?.width) : undefined;
+                    const rowBlock = getBlockById(blockId);
+                    const isBlockComplete = !!rowBlock?.start_date && !!rowBlock?.target_date;
+                    const duration = isBlockComplete
+                      ? getNumberOfDaysFromPosition(rowBlock?.position?.width)
+                      : undefined;
                     const isBlockHoveredOn = isBlockActive(blockId);
 
                     return (
@@ -121,7 +124,7 @@ export const BaseGanttSidebar = observer(function BaseGanttSidebar<T extends IBa
                           <div className="flex h-full flex-grow items-center justify-between gap-2 truncate">
                             <div className="flex-grow truncate">{renderItem(item)}</div>
                             {duration && (
-                              <div className="flex-shrink-0 text-13 text-secondary">
+                              <div className="flex-shrink-0 text-body-xs-regular text-secondary">
                                 <span>
                                   {duration} day{duration > 1 ? "s" : ""}
                                 </span>

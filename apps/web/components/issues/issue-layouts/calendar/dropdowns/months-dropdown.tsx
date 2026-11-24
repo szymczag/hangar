@@ -4,11 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import React, { useState } from "react";
 import { observer } from "mobx-react";
-import { usePopper } from "react-popper";
-import { Popover, Transition } from "@headlessui/react";
-import { ChevronLeftIcon, ChevronRightIcon } from "@plane/propel/icons";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { Toggle } from "@makeplane/propel/components/toggle";
+import { useTranslation } from "@plane/i18n";
+import { Popover, PopoverContent, PopoverTrigger } from "@makeplane/propel/components/popover";
+import { ChevronLeftOutline, ChevronRightOutline } from "@makeplane/propel/icons";
 //hooks
 // icons
 // constants
@@ -26,25 +27,11 @@ interface Props {
 }
 export const CalendarMonthsDropdown = observer(function CalendarMonthsDropdown(props: Props) {
   const { issuesFilterStore } = props;
+  const { t } = useTranslation();
 
   const issueCalendarView = useCalendarView();
 
   const calendarLayout = issuesFilterStore.issueFilters?.displayFilters?.calendar?.layout ?? "month";
-
-  const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
-
-  const { styles, attributes } = usePopper(referenceElement, popperElement, {
-    placement: "auto",
-    modifiers: [
-      {
-        name: "preventOverflow",
-        options: {
-          padding: 12,
-        },
-      },
-    ],
-  });
 
   const { activeMonthDate } = issueCalendarView.calendarFilters;
 
@@ -80,78 +67,62 @@ export const CalendarMonthsDropdown = observer(function CalendarMonthsDropdown(p
   };
 
   return (
-    <Popover className="relative">
-      <Popover.Button as={React.Fragment}>
-        <button
-          type="button"
-          ref={setReferenceElement}
-          className="text-18 font-semibold outline-none"
-          disabled={calendarLayout === "week"}
-        >
-          {calendarLayout === "month"
-            ? `${MONTHS_LIST[activeMonthDate.getMonth() + 1].title} ${activeMonthDate.getFullYear()}`
-            : getWeekLayoutHeader()}
-        </button>
-      </Popover.Button>
-      <Transition
-        as={React.Fragment}
-        enter="transition ease-out duration-200"
-        enterFrom="opacity-0 translate-y-1"
-        enterTo="opacity-100 translate-y-0"
-        leave="transition ease-in duration-150"
-        leaveFrom="opacity-100 translate-y-0"
-        leaveTo="opacity-0 translate-y-1"
-      >
-        <Popover.Panel
-          className="fixed z-50"
-          data-prevent-outside-click
-          portal
-          ref={setPopperElement}
-          style={styles.popper}
-          {...attributes.popper}
-        >
-          <div className="w-56 divide-y divide-subtle-1 rounded-sm border border-subtle bg-surface-1 p-3 shadow-raised-200">
-            <div className="flex items-center justify-between gap-2 pb-3">
-              <button
-                type="button"
-                className="grid place-items-center"
-                onClick={() => {
-                  const previousYear = new Date(activeMonthDate.getFullYear() - 1, activeMonthDate.getMonth(), 1);
-                  handleDateChange(previousYear);
-                }}
-              >
-                <ChevronLeftIcon height={14} width={14} />
-              </button>
-              <span className="text-11">{activeMonthDate.getFullYear()}</span>
-              <button
-                type="button"
-                className="grid place-items-center"
-                onClick={() => {
-                  const nextYear = new Date(activeMonthDate.getFullYear() + 1, activeMonthDate.getMonth(), 1);
-                  handleDateChange(nextYear);
-                }}
-              >
-                <ChevronRightIcon height={14} width={14} />
-              </button>
-            </div>
-            <div className="grid grid-cols-4 items-stretch justify-items-stretch gap-4 pt-3">
-              {Object.values(MONTHS_LIST).map((month, index) => (
-                <button
-                  key={month.shortTitle}
-                  type="button"
-                  className="rounded-sm py-0.5 text-11 hover:bg-layer-1"
-                  onClick={() => {
-                    const newDate = new Date(activeMonthDate.getFullYear(), index, 1);
-                    handleDateChange(newDate);
-                  }}
-                >
-                  {month.shortTitle}
-                </button>
-              ))}
-            </div>
+    <Popover>
+      <PopoverTrigger
+        disabled={calendarLayout === "week"}
+        render={
+          <button
+            type="button"
+            className="rounded-xs text-h5-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+          >
+            {calendarLayout === "month"
+              ? `${MONTHS_LIST[activeMonthDate.getMonth() + 1].title} ${activeMonthDate.getFullYear()}`
+              : getWeekLayoutHeader()}
+          </button>
+        }
+      />
+      <PopoverContent variant="rich" side="bottom" align="start" collisionPadding={12}>
+        <div className="w-56 divide-y divide-subtle-1">
+          <div className="flex items-center justify-between gap-2 pb-3">
+            <IconButton
+              variant="ghost"
+              size="xs"
+              aria-label={`${t("prev")} ${activeMonthDate.getFullYear() - 1}`}
+              icon={<ChevronLeftOutline height={14} width={14} />}
+              onClick={() => {
+                const previousYear = new Date(activeMonthDate.getFullYear() - 1, activeMonthDate.getMonth(), 1);
+                handleDateChange(previousYear);
+              }}
+            />
+            <span className="text-caption-sm-regular">{activeMonthDate.getFullYear()}</span>
+            <IconButton
+              variant="ghost"
+              size="xs"
+              aria-label={`${t("next")} ${activeMonthDate.getFullYear() + 1}`}
+              icon={<ChevronRightOutline height={14} width={14} />}
+              onClick={() => {
+                const nextYear = new Date(activeMonthDate.getFullYear() + 1, activeMonthDate.getMonth(), 1);
+                handleDateChange(nextYear);
+              }}
+            />
           </div>
-        </Popover.Panel>
-      </Transition>
+          <div className="grid grid-cols-4 items-stretch justify-items-stretch gap-4 pt-3">
+            {Object.values(MONTHS_LIST).map((month, index) => (
+              <Toggle
+                key={month.shortTitle}
+                size="xs"
+                label={month.shortTitle}
+                aria-label={`${month.title} ${activeMonthDate.getFullYear()}`}
+                pressed={activeMonthDate.getMonth() === index}
+                onClick={() => {
+                  const newDate = new Date(activeMonthDate.getFullYear(), index, 1);
+                  handleDateChange(newDate);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </PopoverContent>
     </Popover>
   );
 });

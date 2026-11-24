@@ -51,6 +51,9 @@
       "next_page": "Mergeți la pagina următoare",
       "previous_page": "Mergeți la pagina anterioară",
       "root": "Paginare"
+    },
+    "project_board": {
+      "collapse_group": "Restrângeți grupul"
     }
   }
 }

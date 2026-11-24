@@ -6,47 +6,45 @@
 
 import React, { useCallback, useState } from "react";
 import { observer } from "mobx-react";
-import { ListFilterPlus } from "lucide-react";
-import { Transition } from "@headlessui/react";
+import { AddFilterOutline, ArrowCollapseOutline } from "@makeplane/propel/icons";
 // plane imports
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { useTranslation } from "@plane/i18n";
 import type { IFilterInstance } from "@plane/shared-state";
 import type { TExternalFilter, TFilterProperty } from "@plane/types";
-import { cn, EHeaderVariant, Header, Loader } from "@plane/ui";
+import { EHeaderVariant, Header } from "@plane/blocks/layout";
+import { Loader } from "@plane/blocks/skeleton";
+import { cn } from "@plane/utils";
 // local imports
 import type { TAddFilterButtonProps } from "./add-filters/button";
 import { AddFilterButton } from "./add-filters/button";
 import { FilterItem } from "./filter-item/root";
+import { ElementTransition, RowTransition } from "./transition-components";
+import { RichFiltersViewControls } from "./view-controls";
 
 export type TFiltersRowProps<K extends TFilterProperty, E extends TExternalFilter> = {
   buttonConfig?: TAddFilterButtonProps<K, E>["buttonConfig"];
   disabledAllOperations?: boolean;
   filter: IFilterInstance<K, E>;
   variant?: "modal" | "header";
-  trackerElements?: {
-    clearFilter?: string;
-    saveView?: string;
-    updateView?: string;
-  };
 };
 
 export const FiltersRow = observer(function FiltersRow<K extends TFilterProperty, E extends TExternalFilter>(
   props: TFiltersRowProps<K, E>
 ) {
-  const {
-    buttonConfig,
-    disabledAllOperations: disabledAllOperationsProp = false,
-    filter,
-    variant = "header",
-    trackerElements,
-  } = props;
+  const { buttonConfig, disabledAllOperations: disabledAllOperationsProp = false, filter, variant = "header" } = props;
   // states
   const [isUpdating, setIsUpdating] = useState(false);
+  // plane hooks
+  const { t } = useTranslation();
   // derived values
   const disabledAllOperations = disabledAllOperationsProp || !filter.configManager.areConfigsReady;
   const hasAnyConditions = filter.allConditionsForDisplay.length > 0;
+  const showMinimize = !disabledAllOperations && variant === "header";
   const hasAvailableOperations =
-    !disabledAllOperations && (filter.canClearFilters || filter.canSaveView || filter.canUpdateView);
+    !disabledAllOperations && (filter.canClearFilters || filter.canSaveView || filter.canUpdateView || showMinimize);
 
   const headerButtonConfig: Partial<TAddFilterButtonProps<K, E>["buttonConfig"]> = {
     label: null,
@@ -75,10 +73,10 @@ export const FiltersRow = observer(function FiltersRow<K extends TFilterProperty
         buttonConfig={{
           label: null,
           ...(variant === "modal" ? modalButtonConfig : headerButtonConfig),
-          size: "lg",
+          size: "md",
           iconConfig: {
             shouldShowIcon: true,
-            iconComponent: ListFilterPlus,
+            iconComponent: AddFilterOutline,
           },
           ...buttonConfig,
           isDisabled: disabledAllOperations,
@@ -91,36 +89,31 @@ export const FiltersRow = observer(function FiltersRow<K extends TFilterProperty
     <>
       <ElementTransition show={filter.canClearFilters}>
         <Button
-          variant="secondary"
-          className={COMMON_OPERATION_BUTTON_CLASSNAME}
+          variant="ghost"
+          size="md"
+          stretch="auto"
+          label={filter.clearFilterOptions?.label ?? "Clear all"}
           onClick={filter.clearFilters}
-          data-ph-element={trackerElements?.clearFilter}
-        >
-          {filter.clearFilterOptions?.label ?? "Clear all"}
-        </Button>
+        />
       </ElementTransition>
-      <ElementTransition show={filter.canSaveView}>
-        <Button
-          variant="secondary"
-          className={COMMON_OPERATION_BUTTON_CLASSNAME}
-          onClick={filter.saveView}
-          data-ph-element={trackerElements?.saveView}
-        >
-          {filter.saveViewOptions?.label ?? "Save view"}
-        </Button>
-      </ElementTransition>
-      <ElementTransition show={filter.canUpdateView}>
-        <Button
-          variant="secondary"
-          className={COMMON_OPERATION_BUTTON_CLASSNAME}
-          onClick={handleUpdate}
-          loading={isUpdating}
-          disabled={isUpdating}
-          data-ph-element={trackerElements?.updateView}
-        >
-          {isUpdating ? "Confirming" : (filter.updateViewOptions?.label ?? "Update view")}
-        </Button>
-      </ElementTransition>
+      <RichFiltersViewControls
+        save={{ enabled: filter.canSaveView, label: filter.saveViewOptions?.label, onClick: filter.saveView }}
+        update={{
+          enabled: filter.canUpdateView,
+          isUpdating,
+          label: filter.updateViewOptions?.label,
+          onClick: handleUpdate,
+        }}
+      />
+      {showMinimize && (
+        <IconButton
+          variant="ghost"
+          size="md"
+          icon={<Icon icon={ArrowCollapseOutline} />}
+          onClick={() => filter.toggleVisibility(false)}
+          aria-label={t("rich_filters.view_controls.hide_filters")}
+        />
+      )}
     </>
   );
 
@@ -138,7 +131,7 @@ export const FiltersRow = observer(function FiltersRow<K extends TFilterProperty
   );
 
   const ModalVariant = (
-    <div className="flex min-h-11 w-full flex-wrap items-center gap-2 rounded-lg bg-layer-1 p-2">{mainContent}</div>
+    <div className="flex min-h-11 w-full flex-wrap items-center gap-2 rounded-lg bg-layer-1">{mainContent}</div>
   );
 
   const HeaderVariant = (
@@ -158,53 +151,4 @@ export const FiltersRow = observer(function FiltersRow<K extends TFilterProperty
   }
 
   return <RowTransition show={filter.isVisible}>{variant === "modal" ? ModalVariant : HeaderVariant}</RowTransition>;
-});
-
-const COMMON_OPERATION_BUTTON_CLASSNAME = "py-1";
-
-// `children` is deliberately narrower than ReactNode: these wrappers render a Fragment-backed
-// Transition, which forwards a ref and therefore needs exactly one element child. `as="div"` keeps
-// that guarantee structural rather than relying on every caller getting it right.
-type TElementTransitionProps = {
-  children: React.ReactElement;
-  show: boolean;
-};
-
-const ElementTransition = observer(function ElementTransition(props: TElementTransitionProps) {
-  return (
-    <Transition
-      as="div"
-      show={props.show}
-      enter="transition ease-out duration-200"
-      enterFrom="opacity-0 scale-95"
-      enterTo="opacity-100 scale-100"
-      leave="transition ease-in duration-150"
-      leaveFrom="opacity-100 scale-100"
-      leaveTo="opacity-0 scale-95"
-    >
-      {props.children}
-    </Transition>
-  );
-});
-
-type TRowTransitionProps = {
-  children: React.ReactElement;
-  show: boolean;
-};
-
-const RowTransition = observer(function RowTransition(props: TRowTransitionProps) {
-  return (
-    <Transition
-      as="div"
-      show={props.show}
-      enter="transition-all duration-150 ease-out"
-      enterFrom="opacity-0 -translate-y-1"
-      enterTo="opacity-100 translate-y-0"
-      leave="transition-all duration-100 ease-in"
-      leaveFrom="opacity-100 translate-y-0"
-      leaveTo="opacity-0 -translate-y-1"
-    >
-      {props.children}
-    </Transition>
-  );
 });

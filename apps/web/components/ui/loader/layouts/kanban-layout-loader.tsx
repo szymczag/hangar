@@ -7,7 +7,7 @@
 import { forwardRef } from "react";
 import { range } from "lodash-es";
 // plane ui
-import { ContentWrapper } from "@plane/ui";
+import { ContentWrapper } from "@plane/blocks/layout";
 // plane utils
 import { cn } from "@plane/utils";
 
@@ -58,6 +58,7 @@ export function KanbanLayoutLoader({ cardsInEachColumn = [2, 3, 2, 4, 3] }: { ca
   return (
     <ContentWrapper className="flex-row gap-5 overflow-x-auto py-1.5">
       {cardsInEachColumn.map((cardsInColumn, columnIndex) => (
+        // oxlint-disable-next-line react/no-array-index-key -- fixed placeholder columns, never reordered
         <KanbanColumnLoader key={columnIndex} cardsInColumn={cardsInColumn} />
       ))}
     </ContentWrapper>

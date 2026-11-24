@@ -276,7 +276,11 @@
     "archived_banner": "Item kerja ini diarsipkan. Pulihkan untuk melakukan perubahan.",
     "assignee_count": "{count, plural, one {# penugas} other {# penugas}}",
     "description_load_failed": "Tidak dapat memuat deskripsi.",
-    "updated_time_ago": "Diperbarui {time}"
+    "updated_time_ago": "Diperbarui {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# label} other {+# label}}",
+      "trigger_aria_label": "{count, plural, one {# properti lainnya} other {# properti lainnya}}"
+    }
   },
   "sub_work_item": {
     "update": {

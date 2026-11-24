@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "Copy to clipboard"
     },
-    "status": "Status"
+    "status": "Status",
+    "locked": "Locked"
   },
   "chart": {
     "x_axis": "X-axis",
@@ -897,5 +898,14 @@
   },
   "searching": "Searching...",
   "rename_folder": "Rename folder",
-  "entity_detail_toolbar": "Actions"
+  "entity_detail_toolbar": "Actions",
+  "labels_count": "{count, plural, one {# label} other {# labels}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "Hide filters",
+      "save_as": "Save as",
+      "save_options": "Save view options",
+      "update_view": "Update view"
+    }
+  }
 }

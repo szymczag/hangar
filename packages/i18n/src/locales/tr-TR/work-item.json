@@ -276,7 +276,11 @@
     "archived_banner": "Bu iş öğesi arşivlendi. Değişiklik yapmak için geri yükleyin.",
     "assignee_count": "{count, plural, one {# atanan} other {# atanan}}",
     "description_load_failed": "Açıklama yüklenemedi.",
-    "updated_time_ago": "{time} güncellendi"
+    "updated_time_ago": "{time} güncellendi",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# etiket} other {+# etiket}}",
+      "trigger_aria_label": "{count, plural, one {# özellik daha} other {# özellik daha}}"
+    }
   },
   "sub_work_item": {
     "update": {

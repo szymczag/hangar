@@ -51,6 +51,9 @@
       "next_page": "Sonraki sayfaya git",
       "previous_page": "Önceki sayfaya git",
       "root": "Sayfalama"
+    },
+    "project_board": {
+      "collapse_group": "Grubu daralt"
     }
   }
 }

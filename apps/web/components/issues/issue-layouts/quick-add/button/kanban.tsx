@@ -7,19 +7,20 @@
 import { observer } from "mobx-react";
 
 import { useTranslation } from "@plane/i18n";
-import { PlusIcon } from "@plane/propel/icons";
+import { AddOutline } from "@makeplane/propel/icons";
 import type { TQuickAddIssueButton } from "../root";
 
 export const KanbanQuickAddIssueButton = observer(function KanbanQuickAddIssueButton(props: TQuickAddIssueButton) {
   const { onClick, isEpic = false } = props;
   const { t } = useTranslation();
   return (
-    <div
-      className="flex w-full cursor-pointer items-center gap-2 rounded-lg bg-layer-transparent px-2 py-1 py-1.5 hover:bg-layer-transparent-hover"
+    <button
+      type="button"
+      className="flex w-full cursor-pointer items-center gap-2 rounded-lg bg-layer-1 px-2 py-1 text-left hover:bg-layer-transparent-hover focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:outline-none"
       onClick={onClick}
     >
-      <PlusIcon className="h-3.5 w-3.5 stroke-2" />
-      <span className="text-13 font-medium">{isEpic ? t("epic.new") : t("issue.new")}</span>
-    </div>
+      <AddOutline className="h-3.5 w-3.5" />
+      <span className="text-body-xs-medium">{isEpic ? t("epic.new") : t("issue.new")}</span>
+    </button>
   );
 });

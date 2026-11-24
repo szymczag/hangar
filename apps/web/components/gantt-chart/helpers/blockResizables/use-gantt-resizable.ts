@@ -6,7 +6,7 @@
 
 import { useRef, useState } from "react";
 // Hangar
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { IBlockUpdateDependencyData, IGanttBlock } from "@plane/types";
 // hooks
 import { useTimeLineChartStore } from "@/hooks/use-timeline-chart";
@@ -59,8 +59,8 @@ export const useGanttResizable = (
       if (currMouseEvent.current) handleMouseMove(currMouseEvent.current);
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      currMouseEvent.current = e;
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      currMouseEvent.current = moveEvent;
       setIsMoving(dragDirection);
       setIsDragging(true);
 
@@ -68,14 +68,14 @@ export const useGanttResizable = (
 
       const { left: containerLeft } = ganttContainerDimensions.current;
 
-      const mouseX = e.clientX - containerLeft - SIDEBAR_WIDTH + ganttContainerElement.scrollLeft;
+      const pointerX = moveEvent.clientX - containerLeft - SIDEBAR_WIDTH + ganttContainerElement.scrollLeft;
 
       let width = initialPositionRef.current.width;
       let marginLeft = initialPositionRef.current.marginLeft;
 
       if (dragDirection === "left") {
         // calculate new marginLeft and update the initial marginLeft to the newly calculated one
-        marginLeft = Math.round(mouseX / dayWidth) * dayWidth;
+        marginLeft = Math.round(pointerX / dayWidth) * dayWidth;
         // get Dimensions from dom's style
         const prevMarginLeft = parseFloat(resizableDiv.style.marginLeft.slice(0, -2));
         const prevWidth = parseFloat(resizableDiv.style.width.slice(0, -2));
@@ -85,18 +85,18 @@ export const useGanttResizable = (
         width = block.target_date ? prevWidth + marginDelta : DEFAULT_BLOCK_WIDTH;
       } else if (dragDirection === "right") {
         // calculate new width and update the initialMarginLeft using +=
-        width = Math.round(mouseX / dayWidth) * dayWidth - marginLeft;
+        width = Math.round(pointerX / dayWidth) * dayWidth - marginLeft;
 
         // If start date does not exist while dragging with right handle the revert to default width and adjust marginLeft accordingly
         if (!block.start_date) {
           // calculate new right and update the marginLeft to the newly calculated one
-          const marginRight = Math.round(mouseX / dayWidth) * dayWidth;
+          const marginRight = Math.round(pointerX / dayWidth) * dayWidth;
           marginLeft = marginRight - DEFAULT_BLOCK_WIDTH;
           width = DEFAULT_BLOCK_WIDTH;
         }
       } else if (dragDirection === "move") {
         // calculate new marginLeft and update the initial marginLeft using -=
-        marginLeft = Math.round((mouseX - initialPositionRef.current.offsetX) / dayWidth) * dayWidth;
+        marginLeft = Math.round((pointerX - initialPositionRef.current.offsetX) / dayWidth) * dayWidth;
       }
 
       // block needs to be at least 1 dayWidth Wide
@@ -129,7 +129,7 @@ export const useGanttResizable = (
         if (updateBlockDates) updateBlockDates(blockUpdates);
       } catch {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error",
           message: "Something went wrong while updating block dates",
         });
