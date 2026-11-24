@@ -163,7 +163,9 @@ class IntakeIssueListCreateAPIEndpoint(BaseAPIView):
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
 
         # Intake view
-        if intake is None and not project.intake_view:
+        # Fork (see FORK.md): either a missing Intake row or intake turned off
+        # refuses the write, as the list and detail reads already do.
+        if intake is None or not project.intake_view:
             return Response(
                 {"error": "Intake is not enabled for this project enable it through the project's api"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -336,7 +338,9 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
         project = Project.objects.select_for_update().get(workspace__slug=slug, pk=project_id)
 
         # Intake view
-        if intake is None and not project.intake_view:
+        # Fork (see FORK.md): either a missing Intake row or intake turned off
+        # refuses the write, as the list and detail reads already do.
+        if intake is None or not project.intake_view:
             return Response(
                 {"error": "Intake is not enabled for this project enable it through the project's api"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -493,7 +497,9 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
 
         # Intake view
-        if intake is None and not project.intake_view:
+        # Fork (see FORK.md): either a missing Intake row or intake turned off
+        # refuses the write, as the list and detail reads already do.
+        if intake is None or not project.intake_view:
             return Response(
                 {"error": "Intake is not enabled for this project enable it through the project's api"},
                 status=status.HTTP_400_BAD_REQUEST,
