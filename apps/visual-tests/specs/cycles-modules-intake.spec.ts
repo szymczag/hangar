@@ -90,10 +90,11 @@ test("the cycles filters menu", async ({ asUser }) => {
     .getByRole("button", { name: /Filters/ })
     .first()
     .click();
-  // The status section lists "Completed" in both the 1.4 popover and the menu.
-  const completed = page.getByText("Completed", { exact: true }).last();
+  // The status section's heading: a header row in the 1.4 popover, a submenu
+  // row in upstream's menu, which keeps its options one level down.
+  const status = page.getByText("Status of the cycle", { exact: true }).last();
 
-  await capture(page, "cycles-filters-menu", { ready: completed });
+  await capture(page, "cycles-filters-menu", { ready: status });
 });
 
 test("the cycle detail", async ({ asUser }) => {
