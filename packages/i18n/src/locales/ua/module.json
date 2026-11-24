@@ -2,6 +2,11 @@
   "module": {
     "label": "{count, plural, one {Модуль} few {Модулі} other {Модулів}}",
     "no_module": "Немає модуля",
-    "select": "Додати модулі"
+    "select": "Додати модулі",
+    "details_drawer": {
+      "progress": {
+        "empty": "Додайте робочі одиниці до модуля, щоб відстежувати прогрес."
+      }
+    }
   }
 }

@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Не вдалося скопіювати в буфер обміну",
     "tooltip": {
-      "copy_to_clipboard": "Скопіювати в буфер обміну"
+      "copy_to_clipboard": "Скопіювати в буфер обміну",
+      "created_on_date": "Створено {date}",
+      "priority": "Пріоритет: {value}"
     },
     "status": "Статус",
     "locked": "Заблоковано"

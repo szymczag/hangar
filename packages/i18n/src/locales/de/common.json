@@ -742,7 +742,9 @@
     "administration": "Verwaltung",
     "clipboard_copy_failed": "Kopieren in die Zwischenablage fehlgeschlagen",
     "tooltip": {
-      "copy_to_clipboard": "In die Zwischenablage kopieren"
+      "copy_to_clipboard": "In die Zwischenablage kopieren",
+      "created_on_date": "Erstellt am {date}",
+      "priority": "Priorität: {value}"
     },
     "status": "Status",
     "locked": "Gesperrt"

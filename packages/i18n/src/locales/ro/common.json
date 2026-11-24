@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Nu s-a putut copia în clipboard",
     "tooltip": {
-      "copy_to_clipboard": "Copiază în clipboard"
+      "copy_to_clipboard": "Copiază în clipboard",
+      "created_on_date": "Creat la {date}",
+      "priority": "Prioritate: {value}"
     },
     "status": "Stare",
     "locked": "Blocat"

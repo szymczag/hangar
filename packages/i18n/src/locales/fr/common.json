@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Impossible de copier dans le presse-papiers",
     "tooltip": {
-      "copy_to_clipboard": "Copier dans le presse-papiers"
+      "copy_to_clipboard": "Copier dans le presse-papiers",
+      "created_on_date": "Créé le {date}",
+      "priority": "Priorité : {value}"
     },
     "status": "Statut",
     "locked": "Verrouillé"

@@ -7,13 +7,10 @@
 import { observer } from "mobx-react";
 import { INBOX_STATUS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { CloseIcon } from "@plane/propel/icons";
 import type { TInboxIssueStatus } from "@plane/types";
-// constants
-import { Tag } from "@plane/ui";
-// hooks
 import { useProjectInbox } from "@/hooks/store/use-project-inbox";
 import { InboxStatusIcon } from "../../inbox-status-icon";
+import { APPLIED_FILTER_GROUP_CLASSNAME, RemovableChip } from "@/components/common/removable-chip";
 
 export const InboxIssueAppliedFiltersStatus = observer(function InboxIssueAppliedFiltersStatus() {
   // hooks
@@ -28,28 +25,26 @@ export const InboxIssueAppliedFiltersStatus = observer(function InboxIssueApplie
 
   if (filteredValues.length === 0) return <></>;
   return (
-    <Tag>
-      <div className="text-11 text-secondary">Status</div>
+    <div className={APPLIED_FILTER_GROUP_CLASSNAME}>
+      <div className="text-caption-sm-regular text-secondary">Status</div>
       {filteredValues.map((value) => {
         const optionDetail = currentOptionDetail(value);
         if (!optionDetail) return <></>;
         return (
-          <div key={value} className="relative flex items-center gap-1 rounded-sm bg-layer-1 p-1 text-11">
-            <div className="relative flex h-3 w-3 flex-shrink-0 items-center justify-center overflow-hidden">
-              <InboxStatusIcon type={optionDetail?.status} />
-            </div>
-            <div className="truncate text-11">{t(optionDetail?.i18n_title)}</div>
-            {handleFilterValue(optionDetail?.status).length >= 1 && (
-              <div
-                className="relative flex h-3 w-3 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden text-tertiary transition-all hover:text-secondary"
-                onClick={() => handleInboxIssueFilters("status", handleFilterValue(optionDetail?.status))}
-              >
-                <CloseIcon className={`h-3 w-3`} />
-              </div>
-            )}
-          </div>
+          <RemovableChip
+            key={value}
+            variant="soft"
+            icon={<InboxStatusIcon type={optionDetail?.status} className="size-3" />}
+            label={t(optionDetail?.i18n_title)}
+            ariaLabel={t(optionDetail.i18n_title)}
+            onRemove={
+              handleFilterValue(optionDetail?.status).length >= 1
+                ? () => handleInboxIssueFilters("status", handleFilterValue(optionDetail?.status))
+                : undefined
+            }
+          />
         );
       })}
-    </Tag>
+    </div>
   );
 });

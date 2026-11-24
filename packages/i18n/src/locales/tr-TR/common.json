@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Panoya kopyalanamadı",
     "tooltip": {
-      "copy_to_clipboard": "Panoya kopyala"
+      "copy_to_clipboard": "Panoya kopyala",
+      "created_on_date": "Oluşturulma tarihi: {date}",
+      "priority": "Öncelik: {value}"
     },
     "status": "Durum",
     "locked": "Kilitli"

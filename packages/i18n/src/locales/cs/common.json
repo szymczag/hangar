@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Kopírování do schránky se nezdařilo",
     "tooltip": {
-      "copy_to_clipboard": "Kopírovat do schránky"
+      "copy_to_clipboard": "Kopírovat do schránky",
+      "created_on_date": "Vytvořeno dne {date}",
+      "priority": "Priorita: {value}"
     },
     "status": "Stav",
     "locked": "Uzamčeno"

@@ -2,6 +2,11 @@
   "module": {
     "label": "{count, plural, one {Module} other {Modules}}",
     "no_module": "No module",
-    "select": "Add modules"
+    "select": "Add modules",
+    "details_drawer": {
+      "progress": {
+        "empty": "Add work items to the module to track progress."
+      }
+    }
   }
 }

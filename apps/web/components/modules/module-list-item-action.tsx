@@ -7,24 +7,24 @@
 import React from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { SquareUser } from "lucide-react";
+import { CalendarOutline, LeadOutline } from "@makeplane/propel/icons";
 // Hangar imports
 import { MODULE_STATUS, EUserPermissions, EUserPermissionsLevel, IS_FAVORITE_MENU_OPEN } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
 import { useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { setPromiseToast, setToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { IModule } from "@plane/types";
-import { FavoriteStar } from "@plane/ui";
+import { FavoriteStar } from "@plane/blocks/common";
+import { DateRangeSelect } from "@plane/blocks/property-select";
 import { renderFormattedPayloadDate, getDate } from "@plane/utils";
 // components
-import { DateRangeDropdown } from "@/components/dropdowns/date-range";
 import { ModuleQuickActions } from "@/components/modules";
 import { ModuleStatusDropdown } from "@/components/modules/module-status-dropdown";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useModule } from "@/hooks/store/use-module";
-import { useUserPermissions } from "@/hooks/store/user";
+import { useUserPermissions, useUserProfile } from "@/hooks/store/user";
 import { ButtonAvatars } from "../dropdowns/member/avatar";
 
 type Props = {
@@ -41,6 +41,7 @@ export const ModuleListItemAction = observer(function ModuleListItemAction(props
   const { allowPermissions } = useUserPermissions();
   const { addModuleToFavorites, removeModuleFromFavorites, updateModuleDetails } = useModule();
   const { getUserDetails } = useMember();
+  const { data: userProfile } = useUserProfile();
 
   const { t } = useTranslation();
 
@@ -66,6 +67,7 @@ export const ModuleListItemAction = observer(function ModuleListItemAction(props
       () => {
         // open favorites menu if closed
         if (!storedValue) toggleFavoriteMenu(true);
+        return undefined;
       }
     );
 
@@ -112,14 +114,15 @@ export const ModuleListItemAction = observer(function ModuleListItemAction(props
     await updateModuleDetails(workspaceSlug.toString(), projectId.toString(), moduleId, payload)
       .then(() => {
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: "Success!",
           message: "Module updated successfully.",
         });
+        return undefined;
       })
       .catch((err) => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: err?.detail ?? "Module could not be updated. Please try again.",
         });
@@ -130,27 +133,24 @@ export const ModuleListItemAction = observer(function ModuleListItemAction(props
 
   return (
     <>
-      <DateRangeDropdown
-        buttonContainerClassName={`h-6 w-full flex ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"} items-center gap-1.5 text-tertiary border-[0.5px] border-strong rounded-sm text-11`}
-        buttonVariant="transparent-with-text"
-        className="h-7"
+      <DateRangeSelect
+        variant="pill-sm"
+        className="max-w-none"
         value={{
-          from: getDate(moduleDetails.start_date),
-          to: getDate(moduleDetails.target_date),
+          from: getDate(moduleDetails.start_date) ?? null,
+          to: getDate(moduleDetails.target_date) ?? null,
         }}
-        onSelect={(val) => {
-          handleModuleDetailsChange({
-            start_date: val?.from ? renderFormattedPayloadDate(val.from) : null,
-            target_date: val?.to ? renderFormattedPayloadDate(val.to) : null,
+        onChange={(range) => {
+          void handleModuleDetailsChange({
+            start_date: range.from ? renderFormattedPayloadDate(range.from) : null,
+            target_date: range.to ? renderFormattedPayloadDate(range.to) : null,
           });
         }}
         mergeDates
-        placeholder={{
-          from: t("start_date"),
-          to: t("end_date"),
-        }}
+        placeholder={`${t("start_date")} - ${t("end_date")}`}
+        weekStartsOn={userProfile?.start_of_the_week}
         disabled={isDisabled}
-        hideIcon={{ from: renderIcon ?? true, to: renderIcon }}
+        icon={renderIcon ? undefined : <CalendarOutline aria-hidden="true" />}
       />
 
       {moduleStatus && (
@@ -161,15 +161,16 @@ export const ModuleListItemAction = observer(function ModuleListItemAction(props
         />
       )}
 
-      {moduleLeadDetails ? (
-        <span className="cursor-default">
+      {/* sized like the sm icon buttons beside it so the lead, star and menu sit on one even rhythm */}
+      <span className="grid size-6 shrink-0 cursor-default place-items-center">
+        {moduleLeadDetails ? (
           <ButtonAvatars showTooltip={false} userIds={moduleLeadDetails?.id} />
-        </span>
-      ) : (
-        <Tooltip tooltipContent="No lead">
-          <SquareUser className="h-4 w-4 text-tertiary" />
-        </Tooltip>
-      )}
+        ) : (
+          <Tooltip label="No lead">
+            <LeadOutline className="size-4 shrink-0 text-tertiary" />
+          </Tooltip>
+        )}
+      </span>
 
       {isEditingAllowed && !moduleDetails.archived_at && (
         <FavoriteStar
@@ -181,12 +182,13 @@ export const ModuleListItemAction = observer(function ModuleListItemAction(props
         />
       )}
       {workspaceSlug && projectId && (
-        <div className="hidden md:block">
+        <div className="hidden md:flex">
           <ModuleQuickActions
             parentRef={parentRef}
             moduleId={moduleId}
             projectId={projectId.toString()}
             workspaceSlug={workspaceSlug.toString()}
+            size="sm"
           />
         </div>
       )}

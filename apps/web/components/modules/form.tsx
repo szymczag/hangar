@@ -7,19 +7,29 @@
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 // plane imports
+import {
+  DialogActions,
+  DialogBody,
+  DialogHeader,
+  DialogHeading,
+  DialogMain,
+  DialogTitle,
+} from "@makeplane/propel/components/dialog";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { TextAreaField } from "@makeplane/propel/components/text-area-field";
 import { ETabIndices } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
+import { DateRangeSelect } from "@plane/blocks/property-select";
+import { Button } from "@makeplane/propel/components/button";
+import { CalendarOutline } from "@makeplane/propel/icons";
 import type { IModule } from "@plane/types";
-// ui
-import { Input, TextArea } from "@plane/ui";
 import { getDate, renderFormattedPayloadDate, getTabIndex } from "@plane/utils";
 // components
-import { DateRangeDropdown } from "@/components/dropdowns/date-range";
-import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
-import { ProjectDropdown } from "@/components/dropdowns/project/dropdown";
+import { MemberSelect } from "@/components/dropdowns/member/member-select";
+import { ProjectSelect } from "@/components/dropdowns/project/project-select";
 import { ModuleStatusSelect } from "@/components/modules";
 // hooks
+import { useUserProfile } from "@/hooks/store/user";
 import { useUser } from "@/hooks/store/user/user-user";
 
 type Props = {
@@ -44,6 +54,7 @@ export function ModuleForm(props: Props) {
   const { handleFormSubmit, handleClose, status, projectId, setActiveProject, data, isMobile = false } = props;
   // store hooks
   const { projectsWithCreatePermissions } = useUser();
+  const { data: userProfile } = useUserProfile();
   // form info
   const {
     formState: { errors, isSubmitting, dirtyFields },
@@ -81,171 +92,181 @@ export function ModuleForm(props: Props) {
   }, [data, reset]);
 
   return (
-    <form onSubmit={handleSubmit(handleCreateUpdateModule)}>
-      <div className="space-y-5 p-5">
-        <div className="flex items-center gap-x-3">
-          {!status && (
-            <Controller
-              control={control}
-              name="project_id"
-              render={({ field: { value, onChange } }) => (
-                <div className="h-7">
-                  <ProjectDropdown
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit(handleCreateUpdateModule)}>
+      <DialogMain>
+        <DialogHeader>
+          <div className="flex items-center gap-x-3">
+            {!status && (
+              <Controller
+                control={control}
+                name="project_id"
+                render={({ field: { value, onChange } }) => (
+                  <ProjectSelect
                     value={value}
                     onChange={(val) => {
-                      if (!Array.isArray(val)) {
-                        onChange(val);
-                        setActiveProject(val);
-                      }
+                      if (!val) return;
+                      onChange(val);
+                      setActiveProject(val);
                     }}
                     multiple={false}
-                    buttonVariant="border-with-text"
-                    renderCondition={(projectId) => !!projectsWithCreatePermissions?.[projectId]}
+                    variant="pill-sm"
+                    filterOption={(id) => !!projectsWithCreatePermissions?.[id]}
                     tabIndex={getIndex("cover_image")}
                   />
-                </div>
-              )}
-            />
-          )}
-          <h3 className="text-18 font-medium text-secondary">
-            {status ? t("common.update") : t("common.create")} {t("common.module").toLowerCase()}
-          </h3>
-        </div>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Controller
-              control={control}
-              name="name"
-              rules={{
-                required: t("title_is_required"),
-                maxLength: {
-                  value: 255,
-                  message: t("title_should_be_less_than_255_characters"),
-                },
-              }}
-              render={({ field: { value, onChange } }) => (
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  value={value}
-                  onChange={onChange}
-                  hasError={Boolean(errors?.name)}
-                  placeholder={t("title")}
-                  className="w-full text-14"
-                  tabIndex={getIndex("name")}
-                  autoFocus
-                />
-              )}
-            />
-            <span className="text-11 text-danger-primary">{errors?.name?.message}</span>
+                )}
+              />
+            )}
+            <DialogHeading>
+              <DialogTitle>
+                {status ? t("common.update") : t("common.create")} {t("common.module").toLowerCase()}
+              </DialogTitle>
+            </DialogHeading>
           </div>
-          <div>
-            <Controller
-              name="description"
-              control={control}
-              render={({ field: { value, onChange } }) => (
-                <TextArea
-                  id="description"
-                  name="description"
-                  value={value}
-                  onChange={onChange}
-                  placeholder={t("description")}
-                  className="min-h-24 w-full resize-none text-14"
-                  hasError={Boolean(errors?.description)}
-                  tabIndex={getIndex("description")}
-                />
-              )}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Controller
-              control={control}
-              name="start_date"
-              render={({ field: { value: startDateValue, onChange: onChangeStartDate } }) => (
-                <Controller
-                  control={control}
-                  name="target_date"
-                  render={({ field: { value: endDateValue, onChange: onChangeEndDate } }) => (
-                    <DateRangeDropdown
-                      buttonVariant="border-with-text"
-                      className="h-7"
-                      value={{
-                        from: getDate(startDateValue),
-                        to: getDate(endDateValue),
-                      }}
-                      onSelect={(val) => {
-                        onChangeStartDate(val?.from ? renderFormattedPayloadDate(val.from) : null);
-                        onChangeEndDate(val?.to ? renderFormattedPayloadDate(val.to) : null);
-                      }}
-                      placeholder={{
-                        from: t("start_date"),
-                        to: t("end_date"),
-                      }}
-                      hideIcon={{
-                        to: true,
-                      }}
-                      tabIndex={getIndex("date_range")}
-                    />
-                  )}
-                />
-              )}
-            />
-            <div className="h-7">
-              <ModuleStatusSelect control={control} error={errors.status} tabIndex={getIndex("status")} />
+        </DialogHeader>
+        <DialogBody tabIndex={0}>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Controller
+                control={control}
+                name="name"
+                rules={{
+                  required: t("title_is_required"),
+                  maxLength: {
+                    value: 255,
+                    message: t("title_should_be_less_than_255_characters"),
+                  },
+                }}
+                render={({ field: { value, onChange } }) => (
+                  <InputField
+                    size="xl"
+                    orientation="vertical"
+                    error={errors?.name?.message}
+                    id="name"
+                    name="name"
+                    type="text"
+                    value={value}
+                    onChange={onChange}
+                    placeholder={t("title")}
+                    aria-label={t("title")}
+                    tabIndex={getIndex("name")}
+                    // oxlint-disable-next-line jsx_a11y/no-autofocus -- the dialog opens to type a title, as it always has
+                    autoFocus
+                  />
+                )}
+              />
             </div>
-            <Controller
-              control={control}
-              name="lead_id"
-              render={({ field: { value, onChange } }) => (
-                <div className="h-7">
-                  <MemberDropdown
+            <div>
+              <Controller
+                name="description"
+                control={control}
+                render={({ field: { value, onChange } }) => (
+                  <TextAreaField
+                    size="xl"
+                    autoResize
+                    maxRows={8}
+                    error={errors?.description?.message}
+                    id="description"
+                    name="description"
+                    value={value}
+                    onChange={onChange}
+                    placeholder={t("description")}
+                    aria-label={t("description")}
+                    tabIndex={getIndex("description")}
+                  />
+                )}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Controller
+                control={control}
+                name="start_date"
+                render={({ field: { value: startDateValue, onChange: onChangeStartDate } }) => (
+                  <Controller
+                    control={control}
+                    name="target_date"
+                    render={({ field: { value: endDateValue, onChange: onChangeEndDate } }) => (
+                      <DateRangeSelect
+                        variant="pill-sm"
+                        className="max-w-none"
+                        value={{
+                          from: getDate(startDateValue) ?? null,
+                          to: getDate(endDateValue) ?? null,
+                        }}
+                        onChange={(range) => {
+                          onChangeStartDate(range.from ? renderFormattedPayloadDate(range.from) : null);
+                          onChangeEndDate(range.to ? renderFormattedPayloadDate(range.to) : null);
+                        }}
+                        placeholder={`${t("start_date")} - ${t("end_date")}`}
+                        icon={<CalendarOutline />}
+                        weekStartsOn={userProfile?.start_of_the_week}
+                        tabIndex={getIndex("date_range")}
+                      />
+                    )}
+                  />
+                )}
+              />
+              <ModuleStatusSelect control={control} error={errors.status} tabIndex={getIndex("status")} />
+              <Controller
+                control={control}
+                name="lead_id"
+                render={({ field: { value, onChange } }) => (
+                  <MemberSelect
                     value={value}
                     onChange={onChange}
                     projectId={projectId}
                     multiple={false}
-                    buttonVariant="border-with-text"
                     placeholder={t("lead")}
+                    variant="pill-sm"
                     tabIndex={getIndex("lead")}
                   />
-                </div>
-              )}
-            />
-            <Controller
-              control={control}
-              name="member_ids"
-              render={({ field: { value, onChange } }) => (
-                <div className="h-7">
-                  <MemberDropdown
-                    value={value}
+                )}
+              />
+              <Controller
+                control={control}
+                name="member_ids"
+                render={({ field: { value, onChange } }) => (
+                  <MemberSelect
+                    value={value ?? []}
                     onChange={onChange}
                     projectId={projectId}
                     multiple
-                    buttonVariant={value && value.length > 0 ? "transparent-without-text" : "border-with-text"}
-                    buttonClassName={value && value.length > 0 ? "hover:bg-transparent px-0" : ""}
                     placeholder={t("members")}
+                    variant={value?.length ? "avatar-group-sm" : "pill-sm"}
                     tabIndex={getIndex("member_ids")}
                   />
-                </div>
-              )}
-            />
+                )}
+              />
+            </div>
           </div>
-        </div>
-      </div>
-      <div className="flex items-center justify-end gap-2 border-t-[0.5px] border-subtle px-5 py-4">
-        <Button variant="secondary" size="lg" onClick={handleClose} tabIndex={getIndex("cancel")}>
-          {t("cancel")}
-        </Button>
-        <Button variant="primary" size="lg" type="submit" loading={isSubmitting} tabIndex={getIndex("submit")}>
-          {status
-            ? isSubmitting
-              ? t("updating")
-              : t("project_module.update_module")
-            : isSubmitting
-              ? t("creating")
-              : t("project_module.create_module")}
-        </Button>
-      </div>
+        </DialogBody>
+      </DialogMain>
+      <DialogActions>
+        <Button
+          variant="secondary"
+          size="md"
+          stretch="auto"
+          onClick={handleClose}
+          tabIndex={getIndex("cancel")}
+          label={t("cancel")}
+        />
+        <Button
+          variant="primary"
+          size="md"
+          stretch="auto"
+          type="submit"
+          loading={isSubmitting}
+          tabIndex={getIndex("submit")}
+          label={
+            status
+              ? isSubmitting
+                ? t("updating")
+                : t("project_module.update_module")
+              : isSubmitting
+                ? t("creating")
+                : t("project_module.create_module")
+          }
+        />
+      </DialogActions>
     </form>
   );
 }

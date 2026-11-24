@@ -27,8 +27,8 @@ type Props = {
 /**
  * Fork: compatibility shim, removed in phase 9.
  *
- * The 1.4 popover the header filter panels of cycles, modules, intake, pages and the view list still
- * render (search box and `FilterHeader`/`FilterOption` rows). Upstream v1.5.0's `FiltersDropdown` is a
+ * The 1.4 popover the header filter panels of pages and the view list still render (search box and
+ * `FilterHeader`/`FilterOption` rows); cycles, modules and intake moved to upstream's menu in phase 5. Upstream v1.5.0's `FiltersDropdown` is a
  * Propel `Menu` whose typeahead would take the keys typed into those search boxes, so those callers
  * stay on this copy until their own phases move their panels.
  */

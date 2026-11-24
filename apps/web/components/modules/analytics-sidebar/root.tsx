@@ -4,39 +4,46 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
-import { Info, SquareUser } from "lucide-react";
-import { Disclosure, Transition } from "@headlessui/react";
+import {
+  AddOutline,
+  CloseOutline,
+  LeadOutline,
+  MembersOutline,
+  StartDateOutline,
+  StateOutline,
+  WorkItemsOutline,
+} from "@makeplane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
 import { MODULE_STATUS, EUserPermissions, EUserPermissionsLevel, EEstimateSystem } from "@plane/constants";
 // plane types
 import { useTranslation } from "@plane/i18n";
-import {
-  PlusIcon,
-  MembersPropertyIcon,
-  ModuleStatusIcon,
-  WorkItemsIcon,
-  StartDatePropertyIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-} from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { ModuleStatusIcon } from "@plane/blocks/icons";
+import { setToast } from "@plane/blocks/toast";
 import type { ILinkDetails, IModule, ModuleLink } from "@plane/types";
 // plane ui
-import { Loader, CustomSelect, TextArea } from "@plane/ui";
+import { DateRangeSelect } from "@plane/blocks/property-select";
+import { Loader } from "@plane/blocks/skeleton";
 // components
 // helpers
 import { getDate, renderFormattedPayloadDate } from "@plane/utils";
-import { DateRangeDropdown } from "@/components/dropdowns/date-range";
-import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
+import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
+import { MemberSelect } from "@/components/dropdowns/member/member-select";
 import { CreateUpdateModuleLinkModal, ModuleAnalyticsProgress, ModuleLinksList } from "@/components/modules";
+import { ModuleStatusDropdown } from "@/components/modules/module-status-dropdown";
+import { ModuleQuickActions } from "@/components/modules/quick-actions";
 // hooks
 import { useProjectEstimates } from "@/hooks/store/estimates";
 import { useModule } from "@/hooks/store/use-module";
-import { useUserPermissions } from "@/hooks/store/user";
-// plane web constants
+import { useUserPermissions, useUserProfile } from "@/hooks/store/user";
+// local imports
+import { ModuleSidebarDescription } from "./description";
+import { ModuleSidebarGroup } from "./sidebar-group";
+
 const defaultValues: Partial<IModule> = {
   lead_id: "",
   member_ids: [],
@@ -44,6 +51,75 @@ const defaultValues: Partial<IModule> = {
   target_date: null,
   status: "backlog",
 };
+
+type TModuleLinksCollapsibleProps = {
+  moduleDetails: IModule;
+  moduleId: string;
+  isEditingAllowed: boolean;
+  isArchived: boolean;
+  handleEditLink: (link: ILinkDetails) => void;
+  handleDeleteLink: (linkId: string) => Promise<void>;
+  setModuleLinkModal: (value: boolean) => void;
+};
+
+// Its own observer so the open state initialises from the loaded links and MobX tracks the list.
+const ModuleLinksCollapsible = observer(function ModuleLinksCollapsible(props: TModuleLinksCollapsibleProps) {
+  const {
+    moduleDetails,
+    moduleId,
+    isEditingAllowed,
+    isArchived,
+    handleEditLink,
+    handleDeleteLink,
+    setModuleLinkModal,
+  } = props;
+  // states
+  const [isOpen, setIsOpen] = useState(!!moduleDetails?.link_module?.length);
+  // plane hooks
+  const { t } = useTranslation();
+
+  const linkCount = moduleDetails.link_module?.length ?? 0;
+  const canAddLink = isEditingAllowed && !isArchived;
+
+  return (
+    <ModuleSidebarGroup
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      label={t("common.links")}
+      trailing={
+        <div className="flex items-center gap-2">
+          {linkCount > 0 && <span className="text-caption-md-regular text-placeholder">{linkCount}</span>}
+          {canAddLink && (
+            <IconButton
+              variant="ghost"
+              size="xs"
+              aria-label={t("add_link")}
+              icon={<Icon icon={AddOutline} />}
+              onClick={() => setModuleLinkModal(true)}
+            />
+          )}
+        </div>
+      }
+    >
+      <div className="flex w-full flex-col gap-2">
+        {isEditingAllowed && moduleDetails.link_module && moduleDetails.link_module.length > 0 ? (
+          moduleId && (
+            <div className="-mx-2 flex flex-col gap-0.5">
+              <ModuleLinksList
+                moduleId={moduleId}
+                handleEditLink={handleEditLink}
+                handleDeleteLink={handleDeleteLink}
+                disabled={!isEditingAllowed || isArchived}
+              />
+            </div>
+          )
+        ) : (
+          <p className="text-body-xs-regular text-tertiary">{t("common.no_links_added_yet")}</p>
+        )}
+      </div>
+    </ModuleSidebarGroup>
+  );
+});
 
 type Props = {
   moduleId: string;
@@ -57,12 +133,15 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
   // states
   const [moduleLinkModal, setModuleLinkModal] = useState(false);
   const [selectedLinkToUpdate, setSelectedLinkToUpdate] = useState<ILinkDetails | null>(null);
+  // refs
+  const headerRef = useRef<HTMLDivElement>(null);
   // router
   const { workspaceSlug, projectId } = useParams();
 
   // store hooks
   const { t } = useTranslation();
   const { allowPermissions } = useUserPermissions();
+  const { data: userProfile } = useUserProfile();
 
   const { getModuleById, updateModuleDetails, createModuleLink, updateModuleLink, deleteModuleLink } = useModule();
   const { areEstimateEnabledByProjectId, currentActiveEstimateId, estimateById } = useProjectEstimates();
@@ -71,7 +150,7 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
   const moduleDetails = getModuleById(moduleId);
   const areEstimateEnabled = projectId && areEstimateEnabledByProjectId(projectId.toString());
   const estimateType = areEstimateEnabled && currentActiveEstimateId && estimateById(currentActiveEstimateId);
-  const isEstimatePointValid = estimateType && estimateType?.type == EEstimateSystem.POINTS ? true : false;
+  const isEstimatePointValid = Boolean(estimateType && estimateType?.type == EEstimateSystem.POINTS);
 
   const { reset, control } = useForm({
     defaultValues,
@@ -94,23 +173,26 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
     await updateModuleLink(workspaceSlug.toString(), projectId.toString(), moduleId.toString(), linkId, payload);
   };
 
-  const handleDeleteLink = async (linkId: string) => {
-    if (!workspaceSlug || !projectId) return;
-    try {
-      await deleteModuleLink(workspaceSlug.toString(), projectId.toString(), moduleId.toString(), linkId);
-      setToast({
-        type: TOAST_TYPE.SUCCESS,
-        title: "Success!",
-        message: "Module link deleted successfully.",
-      });
-    } catch (_error) {
-      setToast({
-        type: TOAST_TYPE.ERROR,
-        title: "Error!",
-        message: "Some error occurred",
-      });
-    }
-  };
+  const handleDeleteLink = useCallback(
+    async (linkId: string) => {
+      if (!workspaceSlug || !projectId) return;
+      try {
+        await deleteModuleLink(workspaceSlug.toString(), projectId.toString(), moduleId.toString(), linkId);
+        setToast({
+          type: "success",
+          title: "Success!",
+          message: "Module link deleted successfully.",
+        });
+      } catch (_error) {
+        setToast({
+          type: "error",
+          title: "Error!",
+          message: "Some error occurred",
+        });
+      }
+    },
+    [workspaceSlug, projectId, moduleId, deleteModuleLink]
+  );
 
   const handleDateChange = async (startDate: Date | undefined, targetDate: Date | undefined) => {
     submitChanges({
@@ -118,7 +200,7 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
       target_date: targetDate ? renderFormattedPayloadDate(targetDate) : null,
     });
     setToast({
-      type: TOAST_TYPE.SUCCESS,
+      type: "success",
       title: "Success!",
       message: "Module updated successfully.",
     });
@@ -131,22 +213,23 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
       });
   }, [moduleDetails, reset]);
 
-  const handleEditLink = (link: ILinkDetails) => {
+  const handleEditLink = useCallback((link: ILinkDetails) => {
     setSelectedLinkToUpdate(link);
     setModuleLinkModal(true);
-  };
+  }, []);
 
   if (!moduleDetails)
     return (
-      <Loader>
-        <div className="space-y-2">
-          <Loader.Item height="15px" width="50%" />
-          <Loader.Item height="15px" width="30%" />
+      <Loader className="flex flex-col gap-6 py-4">
+        <Loader.Item height="24px" width="60%" />
+        <div className="flex flex-col gap-3">
+          <Loader.Item height="16px" />
+          <Loader.Item height="16px" width="80%" />
         </div>
-        <div className="mt-8 space-y-3">
-          <Loader.Item height="30px" />
-          <Loader.Item height="30px" />
-          <Loader.Item height="30px" />
+        <div className="flex flex-col gap-3">
+          <Loader.Item height="28px" />
+          <Loader.Item height="28px" />
+          <Loader.Item height="28px" />
         </div>
       </Loader>
     );
@@ -169,7 +252,7 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
   );
 
   return (
-    <div className="relative">
+    <div className="relative flex flex-col gap-6 py-4">
       <CreateUpdateModuleLinkModal
         isOpen={moduleLinkModal}
         handleClose={() => {
@@ -182,74 +265,60 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
         createLink={handleCreateLink}
         updateLink={handleUpdateLink}
       />
-      <>
-        <div className={`sticky top-0 z-10 flex items-center justify-between bg-surface-1 pt-5 pb-5`}>
-          <div>
-            <button
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-layer-3"
-              onClick={() => handleClose()}
-            >
-              <ChevronRightIcon className="h-3 w-3 stroke-2 text-on-color" />
-            </button>
-          </div>
+      <div ref={headerRef} className="flex items-start gap-3">
+        {/* h-lh keeps the status icon on the title's first line; py-0.5 centres that line on the header actions. */}
+        <div className="flex min-w-0 flex-1 items-start gap-1 py-0.5 text-body-md-semibold">
+          {moduleStatus && (
+            <span className="flex h-lh w-5 shrink-0 items-center justify-center">
+              <ModuleStatusIcon status={moduleStatus.value} height="14px" width="14px" />
+            </span>
+          )}
+          <h4 className="min-w-0 flex-1 wrap-break-word text-primary">{moduleDetails.name}</h4>
         </div>
-
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-5 pt-2">
-            <Controller
-              control={control}
-              name="status"
-              render={({ field: { value } }) => (
-                <CustomSelect
-                  customButton={
-                    <span
-                      className={`flex h-6 w-20 items-center justify-center rounded-xs text-center text-11 ${
-                        isEditingAllowed && !isArchived ? "cursor-pointer" : "cursor-not-allowed"
-                      }`}
-                      style={{
-                        color: moduleStatus ? moduleStatus.color : "#a3a3a2",
-                        backgroundColor: moduleStatus ? `${moduleStatus.color}20` : "#a3a3a220",
-                      }}
-                    >
-                      {(moduleStatus && t(moduleStatus?.i18n_label)) ?? t("project_modules.status.backlog")}
-                    </span>
-                  }
-                  value={value}
-                  onChange={(value: any) => {
-                    submitChanges({ status: value });
-                  }}
-                  disabled={!isEditingAllowed || isArchived}
-                >
-                  {MODULE_STATUS.map((status) => (
-                    <CustomSelect.Option key={status.value} value={status.value}>
-                      <div className="flex items-center gap-2">
-                        <ModuleStatusIcon status={status.value} />
-                        {t(status.i18n_label)}
-                      </div>
-                    </CustomSelect.Option>
-                  ))}
-                </CustomSelect>
-              )}
+        <div className="flex shrink-0 items-center gap-3">
+          {workspaceSlug && projectId && (
+            <ModuleQuickActions
+              parentRef={headerRef}
+              moduleId={moduleId}
+              projectId={projectId.toString()}
+              workspaceSlug={workspaceSlug.toString()}
             />
-          </div>
-          <h4 className="w-full text-18 font-semibold break-words text-primary">{moduleDetails.name}</h4>
-        </div>
-
-        {moduleDetails.description && (
-          <TextArea
-            className="ring-none !m-0 max-h-max w-full resize-none !border-0 bg-transparent !p-0 text-13 leading-5 text-secondary outline-none"
-            value={moduleDetails.description}
-            disabled
+          )}
+          <IconButton
+            variant="ghost"
+            size="md"
+            aria-label={t("close")}
+            icon={<Icon icon={CloseOutline} />}
+            onClick={() => handleClose()}
           />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        {moduleDetails.description?.trim() && (
+          <>
+            <ModuleSidebarDescription description={moduleDetails.description} />
+            <div className="w-full border-t border-subtle" />
+          </>
         )}
 
-        <div className="flex flex-col gap-5 pt-2.5 pb-6">
-          <div className="flex items-center justify-start gap-1">
-            <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-              <StartDatePropertyIcon className="h-4 w-4" />
-              <span className="text-14">{t("date_range")}</span>
-            </div>
-            <div className="h-7">
+        <ModuleSidebarGroup defaultOpen label={t("common.properties")}>
+          <div className="flex flex-col gap-2">
+            <SidebarPropertyListItem icon={StateOutline} label={t("state")}>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field: { value } }) => (
+                  <ModuleStatusDropdown
+                    isDisabled={!isEditingAllowed || !!isArchived}
+                    variant="select-ghost-md"
+                    moduleDetails={{ ...moduleDetails, status: value ?? moduleDetails.status }}
+                    handleModuleDetailsChange={submitChanges}
+                  />
+                )}
+              />
+            </SidebarPropertyListItem>
+            <SidebarPropertyListItem icon={StartDateOutline} label={t("date_range")}>
               <Controller
                 control={control}
                 name="start_date"
@@ -261,22 +330,20 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
                       const startDate = getDate(startDateValue);
                       const endDate = getDate(endDateValue);
                       return (
-                        <DateRangeDropdown
-                          buttonContainerClassName="w-full"
-                          buttonVariant="background-with-text"
+                        <DateRangeSelect
+                          variant="select-ghost-md"
                           value={{
-                            from: startDate,
-                            to: endDate,
+                            from: startDate ?? null,
+                            to: endDate ?? null,
                           }}
-                          onSelect={(val) => {
-                            onChangeStartDate(val?.from ? renderFormattedPayloadDate(val.from) : null);
-                            onChangeEndDate(val?.to ? renderFormattedPayloadDate(val.to) : null);
-                            handleDateChange(val?.from, val?.to);
+                          onChange={(range) => {
+                            onChangeStartDate(range.from ? renderFormattedPayloadDate(range.from) : null);
+                            onChangeEndDate(range.to ? renderFormattedPayloadDate(range.to) : null);
+                            void handleDateChange(range.from ?? undefined, range.to ?? undefined);
                           }}
-                          placeholder={{
-                            from: t("start_date"),
-                            to: t("end_date"),
-                          }}
+                          mergeDates
+                          placeholder={`${t("start_date")} - ${t("end_date")}`}
+                          weekStartsOn={userProfile?.start_of_the_week}
                           disabled={!isEditingAllowed || isArchived}
                         />
                       );
@@ -284,85 +351,61 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
                   />
                 )}
               />
-            </div>
-          </div>
-          <div className="flex items-center justify-start gap-1">
-            <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-              <SquareUser className="h-4 w-4" />
-              <span className="text-14">{t("lead")}</span>
-            </div>
-            <Controller
-              control={control}
-              name="lead_id"
-              render={({ field: { value } }) => (
-                <div className="h-7 w-3/5">
-                  <MemberDropdown
+            </SidebarPropertyListItem>
+            <SidebarPropertyListItem icon={LeadOutline} label={t("lead")}>
+              <Controller
+                control={control}
+                name="lead_id"
+                render={({ field: { value } }) => (
+                  <MemberSelect
                     value={value ?? null}
                     onChange={(val) => {
-                      submitChanges({ lead_id: val });
+                      void submitChanges({ lead_id: val });
                     }}
                     projectId={projectId?.toString() ?? ""}
                     multiple={false}
-                    buttonVariant="background-with-text"
                     placeholder={t("lead")}
                     disabled={!isEditingAllowed || isArchived}
-                    icon={SquareUser}
+                    variant="select-ghost-md"
                   />
-                </div>
-              )}
-            />
-          </div>
-          <div className="flex items-center justify-start gap-1">
-            <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-              <MembersPropertyIcon className="h-4 w-4" />
-              <span className="text-14">{t("members")}</span>
-            </div>
-            <Controller
-              control={control}
-              name="member_ids"
-              render={({ field: { value } }) => (
-                <div className="h-7 w-3/5">
-                  <MemberDropdown
+                )}
+              />
+            </SidebarPropertyListItem>
+            <SidebarPropertyListItem icon={MembersOutline} label={t("members")}>
+              <Controller
+                control={control}
+                name="member_ids"
+                render={({ field: { value } }) => (
+                  <MemberSelect
                     value={value ?? []}
                     onChange={(val: string[]) => {
-                      submitChanges({ member_ids: val });
+                      void submitChanges({ member_ids: val });
                     }}
                     multiple
                     projectId={projectId?.toString() ?? ""}
-                    buttonVariant={value && value?.length > 0 ? "transparent-without-text" : "background-with-text"}
-                    buttonClassName={value && value.length > 0 ? "hover:bg-transparent px-0" : ""}
+                    placeholder={t("members")}
                     disabled={!isEditingAllowed || isArchived}
+                    variant="select-ghost-md"
+                    showLabel={(value ?? []).length <= 1}
                   />
-                </div>
-              )}
-            />
+                )}
+              />
+            </SidebarPropertyListItem>
+            <SidebarPropertyListItem icon={WorkItemsOutline} label={t("issues")}>
+              <span className="px-1.5 text-body-xs-regular text-tertiary">{issueCount}</span>
+            </SidebarPropertyListItem>
+            {/**
+             * NOTE: Render this section when estimate points of he projects is enabled and the estimate system is points
+             */}
+            {isEstimatePointValid && (
+              <SidebarPropertyListItem icon={WorkItemsOutline} label={t("points")}>
+                <span className="px-1.5 text-body-xs-regular text-tertiary">{issueEstimatePointCount}</span>
+              </SidebarPropertyListItem>
+            )}
           </div>
-          <div className="flex items-center justify-start gap-1">
-            <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-              <WorkItemsIcon className="h-4 w-4" />
-              <span className="text-14">{t("issues")}</span>
-            </div>
-            <div className="flex h-7 w-3/5 items-center">
-              <span className="px-1.5 text-13 text-tertiary">{issueCount}</span>
-            </div>
-          </div>
+        </ModuleSidebarGroup>
 
-          {/**
-           * NOTE: Render this section when estimate points of he projects is enabled and the estimate system is points
-           */}
-          {isEstimatePointValid && (
-            <div className="flex items-center justify-start gap-1">
-              <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-                <WorkItemsIcon className="h-4 w-4" />
-                <span className="text-14">{t("points")}</span>
-              </div>
-              <div className="flex h-7 w-3/5 items-center">
-                <span className="px-1.5 text-13 text-tertiary">{issueEstimatePointCount}</span>
-              </div>
-            </div>
-          )}
-        </div>
-
+        <div className="w-full border-t border-subtle" />
         {workspaceSlug && projectId && moduleDetails?.id && (
           <ModuleAnalyticsProgress
             workspaceSlug={workspaceSlug.toString()}
@@ -371,75 +414,17 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
           />
         )}
 
-        <div className="flex flex-col">
-          <div className="flex w-full flex-col items-center justify-start gap-2 border-t border-subtle px-1.5 py-5">
-            {/* Accessing link outside the disclosure as mobx is not  considering the children inside Disclosure as part of the component hence not observing their state change*/}
-            <Disclosure defaultOpen={!!moduleDetails?.link_module?.length}>
-              {({ open }) => (
-                <div className={`relative flex h-full w-full flex-col ${open ? "" : "flex-row"}`}>
-                  <Disclosure.Button className="flex w-full items-center justify-between gap-2 p-1.5">
-                    <div className="flex items-center justify-start gap-2 text-13">
-                      <span className="font-medium text-secondary">{t("common.links")}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <ChevronDownIcon
-                        className={`h-3.5 w-3.5 ${open ? "rotate-180 transform" : ""}`}
-                        aria-hidden="true"
-                      />
-                    </div>
-                  </Disclosure.Button>
-                  <Transition show={open}>
-                    <Disclosure.Panel>
-                      <div className="mt-2 flex min-h-72 w-full flex-col space-y-3 overflow-y-auto">
-                        {isEditingAllowed && moduleDetails.link_module && moduleDetails.link_module.length > 0 ? (
-                          <>
-                            {isEditingAllowed && !isArchived && (
-                              <div className="flex w-full items-center justify-end">
-                                <button
-                                  className="flex items-center gap-1.5 text-13 font-medium text-accent-primary"
-                                  onClick={() => setModuleLinkModal(true)}
-                                >
-                                  <PlusIcon className="h-3 w-3" />
-                                  {t("add_link")}
-                                </button>
-                              </div>
-                            )}
-
-                            {moduleId && (
-                              <ModuleLinksList
-                                moduleId={moduleId}
-                                handleEditLink={handleEditLink}
-                                handleDeleteLink={handleDeleteLink}
-                                disabled={!isEditingAllowed || isArchived}
-                              />
-                            )}
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <Info className="h-3.5 w-3.5 stroke-[1.5] text-tertiary" />
-                              <span className="p-0.5 text-11 text-tertiary">{t("common.no_links_added_yet")}</span>
-                            </div>
-                            {isEditingAllowed && !isArchived && (
-                              <button
-                                className="flex items-center gap-1.5 text-13 font-medium text-accent-primary"
-                                onClick={() => setModuleLinkModal(true)}
-                              >
-                                <PlusIcon className="h-3 w-3" />
-                                {t("add_link")}
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </Disclosure.Panel>
-                  </Transition>
-                </div>
-              )}
-            </Disclosure>
-          </div>
-        </div>
-      </>
+        <div className="w-full border-t border-subtle" />
+        <ModuleLinksCollapsible
+          moduleDetails={moduleDetails}
+          moduleId={moduleId}
+          isEditingAllowed={isEditingAllowed}
+          isArchived={!!isArchived}
+          handleEditLink={handleEditLink}
+          handleDeleteLink={handleDeleteLink}
+          setModuleLinkModal={setModuleLinkModal}
+        />
+      </div>
     </div>
   );
 });

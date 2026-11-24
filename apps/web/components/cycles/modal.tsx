@@ -7,15 +7,14 @@
 import { useEffect, useState } from "react";
 import { mutate } from "swr";
 // types
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { CycleDateCheckData, ICycle, TCycleTabOptions } from "@plane/types";
 // ui
-import { EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
+import { Dialog, DialogContent } from "@makeplane/propel/components/dialog";
 // hooks
 import { renderFormattedPayloadDate } from "@plane/utils";
 import { useCycle } from "@/hooks/store/use-cycle";
 import { useProject } from "@/hooks/store/use-project";
-import useKeypress from "@/hooks/use-keypress";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // services
@@ -62,14 +61,15 @@ export function CycleCreateUpdateModal(props: CycleModalProps) {
         }
 
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: "Success!",
           message: "Cycle created successfully.",
         });
+        return undefined;
       })
       .catch((err) => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: err?.detail ?? "Error in creating cycle. Please try again.",
         });
@@ -83,25 +83,27 @@ export function CycleCreateUpdateModal(props: CycleModalProps) {
     await updateCycleDetails(workspaceSlug, selectedProjectId, cycleId, payload)
       .then((_res) => {
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: "Success!",
           message: "Cycle updated successfully.",
         });
+        return undefined;
       })
       .catch((err) => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: err?.detail ?? "Error in updating cycle. Please try again.",
         });
       });
   };
 
-  const dateChecker = async (projectId: string, payload: CycleDateCheckData) => {
+  const dateChecker = async (cycleProjectId: string, payload: CycleDateCheckData) => {
     let status = false;
 
-    await cycleService.cycleDateCheck(workspaceSlug, projectId, payload).then((res) => {
+    await cycleService.cycleDateCheck(workspaceSlug, cycleProjectId, payload).then((res) => {
       status = res.status;
+      return undefined;
     });
 
     return status;
@@ -146,12 +148,13 @@ export function CycleCreateUpdateModal(props: CycleModalProps) {
       else {
         await handleCreateCycle(payload).then(() => {
           setCycleTab("all");
+          return undefined;
         });
       }
       handleClose();
     } else
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error!",
         message: "You already have a cycle on the given dates, if you want to create a draft cycle, remove the dates.",
       });
@@ -178,21 +181,27 @@ export function CycleCreateUpdateModal(props: CycleModalProps) {
       setActiveProject(projectId ?? workspaceProjectIds?.[0] ?? null);
   }, [activeProject, data, projectId, workspaceProjectIds, isOpen]);
 
-  useKeypress("Escape", () => {
-    if (isOpen) handleClose();
-  });
-
   return (
-    <ModalCore isOpen={isOpen} position={EModalPosition.TOP} width={EModalWidth.XXL}>
-      <CycleForm
-        handleFormSubmit={handleFormSubmit}
-        handleClose={handleClose}
-        status={!!data}
-        projectId={activeProject ?? ""}
-        setActiveProject={setActiveProject}
-        data={data}
-        isMobile={isMobile}
-      />
-    </ModalCore>
+    <Dialog
+      open={isOpen}
+      // The legacy modal shell had no `handleClose`, so an outside press never dismissed it and
+      // Escape came from `useKeypress`; Base UI's own Escape now reaches the same handler.
+      disablePointerDismissal
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+    >
+      <DialogContent size="md">
+        <CycleForm
+          handleFormSubmit={handleFormSubmit}
+          handleClose={handleClose}
+          status={!!data}
+          projectId={activeProject ?? ""}
+          setActiveProject={setActiveProject}
+          data={data}
+          isMobile={isMobile}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

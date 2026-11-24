@@ -8,53 +8,57 @@ import React from "react";
 import { observer } from "mobx-react";
 import { MODULE_STATUS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import type { TModuleStatus } from "@plane/propel/icons";
-import { ModuleStatusIcon } from "@plane/propel/icons";
+import type { TModuleStatus } from "@plane/blocks/icons";
+import { ModuleStatusIcon } from "@plane/blocks/icons";
+import { Select } from "@plane/blocks/select";
+import type { SelectVariant } from "@plane/blocks/select";
 import type { IModule } from "@plane/types";
-import { CustomSelect } from "@plane/ui";
+
+type ModuleStatusOption = (typeof MODULE_STATUS)[number];
 
 type Props = {
   isDisabled: boolean;
+  variant?: SelectVariant;
   moduleDetails: IModule;
   handleModuleDetailsChange: (payload: Partial<IModule>) => Promise<void>;
 };
 
 export const ModuleStatusDropdown = observer(function ModuleStatusDropdown(props: Props) {
-  const { isDisabled, moduleDetails, handleModuleDetailsChange } = props;
+  const { isDisabled, variant = "pill-sm", moduleDetails, handleModuleDetailsChange } = props;
   const { t } = useTranslation();
-  const moduleStatus = MODULE_STATUS.find((status) => status.value === moduleDetails.status);
+  // fall back to backlog so a module without a status can still have one set
+  const moduleStatus =
+    MODULE_STATUS.find((status) => status.value === moduleDetails.status) ??
+    MODULE_STATUS.find((status) => status.value === "backlog");
 
   if (!moduleStatus) return <></>;
 
   return (
-    <CustomSelect
-      customButton={
-        <span
-          className={`flex h-6 w-20 items-center justify-center rounded-sm text-center text-11 ${
-            isDisabled ? "cursor-not-allowed" : "cursor-pointer"
-          }`}
-          style={{
-            color: moduleStatus ? moduleStatus.color : "#a3a3a2",
-            backgroundColor: moduleStatus ? `${moduleStatus.color}20` : "#a3a3a220",
-          }}
-        >
-          {(moduleStatus && t(moduleStatus?.i18n_label)) ?? t("project_modules.status.backlog")}
-        </span>
-      }
-      value={moduleStatus?.value}
-      onChange={(val: TModuleStatus) => {
-        handleModuleDetailsChange({ status: val });
+    <Select<ModuleStatusOption>
+      getValues={() => MODULE_STATUS}
+      value={moduleStatus}
+      onChange={(val) => {
+        void handleModuleDetailsChange({ status: val as TModuleStatus });
       }}
+      getOptionValue={(status) => status.value}
+      getOptionLabel={(status) => t(status.i18n_label)}
+      getOptionIcon={(status) => <ModuleStatusIcon status={status.value} />}
       disabled={isDisabled}
+      showSearch={false}
+      pinSelected={false}
     >
-      {MODULE_STATUS.map((status) => (
-        <CustomSelect.Option key={status.value} value={status.value}>
-          <div className="flex items-center gap-2">
-            <ModuleStatusIcon status={status.value} />
-            {t(status.i18n_label)}
-          </div>
-        </CustomSelect.Option>
-      ))}
-    </CustomSelect>
+      <Select.Trigger
+        disabled={isDisabled}
+        variant={variant}
+        prependIcon={() => <ModuleStatusIcon status={moduleStatus.value} />}
+        label={(statuses: ModuleStatusOption[]) => (statuses[0] ? t(statuses[0].i18n_label) : "")}
+        tooltip
+      >
+        {(statuses: ModuleStatusOption[]) => {
+          const status = statuses[0];
+          return !!status && <span className="min-w-0 grow truncate text-left">{t(status.i18n_label)}</span>;
+        }}
+      </Select.Trigger>
+    </Select>
   );
 });

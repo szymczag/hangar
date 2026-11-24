@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Không thể sao chép vào bảng tạm",
     "tooltip": {
-      "copy_to_clipboard": "Sao chép vào bảng tạm"
+      "copy_to_clipboard": "Sao chép vào bảng tạm",
+      "created_on_date": "Được tạo vào {date}",
+      "priority": "Ưu tiên: {value}"
     },
     "status": "Trạng thái",
     "locked": "Đã khóa"

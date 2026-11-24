@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Não foi possível copiar para a área de transferência",
     "tooltip": {
-      "copy_to_clipboard": "Copiar para a área de transferência"
+      "copy_to_clipboard": "Copiar para a área de transferência",
+      "created_on_date": "Criado em {date}",
+      "priority": "Prioridade: {value}"
     },
     "status": "Status",
     "locked": "Bloqueado"

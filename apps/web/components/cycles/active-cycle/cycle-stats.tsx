@@ -4,23 +4,23 @@
  * See the LICENSE file for details.
  */
 
-import { Fragment, useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { isEmpty } from "lodash-es";
 import { observer } from "mobx-react";
 import { useTheme } from "next-themes";
-import { CalendarCheck } from "lucide-react";
-// headless ui
-import { Tab } from "@headlessui/react";
+import { CompletedAtOutline } from "@makeplane/propel/icons";
 // plane imports
+import { Avatar } from "@makeplane/propel/components/avatar";
 import { useTranslation } from "@plane/i18n";
-import { PriorityIcon } from "@plane/propel/icons";
-import { Tooltip } from "@plane/propel/tooltip";
+import { PriorityIcon } from "@plane/blocks/icons";
+import { Tabs, TabsList, Tab, TabsPanel } from "@makeplane/propel/components/tabs";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { TWorkItemFilterCondition } from "@plane/shared-state";
 import type { ICycle } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 // ui
-import { Loader, Avatar } from "@plane/ui";
-import { cn, renderFormattedDate, renderFormattedDateWithoutYear, getFileURL } from "@plane/utils";
+import { Loader } from "@plane/blocks/skeleton";
+import { renderFormattedDate, renderFormattedDateWithoutYear, getFileURL } from "@plane/utils";
 // assets
 import darkAssigneeAsset from "@/app/assets/empty-state/active-cycle/assignee-dark.webp?url";
 import lightAssigneeAsset from "@/app/assets/empty-state/active-cycle/assignee-light.webp?url";
@@ -31,7 +31,7 @@ import lightPriorityAsset from "@/app/assets/empty-state/active-cycle/priority-l
 import userImage from "@/app/assets/user.png?url";
 // components
 import { SingleProgressStats } from "@/components/core/sidebar/single-progress-stats";
-import { StateDropdown } from "@/components/dropdowns/state/dropdown";
+import { StateSelect } from "@/components/dropdowns/state/state-select";
 import { SimpleEmptyState } from "@/components/empty-state/simple-empty-state-root";
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
@@ -49,19 +49,6 @@ export type ActiveCycleStatsProps = {
   cycleId?: string | null;
   handleFiltersUpdate: (conditions: TWorkItemFilterCondition[]) => void;
   cycleIssueDetails?: ActiveCycleIssueDetails | { nextPageResults: boolean };
-};
-
-const tabIndexOf = (storedTab: string | null) => {
-  switch (storedTab) {
-    case "Priority-Issues":
-      return 0;
-    case "Assignees":
-      return 1;
-    case "Labels":
-      return 2;
-    default:
-      return 0;
-  }
 };
 
 export const ActiveCycleStats = observer(function ActiveCycleStats(props: ActiveCycleStatsProps) {
@@ -105,77 +92,21 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
   );
 
   return cycleId ? (
-    <div className="col-span-1 flex min-h-[17rem] flex-col gap-4 overflow-hidden rounded-lg border border-subtle bg-surface-1 p-4 lg:col-span-2 xl:col-span-1">
-      <Tab.Group
-        as={Fragment}
-        defaultIndex={tabIndexOf(tab)}
-        onChange={(i) => {
-          switch (i) {
-            case 0:
-              return setTab("Priority-Issues");
-            case 1:
-              return setTab("Assignees");
-            case 2:
-              return setTab("Labels");
-
-            default:
-              return setTab("Priority-Issues");
-          }
-        }}
+    <div className="col-span-1 flex min-h-68 flex-col gap-4 overflow-hidden rounded-lg border border-subtle bg-surface-1 p-4 lg:col-span-2 xl:col-span-1">
+      <Tabs
+        variant="contained"
+        stretch="full"
+        defaultValue={tab ?? "Priority-Issues"}
+        onValueChange={(value: string) => setTab(value)}
       >
-        <Tab.List
-          as="div"
-          className="relative grid rounded-sm border-[0.5px] border-subtle bg-layer-1 p-[1px]"
-          style={{
-            gridTemplateColumns: `repeat(3, 1fr)`,
-          }}
-        >
-          <Tab
-            className={({ selected }) =>
-              cn(
-                "relative z-[1] rounded-[3px] py-1.5 text-11 font-semibold text-placeholder transition duration-500 focus:outline-none",
-                {
-                  "bg-surface-1 text-tertiary": selected,
-                  "hover:text-tertiary": !selected,
-                }
-              )
-            }
-          >
-            {t("project_cycles.active_cycle.priority_issue")}
-          </Tab>
-          <Tab
-            className={({ selected }) =>
-              cn(
-                "relative z-[1] rounded-[3px] py-1.5 text-11 font-semibold text-placeholder transition duration-500 focus:outline-none",
-                {
-                  "bg-surface-1 text-tertiary": selected,
-                  "hover:text-tertiary": !selected,
-                }
-              )
-            }
-          >
-            {t("project_cycles.active_cycle.assignees")}
-          </Tab>
-          <Tab
-            className={({ selected }) =>
-              cn(
-                "relative z-[1] rounded-[3px] py-1.5 text-11 font-semibold text-placeholder transition duration-500 focus:outline-none",
-                {
-                  "bg-surface-1 text-tertiary": selected,
-                  "hover:text-tertiary": !selected,
-                }
-              )
-            }
-          >
-            {t("project_cycles.active_cycle.labels")}
-          </Tab>
-        </Tab.List>
+        <TabsList>
+          <Tab value="Priority-Issues" label={t("project_cycles.active_cycle.priority_issue")} />
+          <Tab value="Assignees" label={t("project_cycles.active_cycle.assignees")} />
+          <Tab value="Labels" label={t("project_cycles.active_cycle.labels")} />
+        </TabsList>
 
-        <Tab.Panels as={Fragment}>
-          <Tab.Panel
-            as="div"
-            className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
-          >
+        <TabsPanel value="Priority-Issues">
+          <div className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary">
             <div
               ref={issuesContainerRef}
               className="vertical-scrollbar scrollbar-sm flex h-full w-full flex-col gap-1 overflow-y-auto"
@@ -206,7 +137,7 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
                           // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the row holds the state dropdown's button, which a <button> cannot contain
                           role="button"
                           tabIndex={0}
-                          className="group flex cursor-pointer items-center justify-between gap-2 rounded-md p-1 hover:bg-surface-2"
+                          className="group flex cursor-pointer items-center justify-between gap-2 rounded-md p-1 hover:bg-layer-1"
                           onClick={openPeek}
                           onKeyDown={(event) => {
                             if (event.key !== "Enter" && event.key !== " ") return;
@@ -216,29 +147,26 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
                         >
                           <div className="flex w-full min-w-24 flex-grow items-center gap-1.5 truncate">
                             <IssueIdentifier issueId={issue.id} projectId={projectId} size="xs" variant="secondary" />
-                            <Tooltip position="top-start" tooltipHeading="Title" tooltipContent={issue.name}>
-                              <span className="truncate text-13 text-primary">{issue.name}</span>
+                            <Tooltip label={`Title: ${issue.name}`} layout="stacked" align="start">
+                              <span className="truncate text-body-xs-regular text-primary">{issue.name}</span>
                             </Tooltip>
                           </div>
-                          <PriorityIcon priority={issue.priority} withContainer size={12} />
+                          <PriorityIcon priority={issue.priority} />
                           <div className="flex flex-shrink-0 items-center gap-1.5">
-                            <StateDropdown
+                            <StateSelect
                               value={issue.state_id}
                               onChange={() => {}}
                               projectId={projectId?.toString() ?? ""}
                               disabled
-                              buttonVariant="background-with-text"
-                              buttonContainerClassName="cursor-pointer max-w-24"
-                              showTooltip
+                              variant="pill-sm"
+                              className="max-w-24"
+                              tooltip
                             />
                             {issue.target_date && (
-                              <Tooltip
-                                tooltipHeading="Target Date"
-                                tooltipContent={renderFormattedDate(issue.target_date)}
-                              >
-                                <div className="flex h-full cursor-pointer items-center gap-1.5 truncate rounded-sm bg-layer-1 px-2 py-0.5 text-11 group-hover:bg-surface-1">
-                                  <CalendarCheck className="h-3 w-3 flex-shrink-0" />
-                                  <span className="truncate text-11">
+                              <Tooltip label={`Target Date: ${renderFormattedDate(issue.target_date) ?? ""}`}>
+                                <div className="flex h-full cursor-pointer items-center gap-1.5 truncate rounded-sm bg-layer-1 px-2 py-0.5 text-caption-md-regular group-hover:bg-layer-1-hover">
+                                  <CompletedAtOutline className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate text-caption-sm-regular">
                                     {renderFormattedDateWithoutYear(issue.target_date)}
                                   </span>
                                 </div>
@@ -252,7 +180,7 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
                       <div
                         ref={setIssueLoaderElement}
                         className={
-                          "relative flex h-11 animate-pulse cursor-pointer items-center gap-3 bg-layer-1 p-3 text-13"
+                          "relative flex h-11 animate-pulse cursor-pointer items-center gap-3 bg-layer-1 p-3 text-body-xs-regular"
                         }
                       />
                     )}
@@ -269,12 +197,11 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
                 loaders
               )}
             </div>
-          </Tab.Panel>
+          </div>
+        </TabsPanel>
 
-          <Tab.Panel
-            as="div"
-            className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
-          >
+        <TabsPanel value="Assignees">
+          <div className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary">
             {cycle && !isEmpty(cycle.distribution) ? (
               cycle?.distribution?.assignees && cycle.distribution.assignees.length > 0 ? (
                 cycle.distribution?.assignees?.map((assignee) => {
@@ -285,8 +212,10 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
                         title={
                           <div className="flex items-center gap-2">
                             <Avatar
-                              name={assignee?.display_name ?? undefined}
+                              alt={assignee?.display_name ?? undefined}
+                              fallback={assignee?.display_name?.[0]?.toUpperCase()}
                               src={getFileURL(assignee?.avatar_url ?? "")}
+                              size="xs"
                             />
 
                             <span>{assignee.display_name}</span>
@@ -331,12 +260,11 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
             ) : (
               loaders
             )}
-          </Tab.Panel>
+          </div>
+        </TabsPanel>
 
-          <Tab.Panel
-            as="div"
-            className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary"
-          >
+        <TabsPanel value="Labels">
+          <div className="vertical-scrollbar scrollbar-sm flex h-52 w-full flex-col gap-1 overflow-y-auto text-secondary">
             {cycle && !isEmpty(cycle.distribution) ? (
               cycle?.distribution?.labels && cycle.distribution.labels.length > 0 ? (
                 cycle.distribution.labels?.map((label) => (
@@ -350,7 +278,9 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
                             backgroundColor: label.color ?? "#000000",
                           }}
                         />
-                        <span className="truncate text-11 text-ellipsis">{label.label_name ?? "No labels"}</span>
+                        <span className="truncate text-caption-sm-regular text-ellipsis">
+                          {label.label_name ?? "No labels"}
+                        </span>
                       </div>
                     }
                     completed={label.completed_issues}
@@ -374,12 +304,12 @@ export const ActiveCycleStats = observer(function ActiveCycleStats(props: Active
             ) : (
               loaders
             )}
-          </Tab.Panel>
-        </Tab.Panels>
-      </Tab.Group>
+          </div>
+        </TabsPanel>
+      </Tabs>
     </div>
   ) : (
-    <Loader className="col-span-1 flex min-h-[17rem] flex-col gap-4 overflow-hidden bg-surface-1 lg:col-span-2 xl:col-span-1">
+    <Loader className="col-span-1 flex min-h-68 flex-col gap-4 overflow-hidden bg-surface-1 lg:col-span-2 xl:col-span-1">
       <Loader.Item width="100%" height="17rem" />
     </Loader>
   );

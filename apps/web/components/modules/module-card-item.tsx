@@ -9,31 +9,36 @@ import React, { useRef } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
-import { Info, SquareUser } from "lucide-react";
+import { CalendarOutline, InfoOutline, LeadOutline, WorkItemsOutline } from "@makeplane/propel/icons";
 // plane package imports
 import {
   MODULE_STATUS,
-  PROGRESS_STATE_GROUPS_DETAILS,
   EUserPermissions,
   EUserPermissionsLevel,
   IS_FAVORITE_MENU_OPEN,
+  PROGRESS_STATE_GROUPS_DETAILS,
 } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
-import { WorkItemsIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { useTranslation } from "@plane/i18n";
+import { setPromiseToast, setToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { IModule } from "@plane/types";
-import { Card, FavoriteStar, LinearProgressIndicator } from "@plane/ui";
+import { Card } from "@plane/blocks/card";
+import { FavoriteStar } from "@plane/blocks/common";
+import { SegmentedProgress } from "@plane/blocks/progress";
+import { DateRangeSelect } from "@plane/blocks/property-select";
 import { getDate, renderFormattedPayloadDate, generateQueryParams } from "@plane/utils";
 // components
-import { DateRangeDropdown } from "@/components/dropdowns/date-range";
+import { handleTriggerKeyDown } from "@/components/common/trigger-guard";
 import { ButtonAvatars } from "@/components/dropdowns/member/avatar";
 import { ModuleQuickActions } from "@/components/modules";
 import { ModuleStatusDropdown } from "@/components/modules/module-status-dropdown";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useModule } from "@/hooks/store/use-module";
-import { useUserPermissions } from "@/hooks/store/user";
+import { useUserPermissions, useUserProfile } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 
@@ -41,8 +46,14 @@ type Props = {
   moduleId: string;
 };
 
+const handleEventPropagation = (e: SyntheticEvent<HTMLDivElement>) => {
+  e.stopPropagation();
+  e.preventDefault();
+};
+
 export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
   const { moduleId } = props;
+  const { t } = useTranslation();
   // refs
   const parentRef = useRef(null);
   // router
@@ -54,6 +65,7 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
   const { allowPermissions } = useUserPermissions();
   const { getModuleById, addModuleToFavorites, removeModuleFromFavorites, updateModuleDetails } = useModule();
   const { getUserDetails } = useMember();
+  const { data: userProfile } = useUserProfile();
   // local storage
   const { setValue: toggleFavoriteMenu, storedValue } = useLocalStorage<boolean>(IS_FAVORITE_MENU_OPEN, false);
   // derived values
@@ -74,6 +86,7 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
     const addToFavoritePromise = addModuleToFavorites(workspaceSlug.toString(), projectId.toString(), moduleId).then(
       () => {
         if (!storedValue) toggleFavoriteMenu(true);
+        return undefined;
       }
     );
 
@@ -114,25 +127,21 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
     });
   };
 
-  const handleEventPropagation = (e: SyntheticEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    e.preventDefault();
-  };
-
   const handleModuleDetailsChange = async (payload: Partial<IModule>) => {
     if (!workspaceSlug || !projectId) return;
 
     await updateModuleDetails(workspaceSlug.toString(), projectId.toString(), moduleId, payload)
       .then(() => {
         setToast({
-          type: TOAST_TYPE.SUCCESS,
+          type: "success",
           title: "Success!",
           message: "Module updated successfully.",
         });
+        return undefined;
       })
       .catch((err) => {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Error!",
           message: err?.detail ?? "Module could not be updated. Please try again.",
         });
@@ -175,99 +184,111 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
     : `0 work items`;
 
   const moduleLeadDetails = moduleDetails.lead_id ? getUserDetails(moduleDetails.lead_id) : undefined;
-
-  const progressIndicatorData = PROGRESS_STATE_GROUPS_DETAILS.map((group, index) => ({
-    id: index,
-    name: group.title,
-    value: moduleTotalIssues > 0 ? (moduleDetails[group.key as keyof IModule] as number) : 0,
+  // One segment per state group; the bar normalises the counts, so an empty module shows only the track.
+  const progressSegments = PROGRESS_STATE_GROUPS_DETAILS.map((group) => ({
+    id: group.key,
+    name: t(`workspace_projects.state.${group.key.replace("_issues", "")}`),
+    value: (moduleDetails[group.key as keyof IModule] as number | undefined) ?? 0,
     color: group.color,
   }));
 
   return (
     <div className="relative" data-prevent-progress>
-      <Link ref={parentRef} href={`/${workspaceSlug}/projects/${moduleDetails.project_id}/modules/${moduleDetails.id}`}>
-        <Card>
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <Tooltip tooltipContent={moduleDetails.name} position="top" isMobile={isMobile}>
-                <span className="truncate text-14 font-medium">{moduleDetails.name}</span>
-              </Tooltip>
-              <div className="flex items-center gap-2" onClick={handleEventPropagation}>
-                {moduleStatus && (
-                  <ModuleStatusDropdown
-                    isDisabled={isDisabled}
-                    moduleDetails={moduleDetails}
-                    handleModuleDetailsChange={handleModuleDetailsChange}
-                  />
-                )}
-                <button onClick={openModuleOverview}>
-                  <Info className="h-4 w-4 text-placeholder" />
-                </button>
-              </div>
-            </div>
+      <Card ref={parentRef} spacing="sm">
+        <div className="flex h-6 items-center justify-between gap-2">
+          <Tooltip label={moduleDetails.name} layout="stacked" disabled={isMobile}>
+            <Link
+              href={`/${workspaceSlug}/projects/${moduleDetails.project_id}/modules/${moduleDetails.id}`}
+              className="min-w-0 truncate text-body-sm-medium after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-strong"
+            >
+              <span className="relative z-[1] block truncate">{moduleDetails.name}</span>
+            </Link>
+          </Tooltip>
+          {/* Sits above the stretched card link; each control stops its own activation. */}
+          <div className="relative z-[1] flex shrink-0 items-center gap-1.5">
+            <IconButton
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={t("info")}
+              showTooltip={!isMobile}
+              onClick={openModuleOverview}
+              icon={<Icon icon={InfoOutline} />}
+            />
+            {isEditingAllowed && (
+              <FavoriteStar
+                onClick={(e) => {
+                  if (moduleDetails.is_favorite) handleRemoveFromFavorites(e);
+                  else handleAddToFavorites(e);
+                }}
+                selected={!!moduleDetails.is_favorite}
+              />
+            )}
+            {workspaceSlug && projectId && (
+              <ModuleQuickActions
+                parentRef={parentRef}
+                moduleId={moduleId}
+                projectId={projectId.toString()}
+                workspaceSlug={workspaceSlug.toString()}
+                size="sm"
+              />
+            )}
           </div>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-secondary">
-                <WorkItemsIcon className="h-4 w-4 text-tertiary" />
-                <span className="text-11 text-tertiary">{issueCount ?? "0 Work item"}</span>
-              </div>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-secondary">
+              <WorkItemsOutline className="size-4 text-tertiary" />
+              <span className="text-caption-sm-regular text-tertiary">{issueCount ?? "0 Work item"}</span>
+            </div>
+            <span className="relative z-[1] flex shrink-0 items-center">
               {moduleLeadDetails ? (
-                <span className="cursor-default">
-                  <ButtonAvatars showTooltip={false} userIds={moduleLeadDetails?.id} />
-                </span>
+                <ButtonAvatars showTooltip={false} userIds={moduleLeadDetails?.id} />
               ) : (
-                <Tooltip tooltipContent="No lead">
-                  <SquareUser className="mx-1 h-4 w-4 text-tertiary" />
+                <Tooltip label="No lead">
+                  <span className="grid size-5 place-items-center text-tertiary">
+                    <LeadOutline className="size-4" />
+                  </span>
                 </Tooltip>
               )}
-            </div>
-            <LinearProgressIndicator size="lg" data={progressIndicatorData} />
-            <div className="flex items-center justify-between py-0.5" onClick={handleEventPropagation}>
-              <DateRangeDropdown
-                buttonContainerClassName={`h-6 w-full flex ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"} items-center gap-1.5 text-tertiary border-[0.5px] border-strong rounded-sm text-11`}
-                buttonVariant="transparent-with-text"
-                className="h-7"
-                value={{
-                  from: getDate(moduleDetails.start_date),
-                  to: getDate(moduleDetails.target_date),
-                }}
-                onSelect={(val) => {
-                  handleModuleDetailsChange({
-                    start_date: val?.from ? renderFormattedPayloadDate(val.from) : null,
-                    target_date: val?.to ? renderFormattedPayloadDate(val.to) : null,
-                  });
-                }}
-                placeholder={{
-                  from: "Start date",
-                  to: "End date",
-                }}
-                disabled={isDisabled}
-                hideIcon={{ from: renderIcon ?? true, to: renderIcon }}
-              />
-            </div>
+            </span>
           </div>
-        </Card>
-      </Link>
-      <div className="absolute right-4 bottom-[18px] flex items-center gap-1.5">
-        {isEditingAllowed && (
-          <FavoriteStar
-            onClick={(e) => {
-              if (moduleDetails.is_favorite) handleRemoveFromFavorites(e);
-              else handleAddToFavorites(e);
-            }}
-            selected={!!moduleDetails.is_favorite}
-          />
-        )}
-        {workspaceSlug && projectId && (
-          <ModuleQuickActions
-            parentRef={parentRef}
-            moduleId={moduleId}
-            projectId={projectId.toString()}
-            workspaceSlug={workspaceSlug.toString()}
-          />
-        )}
-      </div>
+          <SegmentedProgress size="lg" data={progressSegments} className="relative z-[1]" />
+          {/* Keep date and status selection independent of the stretched card navigation link. */}
+          <div
+            className="relative z-[1] flex flex-wrap items-center gap-2"
+            role="presentation"
+            onClick={handleEventPropagation}
+            onKeyDown={handleTriggerKeyDown}
+          >
+            <DateRangeSelect
+              variant="pill-sm"
+              className="max-w-none"
+              value={{
+                from: getDate(moduleDetails.start_date) ?? null,
+                to: getDate(moduleDetails.target_date) ?? null,
+              }}
+              onChange={(range) => {
+                void handleModuleDetailsChange({
+                  start_date: range.from ? renderFormattedPayloadDate(range.from) : null,
+                  target_date: range.to ? renderFormattedPayloadDate(range.to) : null,
+                });
+              }}
+              placeholder={`${t("start_date")} - ${t("end_date")}`}
+              weekStartsOn={userProfile?.start_of_the_week}
+              disabled={isDisabled}
+              icon={renderIcon ? undefined : <CalendarOutline aria-hidden="true" />}
+            />
+            {moduleStatus && (
+              <ModuleStatusDropdown
+                isDisabled={isDisabled}
+                moduleDetails={moduleDetails}
+                handleModuleDetailsChange={handleModuleDetailsChange}
+              />
+            )}
+          </div>
+        </div>
+      </Card>
     </div>
   );
 });
