@@ -261,6 +261,16 @@ class IntakeIssueViewSet(BaseViewSet):
 
         project = Project.objects.get(pk=project_id)
 
+        # Fork (see FORK.md): refuse before anything is written. Without an
+        # Intake row the lookup used to fail after the work item was saved,
+        # answering 500 and leaving the item outside intake.
+        intake = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
+        if intake is None or not project.intake_view:
+            return Response(
+                {"error": "Intake is not enabled for this project"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # get the triage state
         triage_state = State.triage_objects.filter(project_id=project_id, workspace__slug=slug).first()
         if not triage_state:
@@ -286,15 +296,17 @@ class IntakeIssueViewSet(BaseViewSet):
             },
         )
         if serializer.is_valid():
-            serializer.save()
-            intake_id = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
-            # create an intake issue
-            intake_issue = IntakeIssue.objects.create(
-                intake_id=intake_id.id,
-                project_id=project_id,
-                issue_id=serializer.data["id"],
-                source=SourceType.IN_APP,
-            )
+            # Fork (see FORK.md): the work item and its intake entry are written
+            # together, so a failure leaves neither behind.
+            with transaction.atomic():
+                serializer.save()
+                # create an intake issue
+                intake_issue = IntakeIssue.objects.create(
+                    intake_id=intake.id,
+                    project_id=project_id,
+                    issue_id=serializer.data["id"],
+                    source=SourceType.IN_APP,
+                )
             # Create an Issue Activity
             issue_activity.delay(
                 type="issue.activity.created",
@@ -340,7 +352,7 @@ class IntakeIssueViewSet(BaseViewSet):
                     ),
                 )
                 .get(
-                    intake_id=intake_id.id,
+                    intake_id=intake.id,
                     issue_id=serializer.data["id"],
                     project_id=project_id,
                 )
@@ -358,6 +370,10 @@ class IntakeIssueViewSet(BaseViewSet):
         is_description_update = request.data.get("description_html") is not None
 
         intake_id = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
+        # Fork (see FORK.md): a project without an Intake row has no intake
+        # items; answer 404 instead of failing on the missing row.
+        if intake_id is None:
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)
         intake_issue = IntakeIssue.objects.get(
             issue_id=pk,
             workspace__slug=slug,
@@ -527,6 +543,10 @@ class IntakeIssueViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], creator=True, model=Issue)
     def retrieve(self, request, slug, project_id, pk):
         intake_id = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
+        # Fork (see FORK.md): a project without an Intake row has no intake
+        # items; answer 404 instead of failing on the missing row.
+        if intake_id is None:
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)
         project = Project.objects.get(pk=project_id)
         intake_issue = (
             IntakeIssue.objects.select_related("issue")
@@ -574,6 +594,10 @@ class IntakeIssueViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=Issue)
     def destroy(self, request, slug, project_id, pk):
         intake_id = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
+        # Fork (see FORK.md): a project without an Intake row has no intake
+        # items; answer 404 instead of failing on the missing row.
+        if intake_id is None:
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)
         intake_issue = IntakeIssue.objects.get(
             issue_id=pk,
             workspace__slug=slug,
