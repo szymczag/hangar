@@ -545,7 +545,8 @@
       "asc": "Ascendente",
       "desc": "Descendente",
       "created_on": "Creado el",
-      "updated_on": "Actualizado el"
+      "updated_on": "Actualizado el",
+      "label": "Ordenar"
     },
     "comments": "Comentarios",
     "updates": "Actualizaciones",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Buscando...",
-  "rename_folder": "Renombrar carpeta"
+  "rename_folder": "Renombrar carpeta",
+  "entity_detail_toolbar": "Acciones"
 }

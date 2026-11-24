@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "Voir les autres éléments de travail"
         }
+      },
+      "no_access": {
+        "description": "Contactez un administrateur du projet pour demander l’accès.",
+        "title": "Vous n’avez pas accès à cet élément de travail"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "L’élément de travail n’a pas pu être archivé. Veuillez réessayer."
-      }
+      },
+      "banner_message": "Cet élément de travail a été archivé. Accédez à la section Archives pour le restaurer.",
+      "go_to_archives": "Accéder aux archives"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Cliquez pour voter contre",
       "click_to_view_upvotes": "Cliquez pour voir les votes pour",
       "click_to_view_downvotes": "Cliquez pour voir les votes contre"
-    }
+    },
+    "archived_banner": "Cet élément de travail est archivé. Restaurez-le pour le modifier.",
+    "assignee_count": "{count, plural, one {# acteur} many {# acteurs} other {# acteurs}}",
+    "description_load_failed": "Impossible de charger la description.",
+    "updated_time_ago": "Mis à jour {time}"
   },
   "sub_work_item": {
     "update": {

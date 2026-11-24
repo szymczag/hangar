@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "Xem các mục công việc khác"
         }
+      },
+      "no_access": {
+        "description": "Liên hệ với quản trị viên dự án để yêu cầu quyền truy cập.",
+        "title": "Bạn không có quyền truy cập vào mục công việc này"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "Không thể lưu trữ mục công việc. Vui lòng thử lại."
-      }
+      },
+      "banner_message": "Mục công việc này đã được lưu trữ. Truy cập mục Lưu trữ để khôi phục.",
+      "go_to_archives": "Đi đến lưu trữ"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Nhấp để bỏ phiếu chống",
       "click_to_view_upvotes": "Nhấp để xem phiếu thuận",
       "click_to_view_downvotes": "Nhấp để xem phiếu chống"
-    }
+    },
+    "archived_banner": "Mục công việc này đã được lưu trữ. Hãy khôi phục để thực hiện thay đổi.",
+    "assignee_count": "{count, plural, one {# người phụ trách} other {# người phụ trách}}",
+    "description_load_failed": "Không thể tải mô tả.",
+    "updated_time_ago": "Đã cập nhật {time}"
   },
   "sub_work_item": {
     "update": {

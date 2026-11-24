@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "他の作業項目を表示"
         }
+      },
+      "no_access": {
+        "description": "アクセス権をリクエストするには、プロジェクト管理者に連絡してください。",
+        "title": "この作業項目へのアクセス権がありません"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "作業項目をアーカイブできませんでした。もう一度お試しください。"
-      }
+      },
+      "banner_message": "この作業項目はアーカイブされました。復元するには、アーカイブセクションをご確認ください。",
+      "go_to_archives": "アーカイブに移動"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "クリックして反対票を投じる",
       "click_to_view_upvotes": "クリックして賛成票を表示",
       "click_to_view_downvotes": "クリックして反対票を表示"
-    }
+    },
+    "archived_banner": "この作業項目はアーカイブされています。変更するには復元してください。",
+    "assignee_count": "{count, plural, one {担当者 #人} other {担当者 #人}}",
+    "description_load_failed": "説明を読み込めませんでした。",
+    "updated_time_ago": "{time}に更新"
   },
   "sub_work_item": {
     "update": {

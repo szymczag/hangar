@@ -545,7 +545,8 @@
       "asc": "Ascendente",
       "desc": "Discendente",
       "created_on": "Creato il",
-      "updated_on": "Aggiornato il"
+      "updated_on": "Aggiornato il",
+      "label": "Ordina"
     },
     "comments": "Commenti",
     "updates": "Aggiornamenti",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Ricerca in corso...",
-  "rename_folder": "Rinomina cartella"
+  "rename_folder": "Rinomina cartella",
+  "entity_detail_toolbar": "Azioni"
 }

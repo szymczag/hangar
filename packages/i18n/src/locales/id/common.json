@@ -545,7 +545,8 @@
       "asc": "Menaik",
       "desc": "Menurun",
       "created_on": "Dibuat pada",
-      "updated_on": "Diperbarui pada"
+      "updated_on": "Diperbarui pada",
+      "label": "Urutkan"
     },
     "comments": "Komentar",
     "updates": "Pembaruan",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Mencari...",
-  "rename_folder": "Ubah nama folder"
+  "rename_folder": "Ubah nama folder",
+  "entity_detail_toolbar": "Tindakan"
 }

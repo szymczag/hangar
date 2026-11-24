@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "Pokaż inne elementy pracy"
         }
+      },
+      "no_access": {
+        "description": "Skontaktuj się z administratorem projektu, aby poprosić o dostęp.",
+        "title": "Nie masz dostępu do tego elementu pracy"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "Nie udało się zarchiwizować elementu pracy. Spróbuj ponownie."
-      }
+      },
+      "banner_message": "Ten element pracy został zarchiwizowany. Przejdź do sekcji Archiwa, aby go przywrócić.",
+      "go_to_archives": "Przejdź do archiwów"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Kliknij, aby zagłosować przeciw",
       "click_to_view_upvotes": "Kliknij, aby zobaczyć głosy za",
       "click_to_view_downvotes": "Kliknij, aby zobaczyć głosy przeciw"
-    }
+    },
+    "archived_banner": "Ten element pracy jest zarchiwizowany. Aby wprowadzić zmiany, należy go przywrócić.",
+    "assignee_count": "{count, plural, one {# przypisana osoba} few {# przypisane osoby} many {# przypisanych osób} other {# przypisanej osoby}}",
+    "description_load_failed": "Nie udało się wczytać opisu.",
+    "updated_time_ago": "Zaktualizowano {time}"
   },
   "sub_work_item": {
     "update": {

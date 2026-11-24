@@ -545,7 +545,8 @@
       "asc": "Crescător",
       "desc": "Descrescător",
       "created_on": "Creată la",
-      "updated_on": "Actualizată la"
+      "updated_on": "Actualizată la",
+      "label": "Sortează"
     },
     "comments": "Comentarii",
     "updates": "Actualizări",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Se caută...",
-  "rename_folder": "Redenumiți dosarul"
+  "rename_folder": "Redenumiți dosarul",
+  "entity_detail_toolbar": "Acțiuni"
 }

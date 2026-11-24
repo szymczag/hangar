@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "Vezi alte activități"
         }
+      },
+      "no_access": {
+        "description": "Contactează un administrator al proiectului pentru a solicita acces.",
+        "title": "Nu ai acces la această activitate"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "Activitatea nu a putut fi arhivată. Te rugăm să încerci din nou."
-      }
+      },
+      "banner_message": "Această activitate a fost arhivată. Accesează secțiunea Arhive pentru a o restaura.",
+      "go_to_archives": "Accesează arhivele"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Clic pentru a vota negativ",
       "click_to_view_upvotes": "Clic pentru a vedea voturile pozitive",
       "click_to_view_downvotes": "Clic pentru a vedea voturile negative"
-    }
+    },
+    "archived_banner": "Această activitate este arhivată. Restaurați-o pentru a face modificări.",
+    "assignee_count": "{count, plural, one {# responsabil} few {# responsabili} other {# de responsabili}}",
+    "description_load_failed": "Descrierea nu a putut fi încărcată.",
+    "updated_time_ago": "Actualizat {time}"
   },
   "sub_work_item": {
     "update": {

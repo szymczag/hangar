@@ -545,7 +545,8 @@
       "asc": "Aufsteigend",
       "desc": "Absteigend",
       "created_on": "Erstellt am",
-      "updated_on": "Aktualisiert am"
+      "updated_on": "Aktualisiert am",
+      "label": "Sortieren"
     },
     "comments": "Kommentare",
     "updates": "Aktualisierungen",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Wird gesucht...",
-  "rename_folder": "Ordner umbenennen"
+  "rename_folder": "Ordner umbenennen",
+  "entity_detail_toolbar": "Aktionen"
 }

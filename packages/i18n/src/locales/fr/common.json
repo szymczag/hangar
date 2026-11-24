@@ -545,7 +545,8 @@
       "asc": "Croissant",
       "desc": "Décroissant",
       "created_on": "Créé le",
-      "updated_on": "Mis à jour le"
+      "updated_on": "Mis à jour le",
+      "label": "Trier"
     },
     "comments": "Commentaires",
     "updates": "Mises à jour",
@@ -895,5 +896,6 @@
     }
   },
   "searching": "Recherche en cours...",
-  "rename_folder": "Renommer le dossier"
+  "rename_folder": "Renommer le dossier",
+  "entity_detail_toolbar": "Actions"
 }

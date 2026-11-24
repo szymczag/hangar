@@ -157,6 +157,10 @@
         "primary_button": {
           "text": "Weitere Arbeitselemente anzeigen"
         }
+      },
+      "no_access": {
+        "description": "Wenden Sie sich an einen Projektadministrator, um Zugriff anzufordern.",
+        "title": "Sie haben keinen Zugriff auf dieses Arbeitselement"
       }
     },
     "sibling": {
@@ -172,7 +176,9 @@
       },
       "failed": {
         "message": "Archivierung des Arbeitselements fehlgeschlagen. Bitte versuchen Sie es erneut."
-      }
+      },
+      "banner_message": "Dieses Arbeitselement wurde archiviert. Rufen Sie den Bereich „Archive“ auf, um es wiederherzustellen.",
+      "go_to_archives": "Zu den Archiven"
     },
     "restore": {
       "success": {
@@ -266,7 +272,11 @@
       "click_to_downvote": "Klicken zum Runterstimmen",
       "click_to_view_upvotes": "Klicken um Hochstimmen anzuzeigen",
       "click_to_view_downvotes": "Klicken um Runterstimmen anzuzeigen"
-    }
+    },
+    "archived_banner": "Dieses Arbeitselement ist archiviert. Zum Bearbeiten muss es wiederhergestellt werden.",
+    "assignee_count": "{count, plural, one {# zugewiesene Person} other {# zugewiesene Personen}}",
+    "description_load_failed": "Die Beschreibung konnte nicht geladen werden.",
+    "updated_time_ago": "Aktualisiert {time}"
   },
   "sub_work_item": {
     "update": {
