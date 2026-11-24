@@ -8,13 +8,21 @@ import { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "react-router";
 import useSWR from "swr";
-import { Plus, Trash2 } from "lucide-react";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Loader } from "@plane/ui";
+import { Button } from "@makeplane/propel/components/button";
+import { Checkbox } from "@makeplane/propel/components/checkbox";
+import { CheckboxField } from "@makeplane/propel/components/checkbox-field";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { SelectField } from "@makeplane/propel/components/select-field";
+import { AddOutline, DeleteOutline } from "@makeplane/propel/icons";
+import { ConfirmDialog } from "@plane/blocks/dialog";
+import { Loader } from "@plane/blocks/skeleton";
+import { setToast } from "@plane/blocks/toast";
 import { PageHead } from "@/components/core/page-title";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { SettingsContentWrapper } from "@/components/settings/content-wrapper";
+import { SettingsHeading } from "@/components/settings/heading";
 import { useInstance } from "@/hooks/store/use-instance";
 import { useMember } from "@/hooks/store/use-member";
 import { CapacityService } from "@/services/capacity.service";
@@ -75,8 +83,11 @@ function offsetHint(days: number) {
   return days < 0 ? `${Math.abs(days)} days before` : `${days} days after`;
 }
 
-const inputStyle =
-  "h-9 rounded-md border border-subtle bg-surface-2 px-2.5 text-body-sm-regular outline-none focus:border-accent-primary";
+/** What the confirmation dialog is about to delete, if anything. */
+type TPendingDeletion =
+  | { kind: "template"; template: TWorkshopChecklistTemplate }
+  | { kind: "role"; role: TWorkshopRole }
+  | null;
 
 /**
  * The subtasks a Workshop starts with, and who does them.
@@ -117,6 +128,8 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
   const [saving, setSaving] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [busyRole, setBusyRole] = useState<string | null>(null);
+  const [pendingDeletion, setPendingDeletion] = useState<TPendingDeletion>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const templates = data?.results ?? [];
   const roles = roleData?.results ?? [];
@@ -159,10 +172,10 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
         : await service.createChecklistTemplate(slug, payload);
       await mutate();
       setSelectedId(saved.id);
-      setToast({ type: TOAST_TYPE.SUCCESS, title: "Template saved" });
+      setToast({ type: "success", title: "Template saved" });
     } catch (error: unknown) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Template not saved",
         message: errorMessage(error, "Check the checklist items and try again."),
       });
@@ -173,13 +186,12 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
 
   const removeTemplate = async (template: TWorkshopChecklistTemplate) => {
     if (!slug) return;
-    if (!window.confirm(`Delete “${template.name}”? Subtasks it already created are kept.`)) return;
     try {
       await service.deleteChecklistTemplate(slug, template.id);
       if (selectedId === template.id) setSelectedId(null);
       await mutate();
     } catch (error: unknown) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Template not deleted", message: errorMessage(error, "Try again.") });
+      setToast({ type: "error", title: "Template not deleted", message: errorMessage(error, "Try again.") });
     }
   };
 
@@ -191,7 +203,7 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
       setNewRoleName("");
       await mutateRoles();
     } catch (error: unknown) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Role not created", message: errorMessage(error, "Try again.") });
+      setToast({ type: "error", title: "Role not created", message: errorMessage(error, "Try again.") });
     } finally {
       setBusyRole(null);
     }
@@ -207,7 +219,7 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
       await service.updateWorkshopRole(slug, role.id, { name: role.name, member_ids: nextMembers });
       await mutateRoles();
     } catch (error: unknown) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Role not saved", message: errorMessage(error, "Try again.") });
+      setToast({ type: "error", title: "Role not saved", message: errorMessage(error, "Try again.") });
     } finally {
       setBusyRole(null);
     }
@@ -215,17 +227,32 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
 
   const removeRole = async (role: TWorkshopRole) => {
     if (!slug) return;
-    if (!window.confirm(`Delete the role “${role.name}”? Checklist items using it become unassigned.`)) return;
     setBusyRole(role.id);
     try {
       await service.deleteWorkshopRole(slug, role.id);
       await Promise.all([mutateRoles(), mutate()]);
     } catch (error: unknown) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Role not deleted", message: errorMessage(error, "Try again.") });
+      setToast({ type: "error", title: "Role not deleted", message: errorMessage(error, "Try again.") });
     } finally {
       setBusyRole(null);
     }
   };
+
+  const confirmDeletion = async () => {
+    if (!pendingDeletion) return;
+    setDeleting(true);
+    try {
+      if (pendingDeletion.kind === "template") await removeTemplate(pendingDeletion.template);
+      else await removeRole(pendingDeletion.role);
+    } finally {
+      setDeleting(false);
+      setPendingDeletion(null);
+    }
+  };
+
+  const assigneeModeOptions = ASSIGNEE_MODES.map((mode) => ({ value: mode.value, label: mode.label }));
+  const memberOptions = memberIds.map((userId) => ({ value: userId, label: memberName(userId) }));
+  const roleOptions = roles.map((role) => ({ value: role.id, label: role.name }));
 
   if (config && !featureEnabled) return <NotAuthorizedView section="settings" className="h-auto" />;
 
@@ -233,85 +260,80 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
     <SettingsContentWrapper>
       <PageHead title="Workshop checklists" />
       <div className="flex flex-col gap-8">
-        <div>
-          <h3 className="text-xl font-medium">Workshop checklists</h3>
-          <p className="mt-1 text-body-xs-regular text-secondary">
-            The subtasks a Workshop starts with. Due dates are counted from the workshop&apos;s first session, so a
-            template stays correct however often the date moves.
-          </p>
-        </div>
+        <SettingsHeading
+          title="Workshop checklists"
+          description="The subtasks a Workshop starts with. Due dates are counted from the workshop's first session, so a template stays correct however often the date moves."
+        />
 
         <section aria-label="Workshop roles" className="flex flex-col gap-4">
-          <div>
-            <h4 className="text-body-sm-medium">Roles</h4>
-            <p className="mt-1 text-body-xs-regular text-secondary">
-              A standing job and whoever currently does it. Templates point at the role, so when the rota changes you
-              edit it here once instead of editing every template.
-            </p>
-          </div>
+          <SettingsHeading
+            variant="h5"
+            title="Roles"
+            description="A standing job and whoever currently does it. Templates point at the role, so when the rota changes you edit it here once instead of editing every template."
+          />
 
           <div className="flex flex-col gap-3">
             {roles.map((role) => (
-              <div key={role.id} className="rounded-xl border border-subtle bg-surface-1 p-4">
+              <div key={role.id} className="rounded-lg border border-subtle bg-layer-1 p-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-body-sm-medium">{role.name}</span>
+                  <span className="text-body-sm-medium text-primary">{role.name}</span>
                   <span className="text-body-xs-regular text-secondary">
                     {role.member_ids.length === 0
                       ? "nobody yet"
                       : role.member_ids.map((userId) => memberName(userId)).join(", ")}
                   </span>
-                  <button
-                    type="button"
-                    aria-label={`Delete role ${role.name}`}
-                    disabled={busyRole === role.id}
-                    className="ml-auto text-secondary hover:text-danger-primary"
-                    onClick={() => void removeRole(role)}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <span className="ml-auto">
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
+                      icon={<Icon icon={DeleteOutline} />}
+                      aria-label={`Delete role ${role.name}`}
+                      disabled={busyRole === role.id}
+                      onClick={() => setPendingDeletion({ kind: "role", role })}
+                    />
+                  </span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                   {memberIds.map((userId) => (
-                    <label key={userId} className="flex items-center gap-2 text-body-xs-regular">
-                      <input
-                        type="checkbox"
-                        checked={role.member_ids.includes(userId)}
-                        disabled={busyRole === role.id}
-                        onChange={() => void toggleRoleMember(role, userId)}
-                      />
-                      {memberName(userId)}
-                    </label>
+                    <Checkbox
+                      key={userId}
+                      label={memberName(userId)}
+                      checked={role.member_ids.includes(userId)}
+                      disabled={busyRole === role.id}
+                      onCheckedChange={() => void toggleRoleMember(role, userId)}
+                    />
                   ))}
                 </div>
               </div>
             ))}
 
             <div className="flex items-end gap-2">
-              <label className="flex flex-col gap-1 text-body-xs-regular">
-                <span className="text-secondary">New role</span>
-                <input
-                  className={`${inputStyle} w-64`}
+              <div className="w-64">
+                <InputField
+                  size="lg"
+                  orientation="vertical"
+                  label="New role"
                   value={newRoleName}
                   maxLength={80}
                   placeholder="Streaming"
                   onChange={(event) => setNewRoleName(event.target.value)}
                 />
-              </label>
+              </div>
               <Button
                 variant="secondary"
-                size="sm"
+                size="lg"
+                stretch="auto"
+                icon={<Icon icon={AddOutline} />}
+                label="Add role"
                 disabled={!newRoleName.trim() || busyRole === "new"}
                 onClick={() => void addRole()}
-              >
-                <Plus className="mr-1 size-4" />
-                Add role
-              </Button>
+              />
             </div>
           </div>
         </section>
 
         <section aria-label="Checklist templates" className="flex flex-col gap-4">
-          <h4 className="text-body-sm-medium">Templates</h4>
+          <SettingsHeading variant="h5" title="Templates" />
 
           {isLoading ? (
             <Loader className="space-y-3">
@@ -324,141 +346,136 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
                 <div key={template.id} className="flex items-center gap-1">
                   <Button
                     variant={template.id === selectedId ? "primary" : "secondary"}
-                    size="sm"
+                    size="md"
+                    stretch="auto"
+                    label={`${template.name}${template.is_default ? " · default" : ""}`}
                     onClick={() => setSelectedId(template.id)}
-                  >
-                    {template.name}
-                    {template.is_default ? " · default" : ""}
-                  </Button>
-                  <button
-                    type="button"
+                  />
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
+                    icon={<Icon icon={DeleteOutline} />}
                     aria-label={`Delete ${template.name}`}
-                    className="text-secondary hover:text-danger-primary"
-                    onClick={() => void removeTemplate(template)}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                    onClick={() => setPendingDeletion({ kind: "template", template })}
+                  />
                 </div>
               ))}
-              <Button variant="secondary" size="sm" onClick={startNew}>
-                <Plus className="mr-1 size-4" />
-                New template
-              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                stretch="auto"
+                icon={<Icon icon={AddOutline} />}
+                label="New template"
+                onClick={startNew}
+              />
             </div>
           )}
 
           {items.length > 0 || selectedId ? (
-            <div className="flex flex-col gap-4 rounded-xl border border-subtle bg-surface-1 p-5">
+            <div className="flex flex-col gap-4 rounded-lg border border-subtle bg-layer-1 p-5">
               <div className="flex flex-wrap items-end gap-4">
-                <label className="flex flex-col gap-1 text-body-xs-regular">
-                  <span className="text-secondary">Template name</span>
-                  <input
-                    className={`${inputStyle} w-72`}
+                <div className="w-72">
+                  <InputField
+                    size="lg"
+                    orientation="vertical"
+                    label="Template name"
                     value={name}
                     maxLength={120}
                     onChange={(event) => setName(event.target.value)}
                   />
-                </label>
-                <label className="flex items-center gap-2 pb-2 text-body-xs-regular">
-                  <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
-                  Apply to new Workshops automatically
-                </label>
+                </div>
+                <div className="pb-2">
+                  <CheckboxField
+                    name="is-default"
+                    size="lg"
+                    label="Apply to new Workshops automatically"
+                    checked={isDefault}
+                    onCheckedChange={(checked) => setIsDefault(checked)}
+                  />
+                </div>
               </div>
 
               <ol className="flex flex-col gap-3">
                 {items.map((item, index) => (
                   <li key={item.uid} className="flex flex-wrap items-end gap-3 border-t border-subtle pt-3">
-                    <label className="flex min-w-60 flex-1 flex-col gap-1 text-body-xs-regular">
-                      <span className="text-secondary">Subtask</span>
-                      <input
-                        className={inputStyle}
+                    <div className="min-w-60 flex-1">
+                      <InputField
+                        size="lg"
+                        orientation="vertical"
+                        label="Subtask"
                         value={item.title}
                         maxLength={255}
                         onChange={(event) => patchItem(index, { title: event.target.value })}
                       />
-                    </label>
+                    </div>
 
-                    <label className="flex flex-col gap-1 text-body-xs-regular">
-                      <span className="text-secondary">Assigned to</span>
-                      <select
-                        className={inputStyle}
-                        value={item.assignee_mode}
-                        onChange={(event) => {
-                          const mode = event.target.value as TChecklistAssigneeMode;
-                          patchItem(index, {
-                            assignee_mode: mode,
-                            assignee_id: mode === "fixed" ? (item.assignee_id ?? memberIds[0] ?? null) : null,
-                            role_id: mode === "role" ? (item.role_id ?? roles[0]?.id ?? null) : null,
-                          });
-                        }}
-                      >
-                        {ASSIGNEE_MODES.map((mode) => (
-                          <option key={mode.value} value={mode.value}>
-                            {mode.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <SelectField<TChecklistAssigneeMode>
+                      label="Assigned to"
+                      size="lg"
+                      width="fit"
+                      options={assigneeModeOptions}
+                      value={item.assignee_mode}
+                      onValueChange={(mode) => {
+                        if (mode === null) return;
+                        patchItem(index, {
+                          assignee_mode: mode,
+                          assignee_id: mode === "fixed" ? (item.assignee_id ?? memberIds[0] ?? null) : null,
+                          role_id: mode === "role" ? (item.role_id ?? roles[0]?.id ?? null) : null,
+                        });
+                      }}
+                    />
 
                     {item.assignee_mode === "fixed" && (
-                      <label className="flex flex-col gap-1 text-body-xs-regular">
-                        <span className="text-secondary">Person</span>
-                        <select
-                          className={inputStyle}
-                          value={item.assignee_id ?? ""}
-                          onChange={(event) => patchItem(index, { assignee_id: event.target.value || null })}
-                        >
-                          <option value="">Choose a person</option>
-                          {memberIds.map((userId) => (
-                            <option key={userId} value={userId}>
-                              {memberName(userId)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <SelectField<string>
+                        label="Person"
+                        size="lg"
+                        width="fit"
+                        placeholder="Choose a person"
+                        options={memberOptions}
+                        value={item.assignee_id}
+                        onValueChange={(userId) => patchItem(index, { assignee_id: userId || null })}
+                      />
                     )}
 
                     {item.assignee_mode === "role" && (
-                      <label className="flex flex-col gap-1 text-body-xs-regular">
-                        <span className="text-secondary">Role</span>
-                        <select
-                          className={inputStyle}
-                          value={item.role_id ?? ""}
-                          onChange={(event) => patchItem(index, { role_id: event.target.value || null })}
-                        >
-                          <option value="">Choose a role</option>
-                          {roles.map((role) => (
-                            <option key={role.id} value={role.id}>
-                              {role.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <SelectField<string>
+                        label="Role"
+                        size="lg"
+                        width="fit"
+                        placeholder="Choose a role"
+                        options={roleOptions}
+                        value={item.role_id}
+                        onValueChange={(roleId) => patchItem(index, { role_id: roleId || null })}
+                      />
                     )}
 
-                    <label className="flex flex-col gap-1 text-body-xs-regular">
-                      <span className="text-secondary">Days from the workshop</span>
-                      <div className="flex items-center gap-2">
-                        <input
+                    <div className="flex items-end gap-2">
+                      <div className="w-24">
+                        <InputField
+                          size="lg"
+                          orientation="vertical"
                           type="number"
-                          className={`${inputStyle} w-24 text-right`}
+                          label="Days from the workshop"
                           value={item.offset_days}
                           min={-365}
                           max={365}
                           onChange={(event) => patchItem(index, { offset_days: Number(event.target.value) })}
                         />
-                        <span className="text-secondary">{offsetHint(item.offset_days)}</span>
                       </div>
-                    </label>
+                      <span className="pb-2 text-body-xs-regular whitespace-nowrap text-secondary">
+                        {offsetHint(item.offset_days)}
+                      </span>
+                    </div>
 
-                    <button
-                      type="button"
-                      aria-label={`Remove subtask ${index + 1}`}
-                      className="pb-2 text-secondary hover:text-danger-primary"
-                      onClick={() => setItems((current) => current.filter((_, position) => position !== index))}
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
+                    <div className="pb-1">
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        icon={<Icon icon={DeleteOutline} />}
+                        aria-label={`Remove subtask ${index + 1}`}
+                        onClick={() => setItems((current) => current.filter((_, position) => position !== index))}
+                      />
+                    </div>
                   </li>
                 ))}
               </ol>
@@ -466,22 +483,44 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
               <div className="flex items-center gap-2">
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="md"
+                  stretch="auto"
+                  icon={<Icon icon={AddOutline} />}
+                  label="Add subtask"
                   onClick={() =>
                     setItems((current) => [...current, withUid({ ...BLANK_ITEM, position: current.length })])
                   }
-                >
-                  <Plus className="mr-1 size-4" />
-                  Add subtask
-                </Button>
-                <Button variant="primary" size="sm" loading={saving} onClick={() => void save()}>
-                  Save template
-                </Button>
+                />
+                <Button
+                  variant="primary"
+                  size="md"
+                  stretch="auto"
+                  label="Save template"
+                  loading={saving}
+                  onClick={() => void save()}
+                />
               </div>
             </div>
           ) : null}
         </section>
       </div>
+      <ConfirmDialog
+        isOpen={pendingDeletion !== null}
+        handleClose={() => setPendingDeletion(null)}
+        handleSubmit={confirmDeletion}
+        isSubmitting={deleting}
+        primaryButtonText={{ default: "Delete", loading: "Deleting" }}
+        title={
+          pendingDeletion?.kind === "role"
+            ? `Delete the role “${pendingDeletion.role.name}”?`
+            : `Delete “${pendingDeletion?.template.name ?? ""}”?`
+        }
+        content={
+          pendingDeletion?.kind === "role"
+            ? "Checklist items using it become unassigned."
+            : "Subtasks it already created are kept."
+        }
+      />
     </SettingsContentWrapper>
   );
 });

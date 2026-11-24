@@ -5,13 +5,18 @@
  */
 
 import { useReducer, useState } from "react";
-import { Check, KeyRound, LockKeyhole, MailCheck, ShieldAlert, Trash2 } from "lucide-react";
 import useSWR from "swr";
 import type { IEmailSecurityStatus, IOpenPGPEmailKey } from "@plane/types";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Input, TextArea } from "@plane/ui";
+import { Banner } from "@makeplane/propel/components/banner";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { TextAreaField } from "@makeplane/propel/components/text-area-field";
+import { DeleteOutline, KeyOutline, MailCheckOutline, TickOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { cn } from "@plane/utils";
+// components
+import { SettingsHeading } from "@/components/settings/heading";
 // hooks
 import { useUser } from "@/hooks/store/user";
 // services
@@ -49,7 +54,7 @@ const errorMessage = (error: unknown): string => {
 const formatFingerprint = (fingerprint: string) => fingerprint.match(/.{1,4}/g)?.join(" ") ?? fingerprint;
 
 const KeySummary = ({ value }: { value: IOpenPGPEmailKey }) => (
-  <dl className="grid gap-3 rounded-md border border-subtle-1 bg-layer-2 p-4 text-12 sm:grid-cols-2">
+  <dl className="grid gap-3 rounded-lg border border-subtle bg-layer-1 p-4 text-body-xs-regular sm:grid-cols-2">
     <div className="sm:col-span-2">
       <dt className="text-secondary">Primary fingerprint</dt>
       <dd className="font-mono mt-1 break-all text-primary">{formatFingerprint(value.primary_fingerprint)}</dd>
@@ -102,9 +107,9 @@ const Lifecycle = ({ status }: { status: IEmailSecurityStatus }) => {
               step.complete ? "border-success-strong text-success-primary" : "border-subtle-1 text-placeholder"
             )}
           >
-            {step.complete ? <Check className="size-3.5" /> : index + 1}
+            {step.complete ? <TickOutline className="size-3.5" /> : index + 1}
           </span>
-          <span className={cn("truncate text-11", step.complete ? "text-primary" : "text-secondary")}>
+          <span className={cn("truncate text-caption-md-regular", step.complete ? "text-primary" : "text-secondary")}>
             {step.label}
           </span>
         </li>
@@ -112,6 +117,53 @@ const Lifecycle = ({ status }: { status: IEmailSecurityStatus }) => {
     </ol>
   );
 };
+
+/** The OpenPGP certificate field: monospace, never spell-checked or autofilled. */
+const CertificateField = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <div className="[&_textarea]:font-mono">
+    <TextAreaField
+      size="lg"
+      resize="vertical"
+      label={label}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"
+      rows={8}
+      spellCheck={false}
+      autoComplete="off"
+    />
+  </div>
+);
+
+/** The current password a key change asks for, when the account has one (S9). */
+const CurrentPasswordField = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <InputField
+    size="lg"
+    orientation="vertical"
+    type="password"
+    aria-label={label}
+    placeholder={label}
+    value={value}
+    onChange={(event) => onChange(event.target.value)}
+    autoComplete="current-password"
+  />
+);
 
 export const EmailSecuritySettings = () => {
   const { data: currentUser } = useUser();
@@ -128,9 +180,9 @@ export const EmailSecuritySettings = () => {
     try {
       await operation();
       await mutate();
-      setToast({ type: TOAST_TYPE.SUCCESS, title: "Email security updated", message: success });
+      setToast({ type: "success", title: "Email security updated", message: success });
     } catch (error) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Email security update failed", message: errorMessage(error) });
+      setToast({ type: "error", title: "Email security update failed", message: errorMessage(error) });
     } finally {
       dispatchBusyAction(null);
     }
@@ -161,33 +213,26 @@ export const EmailSecuritySettings = () => {
     );
 
   if (isLoading || !data) {
-    return <div className="mt-10 h-48 animate-pulse rounded-md bg-layer-2" aria-label="Loading email security" />;
+    return <div className="mt-10 h-48 animate-pulse rounded-lg bg-layer-1" aria-label="Loading email security" />;
   }
 
+  const passwordRequired = !currentUser?.is_password_autoset;
+
   return (
-    <section className="mt-12 border-t border-subtle-1 pt-8" aria-labelledby="email-security-title">
-      <div className="flex items-start gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-subtle-1 bg-layer-2">
-          <LockKeyhole className="size-4 text-secondary" />
-        </div>
-        <div>
-          <h2 id="email-security-title" className="text-16 font-medium text-primary">
-            Encrypted email notifications
-          </h2>
-          <p className="mt-1 max-w-2xl text-13 leading-5 text-secondary">
-            Verify an OpenPGP public key to receive project activity and export emails. Account access and recovery
-            messages remain unencrypted so you cannot be locked out.
-          </p>
-        </div>
-      </div>
+    <section className="mt-12 border-t border-subtle pt-8" aria-labelledby="email-security-title">
+      <SettingsHeading
+        variant="h4"
+        title={<span id="email-security-title">Encrypted email notifications</span>}
+        description="Verify an OpenPGP public key to receive project activity and export emails. Account access and recovery messages remain unencrypted so you cannot be locked out."
+      />
 
       {!data.enabled && (
-        <div className="mt-6 flex gap-3 rounded-md border border-warning-subtle bg-warning-subtle p-4 text-13">
-          <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-          <p>
-            Encrypted notifications are not switched on for this instance yet. You can add and verify your key now — it
-            starts being used the moment an administrator enables them, with nothing further to do.
-          </p>
+        <div className="mt-6 max-w-3xl">
+          <Banner
+            variant="warning"
+            placement="inline"
+            description="Encrypted notifications are not switched on for this instance yet. You can add and verify your key now — it starts being used the moment an administrator enables them, with nothing further to do."
+          />
         </div>
       )}
 
@@ -196,36 +241,22 @@ export const EmailSecuritySettings = () => {
 
         {data.active_key && !data.pending_key ? (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2 text-13 font-medium text-success-primary">
-              <MailCheck className="size-4" /> Notifications are encrypted
+            <div className="flex items-center gap-2 text-body-xs-medium text-success-primary">
+              <Icon icon={MailCheckOutline} /> Notifications are encrypted
             </div>
             <KeySummary value={data.active_key} />
             {showReplacement && (
-              <label htmlFor="replacement-openpgp-certificate" className="flex flex-col gap-2 text-13 text-primary">
-                Replacement public certificate
-                <TextArea
-                  id="replacement-openpgp-certificate"
-                  value={certificate}
-                  onChange={(event) => setCertificate(event.target.value)}
-                  placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"
-                  rows={8}
-                  className="font-mono min-h-40 text-11"
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-              </label>
+              <CertificateField label="Replacement public certificate" value={certificate} onChange={setCertificate} />
             )}
-            {!currentUser?.is_password_autoset && (
-              <Input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder={
+            {passwordRequired && (
+              <CurrentPasswordField
+                label={
                   showReplacement
                     ? "Current password required to replace this key"
                     : "Current password required to remove this key"
                 }
-                autoComplete="current-password"
+                value={password}
+                onChange={setPassword}
               />
             )}
             <div className="flex flex-wrap gap-2">
@@ -233,59 +264,63 @@ export const EmailSecuritySettings = () => {
                 <Button
                   variant="primary"
                   size="lg"
+                  stretch="auto"
+                  label="Upload replacement"
                   loading={busyAction === "upload"}
-                  disabled={!certificate.trim() || (!currentUser?.is_password_autoset && !password)}
-                  onClick={upload}
-                >
-                  Upload replacement
-                </Button>
+                  disabled={!certificate.trim() || (passwordRequired && !password)}
+                  onClick={() => void upload()}
+                />
               ) : (
-                <Button variant="secondary" size="lg" onClick={() => setShowReplacement(true)}>
-                  Replace public key
-                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  stretch="auto"
+                  label="Replace public key"
+                  onClick={() => setShowReplacement(true)}
+                />
               )}
               <Button
                 variant="secondary"
                 size="lg"
+                stretch="auto"
+                label="Send encrypted test"
                 loading={busyAction === "test"}
                 onClick={() =>
-                  run(
+                  void run(
                     "test",
                     () => userService.sendOpenPGPTest(data.active_key!.id),
                     "An encrypted test message was queued."
                   )
                 }
-              >
-                Send encrypted test
-              </Button>
+              />
               <Button
-                variant="error-outline"
+                variant="danger-outline"
                 size="lg"
+                stretch="auto"
+                icon={<Icon icon={DeleteOutline} />}
+                label={confirmRemoval === data.active_key.id ? "Confirm removal" : "Remove key"}
                 loading={busyAction === "remove"}
-                disabled={!currentUser?.is_password_autoset && !password}
+                disabled={passwordRequired && !password}
                 onClick={() =>
                   confirmRemoval === data.active_key!.id
-                    ? remove(data.active_key!.id)
+                    ? void remove(data.active_key!.id)
                     : setConfirmRemoval(data.active_key!.id)
                 }
-              >
-                <Trash2 className="size-4" />
-                {confirmRemoval === data.active_key.id ? "Confirm removal" : "Remove key"}
-              </Button>
+              />
             </div>
           </div>
         ) : data.pending_key ? (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2 text-13 font-medium text-primary">
-              <KeyRound className="size-4" /> Verification required
+            <div className="flex items-center gap-2 text-body-xs-medium text-primary">
+              <Icon icon={KeyOutline} /> Verification required
             </div>
             {data.active_key && (
-              <p className="text-12 leading-5 text-secondary">
+              <p className="text-body-xs-regular text-secondary">
                 Your existing active key remains in use until this replacement is verified.
               </p>
             )}
             <KeySummary value={data.pending_key} />
-            <p className="text-12 leading-5 text-secondary">
+            <p className="text-body-xs-regular text-secondary">
               Send a challenge, decrypt it with your private key, then enter the code below. Hangar never receives or
               stores your private key.
             </p>
@@ -293,33 +328,39 @@ export const EmailSecuritySettings = () => {
               <Button
                 variant="secondary"
                 size="lg"
+                stretch="auto"
+                label="Send encrypted challenge"
                 loading={busyAction === "challenge"}
                 onClick={() =>
-                  run(
+                  void run(
                     "challenge",
                     () => userService.sendOpenPGPChallenge(data.pending_key!.id),
                     "The encrypted verification message was queued."
                   )
                 }
-              >
-                Send encrypted challenge
-              </Button>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                value={code}
-                onChange={(event) => setCode(event.target.value.toUpperCase())}
-                placeholder="Verification code"
-                autoComplete="one-time-code"
-                className="font-mono uppercase"
               />
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+              <div className="[&_input]:font-mono flex-1 [&_input]:uppercase">
+                <InputField
+                  size="lg"
+                  orientation="vertical"
+                  aria-label="Verification code"
+                  placeholder="Verification code"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.toUpperCase())}
+                  autoComplete="one-time-code"
+                />
+              </div>
               <Button
                 variant="primary"
                 size="lg"
+                stretch="auto"
+                label="Verify key"
                 disabled={code.trim().length < 8}
                 loading={busyAction === "verify"}
                 onClick={() =>
-                  run(
+                  void run(
                     "verify",
                     async () => {
                       await userService.verifyOpenPGPChallenge(data.pending_key!.id, code.trim());
@@ -328,82 +369,64 @@ export const EmailSecuritySettings = () => {
                     "The key is verified. Future project notifications will be encrypted."
                   )
                 }
-              >
-                Verify key
-              </Button>
+              />
             </div>
-            {!currentUser?.is_password_autoset && (
-              <Input
-                type="password"
+            {passwordRequired && (
+              <CurrentPasswordField
+                label="Current password required to discard this key"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Current password required to discard this key"
-                autoComplete="current-password"
+                onChange={setPassword}
               />
             )}
-            <Button
-              variant="error-outline"
-              size="lg"
-              className="self-start"
-              loading={busyAction === "remove"}
-              disabled={!currentUser?.is_password_autoset && !password}
-              onClick={() =>
-                confirmRemoval === data.pending_key!.id
-                  ? remove(data.pending_key!.id)
-                  : setConfirmRemoval(data.pending_key!.id)
-              }
-            >
-              {confirmRemoval === data.pending_key.id ? "Confirm discard" : "Discard pending key"}
-            </Button>
+            <div>
+              <Button
+                variant="danger-outline"
+                size="lg"
+                stretch="auto"
+                label={confirmRemoval === data.pending_key.id ? "Confirm discard" : "Discard pending key"}
+                loading={busyAction === "remove"}
+                disabled={passwordRequired && !password}
+                onClick={() =>
+                  confirmRemoval === data.pending_key!.id
+                    ? void remove(data.pending_key!.id)
+                    : setConfirmRemoval(data.pending_key!.id)
+                }
+              />
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="rounded-md border border-subtle-1 bg-layer-2 p-4 text-13 leading-5 text-secondary">
-              Project and export emails are currently silenced. Paste one ASCII-armored public certificate below;
-              private keys and private-key blocks are rejected.
-            </div>
-            <label htmlFor="openpgp-certificate" className="flex flex-col gap-2 text-13 text-primary">
-              OpenPGP public certificate
-              <TextArea
-                id="openpgp-certificate"
-                value={certificate}
-                onChange={(event) => setCertificate(event.target.value)}
-                placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"
-                rows={8}
-                className="font-mono min-h-40 text-11"
-                spellCheck={false}
-                autoComplete="off"
-              />
-            </label>
-            {!currentUser?.is_password_autoset && (
-              <Input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Current password"
-                autoComplete="current-password"
-              />
+            <Banner
+              variant="neutral"
+              placement="inline"
+              icon={null}
+              description="Project and export emails are currently silenced. Paste one ASCII-armored public certificate below; private keys and private-key blocks are rejected."
+            />
+            <CertificateField label="OpenPGP public certificate" value={certificate} onChange={setCertificate} />
+            {passwordRequired && (
+              <CurrentPasswordField label="Current password" value={password} onChange={setPassword} />
             )}
-            <Button
-              variant="primary"
-              size="lg"
-              className="self-start"
-              disabled={!certificate.trim() || (!currentUser?.is_password_autoset && !password)}
-              loading={busyAction === "upload"}
-              onClick={upload}
-            >
-              Upload public key
-            </Button>
+            <div>
+              <Button
+                variant="primary"
+                size="lg"
+                stretch="auto"
+                label="Upload public key"
+                disabled={!certificate.trim() || (passwordRequired && !password)}
+                loading={busyAction === "upload"}
+                onClick={() => void upload()}
+              />
+            </div>
           </div>
         )}
       </div>
       {data.active_suppressions.length > 0 && (
-        <div className="mt-6 flex max-w-3xl gap-3 rounded-md border border-danger-subtle bg-danger-subtle p-4 text-13">
-          <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-          <p>
-            Email delivery to your address is paused after a provider complaint or permanent bounce. Correct the address
-            if needed, then contact an instance administrator for a reviewed reactivation.
-          </p>
+        <div className="mt-6 max-w-3xl">
+          <Banner
+            variant="danger"
+            placement="inline"
+            description="Email delivery to your address is paused after a provider complaint or permanent bounce. Correct the address if needed, then contact an instance administrator for a reviewed reactivation."
+          />
         </div>
       )}
       <EmailReceiptLedger />

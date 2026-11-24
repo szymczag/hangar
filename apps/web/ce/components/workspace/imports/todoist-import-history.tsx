@@ -6,10 +6,12 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { AnchorButton } from "@makeplane/propel/components/anchor-button";
+import { Button } from "@makeplane/propel/components/button";
+import { LoadingOutline, TickCircleOutline, WarningTriangleOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
+import { SettingsHeading } from "@/components/settings/heading";
 import { importService } from "@/plane-web/services/import.service";
 import type { TImportJob } from "@/plane-web/types/import";
 
@@ -55,7 +57,7 @@ export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken
       await mutate();
     } catch (cancelError) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("workspace_settings.settings.todoist_import.history.cancel_error"),
         message: errorMessage(cancelError),
       });
@@ -66,16 +68,16 @@ export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken
 
   return (
     <section>
-      <div className="mb-3">
-        <h3 className="text-h5-medium text-primary">{t("workspace_settings.settings.todoist_import.history.title")}</h3>
-        <p className="mt-1 text-body-sm-regular text-secondary">
-          {t("workspace_settings.settings.todoist_import.history.description")}
-        </p>
-      </div>
-      <div className="overflow-hidden rounded-xl border border-subtle bg-layer-1">
+      <SettingsHeading
+        className="mb-3"
+        variant="h5"
+        title={t("workspace_settings.settings.todoist_import.history.title")}
+        description={t("workspace_settings.settings.todoist_import.history.description")}
+      />
+      <div className="overflow-hidden rounded-lg border border-subtle bg-layer-1">
         {isLoading ? (
           <div className="flex items-center gap-2 p-5 text-body-sm-regular text-secondary">
-            <Loader2 className="size-4 animate-spin" />
+            <LoadingOutline className="size-4 animate-spin" />
             {t("workspace_settings.settings.todoist_import.history.loading")}
           </div>
         ) : error ? (
@@ -98,11 +100,11 @@ export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken
                 <div key={job.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
                     {job.status === "completed" ? (
-                      <CheckCircle2 className="mt-0.5 size-4 text-success-primary" />
+                      <TickCircleOutline className="mt-0.5 size-4 shrink-0 text-success-primary" />
                     ) : ACTIVE_STATUSES.has(job.status) ? (
-                      <Loader2 className="mt-0.5 size-4 animate-spin text-accent-primary" />
+                      <LoadingOutline className="mt-0.5 size-4 shrink-0 animate-spin text-accent-primary" />
                     ) : (
-                      <AlertTriangle className="mt-0.5 size-4 text-warning-primary" />
+                      <WarningTriangleOutline className="mt-0.5 size-4 shrink-0 text-warning-primary" />
                     )}
                     <div className="min-w-0">
                       <p className="truncate text-body-sm-medium text-primary">{job.project_detail.name}</p>
@@ -126,29 +128,35 @@ export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken
                   </div>
                   <div className="flex items-center gap-3">
                     {job.status === "failed" && (
-                      <Button variant="secondary" size="sm" onClick={() => onRetry(job)}>
-                        {t("workspace_settings.settings.todoist_import.history.retry")}
-                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        stretch="auto"
+                        label={t("workspace_settings.settings.todoist_import.history.retry")}
+                        onClick={() => onRetry(job)}
+                      />
                     )}
                     {CANCELLABLE_STATUSES.has(job.status) && (
                       <Button
                         variant="secondary"
                         size="sm"
+                        stretch="auto"
                         disabled={cancellingJobId === job.id || Boolean(job.cancel_requested_at)}
                         onClick={() => void cancel(job.id)}
-                      >
-                        {job.cancel_requested_at
-                          ? t("workspace_settings.settings.todoist_import.history.cancellation_requested")
-                          : t("workspace_settings.settings.todoist_import.history.cancel")}
-                      </Button>
+                        label={
+                          job.cancel_requested_at
+                            ? t("workspace_settings.settings.todoist_import.history.cancellation_requested")
+                            : t("workspace_settings.settings.todoist_import.history.cancel")
+                        }
+                      />
                     )}
                     {REPORT_STATUSES.has(job.status) && (
-                      <a
-                        className="text-body-xs-medium text-accent-primary hover:underline"
+                      <AnchorButton
+                        variant="primary"
+                        size="sm"
                         href={importService.reportUrl(workspaceSlug, job.id)}
-                      >
-                        {t("workspace_settings.settings.todoist_import.history.download_report")}
-                      </a>
+                        label={t("workspace_settings.settings.todoist_import.history.download_report")}
+                      />
                     )}
                   </div>
                 </div>
@@ -162,19 +170,19 @@ export function TodoistImportHistory({ workspaceSlug, errorMessage, refreshToken
           <Button
             variant="secondary"
             size="sm"
+            stretch="auto"
             disabled={!data.prev_page_results}
             onClick={() => data.prev_cursor && setCursor(data.prev_cursor)}
-          >
-            {t("workspace_settings.settings.todoist_import.history.newer")}
-          </Button>
+            label={t("workspace_settings.settings.todoist_import.history.newer")}
+          />
           <Button
             variant="secondary"
             size="sm"
+            stretch="auto"
             disabled={!data.next_page_results}
             onClick={() => data.next_cursor && setCursor(data.next_cursor)}
-          >
-            {t("workspace_settings.settings.todoist_import.history.older")}
-          </Button>
+            label={t("workspace_settings.settings.todoist_import.history.older")}
+          />
         </div>
       )}
     </section>
