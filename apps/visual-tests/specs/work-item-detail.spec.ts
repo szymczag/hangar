@@ -30,7 +30,10 @@ async function workItemPage(page: Page): Promise<Locator> {
   await page.goto(`/${seed.workspace.slug}/browse/${seed.project.identifier}-1`);
   const main = page.getByRole("main").last();
   await expect(main.getByText(seed.comment, { exact: true }).first()).toBeVisible();
-  await expect(main.getByText("Traced the failing request").first()).toBeVisible();
+  // The feed's worklog entry ("logged 1h 30m") and the sidebar's time tracking
+  // total load separately from the comment (S20: both only for project members).
+  await expect(main.getByText("1h 30m", { exact: true }).first()).toBeVisible();
+  await expect(main.getByText("2h 15m", { exact: true }).first()).toBeVisible();
   return main;
 }
 
@@ -87,7 +90,8 @@ test("the work item peek overview", async ({ asUser }) => {
   const peek = page.locator("#full-screen-portal [class*='md:w-[50%]']").first();
   const comment = peek.getByText(seed.comment, { exact: true }).first();
   await expect(comment).toBeVisible();
-  await expect(peek.getByText("Traced the failing request").first()).toBeVisible();
+  await expect(peek.getByText("1h 30m", { exact: true }).first()).toBeVisible();
+  await expect(peek.getByText("2h 15m", { exact: true }).first()).toBeVisible();
 
   await capture(page, "work-item-peek", { ready: comment, target: peek });
 });

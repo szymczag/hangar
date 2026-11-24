@@ -27,6 +27,7 @@ from django.db import transaction
 from plane.db.models import (
     DeployBoard,
     Issue,
+    IssueActivity,
     IssueComment,
     IssueType,
     IssueLabel,
@@ -42,6 +43,7 @@ from plane.db.models import (
     WorkspaceMemberInvite,
     WorkspaceUserPreference,
 )
+from plane.bgtasks.issue_activities_task import _format_worklog_duration
 from plane.ext.auth.sessions import mint_admin_session, mint_app_session
 from plane.ext.models import (
     ImportJob,
@@ -517,9 +519,21 @@ class Command(BaseCommand):
             # The activity feed prints when each entry was logged, relative to
             # the browser's clock, so the real insert time would drift by a day
             # every day.
-            IssueWorkLog.objects.filter(pk=worklog.pk).update(
-                created_at=CLOCK - timedelta(hours=4 - index), updated_at=CLOCK - timedelta(hours=4 - index)
+            logged_at = CLOCK - timedelta(hours=4 - index)
+            IssueWorkLog.objects.filter(pk=worklog.pk).update(created_at=logged_at, updated_at=logged_at)
+            # The feed lists a worklog through the activity row the worklog view
+            # writes (`create_worklog_activity`), which a direct insert skips.
+            activity, _ = IssueActivity.objects.get_or_create(
+                workspace=workspace,
+                project=project,
+                issue=issue,
+                actor=author,
+                field="worklog",
+                verb="created",
+                new_value=_format_worklog_duration(minutes),
+                defaults={"comment": "logged time", "epoch": logged_at.timestamp()},
             )
+            IssueActivity.objects.filter(pk=activity.pk).update(created_at=logged_at, updated_at=logged_at)
 
     COMMENT = "Reproduced on a fresh workspace: the export stalls after the first page."
 
