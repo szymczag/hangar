@@ -31,11 +31,12 @@ export const ActivityFilterRoot = observer(function ActivityFilterRoot(props: TA
   const isTimeTrackingEnabled = Boolean(getProjectById(projectId)?.is_time_tracking_enabled);
   const showWorklogFilter = isTimeTrackingEnabled && canViewWorklogs && !isIntakeIssue;
   const selectedFilterSet = new Set(selectedFilters);
+  const allowedFilterSet = filterKeys ? new Set(filterKeys) : undefined;
 
   const filters = Object.entries(ACTIVITY_FILTER_TYPE_OPTIONS).reduce<TActivityFilterOption[]>(
     (options, [key, value]) => {
       const filterKey = key as TActivityFilters;
-      if (filterKeys && !filterKeys.includes(filterKey)) return options;
+      if (allowedFilterSet && !allowedFilterSet.has(filterKey)) return options;
       if (!showWorklogFilter && filterKey === EActivityFilterType.WORKLOG) return options;
       options.push({
         key: filterKey,

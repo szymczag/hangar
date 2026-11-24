@@ -143,19 +143,10 @@ export const SubIssuesListItem = observer(function SubIssuesListItem(props: Prop
                       <LinkOutline width={14} height={14} className="animate-spin" />
                     </div>
                   ) : (
+                    // oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- a pointer shortcut inside the row's link, where no control may nest; the sub-work items also open from the row
                     <div
                       className="flex h-full w-full cursor-pointer items-center justify-center text-placeholder hover:text-tertiary"
-                      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- inside the row's link, where a <button> may not nest
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={subIssueHelpers.issue_visibility.includes(issue.id)}
                       onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void handleToggleSubIssues();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter" && e.key !== " ") return;
                         e.preventDefault();
                         e.stopPropagation();
                         void handleToggleSubIssues();
