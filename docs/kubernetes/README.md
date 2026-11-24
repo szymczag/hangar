@@ -6,10 +6,11 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.4.0`. It is a stable Hangar release for Docker
-Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
-for evaluation on AMD64 clusters only and is not yet a supported production
-release.
+The current release is `0.5.0-rc.1`. It is a release candidate for `0.5.0`;
+the current stable Hangar release for Docker Compose, Docker Swarm and the
+all-in-one image remains `0.4.0`. Helm installs a release candidate only when
+you name its version. On Kubernetes, both are qualified for evaluation on AMD64
+clusters only and are not yet a supported production release.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -63,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.4.0` qualification boundary is:
+The `0.5.0-rc.1` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -80,9 +81,10 @@ The backend, the editor and the live server are also converged with upstream
 `v1.5.0`. God Mode, the instance admin console, and Spaces, which serves the
 published boards, use the upstream `v1.5.0` design. The web app loads the
 upstream `v1.5.0` design tokens, and its shell, sign-in and onboarding,
-projects, and workspace, project and account settings use the `v1.5.0`
-components; its other screens, such as the work items, cycles and pages, are
-still the `v1.4` design.
+projects, settings, work items and their layouts, views, drafts, pages,
+stickies, cycles, modules, analytics and intake use the `v1.5.0` components;
+its notifications, profile pages and Hangar's capacity and workshop screens
+are still the `v1.4` design.
 
 The chart does not install an ingress controller, cert-manager, a CNI, a CSI
 driver, an external secret operator, or observability infrastructure.
@@ -227,12 +229,12 @@ client can then change its throttle identity by sending its own `X-Forwarded-For
 
 The product, chart, and Git identifiers are deliberately different:
 
-| Identifier         | Current value                          |
-| ------------------ | -------------------------------------- |
-| Product version    | `v0.4.0`                               |
-| Helm chart version | `0.4.0`                                |
-| Git tag            | `hangar-v0.4.0`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.4.0` |
+| Identifier         | Current value                               |
+| ------------------ | ------------------------------------------- |
+| Product version    | `v0.5.0-rc.1`                               |
+| Helm chart version | `0.5.0-rc.1`                                |
+| Git tag            | `hangar-v0.5.0-rc.1`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.5.0-rc.1` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -247,11 +249,17 @@ The `0.3.0` release candidates, `0.3.0-rc.1` and `0.3.0-rc.2`, are superseded
 by `0.3.0` and are not rollback targets.
 The `0.4.0` release candidates, `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3` and
 `0.4.0-rc.4`, are superseded by `0.4.0` and are not rollback targets.
-`0.3.0` is the previous stable release and the supported rollback target for
+`0.4.0` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
-values, only the images change. License migration `0025` only adds a
+values, only the images change, and it brings back the "Upgrade" button on the
+active cycles page that links off the instance regardless of the external
+links switch, "No estimate" that does not clear an estimate, the create dialog
+without a work item type's custom properties, and the web app's work items,
+cycles, modules, views, pages and intake on the `v1.4` components. Rolling back
+further, to `0.3.0`, needs no schema change or values change either, and only
+the images change. License migration `0025` only adds a
 configuration row that `0.3.0` does not read, so it stays in place. Rolling
-back brings back the previous design of the published boards, a public board
+back that far also brings back the previous design of the published boards, a public board
 API that names every project member and assignee, the web app on the `v1.4`
 design tokens and components, workspace members who can invite people and
 change or withdraw any pending invitation, and a worker log that prints every
@@ -299,7 +307,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.4.0` notes](../releases/hangar-v0.4.0.md) — review
+- [Release `v0.5.0-rc.1` notes](../releases/hangar-v0.5.0-rc.1.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -331,10 +339,9 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.4.0-rc.4`, tag `hangar-v0.4.0-rc.4`, and chart
-`ghcr.io/szymczag/charts/hangar:0.4.0-rc.4`, the last release candidate for
-`0.4.0`, which `0.4.0` supersedes and which is not a rollback target. The
-previous stable release and the rollback target is `0.3.0`, tag
+The previous release is `0.4.0`, tag `hangar-v0.4.0`, and chart
+`ghcr.io/szymczag/charts/hangar:0.4.0`, which is also the current stable
+release and the rollback target. The stable release before it is `0.3.0`, tag
 `hangar-v0.3.0`, and chart `ghcr.io/szymczag/charts/hangar:0.3.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
@@ -361,6 +368,24 @@ in-app release notes. From `0.4.0-rc.1` or `0.4.0-rc.2`, read the 0.4.0-rc.3
 invitation note below before you run it; from `0.4.0-rc.3`, the invitation
 switch keeps its value. From any candidate up to `0.4.0-rc.3`, rotate or purge
 the worker logs as the 0.4.0-rc.4 note below describes.
+
+Release 0.5.0-rc.1 adds no database or license migration compared with 0.4.0
+and changes nothing in the chart's templates, values or Secrets. Upgrade from
+0.4.0 with `helm upgrade` and `--version 0.5.0-rc.1`; Helm does not select a
+release candidate otherwise. No other action is required. Every release
+rebuilds all its images, so every image digest changes. Of the application
+code, the `web` image carries the changes: its work items and their layouts,
+filters and create dialog, views, drafts, pages, stickies, cycles, modules,
+analytics and intake, and Hangar's own settings pages move to the upstream
+Plane 1.5.0 design; "No estimate" now clears an estimate; the create dialog
+shows a work item type's custom properties again; and the "Upgrade" button on
+the active cycles page, which linked off the instance regardless of the
+external links switch, is removed. Guests still see no worklogs. The `api`
+image no longer prints a `Server Error` line for every 404, and the `admin`
+and `space` images change only in the Hangar logo on light surfaces. The
+`live` and `proxy` code is unchanged. From a release older than 0.4.0,
+including a 0.4.0 release candidate, read the 0.4.0 paragraph below first.
+Rolling back to 0.4.0 needs no schema change and no change to the values.
 
 Release 0.4.0 adds one license migration, `0025`, compared with 0.3.0, and no
 database migration, and changes nothing in the chart's templates, values or

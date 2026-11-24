@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.4.0",
+  version: "0.5.0-rc.1",
   highlights: [
-    "The worker's log no longer shows password-reset tokens, sign-in codes or invitation join tokens.",
-    "Published boards no longer reveal who is in the project.",
-    "Workspace invitations are now an admin's act unless the instance hands them to members.",
-    "An outdated setup.sh now refuses to install or upgrade to a newer release.",
-    "Setting a first password is now rate limited.",
+    "The active cycles page no longer links off the instance.",
+    "The new design brings in none of upstream's external services, and guests still see no worklogs.",
+    "The web app's work items, cycles, modules, views, pages, analytics and intake move to the new upstream 1.5.0 design.",
+    'Choosing "No estimate" now clears the estimate.',
+    "The create dialog shows a work item type's custom properties again.",
   ],
   upstream: {
     version: "1.4.3",

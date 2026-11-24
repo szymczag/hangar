@@ -7,8 +7,9 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest stable chart is `0.4.0` (`appVersion: v0.4.0`). The release
-candidates `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3` and `0.4.0-rc.4` are
+The latest stable chart is `0.4.0` (`appVersion: v0.4.0`). Release candidate
+`0.5.0-rc.1` is also published; Helm installs it only when you name its version.
+The release candidates `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3` and `0.4.0-rc.4` are
 superseded by it, and so are the release candidates `0.3.0-rc.1`,
 `0.3.0-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not install
 those, and upgrade an installation on any of them to `0.4.0`. The chart's evaluation profile is live-qualified on AMD64. The
@@ -52,7 +53,12 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.4.0`. Its license migration `0025` only adds the configuration row
+Use `0.4.0`, or name `0.5.0-rc.1` to test the release candidate. It adds no
+migration and no chart change; rolling back from `0.5.0-rc.1` to `0.4.0` needs
+no schema change and no values change, but brings back the "Upgrade" button on
+the active cycles page that links off the instance regardless of the external
+links switch, and the web app's work items, cycles, modules, views, pages and
+intake on the previous design. `0.4.0`'s license migration `0025` only adds the configuration row
 behind the God Mode switch "Members can invite to workspaces", which is off
 after an upgrade from `0.3.0`, so workspace members can no longer invite people
 until an operator turns it on. Its workers no longer log task arguments, which
