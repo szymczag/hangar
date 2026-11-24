@@ -26,11 +26,12 @@ const state = vi.hoisted(() => ({
   user: undefined as Record<string, unknown> | undefined,
   config: { is_email_password_enabled: true } as Record<string, unknown> | undefined,
   pageType: undefined as string | undefined,
+  header: undefined as { pageTitle: string; additionalAction?: unknown } | undefined,
 }));
 
 vi.mock("mobx-react", () => ({ observer: (component: unknown) => component }));
 vi.mock("lucide-react", () => ({ ShieldCheck: () => null }));
-vi.mock("@plane/constants", () => ({ EAuthModes: { SIGN_IN: "SIGN_IN" } }));
+vi.mock("@plane/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("@/layouts/default-layout", () => ({
   default: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
@@ -41,7 +42,13 @@ vi.mock("@/lib/wrappers/authentication-wrapper", () => ({
   },
 }));
 vi.mock("@/helpers/authentication.helper", () => ({ EPageTypes: { SET_PASSWORD: "SET_PASSWORD" } }));
-vi.mock("@/components/auth-screens/header", () => ({ AuthHeader: () => null }));
+vi.mock("@/components/auth-screens/header", () => ({
+  AuthHeader: () => <div data-testid="auth-switch-header" />,
+  AuthHeaderBase: (props: { pageTitle: string; additionalAction?: unknown }) => {
+    state.header = props;
+    return null;
+  },
+}));
 vi.mock("@/components/account/auth-forms/set-password", () => ({
   SetPasswordForm: () => <div data-testid="set-password-form" />,
 }));
@@ -63,6 +70,13 @@ describe("/accounts/set-password", () => {
     state.user = { id: "u1", email: "user@example.com", is_password_autoset: true, is_federated: false };
     state.config = { is_email_password_enabled: true };
     state.pageType = undefined;
+    state.header = undefined;
+  });
+
+  it("does not offer a signed-in visitor the sign-up or sign-in switch", () => {
+    const html = render();
+    expect(html).not.toContain('data-testid="auth-switch-header"');
+    expect(state.header).toEqual({ pageTitle: "auth.set_password.title" });
   });
 
   it("is gated by the set-password authentication rule", () => {
