@@ -76,14 +76,16 @@ test("a page exports to PDF with Trusted Types enforced", async ({ page, context
 
   await openPage(page, created.id);
   // The page's own menu: the one in the header row that carries its name, not
-  // the sidebar's or the editor's drag handles.
-  const menu = page.locator("button:has(svg.lucide-ellipsis)");
+  // the sidebar's or the editor's drag handles. Propel's trigger is an icon
+  // button named "More actions"; the 1.4 one was an unnamed ellipsis.
+  const menu = page.locator('button[aria-label="More actions"], button:has(svg.lucide-ellipsis)');
   await page.locator("div").filter({ hasText: name }).filter({ has: menu }).last().locator(menu).click();
   await page.getByRole("menuitem", { name: "Export" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("button", { name: "PDF" })).toBeVisible();
+  // PDF is the default format; the select shows it on its trigger.
+  await expect(dialog.getByText("PDF", { exact: true })).toBeVisible();
   const download = page.waitForEvent("download");
-  await dialog.getByRole("button", { name: "Export" }).click();
+  await dialog.getByRole("button", { name: "Export", exact: true }).click();
   const file = await (await download).path();
   expect(readFileSync(file).subarray(0, 5).toString("latin1")).toBe("%PDF-");
 
