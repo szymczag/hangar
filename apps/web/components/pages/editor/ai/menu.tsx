@@ -5,13 +5,17 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import type { LucideIcon } from "lucide-react";
-import { CornerDownRight, RefreshCcw, Sparkles, TriangleAlert } from "lucide-react";
+import {
+  AiStar1Outline,
+  ChevronRightOutline,
+  CornerRightDownOutline,
+  RefreshOutline,
+  WarningTriangleOutline,
+} from "@makeplane/propel/icons";
 // plane editor
 import type { EditorRefApi } from "@plane/editor";
-import { ChevronRightIcon } from "@plane/propel/icons";
 // plane ui
-import { Tooltip } from "@plane/propel/tooltip";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 // components
 import { cn } from "@plane/utils";
 import { RichTextEditor } from "@/components/editor/rich-text";
@@ -32,13 +36,13 @@ type Props = {
 };
 
 const MENU_ITEMS: {
-  icon: LucideIcon;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   key: AI_EDITOR_TASKS;
   label: string;
 }[] = [
   {
     key: AI_EDITOR_TASKS.ASK_ANYTHING,
-    icon: Sparkles,
+    icon: AiStar1Outline,
     label: "Ask Pi",
   },
 ];
@@ -164,7 +168,7 @@ export function EditorAIMenu(props: Props) {
                 key={item.key}
                 type="button"
                 className={cn(
-                  "flex w-full items-center justify-between gap-2 truncate rounded-sm px-1 py-1.5 text-11 text-secondary transition-colors hover:bg-layer-1",
+                  "flex w-full items-center justify-between gap-2 truncate rounded-sm px-1 py-1.5 text-caption-sm-regular text-secondary transition-colors hover:bg-layer-1",
                   {
                     "bg-layer-1": isActiveTask,
                   }
@@ -179,7 +183,7 @@ export function EditorAIMenu(props: Props) {
                   <item.icon className="size-3 flex-shrink-0" />
                   {item.label}
                 </span>
-                <ChevronRightIcon
+                <ChevronRightOutline
                   className={cn("pointer-events-none size-3 flex-shrink-0 opacity-0 transition-opacity", {
                     "pointer-events-auto opacity-100": isActiveTask,
                   })}
@@ -209,8 +213,8 @@ export function EditorAIMenu(props: Props) {
                   "items-start": response,
                 })}
               >
-                <span className="grid size-7 flex-shrink-0 place-items-center rounded-full border border-subtle text-secondary">
-                  <Sparkles className="size-3" />
+                <span className="grid size-7 flex-shrink-0 place-items-center rounded-full border border-subtle-1 text-secondary">
+                  <AiStar1Outline className="size-3" />
                 </span>
                 {response ? (
                   <div>
@@ -229,21 +233,21 @@ export function EditorAIMenu(props: Props) {
                     <div className="mt-3 flex items-center gap-4">
                       <button
                         type="button"
-                        className="rounded-sm p-1 text-13 font-medium text-tertiary outline-none hover:bg-layer-1"
+                        className="rounded-sm p-1 text-body-xs-medium text-tertiary outline-none hover:bg-layer-1"
                         onClick={() => handleInsertText(false)}
                       >
                         Replace selection
                       </button>
-                      <Tooltip tooltipContent="Add to next line">
+                      <Tooltip label="Add to next line">
                         <button
                           type="button"
                           className="grid size-6 flex-shrink-0 place-items-center rounded-sm outline-none hover:bg-layer-1"
                           onClick={() => handleInsertText(true)}
                         >
-                          <CornerDownRight className="size-4 text-tertiary" />
+                          <CornerRightDownOutline className="size-4 text-tertiary" />
                         </button>
                       </Tooltip>
-                      <Tooltip tooltipContent="Re-generate response">
+                      <Tooltip label="Re-generate response">
                         <button
                           type="button"
                           className="grid size-6 flex-shrink-0 place-items-center rounded-sm outline-none hover:bg-layer-1"
@@ -254,7 +258,7 @@ export function EditorAIMenu(props: Props) {
                           }}
                           disabled={isRegenerating}
                         >
-                          <RefreshCcw
+                          <RefreshOutline
                             className={cn("size-4 text-tertiary", {
                               "animate-spin": isRegenerating,
                             })}
@@ -264,7 +268,7 @@ export function EditorAIMenu(props: Props) {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-13 text-secondary">
+                  <p className="text-body-xs-regular text-secondary">
                     {activeTask ? LOADING_TEXTS[activeTask] : "Pi is writing"}...
                   </p>
                 )}
@@ -275,7 +279,7 @@ export function EditorAIMenu(props: Props) {
                     key={tone.key}
                     type="button"
                     className={cn(
-                      "rounded-sm bg-layer-1 p-1 text-11 font-medium text-secondary transition-colors outline-none",
+                      "rounded-sm bg-layer-1 p-1 text-caption-sm-medium text-secondary transition-colors outline-none",
                       {
                         "bg-accent-primary/20 text-accent-primary": tone.key === "default",
                       }
@@ -297,9 +301,9 @@ export function EditorAIMenu(props: Props) {
       {activeTask && (
         <div className="flex items-center gap-2 rounded-b-md border-t border-subtle bg-surface-2 px-4 py-2 text-tertiary">
           <span className="grid size-4 flex-shrink-0 place-items-center">
-            <TriangleAlert className="size-3" />
+            <WarningTriangleOutline className="size-3" />
           </span>
-          <p className="flex-shrink-0 text-11 font-medium">
+          <p className="flex-shrink-0 text-caption-sm-medium">
             By using this feature, you consent to sharing the message with a 3rd party service.
           </p>
         </div>

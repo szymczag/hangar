@@ -40,6 +40,16 @@
           "title": "Nessun commento",
           "description": "Aggiungi commenti per vederli qui."
         }
+      },
+      "version_history": {
+        "view_only": "Sola lettura",
+        "loading_details": "Caricamento dei dettagli della versione",
+        "load_error_description": "Impossibile caricare la versione. Per favore, riprova.",
+        "try_again": "Riprova",
+        "restoring": "Ripristino in corso",
+        "restore_success": "Versione della pagina ripristinata.",
+        "restore_failed": "Impossibile ripristinare la versione della pagina.",
+        "list_error_description": "Impossibile caricare la cronologia versioni."
       }
     },
     "toasts": {
@@ -111,5 +121,8 @@
       "success_message": "Pagina rimossa dalla raccolta.",
       "error_message": "Non è stato possibile rimuovere la pagina dalla raccolta. Riprova."
     }
+  },
+  "page_content_limit_banner": {
+    "message": "Limite di contenuto raggiunto e la sincronizzazione in tempo reale è disattivata. Crea una nuova pagina o usa pagine annidate per continuare la sincronizzazione."
   }
 }

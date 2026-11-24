@@ -22,6 +22,10 @@ export type VisualFixtures = {
   workItems: string[];
   /** Names of the seeded saved views, one in the project and one in the workspace. */
   views: { project: string; workspace: string };
+  /** The seeded project pages, by id and name, the first with a little of everything. */
+  pages: { ids: string[]; names: string[] };
+  /** The text the seeded sticky opens with. */
+  sticky: string;
   /** The comment on the first work item. */
   comment: string;
   /** Custom property names on the Task type, in sort order. */
