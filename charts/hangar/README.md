@@ -7,12 +7,11 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest stable chart is `0.3.0` (`appVersion: v0.3.0`). Release candidate
-`0.4.0-rc.3` is also published; Helm installs it only when you name its version.
-It supersedes `0.4.0-rc.1` and `0.4.0-rc.2`; do not install those, and upgrade an
-installation on either to `0.4.0-rc.3`. The release candidates `0.3.0-rc.1` and `0.3.0-rc.2` are superseded by it, and so are the
-release candidates `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not install
-those, and upgrade an installation on any of them to `0.3.0`. The chart's evaluation profile is live-qualified on AMD64. The
+The latest stable chart is `0.4.0` (`appVersion: v0.4.0`). The release
+candidates `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3` and `0.4.0-rc.4` are
+superseded by it, and so are the release candidates `0.3.0-rc.1`,
+`0.3.0-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not install
+those, and upgrade an installation on any of them to `0.4.0`. The chart's evaluation profile is live-qualified on AMD64. The
 chart is qualified for evaluation only and is not yet supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
 
@@ -40,7 +39,7 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.3.0
+  --version 0.4.0
 ```
 
 Do not use `0.1.0-rc.1`, `0.1.0-rc.2`, `0.1.0-rc.20`, `0.1.0-rc.24`,
@@ -53,18 +52,20 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.3.0`, or name `0.4.0-rc.3` to test the release candidate. Its license
-migration `0025` only adds the configuration row behind the God Mode switch
-"Members can invite to workspaces", which is off after the upgrade, so
-workspace members can no longer invite people until an operator turns it on.
-Rolling back from `0.4.0-rc.3` to `0.3.0` needs no schema change and no values
-change; the row stays and `0.3.0` does not read it. The rollback brings back a
-public board API that names every project member and workspace members who can
-manage any pending invitation, and stops recording page versions. `0.2.2` is
-the previous stable release and the supported rollback target from `0.3.0`;
-rolling back to it needs no schema change and no values change,
-but brings back the previous God Mode design and its secret fields that a
-browser could fill with a saved password. Rolling back further, to `0.2.1`,
+Use `0.4.0`. Its license migration `0025` only adds the configuration row
+behind the God Mode switch "Members can invite to workspaces", which is off
+after an upgrade from `0.3.0`, so workspace members can no longer invite people
+until an operator turns it on. Its workers no longer log task arguments, which
+held password-reset tokens and sign-in codes up to `0.3.0`; logs written before
+the upgrade are not rewritten, so rotate or purge them. `0.3.0` is the previous
+stable release and the supported rollback target; rolling back to it needs no
+schema change and no values change, the row stays and `0.3.0` does not read it.
+The rollback brings back a public board API that names every project member,
+workspace members who can manage any pending invitation and the worker log of
+task arguments, and stops recording page versions. Rolling back further, to
+`0.2.2`, needs no schema change or values change either, but brings back the
+previous God Mode design and its secret fields that a browser could fill with a
+saved password. Rolling back further, to `0.2.1`,
 needs no schema change or values change either, but brings back the God Mode
 sessions that survive clone detection and the concurrent-sign-in race that
 `0.2.2` fixes. Rolling back further, to `0.2.0`,
@@ -156,8 +157,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.3.0` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.3.0)
+Release `0.4.0` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.4.0)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 

@@ -341,3 +341,33 @@ class TestTheSettingItself:
         cache.clear()
         assert response.status_code == status.HTTP_200_OK, _detail(response)
         assert response.data["config"]["members_can_invite"] is expected
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestTheInvitationTaskKeepsTheSender:
+    """The e-mail task runs in the worker, outside any request. A plain save()
+    there reset created_by to NULL, so a member never saw, re-roled or withdrew
+    an invitation they had sent (found on the 0.4.0-rc.3 test stack)."""
+
+    def test_sender_still_manages_the_invitation_after_the_task(self, workspace, members_may_invite, monkeypatch):
+        from plane.bgtasks import workspace_invitation_task
+
+        monkeypatch.setattr(workspace_invitation_task, "enqueue_rendered_email", lambda **kwargs: None)
+        member = _user_with_role(workspace, MEMBER)
+        client = _client_for(member)
+        response, email = _create(client, workspace.slug)
+        assert response.status_code == status.HTTP_200_OK, _detail(response)
+        invite = WorkspaceMemberInvite.objects.get(email=email)
+
+        workspace_invitation_task.workspace_invitation(
+            email, workspace.id, invite.token, "http://hangar.test", member.email
+        )
+
+        invite.refresh_from_db()
+        assert invite.message, "the task did not run to the save"
+        assert invite.created_by_id == member.id
+        listed = client.get(_list_url(workspace.slug))
+        assert [row["id"] for row in listed.json()] == [str(invite.id)], _detail(listed)
+        withdrawn = client.delete(_detail_url(workspace.slug, invite.id))
+        assert withdrawn.status_code == status.HTTP_204_NO_CONTENT, _detail(withdrawn)
