@@ -47,7 +47,10 @@ def workspace_invitation(email, workspace_id, token, current_site, inviter):
         text_content = generate_plain_text_from_html(html_content)
 
         workspace_member_invite.message = text_content
-        workspace_member_invite.save()
+        # Fork (see FORK.md): the worker has no current user, so a plain save()
+        # would reset created_by to NULL (BaseModel.save) and the sender would
+        # lose the invitation they may manage. Write the message only.
+        workspace_member_invite.save(update_fields=["message", "updated_at"], disable_auto_set_user=True)
 
         recipient = User.objects.filter(email__iexact=email).first()
         enqueue_rendered_email(
