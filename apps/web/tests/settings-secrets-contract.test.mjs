@@ -16,11 +16,14 @@
  * - inviting is offered to admins, and to members only where the instance
  *   reports `members_can_invite`; a member manages only the invitations they sent;
  * - the password change uses the async zxcvbn estimate (15 characters, S9) and
- *   shows a federated account the notice instead of the form (S10).
+ *   shows a federated account the notice instead of the form (S10);
+ * - the dialog that shows a new token or webhook secret tells the person to
+ *   keep it somewhere safe, not to save it "in Hangar Pages", which was
+ *   upstream's "Plane Pages" renamed mechanically.
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8");
@@ -132,4 +135,25 @@ test("the password change keeps Hangar's strength rules and federated notice", (
   assert.match(source, /if \(currentUser\?\.is_federated\) \{/);
   assert.match(source, /requestCSRFToken\(\)/, "the change must carry a CSRF token");
   assert.equal(source.match(/<EmailSecuritySettings \/>/g)?.length, 2, "both branches keep the email security page");
+});
+
+test("the shown-once secret dialogs do not send the secret to Pages", () => {
+  for (const source of [
+    "components/api-token/modal/generated-token-details.tsx",
+    "components/web-hooks/generated-hook-details.tsx",
+  ]) {
+    assert.match(read(source), /t\("workspace_settings\.copy_key"\)/, `${source} must keep the shared notice`);
+  }
+  const localesDir = new URL("../../../packages/i18n/src/locales/", import.meta.url);
+  const locales = readdirSync(localesDir);
+  assert.ok(locales.length >= 19, "every locale must be checked");
+  for (const locale of locales) {
+    const strings = JSON.parse(readFileSync(new URL(`${locale}/workspace-settings.json`, localesDir), "utf8"));
+    const notice = strings.workspace_settings.copy_key;
+    assert.ok(notice, `${locale} must translate the notice`);
+    assert.doesNotMatch(notice, /Hangar|Pages|Páginas|Halaman|ページ|Documentație/, `${locale}: ${notice}`);
+    assert.match(notice, /CSV/, `${locale} must still mention the downloaded CSV file`);
+  }
+  const english = JSON.parse(readFileSync(new URL("en/workspace-settings.json", localesDir), "utf8"));
+  assert.match(english.workspace_settings.copy_key, /somewhere safe/);
 });

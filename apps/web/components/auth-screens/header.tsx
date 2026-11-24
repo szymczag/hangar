@@ -80,7 +80,7 @@ export const AuthHeaderBase = observer(function AuthHeaderBase(props: TAuthHeade
           {logoUrl ? (
             <img src={logoUrl} alt={brandingName} className="h-5 w-auto max-w-[180px] object-contain" />
           ) : (
-            <HangarLogo height={20} width={95} />
+            <HangarLogo themed height={20} width={95} />
           )}
         </Link>
         {additionalAction}

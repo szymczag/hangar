@@ -3,7 +3,7 @@
     "label": "Çalışma Alanı Ayarları",
     "page_label": "{workspace} - Genel ayarlar",
     "key_created": "Anahtar oluşturuldu",
-    "copy_key": "Bu gizli anahtarı Hangar Pages'e kopyalayıp kaydedin. Kapat düğmesine bastıktan sonra bu anahtarı göremezsiniz. Anahtar içeren bir CSV dosyası indirildi.",
+    "copy_key": "Bu gizli anahtarı kopyalayın ve güvenli bir yerde saklayın. Kapat düğmesine bastıktan sonra bu anahtarı bir daha göremezsiniz. Anahtarı içeren bir CSV dosyası indirildi.",
     "token_copied": "Token panoya kopyalandı.",
     "settings": {
       "general": {

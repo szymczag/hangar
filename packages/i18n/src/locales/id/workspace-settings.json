@@ -3,7 +3,7 @@
     "label": "Pengaturan ruang kerja",
     "page_label": "{workspace} - Pengaturan Umum",
     "key_created": "Kunci dibuat",
-    "copy_key": "Salin dan simpan kunci rahasia ini di Halaman Hangar. Anda tidak dapat melihat kunci ini setelah Anda menekan Tutup. File CSV yang berisi kunci telah diunduh.",
+    "copy_key": "Salin kunci rahasia ini dan simpan di tempat yang aman. Anda tidak dapat melihatnya lagi setelah menekan Tutup. File CSV yang berisi kunci telah diunduh.",
     "token_copied": "Token disalin ke clipboard.",
     "settings": {
       "general": {
