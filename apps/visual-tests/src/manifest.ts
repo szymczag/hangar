@@ -22,6 +22,12 @@ export type VisualFixtures = {
   workItems: string[];
   /** Names of the seeded saved views, one in the project and one in the workspace. */
   views: { project: string; workspace: string };
+  /** The seeded cycles: one completed before the clock, one draft without dates. */
+  cycles: { completed: { id: string; name: string }; draft: { id: string; name: string } };
+  /** The seeded module. */
+  module: { id: string; name: string };
+  /** The pending intake work item (its work item id, which the intake page addresses it by). */
+  intake: { id: string; name: string };
   /** The comment on the first work item. */
   comment: string;
   /** Custom property names on the Task type, in sort order. */

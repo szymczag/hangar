@@ -25,7 +25,10 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from plane.db.models import (
+    Cycle,
     DeployBoard,
+    Intake,
+    IntakeIssue,
     Issue,
     IssueActivity,
     IssueComment,
@@ -34,6 +37,7 @@ from plane.db.models import (
     IssueView,
     IssueSequence,
     Label,
+    Module,
     Profile,
     Project,
     ProjectMember,
@@ -120,6 +124,15 @@ INSTANCE_ID = "a00000000000400080000000"
 # a second row the lists would then show.
 PROJECT_VIEW_ID = uuid.UUID("a0000000-0000-4000-8000-000000000005")
 WORKSPACE_VIEW_ID = uuid.UUID("a0000000-0000-4000-8000-000000000006")
+# The cycles, the module and the intake work item the cycle, module and intake
+# stories photograph, pinned for the same reason.
+COMPLETED_CYCLE_ID = uuid.UUID("a0000000-0000-4000-8000-000000000007")
+DRAFT_CYCLE_ID = uuid.UUID("a0000000-0000-4000-8000-000000000008")
+MODULE_ID = uuid.UUID("a0000000-0000-4000-8000-000000000009")
+INTAKE_ID = uuid.UUID("a0000000-0000-4000-8000-00000000000a")
+INTAKE_STATE_ID = uuid.UUID("a0000000-0000-4000-8000-00000000000b")
+INTAKE_WORK_ITEM_ID = uuid.UUID("a0000000-0000-4000-8000-00000000000c")
+INTAKE_ISSUE_ID = uuid.UUID("a0000000-0000-4000-8000-00000000000d")
 
 # Enough to overflow a 900px viewport, which the layout story depends on.
 #
@@ -181,6 +194,8 @@ class Command(BaseCommand):
         self._worklogs(workspace, project, users["light"])
         self._comments(workspace, project, users["light"])
         self._views(workspace, project, users["light"])
+        self._cycles_and_modules(workspace, project, users["light"])
+        self._intake(workspace, project, users["light"])
         self._shared_links(workspace, users)
         self._import_jobs(workspace, project, users["admin"])
         self._invitations(workspace, users["admin"])
@@ -218,6 +233,13 @@ class Command(BaseCommand):
             "comment": Command.COMMENT,
             # The saved views the view list stories wait on.
             "views": {"project": Command.PROJECT_VIEW, "workspace": Command.WORKSPACE_VIEW},
+            # The cycles, the module and the intake work item their stories open.
+            "cycles": {
+                "completed": {"id": str(COMPLETED_CYCLE_ID), "name": Command.COMPLETED_CYCLE},
+                "draft": {"id": str(DRAFT_CYCLE_ID), "name": Command.DRAFT_CYCLE},
+            },
+            "module": {"id": str(MODULE_ID), "name": Command.MODULE},
+            "intake": {"id": str(INTAKE_WORK_ITEM_ID), "name": Command.INTAKE_WORK_ITEM},
             "invitations": [email for email, _ in Command.INVITATIONS],
             "sharedLinks": {
                 "visible": [t for t, _, hidden in Command.SHARED_LINKS if not hidden],
@@ -607,6 +629,117 @@ class Command(BaseCommand):
             IssueView.objects.filter(pk=view.pk).update(
                 created_at=CLOCK - timedelta(days=3), updated_at=CLOCK - timedelta(days=3)
             )
+
+    COMPLETED_CYCLE = "Hardening sprint"
+    DRAFT_CYCLE = "Next sprint"
+    MODULE = "Export overhaul"
+
+    def _cycles_and_modules(self, workspace, project, owner) -> None:
+        """Two cycles and one module, none holding work items.
+
+        A cycle that ended before `CLOCK` is completed on the server's clock
+        and on the browser's alike, whenever the suite runs; a cycle without
+        dates is a draft on both. An active or upcoming cycle would be decided
+        by the server's real clock and change status as the calendar moves.
+        Neither cycle nor the module holds work items: the work item rows
+        print their cycle and module, so membership would move every layout
+        baseline.
+        """
+        for cycle_id, name, start, end, sort_order in (
+            (COMPLETED_CYCLE_ID, Command.COMPLETED_CYCLE, CLOCK - timedelta(days=21), CLOCK - timedelta(days=8), 1000),
+            (DRAFT_CYCLE_ID, Command.DRAFT_CYCLE, None, None, 2000),
+        ):
+            cycle, _ = Cycle.objects.get_or_create(
+                id=cycle_id,
+                defaults={
+                    "name": name,
+                    "workspace": workspace,
+                    "project": project,
+                    "owned_by": owner,
+                    "created_by": owner,
+                    "start_date": start,
+                    "end_date": end,
+                    "sort_order": sort_order,
+                },
+            )
+            Cycle.objects.filter(pk=cycle.pk).update(
+                created_at=CLOCK - timedelta(days=30), updated_at=CLOCK - timedelta(days=30)
+            )
+        module, _ = Module.objects.get_or_create(
+            id=MODULE_ID,
+            defaults={
+                "name": Command.MODULE,
+                "workspace": workspace,
+                "project": project,
+                "lead": owner,
+                "status": "in-progress",
+                "start_date": (CLOCK - timedelta(days=10)).date(),
+                "target_date": (CLOCK + timedelta(days=20)).date(),
+                "created_by": owner,
+            },
+        )
+        Module.objects.filter(pk=module.pk).update(
+            created_at=CLOCK - timedelta(days=30), updated_at=CLOCK - timedelta(days=30)
+        )
+
+    INTAKE_WORK_ITEM = "Support SAML sign-in for contractors"
+
+    def _intake(self, workspace, project, author) -> None:
+        """One pending intake work item, so the intake list and detail show it.
+
+        The project's intake feature stays off: switching it on would add
+        "Intake" to the project's sidebar entry in every story, so the intake
+        stories patch the flag on the project responses, as the view stories
+        do. The work item sits in the triage state, which every work item
+        list leaves out, and is numbered after the seeded work items.
+        """
+        intake, _ = Intake.objects.get_or_create(
+            id=INTAKE_ID,
+            defaults={
+                "name": f"{project.name} Intake",
+                "workspace": workspace,
+                "project": project,
+                "is_default": True,
+            },
+        )
+        triage, _ = State.all_state_objects.get_or_create(
+            id=INTAKE_STATE_ID,
+            defaults={
+                "name": "Triage",
+                "group": "triage",
+                "color": "#4E5355",
+                "sequence": 65000,
+                "project": project,
+                "workspace": workspace,
+            },
+        )
+        issue = Issue.all_objects.filter(id=INTAKE_WORK_ITEM_ID).first()
+        if issue is None:
+            issue = Issue.objects.create(
+                id=INTAKE_WORK_ITEM_ID,
+                name=Command.INTAKE_WORK_ITEM,
+                project=project,
+                workspace=workspace,
+                state=triage,
+                priority="medium",
+                created_by=author,
+            )
+        stamped = CLOCK - timedelta(days=2)
+        sequence = len(WORK_ITEMS) + 1
+        Issue.all_objects.filter(pk=issue.pk).update(created_at=stamped, updated_at=stamped, sequence_id=sequence)
+        IssueSequence.objects.filter(issue=issue).update(created_at=stamped, updated_at=stamped, sequence=sequence)
+        intake_issue, _ = IntakeIssue.objects.get_or_create(
+            id=INTAKE_ISSUE_ID,
+            defaults={
+                "intake": intake,
+                "issue": issue,
+                "project": project,
+                "workspace": workspace,
+                "source": "IN_APP",
+                "created_by": author,
+            },
+        )
+        IntakeIssue.objects.filter(pk=intake_issue.pk).update(created_at=stamped, updated_at=stamped)
 
     def _shared_links(self, workspace, users) -> None:
         for index, (title, url, hidden) in enumerate(self.SHARED_LINKS):
