@@ -16,6 +16,9 @@ import { useWorkspaceNotifications } from "@/hooks/store/notifications";
 import { useNotification } from "@/hooks/store/notifications/use-notification";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useWorkspace } from "@/hooks/store/use-workspace";
+import { useUserPermissions } from "@/hooks/store/user";
+// Hangar extension
+import { isWorklogHiddenForRole } from "@/plane-web/helpers/worklog";
 // local imports
 import { NotificationContent } from "./content";
 import { NotificationOption } from "./options";
@@ -32,6 +35,7 @@ export const NotificationItem = observer(function NotificationItem(props: TNotif
   const { asJson: notification, markNotificationAsRead } = useNotification(notificationId);
   const { getIsIssuePeeked, setPeekIssue } = useIssueDetail();
   const { getWorkspaceBySlug } = useWorkspace();
+  const { getProjectRoleByWorkspaceSlugAndProjectId } = useUserPermissions();
   // states
   const [isSnoozeStateModalOpen, setIsSnoozeStateModalOpen] = useState(false);
   const [customSnoozeModal, setCustomSnoozeModal] = useState(false);
@@ -68,6 +72,10 @@ export const NotificationItem = observer(function NotificationItem(props: TNotif
   };
 
   if (!workspaceSlug || !notificationId || !notification?.id || !notificationField || !workspace?.id || !projectId)
+    return <></>;
+  // Fork (see FORK.md, S20): a worklog notification prints the logged duration,
+  // so it is left out wherever the reader may not read that project's worklogs.
+  if (isWorklogHiddenForRole(notificationField, getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug, projectId)))
     return <></>;
 
   return (

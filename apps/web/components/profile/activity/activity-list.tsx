@@ -18,7 +18,9 @@ import { RichTextEditor } from "@/components/editor/rich-text";
 import { ActivitySettingsLoader } from "@/components/ui/loader/settings/activity";
 // hooks
 import { useWorkspace } from "@/hooks/store/use-workspace";
-import { useUser } from "@/hooks/store/user";
+import { useUser, useUserPermissions } from "@/hooks/store/user";
+// Hangar extension
+import { isWorklogHiddenForRole } from "@/plane-web/helpers/worklog";
 
 type Props = {
   activity: IUserActivityResponse | undefined;
@@ -31,15 +33,25 @@ export const ActivityList = observer(function ActivityList(props: Props) {
   // store hooks
   const { data: currentUser } = useUser();
   const { getWorkspaceBySlug } = useWorkspace();
+  const { getProjectRoleByWorkspaceSlugAndProjectId } = useUserPermissions();
   // derived values
   const workspaceId = getWorkspaceBySlug(workspaceSlug?.toString() ?? "")?.id ?? "";
+  // Fork (see FORK.md, S20): a worklog row prints the logged duration, so it is
+  // left out wherever the reader may not read that project's worklogs.
+  const visibleActivity = activity?.results.filter(
+    (activityItem) =>
+      !isWorklogHiddenForRole(
+        activityItem.field,
+        getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug?.toString() ?? "", activityItem.project)
+      )
+  );
 
   // TODO: refactor this component
   return (
     <>
       {activity ? (
         <ul role="list">
-          {activity.results.map((activityItem) => {
+          {visibleActivity?.map((activityItem) => {
             if (activityItem.field === "comment")
               return (
                 <li key={activityItem.id} className="mt-2">
