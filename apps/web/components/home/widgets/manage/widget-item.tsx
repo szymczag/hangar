@@ -22,7 +22,8 @@ import { createRoot } from "react-dom/client";
 import { useTranslation } from "@plane/i18n";
 import type { InstructionType } from "@plane/types";
 // plane ui
-import { DropIndicator, ToggleSwitch } from "@plane/ui";
+import { Switch } from "@makeplane/propel/components/switch";
+import { DropIndicator } from "@plane/blocks/common";
 // plane utils
 import { cn } from "@plane/utils";
 // hooks
@@ -76,7 +77,7 @@ export const WidgetItem = observer(function WidgetItem(props: Props) {
             getOffset: pointerOutsideOfPreview({ x: "0px", y: "0px" }),
             render: ({ container }) => {
               const root = createRoot(container);
-              root.render(<div className="rounded-sm bg-surface-1 p-1 pr-2 text-13">{widget.key}</div>);
+              root.render(<div className="rounded-sm bg-surface-1 p-1 pr-2 text-body-xs-regular">{widget.key}</div>);
               return () => root.unmount();
             },
             nativeSetDragImage,
@@ -89,7 +90,7 @@ export const WidgetItem = observer(function WidgetItem(props: Props) {
         onDragStart: () => {
           setIsDragging(true);
         },
-        getData: ({ input, element }) => {
+        getData: ({ input, element: target }) => {
           const blockedStates: InstructionType[] = ["make-child"];
           if (!isLastChild) {
             blockedStates.push("reorder-below");
@@ -97,7 +98,7 @@ export const WidgetItem = observer(function WidgetItem(props: Props) {
 
           return attachInstruction(initialData, {
             input,
-            element,
+            element: target,
             currentLevel: 1,
             indentPerLevel: 0,
             mode: isLastChild ? "last-in-group" : "standard",
@@ -105,8 +106,7 @@ export const WidgetItem = observer(function WidgetItem(props: Props) {
           });
         },
         onDrag: ({ self, source, location }) => {
-          const instruction = getInstructionFromPayload(self, source, location);
-          setInstruction(instruction);
+          setInstruction(getInstructionFromPayload(self, source, location));
         },
         onDragLeave: () => {
           setInstruction(undefined);
@@ -126,7 +126,7 @@ export const WidgetItem = observer(function WidgetItem(props: Props) {
       <div
         ref={elementRef}
         className={cn(
-          "group/widget-item relative flex items-center justify-between rounded-sm px-2 py-2 text-13 font-medium hover:bg-layer-1",
+          "group/widget-item relative flex items-center justify-between rounded-sm px-2 py-2 text-body-xs-medium hover:bg-layer-1",
           {
             "cursor-grabbing bg-layer-1": isDragging,
           }
@@ -136,9 +136,11 @@ export const WidgetItem = observer(function WidgetItem(props: Props) {
           <WidgetItemDragHandle sort_order={widget.sort_order} isDragging={isDragging} />
           <div>{t(widgetTitle, { count: 1 })}</div>
         </div>
-        <ToggleSwitch
-          value={widget.is_enabled}
-          onChange={() => handleToggle(workspaceSlug.toString(), widget.key, !widget.is_enabled)}
+        <Switch
+          size="sm"
+          checked={widget.is_enabled}
+          onCheckedChange={(enabled) => handleToggle(workspaceSlug.toString(), widget.key, enabled)}
+          aria-label={t(widgetTitle, { count: 1 })}
         />
       </div>
       {isLastChild && <DropIndicator isVisible={instruction === "reorder-below"} />}

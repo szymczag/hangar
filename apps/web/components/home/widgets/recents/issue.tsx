@@ -6,14 +6,16 @@
 
 import { observer } from "mobx-react";
 // plane types
-import { PriorityIcon, StateGroupIcon, WorkItemsIcon } from "@plane/propel/icons";
-import { Tooltip } from "@plane/propel/tooltip";
+import { PriorityIcon, StateGroupIcon } from "@plane/blocks/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { WorkItemsOutline } from "@makeplane/propel/icons";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { TActivityEntityData, TIssueEntityData } from "@plane/types";
 // plane ui
 import { calculateTimeAgo, generateWorkItemLink } from "@plane/utils";
 // components
 import { ListItem } from "@/components/core/list";
-import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
+import { ButtonAvatars } from "@/components/dropdowns/member/avatar";
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -69,7 +71,7 @@ export const RecentIssue = observer(function RecentIssue(props: BlockProps) {
         <div className="flex flex-shrink-0 items-center gap-2">
           {issueDetails.type ? (
             <IssueIdentifier
-              size="lg"
+              size="xs"
               issueTypeId={issueDetails?.type}
               projectId={issueDetails?.project_id || ""}
               projectIdentifier={issueDetails?.project_identifier || ""}
@@ -77,11 +79,11 @@ export const RecentIssue = observer(function RecentIssue(props: BlockProps) {
               variant="tertiary"
             />
           ) : (
-            <div className="flex items-center justify-center gap-2">
-              <div className="grid size-8 flex-shrink-0 place-items-center rounded-sm bg-layer-2">
-                <WorkItemsIcon className="size-4 text-tertiary" />
+            <div className="flex items-center justify-center gap-1.5">
+              <div className="grid size-4 flex-shrink-0 place-items-center">
+                <WorkItemsOutline className="size-4 text-tertiary" />
               </div>
-              <div className="text-13 font-medium whitespace-nowrap text-placeholder">
+              <div className="text-caption-md-regular whitespace-nowrap text-tertiary">
                 {issueDetails?.project_identifier}-{issueDetails?.sequence_id}
               </div>
             </div>
@@ -89,50 +91,35 @@ export const RecentIssue = observer(function RecentIssue(props: BlockProps) {
         </div>
       }
       appendTitleElement={
-        <div className="flex-shrink-0 text-11 font-medium text-placeholder">
+        <div className="flex-shrink-0 text-caption-md-regular text-tertiary">
           {calculateTimeAgo(activity.visited_at)}
         </div>
       }
       quickActionElement={
-        <div className="flex gap-4">
-          <Tooltip tooltipHeading="State" tooltipContent={state?.name ?? "State"}>
-            <div>
-              <StateGroupIcon
-                stateGroup={state?.group ?? "backlog"}
-                color={state?.color}
-                className="my-auto h-4 w-4"
-                percentage={state?.order}
-              />
-            </div>
+        <div className="flex items-center gap-2">
+          <Tooltip label={state?.name ?? "State"}>
+            <Icon
+              size="md"
+              icon={
+                <StateGroupIcon stateGroup={state?.group ?? "backlog"} color={state?.color} percentage={state?.order} />
+              }
+            />
           </Tooltip>
-          <Tooltip tooltipHeading="Priority" tooltipContent={issueDetails?.priority ?? "Priority"}>
-            <div>
-              <PriorityIcon priority={issueDetails?.priority} withContainer size={12} />
-            </div>
+          <Tooltip label={issueDetails?.priority ?? "Priority"}>
+            <Icon size="md" icon={<PriorityIcon priority={issueDetails?.priority} />} />
           </Tooltip>
           {issueDetails?.assignees?.length > 0 && (
-            <div className="h-5">
-              <MemberDropdown
-                projectId={issueDetails?.project_id}
-                value={issueDetails?.assignees}
-                onChange={() => {}}
-                disabled
-                multiple
-                buttonVariant={issueDetails?.assignees?.length > 0 ? "transparent-without-text" : "border-without-text"}
-                buttonClassName={issueDetails?.assignees?.length > 0 ? "hover:bg-transparent px-0" : ""}
-                showTooltip={issueDetails?.assignees?.length === 0}
-                placeholder="Assignees"
-                optionsClassName="z-10"
-                tooltipContent=""
-              />
-            </div>
+            <ButtonAvatars showTooltip={false} userIds={issueDetails.assignees} size="xs" max={3} />
           )}
         </div>
       }
       parentRef={ref}
       disableLink={false}
-      className="my-auto border-none !px-2 py-3"
-      itemClassName="my-auto"
+      className="!min-h-[38px] !flex-row !gap-0 rounded-md border-none !px-2 !py-2"
+      itemClassName="!gap-2"
+      linkClassName="!gap-2"
+      titleClassName="text-body-sm-medium"
+      leftElementClassName="!gap-2"
       onItemClick={handlePeekOverview}
       preventDefaultProgress
     />

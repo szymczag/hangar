@@ -909,5 +909,6 @@
       "save_options": "ビューの保存オプション",
       "update_view": "ビューを更新"
     }
-  }
+  },
+  "submitting": "送信中"
 }

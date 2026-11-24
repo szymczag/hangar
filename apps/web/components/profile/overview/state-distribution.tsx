@@ -7,10 +7,10 @@
 // plane imports
 import { STATE_GROUPS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { PieChart } from "@plane/propel/charts/pie-chart";
-import { EmptyStateCompact } from "@plane/propel/empty-state";
+import { PieChart } from "@plane/blocks/charts/pie-chart";
+import { EmptyStateCompact } from "@plane/blocks/empty-state";
 import type { IUserProfileData, IUserStateDistribution } from "@plane/types";
-import { Card } from "@plane/ui";
+import { Card } from "@plane/blocks/card";
 import { capitalizeFirstLetter } from "@plane/utils";
 
 type Props = {
@@ -29,8 +29,8 @@ export function ProfileStateDistribution({ stateDistribution, userProfile }: Pro
 
   return (
     <div className="flex flex-col space-y-2">
-      <h3 className="text-16 font-medium">{t("profile.stats.state_distribution.title")}</h3>
-      <Card className="h-full">
+      <h3 className="text-h6-medium">{t("profile.stats.state_distribution.title")}</h3>
+      <Card className="h-full rounded-xl border border-subtle-1 bg-layer-2 pl-0">
         {stateGroups.length > 0 ? (
           <div className="grid h-[300px] w-full grid-cols-1 gap-x-6 md:grid-cols-2">
             <PieChart
@@ -63,7 +63,7 @@ export function ProfileStateDistribution({ stateDistribution, userProfile }: Pro
             <div className="flex items-center">
               <div className="w-full space-y-4">
                 {stateDistribution.map((group) => (
-                  <div key={group.state_group} className="flex items-center justify-between gap-2 text-11">
+                  <div key={group.state_group} className="flex items-center justify-between gap-2 text-body-xs-regular">
                     <div className="flex items-center gap-1.5">
                       <div
                         className="h-2.5 w-2.5 rounded-xs"

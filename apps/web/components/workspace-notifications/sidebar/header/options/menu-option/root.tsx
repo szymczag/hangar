@@ -4,28 +4,22 @@
  * See the LICENSE file for details.
  */
 
-import type { ReactNode } from "react";
 import { observer } from "mobx-react";
-import { CheckCircle, Clock, MoreVertical } from "lucide-react";
+import { PreferencesOutline } from "@makeplane/propel/icons";
 import { useTranslation } from "@plane/i18n";
 // plane imports
-import { ArchiveIcon, CheckIcon } from "@plane/propel/icons";
 import type { TNotificationFilter } from "@plane/types";
-import { PopoverMenu } from "@plane/ui";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { Menu, MenuCheckboxItem, MenuContent, MenuTrigger } from "@makeplane/propel/components/menu";
 // hooks
 import { useWorkspaceNotifications } from "@/hooks/store/notifications";
-// local imports
-import { NotificationMenuOptionItem } from "./menu-item";
-import { IconButton } from "@plane/propel/icon-button";
 
-export type TPopoverMenuOptions = {
+type TNotificationMenuOption = {
   key: string;
-  type: string;
-  label?: string | undefined;
-  isActive?: boolean | undefined;
-  prependIcon?: ReactNode | undefined;
-  appendIcon?: ReactNode | undefined;
-  onClick?: (() => void) | undefined;
+  label: string;
+  checked: boolean;
+  onChange: () => void;
 };
 
 export const NotificationHeaderMenuOption = observer(function NotificationHeaderMenuOption() {
@@ -38,24 +32,18 @@ export const NotificationHeaderMenuOption = observer(function NotificationHeader
 
   const handleBulkFilterChange = (filter: Partial<TNotificationFilter>) => updateBulkFilters(filter);
 
-  const popoverMenuOptions: TPopoverMenuOptions[] = [
+  const menuOptions: TNotificationMenuOption[] = [
     {
       key: "menu-unread",
-      type: "menu-item",
       label: t("notification.options.show_unread"),
-      isActive: filters?.read,
-      prependIcon: <CheckCircle className="h-3 w-3 flex-shrink-0" />,
-      appendIcon: filters?.read ? <CheckIcon className="h-3 w-3" /> : undefined,
-      onClick: () => handleFilterChange("read", !filters?.read),
+      checked: !!filters?.read,
+      onChange: () => handleFilterChange("read", !filters?.read),
     },
     {
       key: "menu-archived",
-      type: "menu-item",
       label: t("notification.options.show_archived"),
-      isActive: filters?.archived,
-      prependIcon: <ArchiveIcon className="h-3 w-3 flex-shrink-0" />,
-      appendIcon: filters?.archived ? <CheckIcon className="h-3 w-3" /> : undefined,
-      onClick: () =>
+      checked: !!filters?.archived,
+      onChange: () =>
         handleBulkFilterChange({
           archived: !filters?.archived,
           snoozed: false,
@@ -63,12 +51,9 @@ export const NotificationHeaderMenuOption = observer(function NotificationHeader
     },
     {
       key: "menu-snoozed",
-      type: "menu-item",
       label: t("notification.options.show_snoozed"),
-      isActive: filters?.snoozed,
-      prependIcon: <Clock className="h-3 w-3 flex-shrink-0" />,
-      appendIcon: filters?.snoozed ? <CheckIcon className="h-3 w-3" /> : undefined,
-      onClick: () =>
+      checked: !!filters?.snoozed,
+      onChange: () =>
         handleBulkFilterChange({
           snoozed: !filters?.snoozed,
           archived: false,
@@ -76,13 +61,41 @@ export const NotificationHeaderMenuOption = observer(function NotificationHeader
     },
   ];
 
+  const activeOptionsCount = menuOptions.filter((option) => option.checked).length;
+
   return (
-    <PopoverMenu
-      data={popoverMenuOptions}
-      button={<IconButton size="base" variant="ghost" icon={MoreVertical} />}
-      keyExtractor={(item: TPopoverMenuOptions) => item.key}
-      panelClassName="p-0 py-2 rounded-md border border-subtle bg-surface-1 space-y-1"
-      render={(item: TPopoverMenuOptions) => <NotificationMenuOptionItem {...item} />}
-    />
+    // Toggle rows: checkbox items keep the menu open, as the legacy popover did.
+    <Menu>
+      <div className="relative inline-flex">
+        <MenuTrigger
+          render={
+            <IconButton
+              size="sm"
+              variant="secondary"
+              icon={<Icon icon={PreferencesOutline} />}
+              aria-label={t("common.display")}
+            />
+          }
+        />
+        {activeOptionsCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-accent-primary text-[10px] font-medium text-on-color"
+          >
+            {activeOptionsCount}
+          </span>
+        )}
+      </div>
+      <MenuContent side="bottom" align="end">
+        {menuOptions.map((option) => (
+          <MenuCheckboxItem
+            key={option.key}
+            label={option.label}
+            checked={option.checked}
+            onCheckedChange={option.onChange}
+          />
+        ))}
+      </MenuContent>
+    </Menu>
   );
 });
