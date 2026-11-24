@@ -9,7 +9,7 @@ import { observer } from "mobx-react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
+import { setPromiseToast, setToast } from "@plane/blocks/toast";
 import type { TIssue } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 // assets
@@ -84,75 +84,75 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
 
   const issueOperations: TIssueOperations = useMemo(
     () => ({
-      fetch: async (workspaceSlug: string, projectId: string, issueId: string) => {
+      fetch: async (slug: string, targetProjectId: string, targetIssueId: string) => {
         try {
-          await fetchIssue(workspaceSlug, projectId, issueId);
+          await fetchIssue(slug, targetProjectId, targetIssueId);
         } catch (error) {
           console.error("Error fetching the parent issue:", error);
         }
       },
-      update: async (workspaceSlug: string, projectId: string, issueId: string, data: Partial<TIssue>) => {
+      update: async (slug: string, targetProjectId: string, targetIssueId: string, data: Partial<TIssue>) => {
         try {
-          await updateIssue(workspaceSlug, projectId, issueId, data);
+          await updateIssue(slug, targetProjectId, targetIssueId, data);
         } catch (error) {
           console.log("Error in updating issue:", error);
           setToast({
             title: t("common.error.label"),
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             message: t("entity.update.failed", { entity: t("issue.label") }),
           });
         }
       },
-      remove: async (workspaceSlug: string, projectId: string, issueId: string) => {
+      remove: async (slug: string, targetProjectId: string, targetIssueId: string) => {
         try {
-          if (is_archived) await removeArchivedIssue(workspaceSlug, projectId, issueId);
-          else await removeIssue(workspaceSlug, projectId, issueId);
+          if (is_archived) await removeArchivedIssue(slug, targetProjectId, targetIssueId);
+          else await removeIssue(slug, targetProjectId, targetIssueId);
           setToast({
             title: t("common.success"),
-            type: TOAST_TYPE.SUCCESS,
+            type: "success",
             message: t("entity.delete.success", { entity: t("issue.label") }),
           });
         } catch (error) {
           console.log("Error in deleting issue:", error);
           setToast({
             title: t("common.error.label"),
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             message: t("entity.delete.failed", { entity: t("issue.label") }),
           });
         }
       },
-      archive: async (workspaceSlug: string, projectId: string, issueId: string) => {
+      archive: async (slug: string, targetProjectId: string, targetIssueId: string) => {
         try {
-          await archiveIssue(workspaceSlug, projectId, issueId);
+          await archiveIssue(slug, targetProjectId, targetIssueId);
         } catch (error) {
           console.log("Error in archiving issue:", error);
         }
       },
-      addCycleToIssue: async (workspaceSlug: string, projectId: string, cycleId: string, issueId: string) => {
+      addCycleToIssue: async (slug: string, targetProjectId: string, cycleId: string, targetIssueId: string) => {
         try {
-          await addCycleToIssue(workspaceSlug, projectId, cycleId, issueId);
+          await addCycleToIssue(slug, targetProjectId, cycleId, targetIssueId);
         } catch (_error) {
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: t("common.error.label"),
             message: t("issue.add.cycle.failed"),
           });
         }
       },
-      addIssueToCycle: async (workspaceSlug: string, projectId: string, cycleId: string, issueIds: string[]) => {
+      addIssueToCycle: async (slug: string, targetProjectId: string, cycleId: string, issueIds: string[]) => {
         try {
-          await addIssueToCycle(workspaceSlug, projectId, cycleId, issueIds);
+          await addIssueToCycle(slug, targetProjectId, cycleId, issueIds);
         } catch (_error) {
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: t("common.error.label"),
             message: t("issue.add.cycle.failed"),
           });
         }
       },
-      removeIssueFromCycle: async (workspaceSlug: string, projectId: string, cycleId: string, issueId: string) => {
+      removeIssueFromCycle: async (slug: string, targetProjectId: string, cycleId: string, targetIssueId: string) => {
         try {
-          const removeFromCyclePromise = removeIssueFromCycle(workspaceSlug, projectId, cycleId, issueId);
+          const removeFromCyclePromise = removeIssueFromCycle(slug, targetProjectId, cycleId, targetIssueId);
           setPromiseToast(removeFromCyclePromise, {
             loading: t("issue.remove.cycle.loading"),
             success: {
@@ -169,9 +169,9 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
           console.log("Error in removing issue from cycle:", error);
         }
       },
-      removeIssueFromModule: async (workspaceSlug: string, projectId: string, moduleId: string, issueId: string) => {
+      removeIssueFromModule: async (slug: string, targetProjectId: string, moduleId: string, targetIssueId: string) => {
         try {
-          const removeFromModulePromise = removeIssueFromModule(workspaceSlug, projectId, moduleId, issueId);
+          const removeFromModulePromise = removeIssueFromModule(slug, targetProjectId, moduleId, targetIssueId);
           setPromiseToast(removeFromModulePromise, {
             loading: t("issue.remove.module.loading"),
             success: {
@@ -189,13 +189,13 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
         }
       },
       changeModulesInIssue: async (
-        workspaceSlug: string,
-        projectId: string,
-        issueId: string,
+        slug: string,
+        targetProjectId: string,
+        targetIssueId: string,
         addModuleIds: string[],
         removeModuleIds: string[]
       ) => {
-        const promise = await changeModulesInIssue(workspaceSlug, projectId, issueId, addModuleIds, removeModuleIds);
+        const promise = await changeModulesInIssue(slug, targetProjectId, targetIssueId, addModuleIds, removeModuleIds);
         return promise;
       },
     }),
@@ -238,8 +238,8 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
           }}
         />
       ) : (
-        <div className="flex h-full w-full overflow-hidden">
-          <div className="h-full w-full space-y-6 overflow-y-auto px-9 py-5">
+        <div className="relative flex h-full w-full overflow-hidden">
+          <div className="h-full min-w-0 flex-1 overflow-y-auto px-8 py-6">
             <IssueMainContent
               workspaceSlug={workspaceSlug}
               projectId={projectId}
@@ -250,8 +250,8 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
             />
           </div>
           <div
-            className="fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle bg-surface-1 sm:w-1/2 md:relative md:w-1/4 lg:min-w-80 xl:min-w-96"
-            style={issueDetailSidebarCollapsed ? { right: `-${window?.innerWidth || 0}px` } : {}}
+            className="fixed right-0 z-[5] h-full w-full min-w-[300px] shrink-0 border-l border-subtle bg-surface-1 sm:w-1/2 md:relative md:w-80"
+            style={issueDetailSidebarCollapsed ? { right: "-100vw" } : {}}
           >
             <IssueDetailsSidebar
               workspaceSlug={workspaceSlug}

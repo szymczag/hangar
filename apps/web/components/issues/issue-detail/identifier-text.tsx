@@ -4,16 +4,16 @@
  * See the LICENSE file for details.
  */
 
-import { setToast, TOAST_TYPE } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { setToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { TIdentifierTextProps, TIdentifierTextVariant, TIssueIdentifierSize } from "@plane/types";
 import { cn } from "@plane/utils";
 
 const SIZE_MAP: Record<TIssueIdentifierSize, string> = {
-  xs: "text-caption-sm-regular",
-  sm: "text-caption-sm-medium",
+  xs: "text-caption-md-medium",
+  sm: "text-caption-md-medium",
   md: "text-caption-md-medium",
-  lg: "text-caption-lg-medium",
+  lg: "text-caption-md-medium",
 };
 
 const VARIANT_MAP: Record<TIdentifierTextVariant, string> = {
@@ -34,7 +34,7 @@ export function IdentifierText(props: TIdentifierTextProps) {
         .writeText(identifier)
         .then(() => {
           setToast({
-            type: TOAST_TYPE.SUCCESS,
+            type: "success",
             title: "Work item ID copied to clipboard",
           });
           return;
@@ -48,11 +48,21 @@ export function IdentifierText(props: TIdentifierTextProps) {
   const textSizeClassName = SIZE_MAP[size];
   const variantClassName = VARIANT_MAP[variant];
 
+  if (!enableClickToCopyIdentifier) {
+    return (
+      <span
+        className={cn("text-caption-md-medium whitespace-nowrap text-tertiary", textSizeClassName, variantClassName)}
+      >
+        {identifier}
+      </span>
+    );
+  }
+
   return (
-    <Tooltip tooltipContent="Click to copy" disabled={!enableClickToCopyIdentifier} position="top">
+    <Tooltip label="Click to copy" disabled={!enableClickToCopyIdentifier}>
       <button
         type="button"
-        className={cn("text-12 font-medium whitespace-nowrap text-tertiary", textSizeClassName, variantClassName, {
+        className={cn("text-caption-md-medium whitespace-nowrap text-tertiary", textSizeClassName, variantClassName, {
           "cursor-pointer": enableClickToCopyIdentifier,
         })}
         onClick={handleCopyIssueIdentifier}

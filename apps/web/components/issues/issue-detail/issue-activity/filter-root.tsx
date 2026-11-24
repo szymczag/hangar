@@ -19,10 +19,12 @@ export type TActivityFilterRoot = {
   projectId: string;
   isIntakeIssue?: boolean;
   canViewWorklogs: boolean;
+  /** Restricts the options to these filters (e.g. the ones the active activity tab covers). */
+  filterKeys?: TActivityFilters[];
 };
 
 export const ActivityFilterRoot = observer(function ActivityFilterRoot(props: TActivityFilterRoot) {
-  const { selectedFilters, toggleFilter, projectId, isIntakeIssue = false, canViewWorklogs } = props;
+  const { selectedFilters, toggleFilter, projectId, isIntakeIssue = false, canViewWorklogs, filterKeys } = props;
   // store hooks
   const { getProjectById } = useProject();
   // derived values — the worklog filter only applies where worklogs can exist
@@ -32,8 +34,9 @@ export const ActivityFilterRoot = observer(function ActivityFilterRoot(props: TA
 
   const filters = Object.entries(ACTIVITY_FILTER_TYPE_OPTIONS).reduce<TActivityFilterOption[]>(
     (options, [key, value]) => {
-      if (!showWorklogFilter && key === EActivityFilterType.WORKLOG) return options;
       const filterKey = key as TActivityFilters;
+      if (filterKeys && !filterKeys.includes(filterKey)) return options;
+      if (!showWorklogFilter && filterKey === EActivityFilterType.WORKLOG) return options;
       options.push({
         key: filterKey,
         labelTranslationKey: value.labelTranslationKey,

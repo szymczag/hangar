@@ -7,13 +7,14 @@
 import React from "react";
 import { observer } from "mobx-react";
 // plane imports
+import { EntityDetailWidgetSection } from "@plane/blocks/entity-detail";
+import { useTranslation } from "@plane/i18n";
 import type { TIssueServiceType } from "@plane/types";
-import { Collapsible } from "@plane/ui";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local imports
 import { IssueLinksCollapsibleContent } from "./content";
-import { IssueLinksCollapsibleTitle } from "./title";
+import { IssueLinksActionButton } from "./quick-action-button";
 
 type Props = {
   workspaceSlug: string;
@@ -25,24 +26,27 @@ type Props = {
 
 export const LinksCollapsible = observer(function LinksCollapsible(props: Props) {
   const { workspaceSlug, projectId, issueId, disabled = false, issueServiceType } = props;
+  // translation
+  const { t } = useTranslation();
   // store hooks
-  const { openWidgets, toggleOpenWidget } = useIssueDetail(issueServiceType);
+  const {
+    openWidgets,
+    toggleOpenWidget,
+    issue: { getIssueById },
+  } = useIssueDetail(issueServiceType);
   // derived values
   const isCollapsibleOpen = openWidgets.includes("links");
+  const linksCount = getIssueById(issueId)?.link_count ?? 0;
 
   return (
-    <Collapsible
+    <EntityDetailWidgetSection
+      title={t("common.links")}
+      count={linksCount}
       isOpen={isCollapsibleOpen}
       onToggle={() => toggleOpenWidget("links")}
-      title={
-        <IssueLinksCollapsibleTitle
-          isOpen={isCollapsibleOpen}
-          issueId={issueId}
-          disabled={disabled}
-          issueServiceType={issueServiceType}
-        />
+      actions={
+        !disabled ? <IssueLinksActionButton issueServiceType={issueServiceType} disabled={disabled} /> : undefined
       }
-      buttonClassName="w-full"
     >
       <IssueLinksCollapsibleContent
         workspaceSlug={workspaceSlug}
@@ -51,6 +55,6 @@ export const LinksCollapsible = observer(function LinksCollapsible(props: Props)
         disabled={disabled}
         issueServiceType={issueServiceType}
       />
-    </Collapsible>
+    </EntityDetailWidgetSection>
   );
 });

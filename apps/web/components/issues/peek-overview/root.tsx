@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 import useSWR from "swr";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
+import { setPromiseToast, setToast } from "@plane/blocks/toast";
 import type { IWorkItemPeekOverview, TIssue } from "@plane/types";
 import { EIssueServiceType, EIssuesStoreType } from "@plane/types";
 // hooks
@@ -81,7 +81,7 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
             .catch((_error) => {
               setToast({
                 title: t("toast.error"),
-                type: TOAST_TYPE.ERROR,
+                type: "error",
                 message: t("entity.update.failed", { entity: t("issue.label", { count: 1 }) }),
               });
             });
@@ -96,7 +96,7 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
         } catch (_error) {
           setToast({
             title: t("toast.error"),
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             message: t("entity.delete.failed", { entity: t("issue.label", { count: 1 }) }),
           });
         }
@@ -113,13 +113,13 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
         try {
           await restoreIssue(workspaceSlug, projectId, issueId);
           setToast({
-            type: TOAST_TYPE.SUCCESS,
+            type: "success",
             title: t("issue.restore.success.title"),
             message: t("issue.restore.success.message"),
           });
         } catch (_error) {
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: t("toast.error"),
             message: t("issue.restore.failed.message"),
           });
@@ -131,7 +131,7 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
           fetchActivities(workspaceSlug, projectId, issueId);
         } catch (_error) {
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: t("toast.error"),
             message: t("issue.add.cycle.failed"),
           });
@@ -142,7 +142,7 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
           await issues.addIssueToCycle(workspaceSlug, projectId, cycleId, issueIds);
         } catch (_error) {
           setToast({
-            type: TOAST_TYPE.ERROR,
+            type: "error",
             title: t("toast.error"),
             message: t("issue.add.cycle.failed"),
           });

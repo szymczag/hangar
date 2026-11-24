@@ -4,8 +4,10 @@
  * See the LICENSE file for details.
  */
 
-import { MoveRight } from "lucide-react";
-import { Tooltip } from "@plane/propel/tooltip";
+import { ArrowNarrowRightOutline } from "@makeplane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { useTranslation } from "@plane/i18n";
 // assets
 import emptyIssue from "@/app/assets/empty-state/issue.svg?url";
 // components
@@ -19,17 +21,24 @@ type TIssuePeekOverviewError = {
 
 export function IssuePeekOverviewError(props: TIssuePeekOverviewError) {
   const { removeRoutePeekId } = props;
+  const { t } = useTranslation();
   // hooks
   const { isMobile } = usePlatformOS();
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
       <div className="flex flex-shrink-0 justify-start">
-        <Tooltip tooltipContent="Close the peek view" isMobile={isMobile}>
-          <button onClick={removeRoutePeekId} className="m-5 h-5 w-5">
-            <MoveRight className="h-4 w-4 text-tertiary hover:text-secondary" />
-          </button>
-        </Tooltip>
+        <div className="m-5">
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={t("common.close_peek_view")}
+            showTooltip={!isMobile}
+            onClick={removeRoutePeekId}
+            icon={<Icon icon={ArrowNarrowRightOutline} />}
+          />
+        </div>
       </div>
 
       <div className="h-full w-full">

@@ -15,6 +15,23 @@ export function canViewWorklogsForRole(role: number | undefined): boolean {
   return role !== undefined && WORKLOG_READER_ROLES.has(role);
 }
 
+const PROJECT_ADMIN_ROLE = 20;
+
+/**
+ * Whether the activity feed offers "Log time" on a work item: never on an intake
+ * work item, never to someone who may not read worklogs (S20), and otherwise to
+ * project admins and to the work item's assignees.
+ */
+export function canLogWorkForRole(options: {
+  role: number | undefined;
+  isAssignee: boolean;
+  isIntakeIssue: boolean;
+}): boolean {
+  const { role, isAssignee, isIntakeIssue } = options;
+  if (isIntakeIssue || !canViewWorklogsForRole(role)) return false;
+  return role === PROJECT_ADMIN_ROLE || isAssignee;
+}
+
 export function formatWorklogDuration(minutes: number): string {
   const total = Math.max(0, Math.floor(minutes || 0));
   const hours = Math.floor(total / 60);
