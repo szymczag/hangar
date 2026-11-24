@@ -450,7 +450,7 @@ const WorkshopTemplatesSettingsPage = observer(function WorkshopTemplatesSetting
                     )}
 
                     <div className="flex items-end gap-2">
-                      <div className="w-24">
+                      <div className="w-40">
                         <InputField
                           size="lg"
                           orientation="vertical"

@@ -16,7 +16,7 @@ import { IconButton } from "@makeplane/propel/components/icon-button";
 import { InputField } from "@makeplane/propel/components/input-field";
 import { RadioGroupField, RadioGroupFieldOption } from "@makeplane/propel/components/radio-group-field";
 import { Switch } from "@makeplane/propel/components/switch";
-import { ArrowDownOutline, ArrowUpOutline, DeleteOutline, GripOutline } from "@makeplane/propel/icons";
+import { ChevronDownOutline, ChevronUpOutline, DeleteOutline, GripOutline } from "@makeplane/propel/icons";
 import { Loader } from "@plane/blocks/skeleton";
 import { setToast } from "@plane/blocks/toast";
 import { WorkspaceDefaultsService } from "@plane/services";
@@ -167,7 +167,7 @@ const HomeDefaultsSettingsPage = observer(function HomeDefaultsSettingsPage() {
                     <IconButton
                       variant="ghost"
                       size="sm"
-                      icon={<Icon icon={ArrowUpOutline} />}
+                      icon={<Icon icon={ChevronUpOutline} />}
                       aria-label={`Move ${label} up`}
                       onClick={() => move(index, index - 1)}
                       disabled={index === 0}
@@ -175,7 +175,7 @@ const HomeDefaultsSettingsPage = observer(function HomeDefaultsSettingsPage() {
                     <IconButton
                       variant="ghost"
                       size="sm"
-                      icon={<Icon icon={ArrowDownOutline} />}
+                      icon={<Icon icon={ChevronDownOutline} />}
                       aria-label={`Move ${label} down`}
                       onClick={() => move(index, index + 1)}
                       disabled={index === rows.length - 1}
