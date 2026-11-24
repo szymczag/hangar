@@ -32,6 +32,10 @@ export type VisualFixtures = {
   pages: { ids: string[]; names: string[] };
   /** The text the seeded sticky opens with. */
   sticky: string;
+  /** The work item the light user's two (read) inbox notifications are about. */
+  notifications: { workItem: string; count: number };
+  /** The home page's recents, as the recents endpoint would serve them: a work item, a page and a project. */
+  recents: { id: string; entity_name: string; entity_identifier: string; visited_at: string; entity_data: unknown }[];
   /** The comment on the first work item. */
   comment: string;
   /** Custom property names on the Task type, in sort order. */
@@ -40,7 +44,7 @@ export type VisualFixtures = {
   sharedLinks: { visible: string[]; hidden: string[] };
   /** Email addresses of the seeded, unanswered workspace invitations. */
   invitations: string[];
-  users: Record<string, { email: string; sessionCookie?: string; adminSessionCookie?: string }>;
+  users: Record<string, { id: string; email: string; sessionCookie?: string; adminSessionCookie?: string }>;
 };
 
 let cached: VisualFixtures | undefined;
