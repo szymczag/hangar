@@ -11,12 +11,15 @@ import { useParams } from "next/navigation";
 import type { Control, Path, PathValue } from "react-hook-form";
 import { Controller } from "react-hook-form";
 // plane imports
+import { Select } from "@plane/blocks/select";
 import type { EditorRefApi } from "@plane/editor";
-import { CustomSearchSelect } from "@plane/ui";
 // types
 import type { TBulkIssueProperties, TIssue } from "@plane/types";
+// components
+import { IssueTypeIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // plane web
 import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
+import type { TIssueTypeExt } from "@/plane-web/types/issue-types";
 
 export type TIssueFields = TIssue & TBulkIssueProperties;
 
@@ -47,29 +50,46 @@ export function IssueTypeSelect<T extends Partial<TIssueFields>>(props: TIssueTy
 
   if (!projectId || availableTypes.length === 0) return <></>;
 
-  const options = availableTypes.map((type) => ({
-    value: type.id,
-    query: type.name,
-    content: type.name,
-  }));
-
   return (
     <Controller
       control={control}
       name={"type_id" as Path<T>}
-      render={({ field: { value, onChange } }) => (
-        <CustomSearchSelect
-          value={(value as string | null) ?? null}
-          onChange={(next: string | null) => {
-            onChange(next as PathValue<T, Path<T>>);
-            handleFormChange?.();
-          }}
-          options={options}
-          label={availableTypes.find((type) => type.id === value)?.name ?? (placeholder || "Work item type")}
-          disabled={disabled}
-          buttonClassName="h-7"
-        />
-      )}
+      render={({ field: { value, onChange } }) => {
+        const selected = availableTypes.find((type) => type.id === value) ?? null;
+        return (
+          <Select<TIssueTypeExt>
+            getValues={() => availableTypes}
+            value={selected}
+            onChange={(next) => {
+              onChange(next as PathValue<T, Path<T>>);
+              handleFormChange?.();
+            }}
+            getOptionValue={(type) => type.id}
+            getOptionLabel={(type) => type.name}
+            getOptionIcon={(type) => <IssueTypeIdentifier issueTypeId={type.id} projectId={projectId} size="xs" />}
+            disabled={disabled}
+            placeholder={placeholder || "Work item type"}
+            // A handful of types the user picks by name: keep their order, search only when long.
+            pinSelected={false}
+            showSearch={availableTypes.length > 7}
+          >
+            <Select.Trigger<TIssueTypeExt>
+              variant="pill-md"
+              disabled={disabled}
+              data-testid="create-work-item-type-select"
+              prependIcon={(types) =>
+                types[0] ? <IssueTypeIdentifier issueTypeId={types[0].id} projectId={projectId} size="xs" /> : undefined
+              }
+            >
+              {(types) => (
+                <span className="min-w-0 grow truncate text-left">
+                  {types[0]?.name ?? (placeholder || "Work item type")}
+                </span>
+              )}
+            </Select.Trigger>
+          </Select>
+        );
+      }}
     />
   );
 }

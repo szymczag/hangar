@@ -53,10 +53,10 @@ export const WorkItemModalAdditionalProperties = observer(function WorkItemModal
   if (properties.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-3 py-3 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 pt-3 md:grid-cols-2">
       {properties.map((property) => (
         <div key={property.id} className="flex flex-col gap-1">
-          <span className="text-13 text-tertiary">
+          <span className="text-body-xs-medium text-tertiary">
             {property.display_name}
             {property.is_required && <span className="text-danger-primary"> *</span>}
           </span>
@@ -70,7 +70,7 @@ export const WorkItemModalAdditionalProperties = observer(function WorkItemModal
             hasError={Boolean(issuePropertyValueErrors[property.id])}
           />
           {Boolean(issuePropertyValueErrors[property.id]) && (
-            <span className="text-11 text-danger-primary">{property.display_name} is required</span>
+            <span className="text-caption-sm-regular text-danger-primary">{property.display_name} is required</span>
           )}
         </div>
       ))}

@@ -7,12 +7,13 @@
 import { observer } from "mobx-react";
 import { Controller, useForm } from "react-hook-form";
 // plane imports
+import { InputField } from "@makeplane/propel/components/input-field";
+import { TextAreaField } from "@makeplane/propel/components/text-area-field";
 import { ISSUE_DISPLAY_FILTERS_BY_PAGE } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
 import type { IIssueDisplayFilterOptions, IIssueDisplayProperties, IWorkspaceView, IIssueFilters } from "@plane/types";
 import { EViewAccess, EIssueLayoutTypes, EIssuesStoreType } from "@plane/types";
-import { Input, TextArea } from "@plane/ui";
 import { getComputedDisplayFilters, getComputedDisplayProperties } from "@plane/utils";
 // components
 import { DisplayFiltersSelection, FiltersDropdown } from "@/components/issues/issue-layouts/filters";
@@ -76,7 +77,7 @@ export const WorkspaceViewForm = observer(function WorkspaceViewForm(props: Prop
   return (
     <form onSubmit={handleSubmit(handleCreateUpdateView)}>
       <div className="space-y-5 p-5">
-        <h3 className="text-18 font-medium text-secondary">{data ? t("view.update.label") : t("view.create.label")}</h3>
+        <h3 className="text-h5-medium text-secondary">{data ? t("view.update.label") : t("view.create.label")}</h3>
         <div className="space-y-3">
           <div className="space-y-1">
             <Controller
@@ -90,34 +91,38 @@ export const WorkspaceViewForm = observer(function WorkspaceViewForm(props: Prop
                 },
               }}
               render={({ field: { value, onChange, ref } }) => (
-                <Input
+                <InputField
+                  size="lg"
+                  orientation="vertical"
+                  error={errors?.name?.message}
                   id="name"
                   name="name"
                   type="name"
                   value={value}
                   onChange={onChange}
                   ref={ref}
-                  hasError={Boolean(errors.name)}
                   placeholder={t("common.title")}
-                  className="w-full text-14"
+                  aria-label={t("common.title")}
                 />
               )}
             />
-            <span className="text-11 text-danger-primary">{errors?.name?.message}</span>
           </div>
           <div>
             <Controller
               name="description"
               control={control}
               render={({ field: { value, onChange } }) => (
-                <TextArea
+                <TextAreaField
+                  size="lg"
+                  autoResize
+                  maxRows={8}
+                  error={errors?.description?.message}
                   id="description"
                   name="description"
                   value={value}
                   placeholder={t("common.description")}
+                  aria-label={t("common.description")}
                   onChange={onChange}
-                  className="min-h-24 w-full resize-none text-14"
-                  hasError={Boolean(errors?.description)}
                 />
               )}
             />
@@ -184,18 +189,23 @@ export const WorkspaceViewForm = observer(function WorkspaceViewForm(props: Prop
         </div>
       </div>
       <div className="flex items-center justify-end gap-2 border-t-[0.5px] border-subtle px-5 py-4">
-        <Button variant="secondary" onClick={handleClose}>
-          {t("common.cancel")}
-        </Button>
-        <Button variant="primary" type="submit" loading={isSubmitting}>
-          {data
-            ? isSubmitting
-              ? t("common.updating")
-              : t("view.update.label")
-            : isSubmitting
-              ? t("common.creating")
-              : t("view.create.label")}
-        </Button>
+        <Button variant="secondary" size="sm" stretch="auto" label={t("common.cancel")} onClick={handleClose} />
+        <Button
+          variant="primary"
+          size="sm"
+          stretch="auto"
+          type="submit"
+          label={
+            data
+              ? isSubmitting
+                ? t("common.updating")
+                : t("view.update.label")
+              : isSubmitting
+                ? t("common.creating")
+                : t("view.create.label")
+          }
+          loading={isSubmitting}
+        />
       </div>
     </form>
   );
