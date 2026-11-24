@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "In die Zwischenablage kopieren"
     },
-    "status": "Status"
+    "status": "Status",
+    "locked": "Gesperrt"
   },
   "chart": {
     "x_axis": "X-Achse",
@@ -897,5 +898,14 @@
   },
   "searching": "Wird gesucht...",
   "rename_folder": "Ordner umbenennen",
-  "entity_detail_toolbar": "Aktionen"
+  "entity_detail_toolbar": "Aktionen",
+  "labels_count": "{count, plural, one {# Label} other {# Labels}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "Filter ausblenden",
+      "save_as": "Speichern unter",
+      "save_options": "Optionen zum Speichern der Ansicht",
+      "update_view": "Ansicht aktualisieren"
+    }
+  }
 }

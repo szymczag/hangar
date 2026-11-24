@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "复制到剪贴板"
     },
-    "status": "状态"
+    "status": "状态",
+    "locked": "已锁定"
   },
   "chart": {
     "x_axis": "X轴",
@@ -897,5 +898,14 @@
   },
   "searching": "搜索中…",
   "rename_folder": "重命名文件夹",
-  "entity_detail_toolbar": "操作"
+  "entity_detail_toolbar": "操作",
+  "labels_count": "{count, plural, one {# 个标签} other {# 个标签}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "隐藏筛选",
+      "save_as": "另存为",
+      "save_options": "视图保存选项",
+      "update_view": "更新视图"
+    }
+  }
 }

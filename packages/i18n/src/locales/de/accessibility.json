@@ -51,6 +51,9 @@
       "next_page": "Zur nächsten Seite",
       "previous_page": "Zur vorherigen Seite",
       "root": "Seitennavigation"
+    },
+    "project_board": {
+      "collapse_group": "Gruppe einklappen"
     }
   }
 }

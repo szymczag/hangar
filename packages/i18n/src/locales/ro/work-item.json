@@ -276,7 +276,11 @@
     "archived_banner": "Această activitate este arhivată. Restaurați-o pentru a face modificări.",
     "assignee_count": "{count, plural, one {# responsabil} few {# responsabili} other {# de responsabili}}",
     "description_load_failed": "Descrierea nu a putut fi încărcată.",
-    "updated_time_ago": "Actualizat {time}"
+    "updated_time_ago": "Actualizat {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# etichetă} few {+# etichete} other {+# de etichete}}",
+      "trigger_aria_label": "{count, plural, one {încă # proprietate} few {încă # proprietăți} other {încă # de proprietăți}}"
+    }
   },
   "sub_work_item": {
     "update": {

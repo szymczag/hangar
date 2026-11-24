@@ -276,7 +276,11 @@
     "archived_banner": "この作業項目はアーカイブされています。変更するには復元してください。",
     "assignee_count": "{count, plural, one {担当者 #人} other {担当者 #人}}",
     "description_load_failed": "説明を読み込めませんでした。",
-    "updated_time_ago": "{time}に更新"
+    "updated_time_ago": "{time}に更新",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+#件のラベル} other {+#件のラベル}}",
+      "trigger_aria_label": "{count, plural, one {他 # 件のプロパティ} other {他 # 件のプロパティ}}"
+    }
   },
   "sub_work_item": {
     "update": {

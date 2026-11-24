@@ -51,6 +51,9 @@
       "next_page": "Go to next page",
       "previous_page": "Go to previous page",
       "root": "Pagination"
+    },
+    "project_board": {
+      "collapse_group": "Collapse group"
     }
   }
 }

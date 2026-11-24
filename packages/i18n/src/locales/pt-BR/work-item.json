@@ -276,7 +276,11 @@
     "archived_banner": "Este item de trabalho está arquivado. Restaure-o para fazer alterações.",
     "assignee_count": "{count, plural, one {# responsável} many {# responsáveis} other {# responsáveis}}",
     "description_load_failed": "Não foi possível carregar a descrição.",
-    "updated_time_ago": "Atualizado {time}"
+    "updated_time_ago": "Atualizado {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# etiqueta} many {+# etiquetas} other {+# etiquetas}}",
+      "trigger_aria_label": "{count, plural, one {mais # propriedade} many {mais # propriedades} other {mais # propriedades}}"
+    }
   },
   "sub_work_item": {
     "update": {

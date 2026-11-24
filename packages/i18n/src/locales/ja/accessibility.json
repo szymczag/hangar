@@ -51,6 +51,9 @@
       "next_page": "次のページへ移動",
       "previous_page": "前のページへ移動",
       "root": "ページネーション"
+    },
+    "project_board": {
+      "collapse_group": "グループを折りたたむ"
     }
   }
 }

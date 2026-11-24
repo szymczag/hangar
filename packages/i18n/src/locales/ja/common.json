@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "クリップボードにコピー"
     },
-    "status": "ステータス"
+    "status": "ステータス",
+    "locked": "ロック中"
   },
   "chart": {
     "x_axis": "エックス アクシス",
@@ -897,5 +898,14 @@
   },
   "searching": "検索中…",
   "rename_folder": "フォルダー名を変更",
-  "entity_detail_toolbar": "アクション"
+  "entity_detail_toolbar": "アクション",
+  "labels_count": "{count, plural, one {#件のラベル} other {#件のラベル}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "フィルターを非表示",
+      "save_as": "名前を付けて保存",
+      "save_options": "ビューの保存オプション",
+      "update_view": "ビューを更新"
+    }
+  }
 }

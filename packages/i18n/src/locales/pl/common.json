@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "Kopiuj do schowka"
     },
-    "status": "Status"
+    "status": "Status",
+    "locked": "Zablokowane"
   },
   "chart": {
     "x_axis": "Oś X",
@@ -897,5 +898,14 @@
   },
   "searching": "Wyszukiwanie...",
   "rename_folder": "Zmień nazwę folderu",
-  "entity_detail_toolbar": "Akcje"
+  "entity_detail_toolbar": "Akcje",
+  "labels_count": "{count, plural, one {# etykieta} few {# etykiety} many {# etykiet} other {# etykiety}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "Ukryj filtry",
+      "save_as": "Zapisz jako",
+      "save_options": "Opcje zapisu widoku",
+      "update_view": "Zaktualizuj widok"
+    }
+  }
 }

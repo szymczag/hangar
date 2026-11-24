@@ -276,7 +276,11 @@
     "archived_banner": "Tato pracovní položka je archivovaná. Pro provedení změn ji obnovte.",
     "assignee_count": "{count, plural, one {# přiřazený} few {# přiřazení} many {# přiřazeného} other {# přiřazených}}",
     "description_load_failed": "Popis se nepodařilo načíst.",
-    "updated_time_ago": "Aktualizováno {time}"
+    "updated_time_ago": "Aktualizováno {time}",
+    "properties_overflow": {
+      "label_overflow_indicator": "{count, plural, one {+# štítek} few {+# štítky} many {+# štítku} other {+# štítků}}",
+      "trigger_aria_label": "{count, plural, one {# další vlastnost} few {# další vlastnosti} many {# další vlastnosti} other {# dalších vlastností}}"
+    }
   },
   "sub_work_item": {
     "update": {

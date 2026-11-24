@@ -51,6 +51,9 @@
       "next_page": "Ir para a próxima página",
       "previous_page": "Ir para a página anterior",
       "root": "Paginação"
+    },
+    "project_board": {
+      "collapse_group": "Recolher grupo"
     }
   }
 }

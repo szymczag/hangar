@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "클립보드에 복사"
     },
-    "status": "상태"
+    "status": "상태",
+    "locked": "잠김"
   },
   "chart": {
     "x_axis": "X축",
@@ -897,5 +898,14 @@
   },
   "searching": "검색 중...",
   "rename_folder": "폴더 이름 변경",
-  "entity_detail_toolbar": "작업"
+  "entity_detail_toolbar": "작업",
+  "labels_count": "{count, plural, one {레이블 #개} other {레이블 #개}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "필터 숨기기",
+      "save_as": "다른 이름으로 저장",
+      "save_options": "뷰 저장 옵션",
+      "update_view": "뷰 업데이트"
+    }
+  }
 }

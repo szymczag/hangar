@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "Kopírovat do schránky"
     },
-    "status": "Stav"
+    "status": "Stav",
+    "locked": "Uzamčeno"
   },
   "chart": {
     "x_axis": "Osa X",
@@ -897,5 +898,14 @@
   },
   "searching": "Hledání...",
   "rename_folder": "Přejmenovat složku",
-  "entity_detail_toolbar": "Akce"
+  "entity_detail_toolbar": "Akce",
+  "labels_count": "{count, plural, one {# štítek} few {# štítky} many {# štítku} other {# štítků}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "Skrýt filtry",
+      "save_as": "Uložit jako",
+      "save_options": "Možnosti uložení pohledu",
+      "update_view": "Aktualizovat pohled"
+    }
+  }
 }

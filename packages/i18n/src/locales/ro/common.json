@@ -744,7 +744,8 @@
     "tooltip": {
       "copy_to_clipboard": "Copiază în clipboard"
     },
-    "status": "Stare"
+    "status": "Stare",
+    "locked": "Blocat"
   },
   "chart": {
     "x_axis": "axa-X",
@@ -897,5 +898,14 @@
   },
   "searching": "Se caută...",
   "rename_folder": "Redenumiți dosarul",
-  "entity_detail_toolbar": "Acțiuni"
+  "entity_detail_toolbar": "Acțiuni",
+  "labels_count": "{count, plural, one {# etichetă} few {# etichete} other {# de etichete}}",
+  "rich_filters": {
+    "view_controls": {
+      "hide_filters": "Ascunde filtrele",
+      "save_as": "Salvează ca",
+      "save_options": "Opțiuni de salvare a perspectivei",
+      "update_view": "Actualizează perspectiva"
+    }
+  }
 }
