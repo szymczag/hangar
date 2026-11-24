@@ -5,8 +5,8 @@
  */
 
 import { observer } from "mobx-react";
-import { Timer } from "lucide-react";
 // plane imports
+import { TimeTrackingOutline } from "@makeplane/propel/icons";
 import type { TIssueActivityComment } from "@plane/types";
 // components
 import { IssueActivityBlockComponent } from "@/components/issues/issue-detail/issue-activity/activity/actions";
@@ -34,7 +34,7 @@ export const IssueActivityWorklog = observer(function IssueActivityWorklog(props
 
   return (
     <IssueActivityBlockComponent
-      icon={<Timer size={14} className="text-secondary" aria-hidden="true" />}
+      icon={<TimeTrackingOutline className="size-3.5 text-secondary" aria-hidden="true" />}
       activityId={activityComment.id}
       ends={ends}
     >
