@@ -55,7 +55,7 @@ export const WorkItemModalAdditionalProperties = observer(function WorkItemModal
   return (
     <div className="grid grid-cols-1 gap-3 pt-3 md:grid-cols-2">
       {properties.map((property) => (
-        <div key={property.id} className="flex flex-col gap-1">
+        <div key={property.id} className="flex min-w-0 flex-col gap-1">
           <span className="text-body-xs-medium text-tertiary">
             {property.display_name}
             {property.is_required && <span className="text-danger-primary"> *</span>}
