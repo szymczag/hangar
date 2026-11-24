@@ -3,7 +3,7 @@
     "label": "Cài đặt không gian làm việc",
     "page_label": "{workspace} - Cài đặt chung",
     "key_created": "Đã tạo khóa",
-    "copy_key": "Sao chép và lưu khóa này trong Hangar Pages. Bạn sẽ không thể thấy khóa này sau khi đóng. Tệp CSV chứa khóa đã được tải xuống.",
+    "copy_key": "Sao chép khóa bí mật này và lưu ở nơi an toàn. Bạn sẽ không thể xem lại khóa này sau khi đóng. Tệp CSV chứa khóa đã được tải xuống.",
     "token_copied": "Đã sao chép token vào bảng tạm.",
     "settings": {
       "general": {

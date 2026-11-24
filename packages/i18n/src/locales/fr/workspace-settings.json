@@ -3,7 +3,7 @@
     "label": "Paramètres de l’espace de travail",
     "page_label": "{workspace} - Paramètres généraux",
     "key_created": "Clé créée",
-    "copy_key": "Copiez et sauvegardez cette clé secrète dans Hangar Pages. Vous ne pourrez plus voir cette clé après avoir cliqué sur Fermer. Un fichier CSV contenant la clé a été téléchargé.",
+    "copy_key": "Copiez cette clé secrète et conservez-la en lieu sûr. Vous ne pourrez plus la voir après avoir cliqué sur Fermer. Un fichier CSV contenant la clé a été téléchargé.",
     "token_copied": "Jeton copié dans le presse-papiers.",
     "settings": {
       "general": {

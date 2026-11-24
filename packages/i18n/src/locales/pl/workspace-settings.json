@@ -3,7 +3,7 @@
     "label": "Ustawienia przestrzeni roboczej",
     "page_label": "{workspace} - Ustawienia ogólne",
     "key_created": "Klucz utworzony",
-    "copy_key": "Skopiuj i zapisz ten klucz w Hangar Pages. Po zamknięciu nie będzie widoczny ponownie. Plik CSV z kluczem został pobrany.",
+    "copy_key": "Ten tajny klucz należy skopiować i przechowywać w bezpiecznym miejscu. Po zamknięciu nie będzie już widoczny. Plik CSV z kluczem został pobrany.",
     "token_copied": "Token skopiowano do schowka.",
     "settings": {
       "general": {

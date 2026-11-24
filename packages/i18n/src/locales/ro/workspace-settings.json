@@ -3,7 +3,7 @@
     "label": "Setări spațiu de lucru",
     "page_label": "{workspace} - Setări generale",
     "key_created": "Cheie creată",
-    "copy_key": "Copiază și salvează această cheie secretă în Hangar Documentație. Nu vei mai putea vedea această cheie după ce închizi. Un fișier CSV care conține cheia a fost descărcat.",
+    "copy_key": "Copiați această cheie secretă și păstrați-o într-un loc sigur. Nu o veți mai putea vedea după ce apăsați Închide. Un fișier CSV care conține cheia a fost descărcat.",
     "token_copied": "Token-ul a fost copiat în memoria temporară.",
     "settings": {
       "general": {

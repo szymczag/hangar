@@ -3,7 +3,7 @@
     "label": "工作區設定",
     "page_label": "{workspace} - 一般設定",
     "key_created": "金鑰已建立",
-    "copy_key": "複製並儲存此金鑰到 Hangar Pages。關閉後您將無法看到此金鑰。已下載包含金鑰的 CSV 檔案。",
+    "copy_key": "請複製此金鑰並妥善保存。關閉後您將無法再次查看此金鑰。已下載包含金鑰的 CSV 檔案。",
     "token_copied": "權杖已複製到剪貼簿。",
     "settings": {
       "general": {

@@ -3,7 +3,7 @@
     "label": "Arbeitsbereich-Einstellungen",
     "page_label": "{workspace} - Allgemeine Einstellungen",
     "key_created": "Schlüssel erstellt",
-    "copy_key": "Kopieren Sie diesen Schlüssel und fügen Sie ihn in Hangar Pages ein. Nach dem Schließen können Sie ihn nicht mehr sehen. Eine CSV-Datei mit dem Schlüssel wurde heruntergeladen.",
+    "copy_key": "Kopieren Sie diesen geheimen Schlüssel und bewahren Sie ihn an einem sicheren Ort auf. Nach dem Schließen können Sie ihn nicht mehr sehen. Eine CSV-Datei mit dem Schlüssel wurde heruntergeladen.",
     "token_copied": "Token in die Zwischenablage kopiert.",
     "settings": {
       "general": {
