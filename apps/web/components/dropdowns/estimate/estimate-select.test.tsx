@@ -18,8 +18,9 @@ import type { TIssue } from "@plane/types";
  *
  * Since phase 4b every work item layout edits the estimate through upstream's
  * `EstimateSelect`: the list, board and calendar rows through `all-properties.tsx`
- * and the spreadsheet through its estimate column. These pin the clear to `null`
- * in that select and on both paths to the update.
+ * and the spreadsheet through its estimate column. Since phase 4c the create and
+ * edit dialog does too. These pin the clear to `null` in that select and on every
+ * path to the update.
  */
 
 // What `EstimateSelect` hands the blocks select, captured on render.
@@ -29,6 +30,8 @@ vi.mock("@plane/blocks/property-select", () => ({
     captured.onChange = props.onChange;
     return null;
   },
+  // The dialog's date pills; only the estimate matters here.
+  DateSelect: () => null,
 }));
 vi.mock("next/navigation", () => ({ useParams: () => ({ workspaceSlug: "acme" }) }));
 vi.mock("@plane/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -41,14 +44,36 @@ vi.mock("@/hooks/store/estimates", () => ({
   }),
 }));
 vi.mock("@/hooks/store/estimates/use-estimate", () => ({ useEstimate: () => undefined }));
+// The create dialog's other properties, which read stores of their own.
+vi.mock("@/components/dropdowns/cycle/cycle-select", () => ({ CycleSelect: () => null }));
+vi.mock("@/components/dropdowns/label/label-select", () => ({ LabelSelect: () => null }));
+vi.mock("@/components/dropdowns/member/member-select", () => ({ MemberSelect: () => null }));
+vi.mock("@/components/dropdowns/module/module-select", () => ({ ModuleSelect: () => null }));
+vi.mock("@/components/dropdowns/priority/priority-select", () => ({ PrioritySelect: () => null }));
+vi.mock("@/components/dropdowns/state/state-select", () => ({ StateSelect: () => null }));
+vi.mock("@/components/issues/parent-issues-list-modal", () => ({ ParentIssuesListModal: () => null }));
+vi.mock("@/components/issues/issue-detail/issue-identifier", () => ({ IssueIdentifier: () => null }));
+vi.mock("@/plane-web/components/issues/issue-modal/issue-type-select", () => ({ IssueTypeSelect: () => null }));
+vi.mock("@/hooks/store/use-project", () => ({ useProject: () => ({ getProjectById: () => undefined }) }));
+vi.mock("@/hooks/store/use-project-state", () => ({
+  useProjectState: () => ({ getProjectDefaultStateId: () => undefined }),
+}));
+vi.mock("@/hooks/store/user", () => ({ useUserProfile: () => ({ data: undefined }) }));
+vi.mock("@/hooks/use-platform-os", () => ({ usePlatformOS: () => ({ isMobile: false }) }));
 
+import { useForm } from "react-hook-form";
+import type { UseFormReturn } from "react-hook-form";
+import { getChangedIssuefields } from "@plane/utils";
+import { IssueDefaultProperties } from "@/components/issues/issue-modal/components/default-properties";
 import { SpreadsheetEstimateColumn } from "@/components/issues/issue-layouts/spreadsheet/columns/estimate-column";
 import { EstimateSelect } from "./estimate-select";
 
 describe("EstimateSelect", () => {
   it("emits null when the estimate is cleared", () => {
     const onChange = vi.fn();
-    renderToStaticMarkup(<EstimateSelect value="point-1" onChange={onChange} projectId="project-1" />);
+    renderToStaticMarkup(
+      <EstimateSelect value="point-1" onChange={onChange} projectId="project-1" variant="pill-md" />
+    );
 
     captured.onChange?.(undefined);
 
@@ -57,7 +82,9 @@ describe("EstimateSelect", () => {
 
   it("passes a picked estimate point through", () => {
     const onChange = vi.fn();
-    renderToStaticMarkup(<EstimateSelect value={undefined} onChange={onChange} projectId="project-1" />);
+    renderToStaticMarkup(
+      <EstimateSelect value={undefined} onChange={onChange} projectId="project-1" variant="pill-md" />
+    );
 
     captured.onChange?.("point-2");
 
@@ -102,5 +129,52 @@ describe("the list, board and calendar row properties", () => {
     expect(source).toMatch(
       /const handleEstimate = async \(value: string \| null\) => \{\s*if \(updateIssue\) await updateIssue\(issue\.project_id, issue\.id, \{ estimate_point: value \}\);/
     );
+  });
+});
+
+describe("the work item create and edit dialog", () => {
+  /** Renders the dialog's property row on a form holding `estimate_point: "point-1"`. */
+  function renderDialogProperties(): UseFormReturn<TIssue> {
+    const form: { current?: UseFormReturn<TIssue> } = {};
+    function Dialog() {
+      const methods = useForm<TIssue>({ defaultValues: { estimate_point: "point-1" } });
+      form.current = methods;
+      return (
+        <IssueDefaultProperties
+          control={methods.control}
+          id="issue-1"
+          projectId="project-1"
+          workspaceSlug="acme"
+          selectedParentIssue={null}
+          startDate={null}
+          targetDate={null}
+          parentId={null}
+          isDraft={false}
+          handleFormChange={() => undefined}
+          setSelectedParentIssue={() => undefined}
+        />
+      );
+    }
+    renderToStaticMarkup(<Dialog />);
+    if (!form.current) throw new Error("the dialog did not render its form");
+    return form.current;
+  }
+
+  it("stores null in the form for No estimate", () => {
+    const form = renderDialogProperties();
+
+    captured.onChange?.(undefined);
+
+    expect(form.getValues("estimate_point")).toBeNull();
+  });
+
+  it("sends estimate_point: null when the edit is saved", () => {
+    const form = renderDialogProperties();
+
+    captured.onChange?.(undefined);
+
+    // The edit dialog sends only the dirty fields, built the way `form.tsx` builds them.
+    const payload = getChangedIssuefields(form.getValues(), { estimate_point: true });
+    expect(JSON.stringify(payload)).toBe('{"estimate_point":null}');
   });
 });
