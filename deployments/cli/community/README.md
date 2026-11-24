@@ -66,7 +66,7 @@ Installing Hangar is a very easy and minimal step process.
 
 Download the script from the newest release on the
 [Releases page](https://github.com/szymczag/hangar/releases); the commands below
-use `hangar-v0.3.0`. Whichever copy you run, `install` and `upgrade` look
+use `hangar-v0.4.0`. Whichever copy you run, `install` and `upgrade` look
 up the release themselves and fetch that release's compose file and settings,
 but never a newer copy of the script itself. A script from a release after
 hangar-v0.3.0 knows its own release and refuses to install or upgrade to a newer
@@ -85,7 +85,7 @@ cd plane-selfhost
 #### For _Docker Compose_ based setup
 
 ```
-curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.3.0/setup.sh
+curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.4.0/setup.sh
 
 chmod +x setup.sh
 ```
@@ -93,7 +93,7 @@ chmod +x setup.sh
 #### For _Docker Swarm_ based setup
 
 ```
-curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.3.0/swarm.sh
+curl -fsSL -o setup.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.4.0/swarm.sh
 
 chmod +x setup.sh
 ```
@@ -484,7 +484,11 @@ It is always advised to keep Hangar up to date with the latest release.
 > installer itself only takes effect once you run it. In particular, an upgrade
 > to hangar-v0.3.0 or later run with the hangar-v0.2.2 script, or an older one,
 > installs the new images but leaves `plane.env` and `plane.env.bak` at the
-> umask's mode, readable by other local users. Upgrade in five steps:
+> umask's mode, readable by other local users. Likewise, an upgrade to
+> hangar-v0.4.0 or later run with the hangar-v0.3.0 script, or an older one,
+> goes ahead without the release check described below and leaves that old
+> script in place, so it cannot warn you before the next upgrade either.
+> Upgrade in five steps:
 >
 > 1. Replace `setup.sh` with the new release's script, and verify it before it
 >    replaces the old one. Run `./setup.sh update-script` (below), or, with a
@@ -977,7 +981,7 @@ When you want to restore the previously backed-up data, follow the instructions 
 1. Download the restore script using the command below. We suggest downloading it in the same folder as `setup.sh`.
 
    ```bash
-   curl -fsSL -o restore.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.3.0/restore.sh
+   curl -fsSL -o restore.sh https://github.com/szymczag/hangar/releases/download/hangar-v0.4.0/restore.sh
    chmod +x restore.sh
    ```
 
