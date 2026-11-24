@@ -20,6 +20,8 @@ import { expect, fixtures, test } from "../src/fixtures.js";
  * The seed creates two public pages and one sticky for the light user. The
  * editor loads the first page's stored HTML through the live server, which is
  * how every page without collaborative state opens; nothing here types into it.
+ * Live stores the page as it opens it, so the list is seeded with that page as
+ * the most recently modified and reads the same in either order.
  * The export dialog is opened, never submitted.
  */
 
@@ -42,6 +44,11 @@ async function pageEditor(page: Page): Promise<{ main: Locator; editor: Locator 
   await expect(editor).toBeVisible();
   await page.mouse.move(0, 0);
   return { main, editor };
+}
+
+/** A dialog's panel: Headless UI's panel on 1.4 (its root has no box), the Base UI popup on Propel. */
+function dialogPanel(page: Page): Locator {
+  return page.locator('[id^="headlessui-dialog-panel"], [role="dialog"]:not([id^="headlessui-dialog"])').last();
 }
 
 /** The menu trigger: the 1.4 ellipsis menu, or Propel's icon button. */
@@ -91,7 +98,7 @@ test("the page export dialog", async ({ asUser }) => {
   const menu = moreActions(page);
   await page.locator("div").filter({ hasText: seed.pages.names[0] }).filter({ has: menu }).last().locator(menu).click();
   await page.getByRole("menuitem", { name: "Export" }).click();
-  const dialog = page.getByRole("dialog").last();
+  const dialog = dialogPanel(page);
   const exportButton = dialog.getByRole("button", { name: "Export", exact: true });
   await expect(exportButton).toBeVisible();
 

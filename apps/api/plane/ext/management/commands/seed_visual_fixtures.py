@@ -659,9 +659,12 @@ class Command(BaseCommand):
             ProjectPage.objects.get_or_create(
                 page=page, project=project, defaults={"workspace": workspace, "created_by": owner}
             )
-            # `auto_now_add`: the list prints when each page was created.
+            # `auto_now_add`, and the list sorts by date modified. The first page
+            # is the newest: opening it in the editor stores it through the
+            # live server, which moves its `updated_at` to the real date, and
+            # the list must read the same before and after that happens.
             Page.objects.filter(pk=page.pk).update(
-                created_at=CLOCK - timedelta(days=5 - index), updated_at=CLOCK - timedelta(days=5 - index)
+                created_at=CLOCK - timedelta(days=4 + index), updated_at=CLOCK - timedelta(days=4 + index)
             )
 
     def _stickies(self, workspace, owner) -> None:
