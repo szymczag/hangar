@@ -11,14 +11,15 @@ import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-d
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane helpers
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontalOutline } from "@makeplane/propel/icons";
 import { useOutsideClickDetector } from "@plane/hooks";
 // types
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { setToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { TIssue, IIssueDisplayProperties, IIssueMap } from "@plane/types";
 // ui
-import { ControlLink, DropIndicator } from "@plane/ui";
+import { ControlLink } from "@plane/blocks/layout";
+import { DropIndicator } from "@plane/blocks/common";
 import { cn, generateWorkItemLink } from "@plane/utils";
 // components
 import RenderIfVisible from "@/components/core/render-if-visible-HOC";
@@ -61,10 +62,13 @@ interface IssueDetailsBlockProps {
   isEpic?: boolean;
 }
 
-const stopPointerEventPropagation = (event: React.MouseEvent | React.KeyboardEvent) => {
+const stopPointerEventPropagation = (event: React.MouseEvent) => {
   event.stopPropagation();
   event.preventDefault();
 };
+
+// Keys only stop here: cancelling them would also cancel the menu trigger's own Enter and Space activation.
+const stopKeyPropagation = (event: React.KeyboardEvent) => event.stopPropagation();
 
 const KanbanIssueDetailsBlock = observer(function KanbanIssueDetailsBlock(props: IssueDetailsBlockProps) {
   const { cardRef, issue, updateIssue, quickActions, isReadOnly, displayProperties, isEpic = false } = props;
@@ -76,20 +80,19 @@ const KanbanIssueDetailsBlock = observer(function KanbanIssueDetailsBlock(props:
   const { isMobile } = usePlatformOS();
 
   const customActionButton = (
+    // The quick-action menu grafts its trigger behaviour (and accessible name) onto this element via
+    // MenuTrigger render, so it has to be a real button.
     <button
       type="button"
       ref={menuActionRef}
-      className={`flex h-full w-full cursor-pointer items-center rounded-sm p-1 text-placeholder hover:bg-layer-1 ${
+      className={`flex h-full w-full cursor-pointer items-center rounded-sm p-1 hover:bg-layer-1 ${
         isMenuActive ? "bg-layer-1 text-primary" : "text-secondary"
       }`}
       onClick={() => setIsMenuActive(!isMenuActive)}
     >
-      <MoreHorizontal className="h-3.5 w-3.5" />
+      <MoreHorizontalOutline className="h-3.5 w-3.5" />
     </button>
   );
-
-  // derived values
-  const subIssueCount = issue?.sub_issues_count ?? 0;
 
   useOutsideClickDetector(menuActionRef, () => setIsMenuActive(false));
 
@@ -108,12 +111,13 @@ const KanbanIssueDetailsBlock = observer(function KanbanIssueDetailsBlock(props:
         {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
         <div
           className={cn("absolute -top-1 right-0", {
-            "hidden group-hover/kanban-block:block": !isMobile,
-            "!block": isMenuActive,
+            "invisible group-focus-within/kanban-block:visible group-hover/kanban-block:visible has-[[data-popup-open]]:visible":
+              !isMobile,
+            "!visible": isMenuActive,
           })}
           role="presentation"
           onClick={stopPointerEventPropagation}
-          onKeyDown={stopPointerEventPropagation}
+          onKeyDown={stopKeyPropagation}
         >
           {quickActions({
             issue,
@@ -123,14 +127,14 @@ const KanbanIssueDetailsBlock = observer(function KanbanIssueDetailsBlock(props:
         </div>
       </div>
 
-      <Tooltip tooltipContent={issue.name} isMobile={isMobile} renderByDefault={false}>
-        <div className="line-clamp-1 w-full text-body-sm-medium text-primary">
+      <Tooltip label={issue.name} layout="stacked" disabled={isMobile}>
+        <div className="w-full text-body-sm-medium break-words text-primary">
           <span>{issue.name}</span>
         </div>
       </Tooltip>
 
       <IssueProperties
-        className="flex flex-wrap items-center gap-2 pt-1.5 whitespace-nowrap text-tertiary"
+        className="flex flex-wrap items-center gap-2 whitespace-nowrap text-tertiary"
         issue={issue}
         displayProperties={displayProperties}
         activeLayout="Kanban"
@@ -257,7 +261,7 @@ export const KanbanIssueBlock = observer(function KanbanIssueBlock(props: IssueB
           if (isDragAllowed) setIsCurrentBlockDragging(true);
           else {
             setToast({
-              type: TOAST_TYPE.WARNING,
+              type: "warning",
               title: "Cannot move work item",
               message: !canEditIssueProperties
                 ? "You are not allowed to move this work item"
@@ -271,7 +275,7 @@ export const KanbanIssueBlock = observer(function KanbanIssueBlock(props: IssueB
           href={workItemLink}
           ref={cardRef}
           className={cn(
-            "block w-full rounded-lg border border-subtle bg-layer-2 p-3 text-13 shadow-raised-100 outline-[0.5px] outline-transparent transition-all hover:border-strong hover:shadow-raised-200",
+            "block w-full rounded-lg border border-subtle-1 bg-layer-2 p-3 text-body-xs-regular outline-[0.5px] outline-transparent transition-all hover:border-strong hover:shadow-raised-200",
             { "hover:cursor-pointer": isDragAllowed },
             { "border border-accent-strong hover:border-accent-strong": getIsIssuePeeked(issue.id) },
             { "z-[100] bg-layer-1": isCurrentBlockDragging }
@@ -280,7 +284,7 @@ export const KanbanIssueBlock = observer(function KanbanIssueBlock(props: IssueB
           disabled={!!issue?.tempId}
         >
           <RenderIfVisible
-            classNames="space-y-2"
+            classNames="flex flex-col gap-3"
             root={scrollableContainerRef}
             defaultHeight="100px"
             horizontalOffset={100}

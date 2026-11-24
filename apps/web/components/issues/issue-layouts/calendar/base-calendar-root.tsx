@@ -10,7 +10,7 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
 import { EIssueGroupByToServerOptions, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { TGroupedIssues } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 // hooks
@@ -123,7 +123,7 @@ export const BaseCalendarRoot = observer(function BaseCalendarRoot(props: IBaseC
     ).catch((err) => {
       setToast({
         title: "Error!",
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         message: err?.detail ?? "Failed to perform this action",
       });
     });
@@ -138,12 +138,12 @@ export const BaseCalendarRoot = observer(function BaseCalendarRoot(props: IBaseC
 
   const getPaginationData = useCallback(
     (groupId: string | undefined) => issues?.getPaginationData(groupId, undefined),
-    [issues?.getPaginationData]
+    [issues]
   );
 
   const getGroupIssueCount = useCallback(
     (groupId: string | undefined) => issues?.getGroupIssueCount(groupId, undefined, false),
-    [issues?.getGroupIssueCount]
+    [issues]
   );
 
   const canEditProperties = useCallback(

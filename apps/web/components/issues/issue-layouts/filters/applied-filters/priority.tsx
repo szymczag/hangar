@@ -7,8 +7,9 @@
 import { observer } from "mobx-react";
 
 // icons
-import { CloseIcon, PriorityIcon } from "@plane/propel/icons";
+import { PriorityIcon } from "@plane/blocks/icons";
 import type { TIssuePriorities } from "@plane/types";
+import { RemovableChip } from "@/components/common/removable-chip";
 // types
 
 type Props = {
@@ -23,19 +24,14 @@ export const AppliedPriorityFilters = observer(function AppliedPriorityFilters(p
   return (
     <>
       {values.map((priority) => (
-        <div key={priority} className="flex items-center gap-1 rounded-sm bg-layer-1 p-1 text-11">
-          <PriorityIcon priority={priority as TIssuePriorities} className={`h-3 w-3`} />
-          {priority}
-          {editable && (
-            <button
-              type="button"
-              className="grid place-items-center text-tertiary hover:text-secondary"
-              onClick={() => handleRemove(priority)}
-            >
-              <CloseIcon height={10} width={10} strokeWidth={2} />
-            </button>
-          )}
-        </div>
+        <RemovableChip
+          key={priority}
+          variant="soft"
+          icon={<PriorityIcon priority={priority as TIssuePriorities} className="h-3 w-3" />}
+          label={priority}
+          ariaLabel={priority}
+          onRemove={editable ? () => handleRemove(priority) : undefined}
+        />
       ))}
     </>
   );

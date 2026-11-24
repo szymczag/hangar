@@ -21,7 +21,7 @@ import type {
 } from "@plane/types";
 import { EIssuesStoreType, EIssueLayoutTypes } from "@plane/types";
 // ui
-import { Spinner } from "@plane/ui";
+import { Spinner } from "@plane/blocks/spinner";
 import { renderFormattedPayloadDate, cn } from "@plane/utils";
 // constants
 import { MONTHS_LIST } from "@plane/constants";
@@ -122,7 +122,7 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
         element,
       })
     );
-  }, [scrollableContainerRef?.current]);
+  }, []);
 
   if (!calendarPayload || !formattedDatePayload)
     return (
@@ -160,6 +160,7 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
                         setSelectedDate={setSelectedDate}
                         handleDragAndDrop={handleDragAndDrop}
                         issuesFilterStore={issuesFilterStore}
+                        // oxlint-disable-next-line react/no-array-index-key -- a week's position in the month is its identity
                         key={weekIndex}
                         week={week}
                         issues={issues}
@@ -205,7 +206,7 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
 
             {/* mobile view */}
             <div className="md:hidden">
-              <p className="p-4 text-18 font-semibold">
+              <p className="p-4 text-h5-semibold">
                 {`${selectedDate.getDate()} ${
                   MONTHS_LIST[selectedDate.getMonth() + 1].title
                 }, ${selectedDate.getFullYear()}`}
@@ -233,7 +234,7 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
 
         {/* mobile view */}
         <div className="md:hidden">
-          <p className="p-4 text-18 font-semibold">
+          <p className="p-4 text-h5-semibold">
             {`${selectedDate.getDate()} ${
               MONTHS_LIST[selectedDate.getMonth() + 1].title
             }, ${selectedDate.getFullYear()}`}

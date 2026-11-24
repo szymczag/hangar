@@ -7,13 +7,15 @@
 import React from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-// lucide icons
-import { Minimize2, Maximize2, Circle } from "lucide-react";
-import { PlusIcon } from "@plane/propel/icons";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+// icons
+import { AddOutline, ArrowCollapseOutline, ArrowExpandOutline, CircleOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import type { TIssue, ISearchIssueResponse, TIssueKanbanFilters, TIssueGroupByOptions } from "@plane/types";
+import { useTranslation } from "@plane/i18n";
+import { cn } from "@plane/utils";
 // ui
-import { CustomMenu } from "@plane/ui";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@makeplane/propel/components/menu";
 // components
 import { ExistingIssuesListModal } from "@/components/core/modals/existing-issues-list-modal";
 import { CreateUpdateIssueModal } from "@/components/issues/issue-modal/modal";
@@ -48,7 +50,9 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
     disableIssueCreation,
     addIssuesToView,
   } = props;
-  const verticalAlignPosition = sub_group_by ? false : collapsedGroups?.group_by.includes(column_id);
+  // plane hooks
+  const { t } = useTranslation();
+  const isCollapsed = !!collapsedGroups?.group_by.includes(column_id);
   // states
   const [isOpen, setIsOpen] = React.useState(false);
   const [openExistingIssueListModal, setOpenExistingIssueListModal] = React.useState(false);
@@ -69,18 +73,36 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
       await addIssuesToView?.(issues);
 
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Success!",
         message: "Work items added to the cycle successfully.",
       });
     } catch (_error) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error!",
         message: "Selected work items could not be added to the cycle. Please try again.",
       });
     }
   };
+
+  // Collapsed: visuals only, inside the column's expand button (KanbanCollapsedColumnTrigger). The flat board
+  // stacks the icon, a vertical name and the count; a swimlane header cell only fits the icon and the glyph.
+  if (isCollapsed)
+    return (
+      <span className={cn("flex shrink-0 items-center gap-1", !sub_group_by && "flex-col")}>
+        <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-xs">
+          {icon ? icon : <CircleOutline width={16} height={16} />}
+        </span>
+        {!sub_group_by && (
+          <>
+            <span className="max-h-100 vertical-lr truncate text-body-sm-medium text-primary">{title}</span>
+            <span className="pr-0.5 text-body-xs-medium text-tertiary">{count || 0}</span>
+          </>
+        )}
+        <ArrowExpandOutline className="size-3 shrink-0 text-secondary" />
+      </span>
+    );
 
   return (
     <>
@@ -101,81 +123,65 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
           handleOnSubmit={handleAddIssuesToView}
         />
       )}
-      <div
-        className={`relative flex flex-shrink-0 gap-1 py-1.5 ${
-          verticalAlignPosition ? `w-[44px] flex-col items-center` : `w-full flex-row items-center`
-        }`}
-      >
+      <div className="relative flex w-full flex-shrink-0 flex-row items-center gap-1">
         <div className="flex size-5 flex-shrink-0 items-center justify-center overflow-hidden rounded-xs">
-          {icon ? icon : <Circle width={14} strokeWidth={2} />}
+          {icon ? icon : <CircleOutline width={16} height={16} />}
         </div>
 
-        <div
-          className={`relative flex gap-1 ${
-            verticalAlignPosition ? `flex-col items-center` : `w-full flex-row items-baseline overflow-hidden`
-          }`}
-        >
-          <div
-            className={`line-clamp-1 inline-block truncate overflow-hidden font-medium text-primary ${
-              verticalAlignPosition ? `max-h-[400px] vertical-lr` : ``
-            }`}
-          >
+        <div className="relative flex w-full flex-row items-baseline gap-1 overflow-hidden">
+          <div className="line-clamp-1 inline-block truncate overflow-hidden text-body-sm-medium text-primary">
             {title}
           </div>
-          <div
-            className={`flex-shrink-0 text-13 font-medium text-tertiary ${verticalAlignPosition ? `pr-0.5` : `pl-2`}`}
-          >
-            {count || 0}
-          </div>
+          <div className="flex-shrink-0 pl-2 text-body-xs-medium text-tertiary">{count || 0}</div>
         </div>
 
-        {sub_group_by === null && (
-          <button
-            className="flex h-[20px] w-[20px] flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-sm bg-layer-transparent transition-all hover:bg-layer-transparent-hover"
-            onClick={() => handleCollapsedGroups("group_by", column_id)}
-          >
-            {verticalAlignPosition ? (
-              <Maximize2 width={14} strokeWidth={2} />
-            ) : (
-              <Minimize2 width={14} strokeWidth={2} />
-            )}
-          </button>
-        )}
+        <IconButton
+          variant="ghost"
+          size="xs"
+          aria-label={t("aria_labels.project_board.collapse_group")}
+          aria-expanded
+          icon={<ArrowCollapseOutline className="size-3.5" />}
+          onClick={() => handleCollapsedGroups("group_by", column_id)}
+        />
 
         {!disableIssueCreation &&
           (renderExistingIssueModal ? (
-            <CustomMenu
-              customButton={
-                <span className="flex h-[20px] w-[20px] flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-sm bg-layer-transparent transition-all hover:bg-layer-transparent-hover">
-                  <PlusIcon height={14} width={14} strokeWidth={2} />
-                </span>
-              }
-              placement="bottom-end"
-            >
-              <CustomMenu.MenuItem
-                onClick={() => {
-                  setIsOpen(true);
-                }}
-              >
-                <span className="flex items-center justify-start gap-2">Create work item</span>
-              </CustomMenu.MenuItem>
-              <CustomMenu.MenuItem
-                onClick={() => {
-                  setOpenExistingIssueListModal(true);
-                }}
-              >
-                <span className="flex items-center justify-start gap-2">Add an existing work item</span>
-              </CustomMenu.MenuItem>
-            </CustomMenu>
+            <Menu>
+              <MenuTrigger
+                render={
+                  <IconButton
+                    variant="ghost"
+                    size="xs"
+                    aria-label={t("common.add")}
+                    icon={<AddOutline className="size-3.5" />}
+                  />
+                }
+              />
+              <MenuContent side="bottom" align="end">
+                <MenuItem
+                  label="Create work item"
+                  onClick={() => {
+                    setIsOpen(true);
+                  }}
+                />
+                <MenuItem
+                  label="Add an existing work item"
+                  onClick={() => {
+                    setOpenExistingIssueListModal(true);
+                  }}
+                />
+              </MenuContent>
+            </Menu>
           ) : (
-            <button
-              className="flex h-[20px] w-[20px] flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-sm bg-layer-transparent transition-all hover:bg-layer-transparent-hover"
+            <IconButton
+              variant="ghost"
+              size="xs"
+              aria-label={t("common.add")}
+              icon={<AddOutline className="size-3.5" />}
               onClick={() => {
                 setIsOpen(true);
               }}
-            >
-              <PlusIcon width={14} strokeWidth={2} />
-            </button>
+            />
           ))}
       </div>
     </>

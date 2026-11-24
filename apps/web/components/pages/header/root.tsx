@@ -13,7 +13,7 @@ import type { TPageFilterProps, TPageNavigationTabs } from "@plane/types";
 import { Header, EHeaderVariant } from "@plane/ui";
 import { calculateTotalFilters } from "@plane/utils";
 // components
-import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { usePageStore } from "@/hooks/store";
@@ -77,7 +77,7 @@ export const PagesListHeaderRoot = observer(function PagesListHeaderRoot(props: 
               if (val.order) updateFilters("sortBy", val.order);
             }}
           />
-          <FiltersDropdown
+          <FiltersDropdownLegacy
             icon={<ListFilter className="h-3 w-3" />}
             title={t("common.filters")}
             placement="bottom-end"
@@ -88,7 +88,7 @@ export const PagesListHeaderRoot = observer(function PagesListHeaderRoot(props: 
               handleFiltersUpdate={updateFilters}
               memberIds={workspaceMemberIds ?? undefined}
             />
-          </FiltersDropdown>
+          </FiltersDropdownLegacy>
         </Header.RightItem>
       </Header>
       {calculateTotalFilters(filters?.filters ?? {}) !== 0 && (

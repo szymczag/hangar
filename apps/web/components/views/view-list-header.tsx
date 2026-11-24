@@ -16,7 +16,7 @@ import { cn } from "@plane/utils";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useProjectView } from "@/hooks/store/use-project-view";
-import { FiltersDropdown } from "../issues/issue-layouts/filters";
+import { FiltersDropdownLegacy } from "../issues/issue-layouts/filters";
 import { ViewFiltersSelection } from "./filters/filter-selection";
 import { ViewOrderByDropdown } from "./filters/order-by";
 import { IconButton } from "@plane/propel/icon-button";
@@ -108,7 +108,7 @@ export const ViewListHeader = observer(function ViewListHeader() {
             if (val.order) updateFilters("sortBy", val.order);
           }}
         />
-        <FiltersDropdown
+        <FiltersDropdownLegacy
           icon={<ListFilter className="h-3 w-3" />}
           title="Filters"
           placement="bottom-end"
@@ -119,7 +119,7 @@ export const ViewListHeader = observer(function ViewListHeader() {
             handleFiltersUpdate={updateFilters}
             memberIds={projectMemberIds ?? undefined}
           />
-        </FiltersDropdown>
+        </FiltersDropdownLegacy>
       </div>
     </div>
   );

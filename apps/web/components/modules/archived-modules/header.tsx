@@ -17,7 +17,7 @@ import type { TModuleFilters } from "@plane/types";
 import { cn, calculateTotalFilters } from "@plane/utils";
 // components
 import { ArchiveTabsList } from "@/components/archives";
-import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
 import { ModuleFiltersSelection, ModuleOrderByDropdown } from "@/components/modules";
 // helpers
 // hooks
@@ -138,7 +138,7 @@ export const ArchivedModulesHeader = observer(function ArchivedModulesHeader() {
             });
           }}
         />
-        <FiltersDropdown
+        <FiltersDropdownLegacy
           icon={<ListFilter className="h-3 w-3" />}
           title="Filters"
           placement="bottom-end"
@@ -155,7 +155,7 @@ export const ArchivedModulesHeader = observer(function ArchivedModulesHeader() {
             memberIds={workspaceMemberIds ?? undefined}
             isArchived
           />
-        </FiltersDropdown>
+        </FiltersDropdownLegacy>
       </div>
     </div>
   );

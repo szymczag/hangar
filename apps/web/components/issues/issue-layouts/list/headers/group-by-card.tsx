@@ -7,13 +7,15 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { CircleDashed } from "lucide-react";
-import { PlusIcon } from "@plane/propel/icons";
+import { AddOutline, CircleDashedOutline } from "@makeplane/propel/icons";
 // types
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { TIssue, ISearchIssueResponse, TIssueGroupByOptions } from "@plane/types";
+import { useTranslation } from "@plane/i18n";
 // ui
-import { CustomMenu } from "@plane/ui";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@makeplane/propel/components/menu";
 // components
 import { cn } from "@plane/utils";
 import { ExistingIssuesListModal } from "@/components/core/modals/existing-issues-list-modal";
@@ -35,6 +37,7 @@ interface IHeaderGroupByCard {
   addIssuesToView?: (issueIds: string[]) => Promise<TIssue>;
   selectionHelpers: TSelectionHelper;
   handleCollapsedGroups: (value: string) => void;
+  isExpanded: boolean;
   isEpic?: boolean;
 }
 
@@ -50,7 +53,10 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
     addIssuesToView,
     selectionHelpers,
     handleCollapsedGroups,
+    isExpanded,
   } = props;
+  // plane hooks
+  const { t } = useTranslation();
   // states
   const [isOpen, setIsOpen] = useState(false);
   const [openExistingIssueListModal, setOpenExistingIssueListModal] = useState(false);
@@ -73,13 +79,13 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
       await addIssuesToView?.(issues);
 
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Success!",
         message: "Work items added to the cycle successfully.",
       });
     } catch (_error) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Error!",
         message: "Selected work items could not be added to the cycle. Please try again.",
       });
@@ -90,10 +96,10 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
     <>
       <div className="group/list-header flex w-full flex-shrink-0 items-center gap-2 py-1.5">
         {canSelectIssues && (
-          <div className="absolute left-1 flex w-3.5 flex-shrink-0 items-center">
+          <div className="absolute left-0.5 flex w-4 flex-shrink-0 items-center">
             <MultipleSelectGroupAction
               className={cn(
-                "pointer-events-none size-3.5 opacity-0 !outline-none group-hover/list-header:pointer-events-auto group-hover/list-header:opacity-100",
+                "pointer-events-none size-3.5 opacity-0 !outline-none group-focus-within/list-header:pointer-events-auto group-focus-within/list-header:opacity-100 group-hover/list-header:pointer-events-auto group-hover/list-header:opacity-100",
                 {
                   "pointer-events-auto opacity-100": !isGroupSelectionEmpty,
                 }
@@ -105,53 +111,59 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
           </div>
         )}
         <div className="grid flex-shrink-0 place-items-center overflow-hidden">
-          {icon ?? <CircleDashed className="size-3.5" strokeWidth={2} />}
+          {icon ?? <CircleDashedOutline className="size-3.5" />}
         </div>
 
         <button
           type="button"
-          className="relative flex w-full cursor-pointer flex-row items-center gap-1 overflow-hidden"
+          aria-label={title}
+          aria-expanded={isExpanded}
+          className="relative flex w-full min-w-0 cursor-pointer flex-row items-center gap-1 rounded-xs text-left outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
           onClick={() => handleCollapsedGroups(groupID)}
         >
-          <div className="line-clamp-1 inline-block truncate font-medium text-primary">{title}</div>
-          <div className="pl-2 text-13 font-medium text-tertiary">{count || 0}</div>
-          <div className="px-2.5" />
+          <span className="line-clamp-1 inline-block truncate text-body-sm-medium text-primary">{title}</span>
+          <span className="pl-2 text-body-xs-medium text-tertiary">{count || 0}</span>
+          <span className="px-2.5" />
         </button>
 
         {!disableIssueCreation &&
           (renderExistingIssueModal ? (
-            <CustomMenu
-              customButton={
-                <span className="flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xs transition-all hover:bg-layer-1">
-                  <PlusIcon className="h-3.5 w-3.5" strokeWidth={2} />
-                </span>
-              }
-            >
-              <CustomMenu.MenuItem
-                onClick={() => {
-                  setIsOpen(true);
-                }}
-              >
-                <span className="flex items-center justify-start gap-2">Create work item</span>
-              </CustomMenu.MenuItem>
-              <CustomMenu.MenuItem
-                onClick={() => {
-                  setOpenExistingIssueListModal(true);
-                }}
-              >
-                <span className="flex items-center justify-start gap-2">Add an existing work item</span>
-              </CustomMenu.MenuItem>
-            </CustomMenu>
+            <Menu>
+              <MenuTrigger
+                render={
+                  <IconButton
+                    variant="ghost"
+                    size="md"
+                    aria-label={t("common.add")}
+                    icon={<Icon icon={AddOutline} />}
+                  />
+                }
+              />
+              <MenuContent side="bottom" align="start">
+                <MenuItem
+                  label="Create work item"
+                  onClick={() => {
+                    setIsOpen(true);
+                  }}
+                />
+                <MenuItem
+                  label="Add an existing work item"
+                  onClick={() => {
+                    setOpenExistingIssueListModal(true);
+                  }}
+                />
+              </MenuContent>
+            </Menu>
           ) : (
-            <button
-              type="button"
-              className="flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xs transition-all hover:bg-layer-1"
+            <IconButton
+              variant="ghost"
+              size="md"
+              aria-label={t("common.add")}
+              icon={<Icon icon={AddOutline} />}
               onClick={() => {
                 setIsOpen(true);
               }}
-            >
-              <PlusIcon width={14} strokeWidth={2} />
-            </button>
+            />
           ))}
 
         <CreateUpdateIssueModal

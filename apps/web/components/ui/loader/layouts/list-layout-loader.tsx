@@ -7,7 +7,7 @@
 import { Fragment, forwardRef } from "react";
 import { range } from "lodash-es";
 // plane ui
-import { Row } from "@plane/ui";
+import { Row } from "@plane/blocks/layout";
 // plane utils
 import { cn } from "@plane/utils";
 import { getRandomInt, getRandomLength } from "../utils";
@@ -95,6 +95,7 @@ export function ListLayoutLoader() {
   return (
     <div className="flex flex-shrink-0 flex-col">
       {[6, 5, 2].map((itemCount, index) => (
+        // oxlint-disable-next-line react/no-array-index-key -- fixed placeholder sections, never reordered
         <ListSection key={index} itemCount={itemCount} />
       ))}
     </div>

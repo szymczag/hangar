@@ -4,26 +4,44 @@
  * See the LICENSE file for details.
  */
 
-import React, { Fragment, useState } from "react";
-import type { Placement } from "@popperjs/core";
-import { usePopper } from "react-popper";
-// headless ui
-import { Popover, Transition } from "@headlessui/react";
-// ui
-import { Button } from "@plane/propel/button";
+import type React from "react";
+// plane imports
+import { Icon } from "@makeplane/propel/components/icon";
+import { Menu, MenuContent, MenuTrigger } from "@makeplane/propel/components/menu";
+// Element tier on purpose: the menu trigger is the one interactive element, so the chrome inside it
+// must not render buttons of its own.
+import { Button as ButtonElement, ButtonLabel } from "@makeplane/propel/elements/button";
+import { IconButton as IconButtonElement } from "@makeplane/propel/elements/icon-button";
+import { FilterOutline, SelectedFilterOutline } from "@makeplane/propel/icons";
+import type { TPopoverMenuPlacement } from "@plane/blocks/common";
+import { toSideAndAlign } from "@plane/blocks/common";
+import type { IconElement } from "@plane/blocks/types";
+import { cn } from "@plane/utils";
+// components
+import { DateFilterModalHost } from "@/components/common/filters/date-filter-modal-host";
 
 type Props = {
+  /** Menu rows: `MenuGroup`s, `MenuSubmenu`s, `MenuCheckboxItem`s, `MenuSeparator`s… */
   children: React.ReactNode;
-  icon?: React.ReactElement;
+  icon?: IconElement;
   miniIcon?: React.ReactNode;
   title?: string;
-  placement?: Placement;
+  placement?: TPopoverMenuPlacement;
   disabled?: boolean;
   tabIndex?: number;
   menuButton?: React.ReactNode;
   isFiltersApplied?: boolean;
+  /** Renders the trigger as the icon-only Filters button, accent-tinted while filters are applied. */
+  iconOnly?: boolean;
 };
 
+const APPLIED_DOT = <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-accent-primary" />;
+
+/**
+ * The shell shared by the header Filters and Display menus: a Propel `Menu` opened from the header
+ * button (or a caller-supplied `menuButton`). It also hosts the custom date-range modal, which has to
+ * outlive the menu popup that asks for it.
+ */
 export function FiltersDropdown(props: Props) {
   const {
     children,
@@ -35,86 +53,81 @@ export function FiltersDropdown(props: Props) {
     tabIndex,
     menuButton,
     isFiltersApplied = false,
+    iconOnly = false,
   } = props;
 
-  const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | HTMLDivElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
+  const renderTriggerContent = () => {
+    if (menuButton) return menuButton;
 
-  const { styles, attributes } = usePopper(referenceElement, popperElement, {
-    placement: placement ?? "auto",
-  });
+    if (iconOnly) {
+      const FilterIcon = isFiltersApplied ? SelectedFilterOutline : FilterOutline;
+      return (
+        <IconButtonElement
+          variant="secondary"
+          size="md"
+          render={(renderProps) => (
+            <span
+              {...renderProps}
+              className={cn(renderProps.className, {
+                "border-accent-strong bg-accent-subtle text-accent-primary hover:bg-accent-subtle-hover active:bg-accent-subtle-active":
+                  isFiltersApplied,
+              })}
+            />
+          )}
+        >
+          <Icon
+            icon={<FilterIcon className={cn({ "text-accent-primary [&_path]:fill-current": isFiltersApplied })} />}
+          />
+          <span className="sr-only">{title}</span>
+        </IconButtonElement>
+      );
+    }
+
+    return (
+      <>
+        <span className="relative hidden @4xl:flex">
+          <ButtonElement variant="secondary" size="md" stretch="auto" render={<span />}>
+            {icon}
+            <ButtonLabel>{title}</ButtonLabel>
+          </ButtonElement>
+          {isFiltersApplied && APPLIED_DOT}
+        </span>
+        {/* Below @4xl the trigger collapses to the mini icon when there is one. */}
+        <span className="relative flex @4xl:hidden">
+          {miniIcon ? (
+            <IconButtonElement variant="secondary" size="md" render={<span />}>
+              {miniIcon}
+              <span className="sr-only">{title}</span>
+            </IconButtonElement>
+          ) : (
+            <ButtonElement variant="secondary" size="md" stretch="auto" render={<span />}>
+              <ButtonLabel>{title}</ButtonLabel>
+            </ButtonElement>
+          )}
+          {isFiltersApplied && APPLIED_DOT}
+        </span>
+      </>
+    );
+  };
 
   return (
-    <Popover as="div">
-      {({ open }) => (
-        <>
-          <Popover.Button as={React.Fragment}>
-            {menuButton ? (
-              <button type="button" ref={setReferenceElement}>
-                {menuButton}
-              </button>
-            ) : (
-              <div ref={setReferenceElement}>
-                <div className="hidden @4xl:flex">
-                  <Button
-                    disabled={disabled}
-                    variant="secondary"
-                    prependIcon={icon}
-                    tabIndex={tabIndex}
-                    className="relative"
-                    size="lg"
-                  >
-                    <>
-                      <div className={`${open ? "text-primary" : "text-secondary"}`}>
-                        <span>{title}</span>
-                      </div>
-                      {isFiltersApplied && (
-                        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-accent-primary" />
-                      )}
-                    </>
-                  </Button>
-                </div>
-                <div className="flex @4xl:hidden">
-                  <Button
-                    disabled={disabled}
-                    ref={setReferenceElement}
-                    variant="secondary"
-                    tabIndex={tabIndex}
-                    size="lg"
-                  >
-                    {miniIcon || title}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </Popover.Button>
-          <Transition
-            as={Fragment}
-            enter="transition ease-out duration-200"
-            enterFrom="opacity-0 translate-y-1"
-            enterTo="opacity-100 translate-y-0"
-            leave="transition ease-in duration-150"
-            leaveFrom="opacity-100 translate-y-0"
-            leaveTo="opacity-0 translate-y-1"
-          >
-            {/** translate-y-0 is a hack to create new stacking context. Required for safari  */}
-            <Popover.Panel
-              className="fixed z-10 translate-y-0"
-              data-prevent-outside-click
-              portal
-              ref={setPopperElement}
-              style={styles.popper}
-              {...attributes.popper}
-            >
-              <div className="my-1 overflow-hidden rounded-sm border border-subtle bg-surface-1 shadow-raised-100">
-                <div className="flex max-h-[30rem] w-[18.75rem] flex-col overflow-hidden lg:max-h-[37.5rem]">
-                  {children}
-                </div>
-              </div>
-            </Popover.Panel>
-          </Transition>
-        </>
-      )}
-    </Popover>
+    <DateFilterModalHost>
+      <Menu>
+        <MenuTrigger
+          disabled={disabled}
+          tabIndex={tabIndex}
+          aria-label={props.title || undefined}
+          render={
+            <button
+              type="button"
+              className="flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          }
+        >
+          {renderTriggerContent()}
+        </MenuTrigger>
+        <MenuContent {...toSideAndAlign(placement ?? "auto")}>{children}</MenuContent>
+      </Menu>
+    </DateFilterModalHost>
   );
 }

@@ -7,9 +7,10 @@
 import type { MouseEvent } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { ParentOutline } from "@makeplane/propel/icons";
+import { PillButton } from "@plane/blocks/pill-button";
 import { useTranslation } from "@plane/i18n";
-import { ParentPropertyIcon } from "@plane/propel/icons";
-import { Tooltip } from "@plane/propel/tooltip";
 import type { IIssueDisplayProperties, TIssue } from "@plane/types";
 import { cn } from "@plane/utils";
 // components
@@ -44,29 +45,31 @@ export const WorkItemParentProperty = observer(function WorkItemParentProperty(p
   };
 
   return (
-    <Tooltip
-      tooltipHeading={t("common.parent")}
-      tooltipContent={parent?.name ?? t("common.parent")}
-      isMobile={isMobile}
-      renderByDefault={false}
-    >
-      <button
-        type="button"
+    <Tooltip label={parent?.name ?? t("common.parent")} disabled={isMobile}>
+      <PillButton
+        size="md"
         onClick={openParent}
         disabled={!parent}
-        className={cn(
-          "flex h-5 max-w-56 min-w-0 flex-shrink-0 items-center gap-1.5 overflow-hidden rounded-sm border-[0.5px] border-strong px-2 text-caption-sm-regular",
-          { "hover:bg-layer-1": parent },
-          className
-        )}
+        aria-label={`${t("common.parent")}: ${parent?.name ?? ""}`}
+        className={cn("max-w-56 min-w-0 flex-shrink-0 overflow-hidden", className)}
       >
         {parent?.project_id ? (
           <IssueIdentifier issueId={parent.id} projectId={parent.project_id} size="xs" variant="tertiary" />
         ) : (
-          <ParentPropertyIcon className="size-3 flex-shrink-0" />
+          <ParentOutline className="size-3.5 flex-shrink-0" />
         )}
         <span className="truncate">{parent?.name ?? t("common.parent")}</span>
-      </button>
+      </PillButton>
     </Tooltip>
   );
+});
+
+/** The parent's name, for the row's overflow menu. */
+export const WorkItemParentPreview = observer(function WorkItemParentPreview(props: Pick<Props, "issue">) {
+  const { issue } = props;
+  const { t } = useTranslation();
+  const { workspaceSlug } = useParams();
+  const parent = useWorkItemReference(workspaceSlug?.toString(), issue.project_id, issue.parent_id);
+
+  return <span className="truncate">{parent?.name ?? t("common.parent")}</span>;
 });

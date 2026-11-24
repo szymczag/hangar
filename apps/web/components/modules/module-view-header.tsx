@@ -20,7 +20,7 @@ import type { TModuleFilters } from "@plane/types";
 import { cn, calculateTotalFilters } from "@plane/utils";
 // plane utils
 // components
-import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
 import { ModuleFiltersSelection, ModuleOrderByDropdown } from "@/components/modules/dropdowns";
 // constants
 // helpers
@@ -54,7 +54,7 @@ export const ModuleViewHeader = observer(function ModuleViewHeader() {
   const { t } = useTranslation();
 
   // states
-  const [isSearchOpen, setIsSearchOpen] = useState(searchQuery !== "" ? true : false);
+  const [isSearchOpen, setIsSearchOpen] = useState(searchQuery !== "");
 
   // handlers
   const handleFilters = useCallback(
@@ -153,7 +153,7 @@ export const ModuleViewHeader = observer(function ModuleViewHeader() {
           });
         }}
       />
-      <FiltersDropdown
+      <FiltersDropdownLegacy
         icon={<ListFilter className="h-3 w-3" />}
         title="Filters"
         placement="bottom-end"
@@ -169,7 +169,7 @@ export const ModuleViewHeader = observer(function ModuleViewHeader() {
           handleFiltersUpdate={handleFilters}
           memberIds={workspaceMemberIds ?? undefined}
         />
-      </FiltersDropdown>
+      </FiltersDropdownLegacy>
       <div className="hidden items-center gap-1 rounded-sm bg-layer-3 p-1 md:flex">
         {MODULE_VIEW_LAYOUTS.map((layout) => (
           <Tooltip key={layout.key} tooltipContent={t(layout.i18n_title)} isMobile={isMobile}>

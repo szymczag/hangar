@@ -15,7 +15,7 @@ import { SearchIcon, CloseIcon } from "@plane/propel/icons";
 import type { TCycleFilters } from "@plane/types";
 import { cn, calculateTotalFilters } from "@plane/utils";
 // components
-import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
 // hooks
 import { useCycleFilter } from "@/hooks/store/use-cycle-filter";
 // local imports
@@ -33,7 +33,7 @@ export const CyclesViewHeader = observer(function CyclesViewHeader(props: Props)
   const { currentProjectFilters, searchQuery, updateFilters, updateSearchQuery } = useCycleFilter();
   const { t } = useTranslation();
   // states
-  const [isSearchOpen, setIsSearchOpen] = useState(searchQuery !== "" ? true : false);
+  const [isSearchOpen, setIsSearchOpen] = useState(searchQuery !== "");
   // outside click detector hook
   useOutsideClickDetector(inputRef, () => {
     if (isSearchOpen && searchQuery.trim() === "") setIsSearchOpen(false);
@@ -120,14 +120,14 @@ export const CyclesViewHeader = observer(function CyclesViewHeader(props: Props)
         </div>
       )}
 
-      <FiltersDropdown
+      <FiltersDropdownLegacy
         icon={<ListFilter className="h-3 w-3" />}
         title={t("common.filters")}
         placement="bottom-end"
         isFiltersApplied={isFiltersApplied}
       >
         <CycleFiltersSelection filters={currentProjectFilters ?? {}} handleFiltersUpdate={handleFilters} />
-      </FiltersDropdown>
+      </FiltersDropdownLegacy>
     </div>
   );
 });

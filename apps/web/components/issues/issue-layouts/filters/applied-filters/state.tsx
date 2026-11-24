@@ -8,8 +8,9 @@ import { observer } from "mobx-react";
 // icons
 // plane imports
 import { EIconSize } from "@plane/constants";
-import { CloseIcon, StateGroupIcon } from "@plane/propel/icons";
+import { StateGroupIcon } from "@plane/blocks/icons";
 import type { IState } from "@plane/types";
+import { RemovableChip } from "@/components/common/removable-chip";
 
 type Props = {
   handleRemove: (val: string) => void;
@@ -29,24 +30,21 @@ export const AppliedStateFilters = observer(function AppliedStateFilters(props: 
         if (!stateDetails) return null;
 
         return (
-          <div key={stateId} className="flex items-center gap-1 rounded-sm bg-layer-1 p-1 text-11">
-            <StateGroupIcon
-              color={stateDetails.color}
-              stateGroup={stateDetails.group}
-              size={EIconSize.SM}
-              percentage={stateDetails?.order}
-            />
-            {stateDetails.name}
-            {editable && (
-              <button
-                type="button"
-                className="grid place-items-center text-tertiary hover:text-secondary"
-                onClick={() => handleRemove(stateId)}
-              >
-                <CloseIcon height={10} width={10} strokeWidth={2} />
-              </button>
-            )}
-          </div>
+          <RemovableChip
+            key={stateId}
+            variant="soft"
+            icon={
+              <StateGroupIcon
+                color={stateDetails.color}
+                stateGroup={stateDetails.group}
+                size={EIconSize.SM}
+                percentage={stateDetails?.order}
+              />
+            }
+            label={stateDetails.name}
+            ariaLabel={stateDetails.name}
+            onRemove={editable ? () => handleRemove(stateId) : undefined}
+          />
         );
       })}
     </>

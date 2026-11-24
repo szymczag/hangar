@@ -12,7 +12,7 @@ import { observer } from "mobx-react";
 // plane imports
 import { DRAG_ALLOWED_GROUPS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type {
   IGroupByColumn,
   TIssueMap,
@@ -23,7 +23,7 @@ import type {
   TIssueKanbanFilters,
 } from "@plane/types";
 import { EIssueLayoutTypes } from "@plane/types";
-import { Row } from "@plane/ui";
+import { Row } from "@plane/blocks/layout";
 import { cn } from "@plane/utils";
 // components
 import { ListLoaderItemRow } from "@/components/ui/loader/layouts/list-layout-loader";
@@ -135,7 +135,7 @@ export const ListGroup = observer(function ListGroup(props: Props) {
     // oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions
     <div
       className={
-        "relative flex h-11 cursor-pointer items-center gap-3 border border-transparent border-t-subtle-1 bg-surface-1 p-3 pl-8 text-13 font-medium text-accent-primary hover:text-accent-secondary hover:underline"
+        "relative flex h-11 cursor-pointer items-center gap-3 border border-transparent border-t-subtle-1 bg-surface-1 p-3 pl-8 text-body-xs-medium text-accent-primary hover:text-accent-secondary hover:underline"
       }
       onClick={() => loadMoreIssues(group.id)}
     >
@@ -197,7 +197,7 @@ export const ListGroup = observer(function ListGroup(props: Props) {
           if (isWorkflowDropDisabled || group.isDropDisabled) {
             if (group.dropErrorMessage)
               setToast({
-                type: TOAST_TYPE.WARNING,
+                type: "warning",
                 title: t("common.warning"),
                 message: group.dropErrorMessage,
               });
@@ -241,7 +241,7 @@ export const ListGroup = observer(function ListGroup(props: Props) {
       })}
     >
       <Row
-        className={cn("w-full flex-shrink-0 border-b border-subtle bg-layer-1 py-1 pr-3 hover:bg-layer-1-hover", {
+        className={cn("w-full flex-shrink-0 border-b border-subtle bg-layer-1 py-1 pr-5 hover:bg-layer-1-hover", {
           "sticky top-0 z-[2]": isExpanded && groupIssueCount > 0,
         })}
       >
@@ -259,6 +259,7 @@ export const ListGroup = observer(function ListGroup(props: Props) {
           addIssuesToView={addIssuesToView}
           selectionHelpers={selectionHelpers}
           handleCollapsedGroups={handleCollapsedGroups}
+          isExpanded={shouldExpand}
           isEpic={isEpic}
         />
       </Row>

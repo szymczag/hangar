@@ -4,6 +4,8 @@
  * See the LICENSE file for details.
  */
 
+// Fork: compatibility shim, removed in phase 9 (see helpers/index.ts).
+
 import { CheckIcon } from "@plane/propel/icons";
 
 type Props = {
