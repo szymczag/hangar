@@ -6,8 +6,8 @@
 
 import { useRef } from "react";
 import { observer } from "mobx-react";
-import { Logo } from "@plane/propel/emoji-icon-picker";
-import { PageIcon } from "@plane/propel/icons";
+import { Logo } from "@plane/blocks/emoji-icon-picker";
+import { PagesOutline } from "@makeplane/propel/icons";
 // plane imports
 import { getPageName } from "@plane/utils";
 // components
@@ -42,15 +42,16 @@ export const PageListBlock = observer(function PageListBlock(props: TPageListBlo
   return (
     <ListItem
       prependTitleElement={
-        <>
+        <span className="grid size-6 shrink-0 place-items-center">
           {logo_props?.in_use ? (
             <Logo logo={logo_props} size={16} type="lucide" />
           ) : (
-            <PageIcon className="h-4 w-4 text-tertiary" />
+            <PagesOutline className="size-4 text-tertiary" />
           )}
-        </>
+        </span>
       }
       title={getPageName(name)}
+      leftElementClassName="gap-2"
       itemLink={getRedirectionLink()}
       actionableItems={<BlockItemAction page={page} parentRef={parentRef} storeType={storeType} />}
       isMobile={isMobile}

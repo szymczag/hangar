@@ -9,7 +9,7 @@ import { observer } from "mobx-react";
 import { ChevronDownOutline, FilterOutline } from "@makeplane/propel/icons";
 // components
 import { Row } from "@plane/blocks/layout";
-import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
 import { ViewFiltersSelection } from "@/components/views/filters/filter-selection";
 import { ViewOrderByDropdown } from "@/components/views/filters/order-by";
 // hooks
@@ -38,8 +38,7 @@ export const ViewMobileHeader = observer(function ViewMobileHeader() {
           />
         </Row>
         <div className="flex flex-grow items-center justify-center border-l border-subtle text-body-xs-regular text-secondary">
-          {/* Fork: compatibility shim, removed in phase 9 (see `components/views/view-list-header.tsx`). */}
-          <FiltersDropdownLegacy
+          <FiltersDropdown
             icon={<FilterOutline className="h-3 w-3" />}
             title="Filters"
             placement="bottom-end"
@@ -56,7 +55,7 @@ export const ViewMobileHeader = observer(function ViewMobileHeader() {
               handleFiltersUpdate={updateFilters}
               memberIds={projectMemberIds ?? undefined}
             />
-          </FiltersDropdownLegacy>
+          </FiltersDropdown>
         </div>
       </div>
     </>

@@ -40,6 +40,16 @@
           "title": "Keine Kommentare",
           "description": "Fügen Sie Kommentare hinzu, um sie hier zu sehen."
         }
+      },
+      "version_history": {
+        "view_only": "Nur ansehen",
+        "loading_details": "Versionsdetails werden geladen",
+        "load_error_description": "Die Version konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
+        "try_again": "Erneut versuchen",
+        "restoring": "Wird wiederhergestellt",
+        "restore_success": "Seitenversion wiederhergestellt.",
+        "restore_failed": "Seitenversion konnte nicht wiederhergestellt werden.",
+        "list_error_description": "Der Versionsverlauf konnte nicht geladen werden."
       }
     },
     "toasts": {
@@ -111,5 +121,8 @@
       "success_message": "Seite aus Sammlung entfernt.",
       "error_message": "Die Seite konnte nicht aus der Sammlung entfernt werden. Bitte versuchen Sie es erneut."
     }
+  },
+  "page_content_limit_banner": {
+    "message": "Inhaltslimit erreicht, Live-Synchronisierung ist deaktiviert. Neue Seite erstellen oder verschachtelte Seiten verwenden, um die Synchronisierung fortzusetzen."
   }
 }

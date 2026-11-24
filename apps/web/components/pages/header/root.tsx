@@ -6,14 +6,14 @@
 
 import { useCallback } from "react";
 import { observer } from "mobx-react";
-import { ListFilter } from "lucide-react";
+import { FilterOutline } from "@makeplane/propel/icons";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import type { TPageFilterProps, TPageNavigationTabs } from "@plane/types";
-import { Header, EHeaderVariant } from "@plane/ui";
+import { Header, EHeaderVariant } from "@plane/blocks/layout";
 import { calculateTotalFilters } from "@plane/utils";
 // components
-import { FiltersDropdownLegacy } from "@/components/issues/issue-layouts/filters";
+import { FiltersDropdown } from "@/components/issues/issue-layouts/filters";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { usePageStore } from "@/hooks/store";
@@ -77,8 +77,8 @@ export const PagesListHeaderRoot = observer(function PagesListHeaderRoot(props: 
               if (val.order) updateFilters("sortBy", val.order);
             }}
           />
-          <FiltersDropdownLegacy
-            icon={<ListFilter className="h-3 w-3" />}
+          <FiltersDropdown
+            icon={<FilterOutline className="h-3 w-3" />}
             title={t("common.filters")}
             placement="bottom-end"
             isFiltersApplied={isFiltersApplied}
@@ -88,7 +88,7 @@ export const PagesListHeaderRoot = observer(function PagesListHeaderRoot(props: 
               handleFiltersUpdate={updateFilters}
               memberIds={workspaceMemberIds ?? undefined}
             />
-          </FiltersDropdownLegacy>
+          </FiltersDropdown>
         </Header.RightItem>
       </Header>
       {calculateTotalFilters(filters?.filters ?? {}) !== 0 && (

@@ -40,6 +40,16 @@
           "title": "沒有留言",
           "description": "新增留言以在此處檢視它們。"
         }
+      },
+      "version_history": {
+        "view_only": "僅檢視",
+        "loading_details": "正在載入版本詳細資料",
+        "load_error_description": "無法載入此版本。請再試一次。",
+        "try_again": "重試",
+        "restoring": "正在還原",
+        "restore_success": "頁面版本已還原。",
+        "restore_failed": "無法還原頁面版本。",
+        "list_error_description": "無法載入版本歷史。"
       }
     },
     "toasts": {
@@ -111,5 +121,8 @@
       "success_message": "頁面已從集合中移除。",
       "error_message": "無法將頁面從集合中移除。請再試一次。"
     }
+  },
+  "page_content_limit_banner": {
+    "message": "已達到內容上限，即時同步已關閉。請建立新頁面或使用巢狀頁面以繼續同步。"
   }
 }

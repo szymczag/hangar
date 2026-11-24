@@ -40,6 +40,16 @@
           "title": "Niciun comentariu",
           "description": "Adaugă comentarii pentru a le vedea aici."
         }
+      },
+      "version_history": {
+        "view_only": "Doar vizualizare",
+        "loading_details": "Se încarcă detaliile versiunii",
+        "load_error_description": "Versiunea nu a putut fi încărcată. Te rugăm să încerci din nou.",
+        "try_again": "Încearcă din nou",
+        "restoring": "Se restaurează",
+        "restore_success": "Versiunea paginii a fost restaurată.",
+        "restore_failed": "Restaurarea versiunii paginii a eșuat.",
+        "list_error_description": "Istoricul versiunilor nu a putut fi încărcat."
       }
     },
     "toasts": {
@@ -111,5 +121,8 @@
       "success_message": "Pagina a fost eliminată din colecție.",
       "error_message": "Pagina nu a putut fi eliminată din colecție. Te rugăm să încerci din nou."
     }
+  },
+  "page_content_limit_banner": {
+    "message": "Limita de conținut a fost atinsă, iar sincronizarea live este dezactivată. Creează o pagină nouă sau folosește pagini imbricate pentru a continua sincronizarea."
   }
 }
