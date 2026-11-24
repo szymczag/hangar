@@ -8,12 +8,11 @@ import type { MouseEvent } from "react";
 import { useRef } from "react";
 import { observer } from "mobx-react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CheckIcon } from "@plane/propel/icons";
 // plane imports
+import { CycleGroupIcon } from "@plane/blocks/icons";
 import type { TCycleGroups } from "@plane/types";
-import { CircularProgressIndicator } from "@plane/ui";
 // components
-import { generateQueryParams, calculateCycleProgress } from "@plane/utils";
+import { generateQueryParams } from "@plane/utils";
 import { ListItem } from "@/components/core/list";
 // hooks
 import { useCycle } from "@/hooks/store/use-cycle";
@@ -77,23 +76,13 @@ export const CyclesListItem = observer(function CyclesListItem(props: TCyclesLis
 
   const handleItemClick = cycleDetails.archived_at ? handleArchivedCycleClick : undefined;
 
-  const progress = calculateCycleProgress(cycleDetails);
-
   return (
     <ListItem
       title={cycleDetails?.name ?? ""}
       itemLink={`/${workspaceSlug}/projects/${projectId}/cycles/${cycleDetails.id}`}
       onItemClick={handleItemClick}
       className={className}
-      prependTitleElement={
-        <CircularProgressIndicator size={30} percentage={progress} strokeWidth={3}>
-          {progress === 100 ? (
-            <CheckIcon className="h-3 w-3 stroke-2" />
-          ) : (
-            <span className="text-9 text-primary">{`${progress}%`}</span>
-          )}
-        </CircularProgressIndicator>
-      }
+      prependTitleElement={<CycleGroupIcon cycleGroup={cycleStatus} height="16px" width="16px" />}
       actionableItems={
         <CycleListItemAction
           workspaceSlug={workspaceSlug}
@@ -111,6 +100,7 @@ export const CyclesListItem = observer(function CyclesListItem(props: TCyclesLis
             cycleId={cycleId}
             projectId={projectId}
             workspaceSlug={workspaceSlug}
+            size="sm"
           />
         </div>
       }

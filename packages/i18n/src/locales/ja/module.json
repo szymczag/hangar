@@ -2,6 +2,11 @@
   "module": {
     "label": "{count, plural, one {モジュール} other {モジュール}}",
     "no_module": "モジュールなし",
-    "select": "モジュールを追加"
+    "select": "モジュールを追加",
+    "details_drawer": {
+      "progress": {
+        "empty": "進捗を追跡するには、モジュールに作業項目を追加してください。"
+      }
+    }
   }
 }

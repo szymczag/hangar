@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Impossibile copiare negli appunti",
     "tooltip": {
-      "copy_to_clipboard": "Copia negli appunti"
+      "copy_to_clipboard": "Copia negli appunti",
+      "created_on_date": "Creato il {date}",
+      "priority": "Priorità: {value}"
     },
     "status": "Stato",
     "locked": "Bloccato"

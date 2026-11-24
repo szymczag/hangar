@@ -5,10 +5,10 @@
  */
 
 // plane package imports
-import { Logo } from "@plane/propel/emoji-icon-picker";
-import { ProjectIcon } from "@plane/propel/icons";
-import { Tooltip } from "@plane/propel/tooltip";
-import { cn } from "@plane/utils";
+import { Logo } from "@plane/blocks/emoji-icon-picker";
+import { ProjectsOutline } from "@makeplane/propel/icons";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { Badge } from "@makeplane/propel/components/badge";
 // plane web hooks
 import { useProject } from "@/hooks/store/use-project";
 
@@ -22,13 +22,7 @@ type Props = {
 };
 
 function CompletionPercentage({ percentage }: { percentage: number }) {
-  const percentageColor =
-    percentage > 50 ? "bg-success-subtle text-success-primary" : "bg-danger-subtle text-danger-primary";
-  return (
-    <div className={cn("flex items-center gap-2 rounded-sm p-1 text-11", percentageColor)}>
-      <span>{percentage}%</span>
-    </div>
-  );
+  return <Badge variant={percentage > 50 ? "success" : "danger"} size="sm" label={`${percentage}%`} />;
 }
 
 function ActiveProjectItem(props: Props) {
@@ -43,19 +37,19 @@ function ActiveProjectItem(props: Props) {
   return (
     <div className="flex w-full items-center justify-between gap-2">
       <div className="flex flex-1 items-center gap-2 overflow-hidden">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-layer-1">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-layer-1">
           <span className="grid h-4 w-4 flex-shrink-0 place-items-center">
             {projectDetails?.logo_props ? (
               <Logo logo={projectDetails?.logo_props} size={16} />
             ) : (
               <span className="grid h-4 w-4 flex-shrink-0 place-items-center">
-                <ProjectIcon className="h-4 w-4" />
+                <ProjectsOutline className="h-4 w-4" />
               </span>
             )}
           </span>
         </div>
-        <Tooltip tooltipContent={projectDetails?.name} position="top-start">
-          <p className="truncate text-13 font-medium">{projectDetails?.name}</p>
+        <Tooltip label={projectDetails?.name} layout="stacked" align="start">
+          <p className="truncate text-body-xs-medium">{projectDetails?.name}</p>
         </Tooltip>
       </div>
       <CompletionPercentage

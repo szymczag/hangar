@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "No se pudo copiar al portapapeles",
     "tooltip": {
-      "copy_to_clipboard": "Copiar al portapapeles"
+      "copy_to_clipboard": "Copiar al portapapeles",
+      "created_on_date": "Creado el {date}",
+      "priority": "Prioridad: {value}"
     },
     "status": "Estado",
     "locked": "Bloqueado"

@@ -5,18 +5,18 @@
  */
 
 import { observer } from "mobx-react";
+import { useTranslation } from "@plane/i18n";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
 // hooks
-import { CloseIcon } from "@plane/propel/icons";
-import { Tag } from "@plane/ui";
+import { CloseOutline } from "@makeplane/propel/icons";
 import { useLabel } from "@/hooks/store/use-label";
 import { useProjectInbox } from "@/hooks/store/use-project-inbox";
-
-function LabelIcons({ color }: { color: string }) {
-  return <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />;
-}
+import { APPLIED_FILTER_GROUP_CLASSNAME, RemovableChip } from "@/components/common/removable-chip";
 
 export const InboxIssueAppliedFiltersLabel = observer(function InboxIssueAppliedFiltersLabel() {
   // hooks
+  const { t } = useTranslation();
   const { inboxFilters, handleInboxIssueFilters } = useProjectInbox();
   const { getLabelById } = useLabel();
   // derived values
@@ -30,33 +30,31 @@ export const InboxIssueAppliedFiltersLabel = observer(function InboxIssueApplied
 
   if (filteredValues.length === 0) return <></>;
   return (
-    <Tag>
-      <div className="text-11 text-secondary">Label</div>
+    <div className={APPLIED_FILTER_GROUP_CLASSNAME}>
+      <div className="text-caption-sm-regular text-secondary">Label</div>
       {filteredValues.map((value) => {
         const optionDetail = currentOptionDetail(value);
         if (!optionDetail) return <></>;
         return (
-          <div key={value} className="relative flex items-center gap-1 rounded-sm bg-layer-1 p-1 text-11">
-            <div className="relative flex h-3 w-3 flex-shrink-0 items-center justify-center overflow-hidden">
-              <LabelIcons color={optionDetail.color} />
-            </div>
-            <div className="truncate text-11">{optionDetail?.name}</div>
-            <div
-              className="relative flex h-3 w-3 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden text-tertiary transition-all hover:text-secondary"
-              onClick={() => handleInboxIssueFilters("labels", handleFilterValue(value))}
-            >
-              <CloseIcon className={`h-3 w-3`} />
-            </div>
-          </div>
+          <RemovableChip
+            key={value}
+            variant="soft"
+            icon={<span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: optionDetail.color }} />}
+            label={optionDetail.name}
+            ariaLabel={optionDetail.name}
+            onRemove={() => handleInboxIssueFilters("labels", handleFilterValue(value))}
+          />
         );
       })}
 
-      <div
-        className="relative flex h-3 w-3 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden text-tertiary transition-all hover:text-secondary"
+      <IconButton
+        type="button"
+        variant="ghost"
+        size="xs"
+        aria-label={`${t("aria_labels.common.remove")}: Label`}
         onClick={clearFilter}
-      >
-        <CloseIcon className={`h-3 w-3`} />
-      </div>
-    </Tag>
+        icon={<Icon icon={CloseOutline} />}
+      />
+    </div>
   );
 });

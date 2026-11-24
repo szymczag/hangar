@@ -9,8 +9,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 // ui
 import { MODULE_STATUS } from "@plane/constants";
-import { ModuleStatusIcon } from "@plane/propel/icons";
-import { Tooltip } from "@plane/propel/tooltip";
+import { ModuleStatusIcon } from "@plane/blocks/icons";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 // components
 import { SIDEBAR_WIDTH } from "@/components/gantt-chart/constants";
 import { getBlockViewDetails } from "@/components/issues/issue-layouts/utils";
@@ -43,15 +43,12 @@ export const ModuleGanttBlock = observer(function ModuleGanttBlock(props: Props)
 
   return (
     <Tooltip
-      isMobile={isMobile}
-      tooltipContent={
-        <div className="space-y-1">
-          <h5>{moduleDetails?.name}</h5>
-          <div>{message}</div>
-        </div>
-      }
-      position="top-start"
+      label={moduleDetails?.name ? `${moduleDetails.name}: ${message ?? ""}` : (message ?? "")}
+      layout="stacked"
+      align="start"
+      disabled={isMobile}
     >
+      {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events, jsx_a11y/no-static-element-interactions -- a pointer shortcut; the sidebar row is the module's keyboard link */}
       <div
         className="relative flex h-full w-full cursor-pointer items-center rounded-sm"
         style={blockStyle}
@@ -63,7 +60,7 @@ export const ModuleGanttBlock = observer(function ModuleGanttBlock(props: Props)
       >
         <div className="absolute top-0 left-0 h-full w-full bg-surface-1/50" />
         <div
-          className="sticky w-auto truncate overflow-hidden px-2.5 py-1 text-13 text-primary"
+          className="sticky w-auto truncate overflow-hidden px-2.5 py-1 text-body-xs-regular text-primary"
           style={{ left: `${SIDEBAR_WIDTH}px` }}
         >
           {moduleDetails?.name}
@@ -88,7 +85,7 @@ export const ModuleGanttSidebarBlock = observer(function ModuleGanttSidebarBlock
       draggable={false}
     >
       <ModuleStatusIcon status={moduleDetails?.status ?? "backlog"} height="16px" width="16px" />
-      <h6 className="flex-grow truncate text-13 font-medium">{moduleDetails?.name}</h6>
+      <h6 className="flex-grow truncate text-body-xs-medium">{moduleDetails?.name}</h6>
     </Link>
   );
 });

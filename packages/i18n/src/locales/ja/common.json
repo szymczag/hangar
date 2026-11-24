@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "クリップボードにコピーできませんでした",
     "tooltip": {
-      "copy_to_clipboard": "クリップボードにコピー"
+      "copy_to_clipboard": "クリップボードにコピー",
+      "created_on_date": "作成日：{date}",
+      "priority": "優先度：{value}"
     },
     "status": "ステータス",
     "locked": "ロック中"

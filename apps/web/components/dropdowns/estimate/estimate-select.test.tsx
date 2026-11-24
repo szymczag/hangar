@@ -14,13 +14,14 @@ import type { TIssue } from "@plane/types";
 /**
  * "No estimate" must reach the API as `null`. JSON drops `undefined` keys, so a
  * PATCH built from `undefined` arrives without `estimate_point` and the old
- * estimate stays (fixed in phase 4a for the 1.4 shim, see `../estimate.test.tsx`).
+ * estimate stays (fixed in phase 4a for the 1.4 shim, removed in phase 5).
  *
  * Since phase 4b every work item layout edits the estimate through upstream's
  * `EstimateSelect`: the list, board and calendar rows through `all-properties.tsx`
  * and the spreadsheet through its estimate column. Since phase 4c the create and
- * edit dialog does too. These pin the clear to `null` in that select and on every
- * path to the update.
+ * edit dialog does too, and since phase 5 the intake create dialog, which retired
+ * the 1.4 shim. These pin the clear to `null` in that select and on every path to
+ * the update.
  */
 
 // What `EstimateSelect` hands the blocks select, captured on render.
@@ -51,6 +52,7 @@ vi.mock("@/components/dropdowns/member/member-select", () => ({ MemberSelect: ()
 vi.mock("@/components/dropdowns/module/module-select", () => ({ ModuleSelect: () => null }));
 vi.mock("@/components/dropdowns/priority/priority-select", () => ({ PrioritySelect: () => null }));
 vi.mock("@/components/dropdowns/state/state-select", () => ({ StateSelect: () => null }));
+vi.mock("@/components/dropdowns/intake-state/intake-state-select", () => ({ IntakeStateSelect: () => null }));
 vi.mock("@/components/issues/parent-issues-list-modal", () => ({ ParentIssuesListModal: () => null }));
 vi.mock("@/components/issues/issue-detail/issue-identifier", () => ({ IssueIdentifier: () => null }));
 vi.mock("@/plane-web/components/issues/issue-modal/issue-type-select", () => ({ IssueTypeSelect: () => null }));
@@ -64,6 +66,7 @@ vi.mock("@/hooks/use-platform-os", () => ({ usePlatformOS: () => ({ isMobile: fa
 import { useForm } from "react-hook-form";
 import type { UseFormReturn } from "react-hook-form";
 import { getChangedIssuefields } from "@plane/utils";
+import { InboxIssueProperties } from "@/components/inbox/modals/create-modal/issue-properties";
 import { IssueDefaultProperties } from "@/components/issues/issue-modal/components/default-properties";
 import { SpreadsheetEstimateColumn } from "@/components/issues/issue-layouts/spreadsheet/columns/estimate-column";
 import { EstimateSelect } from "./estimate-select";
@@ -176,5 +179,23 @@ describe("the work item create and edit dialog", () => {
     // The edit dialog sends only the dirty fields, built the way `form.tsx` builds them.
     const payload = getChangedIssuefields(form.getValues(), { estimate_point: true });
     expect(JSON.stringify(payload)).toBe('{"estimate_point":null}');
+  });
+});
+
+describe("the intake create dialog", () => {
+  it("sends estimate_point: null for No estimate", () => {
+    // The dialog keeps its fields in a plain object and posts it whole.
+    const data: Partial<TIssue> = { name: "Intake item", estimate_point: "point-1" };
+    const handleData = vi.fn((key: keyof Partial<TIssue>, value: Partial<TIssue>[keyof Partial<TIssue>]) => {
+      Object.assign(data, { [key]: value });
+    });
+    renderToStaticMarkup(
+      <InboxIssueProperties workspaceSlug="acme" projectId="project-1" data={data} handleData={handleData} isVisible />
+    );
+
+    captured.onChange?.(undefined);
+
+    expect(handleData).toHaveBeenCalledWith("estimate_point", null);
+    expect(JSON.stringify(data)).toBe('{"name":"Intake item","estimate_point":null}');
   });
 });

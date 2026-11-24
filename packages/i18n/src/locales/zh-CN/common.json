@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "无法复制到剪贴板",
     "tooltip": {
-      "copy_to_clipboard": "复制到剪贴板"
+      "copy_to_clipboard": "复制到剪贴板",
+      "created_on_date": "创建于 {date}",
+      "priority": "优先级：{value}"
     },
     "status": "状态",
     "locked": "已锁定"

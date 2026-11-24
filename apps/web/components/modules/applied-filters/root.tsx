@@ -5,12 +5,16 @@
  */
 
 import { useTranslation } from "@plane/i18n";
-import { CloseIcon } from "@plane/propel/icons";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { CloseOutline } from "@makeplane/propel/icons";
 import type { TModuleDisplayFilters, TModuleFilters } from "@plane/types";
 // components
-import { Header, EHeaderVariant, Tag } from "@plane/ui";
+import { Header, EHeaderVariant } from "@plane/blocks/layout";
 import { replaceUnderscoreIfSnakeCase } from "@plane/utils";
 import { AppliedDateFilters, AppliedMembersFilters, AppliedStatusFilters } from "@/components/modules";
+import { APPLIED_FILTER_GROUP_CLASSNAME, RemovableChip } from "@/components/common/removable-chip";
 // helpers
 // types
 
@@ -24,8 +28,8 @@ type Props = {
   isArchived?: boolean;
 };
 
-const MEMBERS_FILTERS = ["lead", "members"];
-const DATE_FILTERS = ["start_date", "target_date"];
+const MEMBERS_FILTERS = new Set(["lead", "members"]);
+const DATE_FILTERS = new Set(["start_date", "target_date"]);
 
 export function ModuleAppliedFiltersList(props: Props) {
   const {
@@ -46,7 +50,7 @@ export function ModuleAppliedFiltersList(props: Props) {
 
   return (
     <Header variant={EHeaderVariant.TERNARY}>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {Object.entries(appliedFilters).map(([key, value]) => {
           const filterKey = key as keyof TModuleFilters;
 
@@ -54,9 +58,11 @@ export function ModuleAppliedFiltersList(props: Props) {
           if (Array.isArray(value) && value.length === 0) return;
 
           return (
-            <Tag key={filterKey}>
+            <div key={filterKey} className={APPLIED_FILTER_GROUP_CLASSNAME}>
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-11 text-tertiary">{replaceUnderscoreIfSnakeCase(filterKey)}</span>
+                <span className="text-caption-sm-regular text-tertiary capitalize">
+                  {replaceUnderscoreIfSnakeCase(filterKey)}
+                </span>
                 {filterKey === "status" && (
                   <AppliedStatusFilters
                     editable={isEditingAllowed}
@@ -64,14 +70,14 @@ export function ModuleAppliedFiltersList(props: Props) {
                     values={value}
                   />
                 )}
-                {DATE_FILTERS.includes(filterKey) && (
+                {DATE_FILTERS.has(filterKey) && (
                   <AppliedDateFilters
                     editable={isEditingAllowed}
                     handleRemove={(val) => handleRemoveFilter(filterKey, val)}
                     values={value}
                   />
                 )}
-                {MEMBERS_FILTERS.includes(filterKey) && (
+                {MEMBERS_FILTERS.has(filterKey) && (
                   <AppliedMembersFilters
                     editable={isEditingAllowed}
                     handleRemove={(val) => handleRemoveFilter(filterKey, val)}
@@ -79,52 +85,49 @@ export function ModuleAppliedFiltersList(props: Props) {
                   />
                 )}
                 {isEditingAllowed && (
-                  <button
+                  <IconButton
                     type="button"
-                    className="grid place-items-center text-tertiary hover:text-secondary"
+                    variant="ghost"
+                    size="xs"
+                    aria-label={`${t("aria_labels.common.remove")}: ${replaceUnderscoreIfSnakeCase(filterKey)}`}
                     onClick={() => handleRemoveFilter(filterKey, null)}
-                  >
-                    <CloseIcon height={12} width={12} strokeWidth={2} />
-                  </button>
+                    icon={<Icon icon={CloseOutline} />}
+                  />
                 )}
               </div>
-            </Tag>
+            </div>
           );
         })}
         {!isArchived && isFavoriteFilterApplied && (
-          <div
-            key="module_display_filters"
-            className="flex flex-wrap items-center gap-2 rounded-md border border-subtle px-2 py-1 capitalize"
-          >
+          <div key="module_display_filters" className={APPLIED_FILTER_GROUP_CLASSNAME}>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-11 text-tertiary">Modules</span>
-              <div className="flex items-center gap-1 rounded-sm bg-layer-1 p-1 text-11">
-                Favorite
-                {isEditingAllowed && (
-                  <button
-                    type="button"
-                    className="grid place-items-center text-tertiary hover:text-secondary"
-                    onClick={() =>
-                      handleDisplayFiltersUpdate &&
-                      handleDisplayFiltersUpdate({
-                        favorites: !isFavoriteFilterApplied,
-                      })
-                    }
-                  >
-                    <CloseIcon height={10} width={10} strokeWidth={2} />
-                  </button>
-                )}
-              </div>
+              <span className="text-caption-sm-regular text-tertiary capitalize">Modules</span>
+              <RemovableChip
+                variant="soft"
+                label="Favorite"
+                ariaLabel="Favorite"
+                onRemove={
+                  isEditingAllowed
+                    ? () =>
+                        handleDisplayFiltersUpdate &&
+                        handleDisplayFiltersUpdate({
+                          favorites: !isFavoriteFilterApplied,
+                        })
+                    : undefined
+                }
+              />
             </div>
           </div>
         )}
         {isEditingAllowed && (
-          <button type="button" onClick={handleClearAllFilters}>
-            <Tag>
-              {t("common.clear_all")}
-              <CloseIcon height={12} width={12} strokeWidth={2} />
-            </Tag>
-          </button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            stretch="auto"
+            label={t("common.clear_all")}
+            onClick={handleClearAllFilters}
+          />
         )}
       </div>
     </Header>

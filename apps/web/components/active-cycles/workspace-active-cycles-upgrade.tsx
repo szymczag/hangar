@@ -5,13 +5,17 @@
  */
 
 import { observer } from "mobx-react";
-import { AlertOctagon, BarChart4, CircleDashed, Folder, Microscope } from "lucide-react";
-// plane imports
-import { MARKETING_PRICING_PAGE_LINK } from "@plane/constants";
+import {
+  AlertOctagonOutline,
+  AnalyticsOutline,
+  BarOutline,
+  CircleDashedOutline,
+  FolderOutline,
+  SearchOutline,
+} from "@makeplane/propel/icons";
+// Hangar imports
 import { useTranslation } from "@plane/i18n";
-import { getButtonStyling } from "@plane/propel/button";
-import { SearchIcon } from "@plane/propel/icons";
-import { ContentWrapper } from "@plane/ui";
+import { ContentWrapper } from "@plane/blocks/layout";
 import { cn } from "@plane/utils";
 // assets
 import ctaL1Dark from "@/app/assets/workspace-active-cycles/cta-l-1-dark.webp?url";
@@ -20,8 +24,6 @@ import ctaR1Dark from "@/app/assets/workspace-active-cycles/cta-r-1-dark.webp?ur
 import ctaR1Light from "@/app/assets/workspace-active-cycles/cta-r-1-light.webp?url";
 import ctaR2Dark from "@/app/assets/workspace-active-cycles/cta-r-2-dark.webp?url";
 import ctaR2Light from "@/app/assets/workspace-active-cycles/cta-r-2-light.webp?url";
-// components
-import { ProIcon } from "@/components/common/pro-icon";
 // hooks
 import { useUser } from "@/hooks/store/user";
 
@@ -31,43 +33,45 @@ export const WORKSPACE_ACTIVE_CYCLES_DETAILS = [
     title: "10,000-feet view of all active cycles.",
     description:
       "Zoom out to see running cycles across all your projects at once instead of going from Cycle to Cycle in each project.",
-    icon: Folder,
+    icon: FolderOutline,
   },
   {
     key: "get_snapshot_of_each_active_cycle",
     title: "Get a snapshot of each active cycle.",
     description:
       "Track high-level metrics for all active cycles, see their state of progress, and get a sense of scope against deadlines.",
-    icon: CircleDashed,
+    icon: CircleDashedOutline,
   },
   {
     key: "compare_burndowns",
     title: "Compare burndowns.",
     description: "Monitor how each of your teams are performing with a peek into each cycle’s burndown report.",
-    icon: BarChart4,
+    icon: BarOutline,
   },
   {
     key: "quickly_see_make_or_break_issues",
     title: "Quickly see make-or-break work items. ",
     description:
       "Preview high-priority work items for each cycle against due dates. See all of them per cycle in one click.",
-    icon: AlertOctagon,
+    icon: AlertOctagonOutline,
   },
   {
     key: "zoom_into_cycles_that_need_attention",
     title: "Zoom into cycles that need attention. ",
     description: "Investigate the state of any cycle that doesn’t conform to expectations in one click.",
-    icon: SearchIcon,
+    icon: SearchOutline,
   },
   {
     key: "stay_ahead_of_blockers",
     title: "Stay ahead of blockers.",
     description:
       "Spot challenges from one project to another and see inter-cycle dependencies that aren’t obvious from any other view.",
-    icon: Microscope,
+    icon: AnalyticsOutline,
   },
 ];
 
+// Hangar: no "Upgrade" button. Hangar has no paid tier, and the button linked off the instance
+// without `showExternalLinks` (S22).
 export const WorkspaceActiveCyclesUpgrade = observer(function WorkspaceActiveCyclesUpgrade() {
   const { t } = useTranslation();
   // store hooks
@@ -87,19 +91,8 @@ export const WorkspaceActiveCyclesUpgrade = observer(function WorkspaceActiveCyc
       >
         <div className="relative flex flex-col justify-center gap-7 px-14 lg:w-1/2">
           <div className="flex max-w-64 flex-col gap-2">
-            <h2 className="text-20 font-semibold">{t("on_demand_snapshots_of_all_your_cycles")}</h2>
-            <p className="text-14 font-medium text-tertiary">{t("active_cycles_description")}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <a
-              className={`${getButtonStyling("primary", "base")} cursor-pointer`}
-              href={MARKETING_PRICING_PAGE_LINK}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <ProIcon className="h-3.5 w-3.5 text-on-color" />
-              {t("upgrade")}
-            </a>
+            <h2 className="text-h4-semibold">{t("on_demand_snapshots_of_all_your_cycles")}</h2>
+            <p className="text-body-sm-medium text-tertiary">{t("active_cycles_description")}</p>
           </div>
           <span className="absolute top-0 left-0">
             <img
@@ -125,7 +118,7 @@ export const WorkspaceActiveCyclesUpgrade = observer(function WorkspaceActiveCyc
               <h3 className="font-medium">{t(item.key)}</h3>
               <item.icon className="text-blue-500 mt-1 h-4 w-4" />
             </div>
-            <span className="text-13 text-tertiary">{t(`${item.key}_description`)}</span>
+            <span className="text-body-xs-regular text-tertiary">{t(`${item.key}_description`)}</span>
           </div>
         ))}
       </div>

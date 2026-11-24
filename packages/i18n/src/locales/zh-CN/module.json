@@ -2,6 +2,11 @@
   "module": {
     "label": "{count, plural, one {模块} other {模块}}",
     "no_module": "无模块",
-    "select": "添加模块"
+    "select": "添加模块",
+    "details_drawer": {
+      "progress": {
+        "empty": "向模块添加工作项以跟踪进度。"
+      }
+    }
   }
 }

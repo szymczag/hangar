@@ -9,25 +9,34 @@ import React, { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { Eye, ArrowRight, CalendarDays } from "lucide-react";
+import {
+  CalendarOutline,
+  InfoOutline,
+  MembersOutline,
+  TransferWorkItemOutline,
+  WorkItemsOutline,
+} from "@makeplane/propel/icons";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel, IS_FAVORITE_MENU_OPEN } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
 import { useTranslation } from "@plane/i18n";
-import { TransferIcon, WorkItemsIcon, MembersPropertyIcon } from "@plane/propel/icons";
-import { setPromiseToast } from "@plane/propel/toast";
-import { Tooltip } from "@plane/propel/tooltip";
+import { Avatar } from "@makeplane/propel/components/avatar";
+import { Icon } from "@makeplane/propel/components/icon";
+import { Pill } from "@makeplane/propel/components/pill";
+import { AvatarGroup } from "@makeplane/propel/components/avatar-group";
+import { setPromiseToast } from "@plane/blocks/toast";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { ICycle, TCycleGroups } from "@plane/types";
-import { Avatar, AvatarGroup, FavoriteStar } from "@plane/ui";
+import { FavoriteStar } from "@plane/blocks/common";
+import { DateRangeSelect } from "@plane/blocks/property-select";
 import { getDate, getFileURL, generateQueryParams } from "@plane/utils";
 // components
-import { DateRangeDropdown } from "@/components/dropdowns/date-range";
 import { ButtonAvatars } from "@/components/dropdowns/member/avatar";
 import { MergedDateDisplay } from "@/components/dropdowns/merged-date";
 // hooks
 import { useCycle } from "@/hooks/store/use-cycle";
 import { useMember } from "@/hooks/store/use-member";
-import { useUserPermissions } from "@/hooks/store/user";
+import { useUserPermissions, useUserProfile } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import { useTimeZoneConverter } from "@/hooks/use-timezone-converter";
@@ -67,6 +76,7 @@ export const CycleListItemAction = observer(function CycleListItemAction(props: 
   // store hooks
   const { addCycleToFavorites, removeCycleFromFavorites } = useCycle();
   const { allowPermissions } = useUserPermissions();
+  const { data: userProfile } = useUserProfile();
 
   // local storage
   const { setValue: toggleFavoriteMenu, storedValue: isFavoriteMenuOpen } = useLocalStorage<boolean>(
@@ -179,52 +189,47 @@ export const CycleListItemAction = observer(function CycleListItemAction(props: 
         cycleId={cycleId.toString()}
       />
       <button
+        type="button"
         onClick={openCycleOverview}
-        className={`z-[1] flex flex-shrink-0 gap-1 text-11 text-accent-secondary ${isMobile || (isActive && !searchParams.has("peekCycle")) ? "flex" : "hidden group-hover:flex"}`}
+        aria-label={t("project_cycles.more_details")}
+        className={`z-[1] shrink-0 items-center ${isMobile || (isActive && !searchParams.has("peekCycle")) ? "flex" : "hidden group-focus-within:flex group-hover:flex"}`}
       >
-        <Eye className="my-auto h-4 w-4 text-accent-secondary" />
-        <span>{t("project_cycles.more_details")}</span>
+        <InfoOutline className="size-4 text-placeholder" />
       </button>
       {showIssueCount && (
         <div className="flex items-center gap-1">
-          <WorkItemsIcon className="h-4 w-4 text-tertiary" />
-          <span className="text-11 text-tertiary">{cycleDetails.total_issues}</span>
+          <WorkItemsOutline className="size-4 shrink-0 text-tertiary" />
+          <span className="text-caption-sm-regular text-tertiary">{cycleDetails.total_issues}</span>
         </div>
       )}
       {showTransferIssues && (
-        // oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions
-        <div
-          className="flex h-6 cursor-pointer items-center gap-1 px-2 text-accent-secondary"
-          onClick={() => {
-            setTransferIssuesModal(true);
-          }}
-        >
-          <TransferIcon className="w-4 fill-accent-primary" />
-          <span>{t("project_cycles.transfer_work_items", { count: transferableIssuesCount })}</span>
-        </div>
+        <Pill
+          variant="ghost"
+          size="sm"
+          startIcon={<Icon icon={<TransferWorkItemOutline className="fill-accent-primary" />} />}
+          label={t("project_cycles.transfer_work_items", { count: transferableIssuesCount })}
+          onClick={() => setTransferIssuesModal(true)}
+          render={<button type="button" className="max-w-none" />}
+        />
       )}
       {isActive ? (
         <>
           <div className="flex gap-2">
             {/* Duration */}
             <Tooltip
-              tooltipContent={
-                <span className="flex gap-1">
-                  {renderFormattedDateInUserTimezone(cycleDetails.start_date ?? "")}
-                  <ArrowRight className="my-auto h-3 w-3 flex-shrink-0" />
-                  {renderFormattedDateInUserTimezone(cycleDetails.end_date ?? "")}
-                </span>
-              }
+              label={`${t("project_cycles.in_your_timezone")}: ${renderFormattedDateInUserTimezone(
+                cycleDetails.start_date ?? ""
+              )} → ${renderFormattedDateInUserTimezone(cycleDetails.end_date ?? "")}`}
+              layout="stacked"
               disabled={!isProjectTimeZoneDifferent()}
-              tooltipHeading={t("project_cycles.in_your_timezone")}
             >
-              <div className="flex items-center gap-1 text-11 font-medium text-tertiary">
-                <CalendarDays className="my-auto h-3 w-3 flex-shrink-0" />
+              <div className="flex items-center gap-1 text-caption-sm-medium text-tertiary">
+                <CalendarOutline className="my-auto h-3 w-3 flex-shrink-0" />
                 <MergedDateDisplay startDate={cycleDetails.start_date} endDate={cycleDetails.end_date} />
               </div>
             </Tooltip>
             {projectUTCOffset && (
-              <span className="cursor-default rounded-md bg-layer-1 px-2 py-1 text-11 text-tertiary">
+              <span className="cursor-default rounded-md bg-layer-1 px-2 py-1 text-caption-sm-regular text-tertiary">
                 {projectUTCOffset}
               </span>
             )}
@@ -235,35 +240,25 @@ export const CycleListItemAction = observer(function CycleListItemAction(props: 
       ) : (
         cycleDetails.start_date && (
           <>
-            <DateRangeDropdown
-              buttonVariant={"transparent-with-text"}
-              buttonContainerClassName={`h-6 w-full cursor-auto flex items-center gap-1.5 text-tertiary rounded-sm text-11 [&>div]:hover:bg-transparent`}
-              buttonClassName="p-0"
+            <DateRangeSelect
+              variant="pill-sm"
+              className="max-w-none"
               minDate={new Date()}
               value={{
-                from: getDate(cycleDetails.start_date),
-                to: getDate(cycleDetails.end_date),
+                from: getDate(cycleDetails.start_date) ?? null,
+                to: getDate(cycleDetails.end_date) ?? null,
               }}
-              placeholder={{
-                from: t("project_cycles.start_date"),
-                to: t("project_cycles.end_date"),
-              }}
+              onChange={() => {}}
+              placeholder={`${t("project_cycles.start_date")} - ${t("project_cycles.end_date")}`}
               showTooltip={isProjectTimeZoneDifferent()}
-              customTooltipHeading={t("project_cycles.in_your_timezone")}
-              customTooltipContent={
-                <span className="flex gap-1">
-                  {renderFormattedDateInUserTimezone(cycleDetails.start_date ?? "")}
-                  <ArrowRight className="my-auto h-3 w-3 flex-shrink-0" />
-                  {renderFormattedDateInUserTimezone(cycleDetails.end_date ?? "")}
-                </span>
-              }
+              tooltipHeading={t("project_cycles.in_your_timezone")}
+              tooltipContent={`${renderFormattedDateInUserTimezone(
+                cycleDetails.start_date ?? ""
+              )} → ${renderFormattedDateInUserTimezone(cycleDetails.end_date ?? "")}`}
               mergeDates
-              required={cycleDetails.status !== "draft"}
               disabled
-              hideIcon={{
-                from: false,
-                to: false,
-              }}
+              weekStartsOn={userProfile?.start_of_the_week}
+              icon={<CalendarOutline />}
             />
           </>
         )
@@ -271,19 +266,19 @@ export const CycleListItemAction = observer(function CycleListItemAction(props: 
       {/* created by */}
       {createdByDetails && !isActive && <ButtonAvatars showTooltip={false} userIds={createdByDetails?.id} />}
       {!isActive && (
-        <Tooltip tooltipContent={`${cycleDetails.assignee_ids?.length} Members`} isMobile={isMobile}>
+        <Tooltip label={`${cycleDetails.assignee_ids?.length} Members`} layout="stacked" disabled={isMobile}>
           <div className="flex w-min cursor-default items-center justify-center">
             {cycleDetails.assignee_ids && cycleDetails.assignee_ids?.length > 0 ? (
-              <AvatarGroup showTooltip={false}>
+              <AvatarGroup size="xs" max={2}>
                 {cycleDetails.assignee_ids?.map((assignee_id) => {
                   const member = getUserDetails(assignee_id);
                   return (
-                    <Avatar key={member?.id} name={member?.display_name} src={getFileURL(member?.avatar_url ?? "")} />
+                    <Avatar key={assignee_id} alt={member?.display_name} src={getFileURL(member?.avatar_url ?? "")} />
                   );
                 })}
               </AvatarGroup>
             ) : (
-              <MembersPropertyIcon className="h-4 w-4 text-tertiary" />
+              <MembersOutline className="size-4 shrink-0 text-tertiary" />
             )}
           </div>
         </Tooltip>
@@ -305,6 +300,7 @@ export const CycleListItemAction = observer(function CycleListItemAction(props: 
           cycleId={cycleId}
           projectId={projectId}
           workspaceSlug={workspaceSlug}
+          size="sm"
         />
       </div>
     </>

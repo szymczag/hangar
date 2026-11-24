@@ -11,7 +11,7 @@ import { useTheme } from "next-themes";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import type { ICycle, TCycleEstimateType } from "@plane/types";
-import { Loader } from "@plane/ui";
+import { Loader } from "@plane/blocks/skeleton";
 // assets
 import darkChartAsset from "@/app/assets/empty-state/active-cycle/chart-dark.webp?url";
 import lightChartAsset from "@/app/assets/empty-state/active-cycle/chart-light.webp?url";
@@ -53,7 +53,7 @@ export const ActiveCycleProductivity = observer(function ActiveCycleProductivity
     <div className="flex min-h-[17rem] flex-col gap-5 rounded-lg border border-subtle bg-surface-1 px-3.5 py-4">
       <div className="relative flex items-center justify-between gap-4">
         <Link href={`/${workspaceSlug}/projects/${projectId}/cycles/${cycle?.id}`}>
-          <h3 className="text-14 font-semibold text-tertiary">{t("project_cycles.active_cycle.issue_burndown")}</h3>
+          <h3 className="text-body-sm-semibold text-tertiary">{t("project_cycles.active_cycle.issue_burndown")}</h3>
         </Link>
         <EstimateTypeDropdown value={estimateType} onChange={onChange} cycleId={cycle.id} projectId={projectId} />
       </div>
@@ -62,7 +62,7 @@ export const ActiveCycleProductivity = observer(function ActiveCycleProductivity
         {cycle.total_issues > 0 ? (
           <>
             <div className="h-full w-full px-2">
-              <div className="flex items-center justify-end gap-4 py-1 text-11 text-tertiary">
+              <div className="flex items-center justify-end gap-4 py-1 text-caption-sm-regular text-tertiary">
                 {estimateType === "points" ? (
                   <span>{`Pending points - ${cycle.backlog_estimate_points + cycle.unstarted_estimate_points + cycle.started_estimate_points}`}</span>
                 ) : (

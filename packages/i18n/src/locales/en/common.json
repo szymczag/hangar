@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Couldn't copy to your clipboard",
     "tooltip": {
-      "copy_to_clipboard": "Copy to clipboard"
+      "copy_to_clipboard": "Copy to clipboard",
+      "created_on_date": "Created on {date}",
+      "priority": "Priority: {value}"
     },
     "status": "Status",
     "locked": "Locked"

@@ -5,11 +5,11 @@
  */
 
 import { observer } from "mobx-react";
-import { Tab } from "@headlessui/react";
 import { useTranslation } from "@plane/i18n";
+import { Tabs, TabsList, Tab, TabsPanel } from "@makeplane/propel/components/tabs";
 import type { TWorkItemFilterCondition } from "@plane/shared-state";
 import type { TModuleDistribution, TModuleEstimateDistribution, TModulePlotType } from "@plane/types";
-import { cn, toFilterArray } from "@plane/utils";
+import { toFilterArray } from "@plane/utils";
 // components
 import type { TAssigneeData } from "@/components/core/sidebar/progress-stats/assignee";
 import { AssigneeStatComponent } from "@/components/core/sidebar/progress-stats/assignee";
@@ -17,53 +17,37 @@ import type { TLabelData } from "@/components/core/sidebar/progress-stats/label"
 import { LabelStatComponent } from "@/components/core/sidebar/progress-stats/label";
 import type { TSelectedFilterProgressStats } from "@/components/core/sidebar/progress-stats/shared";
 import { createFilterUpdateHandler, PROGRESS_STATS } from "@/components/core/sidebar/progress-stats/shared";
-import type { TStateGroupData } from "@/components/core/sidebar/progress-stats/state_group";
-import { StateGroupStatComponent } from "@/components/core/sidebar/progress-stats/state_group";
 // hooks
 import useLocalStorage from "@/hooks/use-local-storage";
 
 type TModuleProgressStats = {
   distribution: TModuleDistribution | TModuleEstimateDistribution | undefined;
-  groupedIssues: Record<string, number>;
   handleFiltersUpdate: (condition: TWorkItemFilterCondition) => void;
   isEditable?: boolean;
   moduleId: string;
-  noBackground?: boolean;
   plotType: TModulePlotType;
-  roundedTab?: boolean;
-  selectedFilters: TSelectedFilterProgressStats;
-  size?: "xs" | "sm";
-  totalIssuesCount: number;
+  selectedFilters: Pick<TSelectedFilterProgressStats, "assignees" | "labels">;
 };
 
+// State groups are summarised (and filtered) by the progress tiles above, so only assignees and labels get a tab.
+const MODULE_PROGRESS_STATS = PROGRESS_STATS.filter((stat) => stat.key !== "stat-states");
+const DEFAULT_TAB = "stat-assignees";
+
 export const ModuleProgressStats = observer(function ModuleProgressStats(props: TModuleProgressStats) {
-  const {
-    distribution,
-    groupedIssues,
-    handleFiltersUpdate,
-    isEditable = false,
-    moduleId,
-    noBackground = false,
-    plotType,
-    roundedTab = false,
-    selectedFilters,
-    size = "sm",
-    totalIssuesCount,
-  } = props;
+  const { distribution, handleFiltersUpdate, isEditable = false, moduleId, plotType, selectedFilters } = props;
   // plane imports
   const { t } = useTranslation();
   // hooks
   const { storedValue: currentTab, setValue: setModuleTab } = useLocalStorage(
     `module-analytics-tab-${moduleId}`,
-    "stat-assignees"
+    DEFAULT_TAB
   );
   // derived values
-  const currentTabIndex = (tab: string): number => PROGRESS_STATS.findIndex((stat) => stat.key === tab);
   const currentDistribution = distribution as TModuleDistribution;
   const currentEstimateDistribution = distribution as TModuleEstimateDistribution;
   const selectedAssigneeIds = toFilterArray(selectedFilters?.assignees?.value || []) as string[];
   const selectedLabelIds = toFilterArray(selectedFilters?.labels?.value || []) as string[];
-  const selectedStateGroups = toFilterArray(selectedFilters?.stateGroups?.value || []) as string[];
+  const activeTab = MODULE_PROGRESS_STATS.some((stat) => stat.key === currentTab) ? currentTab : DEFAULT_TAB;
 
   const distributionAssigneeData: TAssigneeData =
     plotType === "burndown"
@@ -99,80 +83,45 @@ export const ModuleProgressStats = observer(function ModuleProgressStats(props: 
           total: label.total_estimates,
         }));
 
-  const distributionStateData: TStateGroupData = Object.keys(groupedIssues || {}).map((state) => ({
-    state: state,
-    completed: groupedIssues?.[state] || 0,
-    total: totalIssuesCount || 0,
-  }));
-
   const handleAssigneeFiltersUpdate = createFilterUpdateHandler(
     "assignee_id",
     selectedAssigneeIds,
     handleFiltersUpdate
   );
   const handleLabelFiltersUpdate = createFilterUpdateHandler("label_id", selectedLabelIds, handleFiltersUpdate);
-  const handleStateGroupFiltersUpdate = createFilterUpdateHandler(
-    "state_group",
-    selectedStateGroups,
-    handleFiltersUpdate
-  );
 
   return (
     <div>
-      <Tab.Group defaultIndex={currentTabIndex(currentTab ? currentTab : "stat-assignees")}>
-        <Tab.List
-          as="div"
-          className={cn(
-            `flex w-full items-center justify-between gap-2 rounded-md p-1`,
-            roundedTab ? `rounded-3xl` : `rounded-md`,
-            noBackground ? `` : `bg-layer-2`,
-            size === "xs" ? `text-11` : `text-13`
-          )}
-        >
-          {PROGRESS_STATS.map((stat) => (
-            <Tab
-              className={cn(
-                `w-full cursor-pointer p-1 text-primary transition-all outline-none focus:outline-none`,
-                roundedTab ? `rounded-3xl border border-subtle` : `rounded-sm`,
-                stat.key === currentTab
-                  ? "bg-layer-transparent-active text-secondary"
-                  : "text-placeholder hover:text-secondary"
-              )}
-              key={stat.key}
-              onClick={() => setModuleTab(stat.key)}
-            >
-              {t(stat.i18n_title)}
-            </Tab>
+      <Tabs
+        variant="contained"
+        stretch="full"
+        defaultValue={activeTab ?? DEFAULT_TAB}
+        onValueChange={(value) => setModuleTab(value)}
+      >
+        <TabsList>
+          {MODULE_PROGRESS_STATS.map((stat) => (
+            <Tab key={stat.key} value={stat.key} label={t(stat.i18n_title)} />
           ))}
-        </Tab.List>
-        <Tab.Panels className="py-3 text-secondary">
-          <Tab.Panel key={"stat-assignees"}>
+        </TabsList>
+        <div className="w-full py-3 text-secondary">
+          <TabsPanel value="stat-assignees">
             <AssigneeStatComponent
               distribution={distributionAssigneeData}
               handleAssigneeFiltersUpdate={handleAssigneeFiltersUpdate}
               isEditable={isEditable}
               selectedAssigneeIds={selectedAssigneeIds}
             />
-          </Tab.Panel>
-          <Tab.Panel key={"stat-labels"}>
+          </TabsPanel>
+          <TabsPanel value="stat-labels">
             <LabelStatComponent
               distribution={distributionLabelData}
               handleLabelFiltersUpdate={handleLabelFiltersUpdate}
               isEditable={isEditable}
               selectedLabelIds={selectedLabelIds}
             />
-          </Tab.Panel>
-          <Tab.Panel key={"stat-states"}>
-            <StateGroupStatComponent
-              distribution={distributionStateData}
-              handleStateGroupFiltersUpdate={handleStateGroupFiltersUpdate}
-              isEditable={isEditable}
-              selectedStateGroups={selectedStateGroups}
-              totalIssuesCount={totalIssuesCount}
-            />
-          </Tab.Panel>
-        </Tab.Panels>
-      </Tab.Group>
+          </TabsPanel>
+        </div>
+      </Tabs>
     </div>
   );
 });

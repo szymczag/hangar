@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "Gagal menyalin ke clipboard",
     "tooltip": {
-      "copy_to_clipboard": "Salin ke clipboard"
+      "copy_to_clipboard": "Salin ke clipboard",
+      "created_on_date": "Dibuat pada {date}",
+      "priority": "Prioritas: {value}"
     },
     "status": "Status",
     "locked": "Terkunci"

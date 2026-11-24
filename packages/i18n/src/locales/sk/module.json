@@ -2,6 +2,11 @@
   "module": {
     "label": "{count, plural, one {Modul} few {Moduly} other {Modulov}}",
     "no_module": "Žiadny modul",
-    "select": "Pridať moduly"
+    "select": "Pridať moduly",
+    "details_drawer": {
+      "progress": {
+        "empty": "Pridajte do modulu pracovné položky a sledujte priebeh."
+      }
+    }
   }
 }

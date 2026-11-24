@@ -7,16 +7,19 @@
 import React from "react";
 import { isEmpty } from "lodash-es";
 import { observer } from "mobx-react";
-import { SquareUser } from "lucide-react";
+import { MembersOutline, LeadOutline, WorkItemsOutline } from "@makeplane/propel/icons";
 // plane types
 import { EEstimateSystem } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { MembersPropertyIcon, WorkItemsIcon } from "@plane/propel/icons";
+import { Avatar } from "@makeplane/propel/components/avatar";
+import { AvatarGroup } from "@makeplane/propel/components/avatar-group";
+import { TextArea } from "@makeplane/propel/components/text-area";
 import type { ICycle } from "@plane/types";
-// plane ui
-import { Avatar, AvatarGroup, TextArea } from "@plane/ui";
 // helpers
 import { getFileURL } from "@plane/utils";
+// components
+import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
+import { DescriptionOverflow } from "@/components/issues/issue-detail/description-overflow";
 // hooks
 import { useProjectEstimates } from "@/hooks/store/estimates";
 import { useMember } from "@/hooks/store/use-member";
@@ -50,12 +53,8 @@ export const CycleSidebarDetails = observer(function CycleSidebarDetails(props: 
   const cycleOwnerDetails = cycleDetails ? getUserDetails(cycleDetails.owned_by_id) : undefined;
 
   const isEstimatePointValid = isEmpty(cycleDetails?.progress_snapshot || {})
-    ? estimateType && estimateType?.type == EEstimateSystem.POINTS
-      ? true
-      : false
-    : isEmpty(cycleDetails?.progress_snapshot?.estimate_distribution || {})
-      ? false
-      : true;
+    ? Boolean(estimateType && estimateType?.type == EEstimateSystem.POINTS)
+    : !isEmpty(cycleDetails?.progress_snapshot?.estimate_distribution || {});
 
   const issueEstimatePointCount =
     isCompleted && !isEmpty(cycleDetails?.progress_snapshot)
@@ -66,84 +65,65 @@ export const CycleSidebarDetails = observer(function CycleSidebarDetails(props: 
         ? `0 ${t("common.work_item")}`
         : `${cycleDetails?.completed_estimate_points}/${cycleDetails?.total_estimate_points}`;
   return (
-    <div className="flex w-full flex-col gap-5">
-      {cycleDetails?.description && (
-        <TextArea
-          className="ring-none !m-0 max-h-max w-full resize-none !border-0 bg-transparent !p-0 text-13 leading-5 text-secondary outline-none"
-          value={cycleDetails.description}
-          disabled
-        />
+    <div className="flex w-full flex-col gap-6">
+      {cycleDetails?.description?.trim() && (
+        // Long descriptions clip at 140px behind a "Show all" / "Show less" toggle.
+        <DescriptionOverflow maxHeight={140}>
+          <div className="flex w-full">
+            <TextArea size="xl" surface="inline" autoResize value={cycleDetails.description} disabled />
+          </div>
+        </DescriptionOverflow>
       )}
 
-      <div className="flex flex-col gap-5 pt-2.5 pb-6">
-        <div className="flex items-center justify-start gap-1">
-          <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-            <SquareUser className="h-4 w-4" />
-            <span className="text-14">{t("lead")}</span>
-          </div>
-          <div className="flex w-3/5 items-center rounded-xs">
-            <div className="flex items-center gap-2.5">
-              <Avatar name={cycleOwnerDetails?.display_name} src={getFileURL(cycleOwnerDetails?.avatar_url ?? "")} />
-              <span className="text-13 text-secondary">{cycleOwnerDetails?.display_name}</span>
-            </div>
-          </div>
+      <section className="border-t border-subtle pt-6">
+        <h3 className="mb-2 text-body-sm-medium text-primary">{t("common.properties")}</h3>
+        <div className="flex flex-col gap-2 text-body-xs-regular text-primary">
+          <SidebarPropertyListItem icon={LeadOutline} label={t("lead")}>
+            {cycleOwnerDetails ? (
+              <div className="flex min-w-0 items-center gap-2">
+                <Avatar
+                  alt={cycleOwnerDetails.display_name}
+                  fallback={cycleOwnerDetails.display_name?.[0]?.toUpperCase()}
+                  src={getFileURL(cycleOwnerDetails.avatar_url ?? "")}
+                  size="2xs"
+                />
+                <span className="truncate">{cycleOwnerDetails.display_name}</span>
+              </div>
+            ) : (
+              <span className="text-tertiary">{t("none")}</span>
+            )}
+          </SidebarPropertyListItem>
+          <SidebarPropertyListItem icon={MembersOutline} label={t("members")}>
+            {cycleDetails?.assignee_ids && cycleDetails.assignee_ids.length > 0 ? (
+              <AvatarGroup size="2xs" max={2}>
+                {cycleDetails.assignee_ids.map((member) => {
+                  const memberDetails = getUserDetails(member);
+                  return (
+                    <Avatar
+                      key={member}
+                      alt={memberDetails?.display_name ?? ""}
+                      src={getFileURL(memberDetails?.avatar_url ?? "")}
+                    />
+                  );
+                })}
+              </AvatarGroup>
+            ) : (
+              <span className="text-tertiary">{t("no_assignee")}</span>
+            )}
+          </SidebarPropertyListItem>
+          <SidebarPropertyListItem icon={WorkItemsOutline} label={t("work_items")}>
+            <span>{issueCount}</span>
+          </SidebarPropertyListItem>
+          {/**
+           * NOTE: Render this section when estimate points of he projects is enabled and the estimate system is points
+           */}
+          {isEstimatePointValid && !isCompleted && (
+            <SidebarPropertyListItem icon={WorkItemsOutline} label={t("points")}>
+              <span>{issueEstimatePointCount}</span>
+            </SidebarPropertyListItem>
+          )}
         </div>
-
-        <div className="flex items-center justify-start gap-1">
-          <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-            <MembersPropertyIcon className="h-4 w-4" />
-            <span className="text-14">{t("members")}</span>
-          </div>
-          <div className="flex w-3/5 items-center rounded-xs">
-            <div className="flex items-center gap-2.5">
-              {cycleDetails?.assignee_ids && cycleDetails.assignee_ids.length > 0 ? (
-                <>
-                  <AvatarGroup showTooltip>
-                    {cycleDetails.assignee_ids.map((member) => {
-                      const memberDetails = getUserDetails(member);
-                      return (
-                        <Avatar
-                          key={memberDetails?.id}
-                          name={memberDetails?.display_name ?? ""}
-                          src={getFileURL(memberDetails?.avatar_url ?? "")}
-                          showTooltip={false}
-                        />
-                      );
-                    })}
-                  </AvatarGroup>
-                </>
-              ) : (
-                <span className="px-1.5 text-13 text-tertiary">{t("no_assignee")}</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-start gap-1">
-          <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-            <WorkItemsIcon className="h-4 w-4" />
-            <span className="text-14">{t("work_items")}</span>
-          </div>
-          <div className="flex w-3/5 items-center">
-            <span className="px-1.5 text-13 text-tertiary">{issueCount}</span>
-          </div>
-        </div>
-
-        {/**
-         * NOTE: Render this section when estimate points of he projects is enabled and the estimate system is points
-         */}
-        {isEstimatePointValid && !isCompleted && (
-          <div className="flex items-center justify-start gap-1">
-            <div className="flex w-2/5 items-center justify-start gap-2 text-tertiary">
-              <WorkItemsIcon className="h-4 w-4" />
-              <span className="text-14">{t("points")}</span>
-            </div>
-            <div className="flex w-3/5 items-center">
-              <span className="px-1.5 text-13 text-tertiary">{issueEstimatePointCount}</span>
-            </div>
-          </div>
-        )}
-      </div>
+      </section>
     </div>
   );
 });

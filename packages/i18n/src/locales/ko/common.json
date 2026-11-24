@@ -742,7 +742,9 @@
     "administration": "Administration",
     "clipboard_copy_failed": "클립보드에 복사하지 못했습니다",
     "tooltip": {
-      "copy_to_clipboard": "클립보드에 복사"
+      "copy_to_clipboard": "클립보드에 복사",
+      "created_on_date": "생성일: {date}",
+      "priority": "우선순위: {value}"
     },
     "status": "상태",
     "locked": "잠김"

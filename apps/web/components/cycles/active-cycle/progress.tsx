@@ -11,7 +11,8 @@ import { PROGRESS_STATE_GROUPS_DETAILS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { TWorkItemFilterCondition } from "@plane/shared-state";
 import type { ICycle } from "@plane/types";
-import { LinearProgressIndicator, Loader } from "@plane/ui";
+import { SegmentedProgress } from "@plane/blocks/progress";
+import { Loader } from "@plane/blocks/skeleton";
 // assets
 import darkProgressAsset from "@/app/assets/empty-state/active-cycle/progress-dark.webp?url";
 import lightProgressAsset from "@/app/assets/empty-state/active-cycle/progress-light.webp?url";
@@ -32,10 +33,10 @@ export const ActiveCycleProgress = observer(function ActiveCycleProgress(props: 
   // plane hooks
   const { t } = useTranslation();
   // derived values
-  const progressIndicatorData = PROGRESS_STATE_GROUPS_DETAILS.map((group, index) => ({
-    id: index,
-    name: group.title,
-    value: cycle && cycle.total_issues > 0 ? (cycle[group.key as keyof ICycle] as number) : 0,
+  const progressSegments = PROGRESS_STATE_GROUPS_DETAILS.map((group) => ({
+    id: group.key,
+    name: t(`workspace_projects.state.${group.key.replace("_issues", "")}`),
+    value: cycle ? ((cycle[group.key as keyof ICycle] as number | undefined) ?? 0) : 0,
     color: group.color,
   }));
   const groupedIssues: any = cycle
@@ -52,49 +53,50 @@ export const ActiveCycleProgress = observer(function ActiveCycleProgress(props: 
     <div className="flex min-h-[17rem] flex-col gap-5 rounded-lg border border-subtle bg-surface-1 px-3.5 py-4">
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-4">
-          <h3 className="text-14 font-semibold text-tertiary">{t("project_cycles.active_cycle.progress")}</h3>
+          <h3 className="text-body-sm-semibold text-tertiary">{t("project_cycles.active_cycle.progress")}</h3>
           {cycle.total_issues > 0 && (
-            <span className="flex gap-1 rounded-xs px-3 py-1 text-13 font-medium whitespace-nowrap text-placeholder">
+            <span className="flex gap-1 rounded-xs px-3 py-1 text-body-xs-medium whitespace-nowrap text-placeholder">
               {`${cycle.completed_issues + cycle.cancelled_issues}/${cycle.total_issues - cycle.cancelled_issues} ${
                 cycle.completed_issues + cycle.cancelled_issues > 1 ? "Work items" : "Work item"
               } closed`}
             </span>
           )}
         </div>
-        {cycle.total_issues > 0 && <LinearProgressIndicator size="lg" data={progressIndicatorData} />}
+        {cycle.total_issues > 0 && (
+          <SegmentedProgress size="lg" data={progressSegments} aria-label={t("project_cycles.active_cycle.progress")} />
+        )}
       </div>
 
       {cycle.total_issues > 0 ? (
         <div className="flex flex-col gap-5">
-          {Object.keys(groupedIssues).map((group, index) => (
-            <>
-              {groupedIssues[group] > 0 && (
-                <div key={index}>
-                  <div
-                    className="flex cursor-pointer items-center justify-between gap-2 text-13"
-                    onClick={() => {
-                      handleFiltersUpdate([{ property: "state_group", operator: "in", value: [group] }]);
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="block h-3 w-3 rounded-full"
-                        style={{
-                          backgroundColor: PROGRESS_STATE_GROUPS_DETAILS[index].color,
-                        }}
-                      />
-                      <span className="w-16 font-medium text-tertiary capitalize">{group}</span>
-                    </div>
-                    <span className="text-tertiary">{`${groupedIssues[group]} ${
-                      groupedIssues[group] > 1 ? "Work items" : "Work item"
-                    }`}</span>
+          {Object.keys(groupedIssues).map((group, index) =>
+            groupedIssues[group] > 0 ? (
+              <div key={group}>
+                <button
+                  type="button"
+                  className="flex w-full cursor-pointer items-center justify-between gap-2 text-left text-body-xs-regular"
+                  onClick={() => {
+                    handleFiltersUpdate([{ property: "state_group", operator: "in", value: [group] }]);
+                  }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="block h-3 w-3 rounded-full"
+                      style={{
+                        backgroundColor: PROGRESS_STATE_GROUPS_DETAILS[index].color,
+                      }}
+                    />
+                    <span className="w-16 font-medium text-tertiary capitalize">{group}</span>
                   </div>
-                </div>
-              )}
-            </>
-          ))}
+                  <span className="text-tertiary">{`${groupedIssues[group]} ${
+                    groupedIssues[group] > 1 ? "Work items" : "Work item"
+                  }`}</span>
+                </button>
+              </div>
+            ) : null
+          )}
           {cycle.cancelled_issues > 0 && (
-            <span className="flex items-center gap-2 text-13 text-tertiary">
+            <span className="flex items-center gap-2 text-body-xs-regular text-tertiary">
               <span>
                 {`${cycle.cancelled_issues} cancelled ${
                   cycle.cancelled_issues > 1 ? "work items are" : "work item is"

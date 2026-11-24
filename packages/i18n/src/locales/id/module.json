@@ -2,6 +2,11 @@
   "module": {
     "label": "{count, plural, one {Modul} other {Modul}}",
     "no_module": "Tidak ada modul",
-    "select": "Tambah modul"
+    "select": "Tambah modul",
+    "details_drawer": {
+      "progress": {
+        "empty": "Tambahkan item kerja ke modul untuk melacak progres."
+      }
+    }
   }
 }
