@@ -19,7 +19,7 @@ from celery.app import trace as celery_trace
 from plane import celery as plane_celery
 from plane.utils.logging import RedactTaskArgumentsFilter
 
-SECRET = "reset-token-6f1c2b"
+MARKER = "argument-marker-6f1c2b"
 
 
 def _emit_received_line(handler):
@@ -31,8 +31,8 @@ def _emit_received_line(handler):
     context = {
         "id": "8a1d",
         "name": "plane.bgtasks.forgot_password_task.forgot_password",
-        "args": f"('Ada', 'ada@example.com', 'MQ', '{SECRET}', 'https://hangar.test')",
-        "kwargs": f"{{'token': '{SECRET}'}}",
+        "args": f"('Ada', 'ada@example.com', 'MQ', '{MARKER}', 'https://hangar.test')",
+        "kwargs": f"{{'value': '{MARKER}'}}",
         "eta": None,
     }
     logger.info(celery_trace.LOG_RECEIVED, context, extra={"data": context})
@@ -51,7 +51,7 @@ def test_the_worker_json_handlers_drop_task_arguments(signal_handler):
     _emit_received_line(handler)
 
     line = stream.getvalue()
-    assert SECRET not in line
+    assert MARKER not in line
     record = json.loads(line.split("\n")[0])
     assert record["data"]["args"] == RedactTaskArgumentsFilter.REDACTED
     assert record["data"]["kwargs"] == RedactTaskArgumentsFilter.REDACTED
