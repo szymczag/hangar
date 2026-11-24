@@ -28,6 +28,10 @@ export type VisualFixtures = {
   module: { id: string; name: string };
   /** The pending intake work item (its work item id, which the intake page addresses it by). */
   intake: { id: string; name: string };
+  /** The seeded project pages, by id and name, the first with a little of everything. */
+  pages: { ids: string[]; names: string[] };
+  /** The text the seeded sticky opens with. */
+  sticky: string;
   /** The comment on the first work item. */
   comment: string;
   /** Custom property names on the Task type, in sort order. */

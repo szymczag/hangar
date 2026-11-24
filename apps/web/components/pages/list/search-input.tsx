@@ -4,12 +4,9 @@
  * See the LICENSE file for details.
  */
 
-import { useRef, useState } from "react";
 // plane imports
-import { useOutsideClickDetector } from "@plane/hooks";
-import { IconButton } from "@plane/propel/icon-button";
-import { SearchIcon, CloseIcon } from "@plane/propel/icons";
-import { cn } from "@plane/utils";
+import { ExpandableSearch } from "@makeplane/propel/components/expandable-search";
+import { useTranslation } from "@plane/i18n";
 
 type Props = {
   searchQuery: string;
@@ -18,70 +15,17 @@ type Props = {
 
 export function PageSearchInput(props: Props) {
   const { searchQuery, updateSearchQuery } = props;
-  // states
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  // refs
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // outside click detector hook
-  useOutsideClickDetector(inputRef, () => {
-    if (isSearchOpen && searchQuery.trim() === "") setIsSearchOpen(false);
-  });
-
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Escape") {
-      if (searchQuery && searchQuery.trim() !== "") updateSearchQuery("");
-      else {
-        setIsSearchOpen(false);
-        inputRef.current?.blur();
-      }
-    }
-  };
+  // plane hooks
+  const { t } = useTranslation();
 
   return (
-    <div className="flex">
-      {!isSearchOpen && (
-        <IconButton
-          variant="ghost"
-          size="lg"
-          className="my-auto -mr-1 shrink-0"
-          onClick={() => {
-            setIsSearchOpen(true);
-            inputRef.current?.focus();
-          }}
-          icon={SearchIcon}
-        />
-      )}
-      <div
-        className={cn(
-          "flex w-0 items-center justify-start overflow-hidden rounded-md border border-transparent text-placeholder opacity-0 transition-[width] ease-linear",
-          {
-            "w-64 border-subtle px-2.5 py-1.5 opacity-100": isSearchOpen,
-          }
-        )}
-      >
-        <SearchIcon className="h-3.5 w-3.5" />
-        <input
-          ref={inputRef}
-          className="ml-2 w-full max-w-[234px] border-none bg-transparent text-13 text-primary placeholder:text-placeholder focus:outline-none"
-          placeholder="Search pages"
-          value={searchQuery}
-          onChange={(e) => updateSearchQuery(e.target.value)}
-          onKeyDown={handleInputKeyDown}
-        />
-        {isSearchOpen && (
-          <button
-            type="button"
-            className="grid place-items-center"
-            onClick={() => {
-              updateSearchQuery("");
-              setIsSearchOpen(false);
-            }}
-          >
-            <CloseIcon className="h-3 w-3" />
-          </button>
-        )}
-      </div>
-    </div>
+    <ExpandableSearch
+      aria-label={t("search")}
+      clearLabel={t("common.clear")}
+      size="md"
+      placeholder="Search pages"
+      value={searchQuery}
+      onValueChange={(value) => updateSearchQuery(value)}
+    />
   );
 }

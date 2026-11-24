@@ -12,7 +12,7 @@ import { useTranslation } from "@plane/i18n";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useProjectView } from "@/hooks/store/use-project-view";
-import { FiltersDropdownLegacy } from "../issues/issue-layouts/filters";
+import { FiltersDropdown } from "../issues/issue-layouts/filters";
 import { ViewFiltersSelection } from "./filters/filter-selection";
 import { ViewOrderByDropdown } from "./filters/order-by";
 
@@ -44,10 +44,7 @@ export const ViewListHeader = observer(function ViewListHeader() {
             if (val.order) updateFilters("sortBy", val.order);
           }}
         />
-        {/* Fork: compatibility shim, removed in phase 9. The panel's created date and
-            created by sections are shared with the pages list filters, which move in
-            phase 6, so the 1.4 popover stays until then. */}
-        <FiltersDropdownLegacy
+        <FiltersDropdown
           icon={<FilterOutline className="h-3 w-3" />}
           title="Filters"
           placement="bottom-end"
@@ -58,7 +55,7 @@ export const ViewListHeader = observer(function ViewListHeader() {
             handleFiltersUpdate={updateFilters}
             memberIds={projectMemberIds ?? undefined}
           />
-        </FiltersDropdownLegacy>
+        </FiltersDropdown>
       </div>
     </div>
   );

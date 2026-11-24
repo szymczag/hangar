@@ -6,9 +6,9 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-import { SmilePlus } from "lucide-react";
+import { ReactionOutline } from "@makeplane/propel/icons";
 // plane imports
-import { EmojiPicker, EmojiIconPickerTypes } from "@plane/propel/emoji-icon-picker";
+import { EmojiPicker } from "@plane/blocks/emoji-icon-picker";
 import { cn } from "@plane/utils";
 // store
 import type { TPageInstance } from "@/store/pages/base-page";
@@ -31,7 +31,12 @@ export const PageEditorHeaderRoot = observer(function PageEditorHeaderRoot(props
 
   return (
     <>
-      <div className="flex h-[48px] items-end text-left">
+      <div
+        className={cn("flex items-end text-left", {
+          "h-[71px]": isLogoSelected,
+          "h-[64px]": !isLogoSelected,
+        })}
+      >
         {!isLogoSelected && (
           <div
             className={cn("opacity-0 transition-all duration-200 group-hover/page-header:opacity-100", {
@@ -47,13 +52,13 @@ export const PageEditorHeaderRoot = observer(function PageEditorHeaderRoot(props
                 <button
                   type="button"
                   className={cn(
-                    "flex items-center gap-1 rounded-sm p-1 text-13 font-medium text-tertiary transition-colors outline-none hover:bg-layer-1",
+                    "flex items-center gap-1 rounded-sm p-1 text-body-xs-medium text-tertiary transition-colors outline-none hover:bg-layer-1",
                     {
                       "bg-layer-1": isLogoPickerOpen,
                     }
                   )}
                 >
-                  <SmilePlus className="size-4 flex-shrink-0" />
+                  <ReactionOutline className="size-4 flex-shrink-0" />
                   Icon
                 </button>
               }
@@ -61,17 +66,13 @@ export const PageEditorHeaderRoot = observer(function PageEditorHeaderRoot(props
               defaultIconColor={
                 logo_props?.in_use && logo_props.in_use === "icon" ? logo_props?.icon?.color : undefined
               }
-              defaultOpen={
-                logo_props?.in_use && logo_props?.in_use === "emoji"
-                  ? EmojiIconPickerTypes.EMOJI
-                  : EmojiIconPickerTypes.ICON
-              }
+              defaultOpen={logo_props?.in_use && logo_props?.in_use === "emoji" ? "emoji" : "icon"}
               disabled={!isContentEditable}
             />
           </div>
         )}
       </div>
-      <PageEditorHeaderLogoPicker className="mt-2 flex w-full flex-shrink-0" page={page} />
+      <PageEditorHeaderLogoPicker className="flex w-full flex-shrink-0" page={page} />
     </>
   );
 });

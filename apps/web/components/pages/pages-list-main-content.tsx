@@ -10,8 +10,8 @@ import { observer } from "mobx-react";
 import { useParams, useRouter } from "next/navigation";
 import { EUserPermissionsLevel, EPageAccess } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { EmptyStateDetailed } from "@plane/propel/empty-state";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { EmptyStateDetailed } from "@plane/blocks/empty-state";
+import { setToast } from "@plane/blocks/toast";
 import type { TPage, TPageNavigationTabs } from "@plane/types";
 import { EUserProjectRoles } from "@plane/types";
 // components
@@ -58,19 +58,18 @@ export const PagesListMainContent = observer(function PagesListMainContent(props
       access: pageType === "private" ? EPageAccess.PRIVATE : EPageAccess.PUBLIC,
     };
 
-    await createPage(payload)
-      .then((res) => {
-        const pageId = `/${workspaceSlug}/projects/${currentProjectDetails?.id}/pages/${res?.id}`;
-        router.push(pageId);
-      })
-      .catch((err) => {
-        setToast({
-          type: TOAST_TYPE.ERROR,
-          title: "Error!",
-          message: err?.data?.error || "Page could not be created. Please try again.",
-        });
-      })
-      .finally(() => setIsCreatingPage(false));
+    try {
+      const res = await createPage(payload);
+      router.push(`/${workspaceSlug}/projects/${currentProjectDetails?.id}/pages/${res?.id}`);
+    } catch (err) {
+      setToast({
+        type: "error",
+        title: "Error!",
+        message: (err as { data?: { error?: string } })?.data?.error || "Page could not be created. Please try again.",
+      });
+    } finally {
+      setIsCreatingPage(false);
+    }
   };
 
   if (loader === "init-loader") return <PageLoader />;

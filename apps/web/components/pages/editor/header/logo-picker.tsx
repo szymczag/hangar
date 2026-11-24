@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
-import { EmojiPicker, EmojiIconPickerTypes, Logo } from "@plane/propel/emoji-icon-picker";
+import { EmojiPicker, Logo } from "@plane/blocks/emoji-icon-picker";
 import { cn } from "@plane/utils";
 // store
 import type { TPageInstance } from "@/store/pages/base-page";
@@ -28,7 +28,7 @@ export const PageEditorHeaderLogoPicker = observer(function PageEditorHeaderLogo
   return (
     <div
       className={cn(className, "pointer-events-none max-h-0 transition-all duration-300 ease-linear", {
-        "pointer-events-auto max-h-[56px]": isLogoSelected,
+        "pointer-events-auto max-h-14": isLogoSelected,
       })}
     >
       <EmojiPicker
@@ -38,7 +38,7 @@ export const PageEditorHeaderLogoPicker = observer(function PageEditorHeaderLogo
         buttonClassName="flex items-center justify-center"
         label={
           <div
-            className={cn("-ml-[8px] grid size-[56px] place-items-center rounded-sm transition-colors", {
+            className={cn("-ml-2 grid size-14 place-items-center rounded-sm transition-colors", {
               "hover:bg-layer-1": isContentEditable,
             })}
           >
@@ -47,9 +47,7 @@ export const PageEditorHeaderLogoPicker = observer(function PageEditorHeaderLogo
         }
         onChange={updatePageLogo}
         defaultIconColor={logo_props?.in_use && logo_props.in_use === "icon" ? logo_props?.icon?.color : undefined}
-        defaultOpen={
-          logo_props?.in_use && logo_props?.in_use === "emoji" ? EmojiIconPickerTypes.EMOJI : EmojiIconPickerTypes.ICON
-        }
+        defaultOpen={logo_props?.in_use && logo_props?.in_use === "emoji" ? "emoji" : "icon"}
         disabled={!isContentEditable}
       />
     </div>

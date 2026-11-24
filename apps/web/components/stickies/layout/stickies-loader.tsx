@@ -5,13 +5,15 @@
  */
 
 // plane ui
-import { Loader } from "@plane/ui";
+import { Loader } from "@plane/blocks/skeleton";
+
+const LOADER_KEYS = ["sticky-1", "sticky-2", "sticky-3", "sticky-4"];
 
 export function StickiesLoader() {
   return (
     <div className="grid grid-cols-4 gap-4 overflow-scroll pb-2">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <Loader key={index} className="space-y-5 rounded-sm border border-subtle p-3">
+      {LOADER_KEYS.map((key) => (
+        <Loader key={key} className="space-y-5 rounded-lg border border-subtle p-3">
           <div className="space-y-2">
             <Loader.Item height="20px" />
             <Loader.Item height="15px" width="75%" />

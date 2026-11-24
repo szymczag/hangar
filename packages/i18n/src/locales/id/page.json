@@ -40,6 +40,16 @@
           "title": "Tidak ada komentar",
           "description": "Tambahkan komentar untuk melihatnya di sini."
         }
+      },
+      "version_history": {
+        "view_only": "Hanya lihat",
+        "loading_details": "Memuat detail versi",
+        "load_error_description": "Versi tidak dapat dimuat. Silakan coba lagi.",
+        "try_again": "Coba lagi",
+        "restoring": "Memulihkan",
+        "restore_success": "Versi halaman dipulihkan.",
+        "restore_failed": "Gagal memulihkan versi halaman.",
+        "list_error_description": "Riwayat versi tidak dapat dimuat."
       }
     },
     "toasts": {
@@ -111,5 +121,8 @@
       "success_message": "Halaman dihapus dari koleksi.",
       "error_message": "Halaman tidak dapat dihapus dari koleksi. Silakan coba lagi."
     }
+  },
+  "page_content_limit_banner": {
+    "message": "Batas konten tercapai dan sinkronisasi langsung nonaktif. Buat halaman baru atau gunakan halaman bertingkat untuk melanjutkan sinkronisasi."
   }
 }

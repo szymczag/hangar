@@ -8,8 +8,8 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 // plane imports
+import { Avatar } from "@makeplane/propel/components/avatar";
 import { useTranslation } from "@plane/i18n";
-import { Avatar } from "@plane/ui";
 import { calculateTimeAgoShort, getFileURL, renderFormattedDate } from "@plane/utils";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
@@ -36,14 +36,14 @@ export const PageNavigationPaneInfoTabActorsInfo = observer(function PageNavigat
   return (
     <div className="mt-4 space-y-3">
       <div>
-        <p className="text-11 font-medium text-tertiary">{t("page_navigation_pane.tabs.info.actors_info.edited_by")}</p>
-        <div className="mt-2 flex items-center justify-between gap-2 text-13 font-medium">
+        <p className="text-body-xs-medium text-tertiary">{t("page_navigation_pane.tabs.info.actors_info.edited_by")}</p>
+        <div className="mt-2 flex items-center justify-between gap-2 text-body-xs-medium">
           <Link href={`/${workspaceSlug?.toString()}/profile/${page.updated_by}`} className="flex items-center gap-1">
             <Avatar
+              alt={editorInformation?.display_name}
+              fallback={editorInformation?.display_name?.[0]?.toUpperCase()}
               src={getFileURL(editorInformation?.avatar_url ?? "")}
-              name={editorInformation?.display_name}
-              className="flex-shrink-0"
-              size="sm"
+              size="2xs"
             />
             <span>{editorInformation?.display_name ?? t("common.deactivated_user")}</span>
           </Link>
@@ -51,16 +51,16 @@ export const PageNavigationPaneInfoTabActorsInfo = observer(function PageNavigat
         </div>
       </div>
       <div>
-        <p className="text-11 font-medium text-tertiary">
+        <p className="text-body-xs-medium text-tertiary">
           {t("page_navigation_pane.tabs.info.actors_info.created_by")}
         </p>
-        <div className="mt-2 flex items-center justify-between gap-2 text-13 font-medium">
+        <div className="mt-2 flex items-center justify-between gap-2 text-body-xs-medium">
           <Link href={`/${workspaceSlug?.toString()}/profile/${page.created_by}`} className="flex items-center gap-1">
             <Avatar
+              alt={creatorInformation?.display_name}
+              fallback={creatorInformation?.display_name?.[0]?.toUpperCase()}
               src={getFileURL(creatorInformation?.avatar_url ?? "")}
-              name={creatorInformation?.display_name}
-              className="flex-shrink-0"
-              size="sm"
+              size="2xs"
             />
             <span>{creatorInformation?.display_name ?? t("common.deactivated_user")}</span>
           </Link>

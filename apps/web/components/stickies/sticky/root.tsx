@@ -4,10 +4,11 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { debounce } from "lodash-es";
 import { observer } from "mobx-react";
-import { Minimize2 } from "lucide-react";
+import { CloseOutline } from "@makeplane/propel/icons";
+import { useTranslation } from "@plane/i18n";
 // plane types
 import type { TSticky } from "@plane/types";
 // plane utils
@@ -36,10 +37,17 @@ export const StickyNote = observer(function StickyNote(props: TProps) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   // store hooks
   const { stickies } = useSticky();
+  // plane hooks
+  const { t } = useTranslation();
   // sticky operations
   const { stickyOperations } = useStickyOperations({ workspaceSlug });
   // derived values
-  const stickyData: Partial<TSticky> = stickyId ? stickies[stickyId] : { background_color: getRandomStickyColor() };
+  const storedSticky = stickyId ? stickies[stickyId] : undefined;
+  // A new sticky picks its colour once, not on every render.
+  const stickyData: Partial<TSticky> = useMemo(
+    () => storedSticky ?? { background_color: getRandomStickyColor() },
+    [storedSticky]
+  );
   // const isStickiesPage = pathName?.includes("stickies");
   const backgroundColor =
     STICKY_COLORS_LIST.find((c) => c.key === stickyData?.background_color)?.backgroundColor ||
@@ -56,14 +64,15 @@ export const StickyNote = observer(function StickyNote(props: TProps) {
         });
       }
     },
-    [stickyId, stickyOperations]
+    [stickyData, stickyId, stickyOperations]
   );
 
-  const debouncedFormSave = useCallback(
-    debounce(async (payload: Partial<TSticky>) => {
-      await handleChange(payload);
-    }, 500),
-    [stickyOperations, stickyData, handleChange]
+  const debouncedFormSave = useMemo(
+    () =>
+      debounce(async (payload: Partial<TSticky>) => {
+        await handleChange(payload);
+      }, 500),
+    [handleChange]
   );
 
   const handleDelete = async () => {
@@ -80,19 +89,19 @@ export const StickyNote = observer(function StickyNote(props: TProps) {
         handleClose={() => setIsDeleteModalOpen(false)}
       />
       <div
-        className={cn("group/sticky flex h-fit w-full flex-col overflow-y-scroll rounded-sm", className)}
+        className={cn("group/sticky flex h-fit w-full flex-col overflow-y-scroll rounded-lg", className)}
         style={{
           backgroundColor,
         }}
       >
         {/* {isStickiesPage && <StickyItemDragHandle isDragging={false} />}{" "} */}
         {onClose && (
-          <button type="button" className="flex flex-shrink-0 justify-end p-2.5" onClick={onClose}>
-            <Minimize2 className="size-4" />
+          <button type="button" className="flex shrink-0 justify-end p-2.5" onClick={onClose} aria-label={t("close")}>
+            <CloseOutline className="size-4" />
           </button>
         )}
         {/* inputs */}
-        <div className="-mt-2">
+        <div className={cn({ "-mt-2": !!onClose })}>
           <StickyInput
             stickyData={stickyData}
             workspaceSlug={workspaceSlug}

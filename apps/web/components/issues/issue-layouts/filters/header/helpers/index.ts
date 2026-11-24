@@ -5,8 +5,7 @@
  */
 
 export * from "./dropdown";
-// Fork: compatibility shim, removed in phase 9 -- the 1.4 popover and filter rows that the page
-// and view list filter panels still render (cycles, modules and intake moved off them in phase 5).
-export * from "./legacy-dropdown";
+// Fork: compatibility shim, removed in phase 9 -- the 1.4 filter rows that Hangar's work item type
+// filter (`ce/components/issues/filters/issue-types.tsx`, phase 8) still renders.
 export * from "./filter-header";
 export * from "./filter-option";
