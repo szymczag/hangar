@@ -123,15 +123,16 @@ test("the work item gantt layout", async ({ asUser }) => {
 
 test("the work item filters menu", async ({ asUser }) => {
   const page = await asUser("light");
-  const main = await workItems(page, "list");
+  await workItems(page, "list");
 
   // The add-filter trigger is icon-only (named only from v1.5.0 on); it sits
   // just before the "Display" menu in the header in both versions.
   const display = page.getByRole("button", { name: /Display/ }).first();
   await display.locator("xpath=preceding::button[1]").click();
   const priority = page.getByRole("option", { name: /Priority/ }).first();
+  // The Propel filter list is modal: it hides the page behind it from the
+  // accessibility tree, so the story waits on the list alone.
   await expect(priority).toBeVisible();
-  await expect(main).toBeVisible();
 
   await capture(page, "work-item-filters-menu", { ready: priority });
 });
