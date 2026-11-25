@@ -5,7 +5,7 @@
  */
 
 import type { Hocuspocus } from "@hocuspocus/server";
-import { createRealtimeEvent } from "@plane/editor";
+import { createRealtimeEvent } from "@plane/editor/lib";
 import { logger } from "@plane/logger";
 import type { HocusPocusServerContext } from "@/types";
 import { broadcastMessageToPage } from "./broadcast-message";
@@ -38,7 +38,7 @@ export const broadcastError = async (
     });
 
     await broadcastMessageToPage(hocuspocusServerInstance, pageId, errorEvent);
-  } catch (broadcastError) {
-    logger.error("Error broadcasting error message to frontend:", broadcastError);
+  } catch (error) {
+    logger.error("Error broadcasting error message to frontend:", error);
   }
 };

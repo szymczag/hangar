@@ -67,6 +67,16 @@ RUN find packages -mindepth 2 -maxdepth 2 -name node_modules -type d -prune -exe
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch --prod --store-dir=/pnpm/store
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store CI=true pnpm install --offline --frozen-lockfile --prod --ignore-scripts --store-dir=/pnpm/store
 
+# Resolve every import the built server reaches, from the file that imports it,
+# in this production-only tree. A workspace package whose dependency is only a
+# dev or peer dependency resolves in development and not here: 0.6.0-rc.1
+# crash-looped on @makeplane/propel's React. The build stops instead. Nothing
+# runs; the server build and the checker stay in this stage, because the runner
+# below copies only packages and node_modules from it.
+COPY --from=installer /app/apps/live/dist ./apps/live/dist
+COPY --from=installer /app/apps/live/scripts/check-runtime-imports.mjs ./apps/live/scripts/check-runtime-imports.mjs
+RUN node apps/live/scripts/check-runtime-imports.mjs apps/live/dist/start.mjs
+
 # *****************************************************************************
 # STAGE 4: Run the project
 # *****************************************************************************

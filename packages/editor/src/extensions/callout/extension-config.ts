@@ -5,7 +5,6 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
-import { stringToEmoji } from "@plane/blocks/emoji-icon-picker/data";
 import type { MarkdownSerializerState } from "prosemirror-markdown";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 // constants
@@ -14,6 +13,7 @@ import { CORE_EXTENSIONS } from "@/constants/extension";
 import { ECalloutAttributeNames } from "./types";
 import type { CustomCalloutExtensionType, TCalloutBlockAttributes } from "./types";
 // utils
+import { calloutEmojiFromUnicode, calloutIconName } from "./emoji-unicode";
 import { DEFAULT_CALLOUT_BLOCK_ATTRIBUTES } from "./utils";
 
 declare module "@tiptap/core" {
@@ -49,14 +49,18 @@ export const CustomCalloutExtensionConfig: CustomCalloutExtensionType = Node.cre
         serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
           const attrs = node.attrs as TCalloutBlockAttributes;
           const logoInUse = attrs["data-logo-in-use"];
-          // add callout logo
+          // add callout logo. Both attributes are page content and are written
+          // unescaped, so each is validated and left out when it does not pass.
           if (logoInUse === "emoji") {
             // The emoji itself, not the image of it the picker also stored:
             // that URL is on a CDN, and exported markdown should not send a
-            // reader to one (docs/content-security-policy.md).
-            state.write(`> ${stringToEmoji(attrs["data-emoji-unicode"] ?? "")}\n`);
+            // reader to one (docs/content-security-policy.md). The live server
+            // serializes this, so the conversion stays local to the editor.
+            const emoji = calloutEmojiFromUnicode(attrs["data-emoji-unicode"]);
+            if (emoji) state.write(`> ${emoji}\n`);
           } else {
-            state.write(`> <icon>${attrs["data-icon-name"]} icon</icon>\n`);
+            const iconName = calloutIconName(attrs["data-icon-name"]);
+            if (iconName) state.write(`> <icon>${iconName} icon</icon>\n`);
           }
           // add an empty line after the logo
           state.write("> \n");
