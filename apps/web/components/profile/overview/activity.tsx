@@ -19,7 +19,9 @@ import { ActivityMessage, IssueLink } from "@/components/core/activity";
 import { USER_PROFILE_ACTIVITY } from "@plane/constants";
 // helpers
 // hooks
-import { useUser } from "@/hooks/store/user";
+import { useUser, useUserPermissions } from "@/hooks/store/user";
+// Hangar extension
+import { isWorklogHiddenForRole } from "@/plane-web/helpers/worklog";
 // services
 import { UserService } from "@/services/user.service";
 
@@ -29,6 +31,7 @@ export const ProfileActivity = observer(function ProfileActivity() {
   const { workspaceSlug, userId } = useParams();
   // store hooks
   const { data: currentUser } = useUser();
+  const { getProjectRoleByWorkspaceSlugAndProjectId } = useUserPermissions();
   const { t } = useTranslation();
 
   const { data: userProfileActivity } = useSWR(
@@ -39,6 +42,16 @@ export const ProfileActivity = observer(function ProfileActivity() {
             per_page: 10,
           })
       : null
+  );
+
+  // Fork (see FORK.md, S20): a worklog row prints the logged duration, so it is
+  // left out wherever the reader may not read that project's worklogs.
+  const visibleActivity = userProfileActivity?.results?.filter(
+    (activity) =>
+      !isWorklogHiddenForRole(
+        activity.field,
+        getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug?.toString() ?? "", activity.project)
+      )
   );
 
   return (
@@ -53,9 +66,9 @@ export const ProfileActivity = observer(function ProfileActivity() {
             <Loader.Item height="40px" />
             <Loader.Item height="40px" />
           </Loader>
-        ) : Array.isArray(userProfileActivity.results) && userProfileActivity.results.length > 0 ? (
+        ) : visibleActivity && visibleActivity.length > 0 ? (
           <div className="space-y-5">
-            {userProfileActivity.results.map((activity) => (
+            {visibleActivity.map((activity) => (
               <div key={activity.id} className="flex gap-3">
                 <Avatar
                   name={activity.actor_detail?.display_name}

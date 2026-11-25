@@ -78,6 +78,7 @@ from plane.db.models import (
     CycleIssue,
     Workspace,
 )
+from plane.ext.services.worklog_access import worklog_activity_visible_q
 from plane.settings.storage import S3Storage
 from plane.utils.order_queryset import (
     ACTIVITY_ORDER_BY_ALLOWLIST,
@@ -1873,6 +1874,8 @@ class IssueActivityListAPIEndpoint(BaseAPIView):
                 project__project_projectmember__is_active=True,
             )
             .filter(project__archived_at__isnull=True)
+            # Fork (see FORK.md, S20): worklog rows carry the logged duration.
+            .filter(worklog_activity_visible_q(request.user.id, slug))
             .select_related("actor", "workspace", "issue", "project")
         ).order_by(
             sanitize_order_by(request.GET.get("order_by", "created_at"), ACTIVITY_ORDER_BY_ALLOWLIST, "created_at")
@@ -1935,6 +1938,8 @@ class IssueActivityDetailAPIEndpoint(BaseAPIView):
                     project__project_projectmember__is_active=True,
                 )
                 .filter(project__archived_at__isnull=True)
+                # Fork (see FORK.md, S20): worklog rows carry the logged duration.
+                .filter(worklog_activity_visible_q(request.user.id, slug))
                 .select_related("actor", "workspace", "issue", "project")
             )
             .order_by(

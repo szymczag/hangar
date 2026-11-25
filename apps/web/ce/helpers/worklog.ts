@@ -15,6 +15,15 @@ export function canViewWorklogsForRole(role: number | undefined): boolean {
   return role !== undefined && WORKLOG_READER_ROLES.has(role);
 }
 
+/**
+ * Whether an activity row or a notification must be left out for this reader:
+ * worklog rows carry the logged duration, which is confidential from anyone who
+ * may not read worklogs in that project (S20). Every other kind of row shows.
+ */
+export function isWorklogHiddenForRole(field: string | null | undefined, role: number | undefined): boolean {
+  return field === "worklog" && !canViewWorklogsForRole(role);
+}
+
 const PROJECT_ADMIN_ROLE = 20;
 
 /**

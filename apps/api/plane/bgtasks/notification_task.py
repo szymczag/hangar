@@ -26,6 +26,8 @@ from plane.db.models import (
 )
 from django.db.models import Subquery
 
+from plane.ext.services.worklog_access import WORKLOG_FIELD, can_read_worklogs
+
 # Third Party imports
 from celery import shared_task
 from bs4 import BeautifulSoup
@@ -317,10 +319,16 @@ def notifications(
                     sender = "in_app:issue_activities:subscribed"
 
                 preference = UserNotificationPreference.objects.get(user_id=subscriber)
+                # Fork (see FORK.md, S20): a worklog activity carries the logged
+                # duration, so it reaches only subscribers who may read worklogs.
+                subscriber_reads_worklogs = can_read_worklogs(subscriber, project_id, project.workspace_id)
 
                 for issue_activity in issue_activities_created:
                     # If activity done in blocking then blocked by email should not go
                     if issue_activity.get("issue_detail").get("id") != issue_id:
+                        continue
+
+                    if issue_activity.get("field") == WORKLOG_FIELD and not subscriber_reads_worklogs:
                         continue
 
                     # Do not send notification for description update
