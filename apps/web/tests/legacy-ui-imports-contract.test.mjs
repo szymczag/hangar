@@ -3,20 +3,16 @@
 
 /**
  * Web moved to Propel (`@makeplane/propel`) and `@plane/blocks` in phases 0-9.
- * After phase 9a only the files below may still import the four legacy
- * packages: `@plane/ui`, the in-repo `@plane/propel`, Headless UI and lucide.
- * Phase 9b moves the first two and then drops the packages from web.
+ * After phase 9b no file in web imports the four legacy packages: `@plane/ui`,
+ * the in-repo `@plane/propel`, Headless UI and lucide. Web no longer depends on
+ * them at all (package.json), so an import would only resolve by accident,
+ * through another package's dependencies, and would bring the 1.4 look back.
  *
- * - the maintenance bar sits above every page, so moving it moves nearly every
- *   baseline, and it gets a pass of its own;
- * - the edition badge is the build identity dialog's trigger, moved with it;
- * - the entry points the 1.4 emoji picker at this app's data, because the
- *   editor's callout logo picker (`packages/editor`) still renders it, and it
- *   must not fall back to a CDN (CSP).
+ * `@plane/editor` still draws some 1.4 components of its own; that is the
+ * editor's dependency, not web's, and is not counted here.
  *
- * Anything else that imports them is a regression. A new `setToast` from
- * `@plane/propel/toast` is the sharpest case: its viewport is gone from the
- * provider, so that toast would show nowhere.
+ * A `setToast` from `@plane/propel/toast` is the sharpest case: its viewport is
+ * gone from the provider, so that toast would show nowhere.
  */
 
 import assert from "node:assert/strict";
@@ -45,13 +41,6 @@ const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, "").replac
 const LEGACY =
   /(?:from\s*|import\s*\(\s*|import\s+|vi\.mock\(\s*|require\(\s*)["'`]((?:@plane\/ui|@plane\/propel|@headlessui\/react|lucide-react)(?:\/[^"'`]*)?)["'`]/g;
 
-/** Each file allowed to import a legacy package, with exactly what it may import. */
-const ALLOWED = {
-  "ce/components/instance/maintenance-bar.tsx": ["lucide-react", "@plane/propel/banner"],
-  "components/workspace/edition-badge.tsx": ["@plane/propel/tooltip", "@plane/propel/button"],
-  "app/entry.client.tsx": ["@plane/propel/emoji-icon-picker"],
-};
-
 const found = new Map();
 for (const file of sources(root)) {
   const relative = path.relative(root, file).split(path.sep).join("/");
@@ -63,22 +52,25 @@ test("the scan reaches web's sources", () => {
   assert.ok([...sources(root)].length > 1500);
 });
 
-test("only the 9b allowlist imports @plane/ui, @plane/propel, Headless UI or lucide", () => {
-  const unexpected = [...found.keys()].filter((file) => !(file in ALLOWED));
-  assert.deepEqual(unexpected, [], `move these to @makeplane/propel or @plane/blocks: ${unexpected.join(", ")}`);
+test("no file in web imports @plane/ui, @plane/propel, Headless UI or lucide", () => {
+  const offenders = [...found].map(([file, specifiers]) => `${file}: ${specifiers.join(", ")}`);
+  assert.deepEqual(offenders, [], `move these to @makeplane/propel or @plane/blocks:\n${offenders.join("\n")}`);
 });
 
-for (const [file, allowed] of Object.entries(ALLOWED)) {
-  test(`${file} imports only what the allowlist names`, () => {
-    for (const specifier of found.get(file) ?? []) {
-      assert.ok(allowed.includes(specifier), `${file} newly imports ${specifier}`);
-    }
-  });
-}
+test("web declares none of them as a dependency", () => {
+  const manifest = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+  const declared = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
+  const legacy = declared.filter((name) =>
+    ["@plane/ui", "@plane/propel", "@headlessui/react", "lucide-react"].includes(name)
+  );
+  assert.deepEqual(legacy, []);
+});
 
-test("nothing raises a toast through the removed 1.4 viewport", () => {
-  for (const [file, specifiers] of found) {
-    assert.ok(!specifiers.includes("@plane/propel/toast"), `${file} imports @plane/propel/toast`);
+test("no stylesheet in web imports the 1.4 packages' styles", () => {
+  const styles = path.join(root, "styles");
+  for (const entry of readdirSync(styles).filter((name) => name.endsWith(".css"))) {
+    const source = stripComments(readFileSync(path.join(styles, entry), "utf8"));
+    assert.doesNotMatch(source, /@import\s+["'](?:@plane\/ui|@plane\/propel)\//, `styles/${entry}`);
   }
 });
 

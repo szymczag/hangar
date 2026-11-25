@@ -1095,9 +1095,6 @@ importers:
       '@fontsource/material-symbols-rounded':
         specifier: 'catalog:'
         version: 5.2.30
-      '@headlessui/react':
-        specifier: 'catalog:'
-        version: 2.2.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@makeplane/propel':
         specifier: workspace:*
         version: link:../../packages/makeplane-propel
@@ -1119,9 +1116,6 @@ importers:
       '@plane/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
-      '@plane/propel':
-        specifier: workspace:*
-        version: link:../../packages/propel
       '@plane/services':
         specifier: workspace:*
         version: link:../../packages/services
@@ -1131,9 +1125,6 @@ importers:
       '@plane/types':
         specifier: workspace:*
         version: link:../../packages/types
-      '@plane/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
       '@plane/utils':
         specifier: workspace:*
         version: link:../../packages/utils
@@ -1173,9 +1164,6 @@ importers:
       lodash-es:
         specifier: 4.18.1
         version: 4.18.1
-      lucide-react:
-        specifier: 'catalog:'
-        version: 0.469.0(react@19.2.8)
       mobx:
         specifier: 'catalog:'
         version: 6.12.0
@@ -1480,6 +1468,9 @@ importers:
       '@hocuspocus/provider':
         specifier: 'catalog:'
         version: 3.4.4(y-protocols@1.0.6(yjs@13.6.27))(yjs@13.6.27)
+      '@plane/blocks':
+        specifier: workspace:*
+        version: link:../blocks
       '@plane/constants':
         specifier: workspace:*
         version: link:../constants

@@ -5,7 +5,6 @@
    token values. See FORK.md, "Vendored upstream packages". */
 @import "@plane/tailwind-config/propel.css";
 @import "@plane/editor/styles";
-@import "@plane/propel/styles/react-day-picker.css";
 @import "./power-k.css";
 @import "./emoji.css";
 @plugin "@tailwindcss/typography";
@@ -57,8 +56,8 @@
 }
 /* end background colors */
 
-/* Hangar: Popper-backed menus (Headless UI with react-popper, @plane/ui and
-   @plane/propel 1.4) leave their trigger's stacking context when portaled. Keep
+/* Hangar: Popper-backed menus (Headless UI with react-popper, as @plane/ui
+   draws them) leave their trigger's stacking context when portaled. Keep
    hit-testing on the floating content instead of an enclosing peek view or
    modal: above every application dialog (capped at z-index 100), below global
    notifications (z-index 1000). `!important` intentionally overrides legacy

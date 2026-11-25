@@ -10,10 +10,14 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const webRequire = createRequire(new URL("../package.json", import.meta.url));
+// Web no longer depends on Headless UI (phase 9b). The contract still guards the
+// packages that do -- `@plane/ui` and `@plane/editor` -- so the library is loaded
+// from `@plane/ui`, which resolves the same React instance as web.
+const uiRequire = createRequire(new URL("../../../packages/ui/package.json", import.meta.url));
 const ts = webRequire("typescript");
 const React = webRequire("react");
 const { renderToString } = webRequire("react-dom/server");
-const { Combobox, Transition } = webRequire("@headlessui/react");
+const { Combobox, Transition } = uiRequire("@headlessui/react");
 
 const sourceRoots = [path.join(repoRoot, "apps"), path.join(repoRoot, "packages")];
 // Web loads the Propel entry point (packages/tailwind-config/propel.css), which has no
