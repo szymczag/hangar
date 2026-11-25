@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.6.0-rc.1`. It is a release candidate for `0.6.0`;
+The current release is `0.6.0-rc.2`. It is a release candidate for `0.6.0`;
 the current stable Hangar release for Docker Compose, Docker Swarm and the
 all-in-one image remains `0.5.0`. Helm installs a release candidate only when
 you name its version. On Kubernetes, both are qualified for evaluation on AMD64
@@ -64,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.6.0-rc.1` qualification boundary is:
+The `0.6.0-rc.2` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -231,10 +231,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                               |
 | ------------------ | ------------------------------------------- |
-| Product version    | `v0.6.0-rc.1`                               |
-| Helm chart version | `0.6.0-rc.1`                                |
-| Git tag            | `hangar-v0.6.0-rc.1`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.6.0-rc.1` |
+| Product version    | `v0.6.0-rc.2`                               |
+| Helm chart version | `0.6.0-rc.2`                                |
+| Git tag            | `hangar-v0.6.0-rc.2`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.6.0-rc.2` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -251,10 +251,15 @@ The `0.4.0` release candidates, `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3` and
 `0.4.0-rc.4`, are superseded by `0.4.0` and are not rollback targets.
 The `0.5.0` release candidate, `0.5.0-rc.1`, is superseded by `0.5.0` and is
 not a rollback target.
+`0.6.0-rc.1` was consumed by an incomplete publication: its container images
+are in GHCR, but its `live` image does not start, so the chart qualification
+failed and neither the chart nor a GitHub Release was published. Do not deploy
+its images; it is neither an upgrade nor a rollback target.
 `0.5.0` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
 values, only the images change, and it brings back the visual test seed
-command that runs without an opt-in, the active cycles upsell page, the old
+command that runs without an opt-in, the callout logo that the editor's
+Markdown serializer writes unchecked, the active cycles upsell page, the old
 callout logo picker, profile activity rows that do not say what a worklog entry
 did, and the web app's profile, notifications, home page and Hangar's own
 screens on the `v1.4` components. Rolling back further, to `0.4.0`, needs no
@@ -319,7 +324,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.6.0-rc.1` notes](../releases/hangar-v0.6.0-rc.1.md) — review
+- [Release `v0.6.0-rc.2` notes](../releases/hangar-v0.6.0-rc.2.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -389,9 +394,9 @@ values and runs no migration; only the images change. `0.5.0` is built from the
 `0.5.0-rc.1` source plus the worklog and intake fixes of the 0.5.0 paragraph
 below and the in-app release notes.
 
-Release 0.6.0-rc.1 adds no database or license migration compared with 0.5.0
+Release 0.6.0-rc.2 adds no database or license migration compared with 0.5.0
 and changes nothing in the chart's templates, values or Secrets. Upgrade from
-0.5.0 with `helm upgrade` and `--version 0.6.0-rc.1`; Helm does not select a
+0.5.0 with `helm upgrade` and `--version 0.6.0-rc.2`; Helm does not select a
 release candidate otherwise. No other action is required. Every release
 rebuilds all its images, so every image digest changes. Of the application
 code, the `web` image carries the changes: a user's profile, the notifications
@@ -401,8 +406,12 @@ upstream Plane 1.5.0 design, and the web app no longer loads the 1.4 component
 libraries; the editor's callout logo picker opens; profile activity says what a
 worklog entry did; sub-work items can be filtered by work item type; and the
 workspace active cycles upsell page is removed. The `space` image changes only
-in the editor's callout logo picker, and the `live` image only in where the
-editor's Markdown export takes its emoji table from, with the same output. The
+in the editor's callout logo picker, and the `live` image only in which parts of
+the editor it loads. In all three, the editor's Markdown serializer writes a
+callout's logo only when it is a single emoji or a plain icon name. The `live`
+image build now fails if the built server imports anything its production
+install cannot resolve: the `0.6.0-rc.1` `live` image did not start for that
+reason, which is why there is no `0.6.0-rc.1` chart. The
 `api` image changes only in the visual test seed command, which now refuses
 to run unless `HANGAR_VISUAL_FIXTURES=1` is set; no installation step uses it.
 The `admin` and `proxy` code is unchanged. From a release older than 0.5.0,
