@@ -149,6 +149,11 @@ PAGE_IDS = (
     uuid.UUID("a0000000-0000-4000-8000-000000000008"),
 )
 STICKY_ID = uuid.UUID("a0000000-0000-4000-8000-000000000009")
+# A private page of the dark user's with a callout, for the callout logo picker
+# story. Private and someone else's so that no story photographing the light
+# user's pages list ever shows it, and opening it (which the live server stores)
+# cannot reorder that list.
+CALLOUT_PAGE_ID = uuid.UUID("a0000000-0000-4000-8000-00000000001a")
 # Two inbox notifications for the light user, for the notifications story.
 NOTIFICATION_IDS = (
     uuid.UUID("a0000000-0000-4000-8000-000000000015"),
@@ -226,6 +231,7 @@ class Command(BaseCommand):
         self._views(workspace, project, users["light"])
         self._cycles_and_modules(workspace, project, users["light"])
         self._pages(workspace, project, users["light"])
+        self._callout_page(workspace, project, users["dark"])
         self._stickies(workspace, users["light"])
         self._notifications(workspace, project, users)
         self._shared_links(workspace, users)
@@ -276,6 +282,7 @@ class Command(BaseCommand):
             "intake": {"id": str(INTAKE_WORK_ITEM_ID), "name": Command.INTAKE_WORK_ITEM},
             # The project pages and the sticky the page and sticky stories wait on.
             "pages": {"ids": [str(page_id) for page_id in PAGE_IDS], "names": [n for n, _ in Command.PAGES]},
+            "calloutPage": {"id": str(CALLOUT_PAGE_ID), "text": Command.CALLOUT_TEXT},
             "sticky": Command.STICKY_TEXT,
             "recents": self._recents(project, workshop),
             # The work item the inbox notifications are about, which the inbox story waits on.
@@ -800,6 +807,7 @@ class Command(BaseCommand):
         ("Retrospective notes", "<p>What went well, and what did not.</p>"),
     )
     STICKY_TEXT = "Book the training room"
+    CALLOUT_TEXT = "Read the release notes first."
 
     def _pages(self, workspace, project, owner) -> None:
         """Two public project pages, the first with a little of everything.
@@ -831,6 +839,33 @@ class Command(BaseCommand):
             Page.objects.filter(pk=page.pk).update(
                 created_at=CLOCK - timedelta(days=4 + index), updated_at=CLOCK - timedelta(days=4 + index)
             )
+
+    def _callout_page(self, workspace, project, owner) -> None:
+        """A private page with one callout, whose logo opens the emoji picker.
+
+        The callout carries no stored emoji image URL: the editor renders the
+        emoji itself from its codepoint, and nothing here should name a CDN.
+        """
+        page, _ = Page.objects.get_or_create(
+            id=CALLOUT_PAGE_ID,
+            defaults={
+                "name": "Callout",
+                "workspace": workspace,
+                "owned_by": owner,
+                "created_by": owner,
+                "description_html": (
+                    '<div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="128161">'
+                    f"<p>{Command.CALLOUT_TEXT}</p></div><p>After the callout.</p>"
+                ),
+                "access": 1,
+            },
+        )
+        ProjectPage.objects.get_or_create(
+            page=page, project=project, defaults={"workspace": workspace, "created_by": owner}
+        )
+        Page.objects.filter(pk=page.pk).update(
+            created_at=CLOCK - timedelta(days=6), updated_at=CLOCK - timedelta(days=6)
+        )
 
     def _stickies(self, workspace, owner) -> None:
         """One sticky, so the stickies page shows a note rather than its empty state."""
