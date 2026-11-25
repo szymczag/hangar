@@ -5,7 +5,7 @@
  */
 
 import useSWR from "swr";
-import { CalendarClock } from "lucide-react";
+import { CalendarOutline } from "@makeplane/propel/icons";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
 import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
 import { CapacityService, type TWorkshopSchedule } from "@/services/capacity.service";
@@ -66,7 +66,7 @@ export function WorkshopScheduleProperty({ workspaceSlug, projectId, issueId, is
     : "Not scheduled";
 
   return (
-    <SidebarPropertyListItem icon={CalendarClock} label="Workshop">
+    <SidebarPropertyListItem icon={CalendarOutline} label="Workshop">
       <button
         type="button"
         title={label}

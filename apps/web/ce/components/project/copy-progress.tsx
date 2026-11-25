@@ -5,8 +5,9 @@
  */
 
 import { useState } from "react";
-import { AlertTriangle, Check, Loader2 } from "lucide-react";
 import useSWR from "swr";
+import { TextButton } from "@makeplane/propel/components/text-button";
+import { LoadingOutline, TickOutline, WarningTriangleOutline } from "@makeplane/propel/icons";
 import { useTranslation } from "@plane/i18n";
 import { ProjectService } from "@/services/project/project.service";
 import { cn } from "@plane/utils";
@@ -66,11 +67,11 @@ export const ProjectCopyProgress = ({ workspaceSlug, projectId }: Props) => {
       )}
     >
       {running ? (
-        <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-secondary" aria-hidden="true" />
+        <LoadingOutline className="mt-0.5 size-4 shrink-0 animate-spin text-secondary" aria-hidden="true" />
       ) : failed ? (
-        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-secondary" aria-hidden="true" />
+        <WarningTriangleOutline className="mt-0.5 size-4 shrink-0 text-secondary" aria-hidden="true" />
       ) : (
-        <Check className="mt-0.5 size-4 shrink-0 text-secondary" aria-hidden="true" />
+        <TickOutline className="mt-0.5 size-4 shrink-0 text-secondary" aria-hidden="true" />
       )}
 
       <div className="min-w-0 flex-1">
@@ -91,13 +92,9 @@ export const ProjectCopyProgress = ({ workspaceSlug, projectId }: Props) => {
       </div>
 
       {!running && (
-        <button
-          type="button"
-          onClick={() => setDismissed(true)}
-          className="shrink-0 text-11 font-medium text-accent-primary"
-        >
-          {t("dismiss")}
-        </button>
+        <span className="shrink-0">
+          <TextButton variant="primary" size="md" label={t("dismiss")} onClick={() => setDismissed(true)} />
+        </span>
       )}
     </div>
   );

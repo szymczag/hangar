@@ -7,9 +7,10 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router";
 import useSWR from "swr";
-import { Download } from "lucide-react";
-import { Button } from "@plane/propel/button";
-import { Loader } from "@plane/ui";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { DownloadOutline } from "@makeplane/propel/icons";
+import { Loader } from "@plane/blocks/skeleton";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
 import { useInstance } from "@/hooks/store/use-instance";
@@ -90,16 +91,16 @@ export default function CapacityReportsPage({ params }: Route.ComponentProps) {
           <MonthStepper monthStart={monthStart} onChange={setMonth} />
           <Button
             variant="secondary"
-            size="sm"
+            size="md"
+            stretch="auto"
+            icon={<Icon icon={DownloadOutline} />}
+            label="Export CSV"
             onClick={() =>
               window.location.assign(
                 capacityService.trainingReportCsvUrl(workspaceSlug, monthStart.toISOString(), monthEnd.toISOString())
               )
             }
-          >
-            <Download className="mr-1 size-4" />
-            Export CSV
-          </Button>
+          />
         </div>
 
         <ReportNotices report={data} error={error} />

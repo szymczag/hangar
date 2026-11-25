@@ -20,7 +20,7 @@ import { expect, fixtures, test } from "../src/fixtures.js";
  * So the story asserts the notes are actually there before it captures. An empty
  * notes section is a perfectly stable screenshot of the bug.
  *
- * It also exercises the 300ms modal transition, which `toBeVisible()` is
+ * It also exercises the dialog's open transition, which `toBeVisible()` is
  * satisfied by at the very start of.
  */
 for (const [name, width] of [
@@ -49,12 +49,14 @@ for (const [name, width] of [
     await expect(badge).toBeVisible();
     await badge.click();
 
-    // The element carrying role="dialog" is Headless UI's outermost wrapper --
-    // `relative z-30` with no size of its own, so it is never "visible" and is
-    // the wrong thing to photograph. The panel is the dialog as anyone looking
-    // at the screen means it, and it is also the element that transitions.
-    await expect(page.getByRole("dialog")).toHaveCount(1);
-    const dialog = page.locator('[id^="headlessui-dialog-panel"]');
+    // The Propel dialog's popup is the element carrying role="dialog": the
+    // panel anyone looking at the screen means, and the element that
+    // transitions. (The 1.4 dialog put that role on Headless UI's outermost
+    // wrapper, which had no size of its own, so this used to find the panel by
+    // its generated id instead.) Named by its title, so a second dialog left
+    // open elsewhere cannot be the one photographed.
+    const dialog = page.getByRole("dialog", { name: /Hangar by @szymczag/i });
+    await expect(dialog).toHaveCount(1);
     await settled(dialog);
 
     // The notes are the point. Without this the story happily records the

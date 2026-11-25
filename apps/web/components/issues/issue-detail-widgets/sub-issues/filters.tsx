@@ -21,16 +21,20 @@ import {
   FilterStateGroup,
 } from "@/components/issues/issue-layouts/filters";
 import { isFiltersApplied } from "@/components/issues/issue-layouts/utils";
+// Fork (see FORK.md): the work item type filter row.
+import { FilterIssueTypes } from "@/plane-web/components/issues/filters/issue-types";
 type TSubIssueFiltersProps = {
   handleFiltersUpdate: (key: keyof IIssueFilterOptions, value: string | string[]) => void;
   filters: IIssueFilterOptions;
   memberIds: string[] | undefined;
   states?: IState[];
   availableFilters: (keyof IIssueFilterOptions)[];
+  /** Fork (see FORK.md): the parent's project, whose work item types are offered. */
+  projectId?: string;
 };
 
 export const SubIssueFilters = observer(function SubIssueFilters(props: TSubIssueFiltersProps) {
-  const { handleFiltersUpdate, filters, memberIds, states, availableFilters } = props;
+  const { handleFiltersUpdate, filters, memberIds, states, availableFilters, projectId } = props;
   // plane hooks
   const { t } = useTranslation();
 
@@ -77,6 +81,15 @@ export const SubIssueFilters = observer(function SubIssueFilters(props: TSubIssu
             appliedFilters={filters.state ?? null}
             handleUpdate={(val) => handleFiltersUpdate("state", val)}
             states={states}
+          />
+        )}
+
+        {/* Work item type (fork, see FORK.md) */}
+        {isFilterEnabled("issue_type") && (
+          <FilterIssueTypes
+            appliedFilters={filters.issue_type ?? null}
+            handleUpdate={(val) => handleFiltersUpdate("issue_type", val)}
+            projectId={projectId}
           />
         )}
 

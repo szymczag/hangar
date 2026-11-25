@@ -5,7 +5,8 @@
  */
 import { useState } from "react";
 import useSWR from "swr";
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
+import { InputField } from "@makeplane/propel/components/input-field";
 import { CapacityService } from "@/services/capacity.service";
 import { errorMessage } from "../shared/capacity-format.utils";
 
@@ -106,15 +107,20 @@ export function TrainingRules({
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
+                stretch="auto"
                 variant={item.writer_status === "ok" ? "secondary" : "primary"}
                 disabled={busy || redirecting}
                 onClick={() => void connectWriter(item.id)}
-              >
-                {item.writer_status === "ok" ? "Change writing account" : "Connect writing account"}
-              </Button>
-              <Button size="sm" variant="secondary" disabled={busy} onClick={() => void save(item.id)}>
-                Remove rule
-              </Button>
+                label={item.writer_status === "ok" ? "Change writing account" : "Connect writing account"}
+              />
+              <Button
+                size="sm"
+                stretch="auto"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void save(item.id)}
+                label="Remove rule"
+              />
             </div>
           </li>
         ))}
@@ -132,22 +138,22 @@ export function TrainingRules({
             { key: "calendar_id", label: "Calendar ID" },
           ] as const
         ).map((field) => (
-          <label key={field.key} className="text-body-xs-medium">
-            {field.label}
-            <input
-              required
-              type="text"
-              autoComplete="off"
-              value={rule[field.key]}
-              disabled={busy}
-              onChange={(event) => setRule({ ...rule, [field.key]: event.target.value })}
-              className="mt-1 w-full rounded border border-subtle bg-surface-2 p-2 text-body-xs-regular"
-            />
-          </label>
+          <InputField
+            key={field.key}
+            size="md"
+            orientation="vertical"
+            label={field.label}
+            required
+            type="text"
+            autoComplete="off"
+            value={rule[field.key]}
+            disabled={busy}
+            onChange={(event) => setRule({ ...rule, [field.key]: event.target.value })}
+          />
         ))}
-        <Button type="submit" variant="primary" size="sm" disabled={busy || !data}>
-          Add rule
-        </Button>
+        <div className="self-end">
+          <Button type="submit" variant="primary" size="md" stretch="auto" disabled={busy || !data} label="Add rule" />
+        </div>
       </form>
     </details>
   );

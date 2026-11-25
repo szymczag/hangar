@@ -4,8 +4,9 @@
  * See the LICENSE file for details.
  */
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@plane/propel/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { ChevronLeftOutline, ChevronRightOutline } from "@makeplane/propel/icons";
 import { shiftMonth } from "./capacity-format.utils";
 
 type Props = {
@@ -23,25 +24,23 @@ type Props = {
 export function MonthStepper({ monthStart, onChange }: Props) {
   return (
     <div className="flex items-center gap-2">
-      <Button
+      <IconButton
         variant="secondary"
-        size="sm"
+        size="md"
+        icon={<Icon icon={ChevronLeftOutline} />}
         aria-label="Previous month"
         onClick={() => onChange((current) => shiftMonth(current, -1))}
-      >
-        <ChevronLeft className="size-4" />
-      </Button>
+      />
       <div className="min-w-40 text-center text-body-xs-medium">
         {monthStart.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
       </div>
-      <Button
+      <IconButton
         variant="secondary"
-        size="sm"
+        size="md"
+        icon={<Icon icon={ChevronRightOutline} />}
         aria-label="Next month"
         onClick={() => onChange((current) => shiftMonth(current, 1))}
-      >
-        <ChevronRight className="size-4" />
-      </Button>
+      />
     </div>
   );
 }

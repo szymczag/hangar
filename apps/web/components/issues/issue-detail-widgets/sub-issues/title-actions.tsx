@@ -114,6 +114,7 @@ export const SubWorkItemTitleActions = observer(function SubWorkItemTitleActions
         memberIds={projectMemberIds ?? undefined}
         states={projectStates}
         availableFilters={SUB_WORK_ITEM_AVAILABLE_FILTERS_FOR_WORK_ITEM_PAGE}
+        projectId={projectId}
       />
       {!disabled && (
         <SubIssuesActionButton issueId={parentId} disabled={disabled} issueServiceType={issueServiceType} />

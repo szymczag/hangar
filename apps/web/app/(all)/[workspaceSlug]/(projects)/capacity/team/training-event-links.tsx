@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import useSWR from "swr";
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
 import { CapacityService } from "@/services/capacity.service";
 import type { TPlanIssue, TTrainerCapacity } from "@/services/capacity.service";
 import { WorkshopPicker } from "../planner/workshop-picker";
@@ -74,12 +74,12 @@ export function TrainingEventLinks({
             </span>
             <Button
               size="sm"
+              stretch="auto"
               variant="secondary"
               disabled={busy || trainer?.training_status !== "fresh"}
               onClick={() => (event.linked ? void save(event.key) : setEventKey(event.key))}
-            >
-              {event.linked ? "Unlink" : "Link to Workshop session"}
-            </Button>
+              label={event.linked ? "Unlink" : "Link to Workshop session"}
+            />
           </li>
         ))}
       </ul>
@@ -99,11 +99,11 @@ export function TrainingEventLinks({
                 key={session.id}
                 variant="secondary"
                 size="sm"
+                stretch="auto"
                 disabled={busy || !session.id}
                 onClick={() => void save(activeEvent.key, session.id!)}
-              >
-                {dateTimeLabel(session.starts_at, undefined, timeZone)}
-              </Button>
+                label={dateTimeLabel(session.starts_at, undefined, timeZone)}
+              />
             ))}
           {issue && schedule === null && (
             <p className="text-body-xs-regular">This Workshop has no scheduled sessions yet.</p>
@@ -111,13 +111,13 @@ export function TrainingEventLinks({
           <Button
             variant="secondary"
             size="sm"
+            stretch="auto"
             onClick={() => {
               setEventKey(null);
               setIssue(null);
             }}
-          >
-            Cancel
-          </Button>
+            label="Cancel"
+          />
         </div>
       )}
     </details>

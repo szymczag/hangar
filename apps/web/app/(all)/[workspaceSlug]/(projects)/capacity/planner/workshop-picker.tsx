@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Briefcase, Check, ChevronDown, X } from "lucide-react";
+import { ChevronDownOutline, CloseOutline, TickOutline, WorkItemsOutline } from "@makeplane/propel/icons";
 import { CapacityService, type TPlanIssue } from "@/services/capacity.service";
 
 const capacityService = new CapacityService();
@@ -58,7 +58,7 @@ export function WorkshopPicker({
           onClick={() => setOpen((current) => !current)}
           className="flex min-w-0 flex-1 items-center gap-2 px-3 text-left text-body-sm-regular text-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Briefcase className="size-3.5 shrink-0 text-tertiary" />
+          <WorkItemsOutline className="size-3.5 shrink-0 text-tertiary" />
           <span className={`min-w-0 flex-1 truncate ${value ? "" : "text-placeholder"}`}>
             {value ? workshopLabel(value) : "Choose a Workshop work item"}
           </span>
@@ -70,10 +70,10 @@ export function WorkshopPicker({
             className="shrink-0 rounded p-0.5 text-tertiary hover:text-primary"
             onClick={() => onChange(null)}
           >
-            <X className="size-3.5" />
+            <CloseOutline className="size-3.5" />
           </button>
         ) : (
-          <ChevronDown className="size-3.5 shrink-0 text-tertiary" />
+          <ChevronDownOutline className="size-3.5 shrink-0 text-tertiary" />
         )}
       </div>
 
@@ -105,7 +105,7 @@ export function WorkshopPicker({
                   className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-body-xs-regular hover:bg-surface-2"
                 >
                   <span className="min-w-0 flex-1 truncate">{workshopLabel(issue)}</span>
-                  {value?.id === issue.id ? <Check className="size-3.5 shrink-0 text-accent-primary" /> : null}
+                  {value?.id === issue.id ? <TickOutline className="size-3.5 shrink-0 text-accent-primary" /> : null}
                 </button>
               ))
             ) : (

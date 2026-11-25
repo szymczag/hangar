@@ -4,8 +4,8 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { setToast } from "@plane/blocks/toast";
 import { CreateUpdateIssueModal } from "@/components/issues/issue-modal/modal";
 import { useProject } from "@/hooks/store/use-project";
 import { issueTypeService } from "@/plane-web/services/issue-type.service";
@@ -28,7 +28,7 @@ async function applyDefaultChecklist(workspaceSlug: string, projectId: string, i
     const result = await capacityService.applyChecklist(workspaceSlug, projectId, issueId);
     if (result.skipped_assignees.length > 0) {
       setToast({
-        type: TOAST_TYPE.WARNING,
+        type: "warning",
         title: "Checklist added, some assignees skipped",
         message: "Some people named by the template cannot be assigned work in this project.",
       });
@@ -75,9 +75,14 @@ export const CreateWorkshop = observer(function CreateWorkshop({
           ))}
         </select>
       </label>
-      <Button variant="secondary" size="sm" disabled={disabled || !workshop} onClick={() => setOpen(true)}>
-        Create workshop
-      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        stretch="auto"
+        label="Create workshop"
+        disabled={disabled || !workshop}
+        onClick={() => setOpen(true)}
+      />
       {error && (
         <p role="alert" className="text-body-xs-regular text-danger-primary">
           Workshop types could not be loaded. Choose the project again to retry.

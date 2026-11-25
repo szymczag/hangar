@@ -4,8 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import { Spinner } from "@plane/ui";
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
+import { Spinner } from "@plane/blocks/spinner";
 import { errorMessage } from "../shared/capacity-format.utils";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
@@ -79,9 +79,9 @@ export default function WorkshopPlannerPage({ params }: Route.ComponentProps) {
           <section role="alert" className="rounded-xl border border-subtle bg-surface-1 p-6">
             <h1 className="text-body-sm-medium">Availability could not be loaded</h1>
             <p className="mt-1 text-body-xs-regular text-secondary">{errorMessage(dataError, "Try again.")}</p>
-            <Button variant="secondary" size="sm" className="mt-3" onClick={retry}>
-              Retry
-            </Button>
+            <div className="mt-3">
+              <Button variant="secondary" size="sm" stretch="auto" label="Retry" onClick={retry} />
+            </div>
           </section>
         ) : capacityLoading || trainersLoading || !config ? (
           <div className="flex items-center justify-center py-16">

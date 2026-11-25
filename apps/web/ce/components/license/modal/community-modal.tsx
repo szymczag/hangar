@@ -4,17 +4,16 @@
  * See the LICENSE file for details.
  */
 
-import { Dialog } from "@headlessui/react";
-import { ExternalLink, FileCode2, X } from "lucide-react";
 import { observer } from "mobx-react";
+import { AnchorButton } from "@makeplane/propel/components/anchor-button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@makeplane/propel/components/dialog";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { CloseOutline } from "@makeplane/propel/icons";
+import { HangarMark } from "@plane/blocks/icons";
 import { DOCUMENTATION_URL, SOURCE_CODE_URL } from "@plane/constants";
 // helpers
 import { showExternalLinks } from "@/helpers/external-links";
-import { getButtonStyling } from "@plane/propel/button";
-import { HangarMark } from "@plane/propel/icons";
-import { IconButton } from "@plane/propel/icon-button";
-import { EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
-import { cn } from "@plane/utils";
 // hooks
 import { useInstance } from "@/hooks/store/use-instance";
 import packageJson from "package.json";
@@ -56,105 +55,101 @@ export const HangarCommunityModal = observer(function HangarCommunityModal(props
   const upstream = RELEASE_NOTES.upstream.version || packageJson.version;
 
   return (
-    <ModalCore
-      isOpen={isOpen}
-      handleClose={handleClose}
-      position={EModalPosition.CENTER}
-      width={EModalWidth.XXXL}
-      className="overflow-hidden"
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
     >
-      {/* The identity is the point of this dialog, so it gets the room: the
+      <DialogContent size="lg">
+        {/* The identity is the point of this dialog, so it gets the room: the
           mark at a size that reads, the name at heading weight, and the build
           it is running underneath in a face that makes a version look like a
           version. */}
-      <div className="border-b border-subtle bg-layer-1 px-6 py-6 sm:px-8">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="grid size-14 shrink-0 place-items-center rounded-xl border border-subtle bg-surface-1 shadow-raised-100">
-              {/* The mark, not the wordmark: this badge is a 56px square, and
+        <div className="border-b border-subtle bg-layer-1 px-6 py-6 sm:px-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="grid size-14 shrink-0 place-items-center rounded-xl border border-subtle bg-surface-1 shadow-raised-100">
+                {/* The mark, not the wordmark: this badge is a 56px square, and
                   the wordmark is 868x258, so at `h-9 w-auto` it rendered 119px
                   wide and spilled ~32px out of either side of its own box. */}
-              <HangarMark className="h-9 w-auto text-primary" />
+                <HangarMark className="h-9 w-auto text-primary" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle>{HANGAR_EDITION_NAME}</DialogTitle>
+                <p className="font-mono mt-1 truncate text-12 text-tertiary">
+                  {version}
+                  <span className="mx-2 text-placeholder" aria-hidden="true">
+                    ·
+                  </span>
+                  {content.builtOnLabel} {upstream}
+                  {RELEASE_NOTES.upstream.revision ? ` (${RELEASE_NOTES.upstream.revision})` : ""}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <Dialog.Title as="h2" className="truncate text-20 leading-7 font-semibold text-primary">
-                {HANGAR_EDITION_NAME}
-              </Dialog.Title>
-              <p className="font-mono mt-1 truncate text-12 text-tertiary">
-                {version}
-                <span className="mx-2 text-placeholder" aria-hidden="true">
-                  ·
-                </span>
-                {content.builtOnLabel} {upstream}
-                {RELEASE_NOTES.upstream.revision ? ` (${RELEASE_NOTES.upstream.revision})` : ""}
-              </p>
-            </div>
+            <IconButton
+              variant="ghost"
+              size="md"
+              icon={<Icon icon={CloseOutline} />}
+              aria-label={`Close ${HANGAR_EDITION_NAME} information`}
+              onClick={handleClose}
+            />
           </div>
-          <IconButton
-            variant="ghost"
-            size="base"
-            icon={X}
-            aria-label={`Close ${HANGAR_EDITION_NAME} information`}
-            onClick={handleClose}
-          />
         </div>
-      </div>
 
-      <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-7 sm:px-8">
-        <Dialog.Description className="max-w-xl text-14 leading-6 text-secondary">
-          {content.description}
-        </Dialog.Description>
+        <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-7 sm:px-8">
+          <DialogDescription>{content.description}</DialogDescription>
 
-        <section className="mt-7" aria-labelledby="hangar-release-notes">
-          <h3 id="hangar-release-notes" className="text-13 font-semibold text-primary">
-            {content.releaseNotesHeading}
-          </h3>
-          {highlights.length > 0 ? (
-            // A rule per line rather than bullets or check marks: this is a
-            // record of what changed, not a list of things you are getting.
-            <ul className="mt-3 divide-y divide-subtle border-t border-subtle">
-              {highlights.map((highlight) => (
-                <li key={highlight} className="py-2.5 text-13 leading-5 text-secondary">
-                  {highlight}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-13 leading-5 text-tertiary">{content.releaseNotesUnavailable}</p>
-          )}
-        </section>
+          <section className="mt-7" aria-labelledby="hangar-release-notes">
+            <h3 id="hangar-release-notes" className="text-13 font-semibold text-primary">
+              {content.releaseNotesHeading}
+            </h3>
+            {highlights.length > 0 ? (
+              // A rule per line rather than bullets or check marks: this is a
+              // record of what changed, not a list of things you are getting.
+              <ul className="mt-3 divide-y divide-subtle border-t border-subtle">
+                {highlights.map((highlight) => (
+                  <li key={highlight} className="py-2.5 text-13 leading-5 text-secondary">
+                    {highlight}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-13 leading-5 text-tertiary">{content.releaseNotesUnavailable}</p>
+            )}
+          </section>
 
-        <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-          {/* AGPL-3.0 section 13 requires the source offer of anyone running a
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+            {/* AGPL-3.0 section 13 requires the source offer of anyone running a
               modified version over a network, so it is not gated. Documentation
               lives on a host this instance does not run, so it is. */}
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(getButtonStyling("secondary", "base"), "justify-center gap-2")}
-          >
-            <FileCode2 className="size-4" aria-hidden="true" />
-            View source and license
-            <ExternalLink className="size-3.5" aria-hidden="true" />
-          </a>
-          {linksAllowed && (
-            <a
-              href={documentationUrl}
+            <AnchorButton
+              variant="primary"
+              size="md"
+              href={sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(getButtonStyling("tertiary", "base"), "justify-center gap-2")}
-            >
-              Documentation
-              <ExternalLink className="size-3.5" aria-hidden="true" />
-            </a>
-          )}
-        </div>
+              external
+              label="View source and license"
+            />
+            {linksAllowed && (
+              <AnchorButton
+                variant="primary"
+                size="md"
+                href={documentationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                external
+                label="Documentation"
+              />
+            )}
+          </div>
 
-        <div className="mt-7 border-t border-subtle pt-5">
-          <p className="text-11 leading-5 text-tertiary">{content.attribution}</p>
+          <div className="mt-7 border-t border-subtle pt-5">
+            <p className="text-11 leading-5 text-tertiary">{content.attribution}</p>
+          </div>
         </div>
-      </div>
-    </ModalCore>
+      </DialogContent>
+    </Dialog>
   );
 });

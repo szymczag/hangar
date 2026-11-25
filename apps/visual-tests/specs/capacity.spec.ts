@@ -375,3 +375,112 @@ test("booking hours keep focus while typing and copy to active days", async ({ a
   // Deliberately leave these edits unsaved: the visual personas share a database.
   await capture(page, "capacity-booking-hours", { ready: end, target: page.getByRole("main").last() });
 });
+
+/**
+ * The calendar import page.
+ *
+ * What it lists comes from reading the shared Google calendar, which nothing in
+ * this stack can reach, so the list is the one GET answered in the browser: two
+ * recognized trainings in the pinned month, one accepted by both trainers and
+ * one still waiting on an answer, so the "not answered" marks are on screen.
+ * Nothing is selected and nothing is imported.
+ */
+test("the calendar import page", async ({ asUser }) => {
+  const page = await asUser("admin");
+  const seed = fixtures();
+  const main = page.getByRole("main").last();
+  const [first, second] = seed.trainers;
+
+  await page.route(
+    (url) => url.pathname.endsWith("/capacity/training-imports/"),
+    async (route) => {
+      await route.fulfill({
+        json: {
+          from: "2026-10-01T00:00:00Z",
+          to: "2026-11-01T00:00:00Z",
+          results: [
+            {
+              id: "30000000-0000-4000-8000-000000000001",
+              occurrence_ids: ["30000000-0000-4000-8000-000000000001"],
+              trainers: [
+                { trainer_id: "30000000-0000-4000-8000-0000000000a1", display_name: first, status: "confirmed" },
+                { trainer_id: "30000000-0000-4000-8000-0000000000a2", display_name: second, status: "confirmed" },
+              ],
+              trainer_id: "30000000-0000-4000-8000-0000000000a1",
+              display_name: first,
+              starts_at: "2026-10-13T08:00:00Z",
+              ends_at: "2026-10-13T15:00:00Z",
+              minutes: 420,
+              status: "confirmed",
+              rule_label: "Training",
+              title: "Onboarding workshop",
+            },
+            {
+              id: "30000000-0000-4000-8000-000000000002",
+              occurrence_ids: ["30000000-0000-4000-8000-000000000002"],
+              trainers: [
+                { trainer_id: "30000000-0000-4000-8000-0000000000a1", display_name: first, status: "pending" },
+              ],
+              trainer_id: "30000000-0000-4000-8000-0000000000a1",
+              display_name: first,
+              starts_at: "2026-10-21T07:30:00Z",
+              ends_at: "2026-10-21T11:00:00Z",
+              minutes: 210,
+              status: "pending",
+              rule_label: "Training",
+              title: null,
+            },
+          ],
+        },
+      });
+    }
+  );
+
+  // Pinned, for the same reason as the report: the stepper prints the month.
+  await page.goto(`/${seed.workspace.slug}/capacity/imports?month=2026-10`);
+
+  const row = main.getByText("Onboarding workshop");
+  await expect(row).toBeVisible();
+  await expect(main.getByText("Not answered yet")).toBeVisible();
+
+  await capture(page, "capacity-imports", { ready: row, target: main });
+});
+
+/**
+ * The planner's "Schedule workshop" dialog: the Workshop picker, the create
+ * button and the confirmation.
+ *
+ * Opened from the first candidate, with the same availability patch as the
+ * planner story. Nothing is chosen, so "Confirm session" is disabled and no
+ * request is sent. The viewport, not the dialog: the 1.4 dialog root has no box
+ * of its own to photograph.
+ */
+test("the planner's schedule dialog", async ({ asUser }) => {
+  const page = await asUser("admin");
+  const seed = fixtures();
+  const main = page.getByRole("main").last();
+
+  await page.route(
+    (url) => url.pathname.endsWith("/capacity/"),
+    async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      for (const trainer of body.trainers ?? []) trainer.availability_status = "fresh";
+      await route.fulfill({ response, json: body });
+    }
+  );
+
+  await page.goto(`/${seed.workspace.slug}/capacity/planner`);
+
+  const candidate = main.getByRole("button", { name: /Reserve for 72 hours/i }).first();
+  await expect(candidate).toBeVisible();
+  await main.getByRole("button", { name: "Schedule workshop", exact: true }).first().click();
+
+  const confirm = page.getByRole("button", { name: "Confirm session" });
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toBeDisabled();
+  // Off the candidate the click left it on, so no hover transition is caught.
+  await page.mouse.move(0, 0);
+
+  await capture(page, "capacity-planner-schedule", { ready: confirm });
+});

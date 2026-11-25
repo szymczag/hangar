@@ -12,6 +12,8 @@ import type { TIssueActivityComment } from "@plane/types";
 import { IssueActivityBlockComponent } from "@/components/issues/issue-detail/issue-activity/activity/actions";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
+// local imports
+import { WorklogActivityMessage } from "./message";
 
 type TIssueActivityWorklog = {
   workspaceSlug: string;
@@ -38,20 +40,7 @@ export const IssueActivityWorklog = observer(function IssueActivityWorklog(props
       activityId={activityComment.id}
       ends={ends}
     >
-      {activity.verb === "created" ? (
-        <>
-          logged <span className="font-medium text-primary">{activity.new_value}</span>
-        </>
-      ) : activity.verb === "updated" ? (
-        <>
-          updated logged time from <span className="font-medium text-primary">{activity.old_value}</span> to{" "}
-          <span className="font-medium text-primary">{activity.new_value}</span>
-        </>
-      ) : (
-        <>
-          removed logged time <span className="font-medium text-primary">{activity.old_value}</span>
-        </>
-      )}
+      <WorklogActivityMessage verb={activity.verb} oldValue={activity.old_value} newValue={activity.new_value} />
     </IssueActivityBlockComponent>
   );
 });

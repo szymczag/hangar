@@ -5,8 +5,9 @@
  */
 
 import { TZDate } from "@date-fns/tz";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@plane/propel/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { ChevronLeftOutline, ChevronRightOutline } from "@makeplane/propel/icons";
 import { shiftWeek } from "./capacity-format.utils";
 
 type Props = {
@@ -29,14 +30,13 @@ type Props = {
 export function WeekStepper({ weekStart, weekEnd, onChange }: Props) {
   return (
     <div className="flex items-center gap-2">
-      <Button
+      <IconButton
         variant="secondary"
-        size="sm"
+        size="md"
+        icon={<Icon icon={ChevronLeftOutline} />}
         aria-label="Previous week"
         onClick={() => onChange((current) => shiftWeek(current, -1))}
-      >
-        <ChevronLeft className="size-4" />
-      </Button>
+      />
       <div className="min-w-44 text-center text-body-xs-medium">
         {weekStart.toLocaleDateString(undefined, { day: "numeric", month: "short" })} –{" "}
         {new TZDate(weekEnd.getTime() - 1, weekEnd instanceof TZDate ? weekEnd.timeZone : undefined).toLocaleDateString(
@@ -48,14 +48,13 @@ export function WeekStepper({ weekStart, weekEnd, onChange }: Props) {
           }
         )}
       </div>
-      <Button
+      <IconButton
         variant="secondary"
-        size="sm"
+        size="md"
+        icon={<Icon icon={ChevronRightOutline} />}
         aria-label="Next week"
         onClick={() => onChange((current) => shiftWeek(current, 1))}
-      >
-        <ChevronRight className="size-4" />
-      </Button>
+      />
     </div>
   );
 }

@@ -8,17 +8,20 @@ import { useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import { useSearchParams } from "react-router";
 import useSWR from "swr";
-import { CalendarPlus } from "lucide-react";
+import { Button } from "@makeplane/propel/components/button";
+import { Checkbox } from "@makeplane/propel/components/checkbox";
+import { Icon } from "@makeplane/propel/components/icon";
+import { SelectField } from "@makeplane/propel/components/select-field";
+import { CalendarOutline } from "@makeplane/propel/icons";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Loader } from "@plane/ui";
+import { Loader } from "@plane/blocks/skeleton";
+import { setToast } from "@plane/blocks/toast";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
 import { useInstance } from "@/hooks/store/use-instance";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
-import { CapacityService } from "@/services/capacity.service";
+import { CapacityService, type TPendingTrainingImport } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
 import {
   errorMessage,
@@ -40,6 +43,49 @@ const SKIP_COPY: Record<string, string> = {
   trainer_not_in_project: "the trainer cannot be assigned work in that project",
   workshops_not_enabled: "that project no longer offers Workshops",
 };
+
+/** One recognized training: its selection box, name, trainers, time, length and answer. */
+function TrainingImportRow({
+  row,
+  selected,
+  onToggle,
+}: {
+  row: TPendingTrainingImport;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <tr className="border-t border-subtle">
+      <td className="px-3 py-3">
+        <Checkbox
+          aria-label={`Select ${row.title ?? "training"} with ${row.display_name}`}
+          checked={selected}
+          onCheckedChange={onToggle}
+        />
+      </td>
+      <th scope="row" className="px-3 py-3 font-medium">
+        {row.title ?? row.rule_label}
+      </th>
+      <td className="px-3 py-3">
+        {/* Every trainer on the training, with whoever has not
+            answered marked: importing takes all of them into one
+            Workshop, so the row has to say who "all" is. */}
+        {(row.trainers?.length
+          ? row.trainers
+          : [{ trainer_id: row.trainer_id, display_name: row.display_name, status: row.status }]
+        ).map((trainer) => (
+          <span key={trainer.trainer_id} className="block">
+            {trainer.display_name}
+            {trainer.status !== "confirmed" && <span className="ml-1 text-tertiary">· not answered</span>}
+          </span>
+        ))}
+      </td>
+      <td className="px-3 py-3">{formatDateTime(row.starts_at)}</td>
+      <td className="px-3 py-3">{Math.round((row.minutes / 60) * 10) / 10}h</td>
+      <td className="px-3 py-3">{row.status === "confirmed" ? "Accepted" : "Not answered yet"}</td>
+    </tr>
+  );
+}
 
 /**
  * Trainings that exist in the calendar but not yet as work items.
@@ -90,6 +136,7 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
   );
 
   const rows = data?.results ?? [];
+  const projectOptions = joinedProjectIds.map((id) => ({ value: id, label: getProjectById(id)?.name ?? id }));
 
   const toggle = (id: string) =>
     setSelected((current) => {
@@ -108,7 +155,7 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
       await mutate();
       const skipped = result.skipped.length;
       setToast({
-        type: skipped ? TOAST_TYPE.WARNING : TOAST_TYPE.SUCCESS,
+        type: skipped ? "warning" : "success",
         title: `${result.created.length} workshop${result.created.length === 1 ? "" : "s"} created`,
         message: skipped
           ? `${skipped} skipped: ${[...new Set(result.skipped.map((row) => SKIP_COPY[row.reason] ?? row.reason))].join(", ")}.`
@@ -116,7 +163,7 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
       });
     } catch (reason: unknown) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Nothing was imported",
         message: errorMessage(reason, "Try again."),
       });
@@ -158,43 +205,38 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
         ) : (
           <section aria-label="Recognized training" className="rounded-xl border border-subtle bg-surface-1 p-5">
             <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-body-xs-regular">
-                <span className="text-secondary">Create workshops in</span>
-                <select
-                  className="h-9 min-w-56 rounded-md border border-subtle bg-surface-2 px-2.5 text-body-sm-regular"
-                  value={projectId}
-                  onChange={(event) => setProjectId(event.target.value)}
-                >
-                  <option value="">Choose a project</option>
-                  {joinedProjectIds.map((id) => (
-                    <option key={id} value={id}>
-                      {getProjectById(id)?.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="min-w-56">
+                <SelectField<string>
+                  label="Create workshops in"
+                  size="lg"
+                  placeholder="Choose a project"
+                  options={projectOptions}
+                  value={projectId || null}
+                  onValueChange={(value) => setProjectId(value ?? "")}
+                />
+              </div>
               <Button
                 variant="primary"
-                size="sm"
+                size="lg"
+                stretch="auto"
                 loading={importing}
                 disabled={!projectId || selected.size === 0}
                 onClick={() => void runImport()}
-              >
-                <CalendarPlus className="mr-1 size-4" />
-                Import {selected.size > 0 ? selected.size : ""}
-              </Button>
+                icon={<Icon icon={CalendarOutline} />}
+                label={`Import ${selected.size > 0 ? selected.size : ""}`.trim()}
+              />
               {rows.length > 0 && (
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="lg"
+                  stretch="auto"
                   onClick={() =>
                     setSelected((current) =>
                       current.size === rows.length ? new Set() : new Set(rows.map((row) => row.id))
                     )
                   }
-                >
-                  {selected.size === rows.length ? "Clear selection" : "Select all"}
-                </Button>
+                  label={selected.size === rows.length ? "Clear selection" : "Select all"}
+                />
               )}
             </div>
 
@@ -214,38 +256,12 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="border-t border-subtle">
-                      <td className="px-3 py-3">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${row.title ?? "training"} with ${row.display_name}`}
-                          checked={selected.has(row.id)}
-                          onChange={() => toggle(row.id)}
-                        />
-                      </td>
-                      <th scope="row" className="px-3 py-3 font-medium">
-                        {row.title ?? row.rule_label}
-                      </th>
-                      <td className="px-3 py-3">
-                        {/* Every trainer on the training, with whoever has not
-                            answered marked: importing takes all of them into one
-                            Workshop, so the row has to say who "all" is. */}
-                        {(row.trainers?.length
-                          ? row.trainers
-                          : [{ trainer_id: row.trainer_id, display_name: row.display_name, status: row.status }]
-                        ).map((trainer) => (
-                          <span key={trainer.trainer_id} className="block">
-                            {trainer.display_name}
-                            {trainer.status !== "confirmed" && (
-                              <span className="ml-1 text-tertiary">· not answered</span>
-                            )}
-                          </span>
-                        ))}
-                      </td>
-                      <td className="px-3 py-3">{formatDateTime(row.starts_at)}</td>
-                      <td className="px-3 py-3">{Math.round((row.minutes / 60) * 10) / 10}h</td>
-                      <td className="px-3 py-3">{row.status === "confirmed" ? "Accepted" : "Not answered yet"}</td>
-                    </tr>
+                    <TrainingImportRow
+                      key={row.id}
+                      row={row}
+                      selected={selected.has(row.id)}
+                      onToggle={() => toggle(row.id)}
+                    />
                   ))}
                   {rows.length === 0 && (
                     <tr>
