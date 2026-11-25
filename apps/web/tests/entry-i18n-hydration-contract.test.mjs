@@ -5,8 +5,9 @@
  * The web entry hydrates only after i18n is ready (upstream makeplane/plane
  * 1a76f29c79, as the published boards do), and everything React must not
  * render without is set up before that wait: the Trusted Types policies and
- * the emoji data URL of both pickers, so neither falls back to a CDN (the
- * 1.4 picker is only rendered by the editor's callout logo picker now).
+ * the emoji data URL of the `@plane/blocks` picker, so it never falls back to
+ * a CDN. Since phase 9b that is the only picker web renders: the editor's
+ * callout logo picker is the same one.
  */
 
 import assert from "node:assert/strict";
@@ -25,23 +26,29 @@ const indexOf = (pattern) => {
 test("web hydrates after initPromise, with policies and emoji data set first", () => {
   assert.match(entry, /import \{ initPromise \} from "@plane\/i18n";/);
   const policies = indexOf(/^installTrustedTypesPolicies\(/m);
-  const propelEmoji = indexOf(/^setEmojiDataUrl\(emojiDataUrl\);/m);
-  const blocksEmoji = indexOf(/^setBlocksEmojiDataUrl\(emojiDataUrl\);/m);
+  const emoji = indexOf(/^setEmojiDataUrl\(`\$\{import\.meta\.env\.BASE_URL\}emojibase`\);/m);
   const wait = indexOf(/^void initPromise\.catch\(\(\) => \{\}\)\.then\(hydrate\);/m);
   const hydrate = indexOf(/hydrateRoot\(/);
-  assert.ok(policies < wait && propelEmoji < wait && blocksEmoji < wait);
+  // The policies first, so even the picker's data fetch runs under them.
+  assert.ok(policies < emoji && emoji < wait);
   // hydrateRoot is only reached through the `hydrate` callback.
   assert.ok(indexOf(/^const hydrate = \(\) =>/m) < hydrate);
   assert.equal(entry.match(/hydrateRoot\(/g).length, 1);
 });
 
-test("both emoji pickers read the data this app serves", () => {
-  assert.match(
-    entry,
-    /import \{ setEmojiDataUrl as setBlocksEmojiDataUrl \} from "@plane\/blocks\/emoji-icon-picker";/
+test("the emoji picker reads the data this app serves, and only the blocks picker is configured", () => {
+  assert.match(entry, /import \{ setEmojiDataUrl \} from "@plane\/blocks\/emoji-icon-picker";/);
+  assert.equal(entry.match(/setEmojiDataUrl\(/g).length, 1);
+  assert.doesNotMatch(entry, /@plane\/propel\/emoji-icon-picker/);
+});
+
+test("the editor's callout picker is the blocks picker that call configures", () => {
+  const selector = readFileSync(
+    new URL("../../../packages/editor/src/extensions/callout/logo-selector.tsx", import.meta.url),
+    "utf8"
   );
-  assert.match(entry, /import \{ setEmojiDataUrl \} from "@plane\/propel\/emoji-icon-picker";/);
-  assert.match(entry, /const emojiDataUrl = `\$\{import\.meta\.env\.BASE_URL\}emojibase`;/);
+  assert.match(selector, /from "@plane\/blocks\/emoji-icon-picker";/);
+  assert.doesNotMatch(selector, /@plane\/propel\/emoji-icon-picker/);
 });
 
 test("the toast viewport is mounted inside TranslationProvider, and only the blocks one", () => {
