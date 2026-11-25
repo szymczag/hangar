@@ -20,8 +20,9 @@ export const BillingRoot = observer(function BillingRoot() {
       <div className="mt-6 overflow-hidden rounded-lg border border-subtle bg-layer-2">
         <div className="flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-start sm:px-6 sm:py-7">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-accent-primary text-on-color">
-            {/* Propel has no infinity glyph, and its loop arrows read as "sync" */}
-            <span className="text-h3-semibold leading-none" aria-hidden="true">
+            {/* Propel has no infinity glyph, and its loop arrows read as "sync". At
+                40px the glyph is as wide as the 28px icon it replaced (26px). */}
+            <span className="text-40 leading-none font-semibold" aria-hidden="true">
               ∞
             </span>
           </div>
