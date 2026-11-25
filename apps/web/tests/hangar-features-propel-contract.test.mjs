@@ -5,7 +5,9 @@
  * Hangar's own features moved to Propel in phase 8: capacity (personal, team,
  * planner, report, calendar import), work item types and custom properties,
  * workshop sessions and the schedule row, the Todoist import wizard, the
- * maintenance bar, the copy progress strip and the build identity dialog.
+ * copy progress strip and the build identity dialog. The maintenance bar is
+ * not here: it sits above every page, so moving it moves every baseline, and it
+ * gets its own pass.
  *
  * The move changed markup only. Each check below is a rule the new markup could
  * drop without a type error or a failing render:
@@ -44,7 +46,6 @@ const FEATURES = [
   "ce/components/issue-types",
   "ce/components/issues",
   "ce/components/workspace/imports",
-  "ce/components/instance/maintenance-bar.tsx",
   "ce/components/project/copy-progress.tsx",
   "ce/components/license/modal/community-modal.tsx",
   "components/issues/issue-detail-widgets/workshop-sessions",
