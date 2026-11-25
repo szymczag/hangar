@@ -5,7 +5,7 @@
  */
 
 import { observer } from "mobx-react";
-import { LoopOutline, TickOutline } from "@makeplane/propel/icons";
+import { TickOutline } from "@makeplane/propel/icons";
 // components
 import { SettingsHeading } from "@/components/settings/heading";
 
@@ -20,7 +20,10 @@ export const BillingRoot = observer(function BillingRoot() {
       <div className="mt-6 overflow-hidden rounded-lg border border-subtle bg-layer-2">
         <div className="flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-start sm:px-6 sm:py-7">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-accent-primary text-on-color">
-            <LoopOutline className="size-7" />
+            {/* Propel has no infinity glyph, and its loop arrows read as "sync" */}
+            <span className="text-h3-semibold leading-none" aria-hidden="true">
+              ∞
+            </span>
           </div>
 
           <div className="max-w-2xl">
