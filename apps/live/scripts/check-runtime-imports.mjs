@@ -36,8 +36,11 @@ const RESOLVE_FLAG = "--experimental-import-meta-resolve";
 // `import x from "a"`, `import { a,\n b } from "a"`, `import "a"`, `export * from "a"`.
 const STATIC_IMPORT = /(?:^|[;\n}])\s*(?:import|export)(?:\s*[\w$*{}\s,]*?\s*from)?\s*["']([^"'\n]+)["']/g;
 const DYNAMIC_IMPORT = /\bimport\(\s*["']([^"'\n]+)["']\s*\)/g;
-// CommonJS interop the bundler emits for a package it could not convert.
-const REQUIRE = /\b(?:__)?require\(\s*["']([^"'\n]+)["']\s*\)/g;
+// CommonJS interop the bundler emits for a package it could not convert, and
+// `createRequire(import.meta.url).resolve(...)` lookups such as the PDF
+// exporter's font directory: `require("a")`, `require.resolve("a")` and their
+// `__require` forms. A resolve that fails throws at load time just the same.
+const REQUIRE = /\b(?:__)?require(?:\.resolve)?\(\s*["']([^"'\n]+)["']\s*\)/g;
 
 const BUILTINS = new Set(builtinModules);
 const isBuiltin = (specifier) =>

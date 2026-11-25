@@ -115,6 +115,29 @@ describe("check-runtime-imports", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+  it("resolves require.resolve lookups, as the PDF exporter's font directory", () => {
+    const dir = fixture();
+    try {
+      write(
+        path.join(dir, "app/start.mjs"),
+        [
+          'import { createRequire } from "node:module";',
+          "const require = createRequire(import.meta.url);",
+          'const ok = require.resolve("dep/package.json");',
+          'const fontDir = require.resolve("@fontsource/missing/package.json");',
+          'const bundled = __require.resolve("missing-bundled");',
+          "",
+        ].join("\n")
+      );
+      const result = check(path.join(dir, "app/start.mjs"));
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /2 imports do not resolve/);
+      assert.match(result.stderr, /@fontsource\/missing\/package\.json .* in .*start\.mjs/);
+      assert.match(result.stderr, /missing-bundled .* in .*start\.mjs/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("the built live server under a production-only install", () => {
