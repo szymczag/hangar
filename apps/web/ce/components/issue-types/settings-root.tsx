@@ -11,7 +11,7 @@ import { observer } from "mobx-react";
 // plane imports
 import { Button } from "@makeplane/propel/components/button";
 import { Icon } from "@makeplane/propel/components/icon";
-import { Input } from "@makeplane/propel/components/input";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { InputField } from "@makeplane/propel/components/input-field";
 import { SelectField } from "@makeplane/propel/components/select-field";
 import { Switch } from "@makeplane/propel/components/switch";
@@ -95,18 +95,20 @@ const PropertyRow = observer(function PropertyRow(props: {
           {isAdmin && (
             <div className="flex items-center gap-1">
               <div className="w-32">
-                <Input
-                  id={`option-${property.id}`}
-                  size="md"
-                  type="text"
-                  aria-label={`Add option to ${property.display_name}`}
-                  value={optionName}
-                  onChange={(e) => setOptionName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void addOption();
-                  }}
-                  placeholder="Add option"
-                />
+                <InputGroup size="md">
+                  <Input
+                    id={`option-${property.id}`}
+                    size="md"
+                    type="text"
+                    aria-label={`Add option to ${property.display_name}`}
+                    value={optionName}
+                    onChange={(e) => setOptionName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void addOption();
+                    }}
+                    placeholder="Add option"
+                  />
+                </InputGroup>
               </div>
             </div>
           )}
@@ -341,18 +343,20 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
         {isAdmin && hasSystemTypes && (
           <div className="flex items-center gap-2">
             <div className="w-40">
-              <Input
-                id="new-type-name"
-                size="md"
-                type="text"
-                aria-label="New work item type name"
-                value={newTypeName}
-                onChange={(e) => setNewTypeName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void createType();
-                }}
-                placeholder="e.g. Bug"
-              />
+              <InputGroup size="md">
+                <Input
+                  id="new-type-name"
+                  size="md"
+                  type="text"
+                  aria-label="New work item type name"
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void createType();
+                  }}
+                  placeholder="e.g. Bug"
+                />
+              </InputGroup>
             </div>
             <Button
               variant="primary"

@@ -10,7 +10,7 @@ import { Checkbox } from "@makeplane/propel/components/checkbox";
 import { CheckboxField } from "@makeplane/propel/components/checkbox-field";
 import { Icon } from "@makeplane/propel/components/icon";
 import { IconButton } from "@makeplane/propel/components/icon-button";
-import { Input } from "@makeplane/propel/components/input";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { SelectField } from "@makeplane/propel/components/select-field";
 import { TextButton } from "@makeplane/propel/components/text-button";
 import { DeleteOutline } from "@makeplane/propel/icons";
@@ -162,23 +162,25 @@ export function ScheduleEditor({
                         <label key={field} className="block w-28 text-body-xs-regular text-secondary">
                           {field === "start" ? "From" : "Until"}
                           <span className="mt-1 block">
-                            <Input
-                              size="lg"
-                              aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} ${field}`}
-                              type="text"
-                              inputMode="numeric"
-                              placeholder="HH:mm"
-                              autoComplete="off"
-                              value={interval[field]}
-                              aria-invalid={Boolean(error)}
-                              aria-describedby={error ? key : undefined}
-                              onChange={(event) => setTime(day, interval.id, field, event.target.value)}
-                              onBlur={() => {
-                                setTouched((current) => ({ ...current, [key]: true }));
-                                const value = normalizeBookingTime(interval[field]);
-                                if (value) setTime(day, interval.id, field, value);
-                              }}
-                            />
+                            <InputGroup size="lg">
+                              <Input
+                                size="lg"
+                                aria-label={`${DAY_LABELS[index]} interval ${intervalIndex + 1} ${field}`}
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="HH:mm"
+                                autoComplete="off"
+                                value={interval[field]}
+                                aria-invalid={Boolean(error)}
+                                aria-describedby={error ? key : undefined}
+                                onChange={(event) => setTime(day, interval.id, field, event.target.value)}
+                                onBlur={() => {
+                                  setTouched((current) => ({ ...current, [key]: true }));
+                                  const value = normalizeBookingTime(interval[field]);
+                                  if (value) setTime(day, interval.id, field, value);
+                                }}
+                              />
+                            </InputGroup>
                           </span>
                           {error && (
                             <span id={key} className="mt-1 block text-danger-primary">
