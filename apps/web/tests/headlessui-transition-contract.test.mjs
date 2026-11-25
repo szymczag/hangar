@@ -20,8 +20,11 @@ const { renderToString } = webRequire("react-dom/server");
 const { Combobox, Transition } = uiRequire("@headlessui/react");
 
 const sourceRoots = [path.join(repoRoot, "apps"), path.join(repoRoot, "packages")];
-// Web loads the Propel entry point (packages/tailwind-config/propel.css), which has no
-// floating-overlay layer of its own, so web's stylesheet carries the token and the rule.
+// Web loads the Propel entry point (packages/tailwind-config/propel.css), not index.css.
+// Nothing web renders is positioned by Popper any more (only `@plane/ui`'s menus are,
+// and web reaches `@plane/ui` solely for the editor's loader), so web's stylesheet no
+// longer carries index.css's floating-overlay layer. The source checks above still
+// guard the Popper menus left in `@plane/ui`.
 const webStylesPath = path.join(repoRoot, "apps/web/styles/globals.css");
 const fragmentButtonComponents = new Set(["Combobox", "Disclosure", "Listbox", "Menu", "Popover"]);
 const nonModalPanelComponents = new Map([
@@ -767,9 +770,4 @@ test("keeps every Popper target above application dialogs", () => {
 
   assert.match(styles, /@import "@plane\/tailwind-config\/propel\.css";/);
   assert.doesNotMatch(styles, /@import "@plane\/tailwind-config\/index\.css";/);
-  assert.match(styles, /--z-index-floating-overlay:\s*110\s*;/);
-  assert.match(
-    styles,
-    /\[data-popper-placement\]\s*\{[^}]*z-index:\s*var\(--z-index-floating-overlay\)\s*!important\s*;/s
-  );
 });

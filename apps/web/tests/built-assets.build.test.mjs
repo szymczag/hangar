@@ -10,9 +10,6 @@
  *
  * - Propel's variants use utilities that need Tailwind 4.2 (`inset-e-4`, ...).
  *   Tailwind drops a class it does not know without a warning.
- * - propel.css has no floating-overlay layer, which index.css had. Web's own
- *   stylesheet carries it; without it Popper menus open behind peek views and
- *   modals.
  * - The SPA prerender of index.html keeps its HydrateFallback loader, which
  *   the first client render (after entry.client.tsx waits for i18n) adopts.
  *
@@ -44,12 +41,6 @@ test("the built web CSS has the Propel tokens, not index.css's", () => {
   // Propel names its keyframes in kebab case; index.css's camelCase ones are gone.
   assert.match(css, /@keyframes slide-in-from-bottom\{/);
   assert.doesNotMatch(css, /@keyframes slideInFromBottom\{/);
-});
-
-test("Popper content sits on the floating-overlay layer in the built web CSS", () => {
-  const css = builtCss("web");
-  assert.match(css, /--z-index-floating-overlay:110[;}]/);
-  assert.match(css, /\[data-popper-placement\]\{z-index:var\(--z-index-floating-overlay\)!important\}/);
 });
 
 test("the prerendered index.html carries the HydrateFallback loader", () => {
