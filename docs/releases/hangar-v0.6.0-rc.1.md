@@ -17,12 +17,12 @@ screens.** `0.5.0` removed the "Upgrade" button from the workspace's Active
 cycles page, which kept its feature description. That page, at
 `/<workspace>/active-cycles/`, advertised a paid upstream feature and offered
 nothing that worked in Hangar; it is now removed with its images, and the
-address shows the app's "page not found" screen. Nothing in the app linked to
-it. Cycles in each project, and the API, are unchanged. Two pieces of upstream
-code that the web app no longer showed are removed as well: the "What's new"
-dialog, which framed upstream's changelog website and which Hangar's help menu
-had already dropped, and upstream's paid plan, checkout and talk-to-sales
-cards. Hangar's own build identity dialog stays.
+address no longer leads to a page. Nothing in the app linked to it. Cycles
+in each project, and the API, are unchanged. Two pieces of upstream code that
+the web app no longer showed are removed as well: the "What's new" dialog,
+which framed upstream's changelog website and which Hangar's help menu had
+already dropped, and upstream's paid plan, checkout and talk-to-sales cards.
+Hangar's own build identity dialog stays.
 
 **The rest of the new design brings in none of upstream's external services,
 and keeps worklogs from guests.** The screens that move to Propel in this
