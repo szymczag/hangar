@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { EUserPermissions } from "@plane/types";
 
-import { canLogWorkForRole, canViewWorklogsForRole } from "./worklog";
+import { canLogWorkForRole, canViewWorklogsForRole, isWorklogHiddenForRole } from "./worklog";
 
 // Worklogs are confidential from guests (FORK.md, "Security invariants", S20).
 // The API refuses them; this keeps the UI from asking and from rendering them.
@@ -36,6 +36,37 @@ describe("canViewWorklogsForRole", () => {
   ])("%s gates worklogs on the helper", (file) => {
     const source = readFileSync(path.join(here, file), "utf8");
     expect(source).toMatch(/canViewWorklogs\s*=\s*canViewWorklogsForRole\(/);
+  });
+});
+
+describe("isWorklogHiddenForRole", () => {
+  it("hides worklog rows from guests and from an unknown role", () => {
+    expect(isWorklogHiddenForRole("worklog", ROLE.GUEST)).toBe(true);
+    expect(isWorklogHiddenForRole("worklog", undefined)).toBe(true);
+  });
+
+  it("shows worklog rows to project admins and members", () => {
+    expect(isWorklogHiddenForRole("worklog", ROLE.ADMIN)).toBe(false);
+    expect(isWorklogHiddenForRole("worklog", ROLE.MEMBER)).toBe(false);
+  });
+
+  it("never hides any other kind of row", () => {
+    for (const field of ["state", "comment", "priority", undefined, null]) {
+      expect(isWorklogHiddenForRole(field, ROLE.GUEST)).toBe(false);
+    }
+  });
+
+  // The profile's activity feeds and the inbox list rows of every kind, and a
+  // worklog row prints the logged duration.
+  it.each([
+    ["../../components/profile/activity/activity-list.tsx", /isWorklogHiddenForRole\(\s*activityItem\.field,/],
+    ["../../components/profile/overview/activity.tsx", /isWorklogHiddenForRole\(\s*activity\.field,/],
+    [
+      "../../components/workspace-notifications/sidebar/notification-card/item.tsx",
+      /isWorklogHiddenForRole\(\s*notificationField,/,
+    ],
+  ])("%s leaves worklog rows out behind the helper", (file, pattern) => {
+    expect(readFileSync(path.join(here, file), "utf8")).toMatch(pattern);
   });
 });
 

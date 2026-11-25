@@ -35,6 +35,7 @@ from plane.app.permissions import (
 from plane.app.serializers import WorkSpaceSerializer, WorkspaceThemeSerializer
 from plane.app.views.base import BaseAPIView, BaseViewSet
 from plane.app.views.workspace.user import _visible_issues_q
+from plane.ext.services.worklog_access import worklog_activity_visible_q
 from plane.db.models import (
     Issue,
     IssueActivity,
@@ -352,13 +353,18 @@ class ExportWorkspaceUserActivityEndpoint(BaseAPIView):
         if not request.data.get("date"):
             return Response({"error": "Date is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        user_activities = IssueActivity.objects.filter(
-            ~Q(field__in=["comment", "vote", "reaction", "draft"]),
-            _visible_issues_q(request.user, prefix="issue__"),
-            workspace__slug=slug,
-            created_at__date=request.data.get("date"),
-            actor_id=user_id,
-        ).select_related("actor", "workspace", "issue", "project")[:10000]
+        user_activities = (
+            IssueActivity.objects.filter(
+                ~Q(field__in=["comment", "vote", "reaction", "draft"]),
+                _visible_issues_q(request.user, prefix="issue__"),
+                workspace__slug=slug,
+                created_at__date=request.data.get("date"),
+                actor_id=user_id,
+            )
+            # Fork (see FORK.md, S20): worklog rows carry the logged duration.
+            .filter(worklog_activity_visible_q(request.user.id, slug))
+            .select_related("actor", "workspace", "issue", "project")[:10000]
+        )
 
         header = [
             "Actor name",

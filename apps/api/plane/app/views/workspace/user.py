@@ -53,6 +53,7 @@ from plane.db.models import (
     WorkspaceMember,
     WorkspaceUserProperties,
 )
+from plane.ext.services.worklog_access import worklog_activity_visible_q
 from plane.utils.grouper import (
     issue_group_values,
     issue_on_results,
@@ -412,13 +413,18 @@ class WorkspaceUserActivityEndpoint(BaseAPIView):
     def get(self, request, slug, user_id):
         projects = request.query_params.getlist("project", [])
 
-        queryset = IssueActivity.objects.filter(
-            ~Q(field__in=["comment", "vote", "reaction", "draft"]),
-            _visible_issues_q(request.user, prefix="issue__"),
-            workspace__slug=slug,
-            project__archived_at__isnull=True,
-            actor=user_id,
-        ).select_related("actor", "workspace", "issue", "project")
+        queryset = (
+            IssueActivity.objects.filter(
+                ~Q(field__in=["comment", "vote", "reaction", "draft"]),
+                _visible_issues_q(request.user, prefix="issue__"),
+                workspace__slug=slug,
+                project__archived_at__isnull=True,
+                actor=user_id,
+            )
+            # Fork (see FORK.md, S20): worklog rows carry the logged duration.
+            .filter(worklog_activity_visible_q(request.user.id, slug))
+            .select_related("actor", "workspace", "issue", "project")
+        )
 
         if projects:
             queryset = queryset.filter(project__in=projects)
