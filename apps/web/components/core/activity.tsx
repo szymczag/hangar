@@ -26,6 +26,7 @@ import {
   ModuleOutline,
   PriorityMedium,
   RelatesToOutline,
+  TimeTrackingOutline,
   WorkItemsOutline,
 } from "@makeplane/propel/icons";
 import { BlockedIcon, BlockerIcon } from "@plane/blocks/icons";
@@ -35,6 +36,8 @@ import { renderFormattedDate, generateWorkItemLink, capitalizeFirstLetter } from
 // helpers
 import { useLabel } from "@/hooks/store/use-label";
 import { usePlatformOS } from "@/hooks/use-platform-os";
+// Hangar extension
+import { WorklogActivityMessage } from "@/plane-web/components/issues/worklog/activity/message";
 // types
 
 export function IssueLink({ activity }: { activity: IIssueActivity }) {
@@ -743,6 +746,23 @@ const activityDetails: {
       </>
     ),
     icon: <IntakeOutline className="size-3 text-secondary" aria-hidden="true" />,
+  },
+  // Fork (see FORK.md): a worklog row reads as it does in the work item's own
+  // feed ("logged 45m"). Only feeds that already left out the rows this reader
+  // may not see reach here (S20, `isWorklogHiddenForRole`).
+  worklog: {
+    message: (activity, showIssue) => (
+      <>
+        <WorklogActivityMessage verb={activity.verb} oldValue={activity.old_value} newValue={activity.new_value} />
+        {showIssue && (
+          <>
+            {" "}
+            on <IssueLink activity={activity} />
+          </>
+        )}
+      </>
+    ),
+    icon: <TimeTrackingOutline width={12} height={12} className="text-secondary" aria-hidden="true" />,
   },
 };
 
