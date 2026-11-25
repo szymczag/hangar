@@ -177,10 +177,6 @@
       "cta_primary": "Creați prima notă",
       "cta_secondary": "Documentație"
     },
-    "active_cycles": {
-      "title": "Niciun ciclu activ",
-      "description": "Nu aveți cicluri în desfășurare în acest moment. Ciclurile active apar aici când includ data de azi."
-    },
     "dashboard": {
       "title": "Vizualizați progresul dvs. cu tablouri de bord",
       "description": "Construiți tablouri de bord personalizabile pentru a urmări metricile, a măsura rezultatele și a prezenta informații eficient.",

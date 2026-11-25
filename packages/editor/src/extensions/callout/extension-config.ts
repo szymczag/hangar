@@ -5,7 +5,7 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
-import { stringToEmoji } from "@plane/propel/emoji-icon-picker";
+import { stringToEmoji } from "@plane/blocks/emoji-icon-picker/data";
 import type { MarkdownSerializerState } from "prosemirror-markdown";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 // constants

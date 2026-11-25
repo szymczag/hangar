@@ -10,8 +10,7 @@ import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
 import { API_BASE_URL } from "@plane/constants";
 import { installTrustedTypesPolicies } from "@plane/csp/trusted-types";
-import { setEmojiDataUrl as setBlocksEmojiDataUrl } from "@plane/blocks/emoji-icon-picker";
-import { setEmojiDataUrl } from "@plane/propel/emoji-icon-picker";
+import { setEmojiDataUrl } from "@plane/blocks/emoji-icon-picker";
 
 import polyfills from "@/lib/polyfills";
 import { isStaleAssetErrorMessage, recoverFromStaleAsset } from "@/lib/stale-asset-error";
@@ -41,13 +40,11 @@ if (import.meta.env.PROD) {
 // value is changed.
 installTrustedTypesPolicies({ reportUrl: `${API_BASE_URL}/api/csp-report/` });
 
-// The emoji pickers read their data from this app, under whatever base path it
-// is served on (packages/csp/src/vite-emoji-data.mjs), never from a CDN. Web
-// itself only renders the blocks picker; the 1.4 one (@plane/propel) is still
-// pointed at it because the editor's callout logo picker renders it.
-const emojiDataUrl = `${import.meta.env.BASE_URL}emojibase`;
-setEmojiDataUrl(emojiDataUrl);
-setBlocksEmojiDataUrl(emojiDataUrl);
+// The emoji picker reads its data from this app, under whatever base path it
+// is served on (packages/csp/src/vite-emoji-data.mjs), never from a CDN. The
+// editor's callout logo picker is the same `@plane/blocks` picker, so this one
+// call covers it too.
+setEmojiDataUrl(`${import.meta.env.BASE_URL}emojibase`);
 
 // Initialize i18n before hydrating (the remix-i18next pattern for React
 // Router: await init, then hydrateRoot), as upstream makeplane/plane 1a76f29c79

@@ -120,8 +120,6 @@
   "general_settings": "일반 설정",
   "sign_out": "로그아웃",
   "signing_out": "로그아웃 중",
-  "active_cycles": "활성 주기",
-  "active_cycles_description": "프로젝트 전반의 주기를 모니터링하고, 고우선 작업 항목을 추적하며, 주의가 필요한 주기를 확대합니다.",
   "on_demand_snapshots_of_all_your_cycles": "모든 주기의 주문형 스냅샷",
   "upgrade": "업그레이드",
   "10000_feet_view": "10,000피트 뷰",

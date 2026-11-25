@@ -7,13 +7,13 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 // ui
+import { Button } from "@makeplane/propel/components/button";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { useTranslation } from "@plane/i18n";
-import { Tooltip } from "@plane/propel/tooltip";
 // hooks
 import { useInstance } from "@/hooks/store/use-instance";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import packageJson from "package.json";
-import { Button } from "@plane/propel/button";
 // Hangar extension
 import { HANGAR_EDITION_NAME, HangarCommunityModal } from "@/plane-web/components/license/modal/community-modal";
 
@@ -34,16 +34,17 @@ export const WorkspaceEditionBadge = observer(function WorkspaceEditionBadge() {
   return (
     <>
       <HangarCommunityModal isOpen={isCommunityModalOpen} handleClose={() => setIsCommunityModalOpen(false)} />
-      <Tooltip tooltipContent={`Version: ${version}`} isMobile={isMobile}>
+      {/* No hover tooltip on touch screens, where it would only cover the dialog it opens. */}
+      <Tooltip label={`Version: ${version}`} disabled={isMobile}>
         <Button
           variant="tertiary"
-          size="lg"
+          size="md"
+          stretch="auto"
+          label={HANGAR_EDITION_NAME}
           onClick={() => setIsCommunityModalOpen(true)}
           aria-haspopup="dialog"
           aria-label={t("aria_labels.projects_sidebar.edition_badge")}
-        >
-          {HANGAR_EDITION_NAME}
-        </Button>
+        />
       </Tooltip>
     </>
   );

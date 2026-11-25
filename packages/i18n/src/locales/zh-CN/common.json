@@ -120,8 +120,6 @@
   "general_settings": "常规设置",
   "sign_out": "退出登录",
   "signing_out": "正在退出登录",
-  "active_cycles": "活动周期",
-  "active_cycles_description": "监控各个项目的周期，跟踪高优先级工作项，并关注需要注意的周期。",
   "on_demand_snapshots_of_all_your_cycles": "所有周期的实时快照",
   "upgrade": "升级",
   "10000_feet_view": "所有活动周期的全局视图。",

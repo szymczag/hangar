@@ -177,10 +177,6 @@
       "cta_primary": "İlk yapışkan notu oluştur",
       "cta_secondary": "Belgeler"
     },
-    "active_cycles": {
-      "title": "Aktif döngü yok",
-      "description": "Şu anda devam eden döngünüz yok. Aktif döngüler bugünün tarihini içerdiğinde burada görünür."
-    },
     "dashboard": {
       "title": "İlerlemenizi kontrol panelleriyle görselleştirin",
       "description": "Metrikleri takip etmek, sonuçları ölçmek ve içgörüleri etkili bir şekilde sunmak için özelleştirilebilir kontrol panelleri oluşturun.",

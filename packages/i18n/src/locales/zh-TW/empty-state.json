@@ -177,10 +177,6 @@
       "cta_primary": "建立第一個便籤",
       "cta_secondary": "文件"
     },
-    "active_cycles": {
-      "title": "無活躍週期",
-      "description": "您目前沒有任何正在進行的週期。包含今天日期的活躍週期將顯示在此處。"
-    },
     "dashboard": {
       "title": "使用儀表板視覺化您的進度",
       "description": "建構可自訂的儀表板以追蹤指標、衡量成果並有效呈現見解。",

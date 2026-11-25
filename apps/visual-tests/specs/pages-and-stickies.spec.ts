@@ -152,3 +152,35 @@ test("the project view list filters", async ({ asUser }) => {
 
   await capture(page, "views-project-list-filters", { ready: createdBy });
 });
+
+/**
+ * The callout's logo picker, which the editor draws with the shared emoji and
+ * icon picker. Phase 9b moves it from the 1.4 picker to `@plane/blocks`.
+ *
+ * The page is the dark user's and private (see the seed), so opening it cannot
+ * reorder the light user's pages list. The emoji grid only renders once the
+ * picker has read its data from this instance's `emojibase` path, so waiting on
+ * an emoji is also a check that the data is served locally rather than from a
+ * CDN, which the Content-Security-Policy would refuse.
+ */
+test("the callout logo picker", async ({ asUser }) => {
+  const page = await asUser("dark");
+  const seed = fixtures();
+  await page.goto(`/${seed.workspace.slug}/projects/${seed.project.id}/pages/${seed.calloutPage.id}`);
+  const main = page.getByRole("main").last();
+  const callout = main.locator(".editor-callout-component", { hasText: seed.calloutPage.text }).first();
+  await expect(callout).toBeVisible();
+
+  // The picker's trigger is disabled until the collaborative session makes the
+  // editor editable, and a click on it before then opens nothing.
+  const logo = callout.getByRole("button").first();
+  await expect(logo).toBeEnabled();
+  await logo.click();
+  const picker = page.getByRole("dialog").last();
+  // An emoji cell is a gridcell named by its emojibase label.
+  const emoji = picker.getByLabel("Grinning face", { exact: true }).first();
+  await expect(emoji).toBeVisible();
+  await page.mouse.move(0, 0);
+
+  await capture(page, "callout-logo-picker", { ready: emoji, target: picker });
+});

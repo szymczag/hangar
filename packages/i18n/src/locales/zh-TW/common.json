@@ -120,8 +120,6 @@
   "general_settings": "一般設定",
   "sign_out": "登出",
   "signing_out": "登出中",
-  "active_cycles": "進行中的週期",
-  "active_cycles_description": "監控跨專案的週期、追蹤高優先順序工作事項，並關注需要注意的週期。",
   "on_demand_snapshots_of_all_your_cycles": "依需求檢視所有週期的快照",
   "upgrade": "升級",
   "10000_feet_view": "俯瞰所有進行中的週期。",

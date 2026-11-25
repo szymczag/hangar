@@ -5,11 +5,10 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertOctagon, AlertTriangle, Info } from "lucide-react";
 import useSWR from "swr";
+import { Banner, type BannerVariant } from "@makeplane/propel/components/banner";
+import { useTranslation } from "@plane/i18n";
 import { InstanceMaintenanceService } from "@plane/services";
-import { Banner } from "@plane/propel/banner";
-import { cn } from "@plane/utils";
 // helpers
 import {
   asMaintenanceNotice,
@@ -24,15 +23,12 @@ import {
 
 const service = new InstanceMaintenanceService();
 
-// The propel variants carry raw palette values under a standing TODO; the
-// severity is expressed here in the semantic tokens the rest of the app uses.
-const SEVERITY: Record<
-  TMaintenanceSeverity,
-  { variant: "info" | "warning" | "error"; surface: string; rule: string; icon: typeof Info }
-> = {
-  info: { variant: "info", surface: "bg-accent-subtle", rule: "border-l-accent-strong", icon: Info },
-  warning: { variant: "warning", surface: "bg-warning-subtle", rule: "border-l-warning-strong", icon: AlertTriangle },
-  critical: { variant: "error", surface: "bg-danger-subtle", rule: "border-l-danger-strong", icon: AlertOctagon },
+// Propel's page banner carries the severity: its surface, its foreground and
+// its default icon (information, warning triangle, warning circle).
+const SEVERITY: Record<TMaintenanceSeverity, BannerVariant> = {
+  info: "info",
+  warning: "warning",
+  critical: "danger",
 };
 
 /**
@@ -47,6 +43,7 @@ const SEVERITY: Record<
 export const MaintenanceBar = () => {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [recalled, setRecalled] = useState<TMaintenanceNotice | null>(null);
+  const { t } = useTranslation();
 
   // Read storage after mount: the server render has no window, and reading it
   // during render would make the first client paint disagree with the markup.
@@ -78,40 +75,38 @@ export const MaintenanceBar = () => {
 
   if (!notice || notice.fingerprint === dismissed) return null;
 
-  const { variant, surface, rule, icon: Icon } = SEVERITY[notice.severity];
   const window = formatMaintenanceWindow(notice);
 
   return (
-    <Banner
-      role="status"
-      aria-live="polite"
-      variant={variant}
-      dismissible
-      onDismiss={() => {
-        dismissMaintenanceNotice(notice.fingerprint);
-        setDismissed(notice.fingerprint);
-      }}
-      icon={<Icon className="size-4 shrink-0 text-secondary" aria-hidden="true" />}
-      title={
-        <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
-          <span className="line-clamp-3 text-13 leading-5 text-primary">{notice.message}</span>
-          {window && (
-            /* Tabular figures so the times line up and read as times rather
-               than as part of the sentence. */
-            <span className="font-mono shrink-0 text-11 text-tertiary tabular-nums">{window}</span>
-          )}
-        </span>
-      }
-      className={cn(
-        // The propel container is a fixed h-12 centred row; a message that
-        // wraps needs to grow, and to align to the top when it does.
-        // Per-side colours on purpose: `border-subtle` and the severity rule
-        // are the same tailwind-merge group, so a bare `border-<colour>` would
-        // repaint all four sides and lose the hairline under the strip.
-        "h-auto min-h-12 shrink-0 items-start gap-3 border-b border-l-[3px] border-b-subtle px-4 py-2.5 sm:px-6",
-        surface,
-        rule
-      )}
-    />
+    // The strip keeps the 1.4 bar's 48px. Propel's page banner is 46px for a
+    // one-line message, and two pixels less here would move every page under
+    // it. The grid stretches the banner to the wrapper's minimum height; a
+    // message that wraps still grows it.
+    <div className="grid min-h-12 shrink-0">
+      <Banner
+        placement="page"
+        variant={SEVERITY[notice.severity]}
+        // Polite whatever the severity. Propel announces warning and danger
+        // banners assertively, which suits an error the reader just caused, not
+        // a notice that is re-rendered every minute while they work.
+        role="status"
+        aria-live="polite"
+        title={
+          <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+            <span className="line-clamp-3">{notice.message}</span>
+            {window && (
+              /* Tabular figures so the times line up and read as times rather
+                 than as part of the sentence. */
+              <span className="font-mono shrink-0 text-11 text-tertiary tabular-nums">{window}</span>
+            )}
+          </span>
+        }
+        dismissLabel={t("dismiss")}
+        onDismiss={() => {
+          dismissMaintenanceNotice(notice.fingerprint);
+          setDismissed(notice.fingerprint);
+        }}
+      />
+    </div>
   );
 };

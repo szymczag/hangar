@@ -177,10 +177,6 @@
       "cta_primary": "创建第一个便签",
       "cta_secondary": "文档"
     },
-    "active_cycles": {
-      "title": "无活跃周期",
-      "description": "您目前没有任何正在进行的周期。包含今天日期的活跃周期将显示在此处。"
-    },
     "dashboard": {
       "title": "使用仪表板可视化您的进度",
       "description": "构建可自定义的仪表板以跟踪指标、衡量成果并有效呈现见解。",

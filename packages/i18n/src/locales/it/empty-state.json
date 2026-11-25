@@ -177,10 +177,6 @@
       "cta_primary": "Crea primo adesivo",
       "cta_secondary": "Documentazione"
     },
-    "active_cycles": {
-      "title": "Nessun ciclo attivo",
-      "description": "Al momento non hai cicli in corso. I cicli attivi appaiono qui quando includono la data odierna."
-    },
     "dashboard": {
       "title": "Visualizza i tuoi progressi con le dashboard",
       "description": "Crea dashboard personalizzabili per tracciare metriche, misurare risultati e presentare intuizioni in modo efficace.",

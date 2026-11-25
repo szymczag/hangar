@@ -30,6 +30,8 @@ export type VisualFixtures = {
   intake: { id: string; name: string };
   /** The seeded project pages, by id and name, the first with a little of everything. */
   pages: { ids: string[]; names: string[] };
+  /** The dark user's private page with one callout, and the text inside it. */
+  calloutPage: { id: string; text: string };
   /** The text the seeded sticky opens with. */
   sticky: string;
   /** The work item the light user's two (read) inbox notifications are about. */
