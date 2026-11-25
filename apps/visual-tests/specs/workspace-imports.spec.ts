@@ -151,6 +151,11 @@ test("the Todoist import review", async ({ asUser }) => {
   await expect(main.getByText("The due date could not be read.")).toBeVisible();
   await expect(main.getByText("Ada Lovelace")).toBeVisible();
 
-  const review = main.locator("section").filter({ has: heading }).last();
+  // `has` resolves inside each section, so the heading is named from the page,
+  // not from `main`: a locator chained off `main` matches nothing in there.
+  const review = main
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Import manifest" }) })
+    .last();
   await capture(page, "workspace-imports-review", { ready: heading, target: review });
 });
