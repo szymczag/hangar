@@ -7,7 +7,7 @@
 import type { ReactElement } from "react";
 // types
 import type { ICycle, IModule, IProjectView, IWorkspaceView } from "@plane/types";
-import type { TContextMenuItem } from "@plane/ui";
+import type { TContextMenuItem } from "@plane/blocks/context-menu";
 // hooks
 import { useQuickActionsFactory } from "@/components/common/quick-actions-factory";
 

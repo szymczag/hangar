@@ -5,7 +5,8 @@
  */
 
 import { useParams } from "next/navigation";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
+import type { SetToastProps } from "@plane/blocks/toast";
 import type { EIssuesStoreType, TIssue, TIssueGroupByOptions, TIssueOrderByOptions } from "@plane/types";
 import type { GroupDropLocation } from "@/components/issues/issue-layouts/utils";
 import { handleGroupDragDrop } from "@/components/issues/issue-layouts/utils";
@@ -64,8 +65,8 @@ export const useGroupIssuesDragNDrop = (
   ) => {
     // Fork (see FORK.md): the server explains a refused move, for example an
     // Epic that cannot take a parent. Say that instead of a generic failure.
-    const errorToast = (error: unknown) => ({
-      type: TOAST_TYPE.ERROR,
+    const errorToast = (error: unknown): SetToastProps => ({
+      type: "error",
       title: "Error!",
       message: getWorkItemErrorMessage(error, "Error while updating work item"),
     });
@@ -123,7 +124,7 @@ export const useGroupIssuesDragNDrop = (
     ).catch((err) => {
       setToast({
         title: "Error!",
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         message: getWorkItemErrorMessage(err, "Failed to perform this action"),
       });
     });

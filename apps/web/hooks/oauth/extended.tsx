@@ -9,7 +9,7 @@
 
 // plane imports
 import { useSearchParams } from "next/navigation";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyOutline, ShieldOutline } from "@makeplane/propel/icons";
 import { API_BASE_URL } from "@plane/constants";
 import type { TOAuthConfigs, TOAuthOption } from "@plane/types";
 // hooks
@@ -29,7 +29,7 @@ export const useExtendedOAuthConfig = (oauthActionText: string): TOAuthConfigs =
     {
       id: "oidc",
       text: `${oauthActionText} with ${oidcProviderName}`,
-      icon: <KeyRound className="h-[18px] w-[18px]" />,
+      icon: <KeyOutline className="size-[18px]" />,
       onClick: () => {
         const params = new URLSearchParams();
         if (nextPath) params.set("next_path", nextPath);
@@ -41,7 +41,7 @@ export const useExtendedOAuthConfig = (oauthActionText: string): TOAuthConfigs =
     {
       id: "saml",
       text: `${oauthActionText} with ${samlProviderName}`,
-      icon: <ShieldCheck className="h-[18px] w-[18px]" />,
+      icon: <ShieldOutline className="size-[18px]" />,
       onClick: () => {
         const params = new URLSearchParams();
         if (nextPath) params.set("next_path", nextPath);

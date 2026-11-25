@@ -5,15 +5,11 @@
  */
 
 import { lazy, Suspense } from "react";
-import { useTheme } from "next-themes";
 import { SWRConfig } from "swr";
 // Hangar Imports
 import { WEB_SWR_CONFIG } from "@plane/constants";
-import { PlaneToastProvider } from "@plane/blocks/toast";
 import { TranslationProvider } from "@plane/i18n";
-import { Toast } from "@plane/propel/toast";
-// helpers
-import { resolveGeneralTheme } from "@plane/utils";
+import { PlaneToastProvider } from "@plane/blocks/toast";
 // mobx store provider
 import { StoreProvider } from "@/lib/store-context";
 
@@ -36,19 +32,14 @@ export interface IAppProvider {
 
 export function AppProvider(props: IAppProvider) {
   const { children } = props;
-  // themes
-  const { resolvedTheme } = useTheme();
 
   return (
     <StoreProvider>
       <>
         <AppProgressBar />
         <TranslationProvider>
-          {/* Both toast APIs work while web moves to Propel in phases: the 1.4
-              `setToast` from @plane/propel/toast reaches <Toast>, the blocks one
-              reaches PlaneToastProvider (which calls `useTranslation`, so it
-              stays inside TranslationProvider). */}
-          <Toast theme={resolveGeneralTheme(resolvedTheme)} />
+          {/* The toast viewport is a provider that calls `useTranslation`, so it sits inside
+              TranslationProvider and wraps everything that can raise a toast. */}
           <PlaneToastProvider>
             <StoreWrapper>
               <InstanceWrapper>

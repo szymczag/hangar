@@ -5,7 +5,7 @@
  */
 
 import { observer } from "mobx-react";
-import { Check, Infinity as InfinityIcon } from "lucide-react";
+import { LoopOutline, TickOutline } from "@makeplane/propel/icons";
 // components
 import { SettingsHeading } from "@/components/settings/heading";
 
@@ -20,7 +20,7 @@ export const BillingRoot = observer(function BillingRoot() {
       <div className="mt-6 overflow-hidden rounded-lg border border-subtle bg-layer-2">
         <div className="flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-start sm:px-6 sm:py-7">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-accent-primary text-on-color">
-            <InfinityIcon className="size-7" aria-hidden="true" />
+            <LoopOutline className="size-7" />
           </div>
 
           <div className="max-w-2xl">
@@ -36,7 +36,7 @@ export const BillingRoot = observer(function BillingRoot() {
         <div className="grid divide-y divide-subtle border-t border-subtle bg-layer-1 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           {["No paid tiers", "No upgrade prompts", "Community maintained"].map((benefit) => (
             <div key={benefit} className="flex items-center gap-2 px-5 py-3 text-body-sm-medium text-primary sm:px-6">
-              <Check className="size-4 shrink-0 text-accent-primary" aria-hidden="true" />
+              <TickOutline className="size-4 text-accent-primary" />
               <span>{benefit}</span>
             </div>
           ))}

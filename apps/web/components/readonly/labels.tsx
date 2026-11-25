@@ -7,7 +7,7 @@
 import { useEffect } from "react";
 import { observer } from "mobx-react";
 // plane imports
-import { Tooltip } from "@plane/propel/tooltip";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { cn } from "@plane/utils";
 // hooks
 import { useLabel } from "@/hooks/store/use-label";
@@ -35,6 +35,7 @@ export const ReadonlyLabels = observer(function ReadonlyLabels(props: TReadonlyL
     if (projectId) {
       fetchProjectLabels(workspaceSlug?.toString(), projectId);
     }
+    // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps -- refetch only when the project changes
   }, [projectId, workspaceSlug]);
 
   return (
@@ -42,11 +43,9 @@ export const ReadonlyLabels = observer(function ReadonlyLabels(props: TReadonlyL
       {labels && (
         <>
           <Tooltip
-            position="top"
-            tooltipHeading="Labels"
-            tooltipContent={labels.map((l) => l?.name).join(", ")}
-            isMobile={isMobile}
-            disabled={labels.length === 0}
+            label={`Labels: ${labels.map((l) => l?.name).join(", ")}`}
+            layout="stacked"
+            disabled={labels.length === 0 || isMobile}
           >
             <div className="flex h-full items-center gap-1 rounded-sm py-1 text-body-xs-bold">
               <span className="h-2 w-2 flex-shrink-0 rounded-full bg-accent-primary" />

@@ -5,7 +5,7 @@
  */
 
 import { observer } from "mobx-react";
-import { ShieldCheck } from "lucide-react";
+import { ShieldOutline } from "@makeplane/propel/icons";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 // components
@@ -25,7 +25,7 @@ function NoPasswordNotice({ title, description }: { title: string; description: 
   return (
     <FormContainer>
       <div className="flex gap-3 rounded-md border border-subtle-1 bg-layer-2 p-4 text-13">
-        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-secondary" />
+        <ShieldOutline className="mt-0.5 size-4 shrink-0 text-secondary" />
         <div>
           <p className="font-medium text-primary">{title}</p>
           <p className="mt-1 leading-5 text-secondary">{description}</p>
