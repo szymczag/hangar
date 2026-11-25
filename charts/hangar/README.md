@@ -7,12 +7,11 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest stable chart is `0.4.0` (`appVersion: v0.4.0`). Release candidate
-`0.5.0-rc.1` is also published; Helm installs it only when you name its version.
-The release candidates `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3` and `0.4.0-rc.4` are
-superseded by it, and so are the release candidates `0.3.0-rc.1`,
+The latest stable chart is `0.5.0` (`appVersion: v0.5.0`). The release
+candidate `0.5.0-rc.1` is superseded by it, and so are the release candidates
+`0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3`, `0.4.0-rc.4`, `0.3.0-rc.1`,
 `0.3.0-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not install
-those, and upgrade an installation on any of them to `0.4.0`. The chart's evaluation profile is live-qualified on AMD64. The
+those, and upgrade an installation on any of them to `0.5.0`. The chart's evaluation profile is live-qualified on AMD64. The
 chart is qualified for evaluation only and is not yet supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
 
@@ -40,7 +39,7 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.4.0
+  --version 0.5.0
 ```
 
 Do not use `0.1.0-rc.1`, `0.1.0-rc.2`, `0.1.0-rc.20`, `0.1.0-rc.24`,
@@ -53,20 +52,28 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.4.0`, or name `0.5.0-rc.1` to test the release candidate. It adds no
-migration and no chart change; rolling back from `0.5.0-rc.1` to `0.4.0` needs
-no schema change and no values change, but brings back the "Upgrade" button on
-the active cycles page that links off the instance regardless of the external
-links switch, and the web app's work items, cycles, modules, views, pages and
-intake on the previous design. `0.4.0`'s license migration `0025` only adds the configuration row
+Use `0.5.0`. It adds no migration and no chart change compared with `0.4.0`.
+Its `api` image keeps worklog entries, which carry the logged time, from
+project guests in the profile activity feed and its export, the public API's
+activity list and detail, and work item notifications, and it refuses intake
+writes on a project whose intake is turned off or missing; through `/api/v1/`
+that now includes updating and deleting intake items while intake is turned
+off, which API clients may notice. `0.4.0` is the previous stable release and
+the supported rollback target; rolling back to it needs no schema change and
+no values change, but brings back the worklog entries for guests on those
+surfaces, the intake endpoint that answers 500 and leaves a stray work item,
+the "Upgrade" button on the active cycles page that links off the instance
+regardless of the external links switch, and the web app's work items, cycles,
+modules, views, pages and intake on the previous design. Rolling back further,
+to `0.3.0`, needs no schema change and no values change either.
+`0.4.0`'s license migration `0025` only adds the configuration row
 behind the God Mode switch "Members can invite to workspaces", which is off
 after an upgrade from `0.3.0`, so workspace members can no longer invite people
 until an operator turns it on. Its workers no longer log task arguments, which
 held password-reset tokens and sign-in codes up to `0.3.0`; logs written before
-the upgrade are not rewritten, so rotate or purge them. `0.3.0` is the previous
-stable release and the supported rollback target; rolling back to it needs no
-schema change and no values change, the row stays and `0.3.0` does not read it.
-The rollback brings back a public board API that names every project member,
+the upgrade are not rewritten, so rotate or purge them. Rolling back to
+`0.3.0`, the row stays and `0.3.0` does not read it.
+That rollback also brings back a public board API that names every project member,
 workspace members who can manage any pending invitation and the worker log of
 task arguments, and stops recording page versions. Rolling back further, to
 `0.2.2`, needs no schema change or values change either, but brings back the
@@ -163,8 +170,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.4.0` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.4.0)
+Release `0.5.0` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.5.0)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 

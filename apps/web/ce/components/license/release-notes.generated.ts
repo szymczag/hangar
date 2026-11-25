@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.5.0-rc.1",
+  version: "0.5.0",
   highlights: [
+    "Guests no longer see logged time in activity outside the work item.",
     "The active cycles page no longer links off the instance.",
-    "The new design brings in none of upstream's external services, and guests still see no worklogs.",
+    "The new design brings in none of upstream's external services, and keeps worklogs from guests.",
     "The web app's work items, cycles, modules, views, pages, analytics and intake move to the new upstream 1.5.0 design.",
     'Choosing "No estimate" now clears the estimate.',
-    "The create dialog shows a work item type's custom properties again.",
   ],
   upstream: {
     version: "1.4.3",
