@@ -21,7 +21,7 @@ import { PageHead } from "@/components/core/page-title";
 import { useInstance } from "@/hooks/store/use-instance";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
-import { CapacityService } from "@/services/capacity.service";
+import { CapacityService, type TPendingTrainingImport } from "@/services/capacity.service";
 import type { Route } from "./+types/page";
 import {
   errorMessage,
@@ -43,6 +43,49 @@ const SKIP_COPY: Record<string, string> = {
   trainer_not_in_project: "the trainer cannot be assigned work in that project",
   workshops_not_enabled: "that project no longer offers Workshops",
 };
+
+/** One recognized training: its selection box, name, trainers, time, length and answer. */
+function TrainingImportRow({
+  row,
+  selected,
+  onToggle,
+}: {
+  row: TPendingTrainingImport;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <tr className="border-t border-subtle">
+      <td className="px-3 py-3">
+        <Checkbox
+          aria-label={`Select ${row.title ?? "training"} with ${row.display_name}`}
+          checked={selected}
+          onCheckedChange={onToggle}
+        />
+      </td>
+      <th scope="row" className="px-3 py-3 font-medium">
+        {row.title ?? row.rule_label}
+      </th>
+      <td className="px-3 py-3">
+        {/* Every trainer on the training, with whoever has not
+            answered marked: importing takes all of them into one
+            Workshop, so the row has to say who "all" is. */}
+        {(row.trainers?.length
+          ? row.trainers
+          : [{ trainer_id: row.trainer_id, display_name: row.display_name, status: row.status }]
+        ).map((trainer) => (
+          <span key={trainer.trainer_id} className="block">
+            {trainer.display_name}
+            {trainer.status !== "confirmed" && <span className="ml-1 text-tertiary">· not answered</span>}
+          </span>
+        ))}
+      </td>
+      <td className="px-3 py-3">{formatDateTime(row.starts_at)}</td>
+      <td className="px-3 py-3">{Math.round((row.minutes / 60) * 10) / 10}h</td>
+      <td className="px-3 py-3">{row.status === "confirmed" ? "Accepted" : "Not answered yet"}</td>
+    </tr>
+  );
+}
 
 /**
  * Trainings that exist in the calendar but not yet as work items.
@@ -213,37 +256,12 @@ const CapacityImportsPage = observer(function CapacityImportsPage({ params }: Ro
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="border-t border-subtle">
-                      <td className="px-3 py-3">
-                        <Checkbox
-                          aria-label={`Select ${row.title ?? "training"} with ${row.display_name}`}
-                          checked={selected.has(row.id)}
-                          onCheckedChange={() => toggle(row.id)}
-                        />
-                      </td>
-                      <th scope="row" className="px-3 py-3 font-medium">
-                        {row.title ?? row.rule_label}
-                      </th>
-                      <td className="px-3 py-3">
-                        {/* Every trainer on the training, with whoever has not
-                            answered marked: importing takes all of them into one
-                            Workshop, so the row has to say who "all" is. */}
-                        {(row.trainers?.length
-                          ? row.trainers
-                          : [{ trainer_id: row.trainer_id, display_name: row.display_name, status: row.status }]
-                        ).map((trainer) => (
-                          <span key={trainer.trainer_id} className="block">
-                            {trainer.display_name}
-                            {trainer.status !== "confirmed" && (
-                              <span className="ml-1 text-tertiary">· not answered</span>
-                            )}
-                          </span>
-                        ))}
-                      </td>
-                      <td className="px-3 py-3">{formatDateTime(row.starts_at)}</td>
-                      <td className="px-3 py-3">{Math.round((row.minutes / 60) * 10) / 10}h</td>
-                      <td className="px-3 py-3">{row.status === "confirmed" ? "Accepted" : "Not answered yet"}</td>
-                    </tr>
+                    <TrainingImportRow
+                      key={row.id}
+                      row={row}
+                      selected={selected.has(row.id)}
+                      onToggle={() => toggle(row.id)}
+                    />
                   ))}
                   {rows.length === 0 && (
                     <tr>
