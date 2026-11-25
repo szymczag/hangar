@@ -177,7 +177,8 @@ test("the callout logo picker", async ({ asUser }) => {
   await expect(logo).toBeEnabled();
   await logo.click();
   const picker = page.getByRole("dialog").last();
-  const emoji = picker.getByRole("button", { name: "grinning face", exact: true }).first();
+  // An emoji cell is a gridcell named by its emojibase label.
+  const emoji = picker.getByLabel("Grinning face", { exact: true }).first();
   await expect(emoji).toBeVisible();
   await page.mouse.move(0, 0);
 
