@@ -4,64 +4,55 @@
  * See the LICENSE file for details.
  */
 
-// Fork (see FORK.md): filter work items by their custom type.
+// Fork (see FORK.md): filter sub-work items by their custom type.
 
-import { useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-// icons
-import { Shapes } from "lucide-react";
+// plane imports
+import { WorkItemsOutline } from "@makeplane/propel/icons";
+import { useTranslation } from "@plane/i18n";
 // components
-import { FilterHeader, FilterOption } from "@/components/issues/issue-layouts/filters";
+import { FilterSubmenu } from "@/components/common/filters/filter-submenu";
 // plane web
 import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
 
 type Props = {
   appliedFilters: string[] | null;
   handleUpdate: (val: string) => void;
-  searchQuery: string;
+  /** The parent work item's project, whose types are offered. */
+  projectId: string | undefined;
 };
 
+/**
+ * The "Work item type" row of a filters menu: one checkable value per active
+ * type of the project. Renders nothing while the project has none, as before.
+ */
 export const FilterIssueTypes = observer(function FilterIssueTypes(props: Props) {
-  const { appliedFilters, handleUpdate, searchQuery } = props;
-  // state
-  const [previewEnabled, setPreviewEnabled] = useState(true);
+  const { appliedFilters, handleUpdate, projectId } = props;
   // router
-  const { workspaceSlug, projectId } = useParams();
+  const { workspaceSlug } = useParams();
+  // plane hooks
+  const { t } = useTranslation();
   // data
-  const { issueTypes } = useIssueTypes(workspaceSlug?.toString(), projectId?.toString());
+  const { issueTypes } = useIssueTypes(workspaceSlug?.toString(), projectId);
   // derived values
-  const availableTypes = (issueTypes ?? []).filter((type) => type.is_active);
-  const filteredTypes = availableTypes.filter((type) => type.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const appliedFilterIds = new Set(appliedFilters ?? []);
-  const appliedFiltersCount = appliedFilters?.length ?? 0;
+  const options = (issueTypes ?? [])
+    .filter((type) => type.is_active)
+    .map((type) => ({
+      value: type.id,
+      label: type.name,
+      icon: <WorkItemsOutline className="h-3.5 w-3.5 text-tertiary" aria-hidden="true" />,
+    }));
 
-  if (availableTypes.length === 0) return null;
+  if (options.length === 0) return null;
 
   return (
-    <>
-      <FilterHeader
-        title={`Work item type${appliedFiltersCount > 0 ? ` (${appliedFiltersCount})` : ""}`}
-        isPreviewEnabled={previewEnabled}
-        handleIsPreviewEnabled={() => setPreviewEnabled(!previewEnabled)}
-      />
-      {previewEnabled && (
-        <div>
-          {filteredTypes.length > 0 ? (
-            filteredTypes.map((type) => (
-              <FilterOption
-                key={type.id}
-                isChecked={appliedFilterIds.has(type.id)}
-                onClick={() => handleUpdate(type.id)}
-                icon={<Shapes className="h-3 w-3 text-tertiary" />}
-                title={type.name}
-              />
-            ))
-          ) : (
-            <p className="text-11 text-tertiary italic">No matches found</p>
-          )}
-        </div>
-      )}
-    </>
+    <FilterSubmenu
+      label={t("issue.display.properties.issue_type")}
+      options={options}
+      appliedFilters={appliedFilters}
+      onToggle={handleUpdate}
+      searchable
+    />
   );
 });
