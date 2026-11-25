@@ -182,6 +182,19 @@ jobs:
       - name: Check the built web app
         run: pnpm test:web-build
 
+      # The live image installs production dependencies only, and no pull
+      # request check builds it. 0.6.0-rc.1 passed every check here and then
+      # crash-looped in the release qualification: the editor's server code
+      # reached @makeplane/propel, whose React is a dev and peer dependency.
+      # This repeats the image's prune and production install from the store
+      # filled above and resolves the built server's whole import graph in it.
+      # Always built, not --affected: a change to any package live reaches can
+      # break it.
+      - name: Check the live server against a production install
+        run: |
+          pnpm turbo run build --filter=live
+          pnpm test:live-build
+
       # Nothing had ever run either Storybook -- no workflow, no turbo task, no
       # chromatic -- which is why `packages/ui`'s could sit broken indefinitely,
       # importing a stylesheet that no longer existed. Repairing it without

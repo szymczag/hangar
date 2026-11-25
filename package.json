@@ -32,6 +32,7 @@
     "test:admin-build": "node --test apps/admin/tests/*.build.test.mjs",
     "test:space-build": "node --test apps/space/tests/*.build.test.mjs",
     "test:web-build": "node --test apps/web/tests/*.build.test.mjs",
+    "test:live-build": "node --test apps/live/tests/*.build.test.mjs",
     "check:lint": "turbo run check:lint",
     "check:format": "turbo run check:format",
     "check:types": "turbo run check:types",
