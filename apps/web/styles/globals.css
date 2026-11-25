@@ -6,7 +6,6 @@
 @import "@plane/tailwind-config/propel.css";
 @import "@plane/editor/styles";
 @import "./power-k.css";
-@import "./emoji.css";
 @plugin "@tailwindcss/typography";
 
 /* stickies and editor colors */
@@ -78,19 +77,6 @@
 /* backdrop filter */
 .backdrop-blur-custom {
   @apply backdrop-filter blur-[9px];
-}
-
-.epr-search-container > input {
-  @apply bg-surface-2! text-primary!;
-  border: none !important;
-}
-
-.epr-search-container > input::placeholder {
-  @apply text-placeholder!;
-}
-
-.epr-search-container > .epr-icn-search {
-  @apply text-placeholder!;
 }
 
 /* Lock icon animations */

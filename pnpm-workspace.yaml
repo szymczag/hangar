@@ -113,7 +113,6 @@ catalog:
   "dompurify": "3.4.17"
   "dotenv": "16.4.7"
   "effect": "3.22.4"
-  "emoji-picker-react": "^4.5.16"
   "emoji-regex": "^10.3.0"
   "export-to-csv": "^1.4.0"
   "express": "4.22.2"
