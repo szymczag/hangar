@@ -294,9 +294,6 @@ catalogs:
     effect:
       specifier: 3.22.4
       version: 3.22.4
-    emoji-picker-react:
-      specifier: ^4.5.16
-      version: 4.12.2
     emoji-regex:
       specifier: ^10.3.0
       version: 10.5.0
@@ -1152,9 +1149,6 @@ importers:
       date-fns:
         specifier: 'catalog:'
         version: 4.1.0
-      emoji-picker-react:
-        specifier: 'catalog:'
-        version: 4.12.2(react@19.2.8)
       export-to-csv:
         specifier: 'catalog:'
         version: 1.4.0
@@ -6240,12 +6234,6 @@ packages:
   element-resize-detector@1.2.4:
     resolution: {integrity: sha512-Fl5Ftk6WwXE0wqCgNoseKWndjzZlDCwuPTcoVZfCP9R3EHQF8qUtr3YUPNETegRBOKqQKPW3n4kiIWngGi8tKg==}
 
-  emoji-picker-react@4.12.2:
-    resolution: {integrity: sha512-6PDYZGlhidt+Kc0ay890IU4HLNfIR7/OxPvcNxw+nJ4HQhMKd8pnGnPn4n2vqC/arRFCNWQhgJP8rpsYKsz0GQ==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      react: '>=16'
-
   emoji-regex@10.5.0:
     resolution: {integrity: sha512-lb49vf1Xzfx080OKA0o6l8DQQpV+6Vg95zyCJX9VB/BqKYlhG7N4wgROUUHRA+ZPUefLnteQOad7z1kT2bV7bg==}
 
@@ -6502,9 +6490,6 @@ packages:
 
   fizzy-ui-utils@2.0.7:
     resolution: {integrity: sha512-CZXDVXQ1If3/r8s0T+v+qVeMshhfcuq0rqIFgJnrtd+Bu8GmDmqMjntjUePypVtjHXKJ6V4sw9zeyox34n9aCg==}
-
-  flairup@1.0.0:
-    resolution: {integrity: sha512-IKlE+pNvL2R+kVL1kEhUYqRxVqeFnjiIvHWDMLFXNaqyUdFXQM2wte44EfMYJNHkW16X991t2Zg8apKkhv7OBA==}
 
   flow-parser@0.293.0:
     resolution: {integrity: sha512-8tEGAcWpCqioajiSqrJr2+JSmkEI2vO/UACFGG378RO106ez9xugVxe9EpXD3aI1Vbf+mEUGhMt0gMpveJwVGA==}
@@ -12845,11 +12830,6 @@ snapshots:
     dependencies:
       batch-processor: 1.0.0
 
-  emoji-picker-react@4.12.2(react@19.2.8):
-    dependencies:
-      flairup: 1.0.0
-      react: 19.2.8
-
   emoji-regex@10.5.0: {}
 
   emoji-regex@10.6.0: {}
@@ -13151,8 +13131,6 @@ snapshots:
   fizzy-ui-utils@2.0.7:
     dependencies:
       desandro-matches-selector: 2.0.2
-
-  flairup@1.0.0: {}
 
   flow-parser@0.293.0: {}
 

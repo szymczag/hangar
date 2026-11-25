@@ -6,7 +6,6 @@
 @import "@plane/tailwind-config/propel.css";
 @import "@plane/editor/styles";
 @import "./power-k.css";
-@import "./emoji.css";
 @plugin "@tailwindcss/typography";
 
 /* stickies and editor colors */
@@ -56,41 +55,12 @@
 }
 /* end background colors */
 
-/* Hangar: Popper-backed menus (Headless UI with react-popper, as @plane/ui
-   draws them) leave their trigger's stacking context when portaled. Keep
-   hit-testing on the floating content instead of an enclosing peek view or
-   modal: above every application dialog (capped at z-index 100), below global
-   notifications (z-index 1000). `!important` intentionally overrides legacy
-   local z-* utilities. Carried over from index.css, which propel.css replaces. */
-:root {
-  --z-index-floating-overlay: 110;
-}
-
-@layer base {
-  [data-popper-placement] {
-    z-index: var(--z-index-floating-overlay) !important;
-  }
-}
-
 .shadow-custom {
   box-shadow: 2px 2px 8px 2px rgba(234, 231, 250, 0.3); /* Convert #EAE7FA4D to rgba */
 }
 /* backdrop filter */
 .backdrop-blur-custom {
   @apply backdrop-filter blur-[9px];
-}
-
-.epr-search-container > input {
-  @apply bg-surface-2! text-primary!;
-  border: none !important;
-}
-
-.epr-search-container > input::placeholder {
-  @apply text-placeholder!;
-}
-
-.epr-search-container > .epr-icn-search {
-  @apply text-placeholder!;
 }
 
 /* Lock icon animations */

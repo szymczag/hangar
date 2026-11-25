@@ -104,6 +104,10 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: plane.settings.production
       DEBUG: "0"
+      # The opt-in seed_visual_fixtures requires. The seed gives its users a
+      # published password, so the command refuses to run anywhere this is not
+      # set -- and this disposable stack is the only place that sets it.
+      HANGAR_VISUAL_FIXTURES: "1"
       POSTGRES_HOST: vr-db
       DATABASE_URL: postgresql://${POSTGRES_USER:-plane}:${POSTGRES_PASSWORD:-plane}@vr-db:5432/${POSTGRES_DB:-plane}
       REDIS_HOST: vr-redis
