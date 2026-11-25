@@ -171,7 +171,11 @@ test("the callout logo picker", async ({ asUser }) => {
   const callout = main.locator(".editor-callout-component", { hasText: seed.calloutPage.text }).first();
   await expect(callout).toBeVisible();
 
-  await callout.locator("button").first().click();
+  // The picker's trigger is disabled until the collaborative session makes the
+  // editor editable, and a click on it before then opens nothing.
+  const logo = callout.getByRole("button").first();
+  await expect(logo).toBeEnabled();
+  await logo.click();
   const picker = page.getByRole("dialog").last();
   const emoji = picker.getByRole("button", { name: "grinning face", exact: true }).first();
   await expect(emoji).toBeVisible();
