@@ -9,9 +9,10 @@
  *
  * The same holds for every other wordmark on a theme surface: the invitations
  * and create-workspace pages, the "not a member" workspace list, the instance
- * not-ready view, the product updates footer button, and the space app's
- * failure page (over the theme's own pattern) and signed-in page. The tour's
- * welcome card keeps the white artwork: it sits on the fixed accent fill.
+ * not-ready view, and the space app's failure page (over the theme's own
+ * pattern) and signed-in page. The product updates footer had one too, until
+ * phase 9 removed that unused dialog. The tour's welcome card keeps the white
+ * artwork: it sits on the fixed accent fill.
  */
 
 import assert from "node:assert/strict";
@@ -29,7 +30,6 @@ const SURFACES = [
   "apps/web/app/(all)/create-workspace/page.tsx",
   "apps/web/layouts/auth-layout/workspace-wrapper.tsx",
   "apps/web/components/instance/not-ready-view.tsx",
-  "apps/web/components/global/product-updates/footer.tsx",
   "apps/space/lib/instance-provider.tsx",
   "apps/space/components/account/user-logged-in.tsx",
 ];
