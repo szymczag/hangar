@@ -5,10 +5,10 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertOctagon, AlertTriangle, Info } from "lucide-react";
 import useSWR from "swr";
+import { Banner } from "@makeplane/propel/components/banner";
+import { AlertOctagonOutline, InfoOutline, WarningTriangleOutline } from "@makeplane/propel/icons";
 import { InstanceMaintenanceService } from "@plane/services";
-import { Banner } from "@plane/propel/banner";
 import { cn } from "@plane/utils";
 // helpers
 import {
@@ -24,15 +24,16 @@ import {
 
 const service = new InstanceMaintenanceService();
 
-// The propel variants carry raw palette values under a standing TODO; the
-// severity is expressed here in the semantic tokens the rest of the app uses.
+// The Propel variant carries the surface (accent, warning or danger subtle, as
+// before); the severity rule down the leading edge is Hangar's own, drawn by the
+// wrapper because the banner takes no class names.
 const SEVERITY: Record<
   TMaintenanceSeverity,
-  { variant: "info" | "warning" | "error"; surface: string; rule: string; icon: typeof Info }
+  { variant: "accent" | "warning" | "danger"; rule: string; icon: typeof InfoOutline }
 > = {
-  info: { variant: "info", surface: "bg-accent-subtle", rule: "border-l-accent-strong", icon: Info },
-  warning: { variant: "warning", surface: "bg-warning-subtle", rule: "border-l-warning-strong", icon: AlertTriangle },
-  critical: { variant: "error", surface: "bg-danger-subtle", rule: "border-l-danger-strong", icon: AlertOctagon },
+  info: { variant: "accent", rule: "border-l-accent-strong", icon: InfoOutline },
+  warning: { variant: "warning", rule: "border-l-warning-strong", icon: WarningTriangleOutline },
+  critical: { variant: "danger", rule: "border-l-danger-strong", icon: AlertOctagonOutline },
 };
 
 /**
@@ -78,40 +79,37 @@ export const MaintenanceBar = () => {
 
   if (!notice || notice.fingerprint === dismissed) return null;
 
-  const { variant, surface, rule, icon: Icon } = SEVERITY[notice.severity];
+  const { variant, rule, icon: Icon } = SEVERITY[notice.severity];
   const window = formatMaintenanceWindow(notice);
 
   return (
-    <Banner
-      role="status"
-      aria-live="polite"
-      variant={variant}
-      dismissible
-      onDismiss={() => {
-        dismissMaintenanceNotice(notice.fingerprint);
-        setDismissed(notice.fingerprint);
-      }}
-      icon={<Icon className="size-4 shrink-0 text-secondary" aria-hidden="true" />}
-      title={
-        <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
-          <span className="line-clamp-3 text-13 leading-5 text-primary">{notice.message}</span>
-          {window && (
-            /* Tabular figures so the times line up and read as times rather
-               than as part of the sentence. */
-            <span className="font-mono shrink-0 text-11 text-tertiary tabular-nums">{window}</span>
-          )}
-        </span>
-      }
-      className={cn(
-        // The propel container is a fixed h-12 centred row; a message that
-        // wraps needs to grow, and to align to the top when it does.
-        // Per-side colours on purpose: `border-subtle` and the severity rule
-        // are the same tailwind-merge group, so a bare `border-<colour>` would
-        // repaint all four sides and lose the hairline under the strip.
-        "h-auto min-h-12 shrink-0 items-start gap-3 border-b border-l-[3px] border-b-subtle px-4 py-2.5 sm:px-6",
-        surface,
-        rule
-      )}
-    />
+    // The page banner draws its own hairline underneath; the wrapper adds only
+    // the severity rule down the leading edge.
+    <div className={cn("shrink-0 border-l-[3px]", rule)}>
+      <Banner
+        // The variant would make a warning or a critical notice an `alert`; this
+        // is an announcement read when convenient, so it stays a polite status.
+        role="status"
+        aria-live="polite"
+        placement="page"
+        variant={variant}
+        dismissLabel="Dismiss banner"
+        onDismiss={() => {
+          dismissMaintenanceNotice(notice.fingerprint);
+          setDismissed(notice.fingerprint);
+        }}
+        icon={<Icon className="size-4 shrink-0 text-secondary" aria-hidden="true" />}
+        title={
+          <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+            <span className="line-clamp-3 text-13 leading-5 text-primary">{notice.message}</span>
+            {window && (
+              /* Tabular figures so the times line up and read as times rather
+                 than as part of the sentence. */
+              <span className="font-mono shrink-0 text-11 text-tertiary tabular-nums">{window}</span>
+            )}
+          </span>
+        }
+      />
+    </div>
   );
 };

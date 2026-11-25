@@ -7,9 +7,10 @@
 import { TZDate } from "@date-fns/tz";
 import { useViewerTimezone } from "../shared/viewer-timezone";
 import { useMemo, useState } from "react";
-import { CalendarClock, CircleAlert } from "lucide-react";
-import { Button } from "@plane/propel/button";
-import { Spinner } from "@plane/ui";
+import { Button } from "@makeplane/propel/components/button";
+import { TextButton } from "@makeplane/propel/components/text-button";
+import { AlertCircleOutline, CalendarOutline } from "@makeplane/propel/icons";
+import { Spinner } from "@plane/blocks/spinner";
 import type { TCapacityInterval, TTrainerCapacity, TTrainerProfile } from "@/services/capacity.service";
 import {
   availableRanges,
@@ -116,7 +117,7 @@ export function CapacityLedger({
       <div className="flex flex-col justify-between gap-4 border-b border-subtle px-5 py-5 md:flex-row md:items-end">
         <div>
           <div className="mb-2 flex items-center gap-2 text-11 font-semibold tracking-[0.16em] text-placeholder uppercase">
-            <CalendarClock className="size-3.5" /> Capacity ledger
+            <CalendarOutline className="size-3.5" /> Capacity ledger
           </div>
           <h1 className="text-xl font-semibold text-primary">Find a trainer and time.</h1>
           <p className="mt-1 max-w-2xl text-body-sm-regular text-secondary">
@@ -125,9 +126,14 @@ export function CapacityLedger({
         </div>
         <div className="flex items-center gap-2">
           {becomeTrainer && !hasActiveProfile ? (
-            <Button variant="primary" size="sm" loading={becomeTrainer.busy} onClick={becomeTrainer.onClick}>
-              {ownProfile ? "Reactivate trainer" : "Become a trainer"}
-            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              loading={becomeTrainer.busy}
+              onClick={becomeTrainer.onClick}
+              label={ownProfile ? "Reactivate trainer" : "Become a trainer"}
+            />
           ) : null}
           <WeekStepper weekStart={weekStart} weekEnd={weekEnd} onChange={setWeekStart} />
         </div>
@@ -138,12 +144,10 @@ export function CapacityLedger({
         </div>
       ) : capacityError && !capacity ? (
         <div role="alert" className="flex min-h-56 flex-col items-center justify-center gap-2 px-5 text-center">
-          <CircleAlert className="size-6 text-danger-primary" />
+          <AlertCircleOutline className="size-6 text-danger-primary" />
           <h2 className="text-body-sm-medium">Capacity could not be loaded</h2>
           <p className="text-body-xs-regular text-secondary">{errorMessage(capacityError, "Try again shortly.")}</p>
-          <Button variant="secondary" size="sm" onClick={() => refreshCapacity()}>
-            Retry
-          </Button>
+          <Button variant="secondary" size="md" stretch="auto" onClick={() => refreshCapacity()} label="Retry" />
         </div>
       ) : capacity?.trainers.length ? (
         <div>
@@ -188,18 +192,19 @@ export function CapacityLedger({
                     {metrics.holdMinutes ? <span>Holds {formatMinutes(metrics.holdMinutes)}</span> : null}
                     {metrics.conflicts.length ? (
                       <span className="inline-flex items-center gap-1 text-danger-primary">
-                        <CircleAlert className="size-3" /> {metrics.conflicts.length} conflict
+                        <AlertCircleOutline className="size-3" /> {metrics.conflicts.length} conflict
                         {metrics.conflicts.length === 1 ? "" : "s"}
                       </span>
                     ) : null}
                     {isAdmin || trainer.trainer_id === ownProfile?.user_id ? (
-                      <button
-                        type="button"
-                        className="ml-auto text-accent-primary"
-                        onClick={() => onManageSchedule(trainer.trainer_id)}
-                      >
-                        Manage schedule
-                      </button>
+                      <span className="ml-auto">
+                        <TextButton
+                          variant="primary"
+                          size="md"
+                          onClick={() => onManageSchedule(trainer.trainer_id)}
+                          label="Manage schedule"
+                        />
+                      </span>
                     ) : null}
                   </div>
                 </article>
@@ -263,18 +268,19 @@ export function CapacityLedger({
                         <div className="text-11 text-placeholder">of {formatMinutes(metrics.workingMinutes)} free</div>
                         {metrics.conflicts.length ? (
                           <div className="mt-1 inline-flex items-center gap-1 text-11 text-danger-primary">
-                            <CircleAlert className="size-3" /> {metrics.conflicts.length} conflict
+                            <AlertCircleOutline className="size-3" /> {metrics.conflicts.length} conflict
                             {metrics.conflicts.length === 1 ? "" : "s"}
                           </div>
                         ) : null}
                         {isAdmin || trainer.trainer_id === ownProfile?.user_id ? (
-                          <button
-                            type="button"
-                            className="mt-2 text-11 text-accent-primary"
-                            onClick={() => onManageSchedule(trainer.trainer_id)}
-                          >
-                            Manage schedule
-                          </button>
+                          <div className="mt-2">
+                            <TextButton
+                              variant="primary"
+                              size="md"
+                              onClick={() => onManageSchedule(trainer.trainer_id)}
+                              label="Manage schedule"
+                            />
+                          </div>
                         ) : null}
                       </div>
                     </article>
@@ -308,15 +314,20 @@ export function CapacityLedger({
         </div>
       ) : (
         <div className="flex min-h-56 flex-col items-center justify-center gap-3 px-5 text-center">
-          <CalendarClock className="size-8 text-placeholder" />
+          <CalendarOutline className="size-8 text-placeholder" />
           <div>
             <h2 className="text-body-sm-medium">No trainers yet</h2>
             <p className="mt-1 text-body-xs-regular text-secondary">Opt in to start the workspace capacity ledger.</p>
           </div>
           {becomeTrainer && !hasActiveProfile ? (
-            <Button variant="primary" loading={becomeTrainer.busy} onClick={becomeTrainer.onClick}>
-              {ownProfile ? "Reactivate trainer" : "Become a trainer"}
-            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              loading={becomeTrainer.busy}
+              onClick={becomeTrainer.onClick}
+              label={ownProfile ? "Reactivate trainer" : "Become a trainer"}
+            />
           ) : null}
         </div>
       )}
@@ -325,25 +336,25 @@ export function CapacityLedger({
           <Button
             variant="secondary"
             size="sm"
+            stretch="auto"
             disabled={cursorHistory.length === 0}
             onClick={() => {
               setTrainerCursor(cursorHistory[cursorHistory.length - 1]);
               setCursorHistory((current) => current.slice(0, -1));
             }}
-          >
-            Previous trainers
-          </Button>
+            label="Previous trainers"
+          />
           <Button
             variant="secondary"
             size="sm"
+            stretch="auto"
             disabled={!trainerPage?.next_cursor}
             onClick={() => {
               setCursorHistory((current) => [...current, trainerCursor]);
               setTrainerCursor(trainerPage?.next_cursor ?? undefined);
             }}
-          >
-            Next trainers
-          </Button>
+            label="Next trainers"
+          />
         </div>
       )}
     </section>

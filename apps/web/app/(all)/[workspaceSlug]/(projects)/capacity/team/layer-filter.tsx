@@ -4,7 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
+import { Checkbox } from "@makeplane/propel/components/checkbox";
 import type { TCapacityInterval } from "@/services/capacity.service";
 import {
   ALL_CAPACITY_LAYERS,
@@ -40,27 +41,25 @@ export function LayerFilter({ layers, onChange }: Props) {
       <Button
         variant={onlyTraining ? "primary" : "secondary"}
         size="sm"
+        stretch="auto"
         aria-pressed={onlyTraining}
         onClick={() => onChange(onlyTraining ? new Set(ALL_CAPACITY_LAYERS) : new Set(ONLY_TRAINING_LAYERS))}
-      >
-        Only training
-      </Button>
+        label="Only training"
+      />
       <span aria-hidden="true" className="bg-subtle h-4 w-px" />
       {CAPACITY_INTERVAL_LAYERS.filter((kind) => kind !== "working").map((kind) => (
-        <label key={kind} className="flex items-center gap-1.5 text-body-xs-regular text-secondary">
-          <input
-            type="checkbox"
-            checked={layers.has(kind)}
-            onChange={() => {
-              const next = new Set(layers);
-              if (next.has(kind)) next.delete(kind);
-              else next.add(kind);
-              next.add("working");
-              onChange(next);
-            }}
-          />
-          {CAPACITY_LAYER_LABELS[kind]}
-        </label>
+        <Checkbox
+          key={kind}
+          label={CAPACITY_LAYER_LABELS[kind]}
+          checked={layers.has(kind)}
+          onCheckedChange={() => {
+            const next = new Set(layers);
+            if (next.has(kind)) next.delete(kind);
+            else next.add(kind);
+            next.add("working");
+            onChange(next);
+          }}
+        />
       ))}
     </div>
   );

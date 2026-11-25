@@ -12,7 +12,7 @@ import React, { useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 // plane imports
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { TIssuePropertyValues } from "@plane/types";
 // plane web
 import { PropertyValueInput } from "@/plane-web/components/issues/issue-properties/property-value-input";
@@ -55,7 +55,7 @@ export const WorkItemAdditionalSidebarProperties = observer(function WorkItemAdd
     } catch (error) {
       console.error(error);
       await mutate(previous, { revalidate: false });
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to update the property." });
+      setToast({ type: "error", title: "Error!", message: "Failed to update the property." });
     } finally {
       setIsSaving(false);
     }

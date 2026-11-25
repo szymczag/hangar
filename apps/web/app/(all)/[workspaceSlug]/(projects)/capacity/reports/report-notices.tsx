@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { AlertTriangle } from "lucide-react";
+import { WarningTriangleOutline } from "@makeplane/propel/icons";
 import type { TTrainingReport } from "@/services/capacity.service";
 import { errorMessage, formatDate } from "../shared/capacity-format.utils";
 
@@ -25,7 +25,7 @@ function Notice({ children }: { children: React.ReactNode }) {
       role="status"
       className="flex items-start gap-2 rounded-lg border border-subtle bg-surface-1 p-3 text-body-xs-regular text-secondary"
     >
-      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-primary" />
+      <WarningTriangleOutline className="mt-0.5 size-4 shrink-0 text-warning-primary" />
       <span>{children}</span>
     </p>
   );

@@ -6,11 +6,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
-import { FileText } from "lucide-react";
+import { Button } from "@makeplane/propel/components/button";
+import { SelectField } from "@makeplane/propel/components/select-field";
+import { TextButton } from "@makeplane/propel/components/text-button";
+import { FileOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { CustomSelect } from "@plane/ui";
 import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
 import { importService } from "@/plane-web/services/import.service";
@@ -94,7 +95,7 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
     } catch (error) {
       if (controller.signal.aborted) return;
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("workspace_settings.settings.todoist_import.preview_error"),
         message: errorMessage(error, t("workspace_settings.settings.todoist_import.request_failed")),
       });
@@ -127,13 +128,13 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
       resetPreview();
       setRetryJobId(null);
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: t("workspace_settings.settings.todoist_import.queued_title"),
         message: t("workspace_settings.settings.todoist_import.queued_message"),
       });
     } catch (error) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: t("workspace_settings.settings.todoist_import.start_error"),
         message: errorMessage(error, t("workspace_settings.settings.todoist_import.request_failed")),
       });
@@ -159,7 +160,7 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
 
   return (
     <div className="flex flex-col gap-8 pb-12">
-      <section className="overflow-hidden rounded-xl border border-subtle bg-layer-1">
+      <section className="overflow-hidden rounded-lg border border-subtle bg-layer-1">
         <div className="bg-subtle grid gap-px md:grid-cols-3">
           {[
             [
@@ -189,47 +190,39 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
         </div>
 
         <div className="flex flex-col gap-5 p-5 md:p-6">
-          <label className="flex flex-col gap-2 text-body-sm-medium text-primary">
-            {t("workspace_settings.settings.todoist_import.destination_project")}
-            <CustomSelect
-              value={projectId}
-              onChange={(value: string) => {
-                setProjectId(value);
-                setRetryJobId(null);
-                resetPreview();
-              }}
-              label={
-                projectOptions.find((option) => option.value === projectId)?.label ??
-                t("workspace_settings.settings.todoist_import.select_project")
-              }
-              buttonClassName="w-full justify-between border border-subtle px-3 py-2.5 text-left"
-            >
-              {projectOptions.map((option) => (
-                <CustomSelect.Option key={option.value} value={option.value}>
-                  {option.label}
-                </CustomSelect.Option>
-              ))}
-            </CustomSelect>
-          </label>
+          <SelectField<string>
+            label={t("workspace_settings.settings.todoist_import.destination_project")}
+            size="lg"
+            placeholder={t("workspace_settings.settings.todoist_import.select_project")}
+            options={projectOptions}
+            value={projectId}
+            onValueChange={(value) => {
+              if (!value) return;
+              setProjectId(value);
+              setRetryJobId(null);
+              resetPreview();
+            }}
+          />
 
           {retryJobId && (
             <div className="rounded-lg border border-subtle bg-layer-2 p-3 text-body-xs-regular text-secondary">
               {t("workspace_settings.settings.todoist_import.retrying_job")} {retryJobId.slice(0, 8)}.{" "}
               {t("workspace_settings.settings.todoist_import.retry_help")}
-              <button
-                type="button"
-                className="ml-2 text-body-xs-medium text-accent-primary hover:underline"
-                onClick={() => setRetryJobId(null)}
-              >
-                {t("workspace_settings.settings.todoist_import.cancel_retry")}
-              </button>
+              <span className="ml-2 inline-flex">
+                <TextButton
+                  variant="primary"
+                  size="md"
+                  label={t("workspace_settings.settings.todoist_import.cancel_retry")}
+                  onClick={() => setRetryJobId(null)}
+                />
+              </span>
             </div>
           )}
 
           <label className="flex flex-col gap-2 text-body-sm-medium text-primary">
             {t("workspace_settings.settings.todoist_import.csv_file")}
             <span className="flex min-h-24 cursor-pointer items-center gap-4 rounded-lg border border-dashed border-subtle bg-layer-2 px-4 py-5 transition-colors focus-within:border-accent-strong hover:border-strong">
-              <FileText className="size-6 shrink-0 text-tertiary" />
+              <FileOutline className="size-6 shrink-0 text-tertiary" />
               <span className="min-w-0">
                 <span className="block truncate text-body-sm-medium text-primary">
                   {file?.name ?? t("workspace_settings.settings.todoist_import.choose_csv")}
@@ -256,13 +249,15 @@ export const TodoistImport = observer(function TodoistImport({ workspaceSlug }: 
               <Button
                 variant="primary"
                 size="lg"
+                stretch="auto"
                 disabled={!projectId || !file || isSubmitting}
-                onClick={handlePreview}
-              >
-                {isSubmitting
-                  ? t("workspace_settings.settings.todoist_import.previewing")
-                  : t("workspace_settings.settings.todoist_import.preview")}
-              </Button>
+                onClick={() => void handlePreview()}
+                label={
+                  isSubmitting
+                    ? t("workspace_settings.settings.todoist_import.previewing")
+                    : t("workspace_settings.settings.todoist_import.preview")
+                }
+              />
             </div>
           )}
         </div>

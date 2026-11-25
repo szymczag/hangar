@@ -4,58 +4,46 @@
  * See the LICENSE file for details.
  */
 
-import { CarFront, Clock3, Timer, Trash2 } from "lucide-react";
-import { Button } from "@plane/propel/button";
+import type { ComponentType } from "react";
+import { Checkbox } from "@makeplane/propel/components/checkbox";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { ClockOutline, DeleteOutline, HourglassOutline, PinOutline } from "@makeplane/propel/icons";
 import { useMember } from "@/hooks/store/use-member";
 import { CalendarSyncBadges } from "./calendar-sync-badges";
 import { blockedSpan, type TEditableSession } from "./helper";
 
-const FIELD =
-  "h-8 w-full min-w-0 rounded-sm border border-subtle bg-surface-1 px-2 text-body-xs-regular focus:border-accent-primary";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex min-w-0 flex-col gap-1">
-      <span className="text-11 text-tertiary">{label}</span>
-      {children}
-    </label>
-  );
-}
-
 function Minutes({
   label,
-  icon: Icon,
+  icon,
   value,
   disabled,
   onChange,
   ariaLabel,
 }: {
   label: string;
-  icon: typeof Timer;
+  icon: ComponentType<{ className?: string }>;
   value: number;
   disabled: boolean;
   onChange: (value: number) => void;
   ariaLabel: string;
 }) {
   return (
-    <Field label={label}>
-      <div className="relative">
-        <Icon className="pointer-events-none absolute inset-y-0 left-2 my-auto size-3.5 text-tertiary" />
-        <input
-          aria-label={ariaLabel}
-          type="number"
-          min={0}
-          max={1440}
-          value={value}
-          disabled={disabled}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className={`${FIELD} pr-9 pl-7`}
-        />
-        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-11 text-placeholder">
-          min
-        </span>
-      </div>
-    </Field>
+    <InputField
+      size="md"
+      orientation="vertical"
+      label={label}
+      aria-label={ariaLabel}
+      type="number"
+      min={0}
+      max={1440}
+      value={value}
+      disabled={disabled}
+      onChange={(event) => onChange(Number(event.target.value))}
+      startIcon={<Icon icon={icon} />}
+      endIcon={<span className="text-11 text-placeholder">min</span>}
+    />
   );
 }
 
@@ -101,35 +89,39 @@ export function WorkshopSessionRow({
           Session {index + 1} of {total}
         </span>
         {!disabled && total > 1 ? (
-          <Button variant="ghost" size="sm" aria-label={`Remove session ${index + 1}`} onClick={onRemove}>
-            <Trash2 className="size-3.5" />
-          </Button>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            icon={<Icon icon={DeleteOutline} />}
+            aria-label={`Remove session ${index + 1}`}
+            onClick={onRemove}
+          />
         ) : null}
       </div>
 
       <CalendarSyncBadges states={session.calendar_sync} nameFor={trainerName} />
 
       <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
-        <Field label="Starts">
-          <input
-            aria-label={`Session ${index + 1} starts in ${timezone}`}
-            type="datetime-local"
-            value={session.starts_at}
-            disabled={disabled}
-            onChange={(event) => onChange({ starts_at: event.target.value })}
-            className={FIELD}
-          />
-        </Field>
-        <Field label="Ends">
-          <input
-            aria-label={`Session ${index + 1} ends in ${timezone}`}
-            type="datetime-local"
-            value={session.ends_at}
-            disabled={disabled}
-            onChange={(event) => onChange({ ends_at: event.target.value })}
-            className={FIELD}
-          />
-        </Field>
+        <InputField
+          size="md"
+          orientation="vertical"
+          label="Starts"
+          aria-label={`Session ${index + 1} starts in ${timezone}`}
+          type="datetime-local"
+          value={session.starts_at}
+          disabled={disabled}
+          onChange={(event) => onChange({ starts_at: event.target.value })}
+        />
+        <InputField
+          size="md"
+          orientation="vertical"
+          label="Ends"
+          aria-label={`Session ${index + 1} ends in ${timezone}`}
+          type="datetime-local"
+          value={session.ends_at}
+          disabled={disabled}
+          onChange={(event) => onChange({ ends_at: event.target.value })}
+        />
       </div>
 
       {/* Buffers in their own row of three. Five fields in one two-column grid
@@ -141,7 +133,7 @@ export function WorkshopSessionRow({
       <div className="mt-3 grid grid-cols-1 gap-3 @sm:grid-cols-3">
         <Minutes
           label="Preparation"
-          icon={Timer}
+          icon={HourglassOutline}
           value={session.preparation_minutes}
           disabled={disabled}
           ariaLabel={`Session ${index + 1} preparation in minutes`}
@@ -149,7 +141,7 @@ export function WorkshopSessionRow({
         />
         <Minutes
           label="Travel before"
-          icon={CarFront}
+          icon={PinOutline}
           value={session.travel_before_minutes}
           disabled={disabled}
           ariaLabel={`Session ${index + 1} travel before in minutes`}
@@ -157,7 +149,7 @@ export function WorkshopSessionRow({
         />
         <Minutes
           label="Travel after"
-          icon={CarFront}
+          icon={PinOutline}
           value={session.travel_after_minutes}
           disabled={disabled}
           ariaLabel={`Session ${index + 1} travel after in minutes`}
@@ -173,24 +165,22 @@ export function WorkshopSessionRow({
               const trainer = getUserDetails(trainerId);
               const checked = session.trainer_ids.includes(trainerId);
               return (
-                <label key={trainerId} className="flex min-w-0 items-center gap-2 text-body-xs-regular text-secondary">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    // The last trainer cannot be unchecked: a session with nobody
-                    // on it is refused by the endpoint, and the refusal reads as a
-                    // save failure rather than as this.
-                    disabled={disabled || (checked && session.trainer_ids.length === 1)}
-                    onChange={() =>
-                      onChange({
-                        trainer_ids: checked
-                          ? session.trainer_ids.filter((id) => id !== trainerId)
-                          : [...session.trainer_ids, trainerId],
-                      })
-                    }
-                  />
-                  <span className="truncate">{trainer?.display_name ?? trainer?.email ?? "Trainer"}</span>
-                </label>
+                <Checkbox
+                  key={trainerId}
+                  label={trainer?.display_name ?? trainer?.email ?? "Trainer"}
+                  checked={checked}
+                  // The last trainer cannot be unchecked: a session with nobody
+                  // on it is refused by the endpoint, and the refusal reads as a
+                  // save failure rather than as this.
+                  disabled={disabled || (checked && session.trainer_ids.length === 1)}
+                  onCheckedChange={() =>
+                    onChange({
+                      trainer_ids: checked
+                        ? session.trainer_ids.filter((id) => id !== trainerId)
+                        : [...session.trainer_ids, trainerId],
+                    })
+                  }
+                />
               );
             })}
             {!assigneeIds.length ? (
@@ -200,7 +190,7 @@ export function WorkshopSessionRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 text-11 text-tertiary">
-          <Clock3 className="size-3.5 shrink-0" />
+          <ClockOutline className="size-3.5 shrink-0" />
           {span ? (
             <span>
               Blocks {span.from.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} –{" "}

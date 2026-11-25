@@ -8,12 +8,23 @@ import { useViewerTimezone } from "../shared/viewer-timezone";
 import { v4 as uuidv4 } from "uuid";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
-import { ModalCore } from "@plane/ui";
 import { PlanToolbar } from "./plan-toolbar";
 import { CreateWorkshop } from "./create-workshop";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { CalendarCheck, CalendarSearch, Clock3, ShieldCheck, Users } from "lucide-react";
+import { Button } from "@makeplane/propel/components/button";
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogHeading,
+  DialogMain,
+  DialogTitle,
+} from "@makeplane/propel/components/dialog";
+import { Icon } from "@makeplane/propel/components/icon";
+import { CalendarOutline, ClockOutline, MembersOutline, SearchOutline, ShieldOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { availabilityCopy, errorMessage, formatMinutes, startOfWeek } from "../shared/capacity-format.utils";
 import {
   CapacityService,
@@ -255,7 +266,7 @@ export function WorkshopPlanner({
       if (controller.signal.aborted) return;
       setSearch({ state: "idle" });
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Search could not finish",
         message: errorMessage(error, "Try again shortly. The full date range has not been checked."),
       });
@@ -370,9 +381,9 @@ export function WorkshopPlanner({
     try {
       await persistDraft();
       await mutateDrafts();
-      setToast({ type: TOAST_TYPE.SUCCESS, title: "Plan saved", message: "Choose a time to hold it for 72 hours." });
+      setToast({ type: "success", title: "Plan saved", message: "Choose a time to hold it for 72 hours." });
     } catch (error: unknown) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Plan not saved", message: errorMessage(error, "Try again.") });
+      setToast({ type: "error", title: "Plan not saved", message: errorMessage(error, "Try again.") });
     } finally {
       setSaving(false);
     }
@@ -386,7 +397,7 @@ export function WorkshopPlanner({
       reset();
       await refreshPlanningData();
     } catch (error: unknown) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Plan not deleted", message: errorMessage(error, "Try again.") });
+      setToast({ type: "error", title: "Plan not deleted", message: errorMessage(error, "Try again.") });
     } finally {
       setSaving(false);
     }
@@ -397,7 +408,7 @@ export function WorkshopPlanner({
     if (new Date(candidate.blockedStartsAt).getTime() <= Date.now()) {
       setNow(new Date());
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Choose a later time",
         message: "Preparation or travel for this slot has already started.",
       });
@@ -423,14 +434,14 @@ export function WorkshopPlanner({
       searchController.current?.abort();
       await refreshPlanningData();
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Time held for 72 hours",
         message: "Your plan is saved. Schedule this workshop, or start another plan while this time stays held.",
       });
     } catch (error: unknown) {
       await refreshPlanningData();
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Time could not be held",
         message: errorMessage(error, "Refresh availability and choose another time."),
       });
@@ -465,13 +476,13 @@ export function WorkshopPlanner({
       setHold(null);
       await refreshPlanningData();
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Workshop scheduled",
         message: `${hold?.trainer_name ?? "The trainer"} is booked on ${workshopLabel(result.issue)}. Choose another time to add a session, or start a new plan.`,
       });
     } catch (error: unknown) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Not scheduled",
         message: errorMessage(error, "The hold is untouched. Refresh capacity and try again."),
       });
@@ -489,7 +500,7 @@ export function WorkshopPlanner({
       revision.current = result.revision;
       await refreshPlanningData();
     } catch (error: unknown) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Hold not released", message: errorMessage(error, "Try again.") });
+      setToast({ type: "error", title: "Hold not released", message: errorMessage(error, "Try again.") });
     } finally {
       setSaving(false);
     }
@@ -532,12 +543,43 @@ export function WorkshopPlanner({
         onSelect={selectPlan}
         onDelete={deleteDraft}
       />
-      <ModalCore isOpen={switchTarget !== null} handleClose={() => !busy && setSwitchTarget(null)}>
-        <div className="space-y-4 p-6">
-          <h2 className="text-lg font-semibold">Save changes before switching plans?</h2>
-          <p className="text-body-sm-regular">Existing reservations stay active when you switch plans.</p>
-          <div className="flex flex-wrap gap-2">
+      <Dialog
+        open={switchTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !busy) setSwitchTarget(null);
+        }}
+      >
+        <DialogContent size="sm">
+          <DialogMain>
+            <DialogHeader>
+              <DialogHeading>
+                <DialogTitle>Save changes before switching plans?</DialogTitle>
+                <DialogDescription>Existing reservations stay active when you switch plans.</DialogDescription>
+              </DialogHeading>
+            </DialogHeader>
+          </DialogMain>
+          <DialogActions>
             <Button
+              variant="secondary"
+              size="md"
+              stretch="auto"
+              label="Cancel"
+              disabled={busy}
+              onClick={() => setSwitchTarget(null)}
+            />
+            <Button
+              variant="secondary"
+              size="md"
+              stretch="auto"
+              label="Discard changes"
+              disabled={busy}
+              onClick={finishSwitch}
+            />
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              label="Save and switch"
               disabled={busy || !validPlan}
               onClick={async () => {
                 setSaving(true);
@@ -547,7 +589,7 @@ export function WorkshopPlanner({
                   finishSwitch();
                 } catch (error) {
                   setToast({
-                    type: TOAST_TYPE.ERROR,
+                    type: "error",
                     title: "Plan not saved",
                     message: errorMessage(error, "Try again."),
                   });
@@ -555,36 +597,54 @@ export function WorkshopPlanner({
                   setSaving(false);
                 }
               }}
-            >
-              Save and switch
-            </Button>
-            <Button variant="secondary" disabled={busy} onClick={finishSwitch}>
-              Discard changes
-            </Button>
-            <Button variant="secondary" disabled={busy} onClick={() => setSwitchTarget(null)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </ModalCore>
-      <ModalCore isOpen={scheduleTarget !== null} handleClose={() => !busy && setScheduleTarget(null)}>
-        <div className="space-y-4 p-6">
-          <h2 className="text-lg font-semibold">Schedule workshop</h2>
-          <p className="text-body-xs-regular text-secondary">
-            Choose or create the workshop that will receive this session. Any reservation stays in place.
-          </p>
-          <WorkshopPicker workspaceSlug={workspaceSlug} value={issue} onChange={setIssue} disabled={busy} />
-          <CreateWorkshop workspaceSlug={workspaceSlug} title={title} disabled={busy} onCreated={setIssue} />
-          <div className="flex gap-2">
-            <Button disabled={!issue || busy} loading={scheduling} onClick={scheduleHold}>
-              Confirm session
-            </Button>
-            <Button variant="secondary" disabled={busy} onClick={() => setScheduleTarget(null)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </ModalCore>
+            />
+          </DialogActions>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={scheduleTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !busy) setScheduleTarget(null);
+        }}
+      >
+        <DialogContent size="sm">
+          <DialogMain>
+            <DialogHeader>
+              <DialogHeading>
+                <DialogTitle>Schedule workshop</DialogTitle>
+                <DialogDescription>
+                  Choose or create the workshop that will receive this session. Any reservation stays in place.
+                </DialogDescription>
+              </DialogHeading>
+            </DialogHeader>
+            <DialogBody>
+              <div className="space-y-4">
+                <WorkshopPicker workspaceSlug={workspaceSlug} value={issue} onChange={setIssue} disabled={busy} />
+                <CreateWorkshop workspaceSlug={workspaceSlug} title={title} disabled={busy} onCreated={setIssue} />
+              </div>
+            </DialogBody>
+          </DialogMain>
+          <DialogActions>
+            <Button
+              variant="secondary"
+              size="md"
+              stretch="auto"
+              label="Cancel"
+              disabled={busy}
+              onClick={() => setScheduleTarget(null)}
+            />
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              label="Confirm session"
+              disabled={!issue || busy}
+              loading={scheduling}
+              onClick={scheduleHold}
+            />
+          </DialogActions>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-0 xl:grid-cols-[380px_1fr]">
         <div className="space-y-5 border-b border-subtle p-5 xl:border-r xl:border-b-0">
@@ -689,7 +749,7 @@ export function WorkshopPlanner({
           </fieldset>
           <fieldset>
             <legend className="flex items-center gap-2 text-body-xs-medium text-secondary">
-              <Users className="size-3.5" /> Eligible trainers
+              <MembersOutline className="size-3.5" /> Eligible trainers
             </legend>
             <div className="mt-2 space-y-1.5">
               {trainers.map((trainer) => (
@@ -747,7 +807,7 @@ export function WorkshopPlanner({
           {hold ? (
             <div className="bg-accent-secondary/10 mb-5 flex flex-col gap-3 rounded-lg border border-accent-subtle p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex gap-3">
-                <ShieldCheck className="mt-0.5 size-5 shrink-0 text-accent-primary" />
+                <ShieldOutline className="mt-0.5 size-5 shrink-0 text-accent-primary" />
                 <div>
                   <h3 className="text-body-sm-medium text-primary">Time held for {hold.trainer_name}</h3>
                   <p className="mt-1 text-body-xs-regular text-secondary">
@@ -764,18 +824,24 @@ export function WorkshopPlanner({
                 </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                <Button variant="secondary" size="sm" disabled={saving || scheduling} onClick={releaseHold}>
-                  Release reservation
-                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  stretch="auto"
+                  label="Release reservation"
+                  disabled={saving || scheduling}
+                  onClick={releaseHold}
+                />
                 <Button
                   variant="primary"
                   size="sm"
+                  stretch="auto"
+                  label="Schedule workshop"
+                  icon={<Icon icon={CalendarOutline} />}
                   loading={scheduling}
                   disabled={saving || scheduling}
                   onClick={() => setScheduleTarget({ candidate: null })}
-                >
-                  <CalendarCheck className="size-3.5" /> Schedule workshop
-                </Button>
+                />
               </div>
               <p className="text-11 text-secondary sm:basis-full">
                 One plan reserves one time. Use “New plan” to plan another workshop and return here through Saved plans.
@@ -805,12 +871,13 @@ export function WorkshopPlanner({
                   <Button
                     variant="secondary"
                     size="sm"
+                    stretch="auto"
+                    label="Find first available"
+                    icon={<Icon icon={SearchOutline} />}
                     loading={search.state === "running"}
                     disabled={busy || !trainerIds.length || !validPlan || search.state === "running"}
                     onClick={() => void findNext(null)}
-                  >
-                    <CalendarSearch className="size-3.5" /> Find first available
-                  </Button>
+                  />
                   <span className="rounded-full bg-surface-2 px-2.5 py-1 text-11 text-secondary">
                     {candidates.length} options
                   </span>
@@ -833,22 +900,23 @@ export function WorkshopPlanner({
                         {dateTimeLabel(search.result.candidate.workshopStartsAt, undefined, timeZone)} –{" "}
                         {dateTimeLabel(search.result.candidate.workshopEndsAt, undefined, timeZone)}.
                       </p>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => {
-                          if (search.result.found) {
-                            const candidate = search.result.candidate;
-                            setTrainerIds((current) =>
-                              current.includes(candidate.trainerId) ? current : [...current, candidate.trainerId]
-                            );
-                            onViewWeek(startOfWeek(new Date(candidate.workshopStartsAt), timeZone));
-                          }
-                        }}
-                      >
-                        Show this week
-                      </Button>
+                      <div className="mt-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          stretch="auto"
+                          label="Show this week"
+                          onClick={() => {
+                            if (search.result.found) {
+                              const candidate = search.result.candidate;
+                              setTrainerIds((current) =>
+                                current.includes(candidate.trainerId) ? current : [...current, candidate.trainerId]
+                              );
+                              onViewWeek(startOfWeek(new Date(candidate.workshopStartsAt), timeZone));
+                            }
+                          }}
+                        />
+                      </div>
                       {search.forTrainer ? <p className="mt-1 text-secondary">Searched that trainer only.</p> : null}
                     </>
                   ) : (
@@ -866,9 +934,9 @@ export function WorkshopPlanner({
                 <div role="alert" className="rounded-lg border border-subtle p-4">
                   <p className="text-body-sm-medium">Availability could not be loaded</p>
                   <p className="mt-1 text-body-xs-regular text-secondary">{capacityError}</p>
-                  <Button variant="secondary" size="sm" className="mt-3" onClick={onRetry}>
-                    Retry
-                  </Button>
+                  <div className="mt-3">
+                    <Button variant="secondary" size="sm" stretch="auto" label="Retry" onClick={onRetry} />
+                  </div>
                 </div>
               ) : capacityState === "loading" ? (
                 <p role="status" className="rounded-lg border border-subtle p-4 text-body-xs-regular text-secondary">
@@ -896,7 +964,7 @@ export function WorkshopPlanner({
                             </div>
                             <div className="mt-4 space-y-2 text-body-xs-regular">
                               <div className="flex items-start gap-2">
-                                <CalendarSearch className="mt-0.5 size-3.5 shrink-0 text-accent-primary" />
+                                <CalendarOutline className="mt-0.5 size-3.5 shrink-0 text-accent-primary" />
                                 <div>
                                   <span className="block text-11 text-placeholder">Workshop</span>
                                   <span className="text-primary">
@@ -906,7 +974,7 @@ export function WorkshopPlanner({
                                 </div>
                               </div>
                               <div className="flex items-start gap-2">
-                                <Clock3 className="mt-0.5 size-3.5 shrink-0 text-secondary" />
+                                <ClockOutline className="mt-0.5 size-3.5 shrink-0 text-secondary" />
                                 <div>
                                   <span className="block text-11 text-placeholder">Trainer blocked</span>
                                   <span className="text-secondary">
@@ -924,24 +992,25 @@ export function WorkshopPlanner({
                                 </div>
                               </div>
                             </div>
-                            <Button
-                              className="mt-4 w-full"
-                              variant="secondary"
-                              size="sm"
-                              disabled={!validPlan || busy}
-                              onClick={() => holdCandidate(candidate)}
-                            >
-                              <ShieldCheck className="size-3.5" /> Reserve for 72 hours
-                            </Button>
-                            <Button
-                              className="mt-2 w-full"
-                              variant="primary"
-                              size="sm"
-                              disabled={!validPlan || busy}
-                              onClick={() => setScheduleTarget({ candidate })}
-                            >
-                              Schedule workshop
-                            </Button>
+                            <div className="mt-4 flex flex-col gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                stretch="full"
+                                label="Reserve for 72 hours"
+                                icon={<Icon icon={ShieldOutline} />}
+                                disabled={!validPlan || busy}
+                                onClick={() => holdCandidate(candidate)}
+                              />
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                stretch="full"
+                                label="Schedule workshop"
+                                disabled={!validPlan || busy}
+                                onClick={() => setScheduleTarget({ candidate })}
+                              />
+                            </div>
                             {planNeedsSaving ? (
                               <p className="mt-2 text-center text-11 text-placeholder">
                                 Reserve this time temporarily, or confirm a Workshop session.
@@ -956,7 +1025,7 @@ export function WorkshopPlanner({
               ) : (
                 <div className="grid min-h-48 place-items-center rounded-lg border border-dashed border-subtle bg-surface-2 px-5 text-center">
                   <div>
-                    <CalendarSearch className="mx-auto size-7 text-placeholder" />
+                    <SearchOutline className="mx-auto size-7 text-placeholder" />
                     <h3 className="mt-2 text-body-sm-medium text-primary">No matching time this week</h3>
                     <p className="mt-1 text-body-xs-regular text-secondary">
                       {noWorkshopFitReason(availability, spec, formatMinutes)}

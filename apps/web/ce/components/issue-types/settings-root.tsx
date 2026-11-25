@@ -8,15 +8,17 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-// icons
-import { Plus } from "lucide-react";
 // plane imports
-import { Button } from "@plane/propel/button";
-import { EmojiIconPickerTypes, EmojiPicker } from "@plane/propel/emoji-icon-picker";
-import type { TChangeHandlerProps } from "@plane/propel/emoji-icon-picker";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { Input } from "@makeplane/propel/components/input";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { SelectField } from "@makeplane/propel/components/select-field";
+import { Switch } from "@makeplane/propel/components/switch";
+import { AddOutline } from "@makeplane/propel/icons";
+import { EmojiPicker, type ChangeHandlerPayload } from "@plane/blocks/emoji-icon-picker";
+import { setToast } from "@plane/blocks/toast";
 import type { TLogoProps } from "@plane/types";
-import { CustomSelect, Input, ToggleSwitch } from "@plane/ui";
 // components
 import { IssueTypeIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // plane web
@@ -25,14 +27,14 @@ import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
 import { WorkshopsCard } from "./workshops-card";
 import type { TIssuePropertyExt, TIssuePropertyType, TIssueTypeExt } from "@/plane-web/types/issue-types";
 
-const PROPERTY_TYPE_OPTIONS: { key: TIssuePropertyType; label: string }[] = [
-  { key: "text", label: "Text" },
-  { key: "number", label: "Number" },
-  { key: "date", label: "Date" },
-  { key: "boolean", label: "Boolean" },
-  { key: "select", label: "Select" },
-  { key: "multi_select", label: "Multi select" },
-  { key: "member", label: "Member" },
+const PROPERTY_TYPE_OPTIONS: { value: TIssuePropertyType; label: string }[] = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "date", label: "Date" },
+  { value: "boolean", label: "Boolean" },
+  { value: "select", label: "Select" },
+  { value: "multi_select", label: "Multi select" },
+  { value: "member", label: "Member" },
 ];
 
 type Props = {
@@ -60,7 +62,7 @@ const PropertyRow = observer(function PropertyRow(props: {
       setOptionName("");
       onChanged();
     } catch {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to add the option." });
+      setToast({ type: "error", title: "Error!", message: "Failed to add the option." });
     }
   };
 
@@ -70,7 +72,7 @@ const PropertyRow = observer(function PropertyRow(props: {
         <div className="flex items-center gap-2 text-14">
           <span className="font-medium">{property.display_name}</span>
           <span className="rounded-sm bg-layer-1 px-1.5 py-0.5 text-11 text-tertiary">
-            {PROPERTY_TYPE_OPTIONS.find((option) => option.key === property.property_type)?.label}
+            {PROPERTY_TYPE_OPTIONS.find((option) => option.value === property.property_type)?.label}
           </span>
           {property.is_required && <span className="text-11 text-danger-primary">required</span>}
           {property.system_key && (
@@ -92,17 +94,20 @@ const PropertyRow = observer(function PropertyRow(props: {
           ))}
           {isAdmin && (
             <div className="flex items-center gap-1">
-              <Input
-                id={`option-${property.id}`}
-                type="text"
-                value={optionName}
-                onChange={(e) => setOptionName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void addOption();
-                }}
-                placeholder="Add option"
-                className="h-6 w-32 text-11"
-              />
+              <div className="w-32">
+                <Input
+                  id={`option-${property.id}`}
+                  size="md"
+                  type="text"
+                  aria-label={`Add option to ${property.display_name}`}
+                  value={optionName}
+                  onChange={(e) => setOptionName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void addOption();
+                  }}
+                  placeholder="Add option"
+                />
+              </div>
             </div>
           )}
         </div>
@@ -111,8 +116,8 @@ const PropertyRow = observer(function PropertyRow(props: {
   );
 });
 
-const toLogoProps = (value: TChangeHandlerProps): TLogoProps =>
-  value.type === EmojiIconPickerTypes.EMOJI
+const toLogoProps = (value: ChangeHandlerPayload): TLogoProps =>
+  value.type === "emoji"
     ? { in_use: "emoji", emoji: { value: value.value } }
     : { in_use: "icon", icon: { name: value.value.name, color: value.value.color } };
 
@@ -129,7 +134,7 @@ const TypeLogo = observer(function TypeLogo(props: {
 
   if (!isAdmin) return mark;
 
-  const updateLogo = async (value: TChangeHandlerProps) => {
+  const updateLogo = async (value: ChangeHandlerPayload) => {
     setIsOpen(false);
     try {
       await issueTypeService.updateIssueType(workspaceSlug, projectId, issueType.id, {
@@ -137,7 +142,7 @@ const TypeLogo = observer(function TypeLogo(props: {
       });
       onChanged();
     } catch {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to update the work item type icon." });
+      setToast({ type: "error", title: "Error!", message: "Failed to update the work item type icon." });
     }
   };
 
@@ -150,7 +155,7 @@ const TypeLogo = observer(function TypeLogo(props: {
       label={mark}
       onChange={(value) => void updateLogo(value)}
       defaultIconColor={issueType.logo_props?.in_use === "icon" ? issueType.logo_props.icon?.color : undefined}
-      defaultOpen={issueType.logo_props?.in_use === "emoji" ? EmojiIconPickerTypes.EMOJI : EmojiIconPickerTypes.ICON}
+      defaultOpen={issueType.logo_props?.in_use === "emoji" ? "emoji" : "icon"}
     />
   );
 });
@@ -184,7 +189,7 @@ const TypeCard = observer(function TypeCard(props: {
       setIsAddingProperty(false);
       onChanged();
     } catch {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to create the property." });
+      setToast({ type: "error", title: "Error!", message: "Failed to create the property." });
     }
   };
 
@@ -208,47 +213,57 @@ const TypeCard = observer(function TypeCard(props: {
           )}
         </div>
         {isAdmin && (
-          <Button variant="secondary" size="sm" onClick={() => setIsAddingProperty((prev) => !prev)}>
-            <Plus className="h-3.5 w-3.5" />
-            Add property
-          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            stretch="auto"
+            icon={<Icon icon={AddOutline} />}
+            label="Add property"
+            onClick={() => setIsAddingProperty((prev) => !prev)}
+          />
         )}
       </div>
       {isAddingProperty && (
         <div className="flex flex-wrap items-end gap-2 rounded-md bg-layer-1 p-3">
-          <div className="flex flex-col gap-1">
-            <span className="text-11 text-tertiary">Name</span>
-            <Input
+          <div className="w-40">
+            <InputField
               id={`new-property-${issueType.id}`}
+              size="md"
+              orientation="vertical"
+              label="Name"
               type="text"
               value={propertyName}
               onChange={(e) => setPropertyName(e.target.value)}
               placeholder="Severity"
-              className="h-7 w-40"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-11 text-tertiary">Type</span>
-            <CustomSelect
-              value={propertyType}
-              onChange={(next: TIssuePropertyType) => setPropertyType(next)}
-              label={PROPERTY_TYPE_OPTIONS.find((option) => option.key === propertyType)?.label}
-              buttonClassName="h-7"
-            >
-              {PROPERTY_TYPE_OPTIONS.map((option) => (
-                <CustomSelect.Option key={option.key} value={option.key}>
-                  {option.label}
-                </CustomSelect.Option>
-              ))}
-            </CustomSelect>
-          </div>
-          <div className="flex items-center gap-1.5 pb-1">
-            <ToggleSwitch value={isRequired} onChange={() => setIsRequired((prev) => !prev)} size="sm" />
+          <SelectField<TIssuePropertyType>
+            label="Type"
+            size="md"
+            width="fit"
+            options={PROPERTY_TYPE_OPTIONS}
+            value={propertyType}
+            onValueChange={(next) => {
+              if (next) setPropertyType(next);
+            }}
+          />
+          <div className="flex items-center gap-1.5 pb-1.5">
+            <Switch
+              size="sm"
+              aria-label="Required"
+              checked={isRequired}
+              onCheckedChange={(checked) => setIsRequired(checked)}
+            />
             <span className="text-11 text-tertiary">Required</span>
           </div>
-          <Button variant="primary" size="sm" onClick={() => void addProperty()} disabled={!propertyName.trim()}>
-            Create
-          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            stretch="auto"
+            label="Create"
+            onClick={() => void addProperty()}
+            disabled={!propertyName.trim()}
+          />
         </div>
       )}
       <div className="flex flex-col gap-2">
@@ -289,12 +304,12 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
       await issueTypeService.enableIssueTypes(workspaceSlug, projectId);
       await mutate();
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Work item types enabled",
         message: "Task and Epic are now available in this project.",
       });
     } catch {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to enable work item types." });
+      setToast({ type: "error", title: "Error!", message: "Failed to enable work item types." });
     } finally {
       setIsEnabling(false);
     }
@@ -308,7 +323,7 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
       setNewTypeName("");
       await mutate();
     } catch {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Failed to create the work item type." });
+      setToast({ type: "error", title: "Error!", message: "Failed to create the work item type." });
     } finally {
       setIsCreating(false);
     }
@@ -325,21 +340,29 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
         </div>
         {isAdmin && hasSystemTypes && (
           <div className="flex items-center gap-2">
-            <Input
-              id="new-type-name"
-              type="text"
-              value={newTypeName}
-              onChange={(e) => setNewTypeName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void createType();
-              }}
-              placeholder="e.g. Bug"
-              className="h-7 w-40"
+            <div className="w-40">
+              <Input
+                id="new-type-name"
+                size="md"
+                type="text"
+                aria-label="New work item type name"
+                value={newTypeName}
+                onChange={(e) => setNewTypeName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void createType();
+                }}
+                placeholder="e.g. Bug"
+              />
+            </div>
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              icon={<Icon icon={AddOutline} />}
+              label="Add type"
+              onClick={() => void createType()}
+              disabled={!newTypeName.trim()}
             />
-            <Button variant="primary" size="sm" onClick={() => void createType()} disabled={!newTypeName.trim()}>
-              <Plus className="h-3.5 w-3.5" />
-              Add type
-            </Button>
           </div>
         )}
       </div>
@@ -352,9 +375,14 @@ export const IssueTypesSettingsRoot = observer(function IssueTypesSettingsRoot(p
             </p>
           </div>
           {isAdmin && (
-            <Button variant="primary" size="sm" onClick={() => void enableTypes()} disabled={isEnabling}>
-              {isEnabling ? "Enabling…" : "Enable work item types"}
-            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              label={isEnabling ? "Enabling…" : "Enable work item types"}
+              onClick={() => void enableTypes()}
+              disabled={isEnabling}
+            />
           )}
         </div>
       )}

@@ -7,7 +7,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import useSWR from "swr";
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
@@ -123,9 +123,13 @@ export default function TeamCapacityPage({ params }: Route.ComponentProps) {
           >
             <div className="flex items-center justify-between">
               <h2 className="text-body-sm-medium">Managing {editingProfile.display_name}</h2>
-              <Button variant="secondary" size="sm" onClick={() => setEditingTrainerId(null)}>
-                Close
-              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                stretch="auto"
+                onClick={() => setEditingTrainerId(null)}
+                label="Close"
+              />
             </div>
             <ScheduleEditor
               key={`${editingProfile.id}-${editingProfile.schedule_revision}-schedule`}

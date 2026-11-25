@@ -6,12 +6,10 @@
 
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-// icons
-import { Shapes } from "lucide-react";
 // plane imports
-import { Logo } from "@plane/propel/emoji-icon-picker";
-import { EpicIcon, WorkItemsIcon } from "@plane/propel/icons";
-import { Tooltip } from "@plane/propel/tooltip";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
+import { BoxesOutline, EpicOutline, WorkItemsOutline } from "@makeplane/propel/icons";
+import { Logo } from "@plane/blocks/emoji-icon-picker";
 import type { TIssueIdentifierProps, TIssueIdentifierSize, TIssueTypeIdentifier, TLogoProps } from "@plane/types";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -74,15 +72,15 @@ export const IssueTypeIdentifier = observer(function IssueTypeIdentifier(props: 
   if (hasLogo) {
     icon = <Logo logo={logo as TLogoProps} size={iconSize} />;
   } else if (issueType.system_key === "epic") {
-    icon = <EpicIcon width={iconSize} height={iconSize} className="text-accent-primary" />;
+    icon = <EpicOutline width={iconSize} height={iconSize} className="text-accent-primary" />;
   } else if (issueType.system_key === "task") {
-    icon = <WorkItemsIcon width={iconSize} height={iconSize} className="text-tertiary" />;
+    icon = <WorkItemsOutline width={iconSize} height={iconSize} className="text-tertiary" />;
   } else {
-    icon = <Shapes style={{ width: iconSize, height: iconSize }} className="text-tertiary" />;
+    icon = <BoxesOutline width={iconSize} height={iconSize} className="text-tertiary" />;
   }
 
   return (
-    <Tooltip tooltipContent={issueType.name}>
+    <Tooltip label={issueType.name}>
       <span className="grid flex-shrink-0 place-items-center" aria-label={issueType.name}>
         {icon}
       </span>

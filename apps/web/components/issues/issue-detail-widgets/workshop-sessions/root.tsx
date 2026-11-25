@@ -6,9 +6,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { CalendarClock, ChevronRight, CircleAlert, Plus } from "lucide-react";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { AddOutline, AlertCircleOutline, CalendarOutline, ChevronRightOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { useMember } from "@/hooks/store/use-member";
 import { useIssueTypes } from "@/plane-web/hooks/use-issue-types";
 import { CapacityService, type TWorkshopSchedule } from "@/services/capacity.service";
@@ -126,13 +127,13 @@ export function WorkshopSessionsCollapsible({
       await capacityService.resyncWorkshopCalendar(workspaceSlug, projectId, issueId);
       await mutate();
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Trying again",
         message: "The training calendar will be updated shortly.",
       });
     } catch {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Could not retry",
         message: "Try again in a moment.",
       });
@@ -154,13 +155,13 @@ export function WorkshopSessionsCollapsible({
       });
       await mutate();
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Workshop scheduled",
         message: `${sessions.length} ${sessions.length === 1 ? "session" : "sessions"} added to trainer capacity.`,
       });
     } catch {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Workshop not scheduled",
         message: "Check every session and make sure its trainers are active Workshop assignees.",
       });
@@ -176,13 +177,13 @@ export function WorkshopSessionsCollapsible({
       setSessions([]);
       await mutate(null, { revalidate: false });
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Workshop schedule removed",
         message: "Trainer capacity has been updated.",
       });
     } catch {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Workshop schedule not removed",
         message: "Try again. The existing schedule is still active.",
       });
@@ -199,8 +200,10 @@ export function WorkshopSessionsCollapsible({
         onClick={() => setIsOpen((open) => !open)}
         className="flex w-full items-center gap-2 rounded-sm py-1 text-left hover:bg-surface-2"
       >
-        <ChevronRight className={`size-4 shrink-0 text-tertiary transition-transform ${isOpen ? "rotate-90" : ""}`} />
-        <CalendarClock className="size-4 shrink-0 text-tertiary" />
+        <ChevronRightOutline
+          className={`size-4 shrink-0 text-tertiary transition-transform ${isOpen ? "rotate-90" : ""}`}
+        />
+        <CalendarOutline className="size-4 shrink-0 text-tertiary" />
         <span className="text-body-sm-medium text-primary">Workshop sessions</span>
         <span className="text-body-xs-regular text-tertiary">
           {sessions.length ? `${sessions.length}` : "none scheduled"}
@@ -211,7 +214,7 @@ export function WorkshopSessionsCollapsible({
         <div className="mt-2 flex flex-col gap-3">
           {error ? (
             <p role="alert" className="flex items-center gap-2 text-body-xs-regular text-danger-primary">
-              <CircleAlert className="size-4 shrink-0" />
+              <AlertCircleOutline className="size-4 shrink-0" />
               The schedule could not be loaded. Try again.
             </p>
           ) : null}
@@ -243,28 +246,39 @@ export function WorkshopSessionsCollapsible({
               <Button
                 variant="secondary"
                 size="sm"
+                stretch="auto"
+                icon={<Icon icon={AddOutline} />}
+                label="Add session"
                 onClick={() => setSessions((current) => [...current, newSession(orderedAssigneeIds)])}
-              >
-                <Plus className="size-3.5" /> Add session
-              </Button>
+              />
               <Button
                 variant="primary"
                 size="sm"
+                stretch="auto"
+                label="Save schedule"
                 loading={saving || isLoading}
                 disabled={!isSchedulable(sessions) || Boolean(error)}
                 onClick={save}
-              >
-                Save schedule
-              </Button>
+              />
               {data ? (
-                <Button variant="secondary" size="sm" disabled={saving} onClick={remove}>
-                  Remove all
-                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  stretch="auto"
+                  label="Remove all"
+                  disabled={saving}
+                  onClick={remove}
+                />
               ) : null}
               {needsRetry ? (
-                <Button variant="secondary" size="sm" loading={retrying} onClick={retryCalendar}>
-                  Retry calendar
-                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  stretch="auto"
+                  label="Retry calendar"
+                  loading={retrying}
+                  onClick={retryCalendar}
+                />
               ) : null}
               <span className="ml-auto text-11 text-placeholder">Times shown in {timezone}</span>
             </div>

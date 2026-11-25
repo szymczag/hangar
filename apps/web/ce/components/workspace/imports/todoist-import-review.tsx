@@ -4,9 +4,13 @@
  * See the LICENSE file for details.
  */
 
-import { AlertTriangle } from "lucide-react";
+import { Badge } from "@makeplane/propel/components/badge";
+import { Button } from "@makeplane/propel/components/button";
+import { CheckboxField } from "@makeplane/propel/components/checkbox-field";
+import { InputField } from "@makeplane/propel/components/input-field";
+import { SelectField } from "@makeplane/propel/components/select-field";
+import { WarningTriangleOutline } from "@makeplane/propel/icons";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
 import type { TTodoistImportPreview } from "@/plane-web/types/import";
 
 export type TModuleAction = "reuse" | "rename";
@@ -60,7 +64,7 @@ export function TodoistImportReview({
   );
 
   return (
-    <section className="rounded-xl border border-subtle bg-layer-1 p-5 md:p-6">
+    <section className="rounded-lg border border-subtle bg-layer-1 p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-h5-medium text-primary">
@@ -70,17 +74,15 @@ export function TodoistImportReview({
             {t("workspace_settings.settings.todoist_import.manifest_description")}
           </p>
         </div>
-        <span
-          className={
+        <Badge
+          variant={hasErrors ? "danger" : "success"}
+          size="md"
+          label={
             hasErrors
-              ? "rounded-full bg-danger-subtle px-3 py-1 text-body-xs-medium text-danger-primary"
-              : "rounded-full bg-success-subtle px-3 py-1 text-body-xs-medium text-success-primary"
+              ? t("workspace_settings.settings.todoist_import.validated_with_skips")
+              : t("workspace_settings.settings.todoist_import.validated")
           }
-        >
-          {hasErrors
-            ? t("workspace_settings.settings.todoist_import.validated_with_skips")
-            : t("workspace_settings.settings.todoist_import.validated")}
-        </span>
+        />
       </div>
 
       <dl className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -109,7 +111,7 @@ export function TodoistImportReview({
                 key={`${diagnostic.code}-${diagnostic.row ?? "file"}-${diagnostic.field ?? "none"}-${diagnostic.level}`}
                 className="flex gap-3 px-4 py-3"
               >
-                <AlertTriangle
+                <WarningTriangleOutline
                   className={`mt-0.5 size-4 shrink-0 ${
                     diagnostic.level === "error" ? "text-danger-primary" : "text-warning-primary"
                   }`}
@@ -131,7 +133,7 @@ export function TodoistImportReview({
 
       {(preview.enables_modules || preview.project_note_action === "skip") && (
         <div className="mt-5 flex gap-3 rounded-lg border border-subtle bg-layer-2 p-4 text-body-sm-regular text-secondary">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-primary" />
+          <WarningTriangleOutline className="mt-0.5 size-4 shrink-0 text-warning-primary" />
           <div>
             {preview.enables_modules && <p>{t("workspace_settings.settings.todoist_import.modules_notice")}</p>}
             {preview.project_note_action === "skip" && (
@@ -153,19 +155,16 @@ export function TodoistImportReview({
             {preview.assignees.map((sourceAssignee) => (
               <div key={sourceAssignee} className="grid items-center gap-3 p-3 sm:grid-cols-2">
                 <span className="truncate text-body-sm-regular text-primary">{sourceAssignee}</span>
-                <select
+                <SelectField<string>
                   aria-label={`${t("workspace_settings.settings.todoist_import.assignee_mapping")}: ${sourceAssignee}`}
-                  className="rounded-md border border-subtle bg-surface-1 px-3 py-2 text-body-sm-regular text-primary outline-none focus:border-accent-strong"
+                  size="lg"
+                  options={[
+                    { value: "", label: t("workspace_settings.settings.todoist_import.leave_unassigned") },
+                    ...memberOptions,
+                  ]}
                   value={assigneeMapping[sourceAssignee] ?? ""}
-                  onChange={(event) => onAssigneeChange(sourceAssignee, event.target.value)}
-                >
-                  <option value="">{t("workspace_settings.settings.todoist_import.leave_unassigned")}</option>
-                  {memberOptions.map((member) => (
-                    <option key={member.value} value={member.value}>
-                      {member.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(memberId) => onAssigneeChange(sourceAssignee, memberId ?? "")}
+                />
               </div>
             ))}
           </div>
@@ -186,22 +185,28 @@ export function TodoistImportReview({
                 <p className="text-body-xs-medium text-secondary">
                   {t("workspace_settings.settings.todoist_import.section")} “{conflict.name}”
                 </p>
-                <select
-                  aria-label={`${t("workspace_settings.settings.todoist_import.module_conflicts")}: ${conflict.name}`}
-                  className="mt-2 w-full rounded-md border border-subtle bg-surface-1 px-3 py-2 text-body-sm-regular text-primary outline-none focus:border-accent-strong"
-                  value={moduleActions[conflict.row] ?? "reuse"}
-                  onChange={(event) => onModuleActionChange(conflict.row, event.target.value as TModuleAction)}
-                >
-                  <option value="reuse">{t("workspace_settings.settings.todoist_import.reuse_module")}</option>
-                  <option value="rename">{t("workspace_settings.settings.todoist_import.rename_module")}</option>
-                </select>
-                <input
-                  aria-label={`${t("workspace_settings.settings.todoist_import.rename_module")}: ${conflict.name}`}
-                  className="mt-2 w-full rounded-md border border-subtle bg-surface-1 px-3 py-2 text-body-sm-regular text-primary outline-none focus:border-accent-strong disabled:opacity-50"
-                  value={renamedModules[conflict.row] ?? conflict.name}
-                  disabled={moduleActions[conflict.row] !== "rename"}
-                  onChange={(event) => onModuleNameChange(conflict.row, event.target.value)}
-                />
+                <div className="mt-2 flex flex-col gap-2">
+                  <SelectField<TModuleAction>
+                    aria-label={`${t("workspace_settings.settings.todoist_import.module_conflicts")}: ${conflict.name}`}
+                    size="lg"
+                    options={[
+                      { value: "reuse", label: t("workspace_settings.settings.todoist_import.reuse_module") },
+                      { value: "rename", label: t("workspace_settings.settings.todoist_import.rename_module") },
+                    ]}
+                    value={moduleActions[conflict.row] ?? "reuse"}
+                    onValueChange={(action) => {
+                      if (action) onModuleActionChange(conflict.row, action);
+                    }}
+                  />
+                  <InputField
+                    aria-label={`${t("workspace_settings.settings.todoist_import.rename_module")}: ${conflict.name}`}
+                    size="lg"
+                    orientation="vertical"
+                    value={renamedModules[conflict.row] ?? conflict.name}
+                    disabled={moduleActions[conflict.row] !== "rename"}
+                    onChange={(event) => onModuleNameChange(conflict.row, event.target.value)}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -209,33 +214,34 @@ export function TodoistImportReview({
       )}
 
       {hasErrors && (
-        <label className="mt-6 flex items-start gap-3 rounded-lg border border-danger-subtle bg-danger-subtle p-4 text-body-sm-regular text-primary">
-          <input
-            className="mt-0.5 size-4"
-            type="checkbox"
+        <div className="mt-6 rounded-lg border border-danger-subtle bg-danger-subtle p-4">
+          <CheckboxField
+            name="allow-skipped-rows"
+            size="lg"
+            label={t("workspace_settings.settings.todoist_import.skip_confirmation")}
             checked={allowSkippedRows}
-            onChange={(event) => onAllowSkippedRowsChange(event.target.checked)}
+            onCheckedChange={(checked) => onAllowSkippedRowsChange(checked)}
           />
-          {t("workspace_settings.settings.todoist_import.skip_confirmation")}
-        </label>
+        </div>
       )}
 
       {preview.duplicate && (
-        <label className="mt-6 flex items-start gap-3 rounded-lg border border-warning-subtle bg-warning-subtle p-4 text-body-sm-regular text-primary">
-          <input
-            className="mt-0.5 size-4"
-            type="checkbox"
+        <div className="mt-6 rounded-lg border border-warning-subtle bg-warning-subtle p-4">
+          <CheckboxField
+            name="allow-duplicate"
+            size="lg"
+            label={t("workspace_settings.settings.todoist_import.duplicate_confirmation")}
             checked={allowDuplicate}
-            onChange={(event) => onAllowDuplicateChange(event.target.checked)}
+            onCheckedChange={(checked) => onAllowDuplicateChange(checked)}
           />
-          {t("workspace_settings.settings.todoist_import.duplicate_confirmation")}
-        </label>
+        </div>
       )}
 
       <div className="mt-6 flex flex-wrap gap-3 border-t border-subtle pt-5">
         <Button
           variant="primary"
           size="lg"
+          stretch="auto"
           disabled={
             isSubmitting ||
             (preview.duplicate && !allowDuplicate) ||
@@ -243,14 +249,20 @@ export function TodoistImportReview({
             hasInvalidModuleRename
           }
           onClick={onImport}
-        >
-          {isSubmitting
-            ? t("workspace_settings.settings.todoist_import.starting")
-            : t("workspace_settings.settings.todoist_import.start")}
-        </Button>
-        <Button variant="secondary" size="lg" disabled={isSubmitting} onClick={onChooseAnother}>
-          {t("workspace_settings.settings.todoist_import.choose_another")}
-        </Button>
+          label={
+            isSubmitting
+              ? t("workspace_settings.settings.todoist_import.starting")
+              : t("workspace_settings.settings.todoist_import.start")
+          }
+        />
+        <Button
+          variant="secondary"
+          size="lg"
+          stretch="auto"
+          disabled={isSubmitting}
+          onClick={onChooseAnother}
+          label={t("workspace_settings.settings.todoist_import.choose_another")}
+        />
       </div>
     </section>
   );

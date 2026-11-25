@@ -6,8 +6,8 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { setToast } from "@plane/blocks/toast";
 import { useInstance } from "@/hooks/store/use-instance";
 import { CapacityService } from "@/services/capacity.service";
 
@@ -53,7 +53,7 @@ export function WorkshopsCard({
       await mutate(await capacityService.setProjectWorkshops(workspaceSlug, projectId, enabled), false);
       onChanged();
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: enabled ? "Workshops enabled" : "Workshops turned off",
         message: enabled
           ? "Workshops can now be created and imported in this project."
@@ -64,7 +64,7 @@ export function WorkshopsCard({
         cause && typeof cause === "object" && "error" in cause && typeof cause.error === "string"
           ? cause.error
           : "Try again.";
-      setToast({ type: TOAST_TYPE.ERROR, title: "Could not change Workshops", message });
+      setToast({ type: "error", title: "Could not change Workshops", message });
     } finally {
       setBusy(false);
     }
@@ -84,13 +84,23 @@ export function WorkshopsCard({
       </div>
       {isAdmin &&
         (data.enabled ? (
-          <Button variant="secondary" size="sm" disabled={busy || inUse} onClick={() => void toggle(false)}>
-            Turn off
-          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            stretch="auto"
+            label="Turn off"
+            disabled={busy || inUse}
+            onClick={() => void toggle(false)}
+          />
         ) : (
-          <Button variant="primary" size="sm" disabled={busy} onClick={() => void toggle(true)}>
-            {busy ? "Enabling…" : "Enable Workshops"}
-          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            stretch="auto"
+            label={busy ? "Enabling…" : "Enable Workshops"}
+            disabled={busy}
+            onClick={() => void toggle(true)}
+          />
         ))}
     </div>
   );

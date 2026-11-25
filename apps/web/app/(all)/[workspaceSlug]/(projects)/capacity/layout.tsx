@@ -6,8 +6,9 @@ import { Outlet, useLocation } from "react-router";
  */
 
 import { ViewerTimezoneProvider } from "./shared/viewer-timezone";
-import { CalendarClock } from "lucide-react";
-import { Breadcrumbs, Header } from "@plane/ui";
+import { CalendarOutline } from "@makeplane/propel/icons";
+import { Breadcrumbs } from "@plane/blocks/breadcrumb";
+import { Header } from "@plane/blocks/layout";
 import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
 import { AppHeader } from "@/components/core/app-header";
 import { ContentWrapper } from "@/components/core/content-wrapper";
@@ -33,7 +34,7 @@ function CapacityHeader() {
       <Header.LeftItem>
         <Breadcrumbs>
           <Breadcrumbs.Item
-            component={<BreadcrumbLink label={label} icon={<CalendarClock className="size-4 text-tertiary" />} />}
+            component={<BreadcrumbLink label={label} icon={<CalendarOutline className="size-4 text-tertiary" />} />}
           />
         </Breadcrumbs>
       </Header.LeftItem>

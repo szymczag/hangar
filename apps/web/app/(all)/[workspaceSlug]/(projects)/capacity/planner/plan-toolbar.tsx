@@ -3,7 +3,10 @@
 
 import { useViewerTimezone } from "../shared/viewer-timezone";
 import { useState } from "react";
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
+import { SearchOutline } from "@makeplane/propel/icons";
 import type { TWorkshopPlanDraft } from "@/services/capacity.service";
 import { dateTimeLabel } from "./workshop-planner.utils";
 
@@ -38,23 +41,40 @@ export function PlanToolbar({
           <p className="mt-1 text-body-xs-regular text-secondary">Find a trainer and reserve or schedule a workshop.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" disabled={busy} onClick={() => setOpen(!open)} aria-expanded={open}>
-            Saved plans
-          </Button>
-          <Button variant="secondary" size="sm" disabled={busy} onClick={() => onSelect(null)}>
-            New plan
-          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            stretch="auto"
+            label="Saved plans"
+            disabled={busy}
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            stretch="auto"
+            label="New plan"
+            disabled={busy}
+            onClick={() => onSelect(null)}
+          />
         </div>
       </div>
       {open && (
         <div className="rounded-lg border border-subtle p-3">
-          <input
-            aria-label="Search saved plans"
-            placeholder="Search saved plans"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="mb-2 h-9 w-full rounded border border-subtle bg-surface-2 px-3"
-          />
+          <div className="mb-2">
+            <InputGroup size="lg">
+              <Icon icon={SearchOutline} tint="placeholder" />
+              <Input
+                size="lg"
+                type="text"
+                aria-label="Search saved plans"
+                placeholder="Search saved plans"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </InputGroup>
+          </div>
           <ul aria-label="Saved plans" className="max-h-64 space-y-1 overflow-y-auto">
             {drafts
               .filter((draft) =>
@@ -106,13 +126,23 @@ export function PlanToolbar({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="primary" size="sm" disabled={!canSave || busy || !dirty} onClick={onSave}>
-            Save changes
-          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            stretch="auto"
+            label="Save changes"
+            disabled={!canSave || busy || !dirty}
+            onClick={onSave}
+          />
           {currentId && (
-            <Button variant="secondary" size="sm" disabled={busy} onClick={onDelete}>
-              Delete plan
-            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              stretch="auto"
+              label="Delete plan"
+              disabled={busy}
+              onClick={onDelete}
+            />
           )}
         </div>
       </div>

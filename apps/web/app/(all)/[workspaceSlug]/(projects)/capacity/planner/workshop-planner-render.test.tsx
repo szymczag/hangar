@@ -15,14 +15,23 @@ vi.mock("@/hooks/store/use-instance", () => ({
 }));
 vi.mock("../shared/use-capacity-data", () => ({ useCapacityData: () => state.data }));
 vi.mock("../shared/week-stepper", () => ({ WeekStepper: () => null }));
-vi.mock("@plane/ui", () => ({ Spinner: () => <p>Loading</p>, ModalCore: () => null }));
+vi.mock("@plane/blocks/spinner", () => ({ Spinner: () => <p>Loading</p> }));
+vi.mock("@makeplane/propel/components/dialog", () => ({
+  Dialog: () => null,
+  DialogActions: () => null,
+  DialogBody: () => null,
+  DialogContent: () => null,
+  DialogDescription: () => null,
+  DialogHeader: () => null,
+  DialogHeading: () => null,
+  DialogMain: () => null,
+  DialogTitle: () => null,
+}));
 vi.mock("./create-workshop", () => ({ CreateWorkshop: () => null }));
 vi.mock("@/components/core/page-title", () => ({ PageHead: () => null }));
 vi.mock("@/components/auth-screens/not-authorized-view", () => ({ NotAuthorizedView: () => null }));
-vi.mock("@plane/propel/button", () => ({
-  Button: ({ children, disabled }: React.PropsWithChildren<{ disabled?: boolean }>) => (
-    <button disabled={disabled}>{children}</button>
-  ),
+vi.mock("@makeplane/propel/components/button", () => ({
+  Button: ({ label, disabled }: { label: string; disabled?: boolean }) => <button disabled={disabled}>{label}</button>,
 }));
 
 const from = new Date(2099, 8, 7);

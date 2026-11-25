@@ -5,10 +5,13 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
-import { Link2, Unplug } from "lucide-react";
 import useSWR, { mutate } from "swr";
-import { Button } from "@plane/propel/button";
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Button } from "@makeplane/propel/components/button";
+import { CheckboxField } from "@makeplane/propel/components/checkbox-field";
+import { Icon } from "@makeplane/propel/components/icon";
+import { TextButton } from "@makeplane/propel/components/text-button";
+import { LinkOutline, UnlinkOutline } from "@makeplane/propel/icons";
+import { setToast } from "@plane/blocks/toast";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
 import { useInstance } from "@/hooks/store/use-instance";
@@ -29,9 +32,7 @@ function BookingHoursSummary({ profile, onManage }: { profile: TTrainerProfile; 
           {profile.timezone} · Google busy time and scheduled workshops are subtracted inside these hours.
         </p>
       </div>
-      <Button variant="secondary" size="sm" onClick={onManage}>
-        Manage schedule
-      </Button>
+      <Button variant="secondary" size="md" stretch="auto" onClick={onManage} label="Manage schedule" />
     </section>
   );
 }
@@ -75,13 +76,13 @@ function CalendarPicker({
     try {
       await capacityService.selectCalendars(workspaceSlug, [...selected], selectionRevision);
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Calendars saved",
         message: "Only anonymous busy ranges will be used.",
       });
       onSaved();
     } catch (error: unknown) {
-      setToast({ type: TOAST_TYPE.ERROR, title: "Calendars not saved", message: errorMessage(error, "Try again.") });
+      setToast({ type: "error", title: "Calendars not saved", message: errorMessage(error, "Try again.") });
     } finally {
       setSaving(false);
     }
@@ -95,23 +96,30 @@ function CalendarPicker({
             Hangar reads free/busy ranges, never event details.
           </p>
         </div>
-        <Button size="sm" variant="primary" loading={saving} disabled={selected.size === 0} onClick={save}>
-          Save calendars
-        </Button>
+        <Button
+          size="md"
+          variant="primary"
+          stretch="auto"
+          loading={saving}
+          disabled={selected.size === 0}
+          onClick={save}
+          label="Save calendars"
+        />
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         {visible.map((calendar) => (
-          <label
+          <div
             key={calendar.id}
-            className={`flex items-center gap-3 rounded-md border border-subtle px-3 py-2 text-body-xs-regular ${
-              calendar.is_training_calendar ? "opacity-70" : "cursor-pointer hover:bg-surface-2"
+            className={`rounded-md border border-subtle px-3 py-2 ${
+              calendar.is_training_calendar ? "opacity-70" : "hover:bg-surface-2"
             }`}
           >
-            <input
-              type="checkbox"
+            <CheckboxField
+              size="md"
+              label={calendar.summary}
               checked={selected.has(calendar.id)}
               disabled={calendar.is_training_calendar}
-              onChange={() =>
+              onCheckedChange={() =>
                 setSelected((current) => {
                   const next = new Set(current);
                   if (next.has(calendar.id)) next.delete(calendar.id);
@@ -119,34 +127,40 @@ function CalendarPicker({
                   return next;
                 })
               }
+              description={
+                calendar.id === calendar.summary && !calendar.is_training_calendar && !calendar.primary ? undefined : (
+                  <>
+                    {calendar.id === calendar.summary ? null : (
+                      <span className="block truncate" title={calendar.id}>
+                        {calendar.id}
+                      </span>
+                    )}
+                    {calendar.is_training_calendar ? (
+                      <span className="block">
+                        Shared training calendar. It carries everybody&apos;s training, so it cannot block your time —
+                        your own trainings are recognized from your invitations.
+                      </span>
+                    ) : null}
+                    {calendar.primary ? <span className="block">Primary</span> : null}
+                  </>
+                )
+              }
             />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate">{calendar.summary}</span>
-              {calendar.id === calendar.summary ? null : (
-                <span className="block truncate text-11 text-placeholder" title={calendar.id}>
-                  {calendar.id}
-                </span>
-              )}
-              {calendar.is_training_calendar ? (
-                <span className="block text-11 text-placeholder">
-                  Shared training calendar. It carries everybody&apos;s training, so it cannot block your time — your
-                  own trainings are recognized from your invitations.
-                </span>
-              ) : null}
-            </span>
-            {calendar.primary ? <span className="shrink-0 text-11 text-placeholder">Primary</span> : null}
-          </label>
+          </div>
         ))}
       </div>
       {rest.length ? (
-        <button
-          type="button"
-          aria-expanded={showAll}
-          className="mt-2 text-11 text-accent-primary"
-          onClick={() => setShowAll((value) => !value)}
-        >
-          {showAll ? "Show fewer calendars" : `Show ${rest.length} more calendar${rest.length === 1 ? "" : "s"}`}
-        </button>
+        <div className="mt-2">
+          <TextButton
+            variant="primary"
+            size="md"
+            aria-expanded={showAll}
+            onClick={() => setShowAll((value) => !value)}
+            label={
+              showAll ? "Show fewer calendars" : `Show ${rest.length} more calendar${rest.length === 1 ? "" : "s"}`
+            }
+          />
+        </div>
       ) : null}
       {selected.size === 0 ? (
         <p role="alert" className="mt-2 text-11 text-danger-primary">
@@ -203,9 +217,14 @@ function TrainingRecognitionPanel({
           </p>
         </>
       )}
-      <Button variant={enabled ? "secondary" : "primary"} loading={busy} onClick={onConnect}>
-        {enabled ? "Renew training calendar access" : "Allow training calendar access"}
-      </Button>
+      <Button
+        variant={enabled ? "secondary" : "primary"}
+        size="md"
+        stretch="auto"
+        loading={busy}
+        onClick={onConnect}
+        label={enabled ? "Renew training calendar access" : "Allow training calendar access"}
+      />
     </section>
   );
 }
@@ -256,7 +275,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
       window.location.assign(authorization_url);
     } catch (error: unknown) {
       setToast({
-        type: TOAST_TYPE.ERROR,
+        type: "error",
         title: "Google Calendar not connected",
         message: errorMessage(error, "Try again."),
       });
@@ -270,7 +289,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
       await capacityService.disconnectGoogle(workspaceSlug);
       await refresh();
       setToast({
-        type: TOAST_TYPE.SUCCESS,
+        type: "success",
         title: "Google Calendar disconnected",
         message: "Cached Google availability was removed.",
       });
@@ -290,7 +309,7 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
         await refresh();
       } else {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Google Calendar remains connected",
           message: errorMessage(error, "Try again later."),
         });
@@ -321,9 +340,14 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                 calendars block your time.
               </p>
             </div>
-            <Button variant="primary" loading={optingIn} onClick={optIn}>
-              {ownProfile ? "Reactivate trainer" : "Become a trainer"}
-            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              stretch="auto"
+              loading={optingIn}
+              onClick={optIn}
+              label={ownProfile ? "Reactivate trainer" : "Become a trainer"}
+            />
           </section>
         ) : null}
 
@@ -331,9 +355,13 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
           <section aria-label="Manage your schedule" className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-body-sm-medium">Your booking hours</h2>
-              <Button variant="secondary" size="sm" onClick={() => setEditingOwnSchedule(false)}>
-                Close
-              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                stretch="auto"
+                onClick={() => setEditingOwnSchedule(false)}
+                label="Close"
+              />
             </div>
             <ScheduleEditor
               key={`${ownProfile.id}-${ownProfile.schedule_revision}-schedule`}
@@ -367,10 +395,15 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
                     Connect read-only free/busy access. This connection reads busy times without event names.
                   </p>
                 </div>
-                <Button variant="primary" loading={connecting} onClick={() => void connect()}>
-                  <Link2 className="mr-2 size-4" />
-                  Connect Google Calendar
-                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  stretch="auto"
+                  loading={connecting}
+                  onClick={() => void connect()}
+                  icon={<Icon icon={LinkOutline} />}
+                  label="Connect Google Calendar"
+                />
               </section>
             )}
             {isConnected && (
@@ -381,15 +414,16 @@ export default function TrainerCapacityPage({ params }: Route.ComponentProps) {
               />
             )}
             {isConnected ? (
-              <button
-                type="button"
-                className="self-end text-11 text-secondary hover:text-danger-primary"
-                disabled={disconnecting}
-                onClick={disconnect}
-              >
-                <Unplug className="mr-1 inline size-3" />
-                {disconnecting ? "Disconnecting…" : "Disconnect Google Calendar"}
-              </button>
+              <div className="self-end">
+                <TextButton
+                  variant="secondary"
+                  size="md"
+                  disabled={disconnecting}
+                  onClick={disconnect}
+                  icon={<Icon icon={UnlinkOutline} />}
+                  label={disconnecting ? "Disconnecting…" : "Disconnect Google Calendar"}
+                />
+              </div>
             ) : null}
           </>
         ) : null}
