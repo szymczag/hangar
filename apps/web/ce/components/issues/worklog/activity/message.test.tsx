@@ -19,7 +19,8 @@ import { ActivityIcon, ActivityMessage } from "@/components/core/activity";
 import { WorklogActivityMessage } from "./message";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const text = (markup: string) => markup.replace(/<[^>]+>/g, "");
+// The duration is the emphasised part of each sentence.
+const strong = (value: string) => `<span class="font-medium text-primary">${value}</span>`;
 
 const worklogRow = (overrides: Partial<IIssueActivity>) =>
   ({
@@ -35,15 +36,15 @@ const worklogRow = (overrides: Partial<IIssueActivity>) =>
 
 describe("WorklogActivityMessage", () => {
   it("says what was logged, changed or removed, with the duration", () => {
-    expect(
-      text(renderToStaticMarkup(<WorklogActivityMessage verb="created" oldValue={undefined} newValue="45m" />))
-    ).toBe("logged 45m");
-    expect(text(renderToStaticMarkup(<WorklogActivityMessage verb="updated" oldValue="30m" newValue="1h" />))).toBe(
-      "updated logged time from 30m to 1h"
+    expect(renderToStaticMarkup(<WorklogActivityMessage verb="created" oldValue={undefined} newValue="45m" />)).toBe(
+      `logged ${strong("45m")}`
     );
-    expect(
-      text(renderToStaticMarkup(<WorklogActivityMessage verb="deleted" oldValue="1h" newValue={undefined} />))
-    ).toBe("removed logged time 1h");
+    expect(renderToStaticMarkup(<WorklogActivityMessage verb="updated" oldValue="30m" newValue="1h" />)).toBe(
+      `updated logged time from ${strong("30m")} to ${strong("1h")}`
+    );
+    expect(renderToStaticMarkup(<WorklogActivityMessage verb="deleted" oldValue="1h" newValue={undefined} />)).toBe(
+      `removed logged time ${strong("1h")}`
+    );
   });
 });
 
@@ -52,10 +53,10 @@ describe("WorklogActivityMessage", () => {
 // had no worklog entry.
 describe("ActivityMessage for a worklog row", () => {
   it("reads like the work item feed", () => {
-    expect(text(renderToStaticMarkup(<ActivityMessage activity={worklogRow({})} />))).toBe("logged 45m");
-    expect(
-      text(renderToStaticMarkup(<ActivityMessage activity={worklogRow({ verb: "updated", old_value: "30m" })} />))
-    ).toBe("updated logged time from 30m to 45m");
+    expect(renderToStaticMarkup(<ActivityMessage activity={worklogRow({})} />)).toBe(`logged ${strong("45m")}`);
+    expect(renderToStaticMarkup(<ActivityMessage activity={worklogRow({ verb: "updated", old_value: "30m" })} />)).toBe(
+      `updated logged time from ${strong("30m")} to ${strong("45m")}`
+    );
   });
 
   it("has an icon", () => {
