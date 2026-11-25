@@ -8,7 +8,7 @@ import { observer } from "mobx-react";
 // plane imports
 import { ENotificationTab } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { EmptyStateCompact } from "@plane/propel/empty-state";
+import { EmptyStateCompact } from "@plane/blocks/empty-state";
 
 type TNotificationEmptyStateProps = {
   currentNotificationTab: ENotificationTab;
@@ -30,7 +30,7 @@ export const NotificationEmptyState = observer(function NotificationEmptyState({
             ? t("workspace_empty_state.inbox_sidebar_all.title")
             : t("workspace_empty_state.inbox_sidebar_mentions.title")
         }
-        className="max-w-56"
+        className="max-w-none px-5"
       />
     </>
   );

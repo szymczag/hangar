@@ -909,5 +909,6 @@
       "save_options": "Opciones para guardar la vista",
       "update_view": "Actualizar vista"
     }
-  }
+  },
+  "submitting": "Enviando"
 }

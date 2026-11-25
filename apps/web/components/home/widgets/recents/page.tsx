@@ -5,11 +5,11 @@
  */
 
 import { useRouter } from "next/navigation";
-import { Logo } from "@plane/propel/emoji-icon-picker";
-import { PageIcon } from "@plane/propel/icons";
+import { Avatar } from "@makeplane/propel/components/avatar";
+import { Logo } from "@plane/blocks/emoji-icon-picker";
+import { PagesOutline } from "@makeplane/propel/icons";
 // plane import
 import type { TActivityEntityData, TPageEntityData } from "@plane/types";
-import { Avatar } from "@plane/ui";
 import { calculateTimeAgo, getFileURL, getPageName } from "@plane/utils";
 import { ListItem } from "@/components/core/list";
 // hooks
@@ -43,35 +43,43 @@ export function RecentPage(props: BlockProps) {
       itemLink={pageLink}
       title={getPageName(pageDetails?.name)}
       prependTitleElement={
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <div className="grid size-8 flex-shrink-0 place-items-center rounded-sm bg-layer-2">
+        <div className="flex flex-shrink-0 items-center gap-1.5">
+          <div className="grid size-4 flex-shrink-0 place-items-center">
             {pageDetails?.logo_props?.in_use ? (
               <Logo logo={pageDetails?.logo_props} size={16} type="lucide" />
             ) : (
-              <PageIcon className="size-4 text-tertiary" />
+              <PagesOutline className="size-4 text-tertiary" />
             )}
           </div>
           {pageDetails?.project_identifier && (
-            <div className="text-13 font-medium whitespace-nowrap text-placeholder">
+            <div className="text-caption-md-regular whitespace-nowrap text-tertiary">
               {pageDetails?.project_identifier}
             </div>
           )}
         </div>
       }
       appendTitleElement={
-        <div className="flex-shrink-0 text-11 font-medium text-placeholder">
+        <div className="flex-shrink-0 text-caption-md-regular text-tertiary">
           {calculateTimeAgo(activity.visited_at)}
         </div>
       }
       quickActionElement={
-        <div className="flex gap-4">
-          <Avatar src={getFileURL(ownerDetails?.avatar_url ?? "")} name={ownerDetails?.display_name} />
+        <div className="flex items-center gap-2">
+          <Avatar
+            alt={ownerDetails?.display_name}
+            fallback={ownerDetails?.display_name?.[0]?.toUpperCase()}
+            src={getFileURL(ownerDetails?.avatar_url ?? "")}
+            size="xs"
+          />
         </div>
       }
       parentRef={ref}
       disableLink={false}
-      className="my-auto border-none !px-2 py-3"
-      itemClassName="my-auto bg-layer-transparent"
+      className="!min-h-[38px] !flex-row !gap-0 rounded-md border-none !px-2 !py-2"
+      itemClassName="!gap-2 bg-layer-transparent"
+      linkClassName="!gap-2"
+      titleClassName="text-body-sm-medium"
+      leftElementClassName="!gap-2"
       onItemClick={(e) => {
         e.preventDefault();
         e.stopPropagation();

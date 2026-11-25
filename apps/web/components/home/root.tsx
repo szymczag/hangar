@@ -8,7 +8,7 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 // plane imports
-import { ContentWrapper } from "@plane/ui";
+import { ContentWrapper } from "@plane/blocks/layout";
 // hooks
 import { useHome } from "@/hooks/store/use-home";
 import { useUserProfile, useUser } from "@/hooks/store/user";
@@ -55,7 +55,7 @@ export const WorkspaceHomeView = observer(function WorkspaceHomeView() {
       <>
         <HomePeekOverviewsRoot />
         <ContentWrapper className="mx-auto scrollbar-hide gap-6 bg-surface-1 px-page-x">
-          <div className="mx-auto w-full max-w-[800px]">
+          <div className="mx-auto w-full max-w-[750px]">
             {currentUser && <UserGreetingsView user={currentUser} />}
             <DashboardWidgets />
           </div>

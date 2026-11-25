@@ -38,6 +38,7 @@ from plane.db.models import (
     IssueSequence,
     Label,
     Module,
+    Notification,
     Page,
     Profile,
     Project,
@@ -50,6 +51,11 @@ from plane.db.models import (
     WorkspaceMember,
     WorkspaceMemberInvite,
     WorkspaceUserPreference,
+)
+from plane.app.serializers.workspace import (
+    IssueRecentVisitSerializer,
+    PageRecentVisitSerializer,
+    ProjectRecentVisitSerializer,
 )
 from plane.bgtasks.issue_activities_task import _format_worklog_duration
 from plane.ext.auth.sessions import mint_admin_session, mint_app_session
@@ -143,6 +149,20 @@ PAGE_IDS = (
     uuid.UUID("a0000000-0000-4000-8000-000000000008"),
 )
 STICKY_ID = uuid.UUID("a0000000-0000-4000-8000-000000000009")
+# Two inbox notifications for the light user, for the notifications story.
+NOTIFICATION_IDS = (
+    uuid.UUID("a0000000-0000-4000-8000-000000000015"),
+    uuid.UUID("a0000000-0000-4000-8000-000000000016"),
+)
+# The home page's recents, served to the home story in place of the live list.
+# These are not rows: a visit is recorded by the server as a side effect of
+# reading a work item, a page or a project, so the live list depends on which
+# stories ran before. The ids are only the list's keys.
+RECENT_VISIT_IDS = (
+    uuid.UUID("a0000000-0000-4000-8000-000000000017"),
+    uuid.UUID("a0000000-0000-4000-8000-000000000018"),
+    uuid.UUID("a0000000-0000-4000-8000-000000000019"),
+)
 
 # Enough to overflow a 900px viewport, which the layout story depends on.
 #
@@ -207,6 +227,7 @@ class Command(BaseCommand):
         self._cycles_and_modules(workspace, project, users["light"])
         self._pages(workspace, project, users["light"])
         self._stickies(workspace, users["light"])
+        self._notifications(workspace, project, users)
         self._shared_links(workspace, users)
         self._import_jobs(workspace, project, users["admin"])
         self._invitations(workspace, users["admin"])
@@ -256,6 +277,9 @@ class Command(BaseCommand):
             # The project pages and the sticky the page and sticky stories wait on.
             "pages": {"ids": [str(page_id) for page_id in PAGE_IDS], "names": [n for n, _ in Command.PAGES]},
             "sticky": Command.STICKY_TEXT,
+            "recents": self._recents(project, workshop),
+            # The work item the inbox notifications are about, which the inbox story waits on.
+            "notifications": {"workItem": WORK_ITEMS[0][0], "count": len(NOTIFICATION_IDS)},
             "invitations": [email for email, _ in Command.INVITATIONS],
             "sharedLinks": {
                 "visible": [t for t, _, hidden in Command.SHARED_LINKS if not hidden],
@@ -263,14 +287,17 @@ class Command(BaseCommand):
             },
             "users": {
                 "light": {
+                    "id": str(users["light"].id),
                     "email": users["light"].email,
                     "sessionCookie": mint_app_session(users["light"]),
                 },
                 "dark": {
+                    "id": str(users["dark"].id),
                     "email": users["dark"].email,
                     "sessionCookie": mint_app_session(users["dark"]),
                 },
                 "admin": {
+                    "id": str(users["admin"].id),
                     "email": users["admin"].email,
                     "sessionCookie": mint_app_session(users["admin"]),
                     "adminSessionCookie": mint_admin_session(users["admin"], verified=True),
@@ -820,6 +847,101 @@ class Command(BaseCommand):
         Sticky.objects.filter(pk=sticky.pk).update(
             created_at=CLOCK - timedelta(days=1), updated_at=CLOCK - timedelta(days=1)
         )
+
+    def _notifications(self, workspace, project, users) -> None:
+        """Two inbox notifications for the light user, both already read.
+
+        Without them the inbox renders its empty state, and no notification
+        card shows anywhere. Read, because the sidebar counts unread
+        notifications on every page: an unread one would add a badge to the
+        light user's sidebar in every story, and opening an unread card marks
+        it read, which is a write the guard refuses. The dark user triggered
+        both, on the first work item, so the cards print a name and an avatar
+        that are not the reader's own.
+        """
+        issue = Issue.objects.filter(project=project).order_by("sequence_id").first()
+        if issue is None:
+            return
+        actor = users["dark"]
+        issue_data = {
+            "id": str(issue.id),
+            "name": issue.name,
+            "identifier": project.identifier,
+            "sequence_id": issue.sequence_id,
+            "state_name": issue.state.name,
+            "state_group": issue.state.group,
+        }
+        for notification_id, (field, title, old_value, new_value, hours) in zip(
+            NOTIFICATION_IDS,
+            (
+                ("priority", "updated the priority to", "medium", "urgent", 1),
+                ("comment", "added a comment", "", self.COMMENT, 3),
+            ),
+        ):
+            stamped = CLOCK - timedelta(hours=hours)
+            notification, _ = Notification.objects.get_or_create(
+                id=notification_id,
+                defaults={
+                    "workspace": workspace,
+                    "project": project,
+                    "receiver": users["light"],
+                    "triggered_by": actor,
+                    "entity_identifier": issue.id,
+                    "entity_name": "issue",
+                    "sender": "in_app:issue_activities:subscribed",
+                    "title": title,
+                    "data": {
+                        "issue": issue_data,
+                        "issue_activity": {
+                            "id": str(notification_id),
+                            "verb": "created" if field == "comment" else "updated",
+                            "field": field,
+                            "actor": str(actor.id),
+                            "new_value": new_value,
+                            "old_value": old_value,
+                            "issue_comment": new_value if field == "comment" else "",
+                            "old_identifier": None,
+                            "new_identifier": None,
+                        },
+                    },
+                },
+            )
+            # `auto_now_add`, and the card prints it relative to the browser's clock.
+            Notification.objects.filter(pk=notification.pk).update(
+                created_at=stamped, updated_at=stamped, read_at=stamped
+            )
+
+    def _recents(self, project, workshop) -> list:
+        """What the recents endpoint would return had the light user visited three things.
+
+        Written by the same serializers the endpoint uses, so the home story
+        photographs the rows the server would send. The workshop is the work
+        item, because it has assignees; the project's members are sorted,
+        because the row prints them in the order given and the query has none.
+        """
+        page = Page.objects.get(pk=PAGE_IDS[0])
+        project_data = ProjectRecentVisitSerializer(project).data
+        project_data["project_members"] = sorted(str(member) for member in project_data["project_members"])
+        issue_data = IssueRecentVisitSerializer(workshop).data
+        issue_data["assignees"] = sorted(str(assignee) for assignee in issue_data["assignees"])
+        entries = (
+            ("issue", workshop.id, issue_data),
+            ("page", page.id, PageRecentVisitSerializer(page).data),
+            ("project", project.id, project_data),
+        )
+        recents = []
+        for index, (visit_id, (entity_name, identifier, data)) in enumerate(zip(RECENT_VISIT_IDS, entries), start=1):
+            recents.append(
+                {
+                    "id": str(visit_id),
+                    "entity_name": entity_name,
+                    "entity_identifier": str(identifier),
+                    "visited_at": (CLOCK - timedelta(hours=index)).isoformat().replace("+00:00", "Z"),
+                    # UUIDs to strings, as the API's renderer would write them.
+                    "entity_data": json.loads(json.dumps(data, default=str)),
+                }
+            )
+        return recents
 
     def _shared_links(self, workspace, users) -> None:
         for index, (title, url, hidden) in enumerate(self.SHARED_LINKS):

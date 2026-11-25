@@ -909,5 +909,6 @@
       "save_options": "Options d’enregistrement de la vue",
       "update_view": "Mettre à jour la vue"
     }
-  }
+  },
+  "submitting": "Envoi en cours"
 }

@@ -9,12 +9,11 @@ import React from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Hotel } from "lucide-react";
+import { CloseOutline, MembersOutline, ProjectsOutline, TickOutline } from "@makeplane/propel/icons";
 // plane ui
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
 import { useTranslation } from "@plane/i18n";
-import { MembersPropertyIcon, CheckIcon, ProjectIcon, CloseIcon } from "@plane/propel/icons";
 import { cn, getFileURL } from "@plane/utils";
 // helpers
 import { canInviteToWorkspace } from "@/helpers/workspace-invite-access";
@@ -60,7 +59,7 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
       id: "create-project",
       title: "home.empty.create_project.title",
       description: "home.empty.create_project.description",
-      icon: <ProjectIcon className="size-4" />,
+      icon: <ProjectsOutline className="size-4" />,
       flag: "projects",
       cta: {
         text: "home.empty.create_project.cta",
@@ -77,7 +76,7 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
       id: "invite-team",
       title: "home.empty.invite_team.title",
       description: "home.empty.invite_team.description",
-      icon: <MembersPropertyIcon className="size-4" />,
+      icon: <MembersOutline className="size-4" />,
       flag: "visited_members",
       cta: {
         text: "home.empty.invite_team.cta",
@@ -89,7 +88,7 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
       id: "configure-workspace",
       title: "home.empty.configure_workspace.title",
       description: "home.empty.configure_workspace.description",
-      icon: <Hotel className="size-4" />,
+      icon: <ProjectsOutline className="size-4" />,
       flag: "visited_workspace",
       cta: {
         text: "home.empty.configure_workspace.cta",
@@ -114,7 +113,7 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
           </Link>
         ) : (
           <Link href={`/${workspaceSlug}/profile/${currentUser?.id}`}>
-            <span className="relative flex size-4 items-center justify-center rounded-full bg-[#028375] p-4 text-13 text-on-color capitalize">
+            <span className="relative flex size-4 items-center justify-center rounded-full bg-[#028375] p-4 text-body-xs-regular text-on-color capitalize">
               {(currentUser?.email ?? currentUser?.display_name ?? "?")[0]}
             </span>
           </Link>
@@ -145,15 +144,15 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <div className="text-14 font-semibold text-tertiary">{t("home.empty.quickstart_guide")}</div>
+        <div className="text-body-sm-semibold text-tertiary">{t("home.empty.quickstart_guide")}</div>
         <button
-          className="flex items-center gap-1 text-13 font-medium text-tertiary"
+          className="flex items-center gap-1 text-body-xs-medium text-tertiary"
           onClick={() => {
             if (!storedValue) return;
             setValue({ ...storedValue, hide: true });
           }}
         >
-          <CloseIcon className="size-4" />
+          <CloseOutline className="size-4" />
           {t("home.empty.not_right_now")}
         </button>
       </div>
@@ -167,13 +166,13 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
                   "bg-accent-primary/10 text-accent-primary": !isStateComplete,
                 })}
               >
-                <span className="my-auto text-24">{item.icon}</span>
+                <span className="my-auto text-h3-regular">{item.icon}</span>
               </div>
-              <h3 className="mb-2 text-13 font-medium text-primary">{t(item.title)}</h3>
-              <p className="mb-2 text-11 text-tertiary">{t(item.description)}</p>
+              <h3 className="mb-2 text-body-xs-medium text-primary">{t(item.title)}</h3>
+              <p className="mb-2 text-caption-md-regular text-tertiary">{t(item.description)}</p>
               {isStateComplete ? (
                 <div className="flex w-fit items-center gap-2 rounded-full bg-[#17a34a] p-1">
-                  <CheckIcon className="size-3 text-accent-primary text-on-color" />
+                  <TickOutline className="size-3 text-accent-primary text-on-color" />
                 </div>
               ) : (
                 !item.cta.disabled &&
@@ -191,14 +190,14 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
                         [item.flag]: true,
                       });
                     }}
-                    className={cn("text-13 font-medium text-accent-primary hover:text-accent-secondary", {})}
+                    className={cn("text-body-xs-medium text-accent-primary hover:text-accent-secondary", {})}
                   >
                     {t(item.cta.text)}
                   </Link>
                 ) : (
                   <button
                     type="button"
-                    className="text-left text-13 font-medium text-accent-primary hover:text-accent-secondary"
+                    className="text-left text-body-xs-medium text-accent-primary hover:text-accent-secondary"
                     onClick={item.cta.onClick}
                   >
                     {t(item.cta.text)}

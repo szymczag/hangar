@@ -6,9 +6,10 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-import { Clock } from "lucide-react";
+import { ClockOutline } from "@makeplane/propel/icons";
 // plane imports
-import { Avatar, Row } from "@plane/ui";
+import { Avatar } from "@makeplane/propel/components/avatar";
+import { Row } from "@plane/blocks/layout";
 import { cn, calculateTimeAgo, renderFormattedDate, renderFormattedTime, getFileURL } from "@plane/utils";
 // hooks
 import { useWorkspaceNotifications } from "@/hooks/store/notifications";
@@ -42,6 +43,7 @@ export const NotificationItem = observer(function NotificationItem(props: TNotif
   // derived values
   const projectId = notification?.project || undefined;
   const issueId = notification?.data?.issue?.id || undefined;
+  const isUnread = notification.read_at === null;
   const workspace = getWorkspaceBySlug(workspaceSlug);
 
   const notificationField = notification?.data?.issue_activity.field || undefined;
@@ -82,12 +84,11 @@ export const NotificationItem = observer(function NotificationItem(props: TNotif
         "group relative flex cursor-pointer items-center gap-2 border-b border-subtle py-4 transition-all",
         {
           "bg-layer-1/30": currentSelectedNotificationId === notification?.id,
-          "bg-accent-primary/5": notification.read_at === null,
         }
       )}
       onClick={handleNotificationIssuePeekOverview}
     >
-      {notification.read_at === null && (
+      {isUnread && (
         <div className="absolute top-[50%] left-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-primary" />
       )}
 
@@ -95,23 +96,29 @@ export const NotificationItem = observer(function NotificationItem(props: TNotif
         <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-layer-1">
           {notificationTriggeredBy && (
             <Avatar
-              name={notificationTriggeredBy.display_name || notificationTriggeredBy?.first_name}
+              alt={notificationTriggeredBy.display_name || notificationTriggeredBy?.first_name}
+              fallback={(notificationTriggeredBy.display_name ||
+                notificationTriggeredBy?.first_name)?.[0]?.toUpperCase()}
               src={getFileURL(notificationTriggeredBy.avatar_url)}
-              size={42}
-              shape="circle"
-              className="bg-layer-1 text-body-sm-medium"
+              size="xl"
             />
           )}
         </div>
 
-        <div className="-mt-2 w-full space-y-1">
+        <div className="w-full space-y-1">
           <div className="relative flex h-8 items-center gap-3">
-            <div className="line-clamp-1 w-full truncate overflow-hidden text-body-xs-medium break-all whitespace-normal text-primary">
+            <div
+              className={cn(
+                "-mt-2 line-clamp-1 w-full truncate overflow-hidden break-all whitespace-normal",
+                isUnread ? "text-body-xs-semibold text-primary" : "text-body-xs-regular text-secondary"
+              )}
+            >
               <NotificationContent
                 notification={notification}
                 workspaceId={workspace.id}
                 workspaceSlug={workspaceSlug}
                 projectId={projectId}
+                isUnread={isUnread}
               />
             </div>
             <NotificationOption
@@ -132,7 +139,7 @@ export const NotificationItem = observer(function NotificationItem(props: TNotif
             <div className="flex-shrink-0">
               {notification?.snoozed_till ? (
                 <p className="flex flex-shrink-0 items-center justify-end gap-x-1 text-tertiary">
-                  <Clock className="h-4 w-4" />
+                  <ClockOutline className="h-4 w-4" />
                   <span>
                     Till {renderFormattedDate(notification.snoozed_till)},&nbsp;
                     {renderFormattedTime(notification.snoozed_till, "12-hour")}
