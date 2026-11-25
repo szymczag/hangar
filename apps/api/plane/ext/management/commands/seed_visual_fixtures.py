@@ -21,7 +21,7 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from plane.db.models import (
@@ -213,14 +213,29 @@ _PRIORITIES = ["urgent", "high", "high", "medium", "medium", "low", "low", "none
 WORK_ITEMS = [(name, _PRIORITIES[index % len(_PRIORITIES)]) for index, name in enumerate(_WORK_ITEM_NAMES)]
 
 
+# The seed gives its users a published password and mints sessions for them, so
+# it must never run against a database anyone relies on. Only the visual
+# regression stack sets this; anywhere else the command refuses before it
+# touches a row.
+OPT_IN_VARIABLE = "HANGAR_VISUAL_FIXTURES"
+
+
 class Command(BaseCommand):
     help = "Seed the fixed data the visual regression suite screenshots"
 
     def add_arguments(self, parser):
         parser.add_argument("--out", default=os.environ.get("VR_FIXTURES", "/vr/fixtures.json"))
 
-    @transaction.atomic
     def handle(self, *args, **options):
+        if os.environ.get(OPT_IN_VARIABLE) != "1":
+            raise CommandError(
+                f"Refusing to seed: these fixtures give their users a known password. "
+                f"Set {OPT_IN_VARIABLE}=1 only in the disposable visual regression stack."
+            )
+        self._seed(options)
+
+    @transaction.atomic
+    def _seed(self, options):
         users = self._users()
         workspace = self._workspace(users["admin"])
         project = self._project(workspace, users)
