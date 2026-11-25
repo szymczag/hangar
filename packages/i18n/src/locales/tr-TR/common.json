@@ -120,8 +120,6 @@
   "general_settings": "Genel ayarlar",
   "sign_out": "Çıkış yap",
   "signing_out": "Çıkış yapılıyor",
-  "active_cycles": "Aktif Döngüler",
-  "active_cycles_description": "Projeler arasında döngüleri izleyin, yüksek öncelikli iş öğelerini takip edin ve dikkat gerektiren döngülere odaklanın.",
   "on_demand_snapshots_of_all_your_cycles": "Tüm döngülerinizin anlık görüntüleri",
   "upgrade": "Yükselt",
   "10000_feet_view": "Tüm aktif döngülerin genel görünümü",

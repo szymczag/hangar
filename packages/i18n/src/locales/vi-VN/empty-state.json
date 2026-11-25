@@ -177,10 +177,6 @@
       "cta_primary": "Tạo ghi chú dán đầu tiên",
       "cta_secondary": "Tài liệu"
     },
-    "active_cycles": {
-      "title": "Không có chu kỳ hoạt động",
-      "description": "Bạn không có chu kỳ đang tiến hành ngay bây giờ. Các chu kỳ hoạt động xuất hiện ở đây khi chúng bao gồm ngày hôm nay."
-    },
     "dashboard": {
       "title": "Trực quan hóa tiến độ của bạn với bảng điều khiển",
       "description": "Xây dựng bảng điều khiển có thể tùy chỉnh để theo dõi số liệu, đo lường kết quả và trình bày thông tin hiệu quả.",

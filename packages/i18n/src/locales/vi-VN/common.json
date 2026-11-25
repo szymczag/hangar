@@ -120,8 +120,6 @@
   "general_settings": "Cài đặt chung",
   "sign_out": "Đăng xuất",
   "signing_out": "Đang đăng xuất",
-  "active_cycles": "Chu kỳ hoạt động",
-  "active_cycles_description": "Theo dõi chu kỳ trên các dự án, theo dõi mục công việc ưu tiên cao và chú ý đến các chu kỳ cần quan tâm.",
   "on_demand_snapshots_of_all_your_cycles": "Ảnh chụp nhanh theo yêu cầu của tất cả chu kỳ của bạn",
   "upgrade": "Nâng cấp",
   "10000_feet_view": "Góc nhìn tổng quan về tất cả chu kỳ hoạt động.",

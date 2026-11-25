@@ -177,10 +177,6 @@
       "cta_primary": "Vytvořit první poznámku",
       "cta_secondary": "Dokumentace"
     },
-    "active_cycles": {
-      "title": "Žádné aktivní cykly",
-      "description": "Momentálně nemáte žádné probíhající cykly. Aktivní cykly se zde zobrazí, když budou zahrnovat dnešní datum."
-    },
     "dashboard": {
       "title": "Vizualizujte svůj pokrok pomocí přehledů",
       "description": "Vytvářejte přizpůsobitelné přehledy pro sledování metrik, měření výsledků a efektivní prezentaci poznatků.",

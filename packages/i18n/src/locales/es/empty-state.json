@@ -177,10 +177,6 @@
       "cta_primary": "Crear primera nota adhesiva",
       "cta_secondary": "Documentación"
     },
-    "active_cycles": {
-      "title": "No hay ciclos activos",
-      "description": "No tienes ningún ciclo en curso en este momento. Los ciclos activos aparecen aquí cuando incluyen la fecha de hoy."
-    },
     "dashboard": {
       "title": "Visualiza tu progreso con paneles de control",
       "description": "Crea paneles personalizables para rastrear métricas, medir resultados y presentar insights de manera efectiva.",

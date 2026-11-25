@@ -177,10 +177,6 @@
       "cta_primary": "Utwórz pierwszą notatkę",
       "cta_secondary": "Dokumentacja"
     },
-    "active_cycles": {
-      "title": "Brak aktywnych cykli",
-      "description": "Nie masz teraz żadnych trwających cykli. Aktywne cykle pojawiają się tutaj, gdy obejmują dzisiejszą datę."
-    },
     "dashboard": {
       "title": "Wizualizuj swój postęp za pomocą pulpitów nawigacyjnych",
       "description": "Twórz konfigurowalne pulpity nawigacyjne do śledzenia metryk, mierzenia wyników i efektywnego prezentowania spostrzeżeń.",

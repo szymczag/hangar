@@ -177,10 +177,6 @@
       "cta_primary": "Erste Haftnotiz erstellen",
       "cta_secondary": "Dokumentation"
     },
-    "active_cycles": {
-      "title": "Keine aktiven Zyklen",
-      "description": "Sie haben derzeit keine laufenden Zyklen. Aktive Zyklen erscheinen hier, wenn sie das heutige Datum enthalten."
-    },
     "dashboard": {
       "title": "Visualisieren Sie Ihren Fortschritt mit Dashboards",
       "description": "Erstellen Sie anpassbare Dashboards, um Metriken zu verfolgen, Ergebnisse zu messen und Erkenntnisse effektiv zu präsentieren.",

@@ -120,8 +120,6 @@
   "general_settings": "一般設定",
   "sign_out": "サインアウト",
   "signing_out": "サインアウト中",
-  "active_cycles": "アクティブサイクル",
-  "active_cycles_description": "プロジェクト全体のサイクルを監視し、優先度の高い作業項目を追跡し、注意が必要なサイクルにズームインします。",
   "on_demand_snapshots_of_all_your_cycles": "すべてのサイクルのオンデマンドスナップショット",
   "upgrade": "アップグレード",
   "10000_feet_view": "すべてのアクティブサイクルの俯瞰図",

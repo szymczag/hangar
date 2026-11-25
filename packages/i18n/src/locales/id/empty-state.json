@@ -177,10 +177,6 @@
       "cta_primary": "Buat catatan pertama",
       "cta_secondary": "Dokumentasi"
     },
-    "active_cycles": {
-      "title": "Tidak ada siklus aktif",
-      "description": "Anda tidak memiliki siklus yang sedang berjalan saat ini. Siklus aktif muncul di sini ketika mereka mencakup tanggal hari ini."
-    },
     "dashboard": {
       "title": "Visualisasikan kemajuan Anda dengan dasbor",
       "description": "Bangun dasbor yang dapat disesuaikan untuk melacak metrik, mengukur hasil, dan menyajikan wawasan secara efektif.",

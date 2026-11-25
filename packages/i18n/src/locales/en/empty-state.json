@@ -177,10 +177,6 @@
       "cta_primary": "Create first sticky",
       "cta_secondary": "Documentation"
     },
-    "active_cycles": {
-      "title": "No active cycles",
-      "description": "You don't have any ongoing cycles right now. Active cycles appear here when they include today's date."
-    },
     "dashboard": {
       "title": "Visualize your progress with dashboards",
       "description": "Build customizable dashboards to track metrics, measure outcomes, and present insights effectively.",
