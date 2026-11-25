@@ -238,3 +238,99 @@ class TestWorklogNotifications:
         assert member.id in receivers
         assert guest_admin.id in receivers
         assert guest.id not in receivers
+
+
+def store_notification(workspace, project, issue, receiver, actor, field, value):
+    """A notification as the task writes it, stored before any role change."""
+    return Notification.objects.create(
+        workspace=workspace,
+        project=project,
+        receiver=receiver,
+        triggered_by=actor,
+        entity_identifier=issue.id,
+        entity_name="issue",
+        sender="in_app:issue_activities:subscribed",
+        title="logged time" if field == "worklog" else "updated the priority to",
+        data={
+            "issue": {"id": str(issue.id), "name": issue.name, "identifier": project.identifier, "sequence_id": 1},
+            "issue_activity": {"field": field, "verb": "created", "new_value": value, "old_value": ""},
+        },
+    )
+
+
+@pytest.mark.contract
+class TestStoredWorklogNotifications:
+    """Rows stored before the fix, or while the receiver was still a project member."""
+
+    def _setup(self, workspace, project, issue, create_user, role, workspace_role=None):
+        receiver = make_user(workspace, project, role, workspace_role=workspace_role)
+        worklog = store_notification(workspace, project, issue, receiver, create_user, "worklog", "1h 30m")
+        priority = store_notification(workspace, project, issue, receiver, create_user, "priority", "urgent")
+        # No activity data at all: must never be mistaken for a worklog row.
+        bare = Notification.objects.create(
+            workspace=workspace,
+            project=project,
+            receiver=receiver,
+            entity_identifier=issue.id,
+            entity_name="issue",
+            sender="in_app:issue_activities:subscribed",
+            title="",
+            data=None,
+        )
+        return client_for(receiver), worklog, priority, bare
+
+    def _list(self, client, workspace):
+        response = client.get(f"/api/workspaces/{workspace.slug}/users/notifications/")
+        assert response.status_code == status.HTTP_200_OK
+        return response
+
+    def _unread(self, client, workspace):
+        response = client.get(f"/api/workspaces/{workspace.slug}/users/notifications/unread/")
+        assert response.status_code == status.HTTP_200_OK
+        return response.data["total_unread_notifications_count"]
+
+    @pytest.mark.django_db
+    def test_a_guest_neither_lists_nor_counts_a_stored_worklog_notification(
+        self, workspace, project, issue, create_user
+    ):
+        client, worklog, priority, bare = self._setup(workspace, project, issue, create_user, GUEST)
+
+        response = self._list(client, workspace)
+
+        ids = {str(item["id"]) for item in response.data}
+        assert str(worklog.id) not in ids
+        assert {str(priority.id), str(bare.id)} <= ids
+        assert "1h 30m" not in json.dumps(response.data, cls=DjangoJSONEncoder)
+        assert self._unread(client, workspace) == 2
+
+    @pytest.mark.django_db
+    def test_a_member_demoted_to_guest_loses_the_stored_worklog_notification(
+        self, workspace, project, issue, create_user
+    ):
+        client, worklog, _, _ = self._setup(workspace, project, issue, create_user, MEMBER)
+        assert str(worklog.id) in {str(item["id"]) for item in self._list(client, workspace).data}
+
+        ProjectMember.objects.filter(project=project, member=worklog.receiver).update(role=GUEST)
+
+        assert str(worklog.id) not in {str(item["id"]) for item in self._list(client, workspace).data}
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("suffix,method", [("", "get"), ("read/", "post"), ("archive/", "post")])
+    def test_a_guest_cannot_reach_a_stored_worklog_notification_by_id(
+        self, workspace, project, issue, create_user, suffix, method
+    ):
+        client, worklog, _, _ = self._setup(workspace, project, issue, create_user, GUEST)
+
+        url = f"/api/workspaces/{workspace.slug}/users/notifications/{worklog.id}/{suffix}"
+        response = getattr(client, method)(url)
+
+        assert response.status_code != status.HTTP_200_OK
+        assert "1h 30m" not in json.dumps(getattr(response, "data", None), cls=DjangoJSONEncoder)
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("role,workspace_role", [(MEMBER, None), (ADMIN, None), (GUEST, ADMIN)])
+    def test_readers_still_list_and_count_it(self, workspace, project, issue, create_user, role, workspace_role):
+        client, worklog, _, _ = self._setup(workspace, project, issue, create_user, role, workspace_role)
+
+        assert str(worklog.id) in {str(item["id"]) for item in self._list(client, workspace).data}
+        assert self._unread(client, workspace) == 3
