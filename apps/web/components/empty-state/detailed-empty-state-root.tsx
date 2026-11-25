@@ -7,7 +7,8 @@
 import React from "react";
 import { observer } from "mobx-react";
 // ui
-import { Button } from "@plane/propel/button";
+import { Button } from "@makeplane/propel/components/button";
+import { Icon } from "@makeplane/propel/components/icon";
 // utils
 import { cn } from "@plane/utils";
 
@@ -39,6 +40,12 @@ const sizeClasses = {
   lg: "md:min-w-[30rem] max-w-[60rem]",
 } as const;
 
+const buttonSizes = {
+  sm: "xs",
+  base: "sm",
+  lg: "md",
+} as const;
+
 function CustomButton({
   config,
   variant,
@@ -51,14 +58,20 @@ function CustomButton({
   return (
     <Button
       variant={variant}
-      size={size}
+      size={buttonSizes[size]}
+      stretch="auto"
+      label={config.text}
       onClick={config.onClick}
-      prependIcon={config.prependIcon}
-      appendIcon={config.appendIcon}
+      icon={
+        config.appendIcon ? (
+          <Icon icon={config.appendIcon} />
+        ) : config.prependIcon ? (
+          <Icon icon={config.prependIcon} />
+        ) : undefined
+      }
+      iconPosition={config.appendIcon && !config.prependIcon ? "end" : "start"}
       disabled={config.disabled}
-    >
-      {config.text}
-    </Button>
+    />
   );
 }
 
@@ -86,8 +99,8 @@ export const DetailedEmptyState = observer(function DetailedEmptyState(props: Pr
     >
       <div className={cn("flex flex-col gap-5", sizeClasses[size])}>
         <div className="flex shrink-0 flex-col gap-1.5">
-          <h3 className={cn("text-18 font-semibold", { "font-medium": !description })}>{title}</h3>
-          {description && <p className="text-13">{description}</p>}
+          <h3 className={cn("text-h5-semibold", { "font-medium": !description })}>{title}</h3>
+          {description && <p className="text-body-xs-regular">{description}</p>}
         </div>
 
         {assetPath && <img src={assetPath} alt={title} className="h-auto w-full" loading="lazy" />}

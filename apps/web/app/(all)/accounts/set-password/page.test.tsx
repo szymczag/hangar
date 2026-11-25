@@ -30,7 +30,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("mobx-react", () => ({ observer: (component: unknown) => component }));
-vi.mock("lucide-react", () => ({ ShieldCheck: () => null }));
+vi.mock("@makeplane/propel/icons", () => ({ ShieldOutline: () => null }));
 vi.mock("@plane/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("@/layouts/default-layout", () => ({
   default: ({ children }: React.PropsWithChildren) => <>{children}</>,

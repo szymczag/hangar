@@ -5,9 +5,9 @@
  */
 
 import { observer } from "mobx-react";
-import { TriangleAlert } from "lucide-react";
 // plane imports
-import { Button } from "@plane/propel/button";
+import { WarningTriangleOutline } from "@makeplane/propel/icons";
+import { Button } from "@makeplane/propel/components/button";
 import { EIssueLayoutTypes } from "@plane/types";
 // components
 import { LayoutErrorBoundary } from "@/components/common/layout-error-boundary";
@@ -58,16 +58,20 @@ export const IssueLayoutHOC = observer(function IssueLayoutHOC(props: Props) {
     return (
       <div className="grid size-full place-items-center">
         <div className="flex max-w-md flex-col items-center gap-4 px-6 text-center">
-          <TriangleAlert className="size-10 text-tertiary" aria-hidden="true" />
+          <WarningTriangleOutline className="size-10 text-tertiary" />
           <div>
             <h2 className="text-16 font-semibold text-primary">Work items could not be loaded</h2>
             <p className="mt-1 text-13 text-tertiary">
               The server returned an error or an incompatible response. Reload the page to try again.
             </p>
           </div>
-          <Button variant="secondary" onClick={() => window.location.reload()}>
-            Reload page
-          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            stretch="auto"
+            label="Reload page"
+            onClick={() => window.location.reload()}
+          />
         </div>
       </div>
     );

@@ -42,9 +42,9 @@ if (import.meta.env.PROD) {
 installTrustedTypesPolicies({ reportUrl: `${API_BASE_URL}/api/csp-report/` });
 
 // The emoji pickers read their data from this app, under whatever base path it
-// is served on (packages/csp/src/vite-emoji-data.mjs), never from a CDN. Both
-// the 1.4 picker (@plane/propel) and the blocks one are pointed at it while web
-// moves to Propel in phases.
+// is served on (packages/csp/src/vite-emoji-data.mjs), never from a CDN. Web
+// itself only renders the blocks picker; the 1.4 one (@plane/propel) is still
+// pointed at it because the editor's callout logo picker renders it.
 const emojiDataUrl = `${import.meta.env.BASE_URL}emojibase`;
 setEmojiDataUrl(emojiDataUrl);
 setBlocksEmojiDataUrl(emojiDataUrl);

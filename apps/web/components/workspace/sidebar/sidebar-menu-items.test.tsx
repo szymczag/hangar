@@ -26,7 +26,6 @@ vi.mock("@plane/constants", () => ({
   EUserPermissionsLevel: { WORKSPACE: "WORKSPACE" },
 }));
 vi.mock("@plane/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock("@plane/propel/icons", () => ({ ChevronRightIcon: () => null }));
 vi.mock("@plane/utils", () => ({ cn: () => "" }));
 vi.mock("@/hooks/store/use-instance", () => ({
   useInstance: () => ({ config: { is_google_calendar_capacity_enabled: state.enabled } }),

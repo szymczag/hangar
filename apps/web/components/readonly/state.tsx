@@ -8,8 +8,8 @@ import { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { useTranslation } from "@plane/i18n";
-import { StateGroupIcon } from "@plane/propel/icons";
-import { Loader } from "@plane/ui";
+import { StateGroupIcon } from "@plane/blocks/icons";
+import { Loader } from "@plane/blocks/skeleton";
 import { cn } from "@plane/utils";
 // hooks
 import { useProjectState } from "@/hooks/store/use-project-state";
@@ -48,6 +48,7 @@ export const ReadonlyState = observer(function ReadonlyState(props: TReadonlySta
 
   useEffect(() => {
     fetchStates();
+    // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps -- refetch only when the project changes
   }, [projectId, workspaceSlug]);
 
   if (stateLoader) {

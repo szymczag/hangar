@@ -5,7 +5,8 @@
  * The web entry hydrates only after i18n is ready (upstream makeplane/plane
  * 1a76f29c79, as the published boards do), and everything React must not
  * render without is set up before that wait: the Trusted Types policies and
- * the emoji data URL of both pickers, so neither falls back to a CDN.
+ * the emoji data URL of both pickers, so neither falls back to a CDN (the
+ * 1.4 picker is only rendered by the editor's callout logo picker now).
  */
 
 import assert from "node:assert/strict";
@@ -43,12 +44,15 @@ test("both emoji pickers read the data this app serves", () => {
   assert.match(entry, /const emojiDataUrl = `\$\{import\.meta\.env\.BASE_URL\}emojibase`;/);
 });
 
-test("both toast viewports are mounted inside TranslationProvider", () => {
+test("the toast viewport is mounted inside TranslationProvider, and only the blocks one", () => {
+  // Phase 9 moved the last `setToast` callers in web off @plane/propel/toast,
+  // so its <Toast> viewport is gone: a toast raised through it would now show
+  // nowhere, which the legacy-imports contract keeps from happening.
   const translation = provider.indexOf("<TranslationProvider>");
-  const legacy = provider.indexOf("<Toast theme=");
   const blocks = provider.indexOf("<PlaneToastProvider>");
   const end = provider.indexOf("</TranslationProvider>");
-  assert.ok(translation >= 0 && legacy > translation && blocks > translation);
+  assert.ok(translation >= 0 && blocks > translation);
   assert.ok(provider.indexOf("</PlaneToastProvider>") < end);
   assert.match(provider, /import \{ PlaneToastProvider \} from "@plane\/blocks\/toast";/);
+  assert.doesNotMatch(provider, /<Toast\b|@plane\/propel\/toast/);
 });

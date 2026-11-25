@@ -7,7 +7,7 @@
 import { useEffect } from "react";
 import { observer } from "mobx-react";
 import { useTranslation } from "@plane/i18n";
-import { EstimatePropertyIcon } from "@plane/propel/icons";
+import { EstimateOutline } from "@makeplane/propel/icons";
 import { EEstimateSystem } from "@plane/types";
 import { cn, convertMinutesToHoursMinutesString } from "@plane/utils";
 // hooks
@@ -45,11 +45,12 @@ export const ReadonlyEstimate = observer(function ReadonlyEstimate(props: TReado
     if (projectId) {
       getProjectEstimates(workspaceSlug, projectId);
     }
+    // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps -- refetch only when the project changes
   }, [projectId, workspaceSlug]);
 
   return (
     <div className={cn("flex items-center gap-1 text-body-xs-regular", className)}>
-      {!hideIcon && <EstimatePropertyIcon className="size-4 flex-shrink-0" />}
+      {!hideIcon && <EstimateOutline className="size-4 flex-shrink-0" />}
       <span className="flex-grow truncate">{displayValue ?? placeholder ?? t("common.none")}</span>
     </div>
   );

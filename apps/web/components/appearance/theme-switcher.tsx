@@ -11,7 +11,7 @@ import { useTheme } from "next-themes";
 import type { I_THEME_OPTION } from "@plane/constants";
 import { THEME_OPTIONS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { setPromiseToast } from "@plane/propel/toast";
+import { setPromiseToast } from "@plane/blocks/toast";
 import { applyCustomTheme } from "@plane/utils";
 // components
 import { CustomThemeSelector } from "@/components/core/theme/custom-theme-selector";
@@ -30,15 +30,15 @@ export const ThemeSwitcher = observer(function ThemeSwitcher(props: {
   // store hooks
   const { data: userProfile, updateUserTheme } = useUserProfile();
   // theme
-  const { setTheme } = useTheme();
+  const { theme: activeTheme, setTheme } = useTheme();
   // translation
   const { t } = useTranslation();
   // derived values
+  // The saved profile theme wins; without one, show the theme the app is already using (e.g. "system").
   const currentTheme = useMemo(() => {
-    // oxlint-disable-next-line no-shadow
-    const userThemeOption = THEME_OPTIONS.find((t) => t.value === userProfile?.theme?.theme);
-    return userThemeOption || null;
-  }, [userProfile?.theme?.theme]);
+    const themeValue = userProfile?.theme?.theme || activeTheme;
+    return THEME_OPTIONS.find((option) => option.value === themeValue) ?? null;
+  }, [userProfile?.theme?.theme, activeTheme]);
 
   const handleThemeChange = useCallback(
     async (themeOption: I_THEME_OPTION) => {

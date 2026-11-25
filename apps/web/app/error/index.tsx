@@ -15,11 +15,12 @@ export function CustomErrorComponent({ error }: { error: unknown }) {
   const router = useAppRouter();
 
   const handleGoHome = () => router.push("/");
+  // oxlint-disable-next-line unicorn/consistent-function-scoping -- kept beside its sibling handler, as upstream has it
   const handleReload = () => window.location.reload();
 
   if (import.meta.env.DEV) {
     return <DevErrorComponent error={error} onGoHome={handleGoHome} onReload={handleReload} />;
   }
 
-  return <ProdErrorComponent onGoHome={handleGoHome} />;
+  return <ProdErrorComponent onGoHome={handleGoHome} onReload={handleReload} />;
 }

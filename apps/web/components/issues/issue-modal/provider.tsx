@@ -14,7 +14,7 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { mutate } from "swr";
 // plane imports
-import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { setToast } from "@plane/blocks/toast";
 import type { ISearchIssueResponse, TIssue, TIssuePropertyValueErrors, TIssuePropertyValues } from "@plane/types";
 // components
 import type {
@@ -158,7 +158,7 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
     ({ projectId, watch }: TPropertyValuesValidationProps) => {
       if (!projectId || schemaStatusByProject.current[projectId] !== "ready") {
         setToast({
-          type: TOAST_TYPE.ERROR,
+          type: "error",
           title: "Unable to validate work item properties",
           message: "The work item type schema is not available yet. Retry after it finishes loading.",
         });
