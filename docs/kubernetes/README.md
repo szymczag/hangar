@@ -6,11 +6,10 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.6.0-rc.2`. It is a release candidate for `0.6.0`;
-the current stable Hangar release for Docker Compose, Docker Swarm and the
-all-in-one image remains `0.5.0`. Helm installs a release candidate only when
-you name its version. On Kubernetes, both are qualified for evaluation on AMD64
-clusters only and are not yet a supported production release.
+The current release is `0.6.0`. It is a stable Hangar release for Docker
+Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
+for evaluation on AMD64 clusters only and is not yet a supported production
+release.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -55,7 +54,7 @@ Start with the [evaluation installation tutorial](evaluation-install.md) to
 exercise the released chart. Use the [production installation guide](production-install.md)
 only to review and help qualify the production profile.
 
-The tutorial installs stable `0.5.0`; the [chart README](../../charts/hangar/README.md)
+The tutorial installs stable `0.6.0`; the [chart README](../../charts/hangar/README.md)
 names the same versions and rollback targets. Each guide renders the chart with
 `helm template` before installing it and passes the target cluster's version with
 `--kube-version`: without a cluster connection Helm checks the chart's
@@ -64,7 +63,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.6.0-rc.2` qualification boundary is:
+The `0.6.0` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -229,12 +228,12 @@ client can then change its throttle identity by sending its own `X-Forwarded-For
 
 The product, chart, and Git identifiers are deliberately different:
 
-| Identifier         | Current value                               |
-| ------------------ | ------------------------------------------- |
-| Product version    | `v0.6.0-rc.2`                               |
-| Helm chart version | `0.6.0-rc.2`                                |
-| Git tag            | `hangar-v0.6.0-rc.2`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.6.0-rc.2` |
+| Identifier         | Current value                          |
+| ------------------ | -------------------------------------- |
+| Product version    | `v0.6.0`                               |
+| Helm chart version | `0.6.0`                                |
+| Git tag            | `hangar-v0.6.0`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.6.0` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -255,9 +254,13 @@ not a rollback target.
 are in GHCR, but its `live` image does not start, so the chart qualification
 failed and neither the chart nor a GitHub Release was published. Do not deploy
 its images; it is neither an upgrade nor a rollback target.
-`0.5.0` is the current stable release and the supported rollback target for
+The `0.6.0` release candidate that was published, `0.6.0-rc.2`, is superseded
+by `0.6.0` and is not a rollback target.
+`0.5.0` is the previous stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
-values, only the images change, and it brings back the visual test seed
+values, only the images change. An all-in-one installation that follows the
+`stable` tag has to name `v0.5.0` to roll back, because `stable` now points to
+`0.6.0`. The rollback brings back the visual test seed
 command that runs without an opt-in, the callout logo that the editor's
 Markdown serializer writes unchecked, the active cycles upsell page, the old
 callout logo picker, profile activity rows that do not say what a worklog entry
@@ -324,7 +327,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.6.0-rc.2` notes](../releases/hangar-v0.6.0-rc.2.md) — review
+- [Release `v0.6.0` notes](../releases/hangar-v0.6.0.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -356,10 +359,13 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.5.0`, tag `hangar-v0.5.0`, and chart
-`ghcr.io/szymczag/charts/hangar:0.5.0`, which is also the current stable
-release and the rollback target. The stable release before it is `0.4.0`, tag
-`hangar-v0.4.0`, and chart `ghcr.io/szymczag/charts/hangar:0.4.0`. Anybody still on rc.62 with
+The previous release is `0.6.0-rc.2`, tag `hangar-v0.6.0-rc.2`, and chart
+`ghcr.io/szymczag/charts/hangar:0.6.0-rc.2`, the release candidate for
+`0.6.0`, which `0.6.0` supersedes and which is not a rollback target. The
+previous stable release and the rollback target is `0.5.0`, tag
+`hangar-v0.5.0`, and chart `ghcr.io/szymczag/charts/hangar:0.5.0`. The stable
+release before it is `0.4.0`, tag `hangar-v0.4.0`, and chart
+`ghcr.io/szymczag/charts/hangar:0.4.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
@@ -367,32 +373,57 @@ Charts `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3` were release candidates
 for `0.2.0` and are superseded by it; do not install them. `0.2.0-rc.1` and its
 images exist in the registry, but that candidate has no GitHub Release because
 a workflow bug skipped the release job. `0.2.0` is built from the `0.2.0-rc.3`
-source, so an installation on any of the candidates upgrades to `0.5.0` with
-`helm upgrade` and `--version 0.5.0`; read the 0.5.0 and 0.4.0 notes below
-first.
+source, so an installation on any of the candidates upgrades to `0.6.0` with
+`helm upgrade` and `--version 0.6.0`; read the 0.6.0, 0.5.0 and 0.4.0 notes
+below first.
 
 Charts `0.3.0-rc.1` and `0.3.0-rc.2` were release candidates for `0.3.0` and
 are superseded by it; do not install them. `0.3.0` is built from the
-`0.3.0-rc.2` source, so an installation on either candidate upgrades to `0.5.0`
-with `helm upgrade` and `--version 0.5.0`; read the 0.5.0 and 0.4.0 notes below
-first.
+`0.3.0-rc.2` source, so an installation on either candidate upgrades to `0.6.0`
+with `helm upgrade` and `--version 0.6.0`; read the 0.6.0, 0.5.0 and 0.4.0
+notes below first.
 
 Charts `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3` and `0.4.0-rc.4` were release
 candidates for `0.4.0` and are superseded by it; do not install them, and
-upgrade an installation on any of them to `0.5.0` with `helm upgrade` and
-`--version 0.5.0`. The upgrade needs no change to the values. `0.4.0` is built
+upgrade an installation on any of them to `0.6.0` with `helm upgrade` and
+`--version 0.6.0`. The upgrade needs no change to the values. `0.4.0` is built
 from the `0.4.0-rc.4` source, so from `0.4.0-rc.4` the upgrade brings only
-what the 0.5.0 paragraph below describes. From `0.4.0-rc.1` or `0.4.0-rc.2`, read the 0.4.0-rc.3
+what the 0.6.0 and 0.5.0 paragraphs below describe. From `0.4.0-rc.1` or `0.4.0-rc.2`, read the 0.4.0-rc.3
 invitation note below before you run it; from `0.4.0-rc.3`, the invitation
 switch keeps its value. From any candidate up to `0.4.0-rc.3`, rotate or purge
 the worker logs as the 0.4.0-rc.4 note below describes.
 
 Chart `0.5.0-rc.1` was the release candidate for `0.5.0` and is superseded by
-it; do not install it, and upgrade an installation on it to `0.5.0` with
-`helm upgrade` and `--version 0.5.0`. The upgrade needs no change to the
+it; do not install it, and upgrade an installation on it to `0.6.0` with
+`helm upgrade` and `--version 0.6.0`. The upgrade needs no change to the
 values and runs no migration; only the images change. `0.5.0` is built from the
 `0.5.0-rc.1` source plus the worklog and intake fixes of the 0.5.0 paragraph
-below and the in-app release notes.
+below and the in-app release notes; read the 0.6.0 and 0.5.0 paragraphs below
+first.
+
+Chart `0.6.0-rc.2` was the release candidate for `0.6.0` and is superseded by
+it; do not install it, and upgrade an installation on it to `0.6.0` with
+`helm upgrade` and `--version 0.6.0`. The upgrade needs no change to the
+values and runs no migration; only the images change. `0.6.0` is built from the
+`0.6.0-rc.2` source plus the in-app release notes; no application code
+changes. There is no chart `0.6.0-rc.1`.
+
+Release 0.6.0 adds no database or license migration compared with 0.5.0 and
+changes nothing in the chart's templates, values or Secrets. Upgrade from 0.5.0
+with `helm upgrade` and `--version 0.6.0`. No other action is required. Every
+release rebuilds all its images, so every image digest changes. Compared with
+0.5.0, the `web`, `space`, `live` and `api` images carry what the 0.6.0-rc.2
+paragraph below describes: the rest of the web app moves to the upstream Plane
+1.5.0 design and no longer loads the 1.4 component libraries, the workspace
+active cycles upsell page is removed, the editor's Markdown serializer writes a
+callout's logo only when it is a single emoji or a plain icon name, the `live`
+image build fails if the built server imports anything its production install
+cannot resolve, and the visual test seed command in the `api` image refuses to
+run unless `HANGAR_VISUAL_FIXTURES=1` is set. The `admin` and `proxy` code is
+unchanged. From a release older than 0.5.0, including 0.5.0-rc.1, read the
+0.5.0 paragraph below first. Rolling back to 0.5.0 needs no schema change and
+no change to the values; [Release identity](#release-identity) lists what it
+brings back.
 
 Release 0.6.0-rc.2 adds no database or license migration compared with 0.5.0
 and changes nothing in the chart's templates, values or Secrets. Upgrade from

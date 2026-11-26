@@ -11,7 +11,7 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.6.0-rc.2",
+  version: "0.6.0",
   highlights: [
     "The visual test seed command no longer runs without an explicit opt-in.",
     "The editor's Markdown serializer no longer writes a callout's logo unchecked.",

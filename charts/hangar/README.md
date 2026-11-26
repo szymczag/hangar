@@ -7,14 +7,13 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest stable chart is `0.5.0` (`appVersion: v0.5.0`). Release candidate
-`0.6.0-rc.2` is also published; Helm installs it only when you name its version.
+The latest stable chart is `0.6.0` (`appVersion: v0.6.0`). The release
+candidate `0.6.0-rc.2` is superseded by it, and so are the release candidates
+`0.5.0-rc.1`, `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3`, `0.4.0-rc.4`,
+`0.3.0-rc.1`, `0.3.0-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not
+install those, and upgrade an installation on any of them to `0.6.0`.
 There is no chart `0.6.0-rc.1`: that publication stopped before the chart was
-pushed because its `live` image does not start, so do not deploy its images.
-The release candidate `0.5.0-rc.1` is superseded by `0.5.0`, and so are the release candidates
-`0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3`, `0.4.0-rc.4`, `0.3.0-rc.1`,
-`0.3.0-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not install
-those, and upgrade an installation on any of them to `0.5.0`. The chart's evaluation profile is live-qualified on AMD64. The
+pushed because its `live` image does not start, so do not deploy its images. The chart's evaluation profile is live-qualified on AMD64. The
 chart is qualified for evaluation only and is not yet supported for production. Release packaging stages these versions and immutable
 image digests from the release tag; source defaults remain fail-closed.
 
@@ -42,7 +41,7 @@ Inspect the published chart without registry credentials:
 
 ```bash
 helm show chart oci://ghcr.io/szymczag/charts/hangar \
-  --version 0.5.0
+  --version 0.6.0
 ```
 
 Do not use `0.1.0-rc.1`, `0.1.0-rc.2`, `0.1.0-rc.20`, `0.1.0-rc.24`,
@@ -55,21 +54,25 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.5.0`, or name `0.6.0-rc.2` to test the release candidate. It adds no
-migration and no chart change; rolling back from `0.6.0-rc.2` to `0.5.0` needs
-no schema change and no values change, but brings back the visual test seed
-command that runs without an opt-in, the callout logo that the editor's
-Markdown serializer writes unchecked, the workspace active cycles upsell page,
-the old callout logo picker, and the web app's profile, notifications, home
-page and Hangar's own screens on the previous design.
+Use `0.6.0`. It adds no migration and no chart change compared with `0.5.0`.
+Its `web` image moves the rest of the web app to the upstream Plane 1.5.0
+design; in the `web`, `space` and `live` images the editor's Markdown
+serializer writes a callout's logo only when it is a single emoji or a plain
+icon name; and the visual test seed command in its `api` image refuses to run
+without an explicit opt-in. `0.5.0` is the previous stable release and the
+supported rollback target; rolling back to it needs no schema change and no
+values change, but brings back the visual test seed command that runs without
+an opt-in, the callout logo that the editor's Markdown serializer writes
+unchecked, the workspace active cycles upsell page, the old callout logo
+picker, and the web app's profile, notifications, home page and Hangar's own
+screens on the previous design.
 `0.5.0` adds no migration and no chart change compared with `0.4.0`.
 Its `api` image keeps worklog entries, which carry the logged time, from
 project guests in the profile activity feed and its export, the public API's
 activity list and detail, and work item notifications, and it refuses intake
 writes on a project whose intake is turned off or missing; through `/api/v1/`
 that now includes updating and deleting intake items while intake is turned
-off, which API clients may notice. `0.4.0` is the previous stable release and
-the supported rollback target; rolling back to it needs no schema change and
+off, which API clients may notice. Rolling back further, to `0.4.0`, needs no schema change and
 no values change, but brings back the worklog entries for guests on those
 surfaces, the intake endpoint that answers 500 and leaves a stray work item,
 the "Upgrade" button on the active cycles page that links off the instance
@@ -180,8 +183,8 @@ digests for the five Hangar application images. The source chart intentionally
 contains all-zero application digests so an unstaged source checkout fails
 closed.
 
-Release `0.5.0` is available from the
-[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.5.0)
+Release `0.6.0` is available from the
+[GitHub Release](https://github.com/szymczag/hangar/releases/tag/hangar-v0.6.0)
 and GHCR. Follow the [verification guide](../../docs/kubernetes/security.md)
 before admitting the package to a controlled environment.
 
