@@ -10,7 +10,8 @@
   "module": "./dist/start.mjs",
   "exports": {
     ".": "./dist/start.mjs",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./assets/fonts/*": "./assets/fonts/*"
   },
   "scripts": {
     "build": "tsc --noEmit && tsdown",

@@ -14,11 +14,13 @@ import {
   MENTION_COLORS,
   TEXT_COLORS,
 } from "./colors";
+import { EMOJI_FONT_FAMILY } from "./emoji";
 
 export const pdfStyles = StyleSheet.create({
   page: {
     padding: 40,
-    fontFamily: "Inter",
+    // A character Inter lacks, such as a bare "☝" or "❤", falls back to the emoji font.
+    fontFamily: ["Inter", EMOJI_FONT_FAMILY],
     fontSize: 11,
     lineHeight: 1.6,
     color: TEXT_COLORS.primary,
@@ -219,6 +221,11 @@ export const pdfStyles = StyleSheet.create({
   calloutIconContainer: {
     marginRight: 10,
     marginTop: 2,
+  },
+  calloutEmoji: {
+    fontFamily: EMOJI_FONT_FAMILY,
+    fontSize: 14,
+    lineHeight: 1.2,
   },
   calloutContent: {
     flex: 1,

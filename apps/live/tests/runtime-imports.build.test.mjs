@@ -126,14 +126,17 @@ describe("check-runtime-imports", () => {
           'const ok = require.resolve("dep/package.json");',
           'const fontDir = require.resolve("@fontsource/missing/package.json");',
           'const bundled = __require.resolve("missing-bundled");',
+          "const require$1 = createRequire(import.meta.url);",
+          'const emojiFont = require$1.resolve("app/assets/missing.ttf");',
           "",
         ].join("\n")
       );
       const result = check(path.join(dir, "app/start.mjs"));
       assert.equal(result.status, 1);
-      assert.match(result.stderr, /2 imports do not resolve/);
+      assert.match(result.stderr, /3 imports do not resolve/);
       assert.match(result.stderr, /@fontsource\/missing\/package\.json .* in .*start\.mjs/);
       assert.match(result.stderr, /missing-bundled .* in .*start\.mjs/);
+      assert.match(result.stderr, /app\/assets\/missing\.ttf .* in .*start\.mjs/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -167,6 +170,8 @@ describe("the built live server under a production-only install", () => {
         });
       }
       cpSync(path.join(ROOT, "apps/live/dist"), path.join(app, "apps/live/dist"), { recursive: true });
+      // The PDF exporter's emoji font, which the server resolves through live's own exports.
+      cpSync(path.join(ROOT, "apps/live/assets"), path.join(app, "apps/live/assets"), { recursive: true });
 
       // pnpm keeps one store per filesystem, and the temporary directory may
       // be on another one than the checkout: name the store the development

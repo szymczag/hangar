@@ -7,6 +7,7 @@
 export * from "@/extensions/core-without-props";
 export * from "@/constants/document-collaborative-events";
 export { CORE_EXTENSIONS } from "@/constants/extension";
+export { calloutEmojiFromUnicode } from "@/extensions/callout/emoji-unicode";
 export * from "@/helpers/get-document-server-event";
 export * from "@/helpers/yjs-utils";
 export * from "@/types/document-collaborative-events";
