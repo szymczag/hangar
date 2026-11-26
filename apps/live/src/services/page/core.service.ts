@@ -19,10 +19,12 @@ export type TUserMention = {
 
 export abstract class PageCoreService extends APIService {
   protected abstract basePath: string;
+  /** `/api/workspaces/<slug>`, for the workspace-level routes the page needs. */
+  protected abstract workspacePath: string;
 
   async fetchDetails(pageId: string): Promise<TPage> {
     try {
-      const response = await this.get(`${this.basePath}/pages/${pageId}/`, {
+      const response = await this.get(`${this.basePath}/pages/${encodeURIComponent(pageId)}/`, {
         headers: this.getHeader(),
       });
       return response?.data as TPage;
@@ -37,7 +39,7 @@ export abstract class PageCoreService extends APIService {
 
   async fetchDescriptionBinary(pageId: string): Promise<Buffer> {
     try {
-      const response = await this.get(`${this.basePath}/pages/${pageId}/description/`, {
+      const response = await this.get(`${this.basePath}/pages/${encodeURIComponent(pageId)}/description/`, {
         headers: {
           ...this.getHeader(),
           "Content-Type": "application/octet-stream",
@@ -85,7 +87,7 @@ export abstract class PageCoreService extends APIService {
 
     try {
       return await Promise.race([
-        this.patch(`${this.basePath}/pages/${pageId}/`, data, {
+        this.patch(`${this.basePath}/pages/${encodeURIComponent(pageId)}/`, data, {
           headers: this.getHeader(),
           signal: abortSignal,
         })
@@ -114,7 +116,7 @@ export abstract class PageCoreService extends APIService {
 
   async updateDescriptionBinary(pageId: string, data: TDocumentPayload): Promise<any> {
     try {
-      const response = await this.patch(`${this.basePath}/pages/${pageId}/description/`, data, {
+      const response = await this.patch(`${this.basePath}/pages/${encodeURIComponent(pageId)}/description/`, data, {
         headers: this.getHeader(),
       });
       return response?.data as unknown;
@@ -128,19 +130,35 @@ export abstract class PageCoreService extends APIService {
   }
 
   /**
-   * Fetches user mentions for a page
-   * @param pageId - The page ID
+   * Fetches the users a page's mentions can name.
+   *
+   * Upstream asks `pages/<id>/mentions/`, a route the community API does not
+   * have, so every mention printed as "@user_mention". The workspace member list
+   * is what the editor itself resolves mentions from. It is requested with the
+   * exporting user's own session, so the API's role check applies: a guest gets
+   * the same lite member rows the web app already shows them, and only display
+   * names are kept.
+   * @param pageId - The page ID (error context only)
    * @returns Array of user mentions
    */
   async fetchUserMentions(pageId: string): Promise<TUserMention[]> {
     try {
-      const response = await this.get(`${this.basePath}/pages/${pageId}/mentions/`, {
+      const response = await this.get(`${this.workspacePath}/members/`, {
         headers: this.getHeader(),
-        params: {
-          mention_type: "user_mention",
-        },
       });
-      return (response?.data as TUserMention[]) ?? [];
+      const rows: unknown[] = Array.isArray(response?.data) ? response.data : [];
+      return rows.flatMap((row) => {
+        const member = (row as { member?: { id?: unknown; display_name?: unknown; avatar_url?: unknown } } | null)
+          ?.member;
+        if (typeof member?.id !== "string" || typeof member.display_name !== "string") return [];
+        return [
+          {
+            id: member.id,
+            display_name: member.display_name,
+            avatar_url: typeof member.avatar_url === "string" ? member.avatar_url : undefined,
+          },
+        ];
+      });
     } catch (error) {
       const appError = new AppError(error, {
         context: { operation: "fetchUserMentions", pageId },

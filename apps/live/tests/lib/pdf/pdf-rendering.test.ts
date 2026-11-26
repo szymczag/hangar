@@ -21,6 +21,18 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   return result.pages.map((p) => p.text).join("\n");
 }
 
+/** A document holding one callout with the given attributes. */
+const callout = (attrs: Record<string, unknown>): TipTapDocument => ({
+  type: "doc",
+  content: [
+    {
+      type: "calloutComponent",
+      attrs,
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Callout body" }] }],
+    },
+  ],
+});
+
 describe("PDF Rendering Integration", () => {
   describe("renderPlaneDocToPdfBuffer", () => {
     it("should render empty document to valid PDF", async () => {
@@ -547,6 +559,56 @@ describe("PDF Rendering Integration", () => {
 
       expect(text).toContain("Hello");
       expect(text).toContain("John Doe");
+    });
+
+    it("should print an unresolved user mention as @user, not the mention type", async () => {
+      const doc: TipTapDocument = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Ping " },
+              { type: "mention", attrs: { entity_name: "user_mention", entity_identifier: "user-unknown" } },
+            ],
+          },
+        ],
+      };
+
+      const text = await extractPdfText(await renderPlaneDocToPdfBuffer(doc, { metadata: { userMentions: [] } }));
+
+      expect(text).toContain("@user");
+      expect(text).not.toContain("user_mention");
+    });
+  });
+
+  describe("callout icons", () => {
+    it.each([
+      ["a chosen emoji", "128522"],
+      ["the default emoji", "128161"],
+      ["a multi code point emoji", "9757-65039"],
+      ["a non-emoji attribute", "60-115-99-114-105-112-116-62"],
+    ])("should not print the code points of %s", async (_label, unicode) => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        callout({ "data-logo-in-use": "emoji", "data-emoji-unicode": unicode })
+      );
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("Callout body");
+      for (const part of unicode.split("-")) expect(text).not.toContain(part);
+      // no emoji character either: the embedded fonts have no glyph for it
+      expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
+      expect(text).not.toContain("<script>");
+    });
+
+    it("should draw icon callouts without printing the icon name", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        callout({ "data-logo-in-use": "icon", "data-icon-name": "Globe", "data-icon-color": "#ff0000" })
+      );
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("Callout body");
+      expect(text).not.toContain("Globe");
     });
   });
 

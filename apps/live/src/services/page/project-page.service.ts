@@ -16,6 +16,7 @@ interface ProjectPageServiceParams {
 
 export class ProjectPageService extends PageService {
   protected basePath: string;
+  protected workspacePath: string;
 
   constructor(params: ProjectPageServiceParams) {
     super();
@@ -26,6 +27,8 @@ export class ProjectPageService extends PageService {
     // set cookie
     this.setHeader("Cookie", params.cookie);
     // set base path
-    this.basePath = `/api/workspaces/${workspaceSlug}/projects/${projectId}`;
+    // both come from the client; encoded so neither can change the path
+    this.workspacePath = `/api/workspaces/${encodeURIComponent(workspaceSlug)}`;
+    this.basePath = `${this.workspacePath}/projects/${encodeURIComponent(projectId)}`;
   }
 }

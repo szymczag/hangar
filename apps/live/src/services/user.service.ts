@@ -9,6 +9,7 @@ import { logger } from "@plane/logger";
 import type { IUser } from "@plane/types";
 // services
 import { AppError } from "@/lib/errors";
+import { isUuid, isWorkspaceSlug } from "@/lib/page-reference";
 import { APIService } from "@/services/api.service";
 
 export class UserService extends APIService {
@@ -45,13 +46,7 @@ export class UserService extends APIService {
     pageId: string,
     action: "view" | "edit" = "view"
   ): Promise<{ project_id: string; read_only?: boolean }> {
-    if (
-      typeof workspaceSlug !== "string" ||
-      // Older slugs predate the [\w-] rule (some hold dots), so refuse only what could change the path.
-      !/^(?!\.{1,2}$)[^/\\?#%\p{Cc}]+$/u.test(workspaceSlug) ||
-      typeof pageId !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pageId)
-    ) {
+    if (!isWorkspaceSlug(workspaceSlug) || !isUuid(pageId)) {
       throw new AppError("Invalid workspace slug or page id", { code: "INVALID_PAGE_REFERENCE" });
     }
     return this.get(`/api/workspaces/${encodeURIComponent(workspaceSlug)}/pages/${pageId}/live-access/`, {

@@ -5,11 +5,16 @@
  */
 
 import { Schema } from "effect";
+import { UUID_PATTERN, WORKSPACE_SLUG_PATTERN } from "@/lib/page-reference";
+
+// All three go into API paths, so a value that could change the path is refused here (400) before any request.
+const WorkspaceSlug = Schema.String.pipe(Schema.pattern(WORKSPACE_SLUG_PATTERN));
+const Uuid = Schema.String.pipe(Schema.pattern(UUID_PATTERN));
 
 export const PdfExportRequestBody = Schema.Struct({
-  pageId: Schema.NonEmptyTrimmedString,
-  workspaceSlug: Schema.NonEmptyTrimmedString,
-  projectId: Schema.optional(Schema.NonEmptyTrimmedString),
+  pageId: Uuid,
+  workspaceSlug: WorkspaceSlug,
+  projectId: Schema.optional(Uuid),
   title: Schema.optional(Schema.String),
   author: Schema.optional(Schema.String),
   subject: Schema.optional(Schema.String),
