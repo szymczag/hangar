@@ -42,10 +42,10 @@ const claimedSurrogates = new WeakSet<object>();
  * react-pdf (textkit 6) picks a font for each UTF-16 code unit, not each code
  * point, so it asks every font in the stack for a glyph for a lone surrogate.
  * None has one, and the character lands in the stack's last font, Helvetica,
- * which react-pdf always appends: every emoji outside the Basic Multilingual
- * Plane came out as two broken WinAnsi bytes. Claiming surrogates puts both
+ * which react-pdf always appends: every emoji above U+FFFF came out as two
+ * broken WinAnsi bytes. Claiming surrogates puts both
  * halves of the pair in the emoji font, which then shapes the whole code point.
- * A non-emoji character outside the BMP had no glyph in Helvetica either, so it
+ * A non-emoji character above U+FFFF had no glyph in Helvetica either, so it
  * is still drawn as a missing glyph, now from this font.
  */
 const claimSurrogates = async (fontStyle: (typeof EMOJI_FONT_STYLES)[number]): Promise<void> => {
