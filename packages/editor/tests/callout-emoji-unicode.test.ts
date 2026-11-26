@@ -21,6 +21,18 @@ describe("calloutEmojiFromUnicode", () => {
     expect(calloutEmojiFromUnicode("9757-65039")).toBe("☝️");
   });
 
+  it("reads a single code point the HTML parser stored as a number", () => {
+    expect(calloutEmojiFromUnicode(128161)).toBe("💡");
+    expect(calloutEmojiFromUnicode(128522)).toBe("😊");
+  });
+
+  it.each([1.5, -128161, Number.NaN, Number.POSITIVE_INFINITY, 1114112, 65, true, {}, ["128161"]])(
+    "gives an empty string for the non-string value %j",
+    (value) => {
+      expect(calloutEmojiFromUnicode(value)).toBe("");
+    }
+  );
+
   it("gives an empty string for no value", () => {
     expect(calloutEmojiFromUnicode("")).toBe("");
     expect(calloutEmojiFromUnicode(undefined)).toBe("");

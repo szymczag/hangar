@@ -27,7 +27,7 @@ const getCalloutIcon = (node: TipTapNode, color: string): ReactElement => {
   // invalid or missing value) keeps the default lightbulb. The attribute's own
   // text never reaches the PDF.
   if (logoInUse === "emoji") {
-    const emoji = calloutEmojiFromUnicode(node.attrs?.["data-emoji-unicode"] as string | undefined);
+    const emoji = calloutEmojiFromUnicode(node.attrs?.["data-emoji-unicode"]);
     if (emoji) return <Text style={pdfStyles.calloutEmoji}>{emoji}</Text>;
     return <LightbulbIcon size={16} color={color} />;
   }

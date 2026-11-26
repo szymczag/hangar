@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { PDFParse } from "pdf-parse";
+import { convertHTMLDocumentToAllFormats } from "@plane/editor/server";
 import { renderPlaneDocToPdfBuffer } from "@/lib/pdf";
 import type { TipTapDocument, PDFExportMetadata } from "@/lib/pdf";
 
@@ -610,6 +611,22 @@ describe("PDF Rendering Integration", () => {
       expect(text).toContain(emoji);
       for (const part of unicode.split("-")) expect(text).not.toContain(part);
       expect(embeddedFonts(buffer)).toContain("NotoEmoji-Regular");
+    });
+
+    it("should print the emoji of a callout parsed from the editor's HTML, which stores a number", async () => {
+      const { description_json: doc } = convertHTMLDocumentToAllFormats({
+        document_html:
+          '<div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="128161" data-background="green"><p>Callout body</p></div>',
+        variant: "document",
+      });
+      expect((doc as TipTapDocument).content?.[0]?.attrs?.["data-emoji-unicode"]).toBe(128161);
+
+      const buffer = await renderPlaneDocToPdfBuffer(doc as TipTapDocument);
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("\u{1F4A1}");
+      expect(text).toContain("Callout body");
+      expect(text).not.toContain("128161");
     });
 
     it.each([

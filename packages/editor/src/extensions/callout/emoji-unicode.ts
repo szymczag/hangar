@@ -29,10 +29,16 @@ const SINGLE_EMOJI = new RegExp(`^(?:${emoji.source})$`, emoji.flags.replace("g"
  * instead of the `stringToEmoji` of `@plane/blocks`, whose entry pulls in the
  * picker's icon set and with it React components the server image does not
  * install.
+ *
+ * The attribute is not always a string: the editor's HTML parser turns a single
+ * code point into a number, so a number is read as its decimal form and any
+ * other type gives an empty string.
  */
-export function calloutEmojiFromUnicode(value: string | null | undefined): string {
-  if (!value) return "";
-  const parts = value.split("-");
+export function calloutEmojiFromUnicode(value: unknown): string {
+  // Parsed from HTML, a single code point ("128161") comes back as a number.
+  const stored = typeof value === "number" ? String(value) : value;
+  if (typeof stored !== "string" || !stored) return "";
+  const parts = stored.split("-");
   if (!parts.every((part) => DECIMAL.test(part))) return "";
   const codePoints = parts.map(Number);
   if (!codePoints.every((n) => Number.isSafeInteger(n) && n <= MAX_CODE_POINT)) return "";
