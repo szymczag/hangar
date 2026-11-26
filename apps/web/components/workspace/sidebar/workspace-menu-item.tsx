@@ -11,7 +11,6 @@ import { useParams, usePathname } from "next/navigation";
 import { EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { EUserWorkspaceRoles } from "@plane/types";
-import { cn } from "@plane/utils";
 // components
 import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 // hooks
@@ -59,11 +58,7 @@ export const SidebarWorkspaceMenuItem = observer(function SidebarWorkspaceMenuIt
     <Link href={item.href} onClick={() => handleLinkClick()}>
       <SidebarNavItem isActive={isActive}>
         <div className="flex items-center gap-1.5 py-[1px]">
-          <item.Icon
-            className={cn("size-4", {
-              "rotate-180": item.key === "active_cycles",
-            })}
-          />
+          <item.Icon className="size-4" />
           <p className="text-body-xs-medium leading-5">{item.label ?? t(item.labelTranslationKey)}</p>
         </div>
       </SidebarNavItem>

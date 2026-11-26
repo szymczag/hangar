@@ -1125,9 +1125,6 @@ importers:
       '@plane/utils':
         specifier: workspace:*
         version: link:../../packages/utils
-      '@popperjs/core':
-        specifier: 'catalog:'
-        version: 2.11.8
       '@react-router/node':
         specifier: 'catalog:'
         version: 8.3.0(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@5.8.3)
@@ -1197,9 +1194,6 @@ importers:
       react-masonry-component:
         specifier: 'catalog:'
         version: 6.3.0(react@19.2.8)
-      react-popper:
-        specifier: 'catalog:'
-        version: 2.3.0(@popperjs/core@2.11.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-router:
         specifier: 'catalog:'
         version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
