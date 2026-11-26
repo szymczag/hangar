@@ -74,3 +74,20 @@ describe("ProjectPageService.fetchUserMentions", () => {
     await expect(s.fetchUserMentions(PAGE_ID)).rejects.toBeDefined();
   });
 });
+
+describe("ProjectPageService URLs", () => {
+  it("encodes the workspace slug, project id and page id into the path", async () => {
+    const s = new ProjectPageService({ workspaceSlug: "a b.c", projectId: "p?x", cookie: "session=c" });
+    const get = vi.spyOn(s, "get").mockResolvedValue({ data: [] } as never);
+
+    await s.fetchUserMentions(PAGE_ID);
+    await s.fetchDetails("x/../y#z");
+
+    expect(get).toHaveBeenNthCalledWith(1, "/api/workspaces/a%20b.c/members/", expect.anything());
+    expect(get).toHaveBeenNthCalledWith(
+      2,
+      "/api/workspaces/a%20b.c/projects/p%3Fx/pages/x%2F..%2Fy%23z/",
+      expect.anything()
+    );
+  });
+});

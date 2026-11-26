@@ -27,7 +27,8 @@ export class ProjectPageService extends PageService {
     // set cookie
     this.setHeader("Cookie", params.cookie);
     // set base path
-    this.workspacePath = `/api/workspaces/${workspaceSlug}`;
-    this.basePath = `${this.workspacePath}/projects/${projectId}`;
+    // both come from the client; encoded so neither can change the path
+    this.workspacePath = `/api/workspaces/${encodeURIComponent(workspaceSlug)}`;
+    this.basePath = `${this.workspacePath}/projects/${encodeURIComponent(projectId)}`;
   }
 }
