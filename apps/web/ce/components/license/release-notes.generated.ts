@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.6.0-rc.1",
+  version: "0.6.0-rc.2",
   highlights: [
     "The visual test seed command no longer runs without an explicit opt-in.",
+    "The editor's Markdown serializer no longer writes a callout's logo unchecked.",
     "The web app no longer carries upstream's upsell and product-update screens.",
     "The rest of the new design brings in none of upstream's external services, and keeps worklogs from guests.",
     "The whole web app now uses the new upstream 1.5.0 design.",
-    "Clicking a callout's logo opens its picker.",
   ],
   upstream: {
     version: "1.4.3",

@@ -8,7 +8,9 @@ oci://ghcr.io/szymczag/charts/hangar
 ```
 
 The latest stable chart is `0.5.0` (`appVersion: v0.5.0`). Release candidate
-`0.6.0-rc.1` is also published; Helm installs it only when you name its version.
+`0.6.0-rc.2` is also published; Helm installs it only when you name its version.
+There is no chart `0.6.0-rc.1`: that publication stopped before the chart was
+pushed because its `live` image does not start, so do not deploy its images.
 The release candidate `0.5.0-rc.1` is superseded by `0.5.0`, and so are the release candidates
 `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3`, `0.4.0-rc.4`, `0.3.0-rc.1`,
 `0.3.0-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not install
@@ -53,10 +55,11 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.5.0`, or name `0.6.0-rc.1` to test the release candidate. It adds no
-migration and no chart change; rolling back from `0.6.0-rc.1` to `0.5.0` needs
+Use `0.5.0`, or name `0.6.0-rc.2` to test the release candidate. It adds no
+migration and no chart change; rolling back from `0.6.0-rc.2` to `0.5.0` needs
 no schema change and no values change, but brings back the visual test seed
-command that runs without an opt-in, the workspace active cycles upsell page,
+command that runs without an opt-in, the callout logo that the editor's
+Markdown serializer writes unchecked, the workspace active cycles upsell page,
 the old callout logo picker, and the web app's profile, notifications, home
 page and Hangar's own screens on the previous design.
 `0.5.0` adds no migration and no chart change compared with `0.4.0`.

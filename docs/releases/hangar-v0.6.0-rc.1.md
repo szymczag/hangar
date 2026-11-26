@@ -1,3 +1,11 @@
+> [!WARNING]
+> Publication of `v0.6.0-rc.1` did not complete. All seven container image tags
+> were published, but its `live` image stops at startup with
+> `ERR_MODULE_NOT_FOUND`, so the chart qualification failed and neither the
+> Helm chart nor the GitHub Release was published. The version is consumed and
+> must not be installed, completed, or repaired in place. Use `v0.6.0-rc.2`
+> instead; its [notes](hangar-v0.6.0-rc.2.md) cover everything below.
+
 ## Security and privacy
 
 **The visual test seed command no longer runs without an explicit opt-in.**
