@@ -20,11 +20,14 @@ const getCalloutIcon = (node: TipTapNode, color: string): ReactElement => {
   const iconName = node.attrs?.["data-icon-name"] as string | undefined;
   const iconColor = (node.attrs?.["data-icon-color"] as string) || color;
 
+  // `data-emoji-unicode` holds the emoji's code points as decimals ("128161"), so
+  // writing it out printed the number. The decoded emoji cannot be drawn either:
+  // the export embeds Inter's latin subset, which has no emoji glyphs, and the
+  // renderer has no emoji image source (one would mean fetching images from a
+  // CDN at export time), so the character came out as broken glyphs. An emoji
+  // callout therefore keeps the default lightbulb, the callout's default emoji.
   if (logoInUse === "emoji") {
-    const emojiUnicode = node.attrs?.["data-emoji-unicode"] as string | undefined;
-    if (emojiUnicode) {
-      return <Text style={{ fontSize: 14 }}>{emojiUnicode}</Text>;
-    }
+    return <LightbulbIcon size={16} color={color} />;
   }
 
   if (iconName) {
@@ -357,11 +360,10 @@ export const nodeRenderers: NodeRendererRegistry = {
 
     let displayText = entityName || id || entityIdentifier;
 
-    if (ctx.metadata && (entityName === "user_mention" || entityName === "user")) {
-      const userMention = ctx.metadata.userMentions?.find((u) => u.id === entityIdentifier || u.id === id);
-      if (userMention) {
-        displayText = userMention.display_name;
-      }
+    if (entityName === "user_mention" || entityName === "user") {
+      const userMention = ctx.metadata?.userMentions?.find((u) => u.id === entityIdentifier || u.id === id);
+      // An unresolved user mention prints a neutral "@user", not the mention type.
+      displayText = userMention?.display_name || "user";
     }
 
     return (
