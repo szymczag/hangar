@@ -7,6 +7,7 @@
 import { createRequire } from "module";
 import path from "path";
 import { Document, Font, Page, pdf, Text } from "@react-pdf/renderer";
+import { loadEmojiFont, withEmojiFont } from "./emoji";
 import { createKeyGenerator, renderNode } from "./node-renderers";
 import { pdfStyles } from "./styles";
 import type { PDFExportOptions, TipTapDocument } from "./types";
@@ -63,7 +64,7 @@ export const createPdfDocument = (doc: TipTapDocument, options: PDFExportOptions
   return (
     <Document title={title} author={author} subject={subject}>
       <Page size={pageSize} orientation={pageOrientation} style={pdfStyles.page}>
-        {title && <Text style={pdfStyles.title}>{title}</Text>}
+        {title && <Text style={pdfStyles.title}>{withEmojiFont(title)}</Text>}
         {renderedContent}
       </Page>
     </Document>
@@ -74,6 +75,7 @@ export const renderPlaneDocToPdfBuffer = async (
   doc: TipTapDocument,
   options: PDFExportOptions = {}
 ): Promise<Buffer> => {
+  await loadEmojiFont();
   const pdfDocument = createPdfDocument(doc, options);
   const pdfInstance = pdf(pdfDocument);
   const blob = await pdfInstance.toBlob();
@@ -82,6 +84,7 @@ export const renderPlaneDocToPdfBuffer = async (
 };
 
 export const renderPlaneDocToPdfBlob = async (doc: TipTapDocument, options: PDFExportOptions = {}): Promise<Blob> => {
+  await loadEmojiFont();
   const pdfDocument = createPdfDocument(doc, options);
   const pdfInstance = pdf(pdfDocument);
   return await pdfInstance.toBlob();

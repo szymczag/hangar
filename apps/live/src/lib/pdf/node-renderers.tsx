@@ -7,9 +7,10 @@
 import { Image, Link, Text, View } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { ReactElement } from "react";
-import { CORE_EXTENSIONS } from "@plane/editor/lib";
+import { calloutEmojiFromUnicode, CORE_EXTENSIONS } from "@plane/editor/lib";
 import { isAssetId, isSafePdfImageDataUri } from "@/lib/asset-fetch-security";
 import { BACKGROUND_COLORS, EDITOR_BACKGROUND_COLORS, resolveColorForPdf, TEXT_COLORS } from "./colors";
+import { withEmojiFont } from "./emoji";
 import { CheckIcon, ClipboardIcon, DocumentIcon, GlobeIcon, LightbulbIcon, LinkIcon } from "./icons";
 import { applyMarks } from "./mark-renderers";
 import { pdfStyles } from "./styles";
@@ -20,13 +21,14 @@ const getCalloutIcon = (node: TipTapNode, color: string): ReactElement => {
   const iconName = node.attrs?.["data-icon-name"] as string | undefined;
   const iconColor = (node.attrs?.["data-icon-color"] as string) || color;
 
-  // `data-emoji-unicode` holds the emoji's code points as decimals ("128161"), so
-  // writing it out printed the number. The decoded emoji cannot be drawn either:
-  // the export embeds Inter's latin subset, which has no emoji glyphs, and the
-  // renderer has no emoji image source (one would mean fetching images from a
-  // CDN at export time), so the character came out as broken glyphs. An emoji
-  // callout therefore keeps the default lightbulb, the callout's default emoji.
+  // `data-emoji-unicode` holds the emoji's code points as decimals ("128161",
+  // "9757-65039"). It is page content, so it is decoded only through the
+  // editor's validation, which yields exactly one emoji or nothing; nothing (an
+  // invalid or missing value) keeps the default lightbulb. The attribute's own
+  // text never reaches the PDF.
   if (logoInUse === "emoji") {
+    const emoji = calloutEmojiFromUnicode(node.attrs?.["data-emoji-unicode"]);
+    if (emoji) return <Text style={pdfStyles.calloutEmoji}>{emoji}</Text>;
     return <LightbulbIcon size={16} color={color} />;
   }
 
@@ -66,14 +68,14 @@ const renderTextWithMarks = (node: TipTapNode, getKey: KeyGenerator): ReactEleme
     const href = (hasLink.attrs?.href as string) || "#";
     return (
       <Link key={getKey()} src={href} style={{ ...pdfStyles.link, ...style }}>
-        {node.text || ""}
+        {withEmojiFont(node.text || "")}
       </Link>
     );
   }
 
   return (
     <Text key={getKey()} style={style}>
-      {node.text || ""}
+      {withEmojiFont(node.text || "")}
     </Text>
   );
 };
@@ -141,7 +143,7 @@ export const nodeRenderers: NodeRendererRegistry = {
     const codeContent = node.content?.map((c) => c.text || "").join("") || "";
     return (
       <View key={ctx.getKey()} style={pdfStyles.codeBlock} wrap={false}>
-        <Text>{codeContent}</Text>
+        <Text>{withEmojiFont(codeContent)}</Text>
       </View>
     );
   },
@@ -368,7 +370,7 @@ export const nodeRenderers: NodeRendererRegistry = {
 
     return (
       <Text key={ctx.getKey()} style={pdfStyles.mention}>
-        @{displayText}
+        {withEmojiFont(`@${displayText}`)}
       </Text>
     );
   },

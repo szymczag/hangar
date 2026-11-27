@@ -74,6 +74,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store CI=true pnpm install --o
 # runs; the server build and the checker stay in this stage, because the runner
 # below copies only packages and node_modules from it.
 COPY --from=installer /app/apps/live/dist ./apps/live/dist
+# The PDF exporter resolves its emoji font as `live/assets/fonts/...`, so the
+# check fails here if the font is missing.
+COPY --from=installer /app/apps/live/assets ./apps/live/assets
 COPY --from=installer /app/apps/live/scripts/check-runtime-imports.mjs ./apps/live/scripts/check-runtime-imports.mjs
 RUN node apps/live/scripts/check-runtime-imports.mjs apps/live/dist/start.mjs
 
@@ -97,6 +100,7 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --chown=node:node --from=runtime-deps /app/packages ./packages
 COPY --chown=node:node --from=installer /app/apps/live/dist ./apps/live/dist
+COPY --chown=node:node --from=installer /app/apps/live/assets ./apps/live/assets
 COPY --chown=node:node --from=runtime-deps /app/apps/live/node_modules ./apps/live/node_modules
 COPY --chown=node:node --from=runtime-deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=installer /app/apps/live/package.json ./apps/live/package.json

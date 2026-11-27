@@ -7,5 +7,9 @@ export default defineConfig({
   dts: false,
   clean: true,
   sourcemap: false,
-  exports: true,
+  exports: {
+    // The PDF exporter resolves its bundled emoji font as `live/assets/fonts/...`,
+    // so the same lookup works from the sources, the build and the image.
+    customExports: (exports) => ({ ...exports, "./assets/fonts/*": "./assets/fonts/*" }),
+  },
 });

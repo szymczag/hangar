@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { PDFParse } from "pdf-parse";
+import { convertHTMLDocumentToAllFormats } from "@plane/editor/server";
 import { renderPlaneDocToPdfBuffer } from "@/lib/pdf";
 import type { TipTapDocument, PDFExportMetadata } from "@/lib/pdf";
 
@@ -21,6 +22,12 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   return result.pages.map((p) => p.text).join("\n");
 }
 
+/** The base names of the fonts a PDF embeds (subset prefixes dropped). */
+function embeddedFonts(buffer: Buffer): string[] {
+  const names = buffer.toString("latin1").matchAll(/\/BaseFont\s*\/(?:[A-Z]{6}\+)?([^\s/>\]]+)/g);
+  return [...new Set([...names].map((match) => match[1]))];
+}
+
 /** A document holding one callout with the given attributes. */
 const callout = (attrs: Record<string, unknown>): TipTapDocument => ({
   type: "doc",
@@ -31,6 +38,12 @@ const callout = (attrs: Record<string, unknown>): TipTapDocument => ({
       content: [{ type: "paragraph", content: [{ type: "text", text: "Callout body" }] }],
     },
   ],
+});
+
+/** A document holding one paragraph with the given inline content. */
+const paragraph = (content: TipTapDocument["content"]): TipTapDocument => ({
+  type: "doc",
+  content: [{ type: "paragraph", content }],
 });
 
 describe("PDF Rendering Integration", () => {
@@ -584,11 +597,48 @@ describe("PDF Rendering Integration", () => {
 
   describe("callout icons", () => {
     it.each([
-      ["a chosen emoji", "128522"],
-      ["the default emoji", "128161"],
-      ["a multi code point emoji", "9757-65039"],
+      ["a chosen emoji", "128522", "\u{1F60A}"],
+      ["the default emoji", "128161", "\u{1F4A1}"],
+      ["a multi code point emoji", "9757-65039", "\u261D\uFE0F"],
+      ["a ZWJ sequence", "128104-8205-128105-8205-128103", "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}"],
+    ])("should print %s as the emoji, not its code points", async (_label, unicode, emoji) => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        callout({ "data-logo-in-use": "emoji", "data-emoji-unicode": unicode })
+      );
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("Callout body");
+      expect(text).toContain(emoji);
+      for (const part of unicode.split("-")) expect(text).not.toContain(part);
+      expect(embeddedFonts(buffer)).toContain("NotoEmoji-Regular");
+    });
+
+    it("should print the emoji of a callout parsed from the editor's HTML, which stores a number", async () => {
+      const { description_json: doc } = convertHTMLDocumentToAllFormats({
+        document_html:
+          '<div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="128161" data-background="green"><p>Callout body</p></div>',
+        variant: "document",
+      });
+      expect((doc as TipTapDocument).content?.[0]?.attrs?.["data-emoji-unicode"]).toBe(128161);
+
+      const buffer = await renderPlaneDocToPdfBuffer(doc as TipTapDocument);
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("\u{1F4A1}");
+      expect(text).toContain("Callout body");
+      expect(text).not.toContain("128161");
+    });
+
+    it.each([
       ["a non-emoji attribute", "60-115-99-114-105-112-116-62"],
-    ])("should not print the code points of %s", async (_label, unicode) => {
+      ["two emoji", "128522-128522"],
+      ["a hex value", "1F60A"],
+      ["an out of range code point", "1114112"],
+      ["a lone surrogate", "55357"],
+      ["text around an emoji", "128522-65"],
+      ["200,000 parts", Array.from({ length: 200_000 }, () => "128161").join("-")],
+      ["17 parts", Array.from({ length: 17 }, () => "8205").join("-")],
+    ])("should draw the lightbulb for %s and print nothing from it", async (_label, unicode) => {
       const buffer = await renderPlaneDocToPdfBuffer(
         callout({ "data-logo-in-use": "emoji", "data-emoji-unicode": unicode })
       );
@@ -596,9 +646,9 @@ describe("PDF Rendering Integration", () => {
 
       expect(text).toContain("Callout body");
       for (const part of unicode.split("-")) expect(text).not.toContain(part);
-      // no emoji character either: the embedded fonts have no glyph for it
       expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
       expect(text).not.toContain("<script>");
+      expect(embeddedFonts(buffer)).not.toContain("NotoEmoji-Regular");
     });
 
     it("should draw icon callouts without printing the icon name", async () => {
@@ -766,6 +816,63 @@ describe("PDF Rendering Integration", () => {
       expect(text).toContain("Level 1");
       expect(text).toContain("Level 2");
       expect(text).toContain("Level 3");
+    });
+  });
+
+  describe("emoji in page text", () => {
+    it("should draw text emoji, sequences included, from the bundled emoji font", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        paragraph([{ type: "text", text: "Smile 😊 thumbs 👍🏽 family 👨‍👩‍👧 point ☝️ key 1️⃣ end" }]),
+        { title: "Release 🎉" }
+      );
+      const text = await extractPdfText(buffer);
+
+      for (const emoji of ["😊", "👍", "👨‍👩‍👧", "☝️", "1️⃣", "🎉"]) expect(text).toContain(emoji);
+      expect(text).toContain("Smile");
+      expect(text).toContain("end");
+      const fonts = embeddedFonts(buffer);
+      expect(fonts).toContain("NotoEmoji-Regular");
+      // the halves of a surrogate pair used to fall through to Helvetica
+      expect(fonts.filter((font) => font.startsWith("Helvetica"))).toEqual([]);
+    });
+
+    it.each([
+      ["bold", [{ type: "bold" }]],
+      ["italic", [{ type: "italic" }]],
+      ["inline code", [{ type: "code" }]],
+      ["a link", [{ type: "link", attrs: { href: "https://example.com" } }]],
+    ])("should draw emoji in %s text", async (_label, marks) => {
+      const buffer = await renderPlaneDocToPdfBuffer(paragraph([{ type: "text", text: "Go 🚀 now", marks }]));
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("🚀");
+      expect(embeddedFonts(buffer)).toContain("NotoEmoji-Regular");
+    });
+
+    it("should draw emoji in headings, code blocks and mentions", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        {
+          type: "doc",
+          content: [
+            { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Plan ✅" }] },
+            { type: "codeBlock", content: [{ type: "text", text: "echo 🐳" }] },
+            {
+              type: "paragraph",
+              content: [{ type: "mention", attrs: { entity_name: "user_mention", entity_identifier: "u1" } }],
+            },
+          ],
+        },
+        { metadata: { userMentions: [{ id: "u1", display_name: "Ola 🌸" }] } }
+      );
+      const text = await extractPdfText(buffer);
+
+      for (const emoji of ["✅", "🐳", "🌸"]) expect(text).toContain(emoji);
+    });
+
+    it("should leave text without emoji in the page font only", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(paragraph([{ type: "text", text: "Plain text 123 #*" }]));
+
+      expect(embeddedFonts(buffer)).not.toContain("NotoEmoji-Regular");
     });
   });
 
