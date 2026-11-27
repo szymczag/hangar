@@ -636,6 +636,8 @@ describe("PDF Rendering Integration", () => {
       ["an out of range code point", "1114112"],
       ["a lone surrogate", "55357"],
       ["text around an emoji", "128522-65"],
+      ["200,000 parts", Array.from({ length: 200_000 }, () => "128161").join("-")],
+      ["17 parts", Array.from({ length: 17 }, () => "8205").join("-")],
     ])("should draw the lightbulb for %s and print nothing from it", async (_label, unicode) => {
       const buffer = await renderPlaneDocToPdfBuffer(
         callout({ "data-logo-in-use": "emoji", "data-emoji-unicode": unicode })

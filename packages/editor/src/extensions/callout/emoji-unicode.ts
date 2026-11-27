@@ -7,6 +7,10 @@
 import emojiRegex from "emoji-regex";
 
 const MAX_CODE_POINT = 0x10ffff;
+// The longest RGI emoji, a kiss or couple with two skin tones, has 10 code
+// points; each part has at most 7 digits ("1114111") and a dash.
+const MAX_PARTS = 16;
+const MAX_STORED_LENGTH = MAX_PARTS * 8;
 const DECIMAL = /^\d+$/;
 const ICON_NAME = /^[A-Za-z0-9_-]+$/;
 
@@ -38,12 +42,21 @@ export function calloutEmojiFromUnicode(value: unknown): string {
   // Parsed from HTML, a single code point ("128161") comes back as a number.
   const stored = typeof value === "number" ? String(value) : value;
   if (typeof stored !== "string" || !stored) return "";
+  // Bounded before anything is split or spread: a value with some 200,000
+  // parts passed every check below and then overflowed the call stack in
+  // String.fromCodePoint, failing the whole export.
+  if (stored.length > MAX_STORED_LENGTH) return "";
   const parts = stored.split("-");
-  if (!parts.every((part) => DECIMAL.test(part))) return "";
+  if (parts.length > MAX_PARTS || !parts.every((part) => DECIMAL.test(part))) return "";
   const codePoints = parts.map(Number);
   if (!codePoints.every((n) => Number.isSafeInteger(n) && n <= MAX_CODE_POINT)) return "";
-  const text = String.fromCodePoint(...codePoints);
-  return SINGLE_EMOJI.test(text) ? text : "";
+  try {
+    const text = String.fromCodePoint(...codePoints);
+    return SINGLE_EMOJI.test(text) ? text : "";
+  } catch {
+    // Not reachable with the bounds above; page content must never fail a caller.
+    return "";
+  }
 }
 
 /** A callout icon name as the markdown export may write it: a plain identifier, or nothing. */
