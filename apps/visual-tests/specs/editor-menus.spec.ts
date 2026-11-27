@@ -10,14 +10,16 @@ import { expect, fixtures, test } from "../src/fixtures.js";
 
 /**
  * The page editor's menus and popovers: the bubble menu and its dropdowns, the
- * slash command menu, the block menu, the table column
- * menu, the image toolbar and viewer, the code block's copy button, the
- * callout colour picker, and the mention and emoji suggestions. Then the
- * comment editor on a published board (apps/space).
+ * link preview and edit popovers, the slash command menu, the block menu, the
+ * table column menu, the image toolbar and viewer, the code block's copy
+ * button, the callout colour picker, and the mention and emoji suggestions.
+ * Then the comment editor on a published board (apps/space).
  *
- * These are the 1.4 menus (Headless UI, floating-ui, lucide and the 1.4 Propel
- * icons) as they render before the editor moves to Propel (FORK.md ledger,
- * the editor stage); none of them showed in any story before.
+ * The bubble menu, link popovers, slash command menu, block menu and the
+ * mention and emoji suggestions are Propel's (the editor stage, phase 2, in
+ * FORK.md); the table, image, code block and callout ones are still the 1.4
+ * menus (Headless UI, floating-ui, lucide and the 1.4 Propel icons) until
+ * phase 3 moves them.
  *
  * They all open the admin's private "Editor menus" page, which the seed fills
  * with every node the menus act on and no other story shows: the light user's
@@ -30,12 +32,11 @@ import { expect, fixtures, test } from "../src/fixtures.js";
  * and the session works, but nothing a story does reaches the stored page, in
  * a retry, in the soak, or in a parallel story.
  *
- * The link preview and edit popovers are not here: hovering a link makes the
- * 1.4 link view copy floating-ui's event handlers onto the <a> with
- * setAttribute, an inline handler attribute the default Trusted Types policy
- * reports (and the enforced policy refuses), so the policy guard fails the
- * story. Upstream v1.5.0 does the same; the popovers are rewritten with the
- * move to Propel, which is where that goes.
+ * The link stories hover the seeded link. In 1.4 (and upstream v1.5.0) the
+ * hover copied floating-ui's event handlers onto the <a> with setAttribute, an
+ * inline handler attribute the Trusted Types policy reports, so the policy
+ * guard failed them; the link view no longer writes any attribute onto the
+ * link, and these stories hold it to that.
  */
 
 /** Read one lib0 unsigned varint from `bytes` at `cursor.offset`. */
@@ -144,6 +145,49 @@ test("the bubble menu's colour dropdown", async ({ asUser }) => {
   });
 });
 
+/** Hover the seeded link until its preview popover is open. */
+async function hoverLink(page: Page, editor: Locator): Promise<Locator> {
+  const seed = fixtures();
+  const link = editor.getByRole("link", { name: seed.editorMenusPage.link });
+  await link.hover();
+  const preview = page.locator("div.shadow-md").filter({ hasText: seed.editorMenusPage.linkHref }).last();
+  await expect(preview.getByRole("button", { name: "Copy link" })).toBeVisible();
+  // The view writes nothing onto the link: no inline handler attribute for
+  // the Trusted Types policy to report.
+  expect(
+    await link.evaluate((anchor) => anchor.getAttributeNames().filter((name) => name.toLowerCase().startsWith("on")))
+  ).toEqual([]);
+  return preview;
+}
+
+test("the link preview on hover", async ({ asUser }) => {
+  const page = await asUser("admin");
+  const { editor } = await openMenusPage(page);
+  // The pointer stays on the link: leaving it starts the preview's close timer.
+  const preview = await hoverLink(page, editor);
+
+  await capture(page, "editor-link-preview", {
+    ready: preview.getByRole("button", { name: "Remove link" }),
+    target: preview,
+  });
+});
+
+test("the link edit popover", async ({ asUser }) => {
+  const page = await asUser("admin");
+  const seed = fixtures();
+  const { editor } = await openMenusPage(page);
+  const preview = await hoverLink(page, editor);
+
+  // The pointer ends on the popover, which keeps it open.
+  await preview.getByRole("button", { name: "Edit link" }).click();
+  const popover = page.locator("div.shadow-md").filter({ hasText: "Remove Link" }).last();
+  const url = popover.getByLabel("URL");
+  await expect(url).toHaveValue(seed.editorMenusPage.linkHref);
+  await expect(url).toBeFocused();
+
+  await capture(page, "editor-link-edit", { ready: popover.getByLabel("Text"), target: popover });
+});
+
 test("the slash command menu", async ({ asUser }) => {
   const page = await asUser("admin");
   const { editor } = await openMenusPage(page);
@@ -165,7 +209,7 @@ test("the block menu from the drag handle", async ({ asUser }) => {
   const handle = page.locator("#drag-handle");
   await expect(handle).toBeVisible();
   await handle.click();
-  const menu = page.locator('[class*="min-w-[7rem]"]').filter({ hasText: "Duplicate" }).last();
+  const menu = page.locator('[class*="origin-top-right"]').filter({ hasText: "Duplicate" }).last();
   // The menu scales in; its finished state is a class, not a sleep.
   await expect(menu).toHaveClass(/opacity-100/);
   await page.mouse.move(0, 0);
@@ -269,7 +313,12 @@ test("the mention suggestions", async ({ asUser }) => {
   // Date.now(); the suite's fixed clock would keep it waiting forever. Moving
   // the fixed time on lets it fire; nothing in the list reads the date.
   await page.clock.setFixedTime(new Date(Date.parse(fixtures().clock) + 60_000));
-  const menu = page.locator('[class*="w-[14rem]"]').filter({ hasText: "VR Light" }).last();
+  // Propel's suggestion menu surface: the element that scrolls past 320px of rows.
+  const menu = page
+    .locator('[class*="max-h-80"]')
+    .filter({ has: page.locator("#mention-item-0-0") })
+    .last();
+  await expect(menu).toContainText("VR Light");
   await page.mouse.move(0, 0);
 
   await capture(page, "editor-mention-suggestions", { ready: menu.getByText("VR Light"), target: menu });
@@ -283,7 +332,7 @@ test("the emoji suggestions", async ({ asUser }) => {
   // An empty query renders nothing; ":ro" matches at least five shortcodes.
   await page.keyboard.type(":ro");
   const menu = page
-    .locator("div")
+    .locator('[class*="max-h-80"]')
     .filter({ has: page.locator("#emoji-item-4") })
     .last();
   await page.mouse.move(0, 0);

@@ -4,8 +4,9 @@
  * See the LICENSE file for details.
  */
 
-import { Link2Off } from "lucide-react";
-import { CopyIcon, GlobeIcon, EditIcon } from "@plane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { CopyOutline, EditOutline, GlobeOutline, UnlinkOutline } from "@makeplane/propel/icons";
 // components
 import type { LinkViewProps, LinkViews } from "@/components/links";
 
@@ -35,24 +36,39 @@ export function LinkPreview({
         transition: "all 0.2s cubic-bezier(.55, .085, .68, .53)",
       }}
     >
-      <div className="shadow-md flex items-center gap-3 rounded-sm border-2 border-subtle bg-layer-1 p-2 text-11 text-tertiary">
-        <GlobeIcon width={14} height={14} className="inline-block" />
+      <div className="shadow-md flex items-center gap-3 rounded-sm border-2 border-subtle bg-layer-1 p-2 text-caption-sm-regular text-tertiary">
+        <GlobeOutline width={14} height={14} className="inline-block" />
         <p>{url?.length > 40 ? url.slice(0, 40) + "..." : url}</p>
         <div className="flex gap-2">
-          <button onClick={copyLinkToClipboard} className="cursor-pointer transition-colors hover:text-primary">
-            <CopyIcon width={14} height={14} className="inline-block" />
-          </button>
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Copy link"
+            showTooltip={false}
+            onClick={copyLinkToClipboard}
+            icon={<Icon icon={CopyOutline} />}
+          />
           {editor.isEditable && (
             <>
-              <button
+              <IconButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label="Edit link"
+                showTooltip={false}
                 onClick={() => switchView("LinkEditView")}
-                className="cursor-pointer transition-colors hover:text-primary"
-              >
-                <EditIcon width={14} height={14} className="inline-block" />
-              </button>
-              <button onClick={removeLink} className="cursor-pointer transition-colors hover:text-primary">
-                <Link2Off size={14} className="inline-block" />
-              </button>
+                icon={<Icon icon={EditOutline} />}
+              />
+              <IconButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label="Remove link"
+                showTooltip={false}
+                onClick={removeLink}
+                icon={<Icon icon={UnlinkOutline} />}
+              />
             </>
           )}
         </div>

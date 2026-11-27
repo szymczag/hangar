@@ -26,8 +26,8 @@ export function LinkViewContainer({ editor, containerRef }: Props) {
 
   const editorState = useEditorState({
     editor,
-    selector: ({ editor }: { editor: Editor }) => ({
-      linkExtensionStorage: editor.storage.link,
+    selector: ({ editor: currentEditor }: { editor: Editor }) => ({
+      linkExtensionStorage: currentEditor.storage.link,
     }),
   });
 
@@ -50,9 +50,13 @@ export function LinkViewContainer({ editor, containerRef }: Props) {
     placement: "bottom-start",
   });
 
+  // useDismiss closes on Escape and on an outside press through listeners on the document, so the
+  // hovered anchor needs none of its reference props. They used to be copied onto the `<a>` with
+  // setAttribute, which stringified floating-ui's handlers into inline `onkeydown` and
+  // `onpointerdown` attributes: markup the editor never writes, and a sink Trusted Types blocks.
   const dismiss = useDismiss(context);
 
-  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss]);
+  const { getFloatingProps } = useInteractions([dismiss]);
 
   // Clear any existing timeout
   const clearHoverTimeout = useCallback(() => {
@@ -78,11 +82,6 @@ export function LinkViewContainer({ editor, containerRef }: Props) {
       // Find the closest anchor tag from the event target
       const target = (event.target as HTMLElement)?.closest("a");
       if (!target) return;
-
-      const referenceProps = getReferenceProps();
-      Object.entries(referenceProps).forEach(([key, value]) => {
-        target.setAttribute(key, value as string);
-      });
 
       const view = editor.view;
       if (!view) return;
@@ -122,7 +121,7 @@ export function LinkViewContainer({ editor, containerRef }: Props) {
         console.error("Error handling link hover:", error);
       }
     },
-    [editor, editorState.linkExtensionStorage, getReferenceProps, isOpen, linkViewProps, clearHoverTimeout]
+    [editor, editorState.linkExtensionStorage, isOpen, linkViewProps, clearHoverTimeout]
   );
 
   // Handle mouse enter on floating element (cancel close timeout)

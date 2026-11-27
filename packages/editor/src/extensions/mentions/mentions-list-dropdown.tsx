@@ -6,12 +6,29 @@
 
 import { FloatingOverlay } from "@floating-ui/react";
 import type { SuggestionProps } from "@tiptap/suggestion";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { v4 as uuidv4 } from "uuid";
 import { debounce } from "lodash-es";
+// propel imports
+import {
+  SuggestionMenu,
+  SuggestionMenuGroup,
+  SuggestionMenuItem,
+  SuggestionMenuItemIcon,
+  SuggestionMenuItemTitle,
+  SuggestionMenuLabel,
+} from "@makeplane/propel/elements/suggestion-menu";
 // plane utils
 import { useOutsideClickDetector } from "@plane/hooks";
-import { cn } from "@plane/utils";
 // helpers
 import { DROPDOWN_NAVIGATION_KEYS, getNextValidIndex } from "@/helpers/tippy";
 // types
@@ -83,19 +100,20 @@ export const MentionsListDropdown = forwardRef(function MentionsListDropdown(pro
   }, [sections]);
 
   // debounced search callback
-  const debouncedSearchCallback = useCallback(
-    debounce(async (searchQuery: string) => {
-      try {
-        const sectionsResponse = await searchCallback?.(searchQuery);
-        if (sectionsResponse) {
-          setSections(sectionsResponse);
+  const debouncedSearchCallback = useMemo(
+    () =>
+      debounce(async (searchQuery: string) => {
+        try {
+          const sectionsResponse = await searchCallback?.(searchQuery);
+          if (sectionsResponse) {
+            setSections(sectionsResponse);
+          }
+        } catch (error) {
+          console.error("Failed to fetch suggestions:", error);
+        } finally {
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.error("Failed to fetch suggestions:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }, 300),
+      }, 300),
     [searchCallback]
   );
 
@@ -144,65 +162,77 @@ export const MentionsListDropdown = forwardRef(function MentionsListDropdown(pro
         }}
         lockScroll
       />
-      <div
-        ref={dropdownContainer}
-        className="relative max-h-80 w-[14rem] space-y-2 overflow-y-auto rounded-md border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 shadow-raised-200"
-        style={{
-          zIndex: 100,
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-        onMouseDown={(e) => {
-          e.stopPropagation();
-        }}
+      <SuggestionMenu
+        width="fit"
+        render={
+          <div
+            ref={dropdownContainer}
+            // Only stops clicks reaching the editor, which would close the list; the rows are buttons.
+            role="presentation"
+            className="relative"
+            style={{ zIndex: 100 }}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
+          />
+        }
       >
         {isLoading ? (
-          <div className="text-center text-13 text-placeholder">Loading...</div>
+          <div className="p-2 text-center text-body-sm-regular text-placeholder">Loading...</div>
         ) : sections.length ? (
           sections.map((section, sectionIndex) => (
-            <div key={section.key} className="space-y-2">
-              {section.title && <h6 className="text-11 font-semibold text-tertiary">{section.title}</h6>}
+            <SuggestionMenuGroup key={section.key}>
+              {section.title && <SuggestionMenuLabel>{section.title}</SuggestionMenuLabel>}
               {section.items.map((item, itemIndex) => {
                 const isSelected = sectionIndex === selectedIndex.section && itemIndex === selectedIndex.item;
 
                 return (
-                  <button
+                  <SuggestionMenuItem
                     key={item.id}
-                    id={`mention-item-${sectionIndex}-${itemIndex}`}
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center gap-2 truncate rounded-sm px-1 py-1.5 text-left text-11 text-secondary hover:bg-layer-1-hover",
-                      {
-                        "bg-layer-1-hover": isSelected,
-                      }
-                    )}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      selectItem(sectionIndex, itemIndex);
-                    }}
-                    onMouseEnter={() =>
-                      setSelectedIndex({
-                        section: sectionIndex,
-                        item: itemIndex,
-                      })
+                    data-highlighted={isSelected ? "" : undefined}
+                    render={
+                      <button
+                        id={`mention-item-${sectionIndex}-${itemIndex}`}
+                        type="button"
+                        className="focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
+                        style={{ textAlign: "start" }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          selectItem(sectionIndex, itemIndex);
+                        }}
+                        onMouseEnter={() =>
+                          setSelectedIndex({
+                            section: sectionIndex,
+                            item: itemIndex,
+                          })
+                        }
+                      />
                     }
                   >
-                    <span className="grid size-5 flex-shrink-0 place-items-center">{item.icon}</span>
-                    {item.subTitle && (
-                      <h5 className="flex-shrink-0 text-11 whitespace-nowrap text-tertiary">{item.subTitle}</h5>
-                    )}
-                    <p className="flex-grow truncate">{item.title}</p>
-                  </button>
+                    <SuggestionMenuItemIcon>{item.icon}</SuggestionMenuItemIcon>
+                    <SuggestionMenuItemTitle>
+                      <span className="flex items-center gap-1.5">
+                        {item.subTitle && (
+                          <span className="shrink-0 text-caption-md-regular whitespace-nowrap text-tertiary">
+                            {item.subTitle}
+                          </span>
+                        )}
+                        <span className="truncate">{item.title}</span>
+                      </span>
+                    </SuggestionMenuItemTitle>
+                  </SuggestionMenuItem>
                 );
               })}
-            </div>
+            </SuggestionMenuGroup>
           ))
         ) : (
-          <div className="text-center text-13 text-placeholder">No results</div>
+          <div className="p-2 text-center text-body-sm-regular text-placeholder">No results</div>
         )}
-      </div>
+      </SuggestionMenu>
     </>
   );
 });
