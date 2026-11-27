@@ -16,9 +16,12 @@ it. The alternative -- tests declaring what they expect to exist -- is two
 descriptions that have to be kept in agreement.
 """
 
+import io
 import json
 import os
+import struct
 import uuid
+import zlib
 from datetime import datetime, timedelta, timezone as dt_timezone
 
 from django.core.management.base import BaseCommand, CommandError
@@ -26,6 +29,7 @@ from django.db import transaction
 
 from plane.db.models import (
     Cycle,
+    FileAsset,
     DeployBoard,
     Intake,
     IntakeIssue,
@@ -72,6 +76,7 @@ from plane.ext.models import (
     WorkspaceSharedLinkHide,
 )
 from plane.ext.services.issue_types import ensure_project_system_types
+from plane.settings.storage import S3Storage
 from plane.license.models import InstanceAdmin, Instance
 from plane.utils.cache import invalidate_cache_directly
 
@@ -154,6 +159,14 @@ STICKY_ID = uuid.UUID("a0000000-0000-4000-8000-000000000009")
 # user's pages list ever shows it, and opening it (which the live server stores)
 # cannot reorder that list.
 CALLOUT_PAGE_ID = uuid.UUID("a0000000-0000-4000-8000-00000000001a")
+# A private page of the admin's with every node the editor's menus act on: a
+# link, a user mention, an emoji, a table, an image, a code block and a callout,
+# for the editor menu stories. The admin user is light-themed; private and
+# owned by someone other than the light user so the light user's pages list
+# never shows it. Its image is a real uploaded asset.
+EDITOR_MENUS_PAGE_ID = uuid.UUID("a0000000-0000-4000-8000-00000000001b")
+EDITOR_MENUS_IMAGE_ID = uuid.UUID("a0000000-0000-4000-8000-00000000001c")
+EDITOR_MENUS_MENTION_ID = uuid.UUID("a0000000-0000-4000-8000-00000000001d")
 # Two inbox notifications for the light user, for the notifications story.
 NOTIFICATION_IDS = (
     uuid.UUID("a0000000-0000-4000-8000-000000000015"),
@@ -220,6 +233,61 @@ WORK_ITEMS = [(name, _PRIORITIES[index % len(_PRIORITIES)]) for index, name in e
 OPT_IN_VARIABLE = "HANGAR_VISUAL_FIXTURES"
 
 
+def editor_menus_html(mention_user_id) -> str:
+    """The editor menus page: every node the editor's menus act on, as stored HTML."""
+    text = Command.EDITOR_MENUS_TEXT
+    return (
+        "<h2>Editor menus</h2>"
+        f"<p>{text['selection']}</p>"
+        f'<p>Read <a href="{text["linkHref"]}">{text["link"]}</a>, ask '
+        f'<mention-component id="{EDITOR_MENUS_MENTION_ID}" entity_identifier="{mention_user_id}"'
+        ' entity_name="user_mention"></mention-component> and ship it '
+        '<span data-type="emoji" data-name="rocket">🚀</span></p>'
+        "<table><tbody>"
+        "<tr><th><p>Step</p></th><th><p>Owner</p></th><th><p>Status</p></th></tr>"
+        "<tr><td><p>Freeze</p></td><td><p>Release</p></td><td><p>Done</p></td></tr>"
+        "<tr><td><p>Notes</p></td><td><p>Docs</p></td><td><p>Open</p></td></tr>"
+        "</tbody></table>"
+        f'<image-component id="{EDITOR_MENUS_IMAGE_ID}" src="{EDITOR_MENUS_IMAGE_ID}" width="320px"'
+        ' height="160px" aspectRatio="2" alignment="left" status="uploaded"></image-component>'
+        f'<pre><code class="language-typescript">{text["code"]}</code></pre>'
+        '<div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="128161"'
+        ' data-background="light-blue">'
+        f"<p>{text['callout']}</p></div>"
+        f"<p>{text['lastParagraph']}</p><p></p>"
+    )
+
+
+def editor_menus_png(width: int = 320, height: int = 160) -> bytes:
+    """A fixed PNG for the editor menus page: four flat colour bands and a frame.
+
+    Generated rather than committed so the seed stays one file; every byte is a
+    function of the arguments, so the image, and the baselines that show it, never
+    vary between runs.
+    """
+    bands = ((59, 130, 246), (16, 185, 129), (245, 158, 11), (239, 68, 68))
+    rows = []
+    for y in range(height):
+        row = bytearray([0])  # filter type: none
+        for x in range(width):
+            if x < 4 or y < 4 or x >= width - 4 or y >= height - 4:
+                row += bytes((31, 41, 55))
+            else:
+                row += bytes(bands[x * len(bands) // width])
+        rows.append(bytes(row))
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
+        + chunk(b"IEND", b"")
+    )
+
+
 class Command(BaseCommand):
     help = "Seed the fixed data the visual regression suite screenshots"
 
@@ -247,6 +315,7 @@ class Command(BaseCommand):
         self._cycles_and_modules(workspace, project, users["light"])
         self._pages(workspace, project, users["light"])
         self._callout_page(workspace, project, users["dark"])
+        self._editor_menus_page(workspace, project, users)
         self._stickies(workspace, users["light"])
         self._notifications(workspace, project, users)
         self._shared_links(workspace, users)
@@ -298,6 +367,9 @@ class Command(BaseCommand):
             # The project pages and the sticky the page and sticky stories wait on.
             "pages": {"ids": [str(page_id) for page_id in PAGE_IDS], "names": [n for n, _ in Command.PAGES]},
             "calloutPage": {"id": str(CALLOUT_PAGE_ID), "text": Command.CALLOUT_TEXT},
+            # The admin's page for the editor menu stories, and the text each
+            # story finds its node by.
+            "editorMenusPage": {"id": str(EDITOR_MENUS_PAGE_ID), **Command.EDITOR_MENUS_TEXT},
             "sticky": Command.STICKY_TEXT,
             "recents": self._recents(project, workshop),
             # The work item the inbox notifications are about, which the inbox story waits on.
@@ -880,6 +952,62 @@ class Command(BaseCommand):
         )
         Page.objects.filter(pk=page.pk).update(
             created_at=CLOCK - timedelta(days=6), updated_at=CLOCK - timedelta(days=6)
+        )
+
+    EDITOR_MENUS_TEXT = {
+        "selection": "Select this sentence to open the bubble menu.",
+        "link": "the handbook",
+        "linkHref": "https://example.com/handbook",
+        "code": "const release = await prepare(notes);",
+        "callout": "Callouts carry a colour of their own.",
+        "lastParagraph": "Type below this line.",
+    }
+
+    def _editor_menus_page(self, workspace, project, users) -> None:
+        """A private page of the admin's with every node the editor menus act on.
+
+        The editor menu stories open it, select, hover and type in it; live is
+        kept from storing what they type (apps/visual-tests/specs/editor-menus.spec.ts).
+        The image is a real asset in the stack's object storage, served the way
+        every page image is, through the asset endpoint's presigned redirect.
+        """
+        owner = users["admin"]
+        page, _ = Page.objects.get_or_create(
+            id=EDITOR_MENUS_PAGE_ID,
+            defaults={
+                "name": "Editor menus",
+                "workspace": workspace,
+                "owned_by": owner,
+                "created_by": owner,
+                "description_html": editor_menus_html(users["light"].id),
+                "access": 1,
+            },
+        )
+        ProjectPage.objects.get_or_create(
+            page=page, project=project, defaults={"workspace": workspace, "created_by": owner}
+        )
+        Page.objects.filter(pk=page.pk).update(
+            created_at=CLOCK - timedelta(days=7), updated_at=CLOCK - timedelta(days=7)
+        )
+
+        image = editor_menus_png()
+        object_name = f"{workspace.id}/{EDITOR_MENUS_IMAGE_ID.hex}-editor-menus.png"
+        if not S3Storage().upload_file(io.BytesIO(image), object_name, content_type="image/png"):
+            raise CommandError(f"Could not upload the editor menus image to {object_name}.")
+        FileAsset.objects.update_or_create(
+            id=EDITOR_MENUS_IMAGE_ID,
+            defaults={
+                "asset": object_name,
+                "attributes": {"name": "editor-menus.png", "type": "image/png", "size": len(image)},
+                "size": len(image),
+                "workspace": workspace,
+                "project": project,
+                "page": page,
+                "entity_type": FileAsset.EntityTypeContext.PAGE_DESCRIPTION,
+                "entity_identifier": str(page.id),
+                "is_uploaded": True,
+                "created_by": owner,
+            },
         )
 
     def _stickies(self, workspace, owner) -> None:
