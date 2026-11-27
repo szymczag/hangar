@@ -15,8 +15,9 @@ import { describe, expect, it } from "vitest";
  * production dependencies only, so a UI package in this graph resolves there
  * only by accident of its own manifest. 0.6.0-rc.1 crash-looped when the graph
  * reached `@makeplane/propel`, whose React is a peer dependency (ledger row
- * 196); the 1.4 `@plane/propel` and `@plane/ui` still declare React as a
- * dependency and would have hidden the same mistake. The server extension set
+ * 196); the 1.4 `@plane/propel` and `@plane/ui` declared React as a
+ * dependency and would have hidden the same mistake. Both are gone from the
+ * workspace (row 204) but stay on the list. The server extension set
  * is built from schema-only configs, so none of the editor's views, menus or
  * icons belong here.
  *

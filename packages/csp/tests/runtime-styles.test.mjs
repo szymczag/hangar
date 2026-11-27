@@ -13,28 +13,19 @@ import { pathToFileURL } from "node:url";
 
 import { RUNTIME_STYLE_ELEMENTS } from "../src/index.mjs";
 
-test("the Base UI scrollbar style matches the installed library", async () => {
-  // Base UI inserts this <style> itself; the policy allows it by the hash of
-  // this exact text. If an upgrade changes the text, the hash stops matching
-  // and the style is refused, so the difference has to surface here.
-  // Resolved from @plane/propel, the package that depends on Base UI, by its
-  // path in the repository: a package dependency on it would close a build
-  // cycle (propel depends on utils, which depends on this package).
-  const propelRequire = createRequire(new URL("../../propel/package.json", import.meta.url));
-  const root = dirname(propelRequire.resolve("@base-ui-components/react/package.json"));
-  const { styleDisableScrollbar } = await import(pathToFileURL(join(root, "esm/utils/styles.js")).href);
-  assert.ok(RUNTIME_STYLE_ELEMENTS.includes(styleDisableScrollbar.element.props.children));
-});
-
-// Base UI 1.x (@base-ui/react) is a separate package from the beta (@base-ui-components/react):
-// @makeplane/propel and @plane/blocks use it, and the workspace pins one copy for both.
+// Base UI 1.x (@base-ui/react): @makeplane/propel and @plane/blocks use it, and the
+// workspace pins one copy for both. Resolved from @makeplane/propel, which depends on it,
+// by its path in the repository; @plane/csp does not depend on Base UI itself.
 const baseUiRoot = () => {
   const makeplanePropelRequire = createRequire(new URL("../../makeplane-propel/package.json", import.meta.url));
   return dirname(makeplanePropelRequire.resolve("@base-ui/react/package.json"));
 };
 
 test("the Base UI 1.x scrollbar style matches the installed library", async () => {
-  // Same <style> as the beta, now built per call with the CSPProvider nonce.
+  // Base UI inserts this <style> itself; the policy allows it by the hash of
+  // this exact text. If an upgrade changes the text, the hash stops matching
+  // and the style is refused, so the difference has to surface here. 1.x builds
+  // it per call with the CSPProvider nonce.
   const { styleDisableScrollbar } = await import(pathToFileURL(join(baseUiRoot(), "utils/styles.mjs")).href);
   const element = styleDisableScrollbar.getElement(undefined);
   assert.equal(element.type, "style");

@@ -41,7 +41,7 @@
 - `pnpm check:types` - TypeScript type checking
 - `pnpm fix` - Auto-fix format and lint issues
 - `pnpm turbo run <command> --filter=<package>` - Target specific package/app
-- `pnpm --filter=@plane/ui storybook` - Start Storybook on port 6007
+- `pnpm vr` - Build web, admin and space, start the visual regression stack and run `apps/visual-tests` against it
 
 ## Reading CI
 
@@ -101,7 +101,10 @@ release because both were read as pass/fail.
 - **Error Handling**: Use try-catch with proper error types, log errors appropriately
 - **State Management**: MobX stores in `packages/shared-state`, reactive patterns
 - **Testing**: All features require unit tests, use existing test framework per package
-- **Components**: Build in `@plane/ui` with Storybook for isolated development
+- **Components**: Primitives come from `@makeplane/propel` (`packages/makeplane-propel`, the source recovered from the
+  published package; its `src/` is never edited by hand, see its README); composite and Plane-specific components live in
+  `@plane/blocks` (`packages/blocks`, subpath imports only, e.g. `@plane/blocks/toast`). Neither has a Storybook: screens
+  are checked with Playwright stories in `apps/visual-tests` (`pnpm vr`)
 
 ## Kubernetes Chart Documentation
 

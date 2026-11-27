@@ -56,10 +56,3 @@ test("the themed wordmark inverts in light themes and is left as drawn in dark o
   );
   assert.match(blocks, /themed \? HANGAR_LOGO_THEMED_CLASSNAME/);
 });
-
-test("the propel copy of the logo stays identical to the blocks one", () => {
-  assert.equal(
-    read("packages/propel/src/icons/brand/hangar-logo.tsx"),
-    read("packages/blocks/src/icons/brand/hangar-logo.tsx")
-  );
-});

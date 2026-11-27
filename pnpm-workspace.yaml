@@ -13,11 +13,8 @@ catalog:
   "@atlaskit/pragmatic-drag-and-drop": "1.7.4"
   "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "1.4.0"
   "@atlaskit/pragmatic-drag-and-drop-hitbox": "1.1.0"
-  "@base-ui-components/react": "1.0.0-beta.3"
   "@base-ui/react": "1.8.0"
-  "@blueprintjs/core": "6.18.0"
   "@bprogress/core": "^1.3.4"
-  "@chromatic-com/storybook": "5.2.1"
   "@effect/platform": "^0.97.3"
   "@effect/platform-node": "^0.108.4"
   "@floating-ui/dom": "^1.7.1"
@@ -26,15 +23,12 @@ catalog:
   "@fontsource/ibm-plex-mono": "5.2.7"
   "@fontsource/inter": "5.2.8"
   "@fontsource/material-symbols-rounded": "5.2.30"
-  "@headlessui/react": "2.2.10"
   "@hocuspocus/extension-database": "3.4.4"
   "@hocuspocus/extension-logger": "3.4.4"
   "@hocuspocus/extension-redis": "3.4.4"
   "@hocuspocus/provider": "3.4.4"
   "@hocuspocus/server": "3.4.4"
   "@hypermod/utils": "^0.7.1"
-  "@popperjs/core": "^2.11.8"
-  "@radix-ui/react-scroll-area": "^1.2.3"
   "@react-pdf/renderer": "^4.3.0"
   "@react-pdf/types": "^2.9.2"
   "@playwright/test": "1.62.1"
@@ -42,15 +36,6 @@ catalog:
   "@react-router/node": "8.3.0"
   "@react-router/serve": "8.3.0"
   "@sesamecare-oss/redlock": "1.4.0"
-  "@storybook/addon-designs": "11.1.3"
-  "@storybook/addon-docs": "10.6.5"
-  "@storybook/addon-links": "10.6.5"
-  "@storybook/addon-onboarding": "10.6.5"
-  "@storybook/addon-styling-webpack": "3.0.2"
-  "@storybook/addon-webpack5-compiler-swc": "4.0.3"
-  "@storybook/react": "10.6.5"
-  "@storybook/react-vite": "10.6.5"
-  "@storybook/react-webpack5": "10.6.5"
   "@tailwindcss/postcss": "4.2.4"
   "@tailwindcss/typography": "0.5.19"
   "@tanstack/react-table": "^8.21.3"
@@ -119,7 +104,6 @@ catalog:
   "express-winston": "^4.2.0"
   "express-ws": "^5.0.2"
   "file-type": "^21.3.1"
-  "framer-motion": "^12.23.0"
   "frimousse": "^0.3.0"
   # EXACT pin. CVE-2026-115895 covers every 17.x-21.0.3, so there is no 20.x fix.
   "happy-dom": "21.0.4"
@@ -156,7 +140,6 @@ catalog:
   "prosemirror-markdown": "1.13.4"
   "react": "19.2.8"
   "react-color": "^2.19.3"
-  "react-day-picker": "9.5.0"
   "react-dom": "19.2.8"
   "react-dropzone": "^14.2.3"
   "react-fast-compare": "^3.2.2"
@@ -165,7 +148,6 @@ catalog:
   "react-is": "^18.2.0"
   "react-markdown": "10.1.0"
   "react-masonry-component": "^6.3.0"
-  "react-popper": "^2.3.0"
   "react-router": "8.3.0"
   "recharts": "^2.15.1"
   "reflect-metadata": "^0.2.2"
@@ -178,7 +160,6 @@ catalog:
   "serve": "14.2.5"
   "sharp": "^0.35.5"
   "smooth-scroll-into-view-if-needed": "^2.0.2"
-  "storybook": "10.6.5"
   "swr": "2.4.2"
   "tailwind-merge": "3.4.0"
   "tailwindcss": "4.2.4"
@@ -204,9 +185,6 @@ overrides:
   mdast-util-to-hast: 13.2.1
   valibot: 1.4.2
   js-yaml: 4.3.2
-  # GHSA-3g3m-2fjr-6pw4 is fixed only in 14.0.2. The one consumer is Storybook's
-  # react-docgen plugin (^13.0.1); 14 keeps the same API.
-  glob: 14.0.3
   brace-expansion: 5.0.12
   nanoid: 3.3.18
   esbuild: 0.28.1
@@ -307,9 +285,6 @@ allowBuilds:
   msgpackr-extract: true
   turbo: true
   sharp: false
-
-minimumReleaseAgeExclude:
-  - "@blueprintjs/core@6.18.0"
 
 patchedDependencies:
   is-emoji-supported@0.0.5: patches/is-emoji-supported@0.0.5.patch
