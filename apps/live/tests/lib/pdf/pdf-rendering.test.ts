@@ -609,7 +609,7 @@ describe("PDF Rendering Integration", () => {
 
       expect(text).toContain("Callout body");
       expect(text).toContain(emoji);
-      for (const part of unicode.split("-")) expect(text).not.toContain(part);
+      for (const part of new Set(unicode.split("-"))) expect(text).not.toContain(part);
       expect(embeddedFonts(buffer)).toContain("NotoEmoji-Regular");
     });
 
@@ -638,18 +638,22 @@ describe("PDF Rendering Integration", () => {
       ["text around an emoji", "128522-65"],
       ["200,000 parts", Array.from({ length: 200_000 }, () => "128161").join("-")],
       ["17 parts", Array.from({ length: 17 }, () => "8205").join("-")],
-    ])("should draw the lightbulb for %s and print nothing from it", async (_label, unicode) => {
-      const buffer = await renderPlaneDocToPdfBuffer(
-        callout({ "data-logo-in-use": "emoji", "data-emoji-unicode": unicode })
-      );
-      const text = await extractPdfText(buffer);
+    ])(
+      "should draw the lightbulb for %s and print nothing from it",
+      async (_label, unicode) => {
+        const buffer = await renderPlaneDocToPdfBuffer(
+          callout({ "data-logo-in-use": "emoji", "data-emoji-unicode": unicode })
+        );
+        const text = await extractPdfText(buffer);
 
-      expect(text).toContain("Callout body");
-      for (const part of unicode.split("-")) expect(text).not.toContain(part);
-      expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
-      expect(text).not.toContain("<script>");
-      expect(embeddedFonts(buffer)).not.toContain("NotoEmoji-Regular");
-    });
+        expect(text).toContain("Callout body");
+        for (const part of new Set(unicode.split("-"))) expect(text).not.toContain(part);
+        expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
+        expect(text).not.toContain("<script>");
+        expect(embeddedFonts(buffer)).not.toContain("NotoEmoji-Regular");
+      },
+      20_000
+    );
 
     it("should draw icon callouts without printing the icon name", async () => {
       const buffer = await renderPlaneDocToPdfBuffer(

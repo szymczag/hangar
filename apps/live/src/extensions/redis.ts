@@ -15,6 +15,8 @@ import { redisManager } from "@/redis";
 import { AdminCommand } from "@/types/admin-commands";
 import type { AdminCommandData, AdminCommandHandler } from "@/types/admin-commands";
 
+type DocumentMessageHandler = (channel: Buffer, data: Buffer) => Promise<void>;
+
 const getRedisClient = () => {
   const redisClient = redisManager.getClient();
   if (!redisClient) {
@@ -29,7 +31,42 @@ export class Redis extends HocuspocusRedis {
 
   constructor() {
     super({ redis: getRedisClient() });
+    // The upstream extension decodes every message on the subscriber connection as a Yjs document message, but the
+    // admin channel shares that connection and carries JSON. Decoding a force_close command as a document message
+    // threw from an async event listener and surfaced as an unhandled rejection. Route only document channels to it.
+    const upstreamHandler = (this as unknown as { handleIncomingMessage?: DocumentMessageHandler })
+      .handleIncomingMessage;
+    if (typeof upstreamHandler !== "function") {
+      throw new AppError("The Hocuspocus Redis extension no longer exposes its document message handler");
+    }
+    // Fail loudly if the handler is not registered as itself (for example behind a wrapper): removing it would then
+    // silently leave the upstream listener in place, and every document message would be handled twice.
+    const subscriber = this.sub as unknown as NodeJS.EventEmitter;
+    const listenersBefore = subscriber.listeners("messageBuffer");
+    if (!listenersBefore.includes(upstreamHandler)) {
+      throw new AppError("The Hocuspocus Redis extension's document message handler is not registered as expected");
+    }
+    subscriber.off("messageBuffer", upstreamHandler);
+    if (subscriber.listenerCount("messageBuffer") !== listenersBefore.length - 1) {
+      throw new AppError("Could not detach the Hocuspocus Redis extension's document message handler");
+    }
+    this.handleUpstreamDocumentMessage = upstreamHandler;
+    this.sub.on("messageBuffer", this.handleDocumentMessage);
   }
+
+  private readonly handleUpstreamDocumentMessage: DocumentMessageHandler;
+
+  private handleDocumentMessage = async (channel: Buffer, data: Buffer) => {
+    const channelName = channel.toString();
+    if (channelName === this.ADMIN_CHANNEL) return;
+
+    try {
+      await this.handleUpstreamDocumentMessage(channel, data);
+    } catch (error) {
+      // A malformed message must not reject inside the event emitter; the content is not logged.
+      logger.error(`[Redis] Dropped an undecodable message on ${channelName} (${data.byteLength} bytes):`, error);
+    }
+  };
 
   async onConfigure(payload: onConfigurePayload) {
     await super.onConfigure(payload);
@@ -114,6 +151,7 @@ export class Redis extends HocuspocusRedis {
 
     // Remove the message listener to prevent memory leaks
     this.sub.removeListener("message", this.handleAdminMessage);
+    this.sub.removeListener("messageBuffer", this.handleDocumentMessage);
     logger.info(`[Redis] Removed admin message listener`);
 
     await super.onDestroy();

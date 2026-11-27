@@ -11,8 +11,10 @@ import RedisClient from "ioredis";
 import { WebSocketServer } from "ws";
 import * as Y from "yjs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { logger } from "@plane/logger";
 import type { TDocumentPayload } from "@plane/types";
 import { Database } from "@/extensions/database";
+import { ForceCloseHandler } from "@/extensions/force-close-handler";
 import { Redis } from "@/extensions/redis";
 import { TitleSyncExtension } from "@/extensions/title-sync";
 import { drainCollaborationServer } from "@/lib/drain-server";
@@ -39,6 +41,14 @@ vi.mock("@/services/page/handler", () => ({
     fetchDescriptionBinary: (id: string) => Promise.resolve(api.saved.get(id) ?? new Uint8Array()),
     fetchDetails: (id: string) => Promise.resolve(api.details.get(id) ?? { name: "" }),
     updateDescriptionBinary: (id: string, payload: TDocumentPayload) => {
+      if (id === "too-large-page") {
+        return Promise.reject(
+          Object.assign(new Error("Request failed with status code 413"), {
+            isAxiosError: true,
+            response: { status: 413, data: {} },
+          })
+        );
+      }
       api.saved.set(id, Buffer.from(payload.description_binary!, "base64"));
       api.html.set(id, payload.description_html!);
       return Promise.resolve();
@@ -112,7 +122,7 @@ describe.skipIf(!REDIS_URL)("Hocuspocus v3 with Plane's Redis extension and v2 d
           }),
         debounce: 20,
         maxDebounce: 100,
-        extensions: [redis, new Database(), new TitleSyncExtension()],
+        extensions: [redis, new Database(), new TitleSyncExtension(), new ForceCloseHandler()],
       });
       servers.push(server);
       const socket = new WebSocketServer({ host: "127.0.0.1", port: 0 });
@@ -188,5 +198,40 @@ describe.skipIf(!REDIS_URL)("Hocuspocus v3 with Plane's Redis extension and v2 d
     expect(document.getXmlFragment("title").toJSON()).toContain("HTML page");
     expect(api.html.get("html-only-page")).toBe('<p class="editor-paragraph-block">Saved as <strong>HTML</strong></p>');
     await disconnectAll("html-only-page");
+  });
+
+  it("force-closes a page the API refuses as too large on every server, without disturbing other pages", async () => {
+    const unhandled = vi.fn();
+    const errors = vi.spyOn(logger, "error");
+    process.on("unhandledRejection", unhandled);
+    try {
+      const first = connect(0, "too-large-page");
+      const second = connect(1, "too-large-page");
+      const other = connect(1, "v2-page-without-title");
+      await vi.waitFor(() => expect(providers.every((provider) => provider.isSynced)).toBe(true), {
+        timeout: 10_000,
+      });
+      for (const { provider } of [first, second]) provider.configuration.websocketProvider.shouldConnect = false;
+
+      const paragraph = new Y.XmlElement("paragraph");
+      paragraph.insert(0, [new Y.XmlText("Too large to save")]);
+      first.document.getXmlFragment("default").insert(0, [paragraph]);
+
+      await vi.waitFor(() => expect(servers.every((server) => !server.documents.has("too-large-page"))).toBe(true), {
+        timeout: 10_000,
+      });
+      for (const messages of stateless) {
+        expect(messages.map((message) => JSON.parse(message))).toContainEqual(
+          expect.objectContaining({ type: "force_close", code: 4001 })
+        );
+      }
+      expect(servers[1].documents.has("v2-page-without-title")).toBe(true);
+      expect(other.provider.isSynced).toBe(true);
+      expect(unhandled).not.toHaveBeenCalled();
+      expect(errors).not.toHaveBeenCalledWith(expect.stringContaining("Document still in memory"));
+      await disconnectAll("v2-page-without-title");
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
   });
 });
