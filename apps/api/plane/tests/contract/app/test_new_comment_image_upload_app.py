@@ -21,16 +21,24 @@ from unittest import mock
 from uuid import uuid4
 
 import pytest
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from plane.db.models import FileAsset, Issue, IssueComment, Project, ProjectMember, User, WorkspaceMember
+from plane.utils.file_asset_upload import UPLOAD_VALIDATION_VERSION
 
 S3_STORAGE_PATH = "plane.app.views.asset.v2.S3Storage"
 UPLOAD_URL = "/api/assets/v2/workspaces/{slug}/projects/{project_id}/"
 BULK_URL = "/api/assets/v2/workspaces/{slug}/projects/{project_id}/{entity_id}/bulk/"
 COMMENT_URL = "/api/workspaces/{slug}/projects/{project_id}/issues/{issue_id}/comments/"
 DUPLICATE_URL = "/api/assets/v2/workspaces/{slug}/duplicate-assets/{asset_id}/"
+READ_URLS = [
+    "/api/assets/v2/workspaces/{slug}/projects/{project_id}/{asset_id}/",
+    "/api/assets/v2/workspaces/{slug}/projects/{project_id}/download/{asset_id}/",
+    "/api/assets/v2/workspaces/{slug}/download/{asset_id}/",
+]
+CHECK_URL = "/api/assets/v2/workspaces/{slug}/check/{asset_id}/"
 
 
 def _user(role, workspace, *projects):
@@ -111,6 +119,36 @@ def _bind(client, setup, comment, asset_ids, project=None):
         {"asset_ids": [str(asset_id) for asset_id in asset_ids]},
         format="json",
     )
+
+
+def _validated(asset):
+    """Mark an asset as passing server-side validation, as completion would."""
+    asset.upload_validation_version = UPLOAD_VALIDATION_VERSION
+    asset.save(update_fields=["upload_validation_version"])
+    return asset
+
+
+def _duplicate(client, setup, source, *, entity_id, project=None):
+    project = project or setup["project"]
+    with (
+        mock.patch(S3_STORAGE_PATH),
+        mock.patch("plane.app.views.asset.v2.duplicate_file_asset", return_value=mock.Mock(id=uuid4())) as copy,
+    ):
+        response = client.post(
+            DUPLICATE_URL.format(slug=setup["workspace"].slug, asset_id=source.id),
+            {
+                "entity_type": FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
+                "entity_id": str(entity_id),
+                "project_id": str(project.id),
+            },
+            format="json",
+        )
+    return response, copy
+
+
+def _restricted_guest(setup):
+    """A GUEST of a project with guest_view_all_features off (the default)."""
+    return _user(5, setup["workspace"], setup["project"])
 
 
 @pytest.mark.contract
@@ -288,25 +326,14 @@ class TestNewCommentImageUpload:
         assert own.status_code == status.HTTP_200_OK
 
     def test_a_new_comment_can_take_a_copied_image(self, setup):
-        """Pasting an existing image duplicates it, under the same work item anchor."""
-        client = _client(setup["writer"])
-        source = _pending_image(client, setup)
-        duplicate = mock.Mock(id=uuid4())
+        """Pasting an existing image duplicates it, under the same work item anchor.
 
-        with (
-            mock.patch(S3_STORAGE_PATH),
-            mock.patch("plane.app.views.asset.v2.copyable_asset", return_value=source),
-            mock.patch("plane.app.views.asset.v2.duplicate_file_asset", return_value=duplicate) as copy,
-        ):
-            response = client.post(
-                DUPLICATE_URL.format(slug=setup["workspace"].slug, asset_id=source.id),
-                {
-                    "entity_type": FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
-                    "entity_id": str(setup["issue"].id),
-                    "project_id": str(setup["project"].id),
-                },
-                format="json",
-            )
+        Only the storage copy is mocked; the source read check is the real one.
+        """
+        client = _client(setup["writer"])
+        source = _validated(_pending_image(client, setup))
+
+        response, copy = _duplicate(client, setup, source, entity_id=setup["issue"].id)
 
         assert response.status_code == status.HTTP_200_OK
         assert copy.call_args.kwargs["entity_fields"] == {"issue_id": setup["issue"].id}
@@ -337,3 +364,172 @@ def test_an_identifier_that_is_not_an_id_is_still_refused(setup, entity_type, id
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "entity_identifier" in response.data["error"]
     assert not FileAsset.objects.filter(created_by=setup["writer"]).exists()
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestCommentImageBindingRules:
+    """The rules the review of #522 asked to pin down."""
+
+    def test_a_project_admin_binds_their_image_to_a_comment_they_did_not_write(self, setup, create_user):
+        client = _client(create_user)
+        asset = _pending_image(client, setup)
+        comment = _comment(setup["issue"], setup["writer"])
+
+        response = _bind(client, setup, comment, [asset.id])
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        asset.refresh_from_db()
+        assert asset.comment_id == comment.id
+
+    def test_a_project_admin_uploads_into_a_comment_they_did_not_write(self, setup, create_user):
+        """The saved-comment edit form passes the comment id; an admin may edit any comment."""
+        comment = _comment(setup["issue"], setup["writer"])
+
+        response = _upload(
+            _client(create_user),
+            setup["workspace"],
+            setup["project"],
+            entity_type=FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
+            entity_identifier=str(comment.id),
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert FileAsset.objects.get(id=response.data["asset_id"]).comment_id == comment.id
+
+    def test_a_member_cannot_upload_into_another_users_comment(self, setup):
+        comment = _comment(setup["issue"], setup["other"])
+
+        response = _upload(
+            _client(setup["writer"]),
+            setup["workspace"],
+            setup["project"],
+            entity_type=FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
+            entity_identifier=str(comment.id),
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert not FileAsset.objects.filter(comment=comment).exists()
+
+    def test_a_restricted_guest_cannot_upload_into_a_comment_on_a_hidden_work_item(self, setup):
+        guest = _restricted_guest(setup)
+        # Even their own comment, left on a work item they can no longer see.
+        comment = _comment(setup["issue"], guest)
+
+        response = _upload(
+            _client(guest),
+            setup["workspace"],
+            setup["project"],
+            entity_type=FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
+            entity_identifier=str(comment.id),
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert not FileAsset.objects.filter(comment=comment).exists()
+
+    def test_a_member_cannot_duplicate_into_another_users_comment(self, setup):
+        client = _client(setup["writer"])
+        source = _validated(_pending_image(client, setup))
+        comment = _comment(setup["issue"], setup["other"])
+
+        response, copy = _duplicate(client, setup, source, entity_id=comment.id)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        copy.assert_not_called()
+
+    def test_a_restricted_guest_cannot_duplicate_onto_a_hidden_work_item(self, setup):
+        guest = _restricted_guest(setup)
+        client = _client(guest)
+        own_issue = _issue(setup["project"], guest, "Guest's own")
+        source = _validated(_pending_image(client, setup, issue=own_issue))
+
+        response, copy = _duplicate(client, setup, source, entity_id=setup["issue"].id)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        copy.assert_not_called()
+
+    def test_a_deleted_work_item_is_not_an_anchor(self, setup):
+        issue = setup["issue"]
+        issue.deleted_at = timezone.now()
+        issue.save(update_fields=["deleted_at"])
+
+        response = _upload(
+            _client(setup["writer"]),
+            setup["workspace"],
+            setup["project"],
+            entity_type=FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
+            entity_identifier=str(issue.id),
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert not FileAsset.all_objects.filter(issue_id=issue.id).exists()
+
+    def test_a_batch_with_one_foreign_image_binds_nothing(self, setup):
+        client = _client(setup["writer"])
+        good = _pending_image(client, setup)
+        foreign = _pending_image(client, setup, issue=setup["sibling_issue"])
+        comment = _comment(setup["issue"], setup["writer"])
+
+        response = _bind(client, setup, comment, [good.id, foreign.id])
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        good.refresh_from_db()
+        foreign.refresh_from_db()
+        assert good.comment_id is None
+        assert foreign.comment_id is None
+        assert foreign.issue_id == setup["sibling_issue"].id
+
+    def test_a_restricted_guest_binds_only_on_their_own_work_item(self, setup):
+        guest = _restricted_guest(setup)
+        client = _client(guest)
+        own_issue = _issue(setup["project"], guest, "Guest's own")
+        asset = _pending_image(client, setup, issue=own_issue)
+        comment = _comment(own_issue, guest)
+
+        assert _bind(client, setup, comment, [asset.id]).status_code == status.HTTP_204_NO_CONTENT
+        asset.refresh_from_db()
+        assert asset.comment_id == comment.id
+
+
+def _read_statuses(client, setup, asset):
+    with mock.patch(S3_STORAGE_PATH) as storage:
+        storage.return_value.generate_presigned_url.return_value = "https://s3.test/object"
+        statuses = [
+            client.get(
+                url.format(slug=setup["workspace"].slug, project_id=setup["project"].id, asset_id=asset.id)
+            ).status_code
+            for url in READ_URLS
+        ]
+    exists = client.get(CHECK_URL.format(slug=setup["workspace"].slug, asset_id=asset.id)).data["exists"]
+    return statuses, exists
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestPendingCommentImageReads:
+    """A pending image is read under its work item's visibility."""
+
+    def test_the_uploader_and_project_members_read_it(self, setup):
+        asset = _pending_image(_client(setup["writer"]), setup)
+
+        statuses, exists = _read_statuses(_client(setup["other"]), setup, asset)
+
+        assert statuses == [status.HTTP_302_FOUND] * len(READ_URLS)
+        assert exists is True
+
+    def test_a_restricted_guest_who_cannot_see_the_work_item_is_refused(self, setup):
+        asset = _pending_image(_client(setup["writer"]), setup)
+
+        statuses, exists = _read_statuses(_client(_restricted_guest(setup)), setup, asset)
+
+        assert all(code in (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND) for code in statuses)
+        assert exists is False
+
+    def test_a_workspace_member_outside_the_project_is_refused(self, setup):
+        asset = _pending_image(_client(setup["writer"]), setup)
+        outsider = _user(15, setup["workspace"])
+
+        statuses, exists = _read_statuses(_client(outsider), setup, asset)
+
+        assert all(code in (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND) for code in statuses)
+        assert exists is False

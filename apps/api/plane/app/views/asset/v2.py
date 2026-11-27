@@ -754,23 +754,39 @@ def pending_comment_asset_fields(*, user_id, workspace, project_id, issue_id):
 
 
 def can_edit_comment(*, user_id, workspace_id, comment):
-    """The rule comment editing applies (IssueCommentViewSet.partial_update): its
-    creator or a project administrator, an active member of the comment's project
-    either way."""
-    if comment.created_by_id == user_id:
-        return ProjectMember.objects.filter(
-            workspace_id=workspace_id,
-            project_id=comment.project_id,
-            member_id=user_id,
-            is_active=True,
-        ).exists()
-    return ProjectMember.objects.filter(
+    """The rule comment editing applies (IssueCommentViewSet.partial_update through
+    allow_permission): an active member of the comment's project who created it, is
+    a project administrator, or is a workspace administrator."""
+    membership = ProjectMember.objects.filter(
         workspace_id=workspace_id,
         project_id=comment.project_id,
         member_id=user_id,
-        role=ROLE.ADMIN.value,
         is_active=True,
-    ).exists()
+    )
+    if not membership.exists():
+        return False
+    if comment.created_by_id == user_id or membership.filter(role=ROLE.ADMIN.value).exists():
+        return True
+    return is_workspace_asset_admin(user_id=user_id, workspace_id=workspace_id)
+
+
+def editable_comment_fields(*, user_id, workspace, comment):
+    """Fields for an image added to a saved comment, or None.
+
+    Binding at upload or duplication time follows the rule the bulk association
+    applies: the caller may edit the comment, and its work item is not hidden from
+    them.
+    """
+    if not can_edit_comment(user_id=user_id, workspace_id=workspace.id, comment=comment):
+        return None
+    if issue_hidden_from_user(
+        user_id=user_id,
+        project_id=comment.project_id,
+        issue_id=comment.issue_id,
+        workspace_scope={"workspace_id": workspace.id},
+    ):
+        return None
+    return {"comment_id": comment.id}
 
 
 class ProjectAssetEndpoint(BaseAPIView):
@@ -818,7 +834,7 @@ class ProjectAssetEndpoint(BaseAPIView):
                 project_id=project_id,
             ).first()
             if comment:
-                return {"comment_id": comment.id}
+                return editable_comment_fields(user_id=request.user.id, workspace=workspace, comment=comment)
             if not allow_pending_comment:
                 return None
             return pending_comment_asset_fields(
