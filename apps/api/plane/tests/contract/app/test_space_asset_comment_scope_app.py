@@ -246,3 +246,73 @@ class TestSpaceAssetBulkBindScope:
         assert response.status_code == status.HTTP_404_NOT_FOUND
         asset.refresh_from_db()
         assert asset.comment_id is None
+
+
+def _bind_on_board(setup, asset_ids):
+    return _client(setup["commenter"]).post(
+        BULK_URL.format(anchor=setup["board"].anchor, entity_id=setup["own_comment"].id),
+        {"asset_ids": [str(asset_id) for asset_id in asset_ids]},
+        format="json",
+    )
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestSpaceAssetBulkClaimScope:
+    """The board's bulk binding claims only an image that is already this comment's or
+    still pending, never one held by another work item or comment (#522 review, L1)."""
+
+    def test_an_unbound_image_is_bound_and_anchored_to_the_comments_work_item(self, setup):
+        asset = _asset(setup["project"], setup["commenter"])
+
+        assert _bind_on_board(setup, [asset.id]).status_code == status.HTTP_204_NO_CONTENT
+        asset.refresh_from_db()
+        assert asset.comment_id == setup["own_comment"].id
+        assert asset.issue_id == setup["issue"].id
+
+    def test_an_image_pending_on_the_comments_work_item_is_bound(self, setup):
+        asset = _asset(setup["project"], setup["commenter"])
+        asset.issue_id = setup["issue"].id
+        asset.save(update_fields=["issue_id"])
+
+        assert _bind_on_board(setup, [asset.id]).status_code == status.HTTP_204_NO_CONTENT
+        asset.refresh_from_db()
+        assert asset.comment_id == setup["own_comment"].id
+
+    def test_an_image_pending_on_another_work_item_is_not_moved(self, setup):
+        state = setup["issue"].state
+        elsewhere = Issue.objects.create(
+            name="Elsewhere",
+            workspace=setup["project"].workspace,
+            project=setup["project"],
+            state=state,
+        )
+        asset = _asset(setup["project"], setup["commenter"])
+        asset.issue_id = elsewhere.id
+        asset.save(update_fields=["issue_id"])
+
+        assert _bind_on_board(setup, [asset.id]).status_code == status.HTTP_404_NOT_FOUND
+        asset.refresh_from_db()
+        assert asset.comment_id is None
+        assert asset.issue_id == elsewhere.id
+
+    def test_an_image_of_another_comment_is_not_moved(self, setup):
+        earlier = _comment(setup["issue"], setup["commenter"])
+        asset = _asset(setup["project"], setup["commenter"])
+        asset.comment_id = earlier.id
+        asset.save(update_fields=["comment_id"])
+
+        assert _bind_on_board(setup, [asset.id]).status_code == status.HTTP_404_NOT_FOUND
+        asset.refresh_from_db()
+        assert asset.comment_id == earlier.id
+
+    def test_a_batch_with_one_foreign_image_binds_nothing(self, setup):
+        good = _asset(setup["project"], setup["commenter"])
+        earlier = _comment(setup["issue"], setup["commenter"])
+        taken = _asset(setup["project"], setup["commenter"])
+        taken.comment_id = earlier.id
+        taken.save(update_fields=["comment_id"])
+
+        assert _bind_on_board(setup, [good.id, taken.id]).status_code == status.HTTP_404_NOT_FOUND
+        good.refresh_from_db()
+        assert good.comment_id is None

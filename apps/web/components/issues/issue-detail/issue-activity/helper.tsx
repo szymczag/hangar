@@ -16,6 +16,14 @@ import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
 import { useUser } from "@/hooks/store/user";
 
+/**
+ * The entity a comment image is uploaded under. A saved comment names itself. A
+ * comment still being written has no id yet, so its images are held under the
+ * work item it is written on, and bound to the comment once it is created.
+ */
+export const commentAssetEntityId = (commentId: string | undefined, issueId: string | undefined) =>
+  commentId || issueId || undefined;
+
 export const useWorkItemCommentOperations = (
   workspaceSlug: string | undefined,
   projectId: string | undefined,
@@ -125,11 +133,12 @@ export const useWorkItemCommentOperations = (
       },
       uploadCommentAsset: async (blockId, file, commentId) => {
         try {
-          if (!workspaceSlug || !projectId) throw new Error("Missing fields");
+          const entityIdentifier = commentAssetEntityId(commentId, issueId);
+          if (!workspaceSlug || !projectId || !entityIdentifier) throw new Error("Missing fields");
           const res = await uploadEditorAsset({
             blockId,
             data: {
-              entity_identifier: commentId ?? "",
+              entity_identifier: entityIdentifier,
               entity_type: EFileAssetType.COMMENT_DESCRIPTION,
             },
             file,
@@ -144,10 +153,11 @@ export const useWorkItemCommentOperations = (
       },
       duplicateCommentAsset: async (assetId, commentId) => {
         try {
-          if (!workspaceSlug || !projectId) throw new Error("Missing fields");
+          const entityId = commentAssetEntityId(commentId, issueId);
+          if (!workspaceSlug || !projectId || !entityId) throw new Error("Missing fields");
           const res = await duplicateEditorAsset({
             assetId,
-            entityId: commentId || undefined,
+            entityId,
             entityType: EFileAssetType.COMMENT_DESCRIPTION,
             projectId,
             workspaceSlug,
