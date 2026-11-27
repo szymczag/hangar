@@ -396,12 +396,15 @@ def test_space_legacy_asset_is_never_rendered_inline(
         entity_name="project",
         entity_identifier=project.id,
     )
+    # The board serves only a description image of a work item it shows.
+    issue = Issue.objects.create(name="Shown", workspace=workspace, project=project, created_by=create_user)
     asset = FileAsset(
         attributes={"name": "legacy.png", "type": "image/png", "size": 32},
         asset=f"{workspace.id}/legacy.png",
         size=32,
         workspace=workspace,
         project=project,
+        issue=issue,
         entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
         is_uploaded=True,
     )

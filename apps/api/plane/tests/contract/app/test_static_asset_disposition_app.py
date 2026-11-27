@@ -16,7 +16,7 @@ from unittest import mock
 import pytest
 from rest_framework.test import APIClient
 
-from plane.db.models import DeployBoard, FileAsset, Project
+from plane.db.models import DeployBoard, FileAsset, Issue, Project
 from plane.utils.file_asset_upload import UPLOAD_VALIDATION_VERSION
 
 
@@ -99,12 +99,15 @@ def test_spaces_asset_disposition_follows_allow_list(
     deploy_board = DeployBoard.objects.create(
         entity_name="project", entity_identifier=project.id, project=project, workspace=workspace
     )
+    # The board serves only a description image of a work item it shows.
+    issue = Issue.objects.create(name="Shown", workspace=workspace, project=project, created_by=create_user)
     asset = FileAsset.objects.create(
         attributes={"name": "a.png", "type": claimed_type, "size": 10},
         asset=f"{workspace.id}/description",
         size=10,
         workspace=workspace,
         project=project,
+        issue=issue,
         created_by=create_user,
         entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
         is_uploaded=True,
