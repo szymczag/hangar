@@ -1450,9 +1450,6 @@ importers:
       '@floating-ui/react':
         specifier: 'catalog:'
         version: 0.26.28(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@headlessui/react':
-        specifier: 'catalog:'
-        version: 2.2.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@hocuspocus/provider':
         specifier: 'catalog:'
         version: 3.4.4(y-protocols@1.0.6(yjs@13.6.27))(yjs@13.6.27)
@@ -1468,15 +1465,9 @@ importers:
       '@plane/hooks':
         specifier: workspace:*
         version: link:../hooks
-      '@plane/propel':
-        specifier: workspace:*
-        version: link:../propel
       '@plane/types':
         specifier: workspace:*
         version: link:../types
-      '@plane/ui':
-        specifier: workspace:*
-        version: link:../ui
       '@plane/utils':
         specifier: workspace:*
         version: link:../utils
@@ -1570,9 +1561,6 @@ importers:
       lowlight:
         specifier: 'catalog:'
         version: 3.3.0
-      lucide-react:
-        specifier: 'catalog:'
-        version: 0.469.0(react@19.2.8)
       prosemirror-codemark:
         specifier: 'catalog:'
         version: 0.4.2(prosemirror-inputrules@1.5.1)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)
