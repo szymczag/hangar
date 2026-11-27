@@ -108,6 +108,20 @@ checks. Server-side duplication accepts only a readable source carrying the
 current trusted validation marker, copies it conditionally against its ETag,
 and verifies the resulting size and canonical MIME type before creating the
 new database row.
+An upload must name an existing record: an empty or malformed
+`entity_identifier` is refused with 400 for every entity type. A comment that is
+still being written has no id, so an image pasted into it names the work item
+instead and is held as a pending comment image of that work item. That is
+accepted only for a work item of the URL workspace and project the caller may
+comment on (a restricted guest only on a work item they created), and the image
+is read under the work item's visibility from the start. Once the comment is
+saved, the bulk association binds the image to it, and only when the caller
+uploaded every image, may edit the comment (its creator or a project
+administrator), and each image is pending on that comment's own work item or
+already belongs to it. A pending image is never moved to another work item,
+project or comment. An image whose comment is never saved stays a pending image
+of its work item and goes with it; the pending-object sweep below covers only
+uploads that were never completed.
 Entity association treats UUIDs as untrusted references: private drafts require
 their creator, and public pages still require an active project link and
 membership in that linked project. This applies consistently to current,

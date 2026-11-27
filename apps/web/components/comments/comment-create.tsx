@@ -63,21 +63,24 @@ export const CommentCreate = observer(function CommentCreate(props: TCommentCrea
     try {
       const comment = await activityOperations.createComment(formData);
       if (comment?.id) onSubmitCallback?.(comment.id);
-      if (uploadedAssetIds.length > 0) {
+      // Images pasted before the comment existed are held under the work item; bind
+      // them to the comment they now belong to.
+      if (comment?.id && uploadedAssetIds.length > 0) {
         if (projectId) {
-          await fileService.updateBulkProjectAssetsUploadStatus(workspaceSlug, projectId.toString(), entityId, {
+          await fileService.updateBulkProjectAssetsUploadStatus(workspaceSlug, projectId.toString(), comment.id, {
             asset_ids: uploadedAssetIds,
           });
         } else {
-          await fileService.updateBulkWorkspaceAssetsUploadStatus(workspaceSlug, entityId, {
+          await fileService.updateBulkWorkspaceAssetsUploadStatus(workspaceSlug, comment.id, {
             asset_ids: uploadedAssetIds,
           });
         }
-        setUploadedAssetIds([]);
       }
     } catch (error) {
       console.error(error);
     } finally {
+      // The editor is cleared either way, so its images no longer belong to a draft.
+      setUploadedAssetIds([]);
       reset({
         comment_html: "<p></p>",
       });
