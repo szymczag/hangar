@@ -130,7 +130,14 @@ of its work item and goes with it; the pending-object sweep below covers only
 uploads that were never completed.
 Entity association treats UUIDs as untrusted references: private drafts require
 their creator, and public pages still require an active project link and
-membership in that linked project. This applies consistently to current,
+membership in that linked project. A work item attachment or description image
+is anchored only to a work item the caller can see, the rule the dedicated
+attachment endpoint applies: a restricted guest only to a work item they
+created. The v2 upload, duplication and bulk association and the legacy
+multipart upload all apply it, and a hidden work item gets the same 404 as a
+missing one. The legacy multipart upload binds a comment image only to a saved
+comment the caller may edit, on a work item they can see, the same rule as the
+v2 upload. This applies consistently to current,
 legacy multipart, bulk, duplicate, and draft-conversion paths.
 Project-cover creation, duplication, association, completion, deletion, and
 restoration require a project administrator or a workspace administrator, the
@@ -139,11 +146,25 @@ guests cannot change the project cover through an asset side channel.
 Changing any other asset bound to a project (an attachment, a description
 image) requires active membership of that project, for a workspace administrator
 as well; within it, the uploader, a project administrator or a workspace
-administrator may delete, restore or rebind it.
+administrator may delete, restore, complete or rebind it. An asset of a work item
+(an attachment, a description image, a comment image) also requires that the
+work item is not hidden from the caller, so a restricted guest changes no asset
+of a work item they did not create, their own earlier uploads included.
 A project's `cover_image_asset` and a workspace's `logo_asset` accept only that
 entity's own cover or logo, or `null`, and refuse any value on create, through
 the workspace screens and the instance-admin console alike: the next upload of
 that kind deletes whatever the field names as the previous one.
+A published board serves, without a session, only the images it shows: a
+description image of a work item on the board (not a draft, archived or triage
+item), and a comment image bound to a comment on the board (EXTERNAL, on a work
+item on the board, with comments enabled). A comment image written on the board
+is unbound until its comment is saved, and until then is served only to its
+uploader while they are an active member of the project. An older comment image
+that was never bound (upstream never bound images pasted into a new comment in
+the app) is served when a comment on the board by its uploader embeds it, on its
+own work item if it has one. An image pending in the app, an image of an
+INTERNAL comment and an image of a work item off the board get the same 404 as
+a missing id.
 Public Spaces and API downloads render raster content inline only when the
 trusted database validation marker is current; historical unvalidated assets
 remain available only as forced `application/octet-stream` attachments.

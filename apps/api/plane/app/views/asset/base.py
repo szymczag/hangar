@@ -36,7 +36,18 @@ from plane.utils.file_asset_permissions import (
     can_manage_project_cover,
     can_mutate_file_asset,
     can_read_file_asset,
+    editable_comment_fields,
+    visible_work_item_fields,
 )
+
+
+def _is_active_project_member(*, request, workspace, project_id):
+    return ProjectMember.objects.filter(
+        project_id=project_id,
+        workspace=workspace,
+        member=request.user,
+        is_active=True,
+    ).exists()
 
 
 def _workspace_entity_fields(*, request, workspace, entity_type, entity_id):
@@ -65,31 +76,28 @@ def _workspace_entity_fields(*, request, workspace, entity_type, entity_id):
         FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
         FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
     }:
+        # The rule the v2 endpoints apply, under the work item's own project: an
+        # active member of it, to whom the work item is not hidden.
         issue = Issue.objects.filter(id=entity_id, workspace=workspace).first()
-        if (
-            issue
-            and ProjectMember.objects.filter(
-                project_id=issue.project_id,
-                workspace=workspace,
-                member=request.user,
-                is_active=True,
-            ).exists()
+        if issue is None or not _is_active_project_member(
+            request=request, workspace=workspace, project_id=issue.project_id
         ):
-            return {"project_id": issue.project_id, "issue_id": issue.id}
-        return None
+            return None
+        fields = visible_work_item_fields(
+            user_id=request.user.id,
+            workspace=workspace,
+            project_id=issue.project_id,
+            issue_id=issue.id,
+        )
+        return None if fields is None else {"project_id": issue.project_id, **fields}
     if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
+        # Only a saved comment the caller may edit, on a work item they can see,
+        # as for an upload naming a comment through the v2 endpoints.
         comment = IssueComment.objects.filter(id=entity_id, workspace=workspace).first()
-        if (
-            comment
-            and ProjectMember.objects.filter(
-                project_id=comment.project_id,
-                workspace=workspace,
-                member=request.user,
-                is_active=True,
-            ).exists()
-        ):
-            return {"project_id": comment.project_id, "comment_id": comment.id}
-        return None
+        if comment is None:
+            return None
+        fields = editable_comment_fields(user_id=request.user.id, workspace=workspace, comment=comment)
+        return None if fields is None else {"project_id": comment.project_id, **fields}
     if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
         page = Page.objects.filter(id=entity_id, workspace=workspace).first()
         if page is None:
