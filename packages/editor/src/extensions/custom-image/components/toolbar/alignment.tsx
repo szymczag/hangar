@@ -11,7 +11,7 @@ import { ChevronDownIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";
 // local imports
 import type { TCustomImageAlignment } from "../../types";
-import { IMAGE_ALIGNMENT_OPTIONS } from "../../utils";
+import { IMAGE_ALIGNMENT_OPTIONS } from "./alignment-options";
 
 type Props = {
   activeAlignment: TCustomImageAlignment;

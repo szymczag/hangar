@@ -13,7 +13,7 @@ import { sanitizeColorKey } from "@/helpers/attribute-guards";
 import { findParentNodeOfType } from "@/helpers/common";
 // local imports
 import { TableCellSelectionOutlinePlugin } from "./plugins/selection-outline/plugin";
-import { DEFAULT_COLUMN_WIDTH } from "./table";
+import { DEFAULT_COLUMN_WIDTH } from "./table/constants";
 import { isCellSelection } from "./table/utilities/helpers";
 
 type TableCellOptions = {
