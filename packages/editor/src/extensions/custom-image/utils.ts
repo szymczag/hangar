@@ -5,11 +5,9 @@
  */
 
 import type { Editor } from "@tiptap/core";
-import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 // local imports
 import { ECustomImageAttributeNames, ECustomImageStatus } from "./types";
-import type { TCustomImageAlignment, Pixel, TCustomImageAttributes } from "./types";
+import type { Pixel, TCustomImageAttributes } from "./types";
 
 export const DEFAULT_CUSTOM_IMAGE_ATTRIBUTES: TCustomImageAttributes = {
   [ECustomImageAttributeNames.SOURCE]: null,
@@ -38,27 +36,6 @@ export const ensurePixelString = <TDefault>(
   return value;
 };
 
-export const IMAGE_ALIGNMENT_OPTIONS: {
-  label: string;
-  value: TCustomImageAlignment;
-  icon: LucideIcon;
-}[] = [
-  {
-    label: "Left",
-    value: "left",
-    icon: AlignLeft,
-  },
-  {
-    label: "Center",
-    value: "center",
-    icon: AlignCenter,
-  },
-  {
-    label: "Right",
-    value: "right",
-    icon: AlignRight,
-  },
-];
 export const getImageBlockId = (id: string) => `editor-image-block-${id}`;
 
 export const isImageDuplicating = (status: ECustomImageStatus) => status === ECustomImageStatus.DUPLICATING;

@@ -5,5 +5,4 @@
  */
 
 export { Table } from "./table";
-
-export const DEFAULT_COLUMN_WIDTH = 150;
+export { DEFAULT_COLUMN_WIDTH } from "./constants";

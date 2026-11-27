@@ -32,6 +32,20 @@ export type VisualFixtures = {
   pages: { ids: string[]; names: string[] };
   /** The dark user's private page with one callout, and the text inside it. */
   calloutPage: { id: string; text: string };
+  /**
+   * The admin's private page for the editor menu stories, and the text each
+   * story finds its node by: a selectable sentence, a link, a code block, a
+   * callout and the paragraph before the empty one the typing stories use.
+   */
+  editorMenusPage: {
+    id: string;
+    selection: string;
+    link: string;
+    linkHref: string;
+    code: string;
+    callout: string;
+    lastParagraph: string;
+  };
   /** The text the seeded sticky opens with. */
   sticky: string;
   /** The work item the light user's two (read) inbox notifications are about. */

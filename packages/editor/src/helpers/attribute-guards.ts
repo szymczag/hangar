@@ -5,7 +5,7 @@
  */
 
 // constants
-import { COLORS_LIST } from "@/constants/common";
+import { COLORS_LIST } from "@/constants/colors";
 import { CORE_EXTENSIONS } from "@/constants/extension";
 
 /**

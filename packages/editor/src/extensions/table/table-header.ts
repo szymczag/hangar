@@ -10,7 +10,7 @@ import { CORE_EXTENSIONS } from "@/constants/extension";
 // helpers
 import { sanitizeColorKey } from "@/helpers/attribute-guards";
 // local imports
-import { DEFAULT_COLUMN_WIDTH } from "./table";
+import { DEFAULT_COLUMN_WIDTH } from "./table/constants";
 
 type TableHeaderOptions = {
   HTMLAttributes: Record<string, unknown>;
