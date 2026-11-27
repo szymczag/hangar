@@ -4,10 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import { Maximize } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FullScreenOutline } from "@makeplane/propel/icons";
+import { useEffect, useRef, useState } from "react";
 // plane imports
-import { Tooltip } from "@plane/propel/tooltip";
+import { Icon } from "@makeplane/propel/components/icon";
+import { ToolbarButton } from "@makeplane/propel/elements/toolbar";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 // local imports
 import { ImageFullScreenModal } from "./modal";
 
@@ -25,6 +27,7 @@ type Props = {
 
 export function ImageFullScreenActionRoot(props: Props) {
   const { image, isTouchDevice, toggleToolbarViewStatus } = props;
+  const openerRef = useRef<HTMLButtonElement>(null);
   // states
   const [isFullScreenEnabled, setIsFullScreenEnabled] = useState(false);
   // derived values
@@ -37,6 +40,7 @@ export function ImageFullScreenActionRoot(props: Props) {
   return (
     <>
       <ImageFullScreenModal
+        openerRef={openerRef}
         aspectRatio={aspectRatio}
         downloadSrc={downloadSrc}
         isFullScreenEnabled={isFullScreenEnabled}
@@ -45,19 +49,21 @@ export function ImageFullScreenActionRoot(props: Props) {
         width={width}
         toggleFullScreenMode={setIsFullScreenEnabled}
       />
-      <Tooltip tooltipContent="View in full screen" disabled={isTouchDevice}>
-        <button
+      <Tooltip label="View in full screen" disabled={isTouchDevice}>
+        <ToolbarButton
+          ref={openerRef}
           type="button"
+          size="sm"
+          labeled={false}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             setIsFullScreenEnabled(true);
           }}
-          className="grid h-full flex-shrink-0 place-items-center text-on-color/60 transition-colors hover:text-on-color"
           aria-label="View image in full screen"
         >
-          <Maximize className="size-3" />
-        </button>
+          <Icon icon={FullScreenOutline} />
+        </ToolbarButton>
       </Tooltip>
     </>
   );
