@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 # Django imports
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.utils import timezone
 
@@ -326,11 +327,19 @@ class EntityBulkAssetEndpoint(BaseAPIView):
             entity_type=FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
             # A public-site user may only rebind assets they created.
             created_by=request.user,
+        ).filter(
+            # Only an image that is already this comment's, or a pending one: unbound
+            # (uploaded here) or pending on this comment's own work item (uploaded in
+            # the app). An image is never moved off another comment or work item.
+            Q(comment_id=comment.id)
+            | Q(comment_id__isnull=True, issue_id__isnull=True)
+            | Q(comment_id__isnull=True, issue_id=comment.issue_id)
         )
         if assets.count() != len(set(asset_ids)):
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        assets.update(comment=comment)
+        # Anchor the image to the comment's work item, so it is read under its rule.
+        assets.update(comment=comment, issue_id=comment.issue_id)
         return Response(status=status.HTTP_204_NO_CONTENT)

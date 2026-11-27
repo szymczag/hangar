@@ -33,7 +33,7 @@ from plane.db.models import (
     WorkspaceMember,
 )
 from plane.settings.storage import S3Storage
-from plane.app.permissions import allow_permission, ROLE
+from plane.app.permissions import allow_permission, issue_hidden_from_user, ROLE
 from plane.utils.cache import invalidate_cache_directly
 from plane.throttles.asset import AssetRateThrottle
 from plane.utils.file_asset_copy import AssetCopyError, copyable_asset, duplicate_file_asset
@@ -730,10 +730,85 @@ class AssetRestoreEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def pending_comment_asset_fields(*, user_id, workspace, project_id, issue_id):
+    """Fields for an image pasted into a comment that has not been saved yet.
+
+    The image is anchored to the work item the comment is being written on, under
+    the rule comment creation applies: the work item belongs to this workspace and
+    project, and a restricted guest may only comment on work items they created.
+    Anchoring it to the work item, not leaving it unbound, means it is read under
+    that work item's visibility from the first request, and that only a comment on
+    the same work item can claim it later.
+    """
+    issue = Issue.objects.filter(id=issue_id, workspace=workspace, project_id=project_id).first()
+    if issue is None:
+        return None
+    if issue_hidden_from_user(
+        user_id=user_id,
+        project_id=project_id,
+        issue_id=issue.id,
+        workspace_scope={"workspace_id": workspace.id},
+    ):
+        return None
+    return {"issue_id": issue.id}
+
+
+def can_edit_comment(*, user_id, workspace_id, comment):
+    """The rule comment editing applies (IssueCommentViewSet.partial_update through
+    allow_permission): an active member of the comment's project who created it, is
+    a project administrator, or is a workspace administrator."""
+    membership = ProjectMember.objects.filter(
+        workspace_id=workspace_id,
+        project_id=comment.project_id,
+        member_id=user_id,
+        is_active=True,
+    )
+    if not membership.exists():
+        return False
+    if comment.created_by_id == user_id or membership.filter(role=ROLE.ADMIN.value).exists():
+        return True
+    return is_workspace_asset_admin(user_id=user_id, workspace_id=workspace_id)
+
+
+def editable_comment_fields(*, user_id, workspace, comment):
+    """Fields for an image added to a saved comment, or None.
+
+    Binding at upload or duplication time follows the rule the bulk association
+    applies: the caller may edit the comment, and its work item is not hidden from
+    them.
+    """
+    if not can_edit_comment(user_id=user_id, workspace_id=workspace.id, comment=comment):
+        return None
+    if issue_hidden_from_user(
+        user_id=user_id,
+        project_id=comment.project_id,
+        issue_id=comment.issue_id,
+        workspace_scope={"workspace_id": workspace.id},
+    ):
+        return None
+    return {"comment_id": comment.id}
+
+
 class ProjectAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload cover images/logos etc for workspace, projects and users."""
 
-    def get_scoped_entity_fields(self, *, request, workspace, project_id, entity_type, entity_id):
+    def get_scoped_entity_fields(
+        self,
+        *,
+        request,
+        workspace,
+        project_id,
+        entity_type,
+        entity_id,
+        allow_pending_comment=True,
+    ):
+        """The relation fields that bind a new asset to the entity it names, or None.
+
+        A comment image may also name the work item of a comment that is not saved
+        yet. It is then held as a pending comment image of that work item, and the
+        bulk association binds it to the comment once it exists. Bulk association
+        passes ``allow_pending_comment=False``: it only ever binds to a comment.
+        """
         if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER:
             can_manage_cover = can_manage_project_cover(
                 user_id=request.user.id,
@@ -758,7 +833,16 @@ class ProjectAssetEndpoint(BaseAPIView):
                 workspace=workspace,
                 project_id=project_id,
             ).first()
-            return {"comment_id": comment.id} if comment else None
+            if comment:
+                return editable_comment_fields(user_id=request.user.id, workspace=workspace, comment=comment)
+            if not allow_pending_comment:
+                return None
+            return pending_comment_asset_fields(
+                user_id=request.user.id,
+                workspace=workspace,
+                project_id=project_id,
+                issue_id=entity_id,
+            )
         if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
             page = Page.objects.filter(
                 Q(owned_by=request.user) | Q(access=Page.PUBLIC_ACCESS),
@@ -957,6 +1041,23 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
         )
         return workspace_admin.exists() or project_admin.exists()
 
+    @staticmethod
+    def comment_may_claim(*, request, workspace, comment, assets):
+        """Whether these comment images may be bound to ``comment``.
+
+        The caller already uploaded every asset (the queryset is limited to their
+        own). The comment must also be one they may edit, and each image must be
+        either a pending image of the comment's own work item or already this
+        comment's: an image pending on one work item cannot be moved onto a comment
+        on another, and an image of another comment cannot be taken from it.
+        """
+        if not can_edit_comment(user_id=request.user.id, workspace_id=workspace.id, comment=comment):
+            return False
+        return all(
+            asset.comment_id == comment.id or (asset.comment_id is None and asset.issue_id == comment.issue_id)
+            for asset in assets
+        )
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, entity_id):
         asset_ids = request.data.get("asset_ids", [])
@@ -1001,12 +1102,24 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
             project_id=project_id,
             entity_type=entity_type,
             entity_id=entity_id,
+            allow_pending_comment=False,
         )
         if entity_fields is None:
             return Response(
                 {"error": "Invalid entity context."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
+            comment = IssueComment.objects.get(id=entity_fields["comment_id"])
+            if not self.comment_may_claim(
+                request=request, workspace=workspace, comment=comment, assets=resolved_assets
+            ):
+                return Response(
+                    {"error": "Invalid entity context."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            # Keep the work item anchor, so the image stays read under its rule.
+            entity_fields = {**entity_fields, "issue_id": comment.issue_id}
         if entity_type == FileAsset.EntityTypeContext.PROJECT_COVER and len(resolved_assets) != 1:
             return Response(
                 {"error": "Only one project cover can be associated."},
