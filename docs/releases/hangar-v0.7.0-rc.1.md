@@ -44,8 +44,8 @@ a Trusted Types violation report. The handlers are no longer applied; the
 preview still closes on Escape and on a click outside it. Upstream Plane
 `1.5.0` has the same fault.
 
-**The PDF export checks what it is asked for and what it prints, and fetches
-nothing from outside.** A page's PDF export runs in the live server:
+**The PDF export checks what it is asked for and what it prints, and draws
+emoji from a bundled font.** A page's PDF export runs in the live server:
 
 - **Request.** The live server took the workspace slug, page id and project id
   of an export request and put them into the paths of the requests it makes to
@@ -92,8 +92,8 @@ the Content-Security-Policy is added, and the reviewed inventories of script
 sinks are unchanged, except that Spaces loses one entry (`eval` in lodash,
 which left its bundle with the old menus). The side-menu drag and AI handles
 still draw their icons as SVG elements, never as markup, and the image
-download and new-tab buttons keep `noopener,noreferrer`. Permissions are
-unchanged.
+download and new-tab buttons keep `noopener,noreferrer`. This removal changes
+no permissions.
 
 ## Migrations and compatibility
 
