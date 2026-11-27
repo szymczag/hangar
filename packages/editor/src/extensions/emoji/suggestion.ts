@@ -18,6 +18,8 @@ import { EmojisListDropdown } from "./components/emojis-list";
 import type { EmojisListDropdownProps, EmojiItem } from "./components/emojis-list";
 import type { ExtendedEmojiStorage } from "./emoji";
 
+const noop = () => {};
+
 const DEFAULT_EMOJIS = ["+1", "-1", "smile", "orange_heart", "eyes"];
 
 export const emojiSuggestion: EmojiOptions["suggestion"] = {
@@ -47,15 +49,17 @@ export const emojiSuggestion: EmojiOptions["suggestion"] = {
 
   render: () => {
     let component: ReactRenderer<CommandListInstance, EmojisListDropdownProps> | null = null;
-    let cleanup: () => void = () => {};
+    let cleanup: () => void = noop;
     let editorRef: Editor | null = null;
 
     const handleClose = (editor?: Editor) => {
       component?.destroy();
       component = null;
-      (editor || editorRef)?.commands.removeActiveDropbarExtension(CORE_EXTENSIONS.EMOJI);
-      const emojiStorage = editor?.storage.emoji as ExtendedEmojiStorage;
-      emojiStorage.forceOpen = false;
+      const activeEditor = editor || editorRef;
+      activeEditor?.commands.removeActiveDropbarExtension(CORE_EXTENSIONS.EMOJI);
+      // Escape closes without an editor argument; the storage is the one onStart saw.
+      const emojiStorage = activeEditor?.storage.emoji as ExtendedEmojiStorage | undefined;
+      if (emojiStorage) emojiStorage.forceOpen = false;
       cleanup();
     };
 

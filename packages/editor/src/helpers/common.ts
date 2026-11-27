@@ -10,6 +10,8 @@ import type { EditorState, Selection } from "@tiptap/pm/state";
 import { cn } from "@plane/utils";
 // constants
 import { CORE_EXTENSIONS } from "@/constants/extension";
+// extensions
+import { isDangerousHref } from "@/extensions/custom-link/url-security";
 
 type EditorClassNameArgs = {
   noBorder?: boolean;
@@ -67,6 +69,12 @@ export const isValidHttpUrl = (string: string): { isValid: boolean; url: string 
   // List of potentially dangerous protocols to block
   const blockedProtocols = ["javascript:", "data:", "vbscript:", "file:", "about:"];
 
+  // The raw input first, as the link mark's renderer and the click handler read it: a scheme
+  // hidden behind tabs, newlines or leading control characters is refused before URL parsing.
+  if (isDangerousHref(string)) {
+    return { isValid: false, url: string };
+  }
+
   // First try with the original string
   try {
     const url = new URL(string);
@@ -94,6 +102,7 @@ export const isValidHttpUrl = (string: string): { isValid: boolean; url: string 
   // Try again with https:// prefix
   try {
     const urlWithHttps = `https://${string}`;
+    // oxlint-disable-next-line no-new -- parsing is the validation
     new URL(urlWithHttps);
     return {
       isValid: true,
