@@ -21,6 +21,33 @@ describe("calloutEmojiFromUnicode", () => {
     expect(calloutEmojiFromUnicode("9757-65039")).toBe("☝️");
   });
 
+  it("reads a single code point the HTML parser stored as a number", () => {
+    expect(calloutEmojiFromUnicode(128161)).toBe("💡");
+    expect(calloutEmojiFromUnicode(128522)).toBe("😊");
+  });
+
+  it.each([1.5, -128161, Number.NaN, Number.POSITIVE_INFINITY, 1114112, 65, true, {}, ["128161"]])(
+    "gives an empty string for the non-string value %j",
+    (value) => {
+      expect(calloutEmojiFromUnicode(value)).toBe("");
+    }
+  );
+
+  it("decodes the longest RGI emoji, a kiss with two skin tones (10 code points)", () => {
+    const kiss = "👩🏻‍❤️‍💋‍👨🏼";
+    expect([...kiss]).toHaveLength(10);
+    expect(calloutEmojiFromUnicode(encode(kiss))).toBe(kiss);
+  });
+
+  it.each([
+    ["200,000 parts", Array.from({ length: 200_000 }, () => "128161").join("-")],
+    ["17 parts, one over the cap", Array.from({ length: 17 }, () => "8205").join("-")],
+    ["129 characters, one over the cap", "0".repeat(128) + "1"],
+  ])("gives an empty string, without throwing, for %s", (_label, value) => {
+    expect(() => calloutEmojiFromUnicode(value)).not.toThrow();
+    expect(calloutEmojiFromUnicode(value)).toBe("");
+  });
+
   it("gives an empty string for no value", () => {
     expect(calloutEmojiFromUnicode("")).toBe("");
     expect(calloutEmojiFromUnicode(undefined)).toBe("");

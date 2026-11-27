@@ -11,7 +11,7 @@
  * change the path or query: `/`, `\`, `?`, `#`, `%`, control characters, and a
  * bare `.` or `..`. Callers still encode the slug.
  */
-export const WORKSPACE_SLUG_PATTERN = /^(?!\.{1,2}$)[^/\\?#%\p{Cc}]+$/u;
+export const WORKSPACE_SLUG_PATTERN = /^(?!\.{1,2}$)[^/\\?#%\p{Cc}\p{Cs}]+$/u;
 
 /** A canonical UUID, the form of every project and page id. */
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

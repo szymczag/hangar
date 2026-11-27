@@ -31,13 +31,18 @@ const valid = { pageId: PAGE_ID, workspaceSlug: "my-ws", projectId: PROJECT_ID }
 
 const decode = (body: unknown) => Schema.decodeUnknownEither(PdfExportRequestBody)(body);
 
-const BAD_SLUGS = ["../other", "..", ".", "a/b", "a\\b", "a?b", "a#b", "a%2Fb", "a\nb", ""];
+// A lone UTF-16 surrogate, as JSON "\ud800" decodes, makes encodeURIComponent throw.
+const LONE_SURROGATE_SLUGS = ["\ud800", "ws\udfff", "a\udc00b", "\udc00\ud800"];
+const BAD_SLUGS = ["../other", "..", ".", "a/b", "a\\b", "a?b", "a#b", "a%2Fb", "a\nb", "", ...LONE_SURROGATE_SLUGS];
 const BAD_IDS = ["not-a-uuid", `${PAGE_ID}/x`, `../${PAGE_ID}`, `${PAGE_ID}?a=b`, ""];
 
 describe("PdfExportRequestBody", () => {
-  it.each(["my-ws", "ws_1", "Acme", "old.slug"])("accepts workspace slug %j", (workspaceSlug) => {
-    expect(Either.isRight(decode({ ...valid, workspaceSlug }))).toBe(true);
-  });
+  it.each(["my-ws", "ws_1", "Acme", "old.slug", "zespół", "ws\u{1F60A}"])(
+    "accepts workspace slug %j",
+    (workspaceSlug) => {
+      expect(Either.isRight(decode({ ...valid, workspaceSlug }))).toBe(true);
+    }
+  );
 
   it("accepts a body without a project id", () => {
     expect(Either.isRight(decode({ pageId: PAGE_ID, workspaceSlug: "ws" }))).toBe(true);
@@ -69,6 +74,7 @@ describe("PdfExportController", () => {
     ["a slug with a query", { ...valid, workspaceSlug: "ws?x=1" }],
     ["a slug with a fragment", { ...valid, workspaceSlug: "ws#x" }],
     ["a slug with a slash", { ...valid, workspaceSlug: "ws/projects" }],
+    ["a slug with a lone surrogate", JSON.parse(`{"pageId":"${PAGE_ID}","workspaceSlug":"ws\\ud800"}`) as unknown],
     ["a non-UUID page id", { ...valid, pageId: "../members" }],
     ["a non-UUID project id", { ...valid, projectId: "p/../../x" }],
   ])("answers 400 for %s without exporting", async (_label, body) => {
