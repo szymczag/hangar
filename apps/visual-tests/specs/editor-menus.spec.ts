@@ -15,11 +15,10 @@ import { expect, fixtures, test } from "../src/fixtures.js";
  * button, the callout colour picker, and the mention and emoji suggestions.
  * Then the comment editor on a published board (apps/space).
  *
- * The bubble menu, link popovers, slash command menu, block menu and the
- * mention and emoji suggestions are Propel's (the editor stage, phase 2, in
- * FORK.md); the table, image, code block and callout ones are still the 1.4
- * menus (Headless UI, floating-ui, lucide and the 1.4 Propel icons) until
- * phase 3 moves them.
+ * All of them are Propel's: the bubble menu, link popovers, slash command
+ * menu, block menu and the mention and emoji suggestions since the editor
+ * stage's phase 2, the table, image, code block and callout ones since phase 3
+ * (FORK.md, ledger rows 202 and 203). Their positioning is still floating-ui.
  *
  * They all open the admin's private "Editor menus" page, which the seed fills
  * with every node the menus act on and no other story shows: the light user's
@@ -224,11 +223,15 @@ test("the table column menu, with its colour submenu", async ({ asUser }) => {
   // The column handles act on the table the selection is in.
   const header = editor.locator("th", { hasText: "Owner" });
   await header.click();
-  await header.locator(".table-col-handle-container button").click();
-  const menu = page.locator('[class*="w-[12rem]"]').filter({ hasText: "Header column" }).last();
+  const handle = header.locator(".table-col-handle-container button");
+  await handle.click();
+  await expect(handle).toHaveAttribute("aria-label", "Column options");
+  // The Propel menu surface, inside the floating-ui wrapper.
+  const menu = page.locator('[class*="max-h-[90vh]"]').filter({ hasText: "Header column" }).last();
+  await expect(menu).toBeVisible();
   await page.mouse.move(0, 0);
 
-  // The colour section is a disclosure that starts open.
+  // The colour section is a collapsible that starts open.
   await capture(page, "editor-table-column-menu", { ready: menu.getByText("Background colors"), target: menu });
 });
 
@@ -245,15 +248,14 @@ test("the image toolbar and its alignment dropdown", async ({ asUser }) => {
   await expect(fullScreen).toBeVisible();
   await capture(page, "editor-image-toolbar", { ready: fullScreen, target: block });
 
-  // The alignment dropdown: the toolbar's only trigger that is neither a link nor the viewer.
-  await block
-    .getByRole("button")
-    .filter({ has: page.locator("svg.lucide-align-left") })
-    .first()
-    .click();
-  await expect(block.locator("svg.lucide-align-center")).toBeVisible();
+  // The alignment dropdown, a second Propel toolbar under the trigger.
+  const align = block.getByRole("button", { name: "Align image", exact: true });
+  await align.click();
+  await expect(align).toHaveAttribute("aria-expanded", "true");
+  const alignments = block.getByRole("group", { name: "Image alignment" });
+  await expect(alignments.getByRole("button", { name: "Align image left" })).toHaveAttribute("aria-pressed", "true");
   await capture(page, "editor-image-toolbar-alignment", {
-    ready: block.locator("svg.lucide-align-right"),
+    ready: alignments.getByRole("button", { name: "Align image right" }),
     target: block,
   });
 });
@@ -283,8 +285,9 @@ test("the code block's copy button on hover", async ({ asUser }) => {
 
   const block = editor.locator(".code-block", { hasText: seed.editorMenusPage.code }).first();
   await block.locator("pre").hover();
-  const copy = block.locator("button").first();
-  await expect(copy).toBeVisible();
+  const copy = block.getByRole("button", { name: "Copy code" });
+  // The button fades in on hover; its wrapper's opacity is the finished state.
+  await expect(copy.locator("xpath=..")).toHaveCSS("opacity", "1");
 
   await capture(page, "editor-code-block-copy", { ready: copy, target: block });
 });

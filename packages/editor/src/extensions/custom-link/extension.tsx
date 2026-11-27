@@ -16,7 +16,7 @@ import { isValidHttpUrl } from "@/helpers/common";
 import { autolink } from "./helpers/autolink";
 import { clickHandler } from "./helpers/clickHandler";
 import { pasteHandler } from "./helpers/pasteHandler";
-import { isDangerousHref } from "./url-security";
+import { isAllowedLinkHref } from "./url-security";
 
 type LinkProtocolOptions = {
   scheme: string;
@@ -176,7 +176,9 @@ export const CustomLinkExtension = Mark.create<LinkOptions, CustomLinkStorage>({
             return null;
           }
           const href = node.getAttribute("href") || "";
-          if (isDangerousHref(href)) {
+          // Pasted or stored HTML keeps a link only for an allowlisted scheme
+          // or a relative reference, the same set the link inputs accept.
+          if (!isAllowedLinkHref(href)) {
             return false;
           }
           return {};
@@ -187,7 +189,10 @@ export const CustomLinkExtension = Mark.create<LinkOptions, CustomLinkStorage>({
 
   renderHTML({ HTMLAttributes }) {
     const href = (HTMLAttributes.href as string) || "";
-    if (isDangerousHref(href)) {
+    // A mark from a collaborative update or the server never passed parseHTML,
+    // so the href is checked again here: a scheme off the allowlist is blanked
+    // and the browser has nothing to open on a middle- or modifier-click.
+    if (!isAllowedLinkHref(href)) {
       return ["a", mergeAttributes(this.options.HTMLAttributes, { ...HTMLAttributes, href: "" }), 0];
     }
     return ["a", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];

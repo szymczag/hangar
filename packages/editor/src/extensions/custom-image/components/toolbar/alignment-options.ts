@@ -4,8 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { AlignCenterOutline, AlignLeftOutline, AlignRightOutline } from "@makeplane/propel/icons";
+import type { ComponentType, SVGProps } from "react";
 // local imports
 import type { TCustomImageAlignment } from "../../types";
 
@@ -15,21 +15,21 @@ import type { TCustomImageAlignment } from "../../types";
 export const IMAGE_ALIGNMENT_OPTIONS: {
   label: string;
   value: TCustomImageAlignment;
-  icon: LucideIcon;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
 }[] = [
   {
     label: "Left",
     value: "left",
-    icon: AlignLeft,
+    icon: AlignLeftOutline,
   },
   {
     label: "Center",
     value: "center",
-    icon: AlignCenter,
+    icon: AlignCenterOutline,
   },
   {
     label: "Right",
     value: "right",
-    icon: AlignRight,
+    icon: AlignRightOutline,
   },
 ];

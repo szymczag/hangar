@@ -11,7 +11,7 @@ import { cn } from "@plane/utils";
 // constants
 import { CORE_EXTENSIONS } from "@/constants/extension";
 // extensions
-import { isDangerousHref } from "@/extensions/custom-link/url-security";
+import { isAllowedLinkProtocol, isDangerousHref } from "@/extensions/custom-link/url-security";
 
 type EditorClassNameArgs = {
   noBorder?: boolean;
@@ -65,41 +65,42 @@ export const getTrimmedHTML = (html: string) =>
     .replace(/^(?:<p><\/p>)+/g, "") // Remove from beginning
     .replace(/(?:<p><\/p>)+$/g, ""); // Remove from end
 
-export const isValidHttpUrl = (string: string): { isValid: boolean; url: string } => {
-  // List of potentially dangerous protocols to block
-  const blockedProtocols = ["javascript:", "data:", "vbscript:", "file:", "about:"];
+// `host:port` with no scheme (`localhost:3000`, `example.com:8080/a`). The URL
+// parser reads the host as a scheme, so it is normalised like other scheme-less input.
+const HOST_WITH_PORT = /^[a-z0-9.-]+:\d+(?:[/?#]|$)/i;
 
+/**
+ * Validates what a user typed into a link input (and what autolink proposes).
+ * Only the link allowlist (`ALLOWED_LINK_PROTOCOLS`: http, https, mailto, tel)
+ * is accepted; any other scheme is refused rather than saved, because a saved
+ * link is one the browser opens on a middle-click, a modifier-click or in a
+ * read-only view. Input with no scheme is normalised to `https://`.
+ */
+export const isValidHttpUrl = (string: string): { isValid: boolean; url: string } => {
   // The raw input first, as the link mark's renderer and the click handler read it: a scheme
   // hidden behind tabs, newlines or leading control characters is refused before URL parsing.
   if (isDangerousHref(string)) {
     return { isValid: false, url: string };
   }
 
-  // First try with the original string
+  let parsed: URL | null = null;
   try {
-    const url = new URL(string);
-
-    // Check for potentially dangerous protocols
-    const protocol = url.protocol.toLowerCase();
-    if (blockedProtocols.some((p) => protocol === p)) {
-      return {
-        isValid: false,
-        url: string,
-      };
-    }
-
-    // If URL has any valid protocol, return as is
-    if (url.protocol && url.protocol !== "") {
-      return {
-        isValid: true,
-        url: string,
-      };
-    }
+    parsed = new URL(string);
   } catch {
-    // Original string wasn't a valid URL - that's okay, we'll try with https
+    // Not an absolute URL - normalised with https below.
   }
 
-  // Try again with https:// prefix
+  if (parsed) {
+    if (isAllowedLinkProtocol(parsed.protocol)) {
+      return { isValid: true, url: string };
+    }
+    // Any other scheme is refused, unless the "scheme" is a host with a port.
+    if (!HOST_WITH_PORT.test(string)) {
+      return { isValid: false, url: string };
+    }
+  }
+
+  // Scheme-less input: try again with an https:// prefix.
   try {
     const urlWithHttps = `https://${string}`;
     // oxlint-disable-next-line no-new -- parsing is the validation

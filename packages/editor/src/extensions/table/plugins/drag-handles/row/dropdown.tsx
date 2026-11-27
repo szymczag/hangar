@@ -6,11 +6,19 @@
 
 import type { Editor } from "@tiptap/core";
 import { TableMap } from "@tiptap/pm/tables";
-import { ArrowDown, ArrowUp, ToggleRight } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import {
+  ArrowDownOutline,
+  CloseOutline,
+  CopyOutline,
+  DeleteOutline,
+  ToggleFilled,
+  TopArrowOutline,
+} from "@makeplane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { MenuItemContent, MenuItemTitle, MenuItemTrailing, MenuSeparator } from "@makeplane/propel/elements/menu";
 // extensions
-import type { ISvgIcons } from "@plane/propel/icons";
-import { CopyIcon, TrashIcon, CloseIcon } from "@plane/propel/icons";
+import type { ISvgIcons } from "@plane/blocks/icons";
+import { FloatingMenuItem } from "@/components/menus/floating-menu/root";
 import { findTable, getSelectedRows } from "@/extensions/table/table/utilities/helpers";
 // local imports
 import { duplicateRows } from "../actions";
@@ -19,25 +27,25 @@ import { TableDragHandleDropdownColorSelector } from "../color-selector";
 const DROPDOWN_ITEMS: {
   key: string;
   label: string;
-  icon: LucideIcon | React.FC<ISvgIcons>;
+  icon: React.FC<React.SVGProps<SVGSVGElement>> | React.FC<ISvgIcons>;
   action: (editor: Editor) => void;
 }[] = [
   {
     key: "insert-above",
     label: "Insert above",
-    icon: ArrowUp,
+    icon: TopArrowOutline,
     action: (editor) => editor.chain().focus().addRowBefore().run(),
   },
   {
     key: "insert-below",
     label: "Insert below",
-    icon: ArrowDown,
+    icon: ArrowDownOutline,
     action: (editor) => editor.chain().focus().addRowAfter().run(),
   },
   {
     key: "duplicate",
     label: "Duplicate",
-    icon: CopyIcon,
+    icon: CopyOutline,
     action: (editor) => {
       const table = findTable(editor.state.selection);
       if (!table) return;
@@ -52,13 +60,13 @@ const DROPDOWN_ITEMS: {
   {
     key: "clear-contents",
     label: "Clear contents",
-    icon: CloseIcon,
+    icon: CloseOutline,
     action: (editor) => editor.chain().focus().clearSelectedCells().run(),
   },
   {
     key: "delete",
     label: "Delete",
-    icon: TrashIcon,
+    icon: DeleteOutline,
     action: (editor) => editor.chain().focus().deleteRow().run(),
   },
 ];
@@ -73,9 +81,8 @@ export function RowOptionsDropdown(props: Props) {
 
   return (
     <>
-      <button
+      <FloatingMenuItem
         type="button"
-        className="flex w-full items-center justify-between gap-2 truncate rounded-sm px-1 py-1.5 text-left text-11 text-secondary hover:bg-layer-1"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -83,16 +90,20 @@ export function RowOptionsDropdown(props: Props) {
           onClose();
         }}
       >
-        <div className="flex-grow truncate">Header row</div>
-        <ToggleRight className="size-3 shrink-0" />
-      </button>
-      <hr className="my-2 border-subtle" />
+        <MenuItemContent>
+          <MenuItemTitle>Header row</MenuItemTitle>
+        </MenuItemContent>
+        <MenuItemTrailing>
+          <Icon icon={ToggleFilled} tint="secondary" />
+        </MenuItemTrailing>
+      </FloatingMenuItem>
+      <MenuSeparator render={<hr />} />
       <TableDragHandleDropdownColorSelector editor={editor} onSelect={onClose} />
       {DROPDOWN_ITEMS.map((item) => (
-        <button
+        <FloatingMenuItem
           key={item.key}
           type="button"
-          className="flex w-full items-center gap-2 truncate rounded-sm px-1 py-1.5 text-left text-11 text-secondary hover:bg-layer-1"
+          variant={item.key === "delete" ? "danger" : "neutral"}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -100,9 +111,11 @@ export function RowOptionsDropdown(props: Props) {
             onClose();
           }}
         >
-          <item.icon className="size-3 shrink-0" />
-          <div className="flex-grow truncate">{item.label}</div>
-        </button>
+          <Icon icon={item.icon} />
+          <MenuItemContent>
+            <MenuItemTitle>{item.label}</MenuItemTitle>
+          </MenuItemContent>
+        </FloatingMenuItem>
       ))}
     </>
   );

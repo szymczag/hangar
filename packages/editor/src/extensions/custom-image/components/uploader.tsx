@@ -4,7 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import { ImageIcon, RotateCcw } from "lucide-react";
+import { Button } from "@makeplane/propel/components/button";
+import { ImageOutline, RefreshOutline } from "@makeplane/propel/icons";
 import type { ChangeEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 // plane imports
@@ -229,29 +230,40 @@ export function CustomImageUploader(props: CustomImageUploaderProps) {
       onDragOver={onDragEnter}
       onDragLeave={onDragLeave}
       contentEditable={false}
+      // The whole surface opens the file picker as a pointer convenience; the
+      // "Choose image" button is the keyboard-reachable control.
+      role="presentation"
       onClick={() => {
         if (!failedToLoadImage && editor.isEditable && !hasDuplicationFailed) {
           fileInputRef.current?.click();
         }
       }}
     >
-      <ImageIcon className="size-4" />
-      <div className="flex-1 text-14 font-medium">{getDisplayMessage()}</div>
+      <ImageOutline className="size-4" />
+      <div className="flex-1 text-body-sm-medium">{getDisplayMessage()}</div>
+      {!failedToLoadImage && editor.isEditable && !hasDuplicationFailed && (
+        <Button
+          label="Choose image"
+          variant="secondary"
+          size="sm"
+          stretch="auto"
+          onClick={(event) => {
+            event.stopPropagation();
+            fileInputRef.current?.click();
+          }}
+        />
+      )}
       {hasDuplicationFailed && editor.isEditable && (
-        <button
-          type="button"
+        <Button
+          label="Retry"
+          aria-label="Retry duplication"
+          variant="secondary"
+          size="sm"
+          stretch="auto"
+          icon={<RefreshOutline />}
+          iconPosition="start"
           onClick={handleRetryClick}
-          className={cn(
-            "flex items-center gap-1 rounded-md px-2 py-1 font-medium text-danger-primary transition-all duration-200 ease-in-out hover:bg-danger-subtle-hover",
-            {
-              "hover:bg-danger-subtle-hover": selected,
-            }
-          )}
-          title="Retry duplication"
-        >
-          <RotateCcw className="size-3" />
-          <span className="text-11">Retry</span>
-        </button>
+        />
       )}
       <input
         className="size-0 overflow-hidden"
@@ -260,6 +272,7 @@ export function CustomImageUploader(props: CustomImageUploaderProps) {
         type="file"
         accept={ACCEPTED_IMAGE_MIME_TYPES.join(",")}
         onChange={onFileChange}
+        onClick={(event) => event.stopPropagation()}
         multiple
       />
     </div>

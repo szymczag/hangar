@@ -4,6 +4,10 @@
  * See the LICENSE file for details.
  */
 
+import { AiStarFourOutline, MoreVerticalOutline } from "@makeplane/propel/icons";
+import type { ComponentType, SVGProps } from "react";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ADD_ICON, SPARKLES_ICON, VERTICAL_ELLIPSIS_ICON, createSvgIcon } from "../src/helpers/svg-icon";
@@ -60,13 +64,41 @@ const parsePrevious = (markup: string): TNode => {
   };
 };
 
+/**
+ * The path data a Propel icon component renders, with any `fill` inherited
+ * from a wrapping `<g>` folded into each path, as the plain-DOM icon carries it.
+ */
+const propelGlyph = (icon: ComponentType<SVGProps<SVGSVGElement>>) => {
+  const markup = renderToStaticMarkup(createElement(icon, { width: 14, height: 14 }));
+  const svg = attributes(/<svg([^>]*)>/.exec(markup)![1]);
+  const groupFill = /<g([^>]*)>/.exec(markup)?.[1];
+  const inherited = groupFill ? attributes(groupFill) : {};
+  return {
+    viewBox: svg.viewBox,
+    paths: [...markup.matchAll(/<path\b([^>]*?)\/?>/g)].map((match) =>
+      Object.assign({}, inherited, attributes(match[1]))
+    ),
+  };
+};
+
 describe("createSvgIcon", () => {
+  it("builds ADD_ICON exactly as the markup it replaces", () => {
+    const built = plain(createSvgIcon(ADD_ICON, recordingDocument()) as unknown as TNode);
+    expect(built).toEqual(parsePrevious(previous.ADD_ICON));
+  });
+
+  // The side-menu handles draw Propel's glyphs, as upstream does, but as plain
+  // DOM: upstream mounts each icon as its own React root (plugins/handle-icon.ts).
   it.each([
-    ["VERTICAL_ELLIPSIS_ICON", VERTICAL_ELLIPSIS_ICON],
-    ["SPARKLES_ICON", SPARKLES_ICON],
-    ["ADD_ICON", ADD_ICON],
-  ] as const)("builds %s exactly as the markup it replaces", (name, icon) => {
+    ["VERTICAL_ELLIPSIS_ICON", VERTICAL_ELLIPSIS_ICON, MoreVerticalOutline],
+    ["SPARKLES_ICON", SPARKLES_ICON, AiStarFourOutline],
+  ] as const)("builds %s with the path data of its Propel icon", (_name, icon, component) => {
     const built = plain(createSvgIcon(icon, recordingDocument()) as unknown as TNode);
-    expect(built).toEqual(parsePrevious(previous[name]));
+    const glyph = propelGlyph(component);
+    expect(built.namespace).toBe("http://www.w3.org/2000/svg");
+    expect(built.attributes).toMatchObject({ width: "14", height: "14", viewBox: glyph.viewBox });
+    expect(built.children.map((child) => ({ tag: child.tag, attributes: child.attributes }))).toEqual(
+      glyph.paths.map((path) => ({ tag: "path", attributes: path }))
+    );
   });
 });

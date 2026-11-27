@@ -115,7 +115,15 @@ describe("the lib and server entries of @plane/editor", () => {
     const { files, reached } = uiImports(path.join(SRC, "index.ts"));
     expect(files).toBeGreaterThan(100);
     const packages = new Set(reached.map((line) => line.split(" -> ").at(-1)));
-    for (const name of ["lucide-react", "@plane/propel/icons", "@headlessui/react", "@tiptap/react", "react"]) {
+    // The root entry's views and menus are Propel's; the legacy UI packages
+    // are gone from the editor altogether (tests/no-legacy-ui-imports.test.ts).
+    for (const name of [
+      "@makeplane/propel/icons",
+      "@makeplane/propel/elements/menu",
+      "@floating-ui/react",
+      "@tiptap/react",
+      "react",
+    ]) {
       expect(packages).toContain(name);
     }
   });
