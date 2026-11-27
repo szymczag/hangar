@@ -9,10 +9,18 @@ import { OutgoingMessage } from "@hocuspocus/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminCommand, CloseCode, ForceCloseReason } from "@/types/admin-commands";
 
+// When set, the fake client registers every listener behind a wrapper, as a library change might.
+const clientOptions = vi.hoisted(() => ({ wrapListeners: false }));
+
 vi.mock("@/redis", async () => {
   const { EventEmitter: Emitter } = await import("node:events");
+  class FakeClient extends Emitter {
+    on(event: string | symbol, listener: (...args: unknown[]) => void) {
+      return super.on(event, clientOptions.wrapListeners ? (...args: unknown[]) => listener(...args) : listener);
+    }
+  }
   const createClient = (): EventEmitter =>
-    Object.assign(new Emitter(), {
+    Object.assign(new FakeClient(), {
       options: { db: 0 },
       duplicate: () => createClient(),
       publish: () => Promise.resolve(1),
@@ -46,7 +54,20 @@ const deliver = (redis: Redis, channel: string, message: Buffer) => {
 };
 
 describe("Redis extension subscriber", () => {
-  beforeEach(() => loggerError.mockClear());
+  beforeEach(() => {
+    loggerError.mockClear();
+    clientOptions.wrapListeners = false;
+  });
+
+  it("refuses to start when the upstream handler is not registered as itself", () => {
+    clientOptions.wrapListeners = true;
+    expect(() => new Redis()).toThrow("document message handler is not registered as expected");
+  });
+
+  it("replaces the upstream handler with exactly one listener", () => {
+    const redis = new Redis();
+    expect((redis.sub as unknown as EventEmitter).listenerCount("messageBuffer")).toBe(1);
+  });
 
   it("does not decode admin commands as Yjs document messages", async () => {
     const redis = new Redis();

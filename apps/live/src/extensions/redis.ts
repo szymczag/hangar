@@ -39,7 +39,17 @@ export class Redis extends HocuspocusRedis {
     if (typeof upstreamHandler !== "function") {
       throw new AppError("The Hocuspocus Redis extension no longer exposes its document message handler");
     }
-    this.sub.off("messageBuffer", upstreamHandler);
+    // Fail loudly if the handler is not registered as itself (for example behind a wrapper): removing it would then
+    // silently leave the upstream listener in place, and every document message would be handled twice.
+    const subscriber = this.sub as unknown as NodeJS.EventEmitter;
+    const listenersBefore = subscriber.listeners("messageBuffer");
+    if (!listenersBefore.includes(upstreamHandler)) {
+      throw new AppError("The Hocuspocus Redis extension's document message handler is not registered as expected");
+    }
+    subscriber.off("messageBuffer", upstreamHandler);
+    if (subscriber.listenerCount("messageBuffer") !== listenersBefore.length - 1) {
+      throw new AppError("Could not detach the Hocuspocus Redis extension's document message handler");
+    }
     this.handleUpstreamDocumentMessage = upstreamHandler;
     this.sub.on("messageBuffer", this.handleDocumentMessage);
   }
