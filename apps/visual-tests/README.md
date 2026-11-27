@@ -198,8 +198,8 @@ renders before the page has fetched anything. It was not satisfied by a skeleton
 or by an error screen; it was satisfied by the furniture around them.
 
 So every console story goes through `consolePage()` in `src/capture.ts`, which
-waits for content inside `<main>` and then asserts the `<Loader>` skeleton
-(`role="status"`, `packages/ui/src/loader.tsx`) is gone. Neither the shell nor
+waits for content inside `<main>` and then asserts the `<Skeleton>` placeholder
+(`role="status"`, `packages/blocks/src/skeleton/root.tsx`) is gone. Neither the shell nor
 the console's "Unable to fetch instance details" screen can satisfy that: the
 error screen renders no `<main>` at all.
 

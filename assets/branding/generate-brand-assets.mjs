@@ -83,8 +83,6 @@ async function buildOutputs() {
 
   addOutput("assets/branding/hangar-wordmark.png", lockup);
   addOutput("assets/branding/hangar-mark.png", mark);
-  addOutput("packages/propel/public/hangar-wordmark.png", lockup);
-  addOutput("packages/propel/public/hangar-mark.png", mark);
 
   for (const appName of appNames) {
     addOutput(`apps/${appName}/public/hangar-wordmark.png`, lockup);

@@ -13,15 +13,23 @@
  *
  * A `setToast` from `@plane/propel/toast` is the sharpest case: its viewport is
  * gone from the provider, so that toast would show nowhere.
+ *
+ * Ledger row 204 then deleted `packages/ui` and `packages/propel` (upstream
+ * v1.5.0 has neither), and with them the last dependant of Headless UI. Those
+ * names no longer resolve anywhere, so the last tests below hold the whole
+ * workspace to that: no package declares them, no source imports them, and
+ * neither directory comes back. lucide stays a web-only rule; `@plane/blocks`
+ * and `@plane/utils` still use it.
  */
 
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.resolve(root, "../..");
 
 const SKIP = new Set(["node_modules", "build", "dist", ".react-router", ".turbo", "public", "tests"]);
 
@@ -72,6 +80,71 @@ test("no stylesheet in web imports the 1.4 packages' styles", () => {
     const source = stripComments(readFileSync(path.join(styles, entry), "utf8"));
     assert.doesNotMatch(source, /@import\s+["'](?:@plane\/ui|@plane\/propel)\//, `styles/${entry}`);
   }
+});
+
+test("web's stylesheet loads the Propel entry point, not the 1.4 index.css", () => {
+  // Both define the same token names with different values, so loading both
+  // would let whichever comes last win token by token.
+  const globals = stripComments(readFileSync(path.join(root, "styles/globals.css"), "utf8"));
+  assert.match(globals, /@import "@plane\/tailwind-config\/propel\.css";/);
+  assert.doesNotMatch(globals, /@import "@plane\/tailwind-config\/index\.css";/);
+});
+
+// The packages that no workspace package may bring back (ledger row 204).
+const REMOVED = new Set(["@plane/ui", "@plane/propel", "@headlessui/react"]);
+const REMOVED_IMPORT =
+  /(?:from\s*|import\s*\(\s*|import\s+|vi\.mock\(\s*|require\(\s*|@import\s+)["'`]((?:@plane\/ui|@plane\/propel|@headlessui\/react)(?:\/[^"'`]*)?)["'`]/g;
+const WORKSPACE_SKIP = new Set([...SKIP, "__tests__", "coverage", "node_modules"]);
+
+const workspaceManifests = () =>
+  ["apps", "packages"].flatMap((group) =>
+    readdirSync(path.join(repoRoot, group), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && existsSync(path.join(repoRoot, group, entry.name, "package.json")))
+      .map((entry) => `${group}/${entry.name}`)
+  );
+
+function* workspaceSources(directory) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (WORKSPACE_SKIP.has(entry.name)) continue;
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) yield* workspaceSources(full);
+    // Test files quote the names they forbid; they are not imports.
+    else if (/\.(tsx?|mjs|js|css)$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name)) yield full;
+  }
+}
+
+test("packages/ui and packages/propel are gone from the workspace", () => {
+  // The manifest, not the directory: a checkout that switched from an older
+  // branch keeps the ignored node_modules and dist there, which is no package.
+  assert.equal(existsSync(path.join(repoRoot, "packages/ui/package.json")), false);
+  assert.equal(existsSync(path.join(repoRoot, "packages/propel/package.json")), false);
+  assert.ok(workspaceManifests().includes("packages/makeplane-propel"), "the scan reaches the workspace packages");
+});
+
+test("no workspace package declares @plane/ui, @plane/propel or Headless UI", () => {
+  const offenders = workspaceManifests().flatMap((workspace) => {
+    const manifest = JSON.parse(readFileSync(path.join(repoRoot, workspace, "package.json"), "utf8"));
+    const declared = Object.keys({
+      ...manifest.dependencies,
+      ...manifest.devDependencies,
+      ...manifest.peerDependencies,
+      ...manifest.optionalDependencies,
+    });
+    return declared.filter((name) => REMOVED.has(name)).map((name) => `${workspace}: ${name}`);
+  });
+  assert.deepEqual(offenders, []);
+});
+
+test("no source in apps or packages imports @plane/ui, @plane/propel or Headless UI", () => {
+  const files = workspaceManifests()
+    .filter((workspace) => workspace !== "packages/makeplane-propel")
+    .flatMap((workspace) => Array.from(workspaceSources(path.join(repoRoot, workspace))));
+  assert.ok(files.length > 3000, "the scan reaches the workspace's sources");
+  const offenders = files.flatMap((file) => {
+    const specifiers = [...stripComments(readFileSync(file, "utf8")).matchAll(REMOVED_IMPORT)].map((m) => m[1]);
+    return specifiers.length ? [`${path.relative(repoRoot, file)}: ${[...new Set(specifiers)].join(", ")}`] : [];
+  });
+  assert.deepEqual(offenders, []);
 });
 
 test("the comment stripper still sees a real import after a URL in a string", () => {

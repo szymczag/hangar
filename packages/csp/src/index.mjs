@@ -22,8 +22,7 @@ import { createHash } from "node:crypto";
  * Allowed by hash; tests/runtime-styles.test.mjs checks each one against the
  * installed library so an upgrade that changes it fails the build, not users.
  *
- * - Base UI ScrollArea/Select: hides the native scrollbar. The beta
- *   (@base-ui-components/react) and 1.x (@base-ui/react) emit the same text.
+ * - Base UI ScrollArea/Select (@base-ui/react 1.x): hides the native scrollbar.
  */
 export const RUNTIME_STYLE_ELEMENTS = [
   ".base-ui-disable-scrollbar{scrollbar-width:none}.base-ui-disable-scrollbar::-webkit-scrollbar{display:none}",

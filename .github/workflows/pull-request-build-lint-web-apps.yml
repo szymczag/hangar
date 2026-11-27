@@ -195,18 +195,6 @@ jobs:
           pnpm turbo run build --filter=live
           pnpm test:live-build
 
-      # Nothing had ever run either Storybook -- no workflow, no turbo task, no
-      # chromatic -- which is why `packages/ui`'s could sit broken indefinitely,
-      # importing a stylesheet that no longer existed. Repairing it without
-      # building it in CI would buy the same outcome again in six months.
-      #
-      # Deliberately not `--affected`: a change to the shared tailwind config or
-      # to a component's stories is exactly the kind of thing that breaks a
-      # Storybook build, and `--affected` is the mechanism by which that would
-      # not be noticed.
-      - name: Build Storybooks
-        run: pnpm turbo run build-storybook
-
       - name: Save Turbo cache
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:

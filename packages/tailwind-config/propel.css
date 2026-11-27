@@ -3,9 +3,10 @@
  * Hangar: the Propel entry point, taken unchanged from upstream v1.5.0's index.css.
  * Apps opt in by importing "@plane/tailwind-config/propel.css" instead of
  * "index.css". The two cannot share one stylesheet: Propel defines the same token
- * names with different values. Admin, space and web are on it; index.css stays
- * the entry for the 1.4 component Storybooks (packages/ui, packages/propel). See
- * FORK.md, "Vendored upstream packages".
+ * names with different values. Admin, space and web are on it. No app loads
+ * index.css any more; it remains the stylesheet oxfmt sorts Tailwind classes
+ * against outside web and blocks (.oxfmtrc.json). See FORK.md, "Vendored
+ * upstream packages".
  */
 /*
  * Design tokens + animations come from @makeplane/propel, which supersedes the

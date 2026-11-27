@@ -158,7 +158,7 @@ jobs:
       # wrong application, and it must not have two definitions.
       #
       # Note this builds with --filter rather than --affected. On a pull request
-      # touching only packages/ui, --affected may not rebuild web at all, and a
+      # touching only packages/blocks, --affected may not rebuild web at all, and a
       # comparison against a stale build/client would pass -- the worst outcome
       # available.
       - name: Run the visual suite

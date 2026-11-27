@@ -144,8 +144,9 @@ export async function settled(dialog: Locator): Promise<void> {
  * Two assertions, in this order. `ready` must be something only the loaded form
  * produces, and it is asserted first because it is the one that actually waits:
  * a page that has not rendered yet has no skeleton either, so the count check
- * alone would pass on an empty document. `<Loader>` carries `role="status"`
- * (packages/ui/src/loader.tsx), and nothing else in the console does.
+ * alone would pass on an empty document. The console's skeleton, `<Skeleton>`
+ * from `@plane/blocks/skeleton` (packages/blocks/src/skeleton/root.tsx), carries
+ * `role="status"`, and nothing else in the console does.
  */
 export async function consolePage(page: Page, path: string, ready: Locator): Promise<void> {
   await page.goto(path);

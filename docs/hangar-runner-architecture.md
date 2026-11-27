@@ -1587,8 +1587,8 @@ Backend tests cover:
 Frontend tests cover activation, permission review, immutable publication, editor
 state, secret write-only behavior, trigger revisions, execution filtering,
 cancellation races, safe result rendering, workspace store reset, and stable API
-error handling. New `@plane/ui` primitives receive Storybook stories and unit
-tests per repository convention.
+error handling. New `@plane/blocks` components receive unit tests per
+repository convention.
 
 The runtime protocol has language-independent conformance fixtures so Gateway,
 Controller, and Node runtime agree on canonical JSON, signatures, states, errors,
