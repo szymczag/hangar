@@ -12,7 +12,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from plane.db.models import DeployBoard, FileAsset, IssueComment, ProjectMember
+from plane.db.models import DeployBoard, FileAsset, Issue, IssueComment, ProjectMember
 from plane.settings.storage import S3Storage
 from plane.utils.file_asset_upload import (
     UPLOAD_URL_EXPIRATION_SECONDS,
@@ -57,6 +57,75 @@ def _own_board_comment(comment_id, deploy_board, user):
     ).first()
 
 
+def _board_work_items(deploy_board):
+    """The work items the board shows: ``issue_objects`` (no draft, archived or
+    triage item) of the board's project, as ProjectIssuesPublicEndpoint and
+    IssueRetrievePublicEndpoint list them."""
+    return Issue.issue_objects.filter(
+        project_id=deploy_board.project_id,
+        workspace_id=deploy_board.workspace_id,
+    )
+
+
+def _board_comments(deploy_board):
+    """The comments the board shows: EXTERNAL comments of the work items it shows,
+    on a board with comments enabled, as IssueCommentPublicViewSet lists them."""
+    if not deploy_board.is_comments_enabled:
+        return IssueComment.objects.none()
+    return IssueComment.objects.filter(
+        project_id=deploy_board.project_id,
+        workspace_id=deploy_board.workspace_id,
+        access="EXTERNAL",
+        issue_id__in=_board_work_items(deploy_board).values("id"),
+    )
+
+
+def _board_shows_asset(*, asset, deploy_board, user):
+    """Whether the board renders this asset, so it may be served from it.
+
+    The board renders two kinds of image, and serves only those:
+
+    - a work item description image, of a work item the board shows;
+    - a comment image of a comment the board shows (``_board_comments``).
+
+    A comment image is bound to its comment by the bulk association once the
+    comment is saved. Until then it has no comment:
+
+    - Written on the board, it is uploaded with no comment and no work item, and
+      only its uploader sees it, in their own editor. It is served to that user
+      while they are an active member of the board's project, as the upload
+      required.
+    - Upstream never bound an image pasted into a new comment in the app, so older
+      comments can show an image that has no comment. Such an image is served when
+      a comment the board shows, by the image's uploader (on the image's
+      own work item, if it has one), embeds it: the board renders it there.
+
+    Anything else, such as an image pending in the app or one in an INTERNAL
+    comment, is not on the board and is not served from it.
+    """
+    if asset.entity_type == FileAsset.EntityTypeContext.ISSUE_DESCRIPTION:
+        return bool(asset.issue_id) and _board_work_items(deploy_board).filter(id=asset.issue_id).exists()
+
+    comments = _board_comments(deploy_board)
+    if asset.comment_id:
+        return comments.filter(id=asset.comment_id).exists()
+
+    if (
+        asset.issue_id is None
+        and user.is_authenticated
+        and asset.created_by_id == user.id
+        and _active_project_member(deploy_board=deploy_board, user=user) is not None
+    ):
+        return True
+
+    if asset.issue_id is not None:
+        comments = comments.filter(issue_id=asset.issue_id)
+    return comments.filter(
+        actor_id=asset.created_by_id,
+        comment_html__contains=str(asset.id),
+    ).exists()
+
+
 class EntityAssetEndpoint(BaseAPIView):
     def get_permissions(self):
         if self.request.method == "GET":
@@ -76,7 +145,7 @@ class EntityAssetEndpoint(BaseAPIView):
             )
 
         # get the asset id — scope to project to prevent cross-project IDOR
-        asset = FileAsset.objects.get(
+        asset = FileAsset.objects.filter(
             workspace_id=deploy_board.workspace_id,
             project_id=deploy_board.project_id,
             pk=pk,
@@ -84,10 +153,15 @@ class EntityAssetEndpoint(BaseAPIView):
                 FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
                 FileAsset.EntityTypeContext.COMMENT_DESCRIPTION,
             ],
-        )
+        ).first()
 
-        # Check if the asset is uploaded
-        if not asset.is_uploaded:
+        # Only an uploaded image the board itself shows. Anything else gets the
+        # same 404 as a missing id, so the response confirms no asset.
+        if (
+            asset is None
+            or not asset.is_uploaded
+            or not _board_shows_asset(asset=asset, deploy_board=deploy_board, user=request.user)
+        ):
             return Response(
                 {"error": "The requested asset could not be found."},
                 status=status.HTTP_404_NOT_FOUND,

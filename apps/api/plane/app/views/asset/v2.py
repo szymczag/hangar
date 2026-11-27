@@ -22,7 +22,6 @@ from plane.db.models import (
     DeployBoard,
     DraftIssue,
     FileAsset,
-    Issue,
     IssueComment,
     Page,
     Project,
@@ -33,7 +32,7 @@ from plane.db.models import (
     WorkspaceMember,
 )
 from plane.settings.storage import S3Storage
-from plane.app.permissions import allow_permission, issue_hidden_from_user, ROLE
+from plane.app.permissions import allow_permission, ROLE
 from plane.utils.cache import invalidate_cache_directly
 from plane.throttles.asset import AssetRateThrottle
 from plane.utils.file_asset_copy import AssetCopyError, copyable_asset, duplicate_file_asset
@@ -48,10 +47,13 @@ from plane.utils.file_asset_upload import (
     validate_upload_metadata,
 )
 from plane.utils.file_asset_permissions import (
+    can_edit_comment,
     can_manage_project_cover,
     can_mutate_file_asset,
     can_read_file_asset,
+    editable_comment_fields,
     is_workspace_asset_admin,
+    visible_work_item_fields,
 )
 
 
@@ -740,53 +742,12 @@ def pending_comment_asset_fields(*, user_id, workspace, project_id, issue_id):
     that work item's visibility from the first request, and that only a comment on
     the same work item can claim it later.
     """
-    issue = Issue.objects.filter(id=issue_id, workspace=workspace, project_id=project_id).first()
-    if issue is None:
-        return None
-    if issue_hidden_from_user(
+    return visible_work_item_fields(
         user_id=user_id,
+        workspace=workspace,
         project_id=project_id,
-        issue_id=issue.id,
-        workspace_scope={"workspace_id": workspace.id},
-    ):
-        return None
-    return {"issue_id": issue.id}
-
-
-def can_edit_comment(*, user_id, workspace_id, comment):
-    """The rule comment editing applies (IssueCommentViewSet.partial_update through
-    allow_permission): an active member of the comment's project who created it, is
-    a project administrator, or is a workspace administrator."""
-    membership = ProjectMember.objects.filter(
-        workspace_id=workspace_id,
-        project_id=comment.project_id,
-        member_id=user_id,
-        is_active=True,
+        issue_id=issue_id,
     )
-    if not membership.exists():
-        return False
-    if comment.created_by_id == user_id or membership.filter(role=ROLE.ADMIN.value).exists():
-        return True
-    return is_workspace_asset_admin(user_id=user_id, workspace_id=workspace_id)
-
-
-def editable_comment_fields(*, user_id, workspace, comment):
-    """Fields for an image added to a saved comment, or None.
-
-    Binding at upload or duplication time follows the rule the bulk association
-    applies: the caller may edit the comment, and its work item is not hidden from
-    them.
-    """
-    if not can_edit_comment(user_id=user_id, workspace_id=workspace.id, comment=comment):
-        return None
-    if issue_hidden_from_user(
-        user_id=user_id,
-        project_id=comment.project_id,
-        issue_id=comment.issue_id,
-        workspace_scope={"workspace_id": workspace.id},
-    ):
-        return None
-    return {"comment_id": comment.id}
 
 
 class ProjectAssetEndpoint(BaseAPIView):
@@ -821,12 +782,15 @@ class ProjectAssetEndpoint(BaseAPIView):
             FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
             FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
         }:
-            issue = Issue.objects.filter(
-                id=entity_id,
+            # Upload, duplication and bulk association all resolve here, so an
+            # attachment or description image is never anchored to a work item
+            # hidden from the caller.
+            return visible_work_item_fields(
+                user_id=request.user.id,
                 workspace=workspace,
                 project_id=project_id,
-            ).first()
-            return {"issue_id": issue.id} if issue else None
+                issue_id=entity_id,
+            )
         if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
             comment = IssueComment.objects.filter(
                 id=entity_id,

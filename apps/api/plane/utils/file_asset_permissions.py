@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from plane.app.permissions import ROLE, issue_hidden_from_user
-from plane.db.models import FileAsset, IssueComment, ProjectMember, ProjectPage, WorkspaceMember
+from plane.db.models import FileAsset, Issue, IssueComment, ProjectMember, ProjectPage, WorkspaceMember
 
 
 def is_workspace_asset_admin(*, user_id, workspace_id) -> bool:
@@ -57,6 +57,64 @@ def _asset_issue_id(asset: FileAsset):
         # all_objects: a soft-deleted comment still belongs to its work item.
         return IssueComment.all_objects.filter(pk=asset.comment_id).values_list("issue_id", flat=True).first()
     return None
+
+
+def visible_work_item_fields(*, user_id, workspace, project_id, issue_id):
+    """Fields that anchor a new asset to a work item the caller can see, or None.
+
+    The work item must belong to this workspace and project and must not be hidden
+    from the caller: a restricted guest only reaches work items they created, the
+    rule ``issue_hidden_from_guest`` applies to the work item sub-resources and the
+    dedicated attachment endpoint. A hidden work item gets the same None as a
+    missing one, so the response says nothing about whether it exists.
+    """
+    issue = Issue.objects.filter(id=issue_id, workspace=workspace, project_id=project_id).first()
+    if issue is None:
+        return None
+    if issue_hidden_from_user(
+        user_id=user_id,
+        project_id=project_id,
+        issue_id=issue.id,
+        workspace_scope={"workspace_id": workspace.id},
+    ):
+        return None
+    return {"issue_id": issue.id}
+
+
+def can_edit_comment(*, user_id, workspace_id, comment):
+    """The rule comment editing applies (IssueCommentViewSet.partial_update through
+    allow_permission): an active member of the comment's project who created it, is
+    a project administrator, or is a workspace administrator."""
+    membership = ProjectMember.objects.filter(
+        workspace_id=workspace_id,
+        project_id=comment.project_id,
+        member_id=user_id,
+        is_active=True,
+    )
+    if not membership.exists():
+        return False
+    if comment.created_by_id == user_id or membership.filter(role=ROLE.ADMIN.value).exists():
+        return True
+    return is_workspace_asset_admin(user_id=user_id, workspace_id=workspace_id)
+
+
+def editable_comment_fields(*, user_id, workspace, comment):
+    """Fields for an image added to a saved comment, or None.
+
+    Binding at upload or duplication time follows the rule the bulk association
+    applies: the caller may edit the comment, and its work item is not hidden from
+    them.
+    """
+    if not can_edit_comment(user_id=user_id, workspace_id=workspace.id, comment=comment):
+        return None
+    if issue_hidden_from_user(
+        user_id=user_id,
+        project_id=comment.project_id,
+        issue_id=comment.issue_id,
+        workspace_scope={"workspace_id": workspace.id},
+    ):
+        return None
+    return {"comment_id": comment.id}
 
 
 def can_read_file_asset(*, user_id, asset: FileAsset) -> bool:
@@ -157,6 +215,16 @@ def can_mutate_file_asset(*, user_id, asset: FileAsset) -> bool:
         # too: can_read_file_asset already refuses a non-member, and an asset a
         # caller may not read is not one they may delete, restore or rebind.
         if not project_membership.exists():
+            return False
+        # The work item's visibility as well, as for reads and anchoring: a
+        # restricted guest changes no asset of a work item hidden from them.
+        issue_id = _asset_issue_id(asset)
+        if issue_id and issue_hidden_from_user(
+            user_id=user_id,
+            project_id=asset.project_id,
+            issue_id=issue_id,
+            workspace_scope={"workspace_id": asset.workspace_id},
+        ):
             return False
         return (
             asset.created_by_id == user_id
