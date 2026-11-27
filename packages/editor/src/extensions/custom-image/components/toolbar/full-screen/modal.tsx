@@ -31,6 +31,85 @@ type Props = {
   width: string;
 };
 
+type ViewerControlsProps = {
+  downloadSrc: string;
+  isTouchDevice: boolean;
+  magnification: number;
+  onZoom: (direction: "increase" | "decrease") => void;
+  src: string;
+};
+
+/** The viewer's zoom, download and open-in-new-tab toolbar. */
+function ImageViewerControls(props: ViewerControlsProps) {
+  const { downloadSrc, isTouchDevice, magnification, onZoom, src } = props;
+  return (
+    <div className="fixed bottom-10 left-1/2 z-10 -translate-x-1/2">
+      <Toolbar size="md" elevation="raised" role="group" aria-label="Image viewer controls">
+        <ToolbarGroup role="group" aria-label="Image zoom">
+          <ToolbarButton
+            type="button"
+            size="md"
+            labeled={false}
+            onClick={(e) => {
+              if (isTouchDevice) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+              onZoom("decrease");
+            }}
+            disabled={magnification <= MIN_ZOOM}
+            aria-label="Zoom out"
+          >
+            <Icon icon={MinusOutline} />
+          </ToolbarButton>
+          <span className="w-12 text-center text-body-xs-regular text-secondary tabular-nums">
+            {Math.round(100 * magnification)}%
+          </span>
+          <ToolbarButton
+            type="button"
+            size="md"
+            labeled={false}
+            onClick={(e) => {
+              if (isTouchDevice) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+              onZoom("increase");
+            }}
+            disabled={magnification >= MAX_ZOOM}
+            aria-label="Zoom in"
+          >
+            <Icon icon={AddOutline} />
+          </ToolbarButton>
+        </ToolbarGroup>
+        {!isTouchDevice && <ToolbarSeparator />}
+        {!isTouchDevice && (
+          <ToolbarButton
+            type="button"
+            size="md"
+            labeled={false}
+            onClick={() => window.open(downloadSrc, "_blank", "noopener,noreferrer")}
+            aria-label="Download image"
+          >
+            <Icon icon={DownloadOutline} />
+          </ToolbarButton>
+        )}
+        {!isTouchDevice && (
+          <ToolbarButton
+            type="button"
+            size="md"
+            labeled={false}
+            onClick={() => window.open(src, "_blank", "noopener,noreferrer")}
+            aria-label="Open image in new tab"
+          >
+            <Icon icon={NewTabOutline} />
+          </ToolbarButton>
+        )}
+      </Toolbar>
+    </div>
+  );
+}
+
 function ImageFullScreenModalWithoutPortal(props: Props) {
   const { aspectRatio, isFullScreenEnabled, isTouchDevice, downloadSrc, src, toggleFullScreenMode, width, openerRef } =
     props;
@@ -279,70 +358,13 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
             }}
             onMouseDown={handleMouseDown}
           />
-          <div className="fixed bottom-10 left-1/2 z-10 -translate-x-1/2">
-            <Toolbar size="md" elevation="raised" role="group" aria-label="Image viewer controls">
-              <ToolbarGroup role="group" aria-label="Image zoom">
-                <ToolbarButton
-                  type="button"
-                  size="md"
-                  labeled={false}
-                  onClick={(e) => {
-                    if (isTouchDevice) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }
-                    handleMagnification("decrease");
-                  }}
-                  disabled={magnification <= MIN_ZOOM}
-                  aria-label="Zoom out"
-                >
-                  <Icon icon={MinusOutline} />
-                </ToolbarButton>
-                <span className="w-12 text-center text-body-xs-regular text-secondary tabular-nums">
-                  {Math.round(100 * magnification)}%
-                </span>
-                <ToolbarButton
-                  type="button"
-                  size="md"
-                  labeled={false}
-                  onClick={(e) => {
-                    if (isTouchDevice) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }
-                    handleMagnification("increase");
-                  }}
-                  disabled={magnification >= MAX_ZOOM}
-                  aria-label="Zoom in"
-                >
-                  <Icon icon={AddOutline} />
-                </ToolbarButton>
-              </ToolbarGroup>
-              {!isTouchDevice && <ToolbarSeparator />}
-              {!isTouchDevice && (
-                <ToolbarButton
-                  type="button"
-                  size="md"
-                  labeled={false}
-                  onClick={() => window.open(downloadSrc, "_blank", "noopener,noreferrer")}
-                  aria-label="Download image"
-                >
-                  <Icon icon={DownloadOutline} />
-                </ToolbarButton>
-              )}
-              {!isTouchDevice && (
-                <ToolbarButton
-                  type="button"
-                  size="md"
-                  labeled={false}
-                  onClick={() => window.open(src, "_blank", "noopener,noreferrer")}
-                  aria-label="Open image in new tab"
-                >
-                  <Icon icon={NewTabOutline} />
-                </ToolbarButton>
-              )}
-            </Toolbar>
-          </div>
+          <ImageViewerControls
+            downloadSrc={downloadSrc}
+            isTouchDevice={isTouchDevice}
+            magnification={magnification}
+            onZoom={handleMagnification}
+            src={src}
+          />
         </div>
       </FloatingFocusManager>
     </FloatingOverlay>
