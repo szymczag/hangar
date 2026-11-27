@@ -157,6 +157,25 @@ on published boards:
 A request that is refused gets the same 404 as a missing comment or work item.
 An empty or malformed identifier is still refused with a 400.
 
+**Uploaded files follow the work item's visibility, and a published board
+serves only the images it shows.** Every way of uploading a file to a work
+item applies the same rule: an attachment, a description image or a comment
+image is attached only to a work item the uploader can see, and a restricted
+guest attaches files only to work items they created. Deleting, restoring,
+completing or moving a file that belongs to a work item needs the same
+visibility, so a restricted guest changes no file on a work item they cannot
+see. A work item that is hidden from the caller gets the same 404 as a missing
+one. A published board serves, to visitors without a session, only the images
+it shows:
+
+- the description images of the work items it lists;
+- the images in its external comments, when comments are enabled on the
+  board.
+
+An image uploaded on the board for a comment that has not been saved yet is
+visible only to its uploader until the comment is saved. Some older images may
+no longer load on a published board; Known limitations below lists them.
+
 **Pressing Escape in the emoji suggestions closes them.** Typing `:` and a
 name opens the emoji list; pressing Escape there threw an error instead of
 closing it. It now closes the list and keeps what you typed. Upstream Plane
@@ -199,7 +218,8 @@ code, `web` and `space` carry the editor's new design, the link rule, the link
 hover and the emoji suggestion fix, and `web` also drops two unused libraries;
 `live` carries the PDF export changes, the force-close fix and the editor's
 link rule, and grows by about 2 MB for the emoji font; `api` carries the
-comment image upload and binding rules, and its visual test seed command adds
+comment image upload and binding rules, the upload rules that follow the work
+item's visibility and the published board's image rules, and its visual test seed command adds
 a page for the editor's screenshot tests and still refuses to run unless
 `HANGAR_VISUAL_FIXTURES=1` is set (the Celery workers, the scheduler and the
 migrator run the `api` image); and the
@@ -272,6 +292,11 @@ before. The web app's `custom` theme gets the light treatment of the Hangar
 logo, which may not suit a dark custom palette. The recorded upstream base
 stays Plane 1.4.0 with the 1.4.3 changes backported.
 
+- Some older images may no longer load on a published board, because the
+  board now serves only the images it shows: a description image that was
+  never bound to a work item, an image pasted from one work item into another,
+  and a comment image that was copied into another user's comment. They still
+  load in the app for members who may see them.
 - Pasting or dropping an image into the description in the create work item
   dialog, or in the intake create dialog, still fails with a 400, because the
   work item does not exist yet and there is nothing to hold the image on. Add
@@ -312,6 +337,7 @@ request, the PDF
 export that prints emoji as broken characters, callout emoji as code points
 and mentions as `@user_mention`, the callout value that can fail the export,
 and the unhandled rejection and "still in memory" errors in the live server's
-log when a page is too large to save. The release check in this release's
+log when a page is too large to save. The upload and published-board image
+rules of this release do not apply there. The release check in this release's
 script never refuses an older release, so it does not stand in the way of a
 rollback.

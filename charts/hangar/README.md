@@ -65,7 +65,9 @@ loses its link and keeps its text when its content is next converted. Its
 mentions in the PDF from a bundled font, and no longer logs an unhandled
 rejection when a page too large to save is closed. Its `api` image lets a new
 work item comment take a pasted image and binds comment images only for their
-uploader, to a comment the uploader may edit. Rolling back from
+uploader, to a comment the uploader may edit; every upload follows the work
+item's visibility, and a published board serves only the images it shows.
+Rolling back from
 `0.7.0-rc.1` to `0.6.0` needs no schema change and no values change, but
 brings back the editor's previous design, links with any scheme, the 400 when
 a new comment takes an image, the looser comment image binding, the unchecked

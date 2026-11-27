@@ -440,7 +440,10 @@ longer logs an unhandled rejection or a "still in memory" error when a page
 too large to save is closed. The `api` image lets a new work item comment take
 a pasted or dropped image, held on the work item until the comment is saved,
 and binds comment images only for their uploader, to a comment the uploader
-may edit on the same work item, in the app and on published boards; its
+may edit on the same work item, in the app and on published boards. Every
+upload path now follows the work item's visibility, and a published board
+serves only the images it shows, so some older images may no longer load on a
+board, though they still load in the app; its
 visual test seed command still refuses to run unless
 `HANGAR_VISUAL_FIXTURES=1` is set, and no installation step uses it. The
 `admin` and `proxy` code is unchanged.
