@@ -1456,6 +1456,9 @@ importers:
       '@hocuspocus/provider':
         specifier: 'catalog:'
         version: 3.4.4(y-protocols@1.0.6(yjs@13.6.27))(yjs@13.6.27)
+      '@makeplane/propel':
+        specifier: workspace:*
+        version: link:../makeplane-propel
       '@plane/blocks':
         specifier: workspace:*
         version: link:../blocks
