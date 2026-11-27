@@ -7,8 +7,9 @@ published as an OCI artifact at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The latest stable chart is `0.6.0` (`appVersion: v0.6.0`). The release
-candidate `0.6.0-rc.2` is superseded by it, and so are the release candidates
+The latest stable chart is `0.6.0` (`appVersion: v0.6.0`). Release candidate
+`0.7.0-rc.1` is also published; Helm installs it only when you name its version.
+The release candidate `0.6.0-rc.2` is superseded by `0.6.0`, and so are the release candidates
 `0.5.0-rc.1`, `0.4.0-rc.1`, `0.4.0-rc.2`, `0.4.0-rc.3`, `0.4.0-rc.4`,
 `0.3.0-rc.1`, `0.3.0-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2` and `0.2.0-rc.3`; do not
 install those, and upgrade an installation on any of them to `0.6.0`.
@@ -54,7 +55,25 @@ there, so upgrade to `rc.68` or later instead. `rc.62` is not a usable target fo
 any deployment with Google Calendar capacity enabled. Earlier `rc.12` through
 `rc.17` additionally contain frontend migration failures.
 
-Use `0.6.0`. It adds no migration and no chart change compared with `0.5.0`.
+Use `0.6.0`, or name `0.7.0-rc.1` to test the release candidate. It adds no
+migration and no chart change. Its `web` and `space` images move the editor's
+menus, popovers, tables and image controls to the upstream Plane 1.5.0 design,
+and in the `web`, `space` and `live` images editor links accept only `http`,
+`https`, `mailto` and `tel` addresses: an existing link with another scheme
+loses its link and keeps its text when its content is next converted. Its
+`live` image checks PDF export requests, prints emoji, callout emoji and
+mentions in the PDF from a bundled font, and no longer logs an unhandled
+rejection when a page too large to save is closed. Its `api` image lets a new
+work item comment take a pasted image and binds comment images only for their
+uploader, to a comment the uploader may edit; every upload follows the work
+item's visibility, and a published board serves only the images it shows.
+Rolling back from
+`0.7.0-rc.1` to `0.6.0` needs no schema change and no values change, but
+brings back the editor's previous design, links with any scheme, the 400 when
+a new comment takes an image, the looser comment image binding, the unchecked
+PDF export request and the PDF export that prints emoji as broken characters;
+links already dropped on `0.7.0-rc.1` do not come back.
+`0.6.0` adds no migration and no chart change compared with `0.5.0`.
 Its `web` image moves the rest of the web app to the upstream Plane 1.5.0
 design; in the `web`, `space` and `live` images the editor's Markdown
 serializer writes a callout's logo only when it is a single emoji or a plain

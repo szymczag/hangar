@@ -6,10 +6,11 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.6.0`. It is a stable Hangar release for Docker
-Compose, Docker Swarm and the all-in-one image. On Kubernetes it is qualified
-for evaluation on AMD64 clusters only and is not yet a supported production
-release.
+The current release is `0.7.0-rc.1`. It is a release candidate for `0.7.0`;
+the current stable Hangar release for Docker Compose, Docker Swarm and the
+all-in-one image remains `0.6.0`. Helm installs a release candidate only when
+you name its version. On Kubernetes, both are qualified for evaluation on AMD64
+clusters only and are not yet a supported production release.
 
 > [!IMPORTANT]
 > Do not use the upstream Plane `plane-ce` chart for Hangar. It does not contain
@@ -63,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.6.0` qualification boundary is:
+The `0.7.0-rc.1` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -81,9 +82,10 @@ The backend, the editor and the live server are also converged with upstream
 published boards, use the upstream `v1.5.0` design. The web app loads the
 upstream `v1.5.0` design tokens, and every screen, including the
 notifications, the profile pages and Hangar's capacity, work item type,
-workshop and import screens, uses the `v1.5.0` components; the web app no
-longer loads the `v1.4` component libraries. The editor's own toolbar, menus,
-code block and table colour picker are still the `v1.4` design.
+workshop and import screens, uses the `v1.5.0` components. The editor's own
+toolbar, menus, popovers, tables, image controls, code block and callout
+colour picker use them too, in the web app and in Spaces, and the `v1.4`
+component libraries are no longer part of the source.
 
 The chart does not install an ingress controller, cert-manager, a CNI, a CSI
 driver, an external secret operator, or observability infrastructure.
@@ -228,12 +230,12 @@ client can then change its throttle identity by sending its own `X-Forwarded-For
 
 The product, chart, and Git identifiers are deliberately different:
 
-| Identifier         | Current value                          |
-| ------------------ | -------------------------------------- |
-| Product version    | `v0.6.0`                               |
-| Helm chart version | `0.6.0`                                |
-| Git tag            | `hangar-v0.6.0`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.6.0` |
+| Identifier         | Current value                               |
+| ------------------ | ------------------------------------------- |
+| Product version    | `v0.7.0-rc.1`                               |
+| Helm chart version | `0.7.0-rc.1`                                |
+| Git tag            | `hangar-v0.7.0-rc.1`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.7.0-rc.1` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -256,11 +258,23 @@ failed and neither the chart nor a GitHub Release was published. Do not deploy
 its images; it is neither an upgrade nor a rollback target.
 The `0.6.0` release candidate that was published, `0.6.0-rc.2`, is superseded
 by `0.6.0` and is not a rollback target.
-`0.5.0` is the previous stable release and the supported rollback target for
+`0.6.0` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
-values, only the images change. An all-in-one installation that follows the
-`stable` tag has to name `v0.5.0` to roll back, because `stable` now points to
-`0.6.0`. The rollback brings back the visual test seed
+values, only the images change. The rollback brings back the editor's toolbar,
+menus, popovers, tables, image controls, code block and callout colour picker
+on the `v1.4` components, editor links with any scheme that parses, the inline
+handler attributes written on link hover, the error on Escape in the emoji
+suggestions, the 400 when a new comment takes a pasted image, the looser rules
+for binding images to comments, the PDF export that takes its request's
+workspace slug and ids
+unchecked and prints emoji as broken characters, callout emoji as code points
+and mentions as `@user_mention`, and the unhandled rejection that every `live`
+pod logs when a page too large to save is closed. Links that lost their address
+on `0.7.0-rc.1` and were saved without it do not come back.
+Rolling back further, to `0.5.0`, needs no schema change or values change
+either, and only the images change. An all-in-one installation that follows
+the `stable` tag has to name `v0.5.0` to roll back that far, because `stable`
+points to `0.6.0`. Rolling back to `0.5.0` also brings back the visual test seed
 command that runs without an opt-in, the callout logo that the editor's
 Markdown serializer writes unchecked, the active cycles upsell page, the old
 callout logo picker, profile activity rows that do not say what a worklog entry
@@ -327,7 +341,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.6.0` notes](../releases/hangar-v0.6.0.md) — review
+- [Release `v0.7.0-rc.1` notes](../releases/hangar-v0.7.0-rc.1.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -359,13 +373,10 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.6.0-rc.2`, tag `hangar-v0.6.0-rc.2`, and chart
-`ghcr.io/szymczag/charts/hangar:0.6.0-rc.2`, the release candidate for
-`0.6.0`, which `0.6.0` supersedes and which is not a rollback target. The
-previous stable release and the rollback target is `0.5.0`, tag
-`hangar-v0.5.0`, and chart `ghcr.io/szymczag/charts/hangar:0.5.0`. The stable
-release before it is `0.4.0`, tag `hangar-v0.4.0`, and chart
-`ghcr.io/szymczag/charts/hangar:0.4.0`. Anybody still on rc.62 with
+The previous release is `0.6.0`, tag `hangar-v0.6.0`, and chart
+`ghcr.io/szymczag/charts/hangar:0.6.0`, which is also the current stable
+release and the rollback target. The stable release before it is `0.5.0`, tag
+`hangar-v0.5.0`, and chart `ghcr.io/szymczag/charts/hangar:0.5.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
 
@@ -407,6 +418,39 @@ it; do not install it, and upgrade an installation on it to `0.6.0` with
 values and runs no migration; only the images change. `0.6.0` is built from the
 `0.6.0-rc.2` source plus the in-app release notes; no application code
 changes. There is no chart `0.6.0-rc.1`.
+
+Release 0.7.0-rc.1 adds no database or license migration compared with 0.6.0
+and changes nothing in the chart's templates, values or Secrets. Upgrade from
+0.6.0 with `helm upgrade` and `--version 0.7.0-rc.1`; Helm does not select a
+release candidate otherwise. No other action is required, but read the link
+change below first. Every release rebuilds all its images, so every image
+digest changes. Of the application code, the `web` and `space` images move the
+editor's toolbar, menus, popovers, tables, image controls, code block and
+callout colour picker to the upstream Plane 1.5.0 components, stop writing
+inline handler attributes on link hover, and close the emoji suggestions on
+Escape without an error. In the `web`, `space` and `live` images, editor links
+accept only `http`, `https`, `mailto` and `tel` addresses: no migration
+rewrites stored content, but an existing link with another scheme, such as
+`ftp:` or a bare `host:port`, loses its link and keeps its text when its
+content is next converted. The `live` image refuses PDF export requests whose
+workspace slug, page id or project id could change an API path, prints emoji,
+callout emoji and mentions in the PDF from a bundled Noto Emoji font (about
+2 MB more image), resolves mentions from the workspace member list, and no
+longer logs an unhandled rejection or a "still in memory" error when a page
+too large to save is closed. The `api` image lets a new work item comment take
+a pasted or dropped image, held on the work item until the comment is saved,
+and binds comment images only for their uploader, to a comment the uploader
+may edit on the same work item, in the app and on published boards. Every
+upload path now follows the work item's visibility, and a published board
+serves only the images it shows, so some older images may no longer load on a
+board, though they still load in the app; its
+visual test seed command still refuses to run unless
+`HANGAR_VISUAL_FIXTURES=1` is set, and no installation step uses it. The
+`admin` and `proxy` code is unchanged.
+From a release older than 0.6.0, including 0.6.0-rc.2, read the 0.6.0
+paragraph below first. Rolling back to 0.6.0 needs no schema change and no
+change to the values; [Release identity](#release-identity) lists what it
+brings back.
 
 Release 0.6.0 adds no database or license migration compared with 0.5.0 and
 changes nothing in the chart's templates, values or Secrets. Upgrade from 0.5.0
