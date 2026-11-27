@@ -264,7 +264,9 @@ values, only the images change. The rollback brings back the editor's toolbar,
 menus, popovers, tables, image controls, code block and callout colour picker
 on the `v1.4` components, editor links with any scheme that parses, the inline
 handler attributes written on link hover, the error on Escape in the emoji
-suggestions, the PDF export that takes its request's workspace slug and ids
+suggestions, the 400 when a new comment takes a pasted image, the looser rules
+for binding images to comments, the PDF export that takes its request's
+workspace slug and ids
 unchecked and prints emoji as broken characters, callout emoji as code points
 and mentions as `@user_mention`, and the unhandled rejection that every `live`
 pod logs when a page too large to save is closed. Links that lost their address
@@ -435,9 +437,13 @@ workspace slug, page id or project id could change an API path, prints emoji,
 callout emoji and mentions in the PDF from a bundled Noto Emoji font (about
 2 MB more image), resolves mentions from the workspace member list, and no
 longer logs an unhandled rejection or a "still in memory" error when a page
-too large to save is closed. The `api` image changes only in the visual test
-seed command, which still refuses to run unless `HANGAR_VISUAL_FIXTURES=1` is
-set; no installation step uses it. The `admin` and `proxy` code is unchanged.
+too large to save is closed. The `api` image lets a new work item comment take
+a pasted or dropped image, held on the work item until the comment is saved,
+and binds comment images only for their uploader, to a comment the uploader
+may edit on the same work item, in the app and on published boards; its
+visual test seed command still refuses to run unless
+`HANGAR_VISUAL_FIXTURES=1` is set, and no installation step uses it. The
+`admin` and `proxy` code is unchanged.
 From a release older than 0.6.0, including 0.6.0-rc.2, read the 0.6.0
 paragraph below first. Rolling back to 0.6.0 needs no schema change and no
 change to the values; [Release identity](#release-identity) lists what it

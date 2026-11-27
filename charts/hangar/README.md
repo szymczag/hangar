@@ -63,9 +63,12 @@ and in the `web`, `space` and `live` images editor links accept only `http`,
 loses its link and keeps its text when its content is next converted. Its
 `live` image checks PDF export requests, prints emoji, callout emoji and
 mentions in the PDF from a bundled font, and no longer logs an unhandled
-rejection when a page too large to save is closed. Rolling back from
+rejection when a page too large to save is closed. Its `api` image lets a new
+work item comment take a pasted image and binds comment images only for their
+uploader, to a comment the uploader may edit. Rolling back from
 `0.7.0-rc.1` to `0.6.0` needs no schema change and no values change, but
-brings back the editor's previous design, links with any scheme, the unchecked
+brings back the editor's previous design, links with any scheme, the 400 when
+a new comment takes an image, the looser comment image binding, the unchecked
 PDF export request and the PDF export that prints emoji as broken characters;
 links already dropped on `0.7.0-rc.1` do not come back.
 `0.6.0` adds no migration and no chart change compared with `0.5.0`.

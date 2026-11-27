@@ -124,6 +124,39 @@ components, in the web app and in Spaces:
 What the controls do is unchanged, apart from the link rule above. Reload open
 web app and Spaces tabs after the upgrade.
 
+**A new comment takes a pasted or dropped image.** Pasting or dropping an
+image into a work item comment that was not saved yet failed with a 400, and
+so did copy-pasting an image that is already on the page into it, because the
+comment had no id for the image to belong to. This happened in the web app on
+work items and intake items. The image is now held on the work item until the
+comment is saved, and is read under that work item's visibility from the
+first request; when the comment is created, it is bound to that comment.
+Upstream Plane `1.5.0` accepts the upload but never binds the image to the new
+comment. Binding is restricted, and the rules apply both in the web app and
+on published boards:
+
+- **Only the uploader may bind an image, and only to a comment they may edit
+  on the same work item.** A comment's author, a project admin or a workspace
+  admin who is a member of the project may edit it. An image that is pending
+  on one work item, or already belongs to one comment, cannot be moved to
+  another work item, project or comment, and nobody can claim someone else's
+  pending image. One image in a request that breaks the rule binds nothing.
+- **Uploading or duplicating an image into a saved comment needs the right to
+  edit that comment and to see its work item.** Before, any member of the
+  project could attach an image to any comment whose id they knew, including
+  one on a work item hidden from them. The image could not be read back, but
+  it was stored on that comment. A restricted guest's own older comment on a
+  work item they can no longer see does not take new images; its text stays
+  editable.
+- **A published board can no longer move a user's images between comments.**
+  Binding images to your own comment on a board accepts only images that are
+  unbound, pending on that comment's work item, or already that comment's, and
+  anchors them to the comment's work item, so who may read an image matches
+  where it is shown.
+
+A request that is refused gets the same 404 as a missing comment or work item.
+An empty or malformed identifier is still refused with a 400.
+
 **Pressing Escape in the emoji suggestions closes them.** Typing `:` and a
 name opens the emoji list; pressing Escape there threw an error instead of
 closing it. It now closes the list and keeps what you typed. Upstream Plane
@@ -165,10 +198,11 @@ refreshed Alpine packages, so every image digest changes. Of the application
 code, `web` and `space` carry the editor's new design, the link rule, the link
 hover and the emoji suggestion fix, and `web` also drops two unused libraries;
 `live` carries the PDF export changes, the force-close fix and the editor's
-link rule, and grows by about 2 MB for the emoji font; `api` changes only in
-the visual test seed command, which adds a page for the editor's screenshot
-tests and still refuses to run unless `HANGAR_VISUAL_FIXTURES=1` is set (the
-Celery workers, the scheduler and the migrator run the `api` image); and the
+link rule, and grows by about 2 MB for the emoji font; `api` carries the
+comment image upload and binding rules, and its visual test seed command adds
+a page for the editor's screenshot tests and still refuses to run unless
+`HANGAR_VISUAL_FIXTURES=1` is set (the Celery workers, the scheduler and the
+migrator run the `api` image); and the
 all-in-one image bundles them all. The `admin` code is unchanged; its built
 stylesheet only loses utility classes that nothing uses any more. The `proxy`
 code is unchanged. `setup.sh` and `swarm.sh` are unchanged since `0.6.0`,
@@ -238,6 +272,13 @@ before. The web app's `custom` theme gets the light treatment of the Hangar
 logo, which may not suit a dark custom palette. The recorded upstream base
 stays Plane 1.4.0 with the 1.4.3 changes backported.
 
+- Pasting or dropping an image into the description in the create work item
+  dialog, or in the intake create dialog, still fails with a 400, because the
+  work item does not exist yet and there is nothing to hold the image on. Add
+  the image after the work item is created. This is a follow-up.
+- An image pasted into a comment that is never saved stays attached to its
+  work item, readable under that work item's visibility, and is deleted with
+  the work item. Nothing sweeps such images earlier.
 - The PDF export's emoji are monochrome, without skin tones, and a character
   outside the basic plane that is not an emoji (some rare CJK characters, for
   example) prints as a missing glyph, as before.
@@ -265,7 +306,9 @@ readable there. A link dropped from content that was saved on this release
 does not come back. Rolling back brings
 back the editor's Plane 1.4 controls, links with any scheme that parses, the
 inline handler attributes and Trusted Types reports on link hover, the error
-on Escape in the emoji suggestions, the unchecked export request, the PDF
+on Escape in the emoji suggestions, the 400 when a new comment takes an
+image, the looser rules for binding images to comments, the unchecked export
+request, the PDF
 export that prints emoji as broken characters, callout emoji as code points
 and mentions as `@user_mention`, the callout value that can fail the export,
 and the unhandled rejection and "still in memory" errors in the live server's
