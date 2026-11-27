@@ -179,6 +179,14 @@ export const forceCloseDocumentAcrossServers = async (
   await new Promise((resolve) => setTimeout(resolve, waitTime));
 
   // STEP 6: UNLOAD DOCUMENT after closing all the connections
+  // A failed store force-closes from inside the onStoreDocument hook, which runs under the document's save mutex.
+  // Hocuspocus refuses to unload while that mutex is held and unloads the document itself once the store
+  // finishes, so unloading here would be a no-op followed by a false "still in memory" report.
+  if (document.saveMutex.isLocked()) {
+    logger.info(`[FORCE_CLOSE] Store in progress for ${pageId}; the document unloads when it completes`);
+    return;
+  }
+
   logger.info(`[FORCE_CLOSE] Unloading document from memory...`);
 
   try {
