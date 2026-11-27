@@ -114,8 +114,10 @@ function* workspaceSources(directory) {
 }
 
 test("packages/ui and packages/propel are gone from the workspace", () => {
-  assert.equal(existsSync(path.join(repoRoot, "packages/ui")), false);
-  assert.equal(existsSync(path.join(repoRoot, "packages/propel")), false);
+  // The manifest, not the directory: a checkout that switched from an older
+  // branch keeps the ignored node_modules and dist there, which is no package.
+  assert.equal(existsSync(path.join(repoRoot, "packages/ui/package.json")), false);
+  assert.equal(existsSync(path.join(repoRoot, "packages/propel/package.json")), false);
   assert.ok(workspaceManifests().includes("packages/makeplane-propel"), "the scan reaches the workspace packages");
 });
 
