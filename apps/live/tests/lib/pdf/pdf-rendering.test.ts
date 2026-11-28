@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { PDFParse } from "pdf-parse";
 import { convertHTMLDocumentToAllFormats } from "@plane/editor/server";
 import { renderPlaneDocToPdfBuffer } from "@/lib/pdf";
-import type { TipTapDocument, PDFExportMetadata } from "@/lib/pdf";
+import type { TipTapDocument, TipTapNode, PDFExportMetadata } from "@/lib/pdf";
 
 const PDF_HEADER = "%PDF-";
 
@@ -28,6 +28,30 @@ function embeddedFonts(buffer: Buffer): string[] {
   return [...new Set([...names].map((match) => match[1]))];
 }
 
+/** The link annotations a PDF carries: how many, and the URI each opens. */
+function linkAnnotations(buffer: Buffer): { count: number; uris: string[] } {
+  const source = buffer.toString("latin1");
+  return {
+    count: [...source.matchAll(/\/Subtype\s*\/Link\b/g)].length,
+    uris: [...source.matchAll(/\/URI\s*\(([^)]*)\)/g)].map((match) => match[1]),
+  };
+}
+
+/** A paragraph whose middle word links to `href`. */
+const linkedParagraph = (href: unknown): TipTapDocument => ({
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "Click " },
+        { type: "text", text: "here", marks: [{ type: "link", attrs: { href } }] },
+        { type: "text", text: " to visit." },
+      ],
+    },
+  ],
+});
+
 /** A document holding one callout with the given attributes. */
 const callout = (attrs: Record<string, unknown>): TipTapDocument => ({
   type: "doc",
@@ -43,6 +67,17 @@ const callout = (attrs: Record<string, unknown>): TipTapDocument => ({
 /** A document holding one paragraph with the given inline content. */
 const paragraph = (content: TipTapDocument["content"]): TipTapDocument => ({
   type: "doc",
+  content: [{ type: "paragraph", content }],
+});
+
+/** An inline emoji node as the editor stores it: the name only. */
+const emojiNode = (name: unknown, marks?: TipTapNode["marks"]): TipTapNode => ({
+  type: "emoji",
+  attrs: { name },
+  ...(marks ? { marks } : {}),
+});
+const cell = (type: "tableHeader" | "tableCell", content: TipTapNode[]): TipTapNode => ({
+  type,
   content: [{ type: "paragraph", content }],
 });
 
@@ -446,6 +481,47 @@ describe("PDF Rendering Integration", () => {
       expect(text).toContain("Click");
       expect(text).toContain("here");
       expect(text).toContain("to visit");
+    });
+  });
+
+  describe("link marks", () => {
+    it.each([
+      ["https", "https://example.com/path?q=1"],
+      ["mailto", "mailto:someone@example.com"],
+      ["tel", "tel:+48123456789"],
+    ])("should keep a %s link as a link annotation", async (_label, href) => {
+      const buffer = await renderPlaneDocToPdfBuffer(linkedParagraph(href));
+
+      expect(linkAnnotations(buffer)).toEqual({ count: 1, uris: [href] });
+      expect(await extractPdfText(buffer)).toContain("Click here to visit.");
+    });
+
+    it.each([
+      ["javascript:", "javascript:alert(1)"],
+      ["a mixed-case javascript: behind whitespace", "  JaVaScRiPt:alert(1)"],
+      ["file:", "file:///etc/passwd"],
+      ["smb:", "smb://attacker.example/share"],
+      ["data:", "data:text/html,<script>alert(1)</script>"],
+      ["a UNC path", "\\\\attacker.example\\share"],
+      ["a relative path", "../../payload.exe"],
+      ["an empty href", ""],
+      ["a non-string href", { toString: "https://example.com" }],
+    ])("should print the text of a link with %s, without a link annotation", async (_label, href) => {
+      const buffer = await renderPlaneDocToPdfBuffer(linkedParagraph(href));
+
+      expect(linkAnnotations(buffer)).toEqual({ count: 0, uris: [] });
+      const text = await extractPdfText(buffer);
+      expect(text).toContain("Click here to visit.");
+      expect(text).not.toContain("alert");
+    });
+
+    it("should drop the link of a refused emoji node and keep the emoji", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        paragraph([emojiNode("rocket", [{ type: "link", attrs: { href: "javascript:alert(1)" } }])])
+      );
+
+      expect(linkAnnotations(buffer).count).toBe(0);
+      expect(await extractPdfText(buffer)).toContain("🚀");
     });
   });
 
@@ -877,6 +953,100 @@ describe("PDF Rendering Integration", () => {
       const buffer = await renderPlaneDocToPdfBuffer(paragraph([{ type: "text", text: "Plain text 123 #*" }]));
 
       expect(embeddedFonts(buffer)).not.toContain("NotoEmoji-Regular");
+    });
+  });
+
+  describe("emoji nodes", () => {
+    it("should draw emoji nodes in a paragraph, a heading and a table cell from the emoji font", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Launch " }, emojiNode("rocket"), { type: "text", text: " today" }],
+          },
+          {
+            type: "heading",
+            attrs: { level: 2 },
+            content: [{ type: "text", text: "Done " }, emojiNode("white_check_mark")],
+          },
+          {
+            type: "table",
+            content: [
+              { type: "tableRow", content: [cell("tableHeader", [emojiNode("+1")])] },
+              { type: "tableRow", content: [cell("tableCell", [{ type: "text", text: "Party " }, emojiNode("tada")])] },
+            ],
+          },
+        ],
+      });
+      const text = await extractPdfText(buffer);
+
+      for (const emoji of ["🚀", "✅", "👍", "🎉"]) expect(text).toContain(emoji);
+      expect(text).toContain("Launch");
+      expect(text).toContain("today");
+      expect(text).toContain("Party");
+      for (const name of ["rocket", "white_check_mark", "+1", "tada"]) expect(text).not.toContain(name);
+      const fonts = embeddedFonts(buffer);
+      expect(fonts).toContain("NotoEmoji-Regular");
+      expect(fonts.filter((font) => font.startsWith("Helvetica"))).toEqual([]);
+    });
+
+    it("should keep the marks of an emoji node", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        paragraph([emojiNode("rocket", [{ type: "bold" }, { type: "link", attrs: { href: "https://example.com" } }])])
+      );
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("🚀");
+      expect(embeddedFonts(buffer)).toContain("NotoEmoji-Regular");
+    });
+
+    it("should print an unknown emoji name as the editor shows it", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        paragraph([{ type: "text", text: "Before " }, emojiNode("not_an_emoji_name"), { type: "text", text: " after" }])
+      );
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain(":not_an_emoji_name:");
+      expect(text).toContain("Before");
+      expect(text).toContain("after");
+      expect(embeddedFonts(buffer)).not.toContain("NotoEmoji-Regular");
+    });
+
+    it.each([
+      ["markup", "<script>alert(1)</script>"],
+      ["a code point number", "128640"],
+      ["the character itself", "🚀"],
+      ["an over-long name", "a".repeat(100_000)],
+      ["a newline", "rocket\nsmile"],
+      ["a number", 128640],
+      ["an object", { name: "rocket" }],
+      ["an array", ["rocket"]],
+      ["null", null],
+      ["undefined", undefined],
+    ])(
+      "should export a document with an emoji node holding %s without failing",
+      async (_label, name) => {
+        const buffer = await renderPlaneDocToPdfBuffer(
+          paragraph([{ type: "text", text: "Before " }, emojiNode(name), { type: "text", text: " after" }])
+        );
+        const text = await extractPdfText(buffer);
+
+        expect(text).toContain("Before");
+        expect(text).toContain("after");
+        expect(text).not.toContain("<script>");
+        expect(text).not.toContain("aaaaaaaa");
+        expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
+        expect(text).not.toContain("128640");
+        expect(text).not.toContain(":");
+      },
+      20_000
+    );
+
+    it("should export an emoji node without attributes", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(paragraph([{ type: "text", text: "Alone" }, { type: "emoji" }]));
+
+      expect(await extractPdfText(buffer)).toContain("Alone");
     });
   });
 
