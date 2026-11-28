@@ -7,6 +7,7 @@ This package provides a logger and a request logger utility built using [Winston
 - Dynamic log level configuration using env.
 - Pre-configured winston logger for general usage (`logger`).
 - Request logger middleware that logs incoming request
+- Credential redaction for every log entry.
 
 ## Usage
 
@@ -48,6 +49,18 @@ Use this as a middleware for incoming requests
 const app = express();
 app.use(requestLogger);
 ```
+
+## Credentials stay out of logs
+
+- The request logger records an allowlist only: method, path, HTTP version, status, response time and the
+  `user-agent`, `content-type` and `content-length` headers. Query strings, bodies, cookies, authorization and CSRF
+  headers, and response headers are never written.
+- Every entry passes through `redactFormat` before it is serialised. Values under credential keys (`cookie`,
+  `authorization`, `x-api-key`, CSRF and session names, and names ending in `token`, `secret`, `password` or
+  `apiKey`) become `[REDACTED]`, at any depth, including inside error objects such as an axios error's
+  `config.headers`. Strings are scrubbed of raw `Cookie:` header lines, credential `name=value` pairs and bearer
+  tokens. The logged objects themselves are not modified.
+- `redactSensitiveData(value)` applies the same rules to a value outside the logger.
 
 ## Available Log Levels
 
