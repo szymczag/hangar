@@ -10,6 +10,7 @@ import type { MarkdownSerializerState } from "prosemirror-markdown";
 // local imports
 import { Emoji } from "./emoji";
 import { EDITOR_EMOJIS } from "./emoji-data";
+import { emojiName } from "./emoji-name";
 
 /**
  * The emoji node with its emoji data and markdown serializer, without the
@@ -27,10 +28,13 @@ export const EmojiExtensionConfig = Emoji.extend({
         serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
           const emojiItem = shortcodeToEmoji(node.attrs.name, extensionOptions.emojis);
           if (emojiItem?.emoji) {
-            state.write(emojiItem?.emoji);
-          } else {
-            state.write(`:${node.attrs.name}:`);
+            state.write(emojiItem.emoji);
+            return;
           }
+          // The name is page content and `write` does not escape it: only a
+          // plain shortcode is written back as `:name:`, anything else nothing.
+          const name = emojiName(node.attrs.name);
+          if (name) state.write(`:${name}:`);
         },
       },
     };

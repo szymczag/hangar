@@ -28,6 +28,30 @@ function embeddedFonts(buffer: Buffer): string[] {
   return [...new Set([...names].map((match) => match[1]))];
 }
 
+/** The link annotations a PDF carries: how many, and the URI each opens. */
+function linkAnnotations(buffer: Buffer): { count: number; uris: string[] } {
+  const source = buffer.toString("latin1");
+  return {
+    count: [...source.matchAll(/\/Subtype\s*\/Link\b/g)].length,
+    uris: [...source.matchAll(/\/URI\s*\(([^)]*)\)/g)].map((match) => match[1]),
+  };
+}
+
+/** A paragraph whose middle word links to `href`. */
+const linkedParagraph = (href: unknown): TipTapDocument => ({
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "Click " },
+        { type: "text", text: "here", marks: [{ type: "link", attrs: { href } }] },
+        { type: "text", text: " to visit." },
+      ],
+    },
+  ],
+});
+
 /** A document holding one callout with the given attributes. */
 const callout = (attrs: Record<string, unknown>): TipTapDocument => ({
   type: "doc",
@@ -457,6 +481,47 @@ describe("PDF Rendering Integration", () => {
       expect(text).toContain("Click");
       expect(text).toContain("here");
       expect(text).toContain("to visit");
+    });
+  });
+
+  describe("link marks", () => {
+    it.each([
+      ["https", "https://example.com/path?q=1"],
+      ["mailto", "mailto:someone@example.com"],
+      ["tel", "tel:+48123456789"],
+    ])("should keep a %s link as a link annotation", async (_label, href) => {
+      const buffer = await renderPlaneDocToPdfBuffer(linkedParagraph(href));
+
+      expect(linkAnnotations(buffer)).toEqual({ count: 1, uris: [href] });
+      expect(await extractPdfText(buffer)).toContain("Click here to visit.");
+    });
+
+    it.each([
+      ["javascript:", "javascript:alert(1)"],
+      ["a mixed-case javascript: behind whitespace", "  JaVaScRiPt:alert(1)"],
+      ["file:", "file:///etc/passwd"],
+      ["smb:", "smb://attacker.example/share"],
+      ["data:", "data:text/html,<script>alert(1)</script>"],
+      ["a UNC path", "\\\\attacker.example\\share"],
+      ["a relative path", "../../payload.exe"],
+      ["an empty href", ""],
+      ["a non-string href", { toString: "https://example.com" }],
+    ])("should print the text of a link with %s, without a link annotation", async (_label, href) => {
+      const buffer = await renderPlaneDocToPdfBuffer(linkedParagraph(href));
+
+      expect(linkAnnotations(buffer)).toEqual({ count: 0, uris: [] });
+      const text = await extractPdfText(buffer);
+      expect(text).toContain("Click here to visit.");
+      expect(text).not.toContain("alert");
+    });
+
+    it("should drop the link of a refused emoji node and keep the emoji", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        paragraph([emojiNode("rocket", [{ type: "link", attrs: { href: "javascript:alert(1)" } }])])
+      );
+
+      expect(linkAnnotations(buffer).count).toBe(0);
+      expect(await extractPdfText(buffer)).toContain("🚀");
     });
   });
 
