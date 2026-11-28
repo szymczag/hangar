@@ -6,7 +6,7 @@ Hangar publishes a Helm chart for Kubernetes at:
 oci://ghcr.io/szymczag/charts/hangar
 ```
 
-The current release is `0.7.0-rc.1`. It is a release candidate for `0.7.0`;
+The current release is `0.7.0-rc.2`. It is a release candidate for `0.7.0`;
 the current stable Hangar release for Docker Compose, Docker Swarm and the
 all-in-one image remains `0.6.0`. Helm installs a release candidate only when
 you name its version. On Kubernetes, both are qualified for evaluation on AMD64
@@ -64,7 +64,7 @@ names the same versions and rollback targets. Each guide renders the chart with
 
 ## Compatibility
 
-The `0.7.0-rc.1` qualification boundary is:
+The `0.7.0-rc.2` qualification boundary is:
 
 | Item                   | Qualified boundary                                               |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -232,10 +232,10 @@ The product, chart, and Git identifiers are deliberately different:
 
 | Identifier         | Current value                               |
 | ------------------ | ------------------------------------------- |
-| Product version    | `v0.7.0-rc.1`                               |
-| Helm chart version | `0.7.0-rc.1`                                |
-| Git tag            | `hangar-v0.7.0-rc.1`                        |
-| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.7.0-rc.1` |
+| Product version    | `v0.7.0-rc.2`                               |
+| Helm chart version | `0.7.0-rc.2`                                |
+| Git tag            | `hangar-v0.7.0-rc.2`                        |
+| OCI chart          | `ghcr.io/szymczag/charts/hangar:0.7.0-rc.2` |
 
 `rc.1`, `rc.2`, `rc.20`, `rc.24`, `rc.25`, `rc.28`, `rc.33`, and `rc.59` were consumed
 by incomplete publication attempts. `rc.59` carried the same changes as `rc.60` and
@@ -258,6 +258,7 @@ failed and neither the chart nor a GitHub Release was published. Do not deploy
 its images; it is neither an upgrade nor a rollback target.
 The `0.6.0` release candidate that was published, `0.6.0-rc.2`, is superseded
 by `0.6.0` and is not a rollback target.
+`0.7.0-rc.1` is superseded by `0.7.0-rc.2` and is not a rollback target.
 `0.6.0` is the current stable release and the supported rollback target for
 this one; rolling back to it needs no schema change and no change to the
 values, only the images change. The rollback brings back the editor's toolbar,
@@ -268,9 +269,13 @@ suggestions, the 400 when a new comment takes a pasted image, the looser rules
 for binding images to comments, the PDF export that takes its request's
 workspace slug and ids
 unchecked and prints emoji as broken characters, callout emoji as code points
-and mentions as `@user_mention`, and the unhandled rejection that every `live`
-pod logs when a page too large to save is closed. Links that lost their address
-on `0.7.0-rc.1` and were saved without it do not come back.
+and mentions as `@user_mention`, leaves out emoji typed in the editor and
+makes every link in the PDF clickable whatever its scheme, the editor's
+Markdown serializer that writes an unknown emoji name unchecked, the
+unhandled rejection that every `live` pod logs when a page too large to save
+is closed, and the `live` request log that records full request headers,
+cookies included, and query strings. Links that lost their address on
+`0.7.0-rc.1` or `0.7.0-rc.2` and were saved without it do not come back.
 Rolling back further, to `0.5.0`, needs no schema change or values change
 either, and only the images change. An all-in-one installation that follows
 the `stable` tag has to name `v0.5.0` to roll back that far, because `stable`
@@ -341,7 +346,7 @@ container sets and published no chart or GitHub Release.
 
 ## Documentation
 
-- [Release `v0.7.0-rc.1` notes](../releases/hangar-v0.7.0-rc.1.md) — review
+- [Release `v0.7.0-rc.2` notes](../releases/hangar-v0.7.0-rc.2.md) — review
   security changes, migrations, compatibility, limitations, and rollback.
 - [Install the evaluation profile](evaluation-install.md) — complete a first
   installation in a dedicated namespace.
@@ -373,9 +378,11 @@ admission is configured through `googleCalendarCapacity.limits.userRate` and
 `60/minute`, and admission fails closed while Valkey is unavailable. The web
 client coalesces capacity refreshes and honours the endpoint's `Retry-After`
 response when either limit is reached.
-The previous release is `0.6.0`, tag `hangar-v0.6.0`, and chart
-`ghcr.io/szymczag/charts/hangar:0.6.0`, which is also the current stable
-release and the rollback target. The stable release before it is `0.5.0`, tag
+The previous release is `0.7.0-rc.1`, tag `hangar-v0.7.0-rc.1`, and chart
+`ghcr.io/szymczag/charts/hangar:0.7.0-rc.1`, a release candidate that
+`0.7.0-rc.2` supersedes and that is not a rollback target. The previous stable
+release and the rollback target is `0.6.0`, tag `hangar-v0.6.0`, and chart
+`ghcr.io/szymczag/charts/hangar:0.6.0`. The stable release before it is `0.5.0`, tag
 `hangar-v0.5.0`, and chart `ghcr.io/szymczag/charts/hangar:0.5.0`. Anybody still on rc.62 with
 calendar capacity enabled should leave it immediately: every Google request fails
 on that release.
@@ -418,6 +425,77 @@ it; do not install it, and upgrade an installation on it to `0.6.0` with
 values and runs no migration; only the images change. `0.6.0` is built from the
 `0.6.0-rc.2` source plus the in-app release notes; no application code
 changes. There is no chart `0.6.0-rc.1`.
+
+Chart `0.7.0-rc.1` was the first release candidate for `0.7.0` and is
+superseded by `0.7.0-rc.2`; do not install it, and upgrade an installation on
+it to `0.7.0-rc.2` with `helm upgrade` and `--version 0.7.0-rc.2`. The upgrade
+needs no change to the values and runs no migration; only the images change.
+Read the live log note in the 0.7.0-rc.2 paragraph below before or right
+after you run it.
+
+Release 0.7.0-rc.2 adds no database or license migration compared with 0.6.0
+or 0.7.0-rc.1 and changes nothing in the chart's templates, values or
+Secrets. Upgrade from 0.6.0 or 0.7.0-rc.1 with `helm upgrade` and
+`--version 0.7.0-rc.2`; Helm does not select a release candidate otherwise.
+Read the link change and the live log note below first. Every release
+rebuilds all its images, so every image digest changes. Compared with
+0.7.0-rc.1, only the `web`, `space` and `live` images carry code changes. The
+`live` image's request log now records only the method, the path without its
+query string, the status, the timing and the `user-agent`, `content-type`,
+`content-length` and `x-request-id` headers, and every `live` log entry,
+including the PDF export's, is scrubbed of credentials before it is written.
+Up to 0.7.0-rc.1, the `live` pods logged each request's full headers,
+including the session cookie and the secret key the `api` sends, and its query
+string. Logs written before the upgrade are not rewritten: treat the `live`
+pods' earlier logs, and every copy your log pipeline or backups hold, as
+sensitive, rotate or delete them, and restrict who can read them. If they may
+have been readable by someone other than your operators, take the steps that
+follow this paragraph. The `live` image's
+PDF export also draws emoji typed or picked in the editor, prints an unknown
+emoji name as `:name:`, and keeps a link clickable only for `http`, `https`,
+`mailto` and `tel` addresses, printing any other link, a relative one
+included, as plain text. In the `web`, `space` and `live` images the editor's
+Markdown serializer writes an unknown emoji name only when it is a plain
+shortcode. In the `web` and `space` images the full-screen image viewer keeps
+keyboard focus, closes on Escape and zooms with `+`, `=`, `-` and `0` without
+those keys reaching the editor, and the callout emoji search keeps focus. The
+`api`, `admin` and `proxy` code is unchanged since 0.7.0-rc.1.
+Compared with 0.6.0, the release also carries everything the 0.7.0-rc.1
+paragraph below describes.
+From a release older than 0.6.0, including 0.6.0-rc.2, read the 0.6.0
+paragraph below first. Rolling back to 0.6.0 needs no schema change and no
+change to the values; [Release identity](#release-identity) lists what it
+brings back.
+
+If the `live` pods' earlier logs may have been exposed:
+
+- Consider ending every session. Sessions are kept in the database, so
+  deleting them signs every user out of the web app, Spaces and God Mode, and
+  they sign in again. Run Django's shell in an API pod:
+
+  ```bash
+  kubectl --namespace "$NAMESPACE" exec deployment/"$RELEASE_NAME"-hangar-api -- \
+    python manage.py shell -c "from plane.db.models import Session; Session.objects.all().delete()"
+  ```
+
+- Ending sessions does not revoke API tokens. Hangar itself sends none to the
+  live server; if your own integrations sent an `x-api-key` or
+  `Authorization` header to it, rotate those tokens too.
+- Consider changing `LIVE_SERVER_SECRET_KEY`. It is in the Secret named by
+  `existingSecrets.live.name` (`hangar-live` by default), and only the `live`
+  Deployment and the general `worker` Deployment read it; the `api`
+  Deployment does not carry it. Change it in that Secret, then restart both:
+
+  ```bash
+  kubectl --namespace "$NAMESPACE" rollout restart \
+    deployment/"$RELEASE_NAME"-hangar-live deployment/"$RELEASE_NAME"-hangar-worker
+  kubectl --namespace "$NAMESPACE" rollout status deployment/"$RELEASE_NAME"-hangar-live --timeout=5m
+  kubectl --namespace "$NAMESPACE" rollout status deployment/"$RELEASE_NAME"-hangar-worker --timeout=5m
+  ```
+
+  Until both have restarted, the worker's document conversions are refused by
+  the live server. If you set `fullnameOverride` or `nameOverride`, use the
+  Deployment names they produce instead of `"$RELEASE_NAME"-hangar-…`.
 
 Release 0.7.0-rc.1 adds no database or license migration compared with 0.6.0
 and changes nothing in the chart's templates, values or Secrets. Upgrade from
