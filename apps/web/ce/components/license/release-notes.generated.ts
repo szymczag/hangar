@@ -11,13 +11,13 @@ export type TBuildIdentity = {
 };
 
 export const RELEASE_NOTES: TBuildIdentity = {
-  version: "0.7.0-rc.1",
+  version: "0.7.0-rc.2",
   highlights: [
+    "The live server's request logs no longer contain cookies, credential headers or query strings.",
     "Behaviour change: editor links now accept only http, https, mailto and tel addresses.",
     "Hovering a link no longer writes inline event handlers into the page.",
     "The PDF export checks what it is asked for and what it prints, and draws emoji from a bundled font.",
     "The legacy component libraries leave the code base.",
-    "The editor now uses the new upstream 1.5.0 design.",
   ],
   upstream: {
     version: "1.4.3",
