@@ -73,10 +73,11 @@ not logged.
 
   - The all-in-one image. `docker exec` does not get the environment the
     container's services run with, so this command takes it from the
-    container's first process:
+    container's first process. If you started the container with `--user`,
+    pass the same `--user` to `docker exec`:
 
     ```sh
-    docker exec -w /app/backend <container> python -c "import subprocess, sys; env = dict(item.split('=', 1) for item in open('/proc/1/environ').read().split(chr(0)) if '=' in item); sys.exit(subprocess.call([sys.executable, 'manage.py', 'shell', '-c', 'from plane.db.models import Session; Session.objects.all().delete()'], env=env))"
+    docker exec -w /app/backend <container> python -c "import subprocess, sys; env = dict(item.split(b'=', 1) for item in open('/proc/1/environ', 'rb').read().split(b'\0') if b'=' in item); sys.exit(subprocess.call([sys.executable, 'manage.py', 'shell', '-c', 'from plane.db.models import Session; Session.objects.all().delete()'], env=env))"
     ```
 
   - Kubernetes, in an API pod, as the
@@ -89,14 +90,19 @@ not logged.
   sends to the live server:
   - On Compose and Swarm it is in `plane-app/plane.env`, and every Hangar
     application service carries it. Change it there, then restart all
-    services: `./setup.sh restart` on Compose, and redeploy the stack on
-    Swarm.
-  - In the all-in-one image, change it where you set it: either the
-    `LIVE_SERVER_SECRET_KEY` you pass to the container, or, if the container
-    generated it, `/app/data/secrets.env`. Then create the container again
-    from the image with the same `/app/data` volume. A plain restart of the
-    same container keeps the old key, because the container's own
-    `/app/plane.env` already holds it and is read first.
+    services: `./setup.sh restart` on Compose, and the Swarm script's
+    `redeploy` action on Swarm (`./setup.sh redeploy` when it is installed as
+    `setup.sh`, as the upgrade steps below assume).
+  - In the all-in-one image, the start script takes the key from the
+    container's environment first, then from `/app/plane.env`, then from
+    `/app/data/secrets.env`, and writes the result into `/app/plane.env`.
+    The robust way is to create the container again with
+    `-e LIVE_SERVER_SECRET_KEY=<new value>` and the same `/app/data` volume,
+    and to write the same value into `/app/data/secrets.env`: the start
+    script does not store a value passed with `-e`, so the old key would come
+    back if you later drop it. If you mount your own `/app/plane.env`, change
+    the key in that file too. A plain restart of the same container keeps the
+    old key, because its `/app/plane.env` already holds it.
   - On Kubernetes it is in the Secret named by `existingSecrets.live.name`
     (`hangar-live` by default). Change it there and restart the `live` and
     `worker` Deployments, as the Kubernetes guide describes.
@@ -323,7 +329,7 @@ see. What a refused request gets depends on the route:
   legacy `…/issues/<id>/issue-attachments/`: a restricted guest gets 403 for
   a work item they did not create, and the same 403 for an id that does not
   exist, so on these routes the answer does not tell them which work items
-  exist. Other roles get 404 for a missing id.
+  exist.
 
 None of this has changed since `0.7.0-rc.1`. **The `0.7.0-rc.1` notes were
 inaccurate here**: they said that a hidden work item always gets the same 404

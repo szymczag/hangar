@@ -494,8 +494,8 @@ If the `live` pods' earlier logs may have been exposed:
   ```
 
   Until both have restarted, the worker's document conversions are refused by
-  the live server. If you set `fullnameOverride`, use that name instead of
-  `"$RELEASE_NAME"-hangar`.
+  the live server. If you set `fullnameOverride` or `nameOverride`, use the
+  Deployment names they produce instead of `"$RELEASE_NAME"-hangar-…`.
 
 Release 0.7.0-rc.1 adds no database or license migration compared with 0.6.0
 and changes nothing in the chart's templates, values or Secrets. Upgrade from
