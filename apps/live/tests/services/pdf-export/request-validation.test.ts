@@ -6,8 +6,11 @@
 
 import { Either, Schema } from "effect";
 import { describe, expect, it, vi } from "vitest";
+import { logger } from "@plane/logger";
 
-vi.mock("@plane/logger", () => ({ logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() } }));
+vi.mock("@plane/logger", () => ({
+  logger: { log: vi.fn(), info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
 
 // the export itself must never run for a refused body
 const exportToPdf = vi.hoisted(() => vi.fn());
@@ -83,5 +86,13 @@ describe("PdfExportController", () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ message: "Invalid request body" });
     expect(exportToPdf).not.toHaveBeenCalled();
+  });
+
+  it("logs the refusal through the shared logger, not Effect's console logger", async () => {
+    vi.mocked(logger.log).mockClear();
+    await post({ ...valid, workspaceSlug: "../../other" });
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ level: "error", message: "PDF_EXPORT: Export failed" })
+    );
   });
 });

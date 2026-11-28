@@ -8,6 +8,7 @@ import type { Request, Response } from "express";
 import { Effect, Schema, Cause } from "effect";
 import { Controller, Post } from "@plane/decorators";
 import { logger } from "@plane/logger";
+import { WinstonEffectLoggerLive } from "@/lib/effect-logger";
 import { AppError } from "@/lib/errors";
 import { PdfExportRequestBody, PdfValidationError, PdfAuthenticationError } from "@/schema/pdf-export";
 import { PdfExportService, exportToPdf } from "@/services/pdf-export";
@@ -116,7 +117,9 @@ export class PdfExportController {
       })
     );
 
-    const result = await Effect.runPromise(Effect.provide(effect, PdfExportService.Default));
+    const result = await Effect.runPromise(
+      effect.pipe(Effect.provide(PdfExportService.Default), Effect.provide(WinstonEffectLoggerLive))
+    );
 
     // Check if result is an error response
     if ("error" in result && "status" in result) {
