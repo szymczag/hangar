@@ -22,7 +22,15 @@ export function EditorContentWrapper(props: Props) {
   return (
     <div
       tabIndex={tabIndex}
-      onFocus={() => editor?.chain().focus(undefined, { scrollIntoView: false }).run()}
+      onFocus={(event) => {
+        // Forward focus only when this wrapper itself takes it (it is tabbable through
+        // `tabIndex`). React bubbles focus through the component tree, so a focus inside
+        // a node view (the image toolbar) or inside a node view's portal (the full-screen
+        // image viewer) reaches this handler too; forwarding those pulled focus straight
+        // back into the editor on the next frame.
+        if (event.target !== event.currentTarget) return;
+        editor?.chain().focus(undefined, { scrollIntoView: false }).run();
+      }}
       className={className}
     >
       <EditorContent editor={editor} id={id} />

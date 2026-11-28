@@ -5,7 +5,7 @@
  */
 
 import { FloatingFocusManager, FloatingOverlay, useFloating } from "@floating-ui/react";
-import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
+import type { RefObject } from "react";
 import { AddOutline, CloseOutline, DownloadOutline, MinusOutline, NewTabOutline } from "@makeplane/propel/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
@@ -19,6 +19,17 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 const ZOOM_SPEED = 0.05;
 const ZOOM_STEPS = [0.5, 1, 1.5, 2];
+
+type ZoomAction = "increase" | "decrease" | "reset";
+
+/** The viewer's keys: Escape closes it, `+`/`=` and `-` step the zoom, `0` resets it. */
+const VIEWER_KEYS: Record<string, "close" | ZoomAction> = {
+  Escape: "close",
+  "+": "increase",
+  "=": "increase",
+  "-": "decrease",
+  "0": "reset",
+};
 
 type Props = {
   openerRef?: RefObject<HTMLButtonElement | null>;
@@ -35,13 +46,15 @@ type ViewerControlsProps = {
   downloadSrc: string;
   isTouchDevice: boolean;
   magnification: number;
-  onZoom: (direction: "increase" | "decrease") => void;
+  onZoom: (direction: ZoomAction) => void;
   src: string;
 };
 
 /** The viewer's zoom, download and open-in-new-tab toolbar. */
 function ImageViewerControls(props: ViewerControlsProps) {
   const { downloadSrc, isTouchDevice, magnification, onZoom, src } = props;
+  const isZoomOutDisabled = magnification <= MIN_ZOOM;
+  const isZoomInDisabled = magnification >= MAX_ZOOM;
   return (
     <div className="fixed bottom-10 left-1/2 z-10 -translate-x-1/2">
       <Toolbar size="md" elevation="raised" role="group" aria-label="Image viewer controls">
@@ -55,9 +68,13 @@ function ImageViewerControls(props: ViewerControlsProps) {
                 e.preventDefault();
                 e.stopPropagation();
               }
+              if (isZoomOutDisabled) return;
               onZoom("decrease");
             }}
-            disabled={magnification <= MIN_ZOOM}
+            // Disabled through ARIA, not the native attribute: a native disabled button
+            // drops focus to the page body when the limit is reached, out of the viewer.
+            aria-disabled={isZoomOutDisabled || undefined}
+            data-disabled={isZoomOutDisabled ? "" : undefined}
             aria-label="Zoom out"
           >
             <Icon icon={MinusOutline} />
@@ -74,9 +91,11 @@ function ImageViewerControls(props: ViewerControlsProps) {
                 e.preventDefault();
                 e.stopPropagation();
               }
+              if (isZoomInDisabled) return;
               onZoom("increase");
             }}
-            disabled={magnification >= MAX_ZOOM}
+            aria-disabled={isZoomInDisabled || undefined}
+            data-disabled={isZoomInDisabled ? "" : undefined}
             aria-label="Zoom in"
           >
             <Icon icon={AddOutline} />
@@ -168,11 +187,13 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
     setInitialMagnification(1);
   }, [isDragging, toggleFullScreenMode]);
 
-  const handleMagnification = useCallback((direction: "increase" | "decrease") => {
+  const handleMagnification = useCallback((direction: ZoomAction) => {
     setMagnification((prev) => {
       // Find the appropriate target zoom level based on current magnification
       let targetZoom: number;
-      if (direction === "increase") {
+      if (direction === "reset") {
+        targetZoom = 1;
+      } else if (direction === "increase") {
         targetZoom = ZOOM_STEPS.find((step) => step > prev) ?? MAX_ZOOM;
       } else {
         // Reverse the array to find the next lower step
@@ -190,18 +211,29 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
   }, []);
 
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent | ReactKeyboardEvent<HTMLDivElement>) => {
-      if (e.key === "Escape" || e.key === "+" || e.key === "=" || e.key === "-") {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (e.key === "Escape") handleClose();
-        if (e.key === "+" || e.key === "=") handleMagnification("increase");
-        if (e.key === "-") handleMagnification("decrease");
-      }
+    (e: KeyboardEvent) => {
+      // Leave browser and system shortcuts (Ctrl/Cmd + `+`, `-`, `0`) alone.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const action = VIEWER_KEYS[e.key];
+      if (!action) return;
+      // The editor sits under the viewer with a node selection on this image: a
+      // character key reaching it replaces the image. Claim the key first.
+      e.preventDefault();
+      e.stopPropagation();
+      if (action === "close") handleClose();
+      else handleMagnification(action);
     },
     [handleClose, handleMagnification]
   );
+
+  // The viewer's keys work wherever focus sits while it is open, and never reach the
+  // editor or an enclosing dialog: a capture listener on the window runs before the
+  // editor's own listeners and before any document-level Escape handler.
+  useEffect(() => {
+    if (!isFullScreenEnabled) return;
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [isFullScreenEnabled, handleKeyDown]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!imgRef.current) return;
@@ -309,7 +341,8 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
     >
       {/* Upstream also passes `outsideElementsInert`, which @floating-ui/react
           0.27 added; on the 0.26 line the modal focus manager hides the
-          outside elements from assistive technology instead. */}
+          outside elements from assistive technology instead. Focus lands on
+          the close button and returns to the full-screen button on close. */}
       <FloatingFocusManager
         context={context}
         initialFocus={closeButtonRef}
@@ -321,8 +354,10 @@ function ImageFullScreenModalWithoutPortal(props: Props) {
           role="dialog"
           aria-modal="true"
           aria-label="Fullscreen image viewer"
-          onKeyDown={handleKeyDown}
           onMouseDown={(e) => {
+            // The viewer is a React child of the image node view: a press inside it
+            // must not bubble on to the block's node-selection handler.
+            e.stopPropagation();
             if (e.target !== modalRef.current) return;
             e.preventDefault();
             handleClose();

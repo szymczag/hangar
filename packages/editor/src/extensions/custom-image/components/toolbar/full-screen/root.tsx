@@ -60,6 +60,14 @@ export function ImageFullScreenActionRoot(props: Props) {
             e.stopPropagation();
             setIsFullScreenEnabled(true);
           }}
+          onKeyDown={(e) => {
+            // Open from the keyboard here rather than through the button's synthesized
+            // click, and keep the key from the editor this button sits inside.
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            e.stopPropagation();
+            setIsFullScreenEnabled(true);
+          }}
           aria-label="View image in full screen"
         >
           <Icon icon={FullScreenOutline} />
