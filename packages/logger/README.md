@@ -52,15 +52,27 @@ app.use(requestLogger);
 
 ## Credentials stay out of logs
 
-- The request logger records an allowlist only: method, path, HTTP version, status, response time and the
-  `user-agent`, `content-type` and `content-length` headers. Query strings, bodies, cookies, authorization and CSRF
-  headers, and response headers are never written.
-- Every entry passes through `redactFormat` before it is serialised. Values under credential keys (`cookie`,
-  `authorization`, `x-api-key`, CSRF and session names, and names ending in `token`, `secret`, `password` or
-  `apiKey`) become `[REDACTED]`, at any depth, including inside error objects such as an axios error's
-  `config.headers`. Strings are scrubbed of raw `Cookie:` header lines, credential `name=value` pairs and bearer
-  tokens. The logged objects themselves are not modified.
-- `redactSensitiveData(value)` applies the same rules to a value outside the logger.
+- The request logger records an allowlist only: method, path without query string or fragment, HTTP version, status,
+  response time, and the `user-agent`, `content-type`, `content-length` and `x-request-id` headers when present.
+  Query strings, bodies, every other request header and all response headers are never written.
+- Every entry passes through `redactFormat`, first in the format chain. It works on a copy; the logged objects are not
+  modified.
+  - Fields: the value under a credential key becomes `[REDACTED]` at any depth (up to 10 levels and 5000 objects per
+    entry), including inside error objects such as an axios error's `config.headers`. Credential keys are the header
+    names `cookie`, `set-cookie`, `authorization`, `proxy-authorization`, `x-api-key`, `x-csrftoken`, `x-csrf-token`,
+    `x-xsrf-token`, `live-server-secret-key` and `x-admin-secret-key`, any key containing `cookie`, `authorization`,
+    `csrf`, `xsrf`, `sessionid` or `credential`, and any key ending in `token`, `secret`, `secretkey`, `password`,
+    `apikey` or `signature` (case, `-` and `_` ignored). In a flat name/value list such as `req.rawHeaders`, the item
+    after a sensitive header name is redacted.
+  - Binary data (`Buffer`, typed arrays, `ArrayBuffer`) is replaced by its size, e.g. `[Buffer 42 bytes]`.
+  - Strings: one of the header names above followed by `:`, anywhere in a line, raw or after a JSON-escaped `\r\n`,
+    loses the rest of the line, whatever cookie names it holds; `cookie=` loses the rest of the line up to `&` or a
+    quote; quoted (`"key": "…"`, `'key': '…'`) and bare (`key: '…'`) pairs with a credential key lose the value, as do
+    `name=value` pairs with a credential name, also when the name is percent-encoded; `Bearer`, `Basic`, `Digest` and
+    `Negotiate` credentials (any case) and `Token` followed by 16 or more token characters are replaced; and URL
+    userinfo (`scheme://user:password@`) is removed.
+  - The splat arguments (`Symbol.for("splat")`) are redacted too, so a `format.splat()` added after it stays clean.
+- `redactSensitiveData(value)` and `redactString(text)` apply the same rules outside the logger.
 
 ## Available Log Levels
 

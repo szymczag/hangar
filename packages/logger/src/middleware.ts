@@ -14,8 +14,11 @@ import { SENSITIVE_HEADER_NAMES } from "./redact";
 /** The only request fields a request log line carries. Query strings, bodies and most headers are left out. */
 export const REQUEST_LOG_FIELDS: readonly string[] = ["method", "url", "httpVersion", "headers"];
 
-/** The only request headers a request log line carries. Cookies and credentials are never among them. */
-export const REQUEST_LOG_HEADERS: readonly string[] = ["user-agent", "content-type", "content-length"];
+/**
+ * The only request headers a request log line carries, when present. `x-request-id` correlates the line with the
+ * proxy's and the API's logs. Cookies and credentials are never among them.
+ */
+export const REQUEST_LOG_HEADERS: readonly string[] = ["user-agent", "content-type", "content-length", "x-request-id"];
 
 /** The only response fields a request log line carries. Response headers (`set-cookie`) are left out. */
 export const RESPONSE_LOG_FIELDS: readonly string[] = ["statusCode"];

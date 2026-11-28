@@ -48,6 +48,7 @@ describe("loggerMiddleware", () => {
       "x-csrftoken": CSRF,
       "proxy-authorization": `Basic ${BEARER}`,
       "user-agent": "vitest",
+      "x-request-id": "req-123",
     });
 
     const raw = entry.raw as string;
@@ -62,7 +63,7 @@ describe("loggerMiddleware", () => {
       method: "GET",
       url: "/live/collaboration",
       httpVersion: "1.1",
-      headers: { "user-agent": "vitest" },
+      headers: { "user-agent": "vitest", "x-request-id": "req-123" },
     });
     expect(meta.res).toEqual({ statusCode: 101 });
   });
