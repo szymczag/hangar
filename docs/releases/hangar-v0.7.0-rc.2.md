@@ -15,9 +15,8 @@
 >   longer replace the selected image, and the callout emoji search keeps
 >   focus;
 > - a correction: the `0.7.0-rc.1` notes said that every refused upload gets
->   the same 404 as a missing work item. The work item's attachment routes
->   answer a restricted guest with 403 instead, as the upload item below
->   describes.
+>   the same 404 as a missing work item. Some routes answer 403 instead, as
+>   the upload item below describes.
 >
 > Items that are new in this candidate say so.
 
@@ -52,11 +51,55 @@ not logged.
 > `live` service, in the all-in-one image `/app/logs/access/live.log` and
 > `/app/logs/error/live.err.log`, and on Kubernetes the logs of the `live`
 > pods. If those logs may have been readable by someone other than your
-> operators, consider invalidating the sessions they could contain. Sessions
-> are kept in the database's `sessions` table, and deleting its rows signs
-> every user out of the web app, Spaces and God Mode; they then sign in again.
-> In that case also consider changing `LIVE_SERVER_SECRET_KEY`, which the
-> `api` and `live` services must share, and restarting both.
+> operators, also take the steps below.
+
+- **Consider ending every session.** Sessions are kept in the database, so
+  deleting them all signs every user out of the web app, Spaces and God Mode;
+  they then sign in again. Run Django's shell in an `api` container:
+  - Compose, from the folder that holds `setup.sh`:
+
+    ```sh
+    cd plane-app
+    docker compose -f docker-compose.yaml --env-file plane.env exec api \
+      python manage.py shell -c "from plane.db.models import Session; Session.objects.all().delete()"
+    ```
+
+  - Swarm, on the node that runs the `api` service:
+
+    ```sh
+    docker exec "$(docker ps -q -f name=<stack>_api | head -n 1)" \
+      python manage.py shell -c "from plane.db.models import Session; Session.objects.all().delete()"
+    ```
+
+  - The all-in-one image. `docker exec` does not get the environment the
+    container's services run with, so this command takes it from the
+    container's first process:
+
+    ```sh
+    docker exec -w /app/backend <container> python -c "import subprocess, sys; env = dict(item.split('=', 1) for item in open('/proc/1/environ').read().split(chr(0)) if '=' in item); sys.exit(subprocess.call([sys.executable, 'manage.py', 'shell', '-c', 'from plane.db.models import Session; Session.objects.all().delete()'], env=env))"
+    ```
+
+  - Kubernetes, in an API pod, as the
+    [Kubernetes guide](../kubernetes/README.md) describes.
+
+- **Ending sessions does not revoke API tokens.** Hangar itself sends none to
+  the live server. If your own integrations sent an `x-api-key` or
+  `Authorization` header to it, rotate those tokens too.
+- **Consider changing `LIVE_SERVER_SECRET_KEY`**, the key the API's worker
+  sends to the live server:
+  - On Compose and Swarm it is in `plane-app/plane.env`, and every Hangar
+    application service carries it. Change it there, then restart all
+    services: `./setup.sh restart` on Compose, and redeploy the stack on
+    Swarm.
+  - In the all-in-one image, change it where you set it: either the
+    `LIVE_SERVER_SECRET_KEY` you pass to the container, or, if the container
+    generated it, `/app/data/secrets.env`. Then create the container again
+    from the image with the same `/app/data` volume. A plain restart of the
+    same container keeps the old key, because the container's own
+    `/app/plane.env` already holds it and is read first.
+  - On Kubernetes it is in the Secret named by `existingSecrets.live.name`
+    (`hangar-live` by default). Change it there and restart the `live` and
+    `worker` Deployments, as the Kubernetes guide describes.
 
 **Behaviour change: editor links now accept only http, https, mailto and tel
 addresses.** Up to and including `0.6.0`, the editor refused only
@@ -239,12 +282,11 @@ published boards:
   another work item, project or comment, and nobody can claim someone else's
   pending image. One image in a request that breaks the rule binds nothing.
 - **Uploading or duplicating an image into a saved comment needs the right to
-  edit that comment and to see its work item.** Before, any member of the
-  project could attach an image to any comment whose id they knew, including
-  one on a work item hidden from them. The image could not be read back, but
-  it was stored on that comment. A restricted guest's own older comment on a
-  work item they can no longer see does not take new images; its text stays
-  editable.
+  edit that comment and to see its work item.** Knowing a comment's id is
+  not enough: a project member who may not edit the comment, or who cannot
+  see its work item, cannot attach an image to it. A restricted guest's own
+  older comment on a work item they can no longer see does not take new
+  images; its text stays editable.
 - **A published board can no longer move a user's images between comments.**
   Binding images to your own comment on a board accepts only images that are
   unbound, pending on that comment's work item, or already that comment's, and
@@ -268,18 +310,24 @@ completing or moving a file that belongs to a work item needs the same
 visibility, so a restricted guest changes no file on a work item they cannot
 see. What a refused request gets depends on the route:
 
-- On the general asset routes, those under `/assets/v2/workspaces/<slug>/`
-  for upload, completion, deletion, restore, duplication and bulk binding, and
-  the legacy `/file-assets/` routes, a work item hidden from the caller gets
-  the same 404 as a missing one, and so does a file on it.
-- On the work item's own attachment routes, `…/issues/<id>/attachments/` and
-  the legacy `…/issues/<id>/issue-attachments/`, a restricted guest gets 403
-  for a work item they did not create, as opening that work item itself
-  already answers. They get the same 403 for an id that does not exist, so the
-  answer does not tell which work items exist. **The `0.7.0-rc.1` notes were
-  inaccurate here**: they said that every route answers a hidden work item
-  with 404. The behaviour has not changed since `0.7.0-rc.1`; only its
-  description has.
+- Uploading, duplicating, bulk binding and restoring a file, completing or
+  deleting it on the project routes
+  (`/assets/v2/workspaces/<slug>/projects/<id>/…`), and the legacy
+  `/file-assets/` routes: a work item hidden from the caller gets the same 404
+  as a missing one, and so does a file on it.
+- Completing or deleting a file on the workspace route,
+  `PATCH` and `DELETE /assets/v2/workspaces/<slug>/<asset_id>/`: a file on a
+  work item hidden from the caller is refused with 403, and an id that does
+  not exist gets 404.
+- The work item's own attachment routes, `…/issues/<id>/attachments/` and the
+  legacy `…/issues/<id>/issue-attachments/`: a restricted guest gets 403 for
+  a work item they did not create, and the same 403 for an id that does not
+  exist, so on these routes the answer does not tell them which work items
+  exist. Other roles get 404 for a missing id.
+
+None of this has changed since `0.7.0-rc.1`. **The `0.7.0-rc.1` notes were
+inaccurate here**: they said that a hidden work item always gets the same 404
+as a missing one.
 
 A published board serves, to visitors without a session, only the images it
 shows:
@@ -389,7 +437,8 @@ release than its own. On Compose and Swarm:
    check `plane-app/plane.env`, then run `./setup.sh start`. Hangar stays down
    until you do. On Swarm, the upgrade redeploys the stack itself.
 5. Rotate or delete the live server's logs written before the upgrade, and
-   decide about sessions, as the first item of these notes describes.
+   decide about sessions, API tokens and `LIVE_SERVER_SECRET_KEY`, as the
+   first item of these notes describes.
 6. For later releases, run `HANGAR_RELEASE=<release> ./setup.sh update-script`
    (or plain `./setup.sh update-script` for the latest stable release) before
    `./setup.sh upgrade`. If you skip it, the upgrade refuses and tells you what

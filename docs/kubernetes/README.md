@@ -449,10 +449,8 @@ including the session cookie and the secret key the `api` sends, and its query
 string. Logs written before the upgrade are not rewritten: treat the `live`
 pods' earlier logs, and every copy your log pipeline or backups hold, as
 sensitive, rotate or delete them, and restrict who can read them. If they may
-have been readable by someone other than your operators, consider ending all
-sessions by deleting the rows of the database's `sessions` table, which signs
-every user out, and changing `LIVE_SERVER_SECRET_KEY` in the application
-Secret, then restarting the `api` and `live` workloads. The `live` image's
+have been readable by someone other than your operators, take the steps that
+follow this paragraph. The `live` image's
 PDF export also draws emoji typed or picked in the editor, prints an unknown
 emoji name as `:name:`, and keeps a link clickable only for `http`, `https`,
 `mailto` and `tel` addresses, printing any other link, a relative one
@@ -468,6 +466,36 @@ From a release older than 0.6.0, including 0.6.0-rc.2, read the 0.6.0
 paragraph below first. Rolling back to 0.6.0 needs no schema change and no
 change to the values; [Release identity](#release-identity) lists what it
 brings back.
+
+If the `live` pods' earlier logs may have been exposed:
+
+- Consider ending every session. Sessions are kept in the database, so
+  deleting them signs every user out of the web app, Spaces and God Mode, and
+  they sign in again. Run Django's shell in an API pod:
+
+  ```bash
+  kubectl --namespace "$NAMESPACE" exec deployment/"$RELEASE_NAME"-hangar-api -- \
+    python manage.py shell -c "from plane.db.models import Session; Session.objects.all().delete()"
+  ```
+
+- Ending sessions does not revoke API tokens. Hangar itself sends none to the
+  live server; if your own integrations sent an `x-api-key` or
+  `Authorization` header to it, rotate those tokens too.
+- Consider changing `LIVE_SERVER_SECRET_KEY`. It is in the Secret named by
+  `existingSecrets.live.name` (`hangar-live` by default), and only the `live`
+  Deployment and the general `worker` Deployment read it; the `api`
+  Deployment does not carry it. Change it in that Secret, then restart both:
+
+  ```bash
+  kubectl --namespace "$NAMESPACE" rollout restart \
+    deployment/"$RELEASE_NAME"-hangar-live deployment/"$RELEASE_NAME"-hangar-worker
+  kubectl --namespace "$NAMESPACE" rollout status deployment/"$RELEASE_NAME"-hangar-live --timeout=5m
+  kubectl --namespace "$NAMESPACE" rollout status deployment/"$RELEASE_NAME"-hangar-worker --timeout=5m
+  ```
+
+  Until both have restarted, the worker's document conversions are refused by
+  the live server. If you set `fullnameOverride`, use that name instead of
+  `"$RELEASE_NAME"-hangar`.
 
 Release 0.7.0-rc.1 adds no database or license migration compared with 0.6.0
 and changes nothing in the chart's templates, values or Secrets. Upgrade from

@@ -71,7 +71,9 @@ large to save is closed. Its `live` request log no longer records cookies,
 credential headers or query strings, and every `live` log entry is scrubbed of
 credentials; logs written by earlier releases are not rewritten, so rotate or
 delete them, and consider ending sessions and changing
-`LIVE_SERVER_SECRET_KEY` if they may have been exposed. Its `api` image lets a new
+`LIVE_SERVER_SECRET_KEY` in the Secret named by `existingSecrets.live.name`
+(then restart the `live` and `worker` Deployments) if they may have been
+exposed; the Kubernetes guide's 0.7.0-rc.2 upgrade notes give the commands. Its `api` image lets a new
 work item comment take a pasted image and binds comment images only for their
 uploader, to a comment the uploader may edit; every upload follows the work
 item's visibility, and a published board serves only the images it shows.
