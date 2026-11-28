@@ -7,14 +7,21 @@
 import { Image, Link, Text, View } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { ReactElement } from "react";
-import { calloutEmojiFromUnicode, CORE_EXTENSIONS } from "@plane/editor/lib";
+import { calloutEmojiFromUnicode, CORE_EXTENSIONS, emojiFromName, emojiName, isNavigableHref } from "@plane/editor/lib";
 import { isAssetId, isSafePdfImageDataUri } from "@/lib/asset-fetch-security";
 import { BACKGROUND_COLORS, EDITOR_BACKGROUND_COLORS, resolveColorForPdf, TEXT_COLORS } from "./colors";
 import { withEmojiFont } from "./emoji";
 import { CheckIcon, ClipboardIcon, DocumentIcon, GlobeIcon, LightbulbIcon, LinkIcon } from "./icons";
 import { applyMarks } from "./mark-renderers";
 import { pdfStyles } from "./styles";
-import type { KeyGenerator, NodeRendererRegistry, PDFExportMetadata, PDFRenderContext, TipTapNode } from "./types";
+import type {
+  KeyGenerator,
+  NodeRendererRegistry,
+  PDFExportMetadata,
+  PDFRenderContext,
+  TipTapMark,
+  TipTapNode,
+} from "./types";
 
 const getCalloutIcon = (node: TipTapNode, color: string): ReactElement => {
   const logoInUse = node.attrs?.["data-logo-in-use"] as string | undefined;
@@ -60,12 +67,26 @@ export const createKeyGenerator = (): KeyGenerator => {
   return () => `node-${counter++}`;
 };
 
-const renderTextWithMarks = (node: TipTapNode, getKey: KeyGenerator): ReactElement => {
-  const style = applyMarks(node.marks, {});
-  const hasLink = node.marks?.find((m) => m.type === "link");
+/**
+ * The href of a link mark as the PDF may carry it, or null. The mark is page
+ * content and the PDF viewer opens what the annotation names, so it must parse
+ * as a URL with a scheme on the editor's link allowlist (http, https, mailto,
+ * tel). A relative href is dropped too: in a PDF it would resolve against the
+ * file's own location.
+ */
+const pdfLinkHref = (mark: TipTapMark): string | null => {
+  const href = mark.attrs?.href;
+  return typeof href === "string" && isNavigableHref(href) ? href : null;
+};
 
-  if (hasLink) {
-    const href = (hasLink.attrs?.href as string) || "#";
+const renderTextWithMarks = (node: TipTapNode, getKey: KeyGenerator): ReactElement => {
+  const linkMark = node.marks?.find((m) => m.type === "link");
+  const href = linkMark ? pdfLinkHref(linkMark) : null;
+  // A refused link keeps its text, without the link look or the annotation.
+  const marks = linkMark && !href ? node.marks?.filter((m) => m !== linkMark) : node.marks;
+  const style = applyMarks(marks, {});
+
+  if (href) {
     return (
       <Link key={getKey()} src={href} style={{ ...pdfStyles.link, ...style }}>
         {withEmojiFont(node.text || "")}
@@ -353,6 +374,19 @@ export const nodeRenderers: NodeRendererRegistry = {
         <View style={[pdfStyles.calloutContent, { color: TEXT_COLORS.primary }]}>{children}</View>
       </View>
     );
+  },
+
+  // An emoji node stores only its name ("rocket"). The character comes from the
+  // editor's bundled emoji set and is drawn as text with the node's marks, so
+  // it takes the emoji font inline in paragraphs, headings and table cells. A
+  // name the set does not know prints as `:name:`, as the editor shows it; a
+  // value that is not a shortcode prints nothing.
+  emoji: (node: TipTapNode, _children: ReactElement[], ctx: PDFRenderContext): ReactElement => {
+    const name = node.attrs?.name;
+    const emoji = emojiFromName(name);
+    const fallback = emojiName(name);
+    const text = emoji || (fallback ? `:${fallback}:` : "");
+    return renderTextWithMarks({ type: "text", text, marks: node.marks }, ctx.getKey);
   },
 
   mention: (node: TipTapNode, _children: ReactElement[], ctx: PDFRenderContext): ReactElement => {
