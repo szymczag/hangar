@@ -7,7 +7,7 @@
 import { Image, Link, Text, View } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { ReactElement } from "react";
-import { calloutEmojiFromUnicode, CORE_EXTENSIONS } from "@plane/editor/lib";
+import { calloutEmojiFromUnicode, CORE_EXTENSIONS, emojiFromName, emojiName } from "@plane/editor/lib";
 import { isAssetId, isSafePdfImageDataUri } from "@/lib/asset-fetch-security";
 import { BACKGROUND_COLORS, EDITOR_BACKGROUND_COLORS, resolveColorForPdf, TEXT_COLORS } from "./colors";
 import { withEmojiFont } from "./emoji";
@@ -353,6 +353,19 @@ export const nodeRenderers: NodeRendererRegistry = {
         <View style={[pdfStyles.calloutContent, { color: TEXT_COLORS.primary }]}>{children}</View>
       </View>
     );
+  },
+
+  // An emoji node stores only its name ("rocket"). The character comes from the
+  // editor's bundled emoji set and is drawn as text with the node's marks, so
+  // it takes the emoji font inline in paragraphs, headings and table cells. A
+  // name the set does not know prints as `:name:`, as the editor shows it; a
+  // value that is not a shortcode prints nothing.
+  emoji: (node: TipTapNode, _children: ReactElement[], ctx: PDFRenderContext): ReactElement => {
+    const name = node.attrs?.name;
+    const emoji = emojiFromName(name);
+    const fallback = emojiName(name);
+    const text = emoji || (fallback ? `:${fallback}:` : "");
+    return renderTextWithMarks({ type: "text", text, marks: node.marks }, ctx.getKey);
   },
 
   mention: (node: TipTapNode, _children: ReactElement[], ctx: PDFRenderContext): ReactElement => {

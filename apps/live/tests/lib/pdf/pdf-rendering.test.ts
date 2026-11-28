@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { PDFParse } from "pdf-parse";
 import { convertHTMLDocumentToAllFormats } from "@plane/editor/server";
 import { renderPlaneDocToPdfBuffer } from "@/lib/pdf";
-import type { TipTapDocument, PDFExportMetadata } from "@/lib/pdf";
+import type { TipTapDocument, TipTapNode, PDFExportMetadata } from "@/lib/pdf";
 
 const PDF_HEADER = "%PDF-";
 
@@ -43,6 +43,17 @@ const callout = (attrs: Record<string, unknown>): TipTapDocument => ({
 /** A document holding one paragraph with the given inline content. */
 const paragraph = (content: TipTapDocument["content"]): TipTapDocument => ({
   type: "doc",
+  content: [{ type: "paragraph", content }],
+});
+
+/** An inline emoji node as the editor stores it: the name only. */
+const emojiNode = (name: unknown, marks?: TipTapNode["marks"]): TipTapNode => ({
+  type: "emoji",
+  attrs: { name },
+  ...(marks ? { marks } : {}),
+});
+const cell = (type: "tableHeader" | "tableCell", content: TipTapNode[]): TipTapNode => ({
+  type,
   content: [{ type: "paragraph", content }],
 });
 
@@ -877,6 +888,100 @@ describe("PDF Rendering Integration", () => {
       const buffer = await renderPlaneDocToPdfBuffer(paragraph([{ type: "text", text: "Plain text 123 #*" }]));
 
       expect(embeddedFonts(buffer)).not.toContain("NotoEmoji-Regular");
+    });
+  });
+
+  describe("emoji nodes", () => {
+    it("should draw emoji nodes in a paragraph, a heading and a table cell from the emoji font", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Launch " }, emojiNode("rocket"), { type: "text", text: " today" }],
+          },
+          {
+            type: "heading",
+            attrs: { level: 2 },
+            content: [{ type: "text", text: "Done " }, emojiNode("white_check_mark")],
+          },
+          {
+            type: "table",
+            content: [
+              { type: "tableRow", content: [cell("tableHeader", [emojiNode("+1")])] },
+              { type: "tableRow", content: [cell("tableCell", [{ type: "text", text: "Party " }, emojiNode("tada")])] },
+            ],
+          },
+        ],
+      });
+      const text = await extractPdfText(buffer);
+
+      for (const emoji of ["🚀", "✅", "👍", "🎉"]) expect(text).toContain(emoji);
+      expect(text).toContain("Launch");
+      expect(text).toContain("today");
+      expect(text).toContain("Party");
+      for (const name of ["rocket", "white_check_mark", "+1", "tada"]) expect(text).not.toContain(name);
+      const fonts = embeddedFonts(buffer);
+      expect(fonts).toContain("NotoEmoji-Regular");
+      expect(fonts.filter((font) => font.startsWith("Helvetica"))).toEqual([]);
+    });
+
+    it("should keep the marks of an emoji node", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        paragraph([emojiNode("rocket", [{ type: "bold" }, { type: "link", attrs: { href: "https://example.com" } }])])
+      );
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain("🚀");
+      expect(embeddedFonts(buffer)).toContain("NotoEmoji-Regular");
+    });
+
+    it("should print an unknown emoji name as the editor shows it", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(
+        paragraph([{ type: "text", text: "Before " }, emojiNode("not_an_emoji_name"), { type: "text", text: " after" }])
+      );
+      const text = await extractPdfText(buffer);
+
+      expect(text).toContain(":not_an_emoji_name:");
+      expect(text).toContain("Before");
+      expect(text).toContain("after");
+      expect(embeddedFonts(buffer)).not.toContain("NotoEmoji-Regular");
+    });
+
+    it.each([
+      ["markup", "<script>alert(1)</script>"],
+      ["a code point number", "128640"],
+      ["the character itself", "🚀"],
+      ["an over-long name", "a".repeat(100_000)],
+      ["a newline", "rocket\nsmile"],
+      ["a number", 128640],
+      ["an object", { name: "rocket" }],
+      ["an array", ["rocket"]],
+      ["null", null],
+      ["undefined", undefined],
+    ])(
+      "should export a document with an emoji node holding %s without failing",
+      async (_label, name) => {
+        const buffer = await renderPlaneDocToPdfBuffer(
+          paragraph([{ type: "text", text: "Before " }, emojiNode(name), { type: "text", text: " after" }])
+        );
+        const text = await extractPdfText(buffer);
+
+        expect(text).toContain("Before");
+        expect(text).toContain("after");
+        expect(text).not.toContain("<script>");
+        expect(text).not.toContain("aaaaaaaa");
+        expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
+        expect(text).not.toContain("128640");
+        expect(text).not.toContain(":");
+      },
+      20_000
+    );
+
+    it("should export an emoji node without attributes", async () => {
+      const buffer = await renderPlaneDocToPdfBuffer(paragraph([{ type: "text", text: "Alone" }, { type: "emoji" }]));
+
+      expect(await extractPdfText(buffer)).toContain("Alone");
     });
   });
 

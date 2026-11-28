@@ -17,6 +17,13 @@ const ICON_NAME = /^[A-Za-z0-9_-]+$/;
 const emoji = emojiRegex();
 /** Exactly one emoji, sequences included (skin tones, ZWJ families, keycaps, flags). */
 const SINGLE_EMOJI = new RegExp(`^(?:${emoji.source})$`, emoji.flags.replace("g", ""));
+// No emoji sequence comes close; the cap keeps the regex off arbitrarily long input.
+const MAX_EMOJI_LENGTH = 64;
+
+/** Whether `text` is exactly one emoji, sequences included. */
+export function isSingleEmoji(text: string): boolean {
+  return text.length > 0 && text.length <= MAX_EMOJI_LENGTH && SINGLE_EMOJI.test(text);
+}
 
 /**
  * Turns a callout's `data-emoji-unicode` attribute, the emoji's code points as
@@ -52,7 +59,7 @@ export function calloutEmojiFromUnicode(value: unknown): string {
   if (!codePoints.every((n) => Number.isSafeInteger(n) && n <= MAX_CODE_POINT)) return "";
   try {
     const text = String.fromCodePoint(...codePoints);
-    return SINGLE_EMOJI.test(text) ? text : "";
+    return isSingleEmoji(text) ? text : "";
   } catch {
     // Not reachable with the bounds above; page content must never fail a caller.
     return "";

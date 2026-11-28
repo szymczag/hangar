@@ -4,11 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import { gitHubEmojis, shortcodeToEmoji } from "@tiptap/extension-emoji";
+import { shortcodeToEmoji } from "@tiptap/extension-emoji";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { MarkdownSerializerState } from "prosemirror-markdown";
 // local imports
 import { Emoji } from "./emoji";
+import { EDITOR_EMOJIS } from "./emoji-data";
 
 /**
  * The emoji node with its emoji data and markdown serializer, without the
@@ -35,8 +36,6 @@ export const EmojiExtensionConfig = Emoji.extend({
     };
   },
 }).configure({
-  // Filter out emojis without emoji value and remove fallbackImage property to prevent CDN calls
-
-  emojis: gitHubEmojis.filter((item) => item.emoji).map(({ fallbackImage, ...emoji }) => emoji),
+  emojis: EDITOR_EMOJIS,
   enableEmoticons: true,
 });
